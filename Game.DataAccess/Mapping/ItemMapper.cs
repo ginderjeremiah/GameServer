@@ -18,6 +18,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 Category = (EItemCategory)entity.ItemCategoryId,
                 Rarity = (ERarity)entity.RarityId,
+                GrantedSkillId = entity.GrantedSkillId,
                 Attributes = entity.ItemAttributes
                     .Select(ia => new AttributeModifier
                     {
@@ -67,6 +68,7 @@ namespace Game.DataAccess.Mapping
                 ItemCategoryId = (EItemCategory)entity.ItemCategoryId,
                 RarityId = (ERarity)entity.RarityId,
                 IconPath = entity.IconPath,
+                GrantedSkillId = entity.GrantedSkillId,
                 Attributes = entity.ItemAttributes
                     .Select(ia => new Contracts.BattlerAttribute
                     {

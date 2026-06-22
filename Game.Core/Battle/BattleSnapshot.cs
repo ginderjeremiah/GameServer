@@ -89,9 +89,23 @@ namespace Game.Core.Battle
         public Battler ToBattler(Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
         {
             var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod));
-            var skills = SkillIds.Select(resolveSkill);
+            var skills = GetBattleSkillIds(resolveItem).Select(resolveSkill);
 
             return new Battler(attributes, skills, Level);
+        }
+
+        /// <summary>
+        /// The ordered, de-duplicated ids of the skills this snapshot's battler fights with: the captured
+        /// selected skills first, then the skills granted by the equipped items in
+        /// <see cref="EEquipmentSlot"/> order (the order <see cref="FromPlayer"/> captured them in). The
+        /// granted ids are derived here from the already-captured <see cref="EquippedItems"/> — no extra
+        /// snapshot field — exactly as the item attributes are. Ordering and de-duplication are delegated to
+        /// <see cref="BattleLoadout.OrderSkillIds"/>, the single rule the frontend mirrors for battle parity.
+        /// </summary>
+        public IEnumerable<int> GetBattleSkillIds(Func<int, Item> resolveItem)
+        {
+            var grantedSkillIds = EquippedItems.SelectNotNull(equipped => resolveItem(equipped.ItemId).GrantedSkillId);
+            return BattleLoadout.OrderSkillIds(SkillIds, grantedSkillIds);
         }
 
         /// <summary>

@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, EItemCategory, EItemModType, ERarity } from '$lib/api';
+import { EAttribute, EItemCategory, EItemModType, ERarity, ESkillAcquisition, type ISkill } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import type { Item } from '$lib/battle';
+import { staticData } from '$stores';
 import ItemTooltip from '$routes/game/screens/inventory/ItemTooltip.svelte';
 
 // A weapon with one prefix and one suffix mod applied. `totalAttributes` is built
@@ -58,7 +59,22 @@ const makeItem = (): Item => {
 	} as unknown as Item;
 };
 
-afterEach(cleanup);
+const skill = (id: number, name: string): ISkill => ({
+	id,
+	name,
+	baseDamage: 0,
+	damageMultipliers: [],
+	effects: [],
+	description: '',
+	cooldownMs: 1000,
+	iconPath: '',
+	acquisition: ESkillAcquisition.Item
+});
+
+afterEach(() => {
+	cleanup();
+	staticData.skills = undefined;
+});
 
 describe('ItemTooltip', () => {
 	it('accents the tooltip border by rarity, not category', () => {
@@ -97,6 +113,28 @@ describe('ItemTooltip', () => {
 		expect(tiles).toHaveLength(2);
 		expect(tiles[0].getAttribute('style')).toContain('var(--rarity-legendary)');
 		expect(tiles[1].getAttribute('style')).toContain('var(--rarity-rare)');
+	});
+
+	it('shows the innate skill an item grants while equipped', () => {
+		staticData.skills = [skill(0, 'Cleave'), skill(1, 'Fireball')];
+		const item = { ...makeItem(), grantedSkillId: 1 } as unknown as Item;
+		const { container } = render(ItemTooltip, { props: { item } });
+		const text = container.textContent ?? '';
+		expect(text).toContain('Grants');
+		expect(text).toContain('Fireball');
+	});
+
+	it('omits the Grants section when the item grants no skill', () => {
+		staticData.skills = [skill(0, 'Cleave')];
+		const { container } = render(ItemTooltip, { props: { item: makeItem() } });
+		expect(container.textContent).not.toContain('Grants');
+	});
+
+	it('omits the Grants section when the item is masked (sealed teaser)', () => {
+		staticData.skills = [skill(0, 'Cleave'), skill(1, 'Fireball')];
+		const item = { ...makeItem(), grantedSkillId: 1 } as unknown as Item;
+		const { container } = render(ItemTooltip, { props: { item, masked: true } });
+		expect(container.textContent).not.toContain('Fireball');
 	});
 
 	it('hides the panel and renders nothing while no item is hovered', () => {

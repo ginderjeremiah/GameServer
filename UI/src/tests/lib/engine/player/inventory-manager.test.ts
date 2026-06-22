@@ -56,13 +56,14 @@ import { InventoryManager, EEquipmentSlot, getEquipmentSlotForCategory } from '$
 import { logMessage } from '$lib/engine/log';
 import type { IInventoryItem } from '$lib/api';
 
-const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon): IItem => ({
+const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon, grantedSkillId?: number): IItem => ({
 	id,
 	name: `Item ${id}`,
 	description: `Description ${id}`,
 	itemCategoryId: category,
 	rarityId: ERarity.Common,
 	iconPath: `/icons/${id}.png`,
+	grantedSkillId,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
 	modSlots: [],
 	tags: []
@@ -257,6 +258,55 @@ describe('InventoryManager', () => {
 
 			// The optimistic equip is reverted on the failed persist, so the cache must follow it back.
 			expect(manager.equipmentStats).toEqual([]);
+		});
+	});
+
+	describe('grantedSkillIds', () => {
+		it('returns empty when nothing is equipped', () => {
+			manager.initialize();
+			expect(manager.grantedSkillIds).toEqual([]);
+		});
+
+		it('gathers the equipped items granted skills in EEquipmentSlot order', () => {
+			// Equip in reverse slot order (accessory first) to prove the gather follows slot index, not equip order.
+			mockItems[1] = makeItem(1, EItemCategory.Accessory, 7);
+			mockItems[2] = makeItem(2, EItemCategory.Helm, 3);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.AccessorySlot }),
+				makeInventoryItem({ itemId: 2, equipped: true, equipmentSlotId: EEquipmentSlot.HelmSlot })
+			];
+
+			manager.initialize();
+
+			// Helm (slot 0) before Accessory (slot 5).
+			expect(manager.grantedSkillIds).toEqual([3, 7]);
+		});
+
+		it('skips equipped items that grant no skill', () => {
+			mockItems[1] = makeItem(1, EItemCategory.Weapon); // no grant
+			mockItems[2] = makeItem(2, EItemCategory.Helm, 4);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot }),
+				makeInventoryItem({ itemId: 2, equipped: true, equipmentSlotId: EEquipmentSlot.HelmSlot })
+			];
+
+			manager.initialize();
+
+			expect(manager.grantedSkillIds).toEqual([4]);
+		});
+
+		it('reassigns a fresh list when equipment changes (so the battle reset re-derives)', async () => {
+			mockItems[1] = makeItem(1, EItemCategory.Weapon, 9);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+
+			const before = manager.grantedSkillIds;
+			expect(before).toEqual([]);
+
+			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+
+			expect(manager.grantedSkillIds).not.toBe(before);
+			expect(manager.grantedSkillIds).toEqual([9]);
 		});
 	});
 

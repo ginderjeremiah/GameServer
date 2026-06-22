@@ -171,6 +171,115 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(9, battler.GetAttributeValue(EAttribute.Strength));
         }
 
+        // ── Item-granted skills (append + order + dedupe) ────────────────────
+
+        [Fact]
+        public void ToBattler_AppendsEquippedItemGrantedSkillAfterSelected()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] }],
+                SkillIds = [2],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, grantedSkillId: 3)),
+                ThrowMod,
+                SkillResolver(MakeSkill(2), MakeSkill(3)));
+
+            // Selected skill first, then the item's granted skill.
+            Assert.Equal([2, 3], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_ItemWithoutGrant_AddsOnlySelectedSkills()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] }],
+                SkillIds = [2],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, grantedSkillId: null)),
+                ThrowMod,
+                SkillResolver(MakeSkill(2)));
+
+            Assert.Equal([2], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_GrantedSkillsFollowEquippedItemOrder()
+        {
+            // EquippedItems is captured in EEquipmentSlot order by FromPlayer, so the granted skills follow
+            // that order: the first item's grant before the second's.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems =
+                [
+                    new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] },
+                    new EquippedItemSnapshot { ItemId = 2, AppliedModIds = [] },
+                ],
+                SkillIds = [5],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, grantedSkillId: 6), MakeItem(2, grantedSkillId: 7)),
+                ThrowMod,
+                SkillResolver(MakeSkill(5), MakeSkill(6), MakeSkill(7)));
+
+            Assert.Equal([5, 6, 7], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_GrantedSkillDuplicatingSelected_AppearsOnce()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] }],
+                SkillIds = [3],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, grantedSkillId: 3)),
+                ThrowMod,
+                SkillResolver(MakeSkill(3)));
+
+            // The grant duplicates the selected skill, so it is fielded once (first occurrence wins).
+            Assert.Equal([3], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_TwoItemsGrantingSameSkill_AppearsOnce()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems =
+                [
+                    new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] },
+                    new EquippedItemSnapshot { ItemId = 2, AppliedModIds = [] },
+                ],
+                SkillIds = [],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, grantedSkillId: 9), MakeItem(2, grantedSkillId: 9)),
+                ThrowMod,
+                SkillResolver(MakeSkill(9)));
+
+            Assert.Equal([9], battler.Skills.Select(s => s.Skill.Id));
+        }
+
         // ── Round-trip parity with the live Player battler ───────────────────
         // The snapshot path must reconstruct exactly the same attributes the live Player aggregate
         // composes — this is the frontend/backend battle-parity (anti-cheat) guarantee.
@@ -229,12 +338,39 @@ namespace Game.Core.Tests.Battle
             AssertBattlerParity(player, ItemResolver(item), ModResolver(prefix, suffix), ThrowSkill);
         }
 
+        [Fact]
+        public void RoundTrip_ItemGrantedSkills_MatchSlotOrderedLivePlayerBattler()
+        {
+            // Two items granting skills, equipped in reverse slot order (accessory first, then helm), plus a
+            // selected skill. Both the live and snapshot paths must field: selected, then the grants in
+            // EEquipmentSlot order (helm before accessory) — proving the slot-ordered assembly round-trips.
+            var helm = MakeItem(1, category: EItemCategory.Helm, grantedSkillId: 6);
+            var accessory = MakeItem(2, category: EItemCategory.Accessory, grantedSkillId: 7);
+            var selected = MakeSkill(5);
+            var helmSkill = MakeSkill(6);
+            var accessorySkill = MakeSkill(7);
+
+            var player = MakePlayer(level: 4, allocations: [Alloc(EAttribute.Strength, 3)], selectedSkills: [selected]);
+            EquipInSlot(player, accessory, EEquipmentSlot.AccessorySlot);
+            EquipInSlot(player, helm, EEquipmentSlot.HelmSlot);
+
+            AssertBattlerParity(player,
+                ItemResolver(helm, accessory),
+                ThrowMod,
+                SkillResolver(selected, helmSkill, accessorySkill));
+
+            // Pin the exact ordered set so a divergence is reported directly rather than only via parity.
+            var battler = BattleSnapshot.FromPlayer(player)
+                .ToBattler(ItemResolver(helm, accessory), ThrowMod, SkillResolver(selected, helmSkill, accessorySkill));
+            Assert.Equal([5, 6, 7], battler.Skills.Select(s => s.Skill.Id));
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static void AssertBattlerParity(Player player,
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
         {
-            var liveBattler = BattlerFactory.FromPlayer(player);
+            var liveBattler = BattlerFactory.FromPlayer(player, resolveSkill);
             var snapshotBattler = BattleSnapshot.FromPlayer(player)
                 .ToBattler(resolveItem, resolveMod, resolveSkill);
 
@@ -265,6 +401,12 @@ namespace Game.Core.Tests.Battle
         {
             player.UnlockItem(item);
             player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot);
+        }
+
+        private static void EquipInSlot(Player player, Item item, EEquipmentSlot slot)
+        {
+            player.UnlockItem(item);
+            player.TryEquipItem(item.Id, slot);
         }
 
         private static void EquipWithMod(Player player, Item item, ItemMod mod, int modSlotIndex)
@@ -303,13 +445,15 @@ namespace Game.Core.Tests.Battle
             id => throw new InvalidOperationException($"Unexpected skill resolve for {id}");
 
         private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory,
-            List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null) => new()
+            List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null,
+            int? grantedSkillId = null) => new()
             {
                 Id = id,
                 Name = $"Item {id}",
                 Description = string.Empty,
                 Category = category,
                 Rarity = ERarity.Common,
+                GrantedSkillId = grantedSkillId,
                 Attributes = attributes ?? [],
                 ModSlots = modSlots ?? [],
             };

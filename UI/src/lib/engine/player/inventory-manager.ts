@@ -58,6 +58,14 @@ export class InventoryManager {
 	 */
 	private equipmentStatsCache: IBattlerAttribute[] = [];
 
+	/**
+	 * Memoised ids of the skills the equipped items grant, gathered in EEquipmentSlot order (the slot index
+	 * order of {@link equippedSlots}). Rebuilt alongside {@link equipmentStats} on every equip/unequip/mod
+	 * mutation, so the battle reset reads a stable, slot-ordered list to append to the player's loadout
+	 * (de-duplicated against the selected skills in {@link Battler}).
+	 */
+	private grantedSkillIdsCache: number[] = [];
+
 	/** Tail of the optimistic-mutation queue; each mutation chains off it so rollback baselines never interleave. */
 	private lastOperation: Promise<unknown> = Promise.resolve();
 
@@ -103,19 +111,32 @@ export class InventoryManager {
 		return this.equipmentStatsCache;
 	}
 
-	/** Rebuilds the memoised {@link equipmentStats} from the currently equipped items + their mods.
-	 *  Called after every mutation that can change them (and after a rollback restores the prior state). */
+	/** Ids of the skills the equipped items grant, in EEquipmentSlot order (memoised — recomputed only by
+	 *  {@link refreshEquipmentStats} on an equip/unequip/mod change). The battle build appends these to the
+	 *  player's loadout, de-duplicated against the selected skills. */
+	public get grantedSkillIds(): number[] {
+		return this.grantedSkillIdsCache;
+	}
+
+	/** Rebuilds the memoised {@link equipmentStats} and {@link grantedSkillIds} from the currently equipped
+	 *  items + their mods. Called after every mutation that can change them (and after a rollback restores
+	 *  the prior state). Reassigns both caches so the battle reset's by-reference change detection fires. */
 	private refreshEquipmentStats() {
 		const stats: IBattlerAttribute[] = [];
+		const grantedSkillIds: number[] = [];
 		for (const item of this.equippedSlots) {
 			if (item) {
 				stats.push(...item.attributes);
 				for (const mod of item.appliedMods) {
 					stats.push(...mod.attributes);
 				}
+				if (item.grantedSkillId != null) {
+					grantedSkillIds.push(item.grantedSkillId);
+				}
 			}
 		}
 		this.equipmentStatsCache = stats;
+		this.grantedSkillIdsCache = grantedSkillIds;
 	}
 
 	public equipItem(itemId: number, slotId: EEquipmentSlot): Promise<boolean> {

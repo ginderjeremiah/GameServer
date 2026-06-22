@@ -9,12 +9,17 @@
         public required string IconPath { get; set; }
         public int RarityId { get; set; }
 
+        /// <summary>The skill this item grants while equipped, or null for none. Mirrors
+        /// <see cref="Challenge.RewardSkillId"/>: the id is the only persisted link (an optional FK).</summary>
+        public int? GrantedSkillId { get; set; }
+
         /// <summary>When set, the record is <em>retired</em>: out of circulation for new acquisition but
         /// kept at its slot and resolvable by id so existing references stay valid. Null while active.</summary>
         public DateTime? RetiredAt { get; set; }
 
         public virtual ItemCategory ItemCategory { get => field ?? throw new NotLoadedException(nameof(ItemCategory)); set; }
         public virtual Rarity Rarity { get => field ?? throw new NotLoadedException(nameof(Rarity)); set; }
+        public virtual Skill? GrantedSkill { get; set; }
 
         public virtual List<ItemAttribute> ItemAttributes { get => field ?? throw new NotLoadedException(nameof(ItemAttributes)); set; }
         public virtual List<ItemModSlot> ItemModSlots { get => field ?? throw new NotLoadedException(nameof(ItemModSlots)); set; }

@@ -1,5 +1,6 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
+using Game.Core;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -11,14 +12,25 @@ namespace Game.DataAccess.Repositories.Admin
     /// on <see cref="ITagAssignmentQueries"/>; all writes go through the entity store. Changes are staged on
     /// the unit of work; the per-action commit filter persists them.
     /// </summary>
-    internal class AdminItems(IItemEntityCache items, ITagAssignmentQueries tags, IEntityStore entityStore) : IAdminItems
+    internal class AdminItems(
+        IItemEntityCache items, ISkillEntityCache skills, ITagAssignmentQueries tags, IEntityStore entityStore)
+        : IAdminItems
     {
         private readonly IItemEntityCache _items = items;
+        private readonly ISkillEntityCache _skills = skills;
         private readonly ITagAssignmentQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
         public AdminSaveResult SaveItems(IReadOnlyList<Change<Contracts.Item>> changes)
         {
+            // Authoring guard (anti-tamper): a skill an item grants must declare itself Item-acquirable. The
+            // flag is the declared intent; this reference is the reality, so the save bridges them — rejected
+            // up front before anything is staged (a tampered admin client can't bypass the filtered picker).
+            if (FindGrantedSkillFlagViolation(changes) is { } rejection)
+            {
+                return rejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Item
                 {
@@ -27,6 +39,7 @@ namespace Game.DataAccess.Repositories.Admin
                     ItemCategoryId = (int)item.ItemCategoryId,
                     RarityId = (int)item.RarityId,
                     IconPath = item.IconPath,
+                    GrantedSkillId = item.GrantedSkillId,
                 }),
                 // Build a fresh, navigation-free entity rather than mutating the cached one, whose loaded
                 // graph would otherwise be dragged into the change tracker.
@@ -38,6 +51,7 @@ namespace Game.DataAccess.Repositories.Admin
                     ItemCategoryId = (int)item.ItemCategoryId,
                     RarityId = (int)item.RarityId,
                     IconPath = item.IconPath,
+                    GrantedSkillId = item.GrantedSkillId,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
@@ -45,6 +59,36 @@ namespace Game.DataAccess.Repositories.Admin
                 // An edit must target an existing item; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _items.LookupItem(item.Id) is not null);
+        }
+
+        /// <summary>
+        /// Returns a rejection for the first added/edited item whose <c>GrantedSkillId</c> targets a skill
+        /// that is not <see cref="ESkillAcquisition.Item"/>-flagged (or does not exist), or null when every
+        /// granted skill is valid. Deletes carry no grant and are skipped.
+        /// </summary>
+        private AdminSaveResult? FindGrantedSkillFlagViolation(IReadOnlyList<Change<Contracts.Item>> changes)
+        {
+            foreach (var change in changes)
+            {
+                if (change.ChangeType == EChangeType.Delete || change.Item.GrantedSkillId is not { } skillId)
+                {
+                    continue;
+                }
+
+                var skill = _skills.LookupSkill(skillId);
+                if (skill is null)
+                {
+                    return AdminSaveResult.Failure($"Granted skill {skillId} does not exist.");
+                }
+
+                if (!((ESkillAcquisition)skill.Acquisition).HasFlag(ESkillAcquisition.Item))
+                {
+                    return AdminSaveResult.Failure(
+                        $"Skill '{skill.Name}' is not flagged as Item-acquirable and cannot be granted by an item.");
+                }
+            }
+
+            return null;
         }
 
         public AdminSaveResult SetAttributes(AddEditAttributesData data)

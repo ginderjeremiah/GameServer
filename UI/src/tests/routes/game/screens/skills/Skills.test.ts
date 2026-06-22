@@ -43,7 +43,10 @@ const {
 	};
 	return {
 		mockPlayerManager: playerManager,
-		mockInventoryManager: { equipmentStats: [] as { attributeId: number; amount: number }[] },
+		mockInventoryManager: {
+			equipmentStats: [] as { attributeId: number; amount: number }[],
+			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[]
+		},
 		sendSocketCommand: vi.fn(),
 		toastError: vi.fn(),
 		// The rail registers a ChallengeTooltip; the registration is stubbed and the tooltip

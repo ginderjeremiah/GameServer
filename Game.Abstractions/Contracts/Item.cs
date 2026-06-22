@@ -15,6 +15,10 @@ namespace Game.Abstractions.Contracts
         public required IEnumerable<ItemModSlot> ModSlots { get; set; }
         public required IEnumerable<int> Tags { get; set; }
 
+        /// <summary>The id of the skill this item grants while equipped (authoring intent: the skill must be
+        /// <see cref="ESkillAcquisition.Item"/>-flagged, enforced on save), or null for none.</summary>
+        public int? GrantedSkillId { get; set; }
+
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
         /// Null while active.</summary>
         public DateTime? RetiredAt { get; set; }

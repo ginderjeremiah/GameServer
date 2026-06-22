@@ -30,6 +30,13 @@
 		</TooltipSection>
 	{/if}
 
+	<!-- Grants — the innate skill the item adds to the loadout while equipped -->
+	{#if !masked && grantedSkillName}
+		<TooltipSection label="Grants">
+			<span class="granted-skill">{grantedSkillName}</span>
+		</TooltipSection>
+	{/if}
+
 	<!-- Description — masked teaser shows even when the real item has none -->
 	{#if masked || item?.description}
 		<TooltipSection label="Description" last>
@@ -41,6 +48,7 @@
 <script lang="ts">
 import type { Item } from '$lib/battle';
 import { composeItemName, itemCategoryColor, itemCategoryName, rarityColor } from '$lib/common';
+import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
@@ -75,6 +83,11 @@ const modSlots = $derived(
 );
 const filledCount = $derived(modSlots.filter((s) => s.mod).length);
 
+// The innate skill this item grants while equipped, resolved by id from the cached skill catalogue.
+const grantedSkillName = $derived(
+	item?.grantedSkillId != null ? staticData.skills?.[item.grantedSkillId]?.name : undefined
+);
+
 // The tooltip's main accent (left border) reflects the item's rarity, while the
 // category row (diamond + label) stays category-coloured — mirroring how
 // ModTooltip accents its border by rarity and its diamond/label by mod type.
@@ -88,3 +101,11 @@ const displayName = $derived(item ? composeItemName(item.name, item.appliedMods)
 const STAT_BAR_WIDTHS = [78, 60, 92, 70];
 const DESC_LINE_WIDTHS = [236, 188];
 </script>
+
+<style lang="scss">
+.granted-skill {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--text-primary);
+}
+</style>

@@ -64,6 +64,17 @@ export interface SkillMetrics {
 	source?: IChallenge;
 }
 
+/** A read-only innate skill granted by an equipped item — shown in the loadout band but not selectable,
+ *  removable, or reorderable. Its presence and order follow the equipped gear, not the player's loadout. */
+export interface InnateSkill {
+	skill: ISkill;
+	/** The equipped item granting it, labelling the read-only card with its source. */
+	sourceItemName: string;
+	/** True when this grant duplicates a selected skill (or an earlier grant): it is already in the loadout
+	 *  and fielded once, surfaced so the dropped duplicate isn't silently invisible. */
+	duplicate: boolean;
+}
+
 /** A Compare-vs quick-pick: an enemy from the current zone whose flat Defense snaps the slider. */
 export interface ComparePreset {
 	/** Stable identity — distinguishes the boss pill from a same-id idle-spawn pill. */
@@ -268,6 +279,31 @@ export class SkillsView {
 
 	/** Available (unequipped) rail rows, in the active sort order. */
 	readonly availableRail = $derived(this.railList.filter((m) => !this.isEquipped(m.skill.id)));
+
+	/** Skills granted by the equipped items (innate, always-active while equipped), in EEquipmentSlot order
+	 *  — read-only loadout entries additive to and exempt from the selectable cap. De-duplicated against the
+	 *  selected loadout and each other (first wins), mirroring the battle assembly: a duplicate is flagged so
+	 *  the band can surface "already in your loadout" rather than dropping it invisibly. */
+	readonly innateSkills = $derived.by<InnateSkill[]>(() => {
+		const skills = staticData.skills ?? [];
+		// A transient local set (selected ids field these grants), not reactive state.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const seen = new Set(this.equipped);
+		const result: InnateSkill[] = [];
+		for (const item of inventoryManager.equippedSlots) {
+			if (!item || item.grantedSkillId == null) {
+				continue;
+			}
+			const skill = skills[item.grantedSkillId];
+			if (!skill) {
+				continue;
+			}
+			const duplicate = seen.has(item.grantedSkillId);
+			seen.add(item.grantedSkillId);
+			result.push({ skill, sourceItemName: item.name, duplicate });
+		}
+		return result;
+	});
 
 	/** Metrics for the inspected skill, falling back to the first listed skill. */
 	readonly selected = $derived(this.metricsById[this.selectedId] ?? this.railList[0]);
