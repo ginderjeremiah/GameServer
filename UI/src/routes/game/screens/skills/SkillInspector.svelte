@@ -133,15 +133,20 @@ const rawNote = $derived.by(() => {
 	if (!metrics) {
 		return '';
 	}
-	const raw = fmt(view.rawDamage(metrics.skill.id));
+	const id = metrics.skill.id;
+	const raw = fmt(view.rawDamage(id));
+	// Surface the expected crit contribution inline so the note reconciles with the breakdown's
+	// Critical row and the crit-inclusive effective hit; omitted when no crit can occur.
+	const critBonus = view.critBonus(id);
+	const critPart = critBonus > 0 ? ` · +${fmt(critBonus)} crit` : '';
 	if (view.defense <= 0) {
-		return `${raw} raw damage · target has no defense`;
+		return `${raw} raw damage${critPart} · target has no defense`;
 	}
-	const applied = fmt(view.appliedDefense(metrics.skill.id));
-	if (view.effective(metrics.skill.id) === 0) {
-		return `${raw} raw − ${applied} def · fully blocked`;
+	const applied = fmt(view.appliedDefense(id));
+	if (view.effective(id) === 0) {
+		return `${raw} raw${critPart} − ${applied} def · fully blocked`;
 	}
-	return `${raw} raw − ${applied} def`;
+	return `${raw} raw${critPart} − ${applied} def`;
 });
 </script>
 

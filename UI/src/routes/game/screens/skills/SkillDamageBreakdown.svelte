@@ -15,6 +15,16 @@
 	{:else}
 		<div class="d-desc">No attribute scaling.</div>
 	{/if}
+	{#if view.critChance > 0}
+		<div class="brk-line crit">
+			<span class="brk-k">
+				<AttributeIcon id={EAttribute.CriticalChance} size={12} />
+				Critical
+				<span class="crit-meta">{critChanceLabel} · ×{formatNum(view.critDamage)}</span>
+			</span>
+			<span class="brk-v">+{fmt(view.critBonus(metrics.skill.id))}</span>
+		</div>
+	{/if}
 	<div class="brk-line def">
 		<span class="brk-k">Enemy defense</span><span class="brk-v">−{fmt(view.appliedDefense(metrics.skill.id))}</span>
 	</div>
@@ -24,10 +34,12 @@
 </div>
 
 <script lang="ts">
-import { attributeColor, attributeName, formatNum } from '$lib/common';
+import { EAttribute } from '$lib/api';
+import { attributeColor, attributeName, formatAttributeValue, formatNum } from '$lib/common';
 import { staticData } from '$stores';
 import Bar from '$components/Bar.svelte';
 import AttributeChip from '$components/AttributeChip.svelte';
+import AttributeIcon from '$components/AttributeIcon.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -40,6 +52,11 @@ const { view, metrics }: Props = $props();
 const fmt = (n: number) => formatNum(Math.round(n));
 
 const maxContribution = $derived(Math.max(metrics.skill.baseDamage, ...metrics.contributions.map((c) => c.value), 1));
+
+// Crit chance in its display form (e.g. `5%`), honoring the attribute's `isPercentage`/`decimals`.
+const critChanceLabel = $derived(
+	formatAttributeValue(view.critChance, EAttribute.CriticalChance, staticData.attributes)
+);
 </script>
 
 <style lang="scss">
@@ -100,6 +117,22 @@ const maxContribution = $derived(Math.max(metrics.skill.baseDamage, ...metrics.c
 	.brk-v {
 		font-family: var(--mono);
 		font-size: 11.5px;
+	}
+
+	&.crit {
+		.brk-k {
+			display: inline-flex;
+			align-items: center;
+			gap: 5px;
+		}
+
+		.brk-v {
+			color: var(--success);
+		}
+	}
+
+	.crit-meta {
+		color: color-mix(in srgb, var(--text-primary) 45%, transparent);
 	}
 
 	&.def {
