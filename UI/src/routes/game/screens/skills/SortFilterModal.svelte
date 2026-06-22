@@ -38,21 +38,6 @@
 			</div>
 		{/if}
 
-		<div class="mgroup">
-			<div class="mrow">
-				<span class="ml">Show locked skills</span>
-				<button
-					type="button"
-					class="switch"
-					class:on={view.showLocked}
-					role="switch"
-					aria-checked={view.showLocked}
-					aria-label="Show locked skills"
-					onclick={() => view.toggleShowLocked()}
-				></button>
-			</div>
-		</div>
-
 		<div class="mfoot">
 			<button type="button" class="btn dim" onclick={() => view.resetFilters()}>Reset</button>
 			<button type="button" class="btn" onclick={() => (view.modalOpen = false)}>Apply</button>
@@ -140,50 +125,6 @@ h3 {
 		background: color-mix(in srgb, var(--ac) 22%, transparent);
 		border-color: var(--ac);
 		color: var(--text-primary);
-	}
-}
-
-.mrow {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: 9px 0;
-	border-bottom: 1px solid var(--border-subtle);
-
-	.ml {
-		font-size: 13.5px;
-	}
-}
-
-.switch {
-	position: relative;
-	width: 40px;
-	height: 21px;
-	border: 1px solid var(--border-medium);
-	border-radius: 20px;
-	background: transparent;
-	cursor: pointer;
-
-	&::after {
-		content: '';
-		position: absolute;
-		top: 2px;
-		left: 2px;
-		width: 15px;
-		height: 15px;
-		border-radius: 50%;
-		background: var(--text-muted);
-		transition: 0.12s;
-	}
-
-	&.on {
-		border-color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 22%, transparent);
-
-		&::after {
-			left: 21px;
-			background: var(--accent);
-		}
 	}
 }
 

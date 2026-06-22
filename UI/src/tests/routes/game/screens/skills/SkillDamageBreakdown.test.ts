@@ -33,7 +33,6 @@ const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
 
 const stubMetrics = (over: Partial<SkillMetrics> = {}): SkillMetrics => ({
 	skill: stubSkill(),
-	unlocked: true,
 	rawDamage: 50,
 	cooldown: 1,
 	contributions: [],
