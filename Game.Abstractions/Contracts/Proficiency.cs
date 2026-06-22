@@ -1,0 +1,26 @@
+namespace Game.Abstractions.Contracts
+{
+    /// <summary>Read/authoring contract for a proficiency in the reference-data catalogue. The child
+    /// collections are read projections; the identity save ignores them (they are persisted through the
+    /// dedicated relationship setters, mirroring the skill editor).</summary>
+    public class Proficiency : IModel
+    {
+        public int Id { get; set; }
+        public required string Name { get; set; }
+        public required string Description { get; set; }
+        public required string IconPath { get; set; }
+        public int MaxLevel { get; set; }
+        public decimal BaseXp { get; set; }
+        public decimal XpGrowth { get; set; }
+        public bool StartsUnlocked { get; set; }
+        public int? SeedSkillId { get; set; }
+
+        /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).</summary>
+        public DateTime? RetiredAt { get; set; }
+
+        public required IEnumerable<ProficiencyLevelModifier> LevelModifiers { get; set; }
+        public required IEnumerable<ProficiencyLevelReward> LevelRewards { get; set; }
+        public required IEnumerable<int> PrerequisiteIds { get; set; }
+        public required IEnumerable<SkillProficiencyContribution> Contributions { get; set; }
+    }
+}

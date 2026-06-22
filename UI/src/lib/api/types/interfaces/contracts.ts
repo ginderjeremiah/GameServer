@@ -91,6 +91,35 @@ export interface IItemModSlot {
 	itemModSlotTypeId: EItemModType;
 }
 
+export interface IProficiency {
+	id: number;
+	name: string;
+	description: string;
+	iconPath: string;
+	maxLevel: number;
+	baseXp: number;
+	xpGrowth: number;
+	startsUnlocked: boolean;
+	seedSkillId?: number;
+	retiredAt?: string;
+	levelModifiers: IProficiencyLevelModifier[];
+	levelRewards: IProficiencyLevelReward[];
+	prerequisiteIds: number[];
+	contributions: ISkillProficiencyContribution[];
+}
+
+export interface IProficiencyLevelModifier {
+	level: number;
+	attributeId: EAttribute;
+	modifierTypeId: EModifierType;
+	amount: number;
+}
+
+export interface IProficiencyLevelReward {
+	level: number;
+	rewardSkillId: number;
+}
+
 export interface ISkill {
 	id: number;
 	name: string;
@@ -114,6 +143,11 @@ export interface ISkillEffect {
 	durationMs: number;
 	scalingAttributeId: EAttribute;
 	scalingAmount: number;
+}
+
+export interface ISkillProficiencyContribution {
+	skillId: number;
+	weight: number;
 }
 
 export interface ITag {

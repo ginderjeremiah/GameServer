@@ -1,10 +1,12 @@
 using Game.Abstractions.DataAccess;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using Entities = Game.Infrastructure.Entities;
 
 namespace Game.Application.Tests.DataAccess
 {
@@ -90,6 +92,57 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(skillId, first.Id);
             Assert.Equal("Shared Skill", first.Name);
             Assert.NotEmpty(first.DamageMultipliers);
+        }
+
+        [Fact]
+        public async Task GetProficiency_ReturnsSharedInstanceAndCorrectData()
+        {
+            int proficiencyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var proficiency = new Entities.Proficiency
+                {
+                    Name = "Shared Proficiency",
+                    Description = "",
+                    IconPath = "",
+                    MaxLevel = 10,
+                    BaseXp = 100m,
+                    XpGrowth = 2m,
+                    StartsUnlocked = true,
+                    LevelModifiers = [],
+                    LevelRewards = [],
+                    Prerequisites = [],
+                    SkillContributions = [],
+                };
+                context.Proficiencies.Add(proficiency);
+                await context.SaveChangesAsync(CancellationToken);
+                proficiencyId = proficiency.Id;
+
+                context.ProficiencyLevelModifiers.Add(new Entities.ProficiencyLevelModifier
+                {
+                    ProficiencyId = proficiencyId,
+                    Level = 1,
+                    AttributeId = (int)EAttribute.Strength,
+                    ModifierType = (int)EModifierType.Additive,
+                    Amount = 1m,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+
+            var first = proficiencies.GetProficiency(proficiencyId);
+            var second = proficiencies.GetProficiency(proficiencyId);
+
+            // The optimization: repeated reads hand back the same pre-materialized instance, not a fresh graph.
+            Assert.Same(first, second);
+            Assert.Equal(proficiencyId, first.Id);
+            Assert.Equal("Shared Proficiency", first.Name);
+            Assert.NotEmpty(first.Levels);
         }
 
         [Fact]
