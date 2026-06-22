@@ -3,6 +3,7 @@ using Game.DataAccess.Mapping;
 using Game.DataAccess.Repositories.Caching;
 using Game.Infrastructure.Entities;
 using Contracts = Game.Abstractions.Contracts;
+using CorePath = Game.Core.Proficiencies.Path;
 using CoreProficiency = Game.Core.Proficiencies.Proficiency;
 using Path = Game.Infrastructure.Entities.Path;
 using SkillContribution = Game.Core.Proficiencies.SkillContribution;
@@ -46,6 +47,11 @@ namespace Game.DataAccess.Repositories
         {
             // Returns the snapshot's shared, pre-materialized immutable instance rather than re-mapping.
             return holder.Current.CoreProficiencies.GetById(proficiencyId, "proficiency");
+        }
+
+        public CorePath GetPath(int pathId)
+        {
+            return holder.Current.CorePaths.GetById(pathId, "path");
         }
 
         public IReadOnlyList<SkillContribution> ContributionsForSkill(int skillId)

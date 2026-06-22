@@ -9,6 +9,7 @@ using Game.Core.Progress;
 using Game.Core.Skills;
 using Game.Core.Zones;
 using Xunit;
+using CorePath = Game.Core.Proficiencies.Path;
 
 namespace Game.Core.Tests.Items
 {
@@ -35,8 +36,9 @@ namespace Game.Core.Tests.Items
         /// <c>docs/backend.md → Reference Data</c>). Every other covered type is reached by walking these.
         /// <see cref="Enemy"/> is included alongside <see cref="EnemyTemplate"/> because it reuses the
         /// template's shared collections by reference, so it is part of the same shared graph.
-        /// <see cref="SkillContribution"/> is a separate root because it is shared via the proficiency cache's
-        /// skill→contributions index rather than being reachable from the <see cref="Proficiency"/> graph.
+        /// <see cref="SkillContribution"/> and <see cref="CorePath"/> are separate roots because they are
+        /// shared via the proficiency cache's skill→contributions index and path-routing lookup rather than
+        /// being reachable from the <see cref="Proficiency"/> graph.
         /// </summary>
         private static readonly Type[] ReferenceDataRoots =
         [
@@ -49,6 +51,7 @@ namespace Game.Core.Tests.Items
             typeof(Challenge),
             typeof(Proficiency),
             typeof(SkillContribution),
+            typeof(CorePath),
         ];
 
         private static readonly Assembly CoreAssembly = typeof(Item).Assembly;
