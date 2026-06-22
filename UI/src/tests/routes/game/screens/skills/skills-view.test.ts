@@ -64,6 +64,7 @@ import {
 	zoneSpawnLevel,
 	type SkillMetrics
 } from '$routes/game/screens/skills/skills-view.svelte';
+import { expectedCritMultiplier } from '$lib/battle';
 
 /* A skill with sensible defaults so each test only states what matters. */
 const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
@@ -226,6 +227,19 @@ describe('pure helpers', () => {
 
 	it('takes the midpoint of a zone range as the representative spawn level', () => {
 		expect(zoneSpawnLevel(ZONES[0])).toBe(5); // (2 + 8) / 2
+	});
+
+	it('folds the crit multiplier into the effective dps/damage ranking', () => {
+		// Two skills whose effective-DPS order flips once a global crit multiplier scales raw damage
+		// before defense (a crit punches through Defense, mirroring the battle and the displayed numbers).
+		const a = metric({ skill: skill({ id: 0 }), rawDamage: 30, cooldown: 3 });
+		const b = metric({ skill: skill({ id: 1 }), rawDamage: 22, cooldown: 2 });
+		// defense 10, no crit: A=(30−10)/3≈6.67 > B=(22−10)/2=6 → A first.
+		expect([b, a].sort(sortMetrics('dps', 10)).map((m) => m.skill.id)).toEqual([0, 1]);
+		// crit ×2: A=(60−10)/3≈16.67 < B=(44−10)/2=17 → B overtakes.
+		expect([a, b].sort(sortMetrics('dps', 10, 2)).map((m) => m.skill.id)).toEqual([1, 0]);
+		// dmg sort, defense 25: no crit both 5/0 → stable; ×2 lifts A=(60−25)=35 > B=(44−25)=19.
+		expect([a, b].sort(sortMetrics('dmg', 25, 2)).map((m) => m.skill.id)).toEqual([0, 1]);
 	});
 });
 
@@ -495,5 +509,60 @@ describe('SkillsView — compare-vs enemy presets', () => {
 		view.selectPreset(spawn);
 		expect(view.defense).toBe(spawn.defense);
 		expect(view.railList.map((m) => m.skill.id).slice(0, 2)).toEqual([3, 1]);
+	});
+});
+
+describe('SkillsView — critical hits fold into effective damage', () => {
+	beforeEach(() => {
+		// Give the player crit chance + damage; the derived attribute pass also adds the base crit
+		// damage (1.5) and any Dex/Luck contribution, so expectations are built off the view's resolved
+		// values rather than hard-coding the derived model. Here: chance 0.5, damage 0.5 + 1.5 = 2.0.
+		mockPlayerManager.attributes = [
+			{ attributeId: EAttribute.CriticalChance, amount: 0.5 },
+			{ attributeId: EAttribute.CriticalDamage, amount: 0.5 }
+		];
+		view = new SkillsView();
+	});
+
+	it('exposes a player-wide crit multiplier matching the shared display helper', () => {
+		expect(view.critChance).toBeCloseTo(0.5, 10);
+		expect(view.critDamage).toBeCloseTo(2, 10);
+		expect(view.critMultiplier).toBe(expectedCritMultiplier(view.critChance, view.critDamage));
+		expect(view.critMultiplier).toBeCloseTo(1.5, 10); // 1 + 0.5·(2−1)
+	});
+
+	it('leaves the multiplier at 1 when the player has no crit chance', () => {
+		mockPlayerManager.attributes = [];
+		const noCrit = new SkillsView();
+		expect(noCrit.critChance).toBe(0);
+		expect(noCrit.critMultiplier).toBe(1);
+		expect(noCrit.critBonus(0)).toBe(0);
+	});
+
+	it('scales raw damage by the crit multiplier before defense in effective/dps/burst', () => {
+		const k = view.critMultiplier;
+		view.setDefense(10);
+		// Alpha (id 0): baseDamage 12, no Strength allocated → rawDamage 12.
+		expect(view.rawDamage(0)).toBe(12);
+		expect(view.effective(0)).toBeCloseTo(Math.max(12 * k - 10, 0), 10); // (12·1.5−10)=8
+		expect(view.effectiveDps(0)).toBeCloseTo(view.effective(0) / view.cooldown(0), 10);
+		// Combined burst sums each loadout skill's crit-scaled effective hit.
+		const expectedBurst = [0, 1, 2].reduce((sum, id) => sum + Math.max(view.rawDamage(id) * k - 10, 0), 0);
+		expect(view.combinedEffectiveBurst).toBeCloseTo(expectedBurst, 10);
+	});
+
+	it('reports the expected crit bonus and clamps applied defense to the crit-scaled hit', () => {
+		const k = view.critMultiplier;
+		expect(view.critBonus(1)).toBeCloseTo(view.rawDamage(1) * (k - 1), 10); // Bravo: 40·0.5 = 20
+		// A defense above the crit-scaled hit fully blocks it; applied defense clamps to that hit so the
+		// breakdown's raw + crit − defense reconciles to 0.
+		view.setDefense(1000);
+		expect(view.appliedDefense(1)).toBeCloseTo(view.rawDamage(1) * k, 10);
+		expect(view.effective(1)).toBe(0);
+	});
+
+	it('raises the slider ceiling to the biggest crit-scaled hit', () => {
+		// Skill 4 (Echo) has the largest raw damage (100); the ceiling scales by the crit multiplier.
+		expect(view.maxDamage).toBeCloseTo(100 * view.critMultiplier, 10);
 	});
 });
