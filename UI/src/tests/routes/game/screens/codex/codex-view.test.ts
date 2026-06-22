@@ -635,7 +635,7 @@ describe('CodexView skill dossier', () => {
 		view.selectSkill(0); // Cleave — rewarded by challenge 0
 		expect(view.skillProvenance.status).toBe('obtainable');
 		expect(view.skillProvenance.sources).toEqual([
-			{ kind: 'challenge', id: 0, label: 'Rewarded by', name: 'Cull the Skitterers', accent: 'var(--accent)' }
+			{ kind: 'challenge', id: 0, label: 'Rewarded by', name: 'Cull the Skitterers', accent: 'var(--attr-intellect)' }
 		]);
 		expect(view.skillProvenance.emptyLabel).toBe('');
 	});

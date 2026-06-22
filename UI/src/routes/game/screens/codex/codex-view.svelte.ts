@@ -214,7 +214,7 @@ export interface SkillSourceVM {
 	/** "Rewarded by" / "Granted by" lead-in. */
 	label: string;
 	name: string;
-	/** Themed accent: challenge → the section accent; item → its rarity hue. */
+	/** Themed accent: challenge → the dossier's intellect section accent; item → its rarity hue. */
 	accent: string;
 }
 
@@ -669,7 +669,7 @@ export class CodexView {
 			id: src.id,
 			label: skillSourceLabel(src.kind),
 			name: src.name,
-			accent: src.kind === 'item' ? rarityColor(allItems[src.id]?.rarityId ?? ERarity.Common) : 'var(--accent)'
+			accent: src.kind === 'item' ? rarityColor(allItems[src.id]?.rarityId ?? ERarity.Common) : 'var(--attr-intellect)'
 		}));
 		return {
 			status: provenance.status,
