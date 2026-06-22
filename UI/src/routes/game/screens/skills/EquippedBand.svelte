@@ -69,16 +69,7 @@
 					</div>
 				{/if}
 				<span class="en">{metrics.skill.name}</span>
-				<div class="es">
-					<div class="stat"><span class="v accent">{fmt(view.effective(id))}</span><span class="k">dmg</span></div>
-					<div class="stat"><span class="v">{metrics.cooldown.toFixed(1)}s</span><span class="k">cd</span></div>
-					<div class="stat"><span class="v accent">{fmt(view.effectiveDps(id))}</span><span class="k">dps</span></div>
-				</div>
-				<div class="chips">
-					{#each metrics.skill.damageMultipliers as mult (mult.attributeId)}
-						<AttributeChip attributeId={mult.attributeId} />
-					{/each}
-				</div>
+				<SkillCardStats {view} {metrics} />
 			</div>
 		{:else}
 			<button type="button" class="eqcard empty" class:dimmed={swapping} onclick={() => focusAvailable()}>
@@ -90,9 +81,8 @@
 </div>
 
 <script lang="ts">
-import { formatNum } from '$lib/common';
-import AttributeChip from '$components/AttributeChip.svelte';
 import OverlayButton from '$components/OverlayButton.svelte';
+import SkillCardStats from './SkillCardStats.svelte';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -108,8 +98,6 @@ const swapName = $derived(view.pendingSwap != null ? (view.metric(view.pendingSw
 
 /** Fixed-length slot list (capacity), nulls for empty slots. */
 const slots = $derived(Array.from({ length: view.cap }, (_, i) => view.equipped[i] ?? null));
-
-const fmt = (n: number) => formatNum(Math.round(n));
 
 /** Selecting an empty slot surfaces the first available skill to equip. */
 const focusAvailable = () => {
@@ -337,44 +325,6 @@ const onDragEnd = () => {
 		font-size: 13.5px;
 		font-weight: 500;
 		line-height: 1.1;
-	}
-
-	.es {
-		display: flex;
-		gap: 13px;
-		margin-top: auto;
-	}
-
-	.chips {
-		display: flex;
-		gap: 5px;
-		// Above the overlay so each chip keeps its own hover (the shared attribute tooltip).
-		position: relative;
-		z-index: 2;
-	}
-}
-
-.stat {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-
-	.v {
-		font-size: 15px;
-		font-weight: 500;
-		line-height: 1;
-
-		&.accent {
-			color: var(--accent);
-		}
-	}
-
-	.k {
-		font-family: var(--mono);
-		font-size: 8px;
-		letter-spacing: 1.2px;
-		text-transform: uppercase;
-		color: var(--text-muted);
 	}
 }
 </style>

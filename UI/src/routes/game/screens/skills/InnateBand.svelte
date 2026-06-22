@@ -16,20 +16,7 @@
 				{#if innate.duplicate}
 					<span class="dupe-note">already in your loadout</span>
 				{:else if metrics}
-					<div class="es">
-						<div class="stat">
-							<span class="v accent">{fmt(view.effective(innate.skill.id))}</span><span class="k">dmg</span>
-						</div>
-						<div class="stat"><span class="v">{metrics.cooldown.toFixed(1)}s</span><span class="k">cd</span></div>
-						<div class="stat">
-							<span class="v accent">{fmt(view.effectiveDps(innate.skill.id))}</span><span class="k">dps</span>
-						</div>
-					</div>
-					<div class="chips">
-						{#each metrics.skill.damageMultipliers as mult (mult.attributeId)}
-							<AttributeChip attributeId={mult.attributeId} />
-						{/each}
-					</div>
+					<SkillCardStats {view} {metrics} />
 				{/if}
 			</div>
 		{/each}
@@ -37,8 +24,7 @@
 {/if}
 
 <script lang="ts">
-import { formatNum } from '$lib/common';
-import AttributeChip from '$components/AttributeChip.svelte';
+import SkillCardStats from './SkillCardStats.svelte';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -46,8 +32,6 @@ type Props = {
 };
 
 const { view }: Props = $props();
-
-const fmt = (n: number) => formatNum(Math.round(n));
 </script>
 
 <style lang="scss">
@@ -114,41 +98,5 @@ const fmt = (n: number) => formatNum(Math.round(n));
 	letter-spacing: 0.8px;
 	text-transform: uppercase;
 	color: var(--text-tertiary);
-}
-
-.es {
-	display: flex;
-	gap: 12px;
-	margin-top: auto;
-}
-
-.stat {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-
-	.v {
-		font-size: 14px;
-		font-weight: 500;
-		line-height: 1;
-
-		&.accent {
-			color: var(--accent);
-		}
-	}
-
-	.k {
-		font-family: var(--mono);
-		font-size: 8px;
-		letter-spacing: 1.2px;
-		text-transform: uppercase;
-		color: var(--text-muted);
-	}
-}
-
-.chips {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
 }
 </style>
