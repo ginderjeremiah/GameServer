@@ -34,6 +34,16 @@ namespace Game.Infrastructure
         // promptly rather than relying on a non-synchronized field.
         private volatile bool _isRunning = false;
 
+        // Gate for the async worker loop. Unlike the sync callback (which returns only once loopAction completes,
+        // so the thread pool re-arms the wait after the run finishes), an async callback returns to the pool at its
+        // first incomplete await — re-arming the wait mid-run. A Start() during an in-flight async run would then fire
+        // a second concurrent loopAction and the finishing run's trailing IsRunning = false could clobber it. This
+        // gate admits a single async run at a time and coalesces any signal that arrives mid-run into one trailing
+        // run. It is held only for the brief state transitions, never across the awaited loopAction.
+        private readonly object _runLock = new();
+        private bool _runActive = false;
+        private bool _runPending = false;
+
         /// <summary>
         /// A custom name for the <see cref="BackgroundWorker"/> used for logging purposes.
         /// </summary>
@@ -177,16 +187,49 @@ namespace Game.Infrastructure
         {
             return async (state, timedOut) =>
             {
-                try
+                // The thread pool re-arms this wait when the callback returns — which for an async callback is at the
+                // first incomplete await, not at task completion. If a run is already active, record that another pass
+                // is needed and bow out so two loopAction calls never overlap; the active run will pick it up.
+                lock (_runLock)
                 {
-                    await loopAction();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "An error occurred while executing the async worker loop for background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
+                    if (_runActive)
+                    {
+                        _runPending = true;
+                        return;
+                    }
+                    _runActive = true;
+                    // Reaffirm under the lock so a concurrent finishing run's IsRunning = false can't leave this run
+                    // wedged 'false' (Start() also publishes it true, but that write races the gated reset below).
+                    IsRunning = true;
                 }
 
-                IsRunning = false;
+                bool runAgain;
+                do
+                {
+                    try
+                    {
+                        await loopAction();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "An error occurred while executing the async worker loop for background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
+                    }
+
+                    // A signal that arrived during the run leaves _runPending set; consume it and loop again rather than
+                    // exiting, coalescing any number of mid-run signals into exactly one trailing pass.
+                    lock (_runLock)
+                    {
+                        runAgain = _runPending;
+                        _runPending = false;
+                        if (!runAgain)
+                        {
+                            _runActive = false;
+                            IsRunning = false;
+                        }
+                    }
+                }
+                while (runAgain);
+
                 _logger.LogTrace("Sleeping background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
             };
         }
