@@ -3,19 +3,19 @@ import { render, cleanup } from '@testing-library/svelte';
 import { EAttribute, ESkillAcquisition, type IAttribute, type ISkill } from '$lib/api';
 
 // The breakdown resolves the crit-chance label and attribute names through the reference-data store,
-// so it is mocked. CriticalChance is flagged `isPercentage` so the chance renders as e.g. `50%`.
-const { staticData } = vi.hoisted(() => ({
-	staticData: {
-		attributes: [
-			{ id: EAttribute.CriticalChance, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
-		] as unknown as IAttribute[]
-	}
-}));
+// so it is mocked. The object backs the hoisted `vi.mock` factory, but its `attributes` are populated
+// after the imports run — the `EAttribute` enum isn't initialized while `vi.hoisted` executes.
+const { staticData } = vi.hoisted(() => ({ staticData: { attributes: [] as unknown[] } }));
 
 vi.mock('$stores', () => ({ staticData }));
 
 import SkillDamageBreakdown from '$routes/game/screens/skills/SkillDamageBreakdown.svelte';
 import type { SkillMetrics, SkillsView } from '$routes/game/screens/skills/skills-view.svelte';
+
+// CriticalChance is flagged `isPercentage` so the chance renders as e.g. `50%`.
+staticData.attributes = [
+	{ id: EAttribute.CriticalChance, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
+] as unknown as IAttribute[];
 
 const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	id: 0,
@@ -76,7 +76,12 @@ describe('SkillDamageBreakdown — critical row', () => {
 
 	it('orders the crit row between the scaling rows and the enemy-defense line', () => {
 		const { container } = render(SkillDamageBreakdown, { props: { view: stubView(), metrics: stubMetrics() } });
-		const rows = Array.from(container.querySelectorAll('.brk-line')).map((el) => el.className);
+		// Drop Svelte's scoped style class (e.g. `svelte-xxxx`) so only the semantic classes are compared.
+		const rows = Array.from(container.querySelectorAll('.brk-line')).map((el) =>
+			Array.from(el.classList)
+				.filter((c) => !c.startsWith('svelte-'))
+				.join(' ')
+		);
 		expect(rows).toEqual(['brk-line crit', 'brk-line def', 'brk-line total']);
 	});
 });
