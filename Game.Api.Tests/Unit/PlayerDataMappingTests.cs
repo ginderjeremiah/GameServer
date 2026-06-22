@@ -19,7 +19,7 @@ namespace Game.Api.Tests.Unit
             var skill7 = MakeSkill(7);
             var skill8 = MakeSkill(8);
 
-            // SelectedSkills arrives already ordered (PlayerMapper.ToCore), so its index is the loadout
+            // SelectedSkills arrives already ordered (PlayerCacheMapper.ToCore), so its index is the loadout
             // order: skill 7 is first (order 0), skill 5 second (order 1); 6 and 8 are unequipped.
             var player = MakePlayer(
                 skills: [skill5, skill6, skill7, skill8],

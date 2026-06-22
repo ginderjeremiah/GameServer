@@ -43,7 +43,7 @@ namespace Game.Api.Models.Player
                 StatPointsUsed = player.StatPoints.StatPointsUsed,
                 // Project every unlocked skill with its loadout state, parallel to UnlockedItems'
                 // Equipped/EquipmentSlotId. SelectedSkills is already a deterministic (Order, SkillId)
-                // ordering (PlayerMapper.ToCore), so the equipped skill's index is its loadout order;
+                // ordering (PlayerCacheMapper.ToCore), so the equipped skill's index is its loadout order;
                 // unselected skills report a null order.
                 UnlockedSkills = player.Skills
                     .Select(skill =>
