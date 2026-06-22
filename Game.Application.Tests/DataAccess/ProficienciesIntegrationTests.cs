@@ -121,6 +121,64 @@ namespace Game.Application.Tests.DataAccess
             Assert.Empty(proficiencies.ContributionsForSkill(skillId));
         }
 
+        [Fact]
+        public async Task ContributionsForSkill_ResolvesToTheHomeTierProficiency_NotTierZero()
+        {
+            int tierZeroId, tierOneId, skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
+
+                var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
+                context.Paths.Add(path);
+                await context.SaveChangesAsync(CancellationToken);
+
+                var tierZero = NewTier(path.Id, ordinal: 0, name: "Fire Magic");
+                var tierOne = NewTier(path.Id, ordinal: 1, name: "Inferno Magic");
+                context.Proficiencies.AddRange(tierZero, tierOne);
+                await context.SaveChangesAsync(CancellationToken);
+                tierZeroId = tierZero.Id;
+                tierOneId = tierOne.Id;
+
+                // Homed at tier 1: the shim must resolve to the tier-1 proficiency, not tier 0 (which would
+                // pass a "first proficiency of the path" regression that ignored HomeTier).
+                context.SkillPathContributions.Add(new Entities.SkillPathContribution
+                {
+                    SkillId = skillId,
+                    PathId = path.Id,
+                    HomeTier = 1,
+                    Weight = 2m,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+
+            var contribution = Assert.Single(proficiencies.ContributionsForSkill(skillId));
+            Assert.Equal(tierOneId, contribution.ProficiencyId);
+            Assert.NotEqual(tierZeroId, contribution.ProficiencyId);
+            Assert.Equal(2d, contribution.Weight);
+        }
+
+        private static Entities.Proficiency NewTier(int pathId, int ordinal, string name) => new()
+        {
+            Name = name,
+            Description = "d",
+            IconPath = "i",
+            PathId = pathId,
+            PathOrdinal = ordinal,
+            MaxLevel = 10,
+            BaseXp = 100m,
+            XpGrowth = 2m,
+            StartsUnlocked = ordinal == 0,
+            LevelModifiers = [],
+            LevelRewards = [],
+            Prerequisites = [],
+        };
+
         private async Task<Entities.Skill> SeedSkillAsync(GameContext context, ESkillAcquisition acquisition)
         {
             var skill = new Entities.Skill
