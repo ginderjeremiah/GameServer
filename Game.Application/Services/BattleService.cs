@@ -62,11 +62,11 @@ namespace Game.Application.Services
         // duration) and the loss path to the moment of the loss, but the duration is identical.
         private static readonly TimeSpan PostBattleCooldown = TimeSpan.FromSeconds(5);
 
-        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, DateTime? scheduledStartTime = null, CancellationToken cancellationToken = default)
+        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, DateTime? scheduledStartTime = null, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
             if (state.HasActiveBattle)
             {
-                await AbandonBattle(player, state, cancellationToken);
+                await AbandonBattle(player, state, clientBattleMs, cancellationToken);
             }
 
             // A real zone change is gated on the target being unlocked and in circulation (anti-cheat). A
@@ -138,7 +138,7 @@ namespace Game.Application.Services
         /// <see cref="StartBattle"/> there is no cooldown gate — the boss challenge is always available — and
         /// challenging does not change the player's current zone.
         /// </summary>
-        public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId, CancellationToken cancellationToken = default)
+        public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
             var zone = _zones.GetDomainZone(zoneId);
 
@@ -160,7 +160,7 @@ namespace Game.Application.Services
 
             if (state.HasActiveBattle)
             {
-                await AbandonBattle(player, state, cancellationToken);
+                await AbandonBattle(player, state, clientBattleMs, cancellationToken);
             }
 
             var now = DateTime.UtcNow;
@@ -333,7 +333,9 @@ namespace Game.Application.Services
         /// </summary>
         public Task ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
-            return AbandonBattle(player, state, cancellationToken);
+            // No client elapsed for an offline/disconnect resolution — the abandon falls back to wall-clock
+            // (capped at DefaultMaxBattleMs), exactly as before.
+            return AbandonBattle(player, state, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -537,15 +539,25 @@ namespace Game.Application.Services
             return completed;
         }
 
-        private async Task AbandonBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        private async Task AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
-            var elapsedMs = (int)(now - state.BattleStartTime).TotalMilliseconds;
+            var wallClockMs = (int)(now - state.BattleStartTime).TotalMilliseconds;
 
-            // Clamp the anti-cheat replay window to the battle's maximum duration. A battle never runs past
+            // Bound the re-simulation by how long the client actually simulated the battle being abandoned,
+            // when it reports it — so a battle the client never fought (e.g. a server-prefetched next battle
+            // superseded by a zone/build change during the cooldown, reported as 0) records no outcome rather
+            // than a phantom one from re-simulating the post-cooldown wall-clock gap. The reported value is
+            // never trusted above the real server-elapsed time, so a won-abandon still can't be claimed faster
+            // than wall-clock allows (under-reporting only ever resolves to an earlier, not-yet-won state).
+            var elapsedMs = clientBattleMs is int reported
+                ? Math.Min(Math.Max(reported, 0), wallClockMs)
+                : wallClockMs;
+
+            // Clamp the replay window to the battle's maximum duration. A battle never runs past
             // DefaultMaxBattleMs on the client — it ends as a draw at the cap — so the replay must not either:
-            // wall-clock time elapsed between the client's draw and the next battle starting must not let the
-            // re-simulation run past the cap and resolve a reported stalemate into a spurious win or loss.
+            // extra time before the next battle starting must not let the re-simulation run past the cap and
+            // resolve a reported stalemate into a spurious win or loss.
             var simulateMs = Math.Min(elapsedMs, GameConstants.DefaultMaxBattleMs);
 
             // No active battle (nothing to resolve) or no elapsed window to re-simulate against — clear
@@ -558,9 +570,10 @@ namespace Game.Application.Services
 
             if (result.Victory)
             {
-                // The enemy died within the elapsed wall-clock time, so this abandon resolved as a real
-                // victory. Pay it out exactly like EndBattleVictory (exp + win/clear/challenge credit)
-                // rather than booking the win while silently withholding the earned exp (#206).
+                // The enemy died within the (wall-clock-capped) elapsed time the client simulated, so this
+                // abandon resolved as a real victory. Pay it out exactly like EndBattleVictory (exp +
+                // win/clear/challenge credit) rather than booking the win while silently withholding the
+                // earned exp (#206).
                 RecordVictory(player, enemy, result, state, now);
             }
             else

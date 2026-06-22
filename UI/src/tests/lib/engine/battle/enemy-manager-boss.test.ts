@@ -180,7 +180,7 @@ describe('EnemyManager boss mode', () => {
 
 		expect(manager.mode).toBe('boss');
 		expect(h.battleEngine.pause).toHaveBeenCalled();
-		expect(send).toHaveBeenCalledWith('ChallengeBoss', { zoneId: 3 });
+		expect(send).toHaveBeenCalledWith('ChallengeBoss', expect.objectContaining({ zoneId: 3 }));
 		expect(manager.currentEnemy).toEqual(bossInstance);
 		expect(loaded).toEqual([bossInstance]);
 	});
@@ -193,7 +193,7 @@ describe('EnemyManager boss mode', () => {
 		await manager.challengeBoss();
 
 		expect(manager.mode).toBe('idle');
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 		expect(manager.currentEnemy).toEqual(normalInstance);
 		expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, 'There was an error challenging the boss: no boss');
 	});
@@ -274,7 +274,7 @@ describe('EnemyManager boss mode', () => {
 		// Auto-fight off ⇒ hand back to the idle farm loop.
 		expect(manager.mode).toBe('idle');
 		expect(manager.bossOutcome).toBeUndefined();
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 	});
 
 	it('on a boss victory with auto-fight on: re-challenges the boss', async () => {
@@ -288,7 +288,7 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.mode).toBe('boss');
 		expect(manager.currentEnemy).toEqual(bossInstance);
 		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
-		expect(send).toHaveBeenCalledWith('ChallengeBoss', { zoneId: 3 });
+		expect(send).toHaveBeenCalledWith('ChallengeBoss', expect.objectContaining({ zoneId: 3 }));
 	});
 
 	it('on a boss victory that completes the next zone gate: refetches and flags the unlock', async () => {
@@ -462,7 +462,7 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.mode).toBe('idle');
 		expect(manager.autoFight).toBe(false);
 		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(5000);
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 		// A loss is not a zone clear.
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
 	});
@@ -483,7 +483,7 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.mode).toBe('idle');
 		// Absent data ⇒ cooldown defaults to 0 ⇒ no loading step, but the idle loop still resumes.
 		expect(h.battleEngine.startLoading).not.toHaveBeenCalled();
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 	});
 
 	it('on a boss draw (timeout): retreats to the idle loop with auto-fight off, recording no loss', async () => {
@@ -500,7 +500,7 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.mode).toBe('idle');
 		expect(manager.autoFight).toBe(false);
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 	});
 
 	it('retreats from a boss fight back to the idle loop', async () => {
@@ -511,7 +511,7 @@ describe('EnemyManager boss mode', () => {
 
 		expect(manager.mode).toBe('idle');
 		expect(h.battleEngine.pause).toHaveBeenCalled();
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 
@@ -829,7 +829,7 @@ describe('EnemyManager boss mode', () => {
 		releaseCooldown();
 		await handled;
 
-		expect(send).not.toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 	});
 
 	it('still resolves a normal idle victory (DefeatEnemy + next enemy)', async () => {
@@ -842,7 +842,7 @@ describe('EnemyManager boss mode', () => {
 		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ clientTotalMs: expect.any(Number) }));
 		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 		expect(manager.mode).toBe('idle');
 	});
 
@@ -857,7 +857,9 @@ describe('EnemyManager boss mode', () => {
 
 		expect(send).not.toHaveBeenCalledWith('DefeatEnemy', expect.anything());
 		expect(send).not.toHaveBeenCalledWith('BattleLost');
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		// The drawn battle was fought to the cap, so the fetch reports the elapsed time the client simulated
+		// (battleEngine.timeElapsed) — the backend abandon re-simulates that window and records the draw.
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 8880 });
 		expect(manager.mode).toBe('idle');
 	});
 
@@ -940,8 +942,9 @@ describe('EnemyManager boss mode', () => {
 		await handled;
 
 		// The bundled enemy was for zone 3; the player is now in zone 7, so it is discarded and a fresh enemy
-		// is fetched for (and the server told about) the new zone.
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 7 });
+		// is fetched for (and the server told about) the new zone. The discarded prefetch was never fought, so
+		// the fetch reports clientBattleMs 0 — the backend records no phantom abandon for it.
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 7, clientBattleMs: 0 });
 		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 
@@ -964,7 +967,8 @@ describe('EnemyManager boss mode', () => {
 		releaseCooldown();
 		await handled;
 
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		// The never-fought prefetch reports clientBattleMs 0, so the backend records no phantom abandon for it.
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 0 });
 		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 

@@ -11,6 +11,7 @@ export interface IBattleLostResponse {
 
 export interface IChallengeBossRequest {
 	zoneId?: number;
+	clientBattleMs?: number;
 }
 
 export interface IDefeatEnemyRequest {
@@ -48,4 +49,5 @@ export interface INewEnemyModel {
 
 export interface INewEnemyRequest {
 	newZoneId?: number;
+	clientBattleMs?: number;
 }
