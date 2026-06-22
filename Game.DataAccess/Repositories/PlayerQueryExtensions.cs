@@ -1,6 +1,7 @@
 using Game.Core;
 using Game.Core.Players;
 using Game.DataAccess.Mapping;
+using Microsoft.EntityFrameworkCore;
 using EntityPlayer = Game.Infrastructure.Entities.Player;
 
 namespace Game.DataAccess.Repositories
@@ -12,6 +13,11 @@ namespace Game.DataAccess.Repositories
     /// <see cref="PlayerCacheMapper.ToCore"/>. Because the model's members are <c>required</c>, the projection
     /// cannot silently omit one (a compile error), so completeness is structural rather than a convention. The
     /// flat, relational shape keeps the projection a trivial column copy with no correlated sub-queries.
+    /// <para>
+    /// It is split into one query per collection (<see cref="RelationalQueryableExtensions.AsSplitQuery{TEntity}"/>):
+    /// the unbounded collections (unlocked items, applied mods, skills) would otherwise be JOINed into a single
+    /// result set, multiplying into a cartesian product that grows as the player progresses.
+    /// </para>
     /// </summary>
     internal static class PlayerQueryExtensions
     {
@@ -44,7 +50,7 @@ namespace Game.DataAccess.Repositories
                 LogPreferences = p.LogPreferences
                     .Select(lp => new LogPreference { LogType = (ELogType)lp.LogTypeId, Enabled = lp.Enabled })
                     .ToList(),
-            });
+            }).AsSplitQuery();
         }
     }
 }
