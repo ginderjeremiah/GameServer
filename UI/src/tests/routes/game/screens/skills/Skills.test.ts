@@ -147,6 +147,7 @@ beforeEach(() => {
 	staticData.challenges = CHALLENGES;
 	staticData.zones = ZONES;
 	staticData.enemies = ENEMIES;
+	staticData.attributes = undefined;
 	mockPlayerManager.currentZone = 0;
 	mockPlayerManager.unlockedSkills = [
 		{ skillId: 0, selected: true, order: 0 },
@@ -414,6 +415,29 @@ describe('Skills screen', () => {
 		expect(cta.disabled).toBe(true);
 		expect(cta.textContent).toContain('Locked');
 		expect(container.querySelector('.d-hint')?.textContent).toContain('Unlock by completing');
+	});
+
+	it('folds the expected crit contribution into the inspector breakdown and raw note', async () => {
+		// CriticalChance is flagged `isPercentage` so the breakdown's chance renders as `50%`.
+		staticData.attributes = [
+			{ id: EAttribute.CriticalChance, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
+		] as unknown as typeof staticData.attributes;
+		// Chance 0.5, damage 0.5 + 1.5 base = 2.0 → expected multiplier 1.5; Alpha's raw 10 → +5 crit.
+		mockPlayerManager.attributes = [
+			{ attributeId: EAttribute.CriticalChance, amount: 0.5 },
+			{ attributeId: EAttribute.CriticalDamage, amount: 0.5 }
+		];
+		const { container } = render(Skills);
+		// Alpha (equipped slot 1) is selected into the inspector by default.
+		expect(container.querySelector('.d-name')?.textContent).toBe('Alpha');
+
+		const crit = container.querySelector('.brk-line.crit') as HTMLElement;
+		expect(crit).not.toBeNull();
+		expect(crit.textContent).toContain('50%');
+		expect(crit.textContent).toContain('×2');
+		expect(crit.textContent).toContain('+5');
+		// The raw note surfaces the same crit contribution inline.
+		expect(container.querySelector('.rawnote')?.textContent).toContain('+5 crit');
 	});
 
 	it('shows the no-scaling note in the damage breakdown for a skill without multipliers', async () => {
