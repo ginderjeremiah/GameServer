@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260622110805_AddUnlockedItemSlotUniqueIndex")]
+    partial class AddUnlockedItemSlotUniqueIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1054,15 +1057,10 @@ namespace Game.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<int>("RarityId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime?>("RetiredAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("RarityId");
 
                     b.ToTable("Skills");
                 });
@@ -1875,17 +1873,6 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Player");
 
                     b.Navigation("StatisticType");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.Skill", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Rarity", "Rarity")
-                        .WithMany()
-                        .HasForeignKey("RarityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Rarity");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.SkillDamageMultiplier", b =>

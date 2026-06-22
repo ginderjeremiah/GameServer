@@ -441,6 +441,13 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<UnlockedItem>(entity =>
             {
                 entity.HasKey(ui => new { ui.PlayerId, ui.ItemId });
+
+                // One item per equipment slot, enforced at the DB level so two concurrent equips into the same
+                // slot can't both succeed — ItemEquippedHandler's clear-then-write isn't atomic across instances.
+                // The partial filter lets the many unequipped (null-slot) rows coexist.
+                entity.HasIndex(ui => new { ui.PlayerId, ui.EquipmentSlotId })
+                    .IsUnique()
+                    .HasFilter("\"EquipmentSlotId\" IS NOT NULL");
             });
 
             modelBuilder.Entity<UnlockedMod>(entity =>
