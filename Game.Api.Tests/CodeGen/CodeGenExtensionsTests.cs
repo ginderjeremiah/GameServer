@@ -223,5 +223,31 @@ namespace Game.Api.Tests.CodeGen
         {
             Assert.False(typeof(Dictionary<string, int>).NeedsInterface());
         }
+
+        [Theory]
+        [InlineData("HelloWorld", "helloWorld")]
+        [InlineData("A", "a")]
+        [InlineData("alreadyLower", "alreadyLower")]
+        public void Decapitalize_LowercasesFirstCharacter(string input, string expected)
+        {
+            Assert.Equal(expected, input.Decapitalize());
+        }
+
+        [Fact]
+        public void Decapitalize_EmptyString_ReturnsEmpty()
+        {
+            Assert.Equal("", "".Decapitalize());
+        }
+
+        [Theory]
+        [InlineData("HelloWorld", "hello-world")]
+        [InlineData("oneTwoThree", "one-two-three")]
+        [InlineData("NoBreaks", "no-breaks")]
+        [InlineData("nobreak", "nobreak")]
+        [InlineData("", "")]
+        public void SnakeCase_InsertsHyphenBetweenLowerThenUpperAndLowercases(string input, string expected)
+        {
+            Assert.Equal(expected, input.SnakeCase());
+        }
     }
 }
