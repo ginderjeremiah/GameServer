@@ -370,6 +370,38 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ItemEquipped_IntoSlotOccupiedByHigherIdItem_ClearsOccupantWithoutColliding()
+        {
+            // Deterministic guard for the (player, slot) unique index's ordering hazard: equipping an item into
+            // an occupied slot must clear the prior occupant *before* the new occupant takes the slot. The new
+            // item is created first (lower id) and the incumbent second (higher id), so a naive single
+            // SaveChanges that orders the two UPDATEs by id would set the new occupant before vacating the
+            // incumbent and trip the unique index. Equip must converge without throwing.
+            var newItemId = await SeedItemAsync();
+            var incumbentId = await SeedItemAsync();
+            var playerId = await SeedPlayerAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, incumbentId, EEquipmentSlot.HelmSlot);
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, newItemId);
+            }
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, newItemId, (int)EEquipmentSlot.HelmSlot));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var occupant = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.EquipmentSlotId == (int)EEquipmentSlot.HelmSlot)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(newItemId, occupant.ItemId);
+            var incumbentRow = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == incumbentId)
+                .ToListAsync(CancellationToken));
+            Assert.Null(incumbentRow.EquipmentSlotId);
+        }
+
+        [Fact]
         public async Task ItemUnequipped_AppliedTwice_ClearsSlotAndConverges()
         {
             var playerId = await SeedPlayerAsync();
@@ -602,6 +634,54 @@ namespace Game.Application.Tests.DataAccess
 
             var ex = await Assert.ThrowsAsync<DbUpdateException>(() => dupContext.SaveChangesAsync(CancellationToken));
             Assert.True(ex.IsUniqueViolation());
+        }
+
+        // Deterministic guard for the invariant the concurrent equip test above relies on but can only provoke
+        // under a timing race: the partial unique index must reject a second item taking an already-occupied
+        // slot, so the slot can never be doubly occupied regardless of cross-instance interleaving.
+        [Fact]
+        public async Task UnlockedItems_DuplicateSlotOccupant_RejectedByUniqueIndex()
+        {
+            var playerId = await SeedPlayerAsync();
+            var firstItemId = await SeedItemAsync();
+            var secondItemId = await SeedItemAsync();
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, firstItemId, EEquipmentSlot.HelmSlot);
+            }
+
+            using var dupScope = CreateScope();
+            var dupContext = dupScope.ServiceProvider.GetRequiredService<GameContext>();
+            dupContext.UnlockedItems.Add(new Infrastructure.Entities.UnlockedItem
+            {
+                PlayerId = playerId,
+                ItemId = secondItemId,
+                EquipmentSlotId = (int)EEquipmentSlot.HelmSlot,
+            });
+
+            var ex = await Assert.ThrowsAsync<DbUpdateException>(() => dupContext.SaveChangesAsync(CancellationToken));
+            Assert.True(ex.IsUniqueViolation());
+        }
+
+        // The partial filter must not over-constrain: many unequipped (null-slot) items for one player coexist,
+        // since "one item per slot" only applies to occupied slots.
+        [Fact]
+        public async Task UnlockedItems_MultipleUnequippedItems_AllowedByPartialFilter()
+        {
+            var playerId = await SeedPlayerAsync();
+            var firstItemId = await SeedItemAsync();
+            var secondItemId = await SeedItemAsync();
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, firstItemId);
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, secondItemId);
+            }
+
+            Assert.Equal(2, await CountAsync(c => c.UnlockedItems.CountAsync(ui => ui.PlayerId == playerId && ui.EquipmentSlotId == null, CancellationToken)));
         }
 
         private static Infrastructure.Entities.PlayerStatistic NewGlobalEnemiesKilled(int playerId, decimal value) => new()

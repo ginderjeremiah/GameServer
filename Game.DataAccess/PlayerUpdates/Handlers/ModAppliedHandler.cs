@@ -9,29 +9,34 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
     {
         public async Task HandleAsync(ModAppliedEvent evt)
         {
-            // Remove existing mod in the same slot
-            await context.AppliedMods
-                .Where(am => am.PlayerId == evt.PlayerId && am.ItemId == evt.ItemId && am.ItemModSlotId == evt.ItemModSlotId)
-                .ExecuteDeleteAsync();
-
-            context.AppliedMods.Add(new AppliedMod
-            {
-                PlayerId = evt.PlayerId,
-                ItemId = evt.ItemId,
-                ItemModSlotId = evt.ItemModSlotId,
-                ItemModId = evt.ItemModId,
-            });
-
-            // The delete-then-insert isn't atomic, so a concurrent apply of the same at-least-once event can
-            // both no-op the delete and both insert the same (player, item, slot) row — the unique-violation
-            // catch absorbs that race as a benign no-op, since both applies carry the identical ItemModId.
+            // The delete-then-insert isn't atomic, so a concurrent or reordered apply can insert the
+            // (player, item, slot) row between our delete and save. The AppliedMod PK excludes ItemModId, so a
+            // colliding apply can carry a *different* mod — absorbing the violation as a no-op (as the prior code
+            // did) would terminally drop ours. On the unique violation the slot row already exists, so settle it
+            // with a server-side last-writer-wins update to our mod: an update can't re-violate the PK, so it
+            // converges without looping or propagating, and an identical double-apply is a harmless self-write.
             try
             {
+                await context.AppliedMods
+                    .Where(am => am.PlayerId == evt.PlayerId && am.ItemId == evt.ItemId && am.ItemModSlotId == evt.ItemModSlotId)
+                    .ExecuteDeleteAsync();
+
+                context.AppliedMods.Add(new AppliedMod
+                {
+                    PlayerId = evt.PlayerId,
+                    ItemId = evt.ItemId,
+                    ItemModSlotId = evt.ItemModSlotId,
+                    ItemModId = evt.ItemModId,
+                });
+
                 await context.SaveChangesAsync();
             }
             catch (DbUpdateException ex) when (ex.IsUniqueViolation())
             {
-                // A concurrent apply inserted the same (player, item, slot) first; the row exists, so this is a no-op.
+                context.ChangeTracker.Clear();
+                await context.AppliedMods
+                    .Where(am => am.PlayerId == evt.PlayerId && am.ItemId == evt.ItemId && am.ItemModSlotId == evt.ItemModSlotId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(am => am.ItemModId, evt.ItemModId));
             }
         }
     }
