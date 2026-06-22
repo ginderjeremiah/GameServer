@@ -4,6 +4,7 @@ using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Enemies;
 using Game.Core.Items;
+using Game.Core.Proficiencies;
 using Game.Core.Progress;
 using Game.Core.Skills;
 using Game.Core.Zones;
@@ -30,10 +31,12 @@ namespace Game.Core.Tests.Items
     {
         /// <summary>
         /// The cached reference-data aggregate roots — the gameplay domain models handed out from the
-        /// reference caches (items, item mods, skills, enemies, zones, challenges; see
+        /// reference caches (items, item mods, skills, enemies, zones, challenges, proficiencies; see
         /// <c>docs/backend.md → Reference Data</c>). Every other covered type is reached by walking these.
         /// <see cref="Enemy"/> is included alongside <see cref="EnemyTemplate"/> because it reuses the
         /// template's shared collections by reference, so it is part of the same shared graph.
+        /// <see cref="SkillContribution"/> is a separate root because it is shared via the proficiency cache's
+        /// skill→contributions index rather than being reachable from the <see cref="Proficiency"/> graph.
         /// </summary>
         private static readonly Type[] ReferenceDataRoots =
         [
@@ -44,6 +47,8 @@ namespace Game.Core.Tests.Items
             typeof(Enemy),
             typeof(Zone),
             typeof(Challenge),
+            typeof(Proficiency),
+            typeof(SkillContribution),
         ];
 
         private static readonly Assembly CoreAssembly = typeof(Item).Assembly;
