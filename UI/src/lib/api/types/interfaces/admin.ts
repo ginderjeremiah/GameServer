@@ -7,7 +7,10 @@ import type {
 	IAttributeDistribution,
 	IBattlerAttribute,
 	IEnemySpawn,
+	IProficiencyLevelModifier,
+	IProficiencyLevelReward,
 	ISkillEffect,
+	ISkillProficiencyContribution,
 	IZoneEnemy
 } from '../';
 
@@ -57,6 +60,26 @@ export interface ISetEnemySkillsData {
 export interface ISetEnemySpawnsData {
 	enemyId: number;
 	spawns: IEnemySpawn[];
+}
+
+export interface ISetProficiencyContributionsData {
+	id: number;
+	contributions: ISkillProficiencyContribution[];
+}
+
+export interface ISetProficiencyModifiersData {
+	id: number;
+	modifiers: IProficiencyLevelModifier[];
+}
+
+export interface ISetProficiencyPrerequisitesData {
+	id: number;
+	prerequisiteIds: number[];
+}
+
+export interface ISetProficiencyRewardsData {
+	id: number;
+	rewards: IProficiencyLevelReward[];
 }
 
 export interface ISetSkillEffectsData {

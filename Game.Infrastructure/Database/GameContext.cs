@@ -49,6 +49,11 @@ namespace Game.Infrastructure.Database
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
         public DbSet<SkillEffect> SkillEffects { get; set; }
+        public DbSet<Proficiency> Proficiencies { get; set; }
+        public DbSet<ProficiencyLevelModifier> ProficiencyLevelModifiers { get; set; }
+        public DbSet<ProficiencyLevelReward> ProficiencyLevelRewards { get; set; }
+        public DbSet<ProficiencyPrerequisite> ProficiencyPrerequisites { get; set; }
+        public DbSet<SkillProficiency> SkillProficiencies { get; set; }
         public DbSet<StatisticType> StatisticTypes { get; set; }
         public DbSet<ItemModType> ItemModTypes { get; set; }
         public DbSet<TagCategory> TagCategories { get; set; }
@@ -379,6 +384,97 @@ namespace Game.Infrastructure.Database
                 entity.HasOne(se => se.ScalingAttribute)
                     .WithMany()
                     .HasForeignKey(se => se.ScalingAttributeId);
+            });
+
+            modelBuilder.Entity<Proficiency>(entity =>
+            {
+                entity.Property(p => p.Id)
+                    .HasIdentityOptions(0, 1, 0);
+
+                entity.Property(p => p.Name)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.Description)
+                    .HasMaxLength(500);
+
+                entity.Property(p => p.IconPath)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.BaseXp)
+                    .HasPrecision(18, 3);
+
+                entity.Property(p => p.XpGrowth)
+                    .HasPrecision(18, 3);
+
+                // Optional tree-seed skill. Clear the FK if the skill is ever removed (skills are retired,
+                // not deleted, so this never fires in practice).
+                entity.HasOne(p => p.SeedSkill)
+                    .WithMany()
+                    .HasForeignKey(p => p.SeedSkillId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<ProficiencyLevelModifier>(entity =>
+            {
+                entity.HasKey(m => new { m.ProficiencyId, m.Level, m.AttributeId });
+
+                entity.Property(m => m.Amount)
+                    .HasPrecision(18, 3);
+
+                entity.HasOne(m => m.Proficiency)
+                    .WithMany(p => p.LevelModifiers)
+                    .HasForeignKey(m => m.ProficiencyId);
+
+                entity.HasOne(m => m.Attribute)
+                    .WithMany()
+                    .HasForeignKey(m => m.AttributeId);
+            });
+
+            modelBuilder.Entity<ProficiencyLevelReward>(entity =>
+            {
+                entity.HasKey(r => new { r.ProficiencyId, r.Level });
+
+                entity.HasOne(r => r.Proficiency)
+                    .WithMany(p => p.LevelRewards)
+                    .HasForeignKey(r => r.ProficiencyId);
+
+                entity.HasOne(r => r.RewardSkill)
+                    .WithMany()
+                    .HasForeignKey(r => r.RewardSkillId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ProficiencyPrerequisite>(entity =>
+            {
+                entity.HasKey(p => new { p.ProficiencyId, p.PrerequisiteProficiencyId });
+
+                entity.HasOne(p => p.Proficiency)
+                    .WithMany(prof => prof.Prerequisites)
+                    .HasForeignKey(p => p.ProficiencyId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // The prerequisite side is a second FK to Proficiency; Restrict so the two FKs don't form a
+                // multiple-cascade-path ambiguity (a proficiency is retired, never deleted, regardless).
+                entity.HasOne(p => p.Prerequisite)
+                    .WithMany()
+                    .HasForeignKey(p => p.PrerequisiteProficiencyId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<SkillProficiency>(entity =>
+            {
+                entity.HasKey(sp => new { sp.SkillId, sp.ProficiencyId });
+
+                entity.Property(sp => sp.Weight)
+                    .HasPrecision(18, 3);
+
+                entity.HasOne(sp => sp.Skill)
+                    .WithMany()
+                    .HasForeignKey(sp => sp.SkillId);
+
+                entity.HasOne(sp => sp.Proficiency)
+                    .WithMany(p => p.SkillContributions)
+                    .HasForeignKey(sp => sp.ProficiencyId);
             });
 
             modelBuilder.Entity<StatisticType>(entity =>

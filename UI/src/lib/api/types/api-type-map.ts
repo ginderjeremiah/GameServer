@@ -20,6 +20,7 @@ import type {
 	ILoginResult,
 	IPlayerData,
 	IPlayerSummary,
+	IProficiency,
 	IRefreshRequest,
 	IReplayDeadLettersData,
 	IRole,
@@ -28,6 +29,10 @@ import type {
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
+	ISetProficiencyContributionsData,
+	ISetProficiencyModifiersData,
+	ISetProficiencyPrerequisitesData,
+	ISetProficiencyRewardsData,
 	ISetSkillEffectsData,
 	ISetTagsData,
 	ISetUserRolesData,
@@ -47,6 +52,7 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditItemMods': undefined;
 	'AdminTools/AddEditItemModSlots': undefined;
 	'AdminTools/AddEditItems': undefined;
+	'AdminTools/AddEditProficiencies': undefined;
 	'AdminTools/AddEditSkills': undefined;
 	'AdminTools/AddEditTags': undefined;
 	'AdminTools/AddEditZones': undefined;
@@ -59,6 +65,10 @@ export type ApiResponseTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
+	'AdminTools/SetProficiencyContributions': undefined;
+	'AdminTools/SetProficiencyModifiers': undefined;
+	'AdminTools/SetProficiencyPrerequisites': undefined;
+	'AdminTools/SetProficiencyRewards': undefined;
 	'AdminTools/SetSkillEffects': undefined;
 	'AdminTools/SetSkillMultipliers': undefined;
 	'AdminTools/SetTagsForItem': undefined;
@@ -88,6 +98,7 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditItemMods': IChange<IItemMod>[];
 	'AdminTools/AddEditItemModSlots': IChange<IItemModSlot>[];
 	'AdminTools/AddEditItems': IChange<IItem>[];
+	'AdminTools/AddEditProficiencies': IChange<IProficiency>[];
 	'AdminTools/AddEditSkills': IChange<ISkill>[];
 	'AdminTools/AddEditTags': IChange<ITag>[];
 	'AdminTools/AddEditZones': IChange<IZone>[];
@@ -99,6 +110,10 @@ export type ApiRequestTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
+	'AdminTools/SetProficiencyContributions': ISetProficiencyContributionsData;
+	'AdminTools/SetProficiencyModifiers': ISetProficiencyModifiersData;
+	'AdminTools/SetProficiencyPrerequisites': ISetProficiencyPrerequisitesData;
+	'AdminTools/SetProficiencyRewards': ISetProficiencyRewardsData;
 	'AdminTools/SetSkillEffects': ISetSkillEffectsData;
 	'AdminTools/SetSkillMultipliers': IAddEditAttributesData;
 	'AdminTools/SetTagsForItem': ISetTagsData;
