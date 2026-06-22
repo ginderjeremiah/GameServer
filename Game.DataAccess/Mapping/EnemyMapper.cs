@@ -2,6 +2,7 @@ using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Enemies;
 using Contracts = Game.Abstractions.Contracts;
+using CoreSkill = Game.Core.Skills.Skill;
 using EntityEnemy = Game.Infrastructure.Entities.Enemy;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
 
@@ -57,16 +58,30 @@ namespace Game.DataAccess.Mapping
                         BaseAmount = ad.BaseAmount,
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
-                // The cached skill list is the zero-based, contiguous-id reference set (docs/backend.md
-                // → Reference Data), so a skill resolves by direct index instead of a per-call dictionary.
-                // A persisted EnemySkill.SkillId is FK-guaranteed in range against the contiguity-asserted
-                // skill set, so the index always resolves; an out-of-range id would be content-data
-                // corruption and throws loudly here rather than silently dropping the skill (the loud-fail
-                // policy the player-load path enforces, vs. the prior skip-if-missing filter).
                 AvailableSkills = entity.EnemySkills
-                    .Select(es => SkillMapper.ToCore(allSkills[es.SkillId]))
+                    .Select(es => ResolveSkill(entity, es.SkillId, allSkills))
                     .ToList(),
             };
+        }
+
+        /// <summary>
+        /// Resolves an enemy's available skill by direct index into the cached, zero-based, contiguous-id
+        /// skill set (docs/backend.md → Reference Data). A persisted <c>EnemySkill.SkillId</c> is
+        /// FK-guaranteed in range against the (contiguity-asserted) skill set, so this always resolves; an
+        /// out-of-range id can only be content-data corruption and fails loudly with a diagnosable message
+        /// naming the enemy and offending id — mirroring the player-load loud-fail policy rather than the
+        /// prior filter that silently dropped the skill from the loadout.
+        /// </summary>
+        private static CoreSkill ResolveSkill(EntityEnemy enemy, int skillId, IReadOnlyList<EntitySkill> allSkills)
+        {
+            if (skillId < 0 || skillId >= allSkills.Count)
+            {
+                throw new InvalidOperationException(
+                    $"Enemy {enemy.Id} ('{enemy.Name}') references a skill with Id {skillId} that does not " +
+                    "resolve against the skill catalog (a content-data mistake — a referenced id is out of range).");
+            }
+
+            return SkillMapper.ToCore(allSkills[skillId]);
         }
     }
 }
