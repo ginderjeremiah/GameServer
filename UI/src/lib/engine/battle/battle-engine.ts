@@ -1,6 +1,6 @@
-import { Battler, battleStep, type BattleStepLog } from '$lib/battle';
+import { Battler, battleStep, type BattleStepLog, type AttributeModifier } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
-import { staticData } from '$stores';
+import { staticData, playerProficiencies } from '$stores';
 import { ELogType, IBattlerAttribute, IEnemyInstance } from '$lib/api';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 import { logMessage, type LogOutcome } from '../log';
@@ -44,16 +44,17 @@ const notifyCombatFloat = combatFloatHook.notify;
  *  activation during the live battle loop; the headless simulator never emits these. */
 export const onCombatFloat = combatFloatHook.onNotified;
 
-/** A reference snapshot of the player's battle-relevant derivation inputs — the same four inputs the
- *  player {@link Battler} is derived from. Captured by {@link BattleEngine.capturePlayerBattleState} and
- *  compared by {@link BattleEngine.playerBattleStateMatches}. Used by the idle loop to tell whether the
- *  player changed their build during a post-battle cooldown, in which case a server-prefetched next battle
+/** A reference snapshot of the player's battle-relevant derivation inputs — the same inputs the player
+ *  {@link Battler} is derived from. Captured by {@link BattleEngine.capturePlayerBattleState} and compared
+ *  by {@link BattleEngine.playerBattleStateMatches}. Used by the idle loop to tell whether the player
+ *  changed their build during a post-battle cooldown, in which case a server-prefetched next battle
  *  (snapshotted at the previous battle's end) would no longer match what the frontend derives. */
 export interface PlayerBattleState {
 	equipmentStats: IBattlerAttribute[];
 	attributes: IBattlerAttribute[];
 	selectedSkills: number[];
 	level: number;
+	proficiencyModifiers: AttributeModifier[];
 }
 
 export class BattleEngine {
@@ -104,6 +105,7 @@ export class BattleEngine {
 	private lastPlayerAttributes?: IBattlerAttribute[];
 	private lastSelectedSkills?: number[];
 	private lastPlayerLevel?: number;
+	private lastProficiencyModifiers?: AttributeModifier[];
 
 	public start() {
 		if (!this.running) {
@@ -167,22 +169,28 @@ export class BattleEngine {
 		const attributes = playerManager.attributes;
 		const selectedSkills = playerManager.selectedSkills;
 		const level = playerManager.level;
+		// Proficiency level bonuses, composed from the player's levels against the reference data. A stable
+		// reference while unchanged (a `$derived`), so an idle farm whose proficiencies didn't change re-arms
+		// the existing battler instead of rebuilding it (#811).
+		const proficiencyModifiers = playerProficiencies.battleModifiers;
 		if (
 			equipmentStats === this.lastEquipmentStats &&
 			attributes === this.lastPlayerAttributes &&
 			selectedSkills === this.lastSelectedSkills &&
-			level === this.lastPlayerLevel
+			level === this.lastPlayerLevel &&
+			proficiencyModifiers === this.lastProficiencyModifiers
 		) {
 			this.player.reset();
 			return;
 		}
 		// Granted skills change only when equipment does, so gating the re-derive on equipmentStats (above)
 		// already covers them; read the slot-ordered ids here so the rebuilt battler fields them.
-		this.player.reset(playerManager, equipmentStats, inventoryManager.grantedSkillIds);
+		this.player.reset(playerManager, equipmentStats, inventoryManager.grantedSkillIds, proficiencyModifiers);
 		this.lastEquipmentStats = equipmentStats;
 		this.lastPlayerAttributes = attributes;
 		this.lastSelectedSkills = selectedSkills;
 		this.lastPlayerLevel = level;
+		this.lastProficiencyModifiers = proficiencyModifiers;
 	}
 
 	public getOpponent(battler: Battler) {
@@ -197,7 +205,8 @@ export class BattleEngine {
 			equipmentStats: inventoryManager.equipmentStats,
 			attributes: playerManager.attributes,
 			selectedSkills: playerManager.selectedSkills,
-			level: playerManager.level
+			level: playerManager.level,
+			proficiencyModifiers: playerProficiencies.battleModifiers
 		};
 	}
 
@@ -210,7 +219,8 @@ export class BattleEngine {
 			state.equipmentStats === inventoryManager.equipmentStats &&
 			state.attributes === playerManager.attributes &&
 			state.selectedSkills === playerManager.selectedSkills &&
-			state.level === playerManager.level
+			state.level === playerManager.level &&
+			state.proficiencyModifiers === playerProficiencies.battleModifiers
 		);
 	}
 
