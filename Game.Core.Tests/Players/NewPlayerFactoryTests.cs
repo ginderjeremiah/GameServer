@@ -66,7 +66,7 @@ namespace Game.Core.Tests.Players
             var newPlayer = _factory.Create("hero", [0, 9, 9]);
 
             Assert.Equal(NewPlayerFactory.StarterSkillCount + 1, newPlayer.Skills.Count);
-            var seed = Assert.Single(newPlayer.Skills.Where(skill => !skill.Selected));
+            var seed = Assert.Single(newPlayer.Skills, skill => !skill.Selected);
             Assert.Equal(9, seed.SkillId);
         }
 

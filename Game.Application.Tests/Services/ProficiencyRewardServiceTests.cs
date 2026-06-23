@@ -189,7 +189,7 @@ namespace Game.Application.Tests.Services
             service.AccrueAndApply(progress, stats, difficultyMultiplier: 1.0, player, notify: false);
             service.AccrueAndApply(progress, stats, difficultyMultiplier: 1.0, player, notify: false);
 
-            Assert.Single(player.Skills.Where(s => s.Id == rewardSkill.Id));
+            Assert.Single(player.Skills, s => s.Id == rewardSkill.Id);
         }
 
         // Seeds a fresh player whose one (selected) starter skill contributes to a single-tier proficiency, so
