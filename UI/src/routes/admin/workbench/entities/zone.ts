@@ -112,6 +112,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			warn: (z) => (z.zoneEnemies.length ? null : 'No enemies spawn here'),
 			kind: 'table',
 			itemsKey: 'zoneEnemies',
+			rowKey: 'enemyId',
 			addLabel: 'Assign enemy',
 			emptyIcon: 'skull',
 			emptyTitle: 'No enemies assigned',

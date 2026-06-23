@@ -1,7 +1,37 @@
 import { EChangeType, type IChange, type IItemModSlot, type ISkillEffect } from '$lib/api';
 import type { Identified, SaveDiff } from './entities/types';
 
-export const listsEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Recursively normalise a value to a canonical shape: object keys sorted, and `null`/`undefined`/
+ * absent keys collapsed to the same (omitted) state. Lets structural comparison ignore key order
+ * and treat a server `null` for an unset optional as equal to a locally-absent key — both of which
+ * a raw `JSON.stringify` compare would otherwise read as a (phantom) difference.
+ */
+const canonicalize = (value: unknown): unknown => {
+	if (value === null || value === undefined) {
+		return null;
+	}
+	if (Array.isArray(value)) {
+		return value.map(canonicalize);
+	}
+	if (typeof value === 'object') {
+		const out: Record<string, unknown> = {};
+		for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+			const normalized = canonicalize((value as Record<string, unknown>)[key]);
+			if (normalized !== null) {
+				out[key] = normalized;
+			}
+		}
+		return out;
+	}
+	return value;
+};
+
+/** Structural equality that is insensitive to object key order and to `null`-vs-absent optionals. */
+export const canonicalEqual = (a: unknown, b: unknown): boolean =>
+	JSON.stringify(canonicalize(a)) === JSON.stringify(canonicalize(b));
+
+export const listsEqual = canonicalEqual;
 
 /** True when a child collection differs from its saved baseline (added records have none). */
 export const childChanged = <T>(current: T, baseline: T | undefined): boolean =>
@@ -176,7 +206,10 @@ export function skillEffectChanges(
 			a.amount === b.amount &&
 			a.durationMs === b.durationMs &&
 			a.scalingAttributeId === b.scalingAttributeId &&
-			a.scalingAmount === b.scalingAmount
+			a.scalingAmount === b.scalingAmount,
+		// New, unsaved effects carry a unique negative client id; normalise it to 0 so the wire
+		// payload marks an Add the same way regardless of the local id.
+		(effect) => ({ ...effect, id: effect.id <= 0 ? 0 : effect.id })
 	);
 }
 

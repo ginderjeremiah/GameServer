@@ -10,11 +10,34 @@ import {
 } from '$lib/api';
 import {
 	attributeChanges,
+	canonicalEqual,
 	modSlotChanges,
 	persistEntity,
 	skillEffectChanges
 } from '../../../../routes/admin/workbench/save-helpers';
 import type { Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
+
+describe('canonicalEqual', () => {
+	it('is insensitive to object key order', () => {
+		expect(canonicalEqual({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(true);
+	});
+
+	it('treats null, undefined, and an absent optional as equal', () => {
+		expect(canonicalEqual({ a: 1, b: null }, { a: 1 })).toBe(true);
+		expect(canonicalEqual({ a: 1, b: undefined }, { a: 1 })).toBe(true);
+		expect(canonicalEqual({ a: 1, b: null }, { a: 1, b: undefined })).toBe(true);
+	});
+
+	it('distinguishes a real value (including 0) from null/absent', () => {
+		expect(canonicalEqual({ a: 1, b: 0 }, { a: 1 })).toBe(false);
+		expect(canonicalEqual({ a: 1, b: '' }, { a: 1 })).toBe(false);
+	});
+
+	it('compares nested arrays and objects structurally', () => {
+		expect(canonicalEqual({ xs: [{ a: 1, b: 2 }] }, { xs: [{ b: 2, a: 1 }] })).toBe(true);
+		expect(canonicalEqual([1, 2], [2, 1])).toBe(false);
+	});
+});
 
 describe('attributeChanges', () => {
 	it('emits Add / Edit / Delete keyed by attributeId', () => {
@@ -87,6 +110,11 @@ describe('skillEffectChanges', () => {
 		const current: ISkillEffect[] = [makeEffect(0)];
 		const changes = skillEffectChanges(current, undefined);
 		expect(changes).toEqual([{ changeType: EChangeType.Add, item: makeEffect(0) }]);
+	});
+
+	it('normalises a negative client id to 0 on the Add payload', () => {
+		const changes = skillEffectChanges([makeEffect(-3, { amount: 7 })], []);
+		expect(changes).toEqual([{ changeType: EChangeType.Add, item: makeEffect(0, { amount: 7 }) }]);
 	});
 
 	it('emits no changes when current and baseline are identical', () => {

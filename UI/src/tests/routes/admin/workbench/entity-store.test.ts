@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('$stores', () => ({ toastError: vi.fn() }));
+
 import { EntityStore } from '../../../../routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
 
@@ -129,6 +132,49 @@ describe('EntityStore', () => {
 		expect(store.counts.total).toBe(0);
 		expect(store.items).toHaveLength(3);
 		expect(store.saved).toBe(true);
+	});
+
+	it('re-seeds from server truth when a save fails, so a retry cannot re-add duplicates', async () => {
+		// A partial failure: the add committed server-side (now id 2) but persist then threw.
+		const serverTruth: Row[] = [
+			{ id: 0, name: 'Alpha', value: 1 },
+			{ id: 1, name: 'Beta', value: 2 },
+			{ id: 2, name: 'Gamma', value: 3 }
+		];
+		const config: EntityConfig<Row> = {
+			...makeConfig(async () => {
+				throw new Error('child saver failed');
+			}),
+			refresh: async () => serverTruth
+		};
+		const store = new EntityStore(config, seed);
+		store.addItem();
+		expect(store.counts.added).toBe(1);
+
+		await store.save();
+
+		// The negative-id "added" record is gone — the screen reflects what actually persisted, so
+		// a retry diffs against server truth instead of re-Adding the already-persisted record.
+		expect(store.counts.total).toBe(0);
+		expect(store.items).toHaveLength(3);
+		expect(store.items.some((r) => r.id < 0)).toBe(false);
+	});
+
+	it('keeps local edits intact when the post-failure recovery refresh also fails', async () => {
+		const config: EntityConfig<Row> = {
+			...makeConfig(async () => {
+				throw new Error('save failed');
+			}),
+			refresh: async () => {
+				throw new Error('refresh failed');
+			}
+		};
+		const store = new EntityStore(config, seed);
+		store.addItem();
+
+		await store.save();
+
+		expect(store.counts.added).toBe(1);
 	});
 
 	it('does not call persist when there are no changes', async () => {

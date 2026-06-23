@@ -1,11 +1,12 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { toastError } from '$stores';
+import { canonicalEqual } from './save-helpers';
 import type { EntityConfig, Identified, SaveDiff } from './entities/types';
 
 export type RecordStatus = 'clean' | 'added' | 'modified' | 'deleted';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
-export const recordsEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+export const recordsEqual = canonicalEqual;
 
 /**
  * Working store for one entity: holds an editable copy of the saved records plus
@@ -168,8 +169,19 @@ export class EntityStore<T extends Identified> {
 			this.deleted.clear();
 			this.flashSaved();
 		} catch (ex) {
-			// Without this, a failed persist reset only the saving flag and the
-			// user was left with unsaved edits and no indication anything broke.
+			// A partial failure (e.g. the identity Add/Edit batch committed but a child saver then
+			// threw) leaves our baseline behind the server: the persisted adds are still local
+			// "added" records, so a naive retry would re-Add duplicates. Re-seed from server truth
+			// so a retry diffs against what actually persisted. If even the refresh fails, keep the
+			// local edits rather than blanking the screen — the toast below still flags the failure.
+			try {
+				const fresh = await this.config.refresh();
+				this.items = fresh.map(clone);
+				this.base = fresh.map(clone);
+				this.deleted.clear();
+			} catch {
+				// Leave local state intact; surfacing the original save error is what matters.
+			}
 			toastError(ex instanceof Error ? ex.message : 'Failed to save changes.');
 		} finally {
 			this.saving = false;
