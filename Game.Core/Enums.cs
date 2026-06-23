@@ -239,7 +239,13 @@ namespace Game.Core
         /// Logs for skill-effect activity in battle: timed buff/debuff application and
         /// per-second damage-over-time / heal-over-time summaries.
         /// </summary>
-        SkillEffect = 7
+        SkillEffect = 7,
+
+        /// <summary>
+        /// Logs for proficiency progression earned from won battles: XP gained, level-ups,
+        /// milestones reached, and newly-opened proficiencies.
+        /// </summary>
+        Proficiency = 8
     }
 
     /// <summary>

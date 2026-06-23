@@ -8,7 +8,13 @@ vi.mock('$lib/api', async (importOriginal) => {
 	return { ...actual, fetchSocketData: mockFetchSocket };
 });
 
-import { EAttribute, EModifierType, type IPlayerProficiency, type IProficiency } from '$lib/api';
+import {
+	EAttribute,
+	EModifierType,
+	type IPlayerProficiency,
+	type IProficiency,
+	type IProficiencyXpResultModel
+} from '$lib/api';
 import { EAttributeModifierSource } from '$lib/battle/attribute-modifier';
 import { playerProficiencies } from '$stores/proficiencies.svelte';
 import { staticData } from '$stores/static-data.svelte';
@@ -104,6 +110,81 @@ describe('proficiencies store', () => {
 		mockFetchSocket.mockResolvedValue([playerProficiency(2, 1)]);
 		await playerProficiencies.load();
 		expect(playerProficiencies.all).toEqual([playerProficiency(2, 1)]);
+	});
+
+	describe('levelOf', () => {
+		it('returns the stored level for a known proficiency and 0 for an unopened one', async () => {
+			mockFetchSocket.mockResolvedValue([playerProficiency(0, 3)]);
+			await playerProficiencies.load();
+
+			expect(playerProficiencies.levelOf(0)).toBe(3);
+			expect(playerProficiencies.levelOf(7)).toBe(0);
+		});
+	});
+
+	describe('applyXpGained', () => {
+		const xpResult = (proficiencyId: number, newLevel: number, newXp: number): IProficiencyXpResultModel => ({
+			proficiencyId,
+			xpGained: 10,
+			newLevel,
+			newXp,
+			milestonesCrossed: [],
+			grantedSkillIds: []
+		});
+
+		it('updates an existing proficiency in place to its new level and xp', async () => {
+			mockFetchSocket.mockResolvedValue([playerProficiency(0, 3, 20)]);
+			await playerProficiencies.load();
+
+			playerProficiencies.applyXpGained({ proficiencies: [xpResult(0, 4, 5)], opened: [] });
+
+			expect(playerProficiencies.all).toEqual([playerProficiency(0, 4, 5)]);
+		});
+
+		it('inserts a proficiency that was not yet in the store', async () => {
+			mockFetchSocket.mockResolvedValue([]);
+			await playerProficiencies.load();
+
+			playerProficiencies.applyXpGained({ proficiencies: [xpResult(2, 1, 8)], opened: [] });
+
+			expect(playerProficiencies.all).toEqual([playerProficiency(2, 1, 8)]);
+		});
+
+		it('adds a newly-opened proficiency at level 0 when the battle did not also train it', async () => {
+			mockFetchSocket.mockResolvedValue([]);
+			await playerProficiencies.load();
+
+			playerProficiencies.applyXpGained({
+				proficiencies: [],
+				opened: [{ proficiencyId: 5, seedSkillId: 12 }]
+			});
+
+			expect(playerProficiencies.all).toEqual([playerProficiency(5, 0, 0)]);
+		});
+
+		it('does not duplicate an opened proficiency the same push already trained', async () => {
+			mockFetchSocket.mockResolvedValue([]);
+			await playerProficiencies.load();
+
+			playerProficiencies.applyXpGained({
+				proficiencies: [xpResult(5, 1, 3)],
+				opened: [{ proficiencyId: 5 }]
+			});
+
+			expect(playerProficiencies.all).toEqual([playerProficiency(5, 1, 3)]);
+		});
+
+		it('reassigns the array so battleModifiers re-derives after a level change', async () => {
+			staticData.proficiencies = [proficiency(0, [additive(1, EAttribute.Strength, 4)])];
+			mockFetchSocket.mockResolvedValue([playerProficiency(0, 1)]);
+			await playerProficiencies.load();
+
+			const before = playerProficiencies.battleModifiers;
+			playerProficiencies.applyXpGained({ proficiencies: [xpResult(0, 2, 0)], opened: [] });
+
+			expect(playerProficiencies.battleModifiers).not.toBe(before);
+			expect(playerProficiencies.levelOf(0)).toBe(2);
+		});
 	});
 
 	describe('battleModifiers', () => {

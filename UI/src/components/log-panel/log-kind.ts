@@ -71,6 +71,8 @@ export function logKind(log: LogMessage): LogKind {
 			return { color: REWARD, glyph: 'crit', label: 'Exp' };
 		case ELogType.LevelUp:
 			return { color: REWARD, glyph: 'crit', label: 'Level' };
+		case ELogType.Proficiency:
+			return { color: REWARD, glyph: 'crit', label: 'Prof' };
 		case ELogType.EnemyDefeated:
 			return fromPlayer
 				? { color: ENEMY, glyph: 'kill', label: 'Defeat' }

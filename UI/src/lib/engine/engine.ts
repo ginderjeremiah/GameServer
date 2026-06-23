@@ -1,11 +1,22 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { BattleEngine } from './battle/battle-engine';
-import { statify, type Action, resolveUnlockReward, challengeCompletedMessage } from '$lib/common';
+import {
+	statify,
+	type Action,
+	resolveUnlockReward,
+	challengeCompletedMessage,
+	proficiencyXpMessage,
+	proficiencyLevelMessage,
+	proficiencyMilestoneMessage,
+	proficiencyOpenedMessage
+} from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
 import { BackgroundThrottleMonitor } from './background-throttle-notice';
 import { InventoryManager } from './player/inventory-manager';
+import { playerManager } from './player/player-manager';
+import { logMessage } from './log';
 import { EnemyManager } from './battle/enemy-manager';
 import {
 	staticData,
@@ -17,7 +28,13 @@ import {
 	toastSuccess,
 	navigation
 } from '$stores';
-import { apiSocket, type IApiSocketResponse } from '$lib/api';
+import {
+	apiSocket,
+	ELogType,
+	type IApiSocketResponse,
+	type IProficiencyXpResultModel,
+	type IProficiencyOpenedModel
+} from '$lib/api';
 
 export const inventoryManager = statify(new InventoryManager());
 export const enemyManager = statify(new EnemyManager());
@@ -35,6 +52,7 @@ export const SESSION_REPLACED_BODY =
 
 let socketReplacedUnhook: Action | undefined;
 let challengeCompletedUnhook: Action | undefined;
+let proficiencyXpGainedUnhook: Action | undefined;
 let serverCommandFailedUnhook: Action | undefined;
 
 export const startGame = () => {
@@ -55,22 +73,26 @@ export const startGame = () => {
 		startBattleEngine();
 		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced, true);
 		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted, true);
+		proficiencyXpGainedUnhook = apiSocket.listenCommand('ProficiencyXpGained', handleProficiencyXpGained, true);
 		serverCommandFailedUnhook = apiSocket.listenCommand('ServerCommandFailed', handleServerCommandFailed, true);
 	}
 };
 
 /**
  * Reacts to a ServerCommandFailed notice: the server dead-lettered a server-pushed command that threw and
- * is telling us to re-sync rather than silently diverge from the authoritative state. The only push that
- * leaves divergent client state is ChallengeCompleted (its completion gates zone navigation), so a failed
- * one force-reloads the authoritative challenge progress; any reward it carried still surfaces on the next
- * natural load of the inventory/skills stores.
+ * is telling us to re-sync rather than silently diverge from the authoritative state. Two pushes leave
+ * divergent client state: ChallengeCompleted (its completion gates zone navigation) and ProficiencyXpGained
+ * (its levels feed the live battler's attribute bonuses), so a failed one force-reloads the matching
+ * authoritative progress; any reward/skill it carried still surfaces on the next natural load of the
+ * inventory/skills stores.
  */
 export const handleServerCommandFailed = (response: IApiSocketResponse<'ServerCommandFailed'>) => {
 	const failedCommand = response.data?.commandName;
 	console.warn(`A server-pushed command failed on the server and was dead-lettered: ${failedCommand ?? 'unknown'}.`);
 	if (failedCommand === 'ChallengeCompleted') {
 		void playerChallenges.load(true);
+	} else if (failedCommand === 'ProficiencyXpGained') {
+		void playerProficiencies.load(true);
 	}
 };
 
@@ -123,6 +145,86 @@ const notifyChallengeCompleted = (challengeId: number) => {
 	});
 };
 
+/**
+ * Applies a proficiency-XP push from a won battle (spike #982 area H): surfaces the per-proficiency XP,
+ * level-ups, milestones, and newly-opened proficiencies, makes any milestone/seed skill usable
+ * immediately (mirroring the challenge-reward unlock), then updates the proficiency store so the tree and
+ * the live battler's bonuses reflect the gain without a refetch. Prior levels are read off the store
+ * before it is updated, since the push carries only the new level — the level-up is detected by comparison.
+ */
+export const handleProficiencyXpGained = (response: IApiSocketResponse<'ProficiencyXpGained'>) => {
+	const data = response.data;
+	if (!data) {
+		return;
+	}
+
+	for (const result of data.proficiencies) {
+		notifyProficiencyResult(result, playerProficiencies.levelOf(result.proficiencyId));
+		for (const skillId of result.grantedSkillIds) {
+			playerManager.addUnlockedSkill(skillId);
+		}
+	}
+	for (const opened of data.opened) {
+		notifyProficiencyOpened(opened);
+		if (opened.seedSkillId != null) {
+			playerManager.addUnlockedSkill(opened.seedSkillId);
+		}
+	}
+
+	playerProficiencies.applyXpGained(data);
+};
+
+/**
+ * Surfaces one proficiency's outcome. Routine XP goes to the combat log only (it lands every won battle,
+ * like the player's own XP); a level-up adds a log line, and crossing a milestone both logs and toasts —
+ * naming the granted skill, resolved from the proficiency's authored level rewards. A plain level-up also
+ * toasts, but only when no milestone was crossed at the same time, so the richer milestone toast isn't
+ * duplicated. Unknown reference ids are skipped (the store is still updated by the caller).
+ */
+const notifyProficiencyResult = (result: IProficiencyXpResultModel, previousLevel: number) => {
+	const proficiency = staticData.proficiencies?.[result.proficiencyId];
+	if (!proficiency) {
+		return;
+	}
+	const name = proficiency.name;
+
+	const xp = Math.round(result.xpGained);
+	if (xp > 0) {
+		logMessage(ELogType.Proficiency, proficiencyXpMessage(name, xp));
+	}
+
+	const leveledUp = result.newLevel > previousLevel;
+	if (leveledUp) {
+		logMessage(ELogType.Proficiency, proficiencyLevelMessage(name, result.newLevel));
+	}
+
+	for (const milestoneLevel of result.milestonesCrossed) {
+		const skillId = proficiency.levelRewards.find((reward) => reward.level === milestoneLevel)?.rewardSkillId;
+		const skillName = skillId != null ? staticData.skills?.[skillId]?.name : undefined;
+		const message = proficiencyMilestoneMessage(name, milestoneLevel, skillName);
+		logMessage(ELogType.Proficiency, message);
+		toastSuccess(message);
+	}
+
+	if (leveledUp && result.milestonesCrossed.length === 0) {
+		toastSuccess(proficiencyLevelMessage(name, result.newLevel));
+	}
+};
+
+/** Surfaces a newly-opened proficiency (a maxed tier's next tier, or a newly-satisfied gateway), naming
+ *  the seed skill granted with it when present. Both a combat-log line and a toast, since an unlock is a
+ *  notable, infrequent event. Unknown reference ids are skipped. */
+const notifyProficiencyOpened = (opened: IProficiencyOpenedModel) => {
+	const proficiency = staticData.proficiencies?.[opened.proficiencyId];
+	if (!proficiency) {
+		return;
+	}
+	const seedSkillName = opened.seedSkillId != null ? staticData.skills?.[opened.seedSkillId]?.name : undefined;
+	const message = proficiencyOpenedMessage(proficiency.name, seedSkillName);
+	logMessage(ELogType.Proficiency, message);
+	toastSuccess(message);
+};
+
 // Use goto() not location.href — a reload re-runs the boot gate and bounces an authenticated client back into the game.
 export const handleSocketReplaced = async () => {
 	stopGame();
@@ -157,6 +259,7 @@ const stopGame = () => {
 	resetLogs();
 	socketReplacedUnhook?.();
 	challengeCompletedUnhook?.();
+	proficiencyXpGainedUnhook?.();
 	serverCommandFailedUnhook?.();
 	// SocketReplaced routes back to login client-side (no reload), so the socket singleton survives. Tear
 	// it down explicitly, otherwise the keepalive ping would silently reconnect and fight the session that
