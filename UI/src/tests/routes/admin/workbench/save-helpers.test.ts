@@ -10,11 +10,35 @@ import {
 } from '$lib/api';
 import {
 	attributeChanges,
+	canonicalEqual,
 	modSlotChanges,
 	persistEntity,
+	PersistFailedError,
 	skillEffectChanges
 } from '../../../../routes/admin/workbench/save-helpers';
 import type { Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
+
+describe('canonicalEqual', () => {
+	it('is insensitive to object key order', () => {
+		expect(canonicalEqual({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(true);
+	});
+
+	it('treats null, undefined, and an absent optional as equal', () => {
+		expect(canonicalEqual({ a: 1, b: null }, { a: 1 })).toBe(true);
+		expect(canonicalEqual({ a: 1, b: undefined }, { a: 1 })).toBe(true);
+		expect(canonicalEqual({ a: 1, b: null }, { a: 1, b: undefined })).toBe(true);
+	});
+
+	it('distinguishes a real value (including 0) from null/absent', () => {
+		expect(canonicalEqual({ a: 1, b: 0 }, { a: 1 })).toBe(false);
+		expect(canonicalEqual({ a: 1, b: '' }, { a: 1 })).toBe(false);
+	});
+
+	it('compares nested arrays and objects structurally', () => {
+		expect(canonicalEqual({ xs: [{ a: 1, b: 2 }] }, { xs: [{ b: 2, a: 1 }] })).toBe(true);
+		expect(canonicalEqual([1, 2], [2, 1])).toBe(false);
+	});
+});
 
 describe('attributeChanges', () => {
 	it('emits Add / Edit / Delete keyed by attributeId', () => {
@@ -57,6 +81,11 @@ describe('modSlotChanges', () => {
 			{ changeType: EChangeType.Delete, item: { id: 2, itemId: 5, itemModSlotTypeId: 1 } }
 		]);
 	});
+
+	it('normalises a negative client id to 0 on the Add payload', () => {
+		const changes = modSlotChanges([{ id: -2, itemId: 0, itemModSlotTypeId: 3 }], [], 5);
+		expect(changes).toEqual([{ changeType: EChangeType.Add, item: { id: 0, itemId: 5, itemModSlotTypeId: 3 } }]);
+	});
 });
 
 const makeEffect = (id: number, overrides: Partial<ISkillEffect> = {}): ISkillEffect => ({
@@ -87,6 +116,11 @@ describe('skillEffectChanges', () => {
 		const current: ISkillEffect[] = [makeEffect(0)];
 		const changes = skillEffectChanges(current, undefined);
 		expect(changes).toEqual([{ changeType: EChangeType.Add, item: makeEffect(0) }]);
+	});
+
+	it('normalises a negative client id to 0 on the Add payload', () => {
+		const changes = skillEffectChanges([makeEffect(-3, { amount: 7 })], []);
+		expect(changes).toEqual([{ changeType: EChangeType.Add, item: makeEffect(0, { amount: 7 }) }]);
 	});
 
 	it('emits no changes when current and baseline are identical', () => {
@@ -212,5 +246,51 @@ describe('persistEntity', () => {
 
 		expect(postPrimary).not.toHaveBeenCalled();
 		expect(childIds).toEqual([0]);
+	});
+
+	it('propagates a pre-commit (postPrimary) failure raw, not as PersistFailedError', async () => {
+		const diff: SaveDiff<Row> = { added: [{ id: -1, name: 'A' }], modified: [], deleted: [], existingIds: [] };
+		const cause = new Error('primary batch 500');
+		await expect(
+			persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => r,
+				postPrimary: async () => {
+					throw cause;
+				},
+				refresh: async () => []
+			})
+		).rejects.toBe(cause);
+	});
+
+	it('wraps a post-commit (child saver) failure as PersistFailedError', async () => {
+		const diff: SaveDiff<Row> = { added: [{ id: -1, name: 'A' }], modified: [], deleted: [], existingIds: [] };
+		await expect(
+			persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => r,
+				postPrimary: async () => undefined,
+				refresh: async () => [{ id: 1, name: 'A' }],
+				childSavers: [
+					async () => {
+						throw new Error('child saver 500');
+					}
+				]
+			})
+		).rejects.toBeInstanceOf(PersistFailedError);
+	});
+
+	it('wraps a post-commit refresh failure as PersistFailedError', async () => {
+		const diff: SaveDiff<Row> = { added: [{ id: -1, name: 'A' }], modified: [], deleted: [], existingIds: [] };
+		await expect(
+			persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => r,
+				postPrimary: async () => undefined,
+				refresh: async () => {
+					throw new Error('refresh 500');
+				}
+			})
+		).rejects.toBeInstanceOf(PersistFailedError);
 	});
 });

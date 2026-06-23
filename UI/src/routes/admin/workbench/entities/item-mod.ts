@@ -74,6 +74,7 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 			warn: (m) => (m.attributes.length ? null : 'No attributes'),
 			kind: 'table',
 			itemsKey: 'attributes',
+			rowKey: 'attributeId',
 			addLabel: 'Add bonus',
 			emptyIcon: 'bars',
 			emptyTitle: 'No attribute bonuses',

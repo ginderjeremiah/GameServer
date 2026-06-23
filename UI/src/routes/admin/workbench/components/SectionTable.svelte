@@ -19,12 +19,12 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each rows as row, i (i)}
-					{@const isNewRow = !baseRows || i >= baseRows.length}
-					{@const baseRow = baseRows?.[i]}
+				{#each rows as row, i (row[rowKey])}
+					{@const baseRow = baseByKey[row[rowKey]]}
+					{@const isNewRow = baseRow === undefined}
 					{@const edge = isNewRow
 						? 'var(--change-added)'
-						: baseRow && !recordsEqual(row, baseRow)
+						: !recordsEqual(row, baseRow)
 							? 'var(--change-modified)'
 							: 'transparent'}
 					<tr>
@@ -43,7 +43,7 @@
 								idx={i}
 								{rows}
 								{record}
-								dirty={!isNewRow && !!baseRow && !recordsEqual(row[col.key], baseRow[col.key])}
+								dirty={!isNewRow && !recordsEqual(row[col.key], baseRow[col.key])}
 								onChange={(value) => setCell(i, col.key, value)}
 							/>
 						{/each}
@@ -86,8 +86,19 @@ interface Props {
 const { section, record, baseline, store }: Props = $props();
 
 const itemsKey = $derived(section.itemsKey as string);
+const rowKey = $derived(section.rowKey);
 const rows = $derived((fieldsOf(record)[itemsKey] as Record<string, number>[]) ?? []);
 const baseRows = $derived(baseline ? (fieldsOf(baseline)[itemsKey] as Record<string, number>[]) : null);
+
+// Match each row to its baseline by stable identity (not array position), so a mid-list delete
+// shifting indices can no longer compare a row against the wrong baseline.
+const baseByKey = $derived.by(() => {
+	const map: Record<number, Record<string, number>> = {};
+	for (const baseRow of baseRows ?? []) {
+		map[baseRow[rowKey]] = baseRow;
+	}
+	return map;
+});
 
 // Disable Add once a unique select column has exhausted every option.
 const uniqueCol = $derived(section.columns.find((c) => c.type === 'select' && c.unique));
@@ -103,7 +114,15 @@ const mutateRows = (mutate: (list: Record<string, number>[]) => void) => {
 
 const add = () =>
 	store.patch(record.id, (draft) => {
-		(fieldsOf(draft)[itemsKey] as Record<string, number>[]).push(section.newRow(draft));
+		const list = fieldsOf(draft)[itemsKey] as Record<string, number>[];
+		const row = section.newRow(draft);
+		// Surrogate-id collections mark new rows with id 0; give each a unique negative id so its
+		// identity (and the {#each} key) stays stable and collision-free across several unsaved rows.
+		// The persist layer treats any id <= 0 as an Add, normalising it back before sending.
+		if (rowKey === 'id') {
+			row.id = Math.min(0, ...list.map((r) => r.id ?? 0)) - 1;
+		}
+		list.push(row);
 	});
 const removeRow = (i: number) => mutateRows((list) => list.splice(i, 1));
 const setCell = (i: number, key: string, value: number) => mutateRows((list) => (list[i][key] = value));
