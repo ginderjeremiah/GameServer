@@ -121,25 +121,25 @@ namespace Game.Core.Tests.Proficiencies
         private static Proficiency Make(
             double baseXp, double xpGrowth, int maxLevel = 10, int[]? payoutLevels = null,
             (int Level, int? RewardSkillId)[]? rewardLevels = null) => new()
-        {
-            Id = 0,
-            Name = "Test",
-            Description = string.Empty,
-            PathId = 0,
-            PathOrdinal = 0,
-            MaxLevel = maxLevel,
-            BaseXp = baseXp,
-            XpGrowth = xpGrowth,
-            StartsUnlocked = true,
-            SeedSkillId = null,
-            PrerequisiteIds = [],
-            Levels = (rewardLevels ?? (payoutLevels ?? []).Select(level => (level, (int?)null)).ToArray())
+            {
+                Id = 0,
+                Name = "Test",
+                Description = string.Empty,
+                PathId = 0,
+                PathOrdinal = 0,
+                MaxLevel = maxLevel,
+                BaseXp = baseXp,
+                XpGrowth = xpGrowth,
+                StartsUnlocked = true,
+                SeedSkillId = null,
+                PrerequisiteIds = [],
+                Levels = (rewardLevels ?? (payoutLevels ?? []).Select(level => (level, (int?)null)).ToArray())
                 .Select(payout => new ProficiencyLevel
                 {
                     Level = payout.Item1,
                     Modifiers = [],
                     RewardSkillId = payout.Item2,
                 }).ToList(),
-        };
+            };
     }
 }
