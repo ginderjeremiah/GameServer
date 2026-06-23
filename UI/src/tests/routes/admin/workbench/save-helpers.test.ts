@@ -13,6 +13,7 @@ import {
 	canonicalEqual,
 	modSlotChanges,
 	persistEntity,
+	PersistFailedError,
 	skillEffectChanges
 } from '../../../../routes/admin/workbench/save-helpers';
 import type { Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
@@ -79,6 +80,11 @@ describe('modSlotChanges', () => {
 			{ changeType: EChangeType.Add, item: { id: 0, itemId: 5, itemModSlotTypeId: 3 } },
 			{ changeType: EChangeType.Delete, item: { id: 2, itemId: 5, itemModSlotTypeId: 1 } }
 		]);
+	});
+
+	it('normalises a negative client id to 0 on the Add payload', () => {
+		const changes = modSlotChanges([{ id: -2, itemId: 0, itemModSlotTypeId: 3 }], [], 5);
+		expect(changes).toEqual([{ changeType: EChangeType.Add, item: { id: 0, itemId: 5, itemModSlotTypeId: 3 } }]);
 	});
 });
 
@@ -240,5 +246,51 @@ describe('persistEntity', () => {
 
 		expect(postPrimary).not.toHaveBeenCalled();
 		expect(childIds).toEqual([0]);
+	});
+
+	it('propagates a pre-commit (postPrimary) failure raw, not as PersistFailedError', async () => {
+		const diff: SaveDiff<Row> = { added: [{ id: -1, name: 'A' }], modified: [], deleted: [], existingIds: [] };
+		const cause = new Error('primary batch 500');
+		await expect(
+			persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => r,
+				postPrimary: async () => {
+					throw cause;
+				},
+				refresh: async () => []
+			})
+		).rejects.toBe(cause);
+	});
+
+	it('wraps a post-commit (child saver) failure as PersistFailedError', async () => {
+		const diff: SaveDiff<Row> = { added: [{ id: -1, name: 'A' }], modified: [], deleted: [], existingIds: [] };
+		await expect(
+			persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => r,
+				postPrimary: async () => undefined,
+				refresh: async () => [{ id: 1, name: 'A' }],
+				childSavers: [
+					async () => {
+						throw new Error('child saver 500');
+					}
+				]
+			})
+		).rejects.toBeInstanceOf(PersistFailedError);
+	});
+
+	it('wraps a post-commit refresh failure as PersistFailedError', async () => {
+		const diff: SaveDiff<Row> = { added: [{ id: -1, name: 'A' }], modified: [], deleted: [], existingIds: [] };
+		await expect(
+			persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => r,
+				postPrimary: async () => undefined,
+				refresh: async () => {
+					throw new Error('refresh 500');
+				}
+			})
+		).rejects.toBeInstanceOf(PersistFailedError);
 	});
 });

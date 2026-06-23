@@ -43,7 +43,7 @@
 								idx={i}
 								{rows}
 								{record}
-								dirty={!isNewRow && !!baseRow && !recordsEqual(row[col.key], baseRow[col.key])}
+								dirty={!isNewRow && !recordsEqual(row[col.key], baseRow[col.key])}
 								onChange={(value) => setCell(i, col.key, value)}
 							/>
 						{/each}

@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('$stores', () => ({ toastError: vi.fn() }));
 
 import { EntityStore } from '../../../../routes/admin/workbench/entity-store.svelte';
+import { PersistFailedError } from '../../../../routes/admin/workbench/save-helpers';
 import type { EntityConfig, Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
 
 interface Row extends Identified {
@@ -134,8 +135,9 @@ describe('EntityStore', () => {
 		expect(store.saved).toBe(true);
 	});
 
-	it('re-seeds from server truth when a save fails, so a retry cannot re-add duplicates', async () => {
-		// A partial failure: the add committed server-side (now id 2) but persist then threw.
+	it('re-seeds from server truth on a partial (committed) failure, so a retry cannot re-add duplicates', async () => {
+		// A partial failure: the add committed server-side (now id 2) but a child saver then threw,
+		// surfacing as PersistFailedError.
 		const serverTruth: Row[] = [
 			{ id: 0, name: 'Alpha', value: 1 },
 			{ id: 1, name: 'Beta', value: 2 },
@@ -143,7 +145,7 @@ describe('EntityStore', () => {
 		];
 		const config: EntityConfig<Row> = {
 			...makeConfig(async () => {
-				throw new Error('child saver failed');
+				throw new PersistFailedError(new Error('child saver failed'));
 			}),
 			refresh: async () => serverTruth
 		};
@@ -160,10 +162,33 @@ describe('EntityStore', () => {
 		expect(store.items.some((r) => r.id < 0)).toBe(false);
 	});
 
-	it('keeps local edits intact when the post-failure recovery refresh also fails', async () => {
+	it('keeps local edits on a total (pre-commit) failure so a retry does not lose work', async () => {
+		// A plain Error (not PersistFailedError) means nothing committed — the user's edits must
+		// survive, and we must not re-seed from server truth behind a toast.
+		const serverTruth: Row[] = [...seed];
+		const refresh = vi.fn(async () => serverTruth);
 		const config: EntityConfig<Row> = {
 			...makeConfig(async () => {
-				throw new Error('save failed');
+				throw new Error('primary batch 500');
+			}),
+			refresh
+		};
+		const store = new EntityStore(config, seed);
+		store.addItem();
+		store.patch(0, (draft) => (draft.name = 'edited'));
+
+		await store.save();
+
+		expect(store.counts.added).toBe(1);
+		expect(store.items.find((r) => r.id === 0)?.name).toBe('edited');
+		// No recovery refresh is issued on a pre-commit failure.
+		expect(refresh).not.toHaveBeenCalled();
+	});
+
+	it('keeps local edits when the partial-failure recovery refresh also fails', async () => {
+		const config: EntityConfig<Row> = {
+			...makeConfig(async () => {
+				throw new PersistFailedError(new Error('child saver failed'));
 			}),
 			refresh: async () => {
 				throw new Error('refresh failed');
