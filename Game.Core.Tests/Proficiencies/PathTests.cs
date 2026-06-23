@@ -73,5 +73,17 @@ namespace Game.Core.Tests.Proficiencies
             Assert.Equal(1.0, path.FalloffAt(0), precision: 9);
             Assert.Equal(1.0, path.FalloffAt(5), precision: 9);
         }
+
+        [Fact]
+        public void NextTier_ReturnsTheSuccessorTier()
+        {
+            Assert.Equal(new PathTier(1, 1, 10), TwoTierPath(0.3).NextTier(0));
+        }
+
+        [Fact]
+        public void NextTier_OfTheLastTier_IsNull()
+        {
+            Assert.Null(TwoTierPath(0.3).NextTier(1));
+        }
     }
 }

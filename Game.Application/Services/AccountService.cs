@@ -21,6 +21,7 @@ namespace Game.Application.Services
         IPasswordHasher passwordHasher,
         LoginBackoffGuard backoffGuard,
         NewPlayerFactory newPlayerFactory,
+        IProficiencies proficiencies,
         IOptions<PlayerCreationOptions> playerCreationOptions,
         ILogger<AccountService> logger)
     {
@@ -31,6 +32,7 @@ namespace Game.Application.Services
         private readonly IPasswordHasher _passwordHasher = passwordHasher;
         private readonly LoginBackoffGuard _backoffGuard = backoffGuard;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
+        private readonly IProficiencies _proficiencies = proficiencies;
         private readonly PlayerCreationOptions _playerCreationOptions = playerCreationOptions.Value;
         private readonly ILogger<AccountService> _logger = logger;
 
@@ -55,7 +57,7 @@ namespace Game.Application.Services
                 PassHash = _passwordHasher.Hash(password),
             };
 
-            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username));
+            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username, RootSeedSkillIds()));
 
             return created ? CreateAccountStatus.Success : CreateAccountStatus.UsernameTaken;
         }
@@ -195,6 +197,20 @@ namespace Game.Application.Services
         /// status so the caller can surface the right message; on success the new character's summary is
         /// returned so the client can add it to the select list.
         /// </summary>
+        /// <summary>
+        /// The seed skills granted to a brand-new character so its root proficiencies are trainable from
+        /// creation — the tree-seed skill of every live root (a <c>StartsUnlocked</c> proficiency with a seed
+        /// skill and no world source). Empty until roots are authored. The factory dedupes these against the
+        /// starter skills.
+        /// </summary>
+        private IReadOnlyList<int> RootSeedSkillIds()
+        {
+            return [.. _proficiencies.AllProficiencies()
+                .Where(p => p.StartsUnlocked && p.RetiredAt is null && p.SeedSkillId is not null)
+                .Select(p => p.SeedSkillId!.Value)
+                .Distinct()];
+        }
+
         public async Task<AccountCreatePlayerResult> CreatePlayer(int userId, string? name)
         {
             if (!PlayerName.TryNormalize(name, out var normalized))
@@ -202,7 +218,7 @@ namespace Game.Application.Services
                 return AccountCreatePlayerResult.Failed(CreatePlayerStatus.InvalidName);
             }
 
-            var blueprint = _newPlayerFactory.Create(normalized);
+            var blueprint = _newPlayerFactory.Create(normalized, RootSeedSkillIds());
             var result = await _users.CreatePlayer(userId, blueprint, _playerCreationOptions.MaxPlayersPerAccount);
 
             return result.Outcome switch

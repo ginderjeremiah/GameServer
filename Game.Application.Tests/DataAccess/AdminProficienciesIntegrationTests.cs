@@ -301,6 +301,41 @@ namespace Game.Application.Tests.DataAccess
             Assert.Contains("cannot be its own prerequisite", result.ErrorMessage);
         }
 
+        [Fact]
+        public async Task SetPrerequisites_WouldFormACycle_ReturnsFailure()
+        {
+            int gatedId, prerequisiteId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var gated = await SeedProficiencyAsync(seedScope);
+                var prerequisite = await SeedProficiencyAsync(seedScope);
+                gatedId = gated.Id;
+                prerequisiteId = prerequisite.Id;
+
+                // gated already depends on prerequisite; making prerequisite depend on gated closes a cycle.
+                context.Set<Entities.ProficiencyPrerequisite>().Add(new Entities.ProficiencyPrerequisite
+                {
+                    ProficiencyId = gatedId,
+                    PrerequisiteProficiencyId = prerequisiteId,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SetPrerequisites(new SetProficiencyPrerequisitesData
+            {
+                Id = prerequisiteId,
+                PrerequisiteIds = [gatedId],
+            });
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("cycle", result.ErrorMessage);
+        }
+
         private async Task<Entities.Path> SeedPathAsync(IServiceScope scope)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();

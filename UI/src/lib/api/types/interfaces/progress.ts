@@ -55,8 +55,14 @@ export interface IPlayerStatistic {
 	value: number;
 }
 
+export interface IProficiencyOpenedModel {
+	proficiencyId: number;
+	seedSkillId?: number;
+}
+
 export interface IProficiencyXpGainedModel {
 	proficiencies: IProficiencyXpResultModel[];
+	opened: IProficiencyOpenedModel[];
 }
 
 export interface IProficiencyXpResultModel {
@@ -65,6 +71,7 @@ export interface IProficiencyXpResultModel {
 	newLevel: number;
 	newXp: number;
 	milestonesCrossed: number[];
+	grantedSkillIds: number[];
 }
 
 export interface IStatisticType {

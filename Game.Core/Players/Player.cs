@@ -222,19 +222,21 @@ namespace Game.Core.Players
 
         /// <summary>
         /// Announces a won battle's proficiency-XP accrual for the live client push, carrying every
-        /// proficiency the battle trained (XP gained, new level/XP, milestones crossed). The XP itself is
-        /// persisted through the separate progress aggregate; this event is notification-only, mirroring the
-        /// challenge-completion push. The offline batch never calls this — its gains ride the welcome-back
-        /// summary instead (spike #982 decision 9). A no-op when nothing was trained.
+        /// proficiency the battle trained (XP gained, new level/XP, milestones crossed, reward skills) and any
+        /// nodes it opened. The XP and skill grants themselves are persisted through their own paths; this
+        /// event is notification-only, mirroring the challenge-completion push. The offline batch never calls
+        /// this — its gains ride the welcome-back summary instead (spike #982 decision 9). A no-op when nothing
+        /// was trained or opened.
         /// </summary>
-        public void RaiseProficiencyXpGained(IReadOnlyList<ProficiencyXpResult> results)
+        public void RaiseProficiencyXpGained(
+            IReadOnlyList<ProficiencyXpResult> results, IReadOnlyList<ProficiencyOpened> opened)
         {
-            if (results.Count == 0)
+            if (results.Count == 0 && opened.Count == 0)
             {
                 return;
             }
 
-            RaiseEvent(new ProficiencyXpGainedEvent(Id, results));
+            RaiseEvent(new ProficiencyXpGainedEvent(Id, results, opened));
         }
 
         /// <summary>

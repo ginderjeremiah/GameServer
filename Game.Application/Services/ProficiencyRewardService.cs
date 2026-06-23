@@ -46,6 +46,8 @@ namespace Game.Application.Services
             }
 
             var results = new List<ProficiencyXpResult>();
+            var opened = new List<ProficiencyOpened>();
+            var openedIds = new HashSet<int>();
             foreach (var slice in slices)
             {
                 // The slice's proficiency is the path's frontier tier — un-maxed by construction (the routing
@@ -70,16 +72,90 @@ namespace Game.Application.Services
                 var (newLevel, newXp) = proficiency.ApplyXp(oldLevel, oldXp, xpGain);
                 progress.SetProficiencyProgress(slice.ProficiencyId, newLevel, newXp);
 
+                // Grant the reward skill of every milestone the gain crossed (UnlockSkill is idempotent, so the
+                // offline batch re-running per battle never double-grants).
+                var grantedSkillIds = proficiency.RewardSkillsCrossed(oldLevel, newLevel);
+                foreach (var skillId in grantedSkillIds)
+                {
+                    player.UnlockSkill(_skills.GetSkill(skillId));
+                }
+
+                // Maxing a tier opens the next nodes: its within-path successor, plus any cross-path gateway
+                // whose prerequisites are now all maxed. Each open grants the opened tier's seed skill.
+                if (proficiency.IsMaxed(newLevel) && !proficiency.IsMaxed(oldLevel))
+                {
+                    OpenSuccessors(proficiency, progress, player, opened, openedIds);
+                }
+
                 results.Add(new ProficiencyXpResult(
-                    slice.ProficiencyId, xpGain, newLevel, newXp, proficiency.MilestonesCrossed(oldLevel, newLevel)));
+                    slice.ProficiencyId, xpGain, newLevel, newXp,
+                    proficiency.MilestonesCrossed(oldLevel, newLevel), grantedSkillIds));
             }
 
             if (notify)
             {
-                player.RaiseProficiencyXpGained(results);
+                player.RaiseProficiencyXpGained(results, opened);
             }
 
             return results;
+        }
+
+        // Opens the nodes a just-maxed proficiency unlocks: the next tier within its own path (revealed by
+        // maxing the tier before it — spike #982 decision 10), and any cross-path gateway it gates whose every
+        // prerequisite is now maxed (decision 10's themed gateways). Within-path order is implicit in the
+        // ordinals, so a successor tier needs no authored prerequisite row.
+        private void OpenSuccessors(
+            Proficiency maxed, PlayerProgress progress, Player player,
+            List<ProficiencyOpened> opened, HashSet<int> openedIds)
+        {
+            if (_proficiencies.GetPath(maxed.PathId).NextTier(maxed.PathOrdinal) is { } nextTier)
+            {
+                Open(nextTier.ProficiencyId, player, opened, openedIds);
+            }
+
+            foreach (var gatedId in _proficiencies.DependentsOf(maxed.Id))
+            {
+                if (AllPrerequisitesMaxed(gatedId, progress))
+                {
+                    Open(gatedId, player, opened, openedIds);
+                }
+            }
+        }
+
+        // Grants the opened tier's seed skill (the native, full-pace training vehicle for a node with no world
+        // skill source — decision 8) and records the open for the client push. De-duped within the battle so
+        // two prerequisites maxing in one fight open a shared gateway once.
+        private void Open(int proficiencyId, Player player, List<ProficiencyOpened> opened, HashSet<int> openedIds)
+        {
+            if (!openedIds.Add(proficiencyId))
+            {
+                return;
+            }
+
+            var seedSkillId = _proficiencies.GetProficiency(proficiencyId).SeedSkillId;
+            if (seedSkillId is { } skillId)
+            {
+                player.UnlockSkill(_skills.GetSkill(skillId));
+            }
+
+            opened.Add(new ProficiencyOpened(proficiencyId, seedSkillId));
+        }
+
+        // Whether every prerequisite of the gated proficiency is at its cap on the player's current progress.
+        // A gateway opens only once all its themed prerequisites are maxed (the just-maxed one included, since
+        // its new level is already written through the progress aggregate before this runs).
+        private bool AllPrerequisitesMaxed(int gatedId, PlayerProgress progress)
+        {
+            foreach (var prerequisiteId in _proficiencies.GetProficiency(gatedId).PrerequisiteIds)
+            {
+                var level = progress.TryGetProficiency(prerequisiteId, out var existing) ? existing.Level : 0;
+                if (!_proficiencies.GetProficiency(prerequisiteId).IsMaxed(level))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         // The weighted contributions of every skill that fired in the battle, routed to each path's frontier

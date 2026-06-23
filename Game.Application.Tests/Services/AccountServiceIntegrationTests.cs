@@ -789,6 +789,7 @@ namespace Game.Application.Tests.Services
                 hasher,
                 backoffGuard,
                 new NewPlayerFactory(),
+                provider.GetRequiredService<IProficiencies>(),
                 Options.Create(new PlayerCreationOptions { MaxPlayersPerAccount = maxPlayersPerAccount }),
                 NullLogger<AccountService>.Instance);
         }
