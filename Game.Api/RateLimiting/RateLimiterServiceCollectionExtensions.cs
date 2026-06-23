@@ -60,8 +60,10 @@ namespace Game.Api.RateLimiting
 
             if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
             {
+                // Round up (matching the per-account login backoff's Retry-After): truncating a sub-second
+                // remaining window to 0 would tell the client it may retry immediately when it can't.
                 context.HttpContext.Response.Headers.RetryAfter =
-                    ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+                    ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
             }
 
             await context.HttpContext.Response.WriteAsJsonAsync(

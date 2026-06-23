@@ -7,10 +7,9 @@ namespace Game.Api.Sockets.Commands
     /// <summary>
     /// Returns the connected player's challenge progress (player progress). Unlike the reference-data
     /// commands this is player-scoped: it resolves the player from the socket session and delegates to
-    /// <see cref="IPlayerProgressRepository.GetChallenges"/> — the same read the <c>GET /api/Challenges/Player</c>
-    /// endpoint runs (cache-first, so it serves warm cached progress). Named to stay unambiguous against
-    /// the reference-data <see cref="GetChallenges"/> command, which returns the challenge definitions
-    /// rather than the player's progress.
+    /// <see cref="IPlayerProgressRepository.GetChallenges"/> (cache-first, so it serves warm cached
+    /// progress). Named to stay unambiguous against the reference-data <see cref="GetChallenges"/>
+    /// command, which returns the challenge definitions rather than the player's progress.
     /// </summary>
     public class GetPlayerChallenges : AbstractSocketCommandWithResponseData<IEnumerable<PlayerChallenge>>
     {

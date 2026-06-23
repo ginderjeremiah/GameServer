@@ -366,6 +366,17 @@ namespace Game.Api.Sockets
                         return;
                     }
 
+                    if (!_commandFactory.IsKnownCommand(commandInfo.Name))
+                    {
+                        // An unknown command name (a stale/garbage name, realistic across deploys) is a
+                        // bad request, not an internal fault: reject it with a structured error like the
+                        // sibling rejections above instead of letting it reach the command lookup, whose
+                        // throw would be logged at error and surfaced to the client as "Internal Server Error".
+                        _logger.LogWarning("Received unknown socket command: {CommandInfo} on socket: {Id}", commandInfo, Id);
+                        await SendErrorAsync(commandInfo, "Unknown command.");
+                        return;
+                    }
+
                     await ExecuteCommand(commandInfo);
                 }
             }
