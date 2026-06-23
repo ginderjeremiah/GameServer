@@ -136,6 +136,31 @@ namespace Game.Application.Services
         }
 
         /// <summary>
+        /// Best-effort <see cref="PrepareNextIdleBattle"/> for the battle-end commands: on any prefetch failure
+        /// it logs and returns <c>null</c> instead of throwing. The victory/loss is already durably credited and
+        /// has cleared the in-flight battle on the <see cref="PlayerState"/>, but that resolved state is only
+        /// persisted to the session cache <em>after</em> this prefetch. Letting the prefetch throw would strand
+        /// the resolved state (the cleared battle is lost), so on reconnect the stale session still shows the
+        /// already-credited battle as active and the next <c>StartBattle</c> re-abandons — and thus re-credits —
+        /// it. Swallowing here keeps the caller on its path to save the resolved state; the client round-trips
+        /// <c>NewEnemy</c> when no next battle is bundled.
+        /// </summary>
+        public async Task<BattleStartResult?> TryPrepareNextIdleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await PrepareNextIdleBattle(player, state, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Next-idle-battle prefetch failed for player {PlayerId}; returning without a bundled next enemy.",
+                    player.Id);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Starts a deterministic battle against the zone's dedicated boss (the "Challenge Boss" action),
         /// separate from the random idle spawn. The boss is fought at the zone's fixed level with its full
         /// authored skill loadout. Returns <c>null</c> when the zone has no dedicated boss authored. Unlike
