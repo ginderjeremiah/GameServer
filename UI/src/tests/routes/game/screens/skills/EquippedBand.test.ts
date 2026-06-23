@@ -259,8 +259,8 @@ describe('EquippedBand — reorder via move buttons (keyboard/touch)', () => {
 
 describe('EquippedBand — empty slot', () => {
 	beforeEach(() => {
-		// Free a slot so the band renders one empty card.
-		view.equipped = [0, 1];
+		// Free a slot (unequip Charlie) so the band renders one empty card.
+		view.toggle(2);
 	});
 
 	it('renders the empty slot as a real focusable button, not a presentational tile', () => {
