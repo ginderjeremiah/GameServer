@@ -122,6 +122,69 @@ describe('Battler', () => {
 			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 		});
 
+		// Proficiency bonuses (#982 area E / #1119) ride the modifier pipeline (by their additive/
+		// multiplicative type), composing through computeAttributes exactly like the backend's snapshot.
+		it('applies additional (proficiency) modifiers through the attribute pipeline', () => {
+			const battler = new Battler(
+				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				undefined,
+				undefined,
+				[
+					{
+						attribute: EAttribute.Strength,
+						amount: 5,
+						type: EModifierType.Additive,
+						source: EAttributeModifierSource.Proficiency
+					},
+					{
+						attribute: EAttribute.Strength,
+						amount: 2,
+						type: EModifierType.Multiplicative,
+						source: EAttributeModifierSource.Proficiency
+					}
+				]
+			);
+
+			// (10 alloc + 5 additive) * 2 multiplicative = 30, the additive-then-multiplicative order.
+			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(30);
+		});
+
+		it('reflects additional modifiers in derived MaxHealth (applied before health is read)', () => {
+			const battler = new Battler(makeBattlerData({ attributes: [] }), undefined, undefined, [
+				{
+					attribute: EAttribute.Endurance,
+					amount: 10,
+					type: EModifierType.Additive,
+					source: EAttributeModifierSource.Proficiency
+				}
+			]);
+
+			// MaxHealth = 50 base + 20·Endurance(10) = 250, so the proficiency Endurance bonus is in currentHealth.
+			expect(battler.currentHealth).toBe(250);
+		});
+
+		it('drops the additional modifiers on a data-less re-arm (setData replaced them; #811)', () => {
+			const battler = new Battler(
+				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				undefined,
+				undefined,
+				[
+					{
+						attribute: EAttribute.Strength,
+						amount: 5,
+						type: EModifierType.Additive,
+						source: EAttributeModifierSource.Proficiency
+					}
+				]
+			);
+			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
+
+			// A data-less re-arm keeps the existing attribute set (proficiency modifier included) — the engine
+			// re-derives with fresh modifiers only when they actually change.
+			battler.reset();
+			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
+		});
+
 		it('re-arms skill charges on a data-less reset so an unchanged re-spawn starts at zero charge (#811)', () => {
 			const battler = new Battler(makeBattlerData({ selectedSkills: [0] }));
 			battler.skills[0]!.chargeTime = 300;

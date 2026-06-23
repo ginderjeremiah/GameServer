@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { staticData } from '$stores/static-data.svelte';
 
-// The nine reference-data slots the store exposes. Keeping the list here lets each test
+// The reference-data slots the store exposes. Keeping the list here lets each test
 // reset every slot and populate the full set without repeating the names inline.
 const SLOTS = [
 	'zones',
@@ -12,7 +12,8 @@ const SLOTS = [
 	'attributes',
 	'challenges',
 	'challengeTypes',
-	'statisticTypes'
+	'statisticTypes',
+	'proficiencies'
 ] as const;
 
 const clearAll = () => {

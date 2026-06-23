@@ -11,6 +11,7 @@ import {
 	staticData,
 	statistics,
 	playerChallenges,
+	playerProficiencies,
 	acknowledgeModal,
 	resetLogs,
 	toastSuccess,
@@ -46,6 +47,10 @@ export const startGame = () => {
 		// Challenge completion gates zone navigation (a zone unlocks once its gating challenge is
 		// completed); a failed load just leaves zones gated as-is until the next load.
 		void playerChallenges.load();
+		// Proficiency levels feed the live battler's per-level attribute bonuses (mirroring the backend
+		// battle snapshot). Loaded before the battle engine starts so the first enemy — fetched over the
+		// same serialized socket after this command — is fought against a battler with the bonus applied.
+		void playerProficiencies.load();
 		startLogicEngine();
 		startRenderEngine();
 		startBattleEngine();
@@ -153,6 +158,7 @@ const stopGame = () => {
 	stopEngines();
 	statistics.reset();
 	playerChallenges.reset();
+	playerProficiencies.reset();
 	resetLogs();
 	socketReplacedUnhook?.();
 	challengeCompletedUnhook?.();

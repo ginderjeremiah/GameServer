@@ -12,22 +12,29 @@ vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 // Use the real modal store (so the full show → acknowledge → navigate flow is exercised) but stub
 // staticData so we can toggle whether startGame runs.
-const { staticDataStub, statisticsStub, playerChallengesStub, resetLogs, toastSuccess, navigation } = vi.hoisted(
-	() => ({
-		staticDataStub: { loaded: true } as {
-			loaded: boolean;
-			challenges?: ({ id: number; name: string; rewardItemId?: number } | undefined)[];
-			items?: ({ id: number; name: string; rarityId: number; itemCategoryId: number } | undefined)[];
-			itemMods?: unknown[];
-			skills?: unknown[];
-		},
-		statisticsStub: { load: vi.fn(), reset: vi.fn() },
-		playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
-		resetLogs: vi.fn(),
-		toastSuccess: vi.fn(),
-		navigation: { requestScreen: vi.fn() }
-	})
-);
+const {
+	staticDataStub,
+	statisticsStub,
+	playerChallengesStub,
+	playerProficienciesStub,
+	resetLogs,
+	toastSuccess,
+	navigation
+} = vi.hoisted(() => ({
+	staticDataStub: { loaded: true } as {
+		loaded: boolean;
+		challenges?: ({ id: number; name: string; rewardItemId?: number } | undefined)[];
+		items?: ({ id: number; name: string; rarityId: number; itemCategoryId: number } | undefined)[];
+		itemMods?: unknown[];
+		skills?: unknown[];
+	},
+	statisticsStub: { load: vi.fn(), reset: vi.fn() },
+	playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
+	playerProficienciesStub: { load: vi.fn(), reset: vi.fn() },
+	resetLogs: vi.fn(),
+	toastSuccess: vi.fn(),
+	navigation: { requestScreen: vi.fn() }
+}));
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
 	return {
@@ -35,6 +42,7 @@ vi.mock('$stores', async () => {
 		staticData: staticDataStub,
 		statistics: statisticsStub,
 		playerChallenges: playerChallengesStub,
+		playerProficiencies: playerProficienciesStub,
 		resetLogs,
 		toastSuccess,
 		navigation
@@ -188,6 +196,9 @@ describe('startGame', () => {
 		startGame();
 
 		expect(inventoryManager.initialize).toHaveBeenCalledTimes(1);
+		// Player progress the live battler needs is loaded before the engines start.
+		expect(playerChallengesStub.load).toHaveBeenCalledTimes(1);
+		expect(playerProficienciesStub.load).toHaveBeenCalledTimes(1);
 		expect(logicEngine.start).toHaveBeenCalledTimes(1);
 		expect(renderEngine.start).toHaveBeenCalledTimes(1);
 		expect(enemyManager.start).toHaveBeenCalledTimes(1);

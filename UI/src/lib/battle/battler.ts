@@ -101,8 +101,13 @@ export class Battler {
 		return cooldownMultiplier(this.attributes);
 	}
 
-	constructor(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[], grantedSkillIds?: number[]) {
-		this.reset(battlerData, additionalAtttributes, grantedSkillIds);
+	constructor(
+		battlerData?: BattlerData,
+		additionalAtttributes?: IBattlerAttribute[],
+		grantedSkillIds?: number[],
+		additionalModifiers?: AttributeModifier[]
+	) {
+		this.reset(battlerData, additionalAtttributes, grantedSkillIds, additionalModifiers);
 	}
 
 	/** Advances each skill's charge by `timeDelta * cdMultiplier` **in loadout order**, invoking `onFire`
@@ -292,7 +297,12 @@ export class Battler {
 		}
 	}
 
-	public reset(battlerData?: BattlerData, additionalAtttributes?: IBattlerAttribute[], grantedSkillIds?: number[]) {
+	public reset(
+		battlerData?: BattlerData,
+		additionalAtttributes?: IBattlerAttribute[],
+		grantedSkillIds?: number[],
+		additionalModifiers?: AttributeModifier[]
+	) {
 		// Remove the active effects' modifiers, not just the bookkeeping — a data-less reset keeps the
 		// existing attribute set, so leaving the modifiers would carry the previous battle's buffs over.
 		for (const modifier of this.#effectModifiers.values()) {
@@ -306,6 +316,13 @@ export class Battler {
 				: battlerData.attributes;
 
 			this.attributes.setData(atts);
+			// Proficiency bonuses ride the modifier pipeline (additive/multiplicative by their type), not the
+			// flat base data, so they compose through computeAttributes exactly like the backend's
+			// AttributeCollection — the proficiency parity surface (#982 area E). setData replaced the modifier
+			// list, so re-add them here; applied before MaxHealth is read below so the bonus is reflected.
+			for (const modifier of additionalModifiers ?? []) {
+				this.attributes.addModifier(modifier);
+			}
 			this.level = battlerData.level;
 			this.name = battlerData.name;
 			this.skills = this.fillSkills(battlerData, grantedSkillIds ?? []);

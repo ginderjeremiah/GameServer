@@ -114,6 +114,13 @@ export const REFERENCE_DATA: RefDataSource[] = [
 		'GetStatisticTypes',
 		() => staticData.statisticTypes,
 		(d) => (staticData.statisticTypes = d)
+	),
+	refSource(
+		'proficiencies',
+		'Proficiencies',
+		'GetProficiencies',
+		() => staticData.proficiencies,
+		(d) => (staticData.proficiencies = d)
 	)
 ];
 
