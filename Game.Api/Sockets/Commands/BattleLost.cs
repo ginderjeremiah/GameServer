@@ -38,7 +38,11 @@ namespace Game.Api.Sockets.Commands
 
                 // A boss loss returns to the idle farm, so prefetch and bundle the next idle battle — letting
                 // the client begin it the instant the post-loss cooldown elapses, hiding the NewEnemy round-trip.
-                var next = await _battleService.PrepareNextIdleBattle(player, state, cancellationToken);
+                // The prefetch is best-effort: the loss is already durably recorded and its battle-cleared
+                // PlayerState is saved below regardless, so a prefetch failure must not strand that resolved
+                // state (which a reconnect would re-abandon, re-recording the completion). The client
+                // round-trips NewEnemy when none is bundled.
+                var next = await _battleService.TryPrepareNextIdleBattle(player, state, cancellationToken);
 
                 context.Session.SavePlayerState();
 
@@ -46,8 +50,8 @@ namespace Game.Api.Sockets.Commands
                 return Success(new BattleLostResponse
                 {
                     Cooldown = (state.EnemyCooldown - now).TotalMilliseconds,
-                    NextEnemy = EnemyInstance.FromSource(next),
-                    NextZoneId = player.CurrentZoneId,
+                    NextEnemy = next is not null ? EnemyInstance.FromSource(next) : null,
+                    NextZoneId = next is not null ? player.CurrentZoneId : null,
                 });
             }
             else
