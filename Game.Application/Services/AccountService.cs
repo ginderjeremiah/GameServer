@@ -197,20 +197,6 @@ namespace Game.Application.Services
         /// status so the caller can surface the right message; on success the new character's summary is
         /// returned so the client can add it to the select list.
         /// </summary>
-        /// <summary>
-        /// The seed skills granted to a brand-new character so its root proficiencies are trainable from
-        /// creation — the tree-seed skill of every live root (a <c>StartsUnlocked</c> proficiency with a seed
-        /// skill and no world source). Empty until roots are authored. The factory dedupes these against the
-        /// starter skills.
-        /// </summary>
-        private IReadOnlyList<int> RootSeedSkillIds()
-        {
-            return [.. _proficiencies.AllProficiencies()
-                .Where(p => p.StartsUnlocked && p.RetiredAt is null && p.SeedSkillId is not null)
-                .Select(p => p.SeedSkillId!.Value)
-                .Distinct()];
-        }
-
         public async Task<AccountCreatePlayerResult> CreatePlayer(int userId, string? name)
         {
             if (!PlayerName.TryNormalize(name, out var normalized))
@@ -229,6 +215,20 @@ namespace Game.Application.Services
                 CreatePlayerOutcome.UserNotFound => AccountCreatePlayerResult.Failed(CreatePlayerStatus.UserNotFound),
                 _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, null),
             };
+        }
+
+        /// <summary>
+        /// The seed skills granted to a brand-new character so its root proficiencies are trainable from
+        /// creation — the authored tree-seed skill of every live root (a <c>StartsUnlocked</c>, non-retired
+        /// proficiency that authors a <c>SeedSkillId</c>). Empty until roots are authored. The factory dedupes
+        /// these against the starter skills.
+        /// </summary>
+        private IReadOnlyList<int> RootSeedSkillIds()
+        {
+            return [.. _proficiencies.AllProficiencies()
+                .Where(p => p.StartsUnlocked && p.RetiredAt is null && p.SeedSkillId is not null)
+                .Select(p => p.SeedSkillId!.Value)
+                .Distinct()];
         }
 
         /// <summary>
