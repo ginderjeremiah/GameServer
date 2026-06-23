@@ -41,7 +41,6 @@ export interface IChallenge {
 	progressGoal: number;
 	rewardItemId?: number;
 	rewardItemModId?: number;
-	rewardSkillId?: number;
 	retiredAt?: string;
 }
 

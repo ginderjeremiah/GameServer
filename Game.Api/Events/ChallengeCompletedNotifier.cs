@@ -24,7 +24,6 @@ namespace Game.Api.Events
                 ChallengeId = domainEvent.ChallengeId,
                 RewardItemId = domainEvent.RewardItemId,
                 RewardItemModId = domainEvent.RewardItemModId,
-                RewardSkillId = domainEvent.RewardSkillId,
             };
 
             return _socketManager.EmitSocketCommand(new ChallengeCompletedInfo(model), domainEvent.PlayerId);

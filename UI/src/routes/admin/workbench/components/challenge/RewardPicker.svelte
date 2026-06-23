@@ -11,8 +11,8 @@
 			<input
 				class="inp"
 				autofocus
-				aria-label={`Search ${kind === 'item' ? 'items' : kind === 'mod' ? 'item mods' : 'skills'}`}
-				placeholder={`Search ${kind === 'item' ? 'items' : kind === 'mod' ? 'item mods' : 'skills'}…`}
+				aria-label={`Search ${kind === 'item' ? 'items' : 'item mods'}`}
+				placeholder={`Search ${kind === 'item' ? 'items' : 'item mods'}…`}
 				bind:value={query}
 			/>
 		</div>
@@ -62,7 +62,7 @@ export interface PickerRecord {
 }
 
 interface Props {
-	kind: 'item' | 'mod' | 'skill';
+	kind: 'item' | 'mod';
 	records: PickerRecord[];
 	currentId: number | undefined;
 	claimed: Map<number, IChallenge>;

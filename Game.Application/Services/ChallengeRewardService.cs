@@ -18,11 +18,10 @@ namespace Game.Application.Services
     /// offline batch suppresses it (the welcome-back summary is the notification).
     /// </para>
     /// </summary>
-    public class ChallengeRewardService(IChallenges challenges, IItems items, ISkills skills)
+    public class ChallengeRewardService(IChallenges challenges, IItems items)
     {
         private readonly IChallenges _challenges = challenges;
         private readonly IItems _items = items;
-        private readonly ISkills _skills = skills;
 
         /// <summary>
         /// Evaluates the challenges relevant to <paramref name="touchedStatistics"/> against
@@ -45,8 +44,7 @@ namespace Game.Application.Services
                 // Resolve the reward reference data here (the data-access concern) and let the domain own the
                 // rest: unlocking each reward and (when notifying) raising the ChallengeCompletedEvent.
                 var rewardItem = c.RewardItemId.HasValue ? _items.GetItem(c.RewardItemId.Value) : null;
-                var rewardSkill = c.RewardSkillId.HasValue ? _skills.GetSkill(c.RewardSkillId.Value) : null;
-                player.CompleteChallenge(c.ChallengeId, rewardItem, c.RewardItemModId, rewardSkill, notify);
+                player.CompleteChallenge(c.ChallengeId, rewardItem, c.RewardItemModId, notify);
             }
 
             return completed;

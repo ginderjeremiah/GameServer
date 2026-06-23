@@ -148,16 +148,6 @@ export function claimedModMap(challenges: IChallenge[], exceptId: number): Map<n
 	return map;
 }
 
-export function claimedSkillMap(challenges: IChallenge[], exceptId: number): Map<number, IChallenge> {
-	const map = new Map<number, IChallenge>();
-	for (const c of challenges) {
-		if (c.id !== exceptId && c.rewardSkillId != null) {
-			map.set(c.rewardSkillId, c);
-		}
-	}
-	return map;
-}
-
 /** Re-derive the statistic + entity a challenge tracks from a (possibly new) type. */
 export function deriveFromType(c: IChallenge, types: IChallengeType[], typeId: EChallengeType): void {
 	const stat = typeStatistic(types, typeId);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ERarity, type IChallenge, type IChallengeCompletedModel, type IItem, type ISkill } from '$lib/api';
+import { ERarity, type IChallenge, type IChallengeCompletedModel, type IItem } from '$lib/api';
 import { formatAwayDuration, resolveCompletedChallenges } from '$routes/game/welcome-back/offline-summary';
 
 describe('formatAwayDuration', () => {
@@ -27,32 +27,26 @@ describe('formatAwayDuration', () => {
 
 describe('resolveCompletedChallenges', () => {
 	const item: IItem = { id: 2, name: 'Aegis', rarityId: ERarity.Rare, itemCategoryId: 0 } as unknown as IItem;
-	const skill: ISkill = { id: 4, name: 'Firebolt' } as ISkill;
+	// Id-indexed catalogue: index 1 is unused here but kept so id 2 stays at index 2.
 	const challenges: (IChallenge | undefined)[] = [
 		{ id: 0, name: 'First Blood', rewardItemId: 2 } as IChallenge,
-		{ id: 1, name: 'Untouchable', rewardSkillId: 4 } as IChallenge,
+		undefined,
 		{ id: 2, name: 'Persistence' } as IChallenge // no direct reward
 	];
 	const refs = {
 		challenges,
 		items: [undefined, undefined, item],
-		itemMods: [],
-		skills: [undefined, undefined, undefined, undefined, skill]
+		itemMods: []
 	};
 
 	it('resolves each completed challenge to its name and unlocked reward', () => {
-		const completed: IChallengeCompletedModel[] = [
-			{ challengeId: 0, rewardItemId: 2 },
-			{ challengeId: 1, rewardSkillId: 4 }
-		];
+		const completed: IChallengeCompletedModel[] = [{ challengeId: 0, rewardItemId: 2 }];
 
 		const result = resolveCompletedChallenges(completed, refs);
 
 		expect(result[0].name).toBe('First Blood');
 		expect(result[0].reward?.kind).toBe('item');
-		expect(result[1].name).toBe('Untouchable');
-		expect(result[1].reward?.kind).toBe('skill');
-		expect(result[1].reward?.name).toBe('Firebolt');
+		expect(result[0].reward?.name).toBe('Aegis');
 	});
 
 	it('resolves a no-reward challenge to a null reward', () => {

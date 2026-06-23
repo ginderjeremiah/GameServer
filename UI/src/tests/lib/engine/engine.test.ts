@@ -115,9 +115,6 @@ vi.mock('$lib/engine/player/inventory-manager', () => ({
 	}
 }));
 
-const { addUnlockedSkill } = vi.hoisted(() => ({ addUnlockedSkill: vi.fn() }));
-vi.mock('$lib/engine/player/player-manager', () => ({ playerManager: { addUnlockedSkill } }));
-
 import {
 	startGame,
 	handleSocketReplaced,
@@ -261,7 +258,6 @@ describe('handleChallengeCompleted', () => {
 			appliedMods: []
 		});
 		expect(inventoryManager.addUnlockedMod).not.toHaveBeenCalled();
-		expect(addUnlockedSkill).not.toHaveBeenCalled();
 	});
 
 	it('unlocks a mod reward', () => {
@@ -271,20 +267,11 @@ describe('handleChallengeCompleted', () => {
 		expect(inventoryManager.addUnlockedItem).not.toHaveBeenCalled();
 	});
 
-	it('unlocks a skill reward', () => {
-		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardSkillId: 9 }));
-
-		expect(addUnlockedSkill).toHaveBeenCalledWith(9);
-	});
-
 	it('unlocks every reward kind a single challenge carries', () => {
-		handleChallengeCompleted(
-			challengeCompletedResponse({ challengeId: 7, rewardItemId: 3, rewardItemModId: 5, rewardSkillId: 9 })
-		);
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardItemId: 3, rewardItemModId: 5 }));
 
 		expect(inventoryManager.addUnlockedItem).toHaveBeenCalledTimes(1);
 		expect(inventoryManager.addUnlockedMod).toHaveBeenCalledWith(5);
-		expect(addUnlockedSkill).toHaveBeenCalledWith(9);
 	});
 
 	it('does nothing when the push carries no data', () => {
