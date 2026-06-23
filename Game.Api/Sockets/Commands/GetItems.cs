@@ -4,8 +4,7 @@ using Game.Abstractions.DataAccess;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the full item reference-data collection. WebSocket equivalent of
-    /// the <c>GET /api/Items</c> endpoint.
+    /// Serves the full item reference-data set over the socket.
     /// </summary>
     public class GetItems : AbstractReferenceDataCommand<Item>
     {

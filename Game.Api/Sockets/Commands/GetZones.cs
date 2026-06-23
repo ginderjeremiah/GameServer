@@ -4,8 +4,7 @@ using Game.Abstractions.DataAccess;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the full zone reference-data collection. WebSocket equivalent of
-    /// the <c>GET /api/Zones</c> endpoint.
+    /// Serves the full zone reference-data set over the socket.
     /// </summary>
     public class GetZones : AbstractReferenceDataCommand<Zone>
     {

@@ -4,8 +4,7 @@ using Game.Abstractions.DataAccess;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the full item-modifier reference-data collection. WebSocket
-    /// equivalent of the <c>GET /api/ItemMods</c> endpoint.
+    /// Serves the full item-modifier reference-data set over the socket.
     /// </summary>
     public class GetItemMods : AbstractReferenceDataCommand<ItemMod>
     {

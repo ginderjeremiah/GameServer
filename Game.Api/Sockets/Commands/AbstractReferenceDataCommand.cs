@@ -4,9 +4,8 @@ namespace Game.Api.Sockets.Commands
 {
     /// <summary>
     /// Base for socket commands that fetch a read-only reference-data collection
-    /// (the static/intrinsic data the loading screen needs). Mirrors the
-    /// corresponding reference-data HTTP endpoints so the data can be loaded over
-    /// the authenticated WebSocket connection instead of a separate HTTP request.
+    /// (the static/intrinsic data the loading screen needs), served over the
+    /// authenticated WebSocket connection.
     /// </summary>
     /// <typeparam name="TModel">The API model type returned in the collection.</typeparam>
     public abstract class AbstractReferenceDataCommand<TModel> : AbstractSocketCommandWithResponseData<IEnumerable<TModel>>, IReferenceDataCommand

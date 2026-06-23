@@ -20,6 +20,18 @@ namespace Game.Api.Services
         }
 
         /// <summary>
+        /// Whether a generator is registered for the named command. Lets the inbound client path reject an
+        /// unknown command name (e.g. a stale name across deploys) with a structured rejection rather than
+        /// letting it reach <see cref="CreateCommand"/>, whose throw would be misclassified as an internal
+        /// fault — logged at error and surfaced to the client as an "Internal Server Error". Virtual so a test
+        /// double can control known-ness without populating the static registry.
+        /// </summary>
+        public virtual bool IsKnownCommand(string commandName)
+        {
+            return _socketCommandGenerators.ContainsKey(commandName);
+        }
+
+        /// <summary>
         /// Creates the requested socket command inside a fresh DI scope.
         /// The caller is responsible for disposing the returned <see cref="IServiceScope"/>
         /// after the command has executed (and after any post-execution work such as UoW commit).

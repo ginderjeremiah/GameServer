@@ -4,8 +4,7 @@ using Game.Abstractions.DataAccess;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the full skill reference-data collection. WebSocket equivalent of
-    /// the <c>GET /api/Skills</c> endpoint.
+    /// Serves the full skill reference-data set over the socket.
     /// </summary>
     public class GetSkills : AbstractReferenceDataCommand<Skill>
     {
