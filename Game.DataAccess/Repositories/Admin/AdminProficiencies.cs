@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
+using Game.DataAccess.Repositories.Caching;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -161,6 +162,14 @@ namespace Game.DataAccess.Repositories.Admin
                 }
             }
 
+            // Reject a prerequisite that would cycle (A needs B needs A), which would soft-lock both nodes.
+            // Build the prospective graph — every other proficiency's existing edges plus this one's desired
+            // set — and run full cycle detection before anything commits.
+            if (FindPrerequisiteCycle(proficiency.Id, data.PrerequisiteIds) is { } cycleRejection)
+            {
+                return cycleRejection;
+            }
+
             return ChildCollectionReconciler.Reconcile(
                 existing: proficiency.Prerequisites,
                 desired: data.PrerequisiteIds,
@@ -238,6 +247,26 @@ namespace Game.DataAccess.Repositories.Admin
                     return AdminSaveResult.Failure(
                         $"Proficiency {role} level {level} is out of range (must be between 1 and the cap of {proficiency.MaxLevel}).");
                 }
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns a rejection if setting <paramref name="proficiencyId"/>'s prerequisites to
+        /// <paramref name="desiredPrerequisiteIds"/> would introduce a cycle in the prerequisite graph, else
+        /// null. The prospective graph keeps every other proficiency's existing edges and overrides only this
+        /// node's.</summary>
+        private AdminSaveResult? FindPrerequisiteCycle(int proficiencyId, IReadOnlyList<int> desiredPrerequisiteIds)
+        {
+            var graph = _proficiencies.AllProficiencyEntities().ToDictionary(
+                p => p.Id,
+                p => (IReadOnlyList<int>)p.Prerequisites.Select(pr => pr.PrerequisiteProficiencyId).ToList());
+            graph[proficiencyId] = desiredPrerequisiteIds;
+
+            if (ProficiencyPrerequisiteGraph.TryFindCycle(graph, out var cycle))
+            {
+                return AdminSaveResult.Failure(
+                    $"These prerequisites would create a cycle: {string.Join(" -> ", cycle)}.");
             }
 
             return null;

@@ -104,6 +104,10 @@ Each proficiency tier has a low level **cap** and a geometric XP **curve** (`Bas
 
 The curve numbers, the pie magnitude, the per-path falloff base, and the caps are all **strawman values tunable during balancing**.
 
+## Opening tiers, milestones, and seeds
+
+A tier is **open** (trainable, and drawn on the tree) when it has accrued any XP, is a root (`StartsUnlocked`), has the previous tier in its path maxed, or — for a cross-path **gateway** (lava = advanced-fire + advanced-earth) — has all its prerequisite tiers maxed. Openness is purely derived from progress + structure, so *using* a contributing skill is itself what opens a path; nothing is gated behind a separate unlock, and losing a seeding item never closes a path you've trained. Authored **milestone** levels grant a **permanent reward skill** (in addition to their attribute bonus; a milestone may be bonus-only). Opening a tree-seeded tier (a maxed tier's successor, or a satisfied gateway) grants its **seed skill** — the native, full-pace training vehicle for a node with no world skill source — so a freshly-revealed tier is never walled. Roots are seeded at character creation. Challenges no longer grant skills; skills come from the starter kit, item grants, and proficiency milestones/seeds.
+
 # Items, Item Mods, and Tags
 
 In early versions of this game, items dropped randomly from enemies with random modifications based on matching tags. This tag system has data like: "Weapon", "Sharp", "Two-Handed", etc. An item would have a set of tags, and item modifications would also have tags. When an item dropped, the game would roll for modifications that had matching tags to the item.

@@ -5,19 +5,22 @@ namespace Game.Core.Players.Events
 {
     /// <summary>
     /// Raised when a won battle accrues proficiency XP (live path only — the offline batch suppresses it in
-    /// favour of the welcome-back summary). Carries every proficiency the battle trained, so the API layer
-    /// can push one update to the connected client and a level-up or milestone becomes visible immediately
-    /// rather than only after a refresh — mirroring <see cref="ChallengeCompletedEvent"/>.
+    /// favour of the welcome-back summary). Carries every proficiency the battle trained plus any nodes it
+    /// opened (a maxed tier's next tier or a newly-satisfied gateway), so the API layer can push one update to
+    /// the connected client and a level-up, milestone, or unlock becomes visible immediately rather than only
+    /// after a refresh — mirroring <see cref="ChallengeCompletedEvent"/>.
     /// </summary>
     public record ProficiencyXpGainedEvent(
         int PlayerId,
-        IReadOnlyList<ProficiencyXpResult> Results) : IDomainEvent, ILoggableDomainEvent
+        IReadOnlyList<ProficiencyXpResult> Results,
+        IReadOnlyList<ProficiencyOpened> Opened) : IDomainEvent, ILoggableDomainEvent
     {
         // Curated safe scalars only — never the per-proficiency payload itself.
         public IReadOnlyList<KeyValuePair<string, object?>> GetLogProperties() =>
         [
             new("PlayerId", PlayerId),
             new("ProficienciesTrained", Results.Count),
+            new("ProficienciesOpened", Opened.Count),
         ];
     }
 }

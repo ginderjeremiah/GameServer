@@ -10,10 +10,15 @@ namespace Game.Api.Models.Progress
     public class ProficiencyXpGainedModel : IModel
     {
         public required List<ProficiencyXpResultModel> Proficiencies { get; set; }
+
+        /// <summary>The nodes this battle opened (a maxed tier's next tier, or a newly-satisfied gateway), each
+        /// with the seed skill it granted (if any), so the client surfaces the unlock and adds the seed skill.</summary>
+        public required List<ProficiencyOpenedModel> Opened { get; set; }
     }
 
-    /// <summary>One proficiency's outcome from the battle: XP gained, the level/residual XP it ended at, and
-    /// any authored milestone levels the gain crossed.</summary>
+    /// <summary>One proficiency's outcome from the battle: XP gained, the level/residual XP it ended at, the
+    /// authored milestone levels the gain crossed, and the reward skills those milestones granted (a milestone
+    /// in <see cref="MilestonesCrossed"/> absent from <see cref="GrantedSkillIds"/> is bonus-only).</summary>
     public class ProficiencyXpResultModel : IModel
     {
         public int ProficiencyId { get; set; }
@@ -21,5 +26,13 @@ namespace Game.Api.Models.Progress
         public int NewLevel { get; set; }
         public decimal NewXp { get; set; }
         public required List<int> MilestonesCrossed { get; set; }
+        public required List<int> GrantedSkillIds { get; set; }
+    }
+
+    /// <summary>A node the battle opened and the seed skill granted with it (null when seeded by a world skill).</summary>
+    public class ProficiencyOpenedModel : IModel
+    {
+        public int ProficiencyId { get; set; }
+        public int? SeedSkillId { get; set; }
     }
 }

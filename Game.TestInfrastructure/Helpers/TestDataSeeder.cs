@@ -434,7 +434,9 @@ namespace Game.TestInfrastructure.Helpers
             decimal baseXp = 100m,
             decimal xpGrowth = 2m,
             int? pathId = null,
-            int pathOrdinal = 0)
+            int pathOrdinal = 0,
+            bool startsUnlocked = true,
+            int? seedSkillId = null)
         {
             pathId ??= (await CreatePathAsync(context)).Id;
 
@@ -448,7 +450,8 @@ namespace Game.TestInfrastructure.Helpers
                 MaxLevel = maxLevel,
                 BaseXp = baseXp,
                 XpGrowth = xpGrowth,
-                StartsUnlocked = true,
+                StartsUnlocked = startsUnlocked,
+                SeedSkillId = seedSkillId,
                 LevelModifiers = [],
                 LevelRewards = [],
                 Prerequisites = [],
@@ -457,6 +460,31 @@ namespace Game.TestInfrastructure.Helpers
             context.Proficiencies.Add(proficiency);
             await context.SaveChangesAsync();
             return proficiency;
+        }
+
+        // Authors a milestone reward: reaching the given level in the proficiency grants the reward skill.
+        public static async Task AddProficiencyLevelRewardAsync(
+            GameContext context, int proficiencyId, int level, int rewardSkillId)
+        {
+            context.Set<ProficiencyLevelReward>().Add(new ProficiencyLevelReward
+            {
+                ProficiencyId = proficiencyId,
+                Level = level,
+                RewardSkillId = rewardSkillId,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Adds a cross-path gateway edge: the proficiency opens once prerequisiteId is maxed.
+        public static async Task AddProficiencyPrerequisiteAsync(
+            GameContext context, int proficiencyId, int prerequisiteId)
+        {
+            context.Set<ProficiencyPrerequisite>().Add(new ProficiencyPrerequisite
+            {
+                ProficiencyId = proficiencyId,
+                PrerequisiteProficiencyId = prerequisiteId,
+            });
+            await context.SaveChangesAsync();
         }
 
         public static async Task AddPlayerProficiencyAsync(

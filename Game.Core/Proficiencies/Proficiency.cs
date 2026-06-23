@@ -103,10 +103,24 @@ namespace Game.Core.Proficiencies
         /// <summary>
         /// The authored payout levels crossed by advancing from <paramref name="fromLevel"/> (exclusive) to
         /// <paramref name="toLevel"/> (inclusive) — the milestones this battle's gain newly reached, in
-        /// ascending order. The effects themselves (reward skills, child-node unlocks) are applied by the
-        /// milestone sub-issue (#1118); this just reports which were crossed for the client push.
+        /// ascending order. Reported on the client push so a level-up surfaces immediately; the effects
+        /// themselves (reward skills) are applied by <see cref="RewardSkillsCrossed"/>.
         /// </summary>
         public IReadOnlyList<int> MilestonesCrossed(int fromLevel, int toLevel) =>
             [.. Levels.Where(l => l.Level > fromLevel && l.Level <= toLevel).Select(l => l.Level)];
+
+        /// <summary>
+        /// The reward skill ids granted by the milestones crossed advancing from <paramref name="fromLevel"/>
+        /// (exclusive) to <paramref name="toLevel"/> (inclusive) — the permanent skills this gain newly earns,
+        /// in ascending level order. A milestone with only an attribute bonus (no <see cref="ProficiencyLevel.RewardSkillId"/>)
+        /// is bonus-only and contributes nothing here, so the gap between this and <see cref="MilestonesCrossed"/>
+        /// is exactly the bonus-only set.
+        /// </summary>
+        public IReadOnlyList<int> RewardSkillsCrossed(int fromLevel, int toLevel) =>
+            [.. Levels.Where(l => l.Level > fromLevel && l.Level <= toLevel && l.RewardSkillId is not null)
+                .Select(l => l.RewardSkillId!.Value)];
+
+        /// <summary>True once a player has reached this proficiency's <see cref="MaxLevel"/>.</summary>
+        public bool IsMaxed(int level) => level >= MaxLevel;
     }
 }

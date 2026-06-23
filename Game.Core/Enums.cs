@@ -483,10 +483,10 @@ namespace Game.Core
     /// <summary>
     /// The channels a skill is <em>allowed</em> to be acquired through. A declared authoring intent, not a
     /// record of what exists: a skill may be <see cref="Item"/>-flagged with no item granting it yet. The
-    /// references (a challenge's reward, an enemy's skill pool, an item's grant) are the reality; backend
-    /// authoring validation bridges the two. "Enemy-Only" is <see cref="Enemy"/> set with the others clear —
-    /// an <see cref="Item"/>-only skill can never be a challenge reward, which is what guarantees it can be
-    /// obtained solely by equipping the granting item.
+    /// references (a proficiency milestone reward or tree-seed skill, an enemy's skill pool, an item's grant)
+    /// are the reality; backend authoring validation bridges the two. "Enemy-Only" is <see cref="Enemy"/> set
+    /// with the others clear — an <see cref="Item"/>-only skill can never be a proficiency grant, which is what
+    /// guarantees it can be obtained solely by equipping the granting item.
     /// </summary>
     [Flags]
     [ClientMirrored]
@@ -495,7 +495,8 @@ namespace Game.Core
         /// <summary>Not acquirable through any channel.</summary>
         None = 0,
 
-        /// <summary>Selectable by the player — a valid challenge reward, added to the unlocked loadout pool.</summary>
+        /// <summary>Permanently granted to the player and added to the unlocked loadout pool — by a proficiency
+        /// milestone reward or a tree-seed skill (challenges no longer grant skills; spike #982 area D/I).</summary>
         Player = 1,
 
         /// <summary>Grantable by an equipped item.</summary>

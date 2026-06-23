@@ -21,10 +21,29 @@ namespace Game.Core.Players
 
         /// <summary>
         /// Creates the blueprint for a brand-new player with the given <paramref name="name"/>: the
-        /// starter skills (all selected), the base attribute spread, and the default log preferences.
+        /// starter skills (all selected), the root-proficiency seed skills (unselected — a tree-seeded root
+        /// with no world skill source grants its native skill so the root is trainable from creation; spike
+        /// #982 area D), the base attribute spread, and the default log preferences. Root proficiencies are
+        /// open by construction (their <c>StartsUnlocked</c> flag), so only the seed-skill grant is seeded
+        /// here, not any per-player open state. <paramref name="rootSeedSkillIds"/> is resolved from the
+        /// proficiency catalogue by the orchestration layer; it is empty until roots are authored.
         /// </summary>
-        public NewPlayer Create(string name)
+        public NewPlayer Create(string name, IReadOnlyList<int> rootSeedSkillIds)
         {
+            // Starter skills are selected (ids 0..N-1); root seed skills are appended unselected, dropping any
+            // already covered by a starter skill so a player never gets a duplicate skill row.
+            var starterSkills = Enumerable.Range(0, StarterSkillCount)
+                .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index });
+            var seedSkills = rootSeedSkillIds
+                .Distinct()
+                .Where(id => id >= StarterSkillCount)
+                .Select((id, index) => new NewPlayerSkill
+                {
+                    SkillId = id,
+                    Selected = false,
+                    Order = StarterSkillCount + index,
+                });
+
             return new NewPlayer
             {
                 Name = name,
@@ -33,9 +52,7 @@ namespace Game.Core.Players
                 CurrentZoneId = StartingZoneId,
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
-                Skills = Enumerable.Range(0, StarterSkillCount)
-                    .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index })
-                    .ToList(),
+                Skills = [.. starterSkills, .. seedSkills],
                 // Seed an allocation row for exactly the core (directly-allocatable) attributes, derived from
                 // the attribute set itself rather than a hardcoded count — so adding a seventh core attribute
                 // automatically grants new players its allocation row (without one, PlayerStatPoints rejects

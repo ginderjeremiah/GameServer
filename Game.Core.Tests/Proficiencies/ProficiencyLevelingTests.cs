@@ -96,25 +96,50 @@ namespace Game.Core.Tests.Proficiencies
             Assert.Empty(proficiency.MilestonesCrossed(fromLevel: 6, toLevel: 9));
         }
 
-        private static Proficiency Make(double baseXp, double xpGrowth, int maxLevel = 10, int[]? payoutLevels = null) => new()
+        [Fact]
+        public void RewardSkillsCrossed_ReturnsOnlyTheRewardSkillsOfCrossedMilestones()
         {
-            Id = 0,
-            Name = "Test",
-            Description = string.Empty,
-            PathId = 0,
-            PathOrdinal = 0,
-            MaxLevel = maxLevel,
-            BaseXp = baseXp,
-            XpGrowth = xpGrowth,
-            StartsUnlocked = true,
-            SeedSkillId = null,
-            PrerequisiteIds = [],
-            Levels = (payoutLevels ?? []).Select(level => new ProficiencyLevel
+            // Level 5 grants a skill; level 10 is bonus-only (no reward skill).
+            var proficiency = Make(baseXp: 100, xpGrowth: 2, rewardLevels: [(5, 42), (10, null)]);
+
+            Assert.Equal([42], proficiency.RewardSkillsCrossed(fromLevel: 0, toLevel: 7));
+            // Crossing the bonus-only level 10 grants nothing, even though it is a crossed milestone.
+            Assert.Empty(proficiency.RewardSkillsCrossed(fromLevel: 7, toLevel: 10));
+            Assert.Equal([42], proficiency.RewardSkillsCrossed(fromLevel: 0, toLevel: 10));
+            Assert.Empty(proficiency.RewardSkillsCrossed(fromLevel: 5, toLevel: 9));
+        }
+
+        [Theory]
+        [InlineData(4, false)]
+        [InlineData(5, true)]
+        [InlineData(6, true)]
+        public void IsMaxed_IsTrueAtOrAboveTheCap(int level, bool expected)
+        {
+            Assert.Equal(expected, Make(baseXp: 100, xpGrowth: 2, maxLevel: 5).IsMaxed(level));
+        }
+
+        private static Proficiency Make(
+            double baseXp, double xpGrowth, int maxLevel = 10, int[]? payoutLevels = null,
+            (int Level, int? RewardSkillId)[]? rewardLevels = null) => new()
             {
-                Level = level,
-                Modifiers = [],
-                RewardSkillId = null,
-            }).ToList(),
-        };
+                Id = 0,
+                Name = "Test",
+                Description = string.Empty,
+                PathId = 0,
+                PathOrdinal = 0,
+                MaxLevel = maxLevel,
+                BaseXp = baseXp,
+                XpGrowth = xpGrowth,
+                StartsUnlocked = true,
+                SeedSkillId = null,
+                PrerequisiteIds = [],
+                Levels = (rewardLevels ?? (payoutLevels ?? []).Select(level => (level, (int?)null)).ToArray())
+                .Select(payout => new ProficiencyLevel
+                {
+                    Level = payout.Item1,
+                    Modifiers = [],
+                    RewardSkillId = payout.Item2,
+                }).ToList(),
+            };
     }
 }

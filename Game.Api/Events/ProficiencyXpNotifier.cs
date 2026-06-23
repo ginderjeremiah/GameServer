@@ -30,6 +30,14 @@ namespace Game.Api.Events
                         NewLevel = result.NewLevel,
                         NewXp = result.NewXp,
                         MilestonesCrossed = [.. result.MilestonesCrossed],
+                        GrantedSkillIds = [.. result.GrantedSkillIds],
+                    })
+                    .ToList(),
+                Opened = domainEvent.Opened
+                    .Select(opened => new ProficiencyOpenedModel
+                    {
+                        ProficiencyId = opened.ProficiencyId,
+                        SeedSkillId = opened.SeedSkillId,
                     })
                     .ToList(),
             };

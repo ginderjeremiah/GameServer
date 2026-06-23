@@ -43,6 +43,11 @@ namespace Game.DataAccess.Repositories
             return Entities.FirstOrDefault(p => p.PathId == pathId && p.PathOrdinal == ordinal);
         }
 
+        public IReadOnlyList<Proficiency> AllProficiencyEntities()
+        {
+            return Entities;
+        }
+
         public CoreProficiency GetProficiency(int proficiencyId)
         {
             // Returns the snapshot's shared, pre-materialized immutable instance rather than re-mapping.
@@ -58,6 +63,13 @@ namespace Game.DataAccess.Repositories
         {
             return holder.Current.ContributionsBySkill.TryGetValue(skillId, out var contributions)
                 ? contributions
+                : [];
+        }
+
+        public IReadOnlyList<int> DependentsOf(int proficiencyId)
+        {
+            return holder.Current.DependentsByProficiency.TryGetValue(proficiencyId, out var dependents)
+                ? dependents
                 : [];
         }
     }

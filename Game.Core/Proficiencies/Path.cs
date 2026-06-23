@@ -45,6 +45,24 @@ namespace Game.Core.Proficiencies
         /// tier below where it was acquired.
         /// </summary>
         public double FalloffAt(int distance) => Math.Pow(FalloffBase, distance);
+
+        /// <summary>
+        /// The tier immediately after <paramref name="ordinal"/> within the path (its
+        /// <see cref="PathTier.Ordinal"/> + 1), or <c>null</c> when <paramref name="ordinal"/> is the last
+        /// tier. The within-path open trigger uses this: maxing a tier reveals and seeds the next one.
+        /// </summary>
+        public PathTier? NextTier(int ordinal)
+        {
+            foreach (var tier in Tiers)
+            {
+                if (tier.Ordinal == ordinal + 1)
+                {
+                    return tier;
+                }
+            }
+
+            return null;
+        }
     }
 
     /// <summary>One tier of a path: the proficiency at <see cref="Ordinal"/> and its level cap.</summary>

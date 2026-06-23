@@ -26,8 +26,10 @@ namespace Game.Api.Tests.Unit
                         NewLevel = 2,
                         NewXp = 4m,
                         MilestonesCrossed = [5],
+                        GrantedSkillIds = [9],
                     },
                 ],
+                Opened = [new ProficiencyOpenedModel { ProficiencyId = 4, SeedSkillId = 11 }],
             };
 
             var command = new ProficiencyXpGained();
@@ -43,6 +45,10 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(2, echoed.NewLevel);
             Assert.Equal(4m, echoed.NewXp);
             Assert.Equal([5], echoed.MilestonesCrossed);
+            Assert.Equal([9], echoed.GrantedSkillIds);
+            var opened = Assert.Single(response.Data.Opened);
+            Assert.Equal(4, opened.ProficiencyId);
+            Assert.Equal(11, opened.SeedSkillId);
         }
 
         [Fact]
