@@ -96,8 +96,6 @@ beforeEach(() => {
 	staticData.enemies[1] = { id: 1, name: 'Goblin' };
 	staticData.zones = [];
 	staticData.zones[2] = { id: 2, name: 'Forgotten Catacombs' };
-	staticData.skills = [];
-	staticData.skills[2] = { id: 2, name: 'Firebolt', rarityId: ERarity.Epic };
 
 	staticData.challengeTypes = [
 		{ id: EChallengeType.EnemiesKilled, goalComparison: EChallengeGoalComparison.AtLeast, name: 'Enemies Killed' },
@@ -145,47 +143,6 @@ describe('resolveReward', () => {
 		expect(reward).toMatchObject({ kind: 'mod', revealed: false, rarity: ERarity.Rare, name: 'Honed' });
 		expect(reward?.sub).toBe('Rare · Prefix');
 		expect(reward?.mod?.id).toBe(213);
-	});
-
-	it('resolves a skill reward with its rarity tier accent, "rarity · Skill" sub-line and a tier glow', () => {
-		const ch = challenge({
-			id: 7,
-			name: 'Pyromancer',
-			challengeTypeId: EChallengeType.EnemiesKilled,
-			rewardSkillId: 2
-		});
-		const reward = resolveReward(ch, true);
-		expect(reward).toMatchObject({
-			kind: 'skill',
-			revealed: true,
-			name: 'Firebolt',
-			sub: 'Epic · Skill',
-			rarity: ERarity.Epic
-		});
-		// Skill rewards now tint + glow by their real rarity tier (no neutral/suppressed-glow special case).
-		expect(reward?.accent).toContain('--rarity-');
-		expect(reward?.glow).toContain('--rarity-');
-		expect(reward?.skill?.id).toBe(2);
-	});
-
-	it('honours the revealed flag for a skill reward', () => {
-		const ch = challenge({
-			id: 8,
-			name: 'Pyromancer',
-			challengeTypeId: EChallengeType.EnemiesKilled,
-			rewardSkillId: 2
-		});
-		expect(resolveReward(ch, false)?.revealed).toBe(false);
-	});
-
-	it('returns null when the rewarded skill is missing from the pool', () => {
-		const ch = challenge({
-			id: 8,
-			name: 'Pyromancer',
-			challengeTypeId: EChallengeType.EnemiesKilled,
-			rewardSkillId: 999
-		});
-		expect(resolveReward(ch, true)).toBeNull();
 	});
 
 	it('returns null when the challenge has no reward', () => {

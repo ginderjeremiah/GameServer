@@ -61,11 +61,10 @@ const sources = (): ReferenceSources => ({
 		challenge(1, 'Bat Hunter', {
 			entityType: EEntityType.Enemy,
 			targetEntityId: 0,
-			rewardItemModId: 1,
-			rewardSkillId: 0
+			rewardItemModId: 1
 		}),
 		challenge(2, 'Zone Clearer', { entityType: EEntityType.Zone, targetEntityId: 1 }),
-		challenge(3, 'Skill Spammer', { entityType: EEntityType.Skill, targetEntityId: 1, rewardSkillId: 1 })
+		challenge(3, 'Skill Spammer', { entityType: EEntityType.Skill, targetEntityId: 1 })
 	]
 });
 
@@ -129,22 +128,18 @@ describe('computeReferences — items and item mods', () => {
 });
 
 describe('computeReferences — skills', () => {
-	it('lists enemy skill-pool membership and challenge rewards', () => {
-		expect(computeReferences('skills', 0, sources())).toEqual([
-			{ kind: 'enemySkill', names: ['Cave Bat'] },
-			{ kind: 'challengeReward', names: ['Bat Hunter'] }
-		]);
+	it('lists enemy skill-pool membership', () => {
+		expect(computeReferences('skills', 0, sources())).toEqual([{ kind: 'enemySkill', names: ['Cave Bat'] }]);
 	});
 
-	it('lists skill-pool membership, reward, and challenge-target references together', () => {
+	it('lists skill-pool membership and challenge-target references together', () => {
 		expect(computeReferences('skills', 1, sources())).toEqual([
 			{ kind: 'enemySkill', names: ['Cave Bat'] },
-			{ kind: 'challengeReward', names: ['Skill Spammer'] },
 			{ kind: 'challengeTarget', names: ['Skill Spammer'] }
 		]);
 	});
 
-	it('reports only skill-pool membership for a skill that is no reward or target', () => {
+	it('reports only skill-pool membership for a skill that is no target', () => {
 		expect(computeReferences('skills', 2, sources())).toEqual([{ kind: 'enemySkill', names: ['Catacomb Lich'] }]);
 	});
 });

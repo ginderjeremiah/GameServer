@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EChallengeType, ERarity, ESkillAcquisition, type ISkill } from '$lib/api';
+import { EChallengeType, ERarity, EItemModType, type IItemMod } from '$lib/api';
 import OverviewPane from '$routes/game/screens/challenges/OverviewPane.svelte';
 import type {
 	ChallengeVM,
@@ -11,28 +11,22 @@ import type {
 
 afterEach(cleanup);
 
-const sampleSkill: ISkill = {
+const sampleMod: IItemMod = {
 	id: 5,
-	name: 'Firebolt',
-	baseDamage: 12,
-	description: 'Hurls a bolt of fire.',
-	damageMultipliers: [],
-	effects: [],
-	cooldownMs: 3000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	acquisition: ESkillAcquisition.Player
-};
+	name: 'of Fury',
+	itemModTypeId: EItemModType.Suffix,
+	rarityId: ERarity.Common
+} as IItemMod;
 
 const reward: ResolvedReward = {
-	kind: 'skill',
+	kind: 'mod',
 	revealed: true,
 	rarity: ERarity.Common,
 	accent: 'var(--accent-light)',
 	glow: 'var(--rarity-common-glow)',
-	name: 'Firebolt',
-	sub: 'Skill',
-	skill: sampleSkill
+	name: 'of Fury',
+	sub: 'Common · Suffix',
+	mod: sampleMod
 };
 
 const challenge = (over: Partial<ChallengeVM> & { id: number }): ChallengeVM =>

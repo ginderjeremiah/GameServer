@@ -12,6 +12,5 @@ namespace Game.Core.Players.Events
         int PlayerId,
         int ChallengeId,
         int? RewardItemId,
-        int? RewardItemModId,
-        int? RewardSkillId) : IDomainEvent;
+        int? RewardItemModId) : IDomainEvent;
 }

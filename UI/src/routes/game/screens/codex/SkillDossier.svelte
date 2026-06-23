@@ -1,9 +1,9 @@
 <!-- The skill dossier (right panel): the header carries a rarity-tinted accent border + tier tag
      alongside the intellect "Skill" kind mark (mirroring items: rarity on the border, kind on the
-     label), base damage / cooldown meta, how to obtain the skill (challenge rewards / item grants, or
-     the enemy-only / not-obtainable wording), the attributes the skill scales with, its authored
-     effects (wording from the shared skill-effect-display helper), and the enemies that use it. The
-     "used by" pills cross-link into the enemy dossier. A reference card only — no equip/loadout, no DPS. -->
+     label), base damage / cooldown meta, how to obtain the skill (item grants, or the enemy-only /
+     not-obtainable wording), the attributes the skill scales with, its authored effects (wording
+     from the shared skill-effect-display helper), and the enemies that use it. The "used by" pills
+     cross-link into the enemy dossier. A reference card only — no equip/loadout, no DPS. -->
 {#if view.selectedSkill}
 	{@const skill = view.selectedSkill}
 	{@const rarity = view.selectedSkillRarity}

@@ -10,14 +10,12 @@ namespace Game.Infrastructure.Entities
         public decimal ProgressGoal { get; set; }
         public int? RewardItemId { get; set; }
         public int? RewardItemModId { get; set; }
-        public int? RewardSkillId { get; set; }
 
         /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
         public DateTime? RetiredAt { get; set; }
 
         public virtual Item? RewardItem { get; set; }
         public virtual ItemMod? RewardItemMod { get; set; }
-        public virtual Skill? RewardSkill { get; set; }
         public virtual ChallengeType ChallengeType { get => field ?? throw new NotLoadedException(nameof(ChallengeType)); set; }
     }
 }

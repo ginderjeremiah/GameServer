@@ -6,8 +6,7 @@ import {
 	type IChallenge,
 	type IItem,
 	type IItemMod,
-	type IPlayerChallenge,
-	type ISkill
+	type IPlayerChallenge
 } from '$lib/api';
 import { BattleAttributes, type Item } from '$lib/battle';
 import {
@@ -25,27 +24,25 @@ import { challengeTypeUnit } from './challenge-meta';
 export type ChallengeState = 'locked' | 'active' | 'done';
 export type SortKey = 'progress' | 'rarity' | 'name';
 
-/** A challenge's reward, resolved against the item/mod/skill reference pools. While
+/** A challenge's reward, resolved against the item/mod reference pools. While
  *  the challenge is incomplete the reward is *sealed* (`revealed: false`) — the
  *  rarity tier and category are teased, but the name/stats stay hidden. */
 export interface ResolvedReward {
-	kind: 'item' | 'mod' | 'skill';
+	kind: 'item' | 'mod';
 	revealed: boolean;
-	/** Rarity tier (drives the rarity sort). Items, mods, and skills all carry a tier. */
+	/** Rarity tier (drives the rarity sort). Items and mods both carry a tier. */
 	rarity: ERarity;
 	/** Themeable rarity hue for the reward. */
 	accent: string;
 	/** Themeable rarity glow intensity token (`var(--rarity-*-glow)`). */
 	glow: string;
 	name: string;
-	/** Teaser sub-line, e.g. `Rare · Helm`, or `Skill`. */
+	/** Teaser sub-line, e.g. `Rare · Helm`. */
 	sub: string;
 	/** Item rewards: a preview battle item for the (re-used) item tooltip. */
 	item?: Item;
 	/** Mod rewards: the raw mod data for the mod tooltip. */
 	mod?: IItemMod;
-	/** Skill rewards: the raw skill data for the skill tooltip. */
-	skill?: ISkill;
 }
 
 export interface ProgressInfo {
@@ -136,12 +133,11 @@ function buildPreviewItem(itemData: IItem): Item {
 /* ─── Reward resolution (+ reveal gating) ────────────────────────────── */
 /** Build the rich, reveal-gated reward view on top of the shared `resolveUnlockReward` resolution:
  *  the precedence, accent, rarity and sub-label come from the shared helper, and this layer adds the
- *  reveal flag, the rarity glow, and the per-kind tooltip preview (battle item / raw mod / raw skill). */
+ *  reveal flag, the rarity glow, and the per-kind tooltip preview (battle item / raw mod). */
 export function resolveReward(ch: IChallenge, revealed: boolean): ResolvedReward | null {
 	const base = resolveUnlockReward(ch, {
 		items: staticData.items,
-		itemMods: staticData.itemMods,
-		skills: staticData.skills
+		itemMods: staticData.itemMods
 	});
 	if (base == null) {
 		return null;
@@ -162,9 +158,6 @@ export function resolveReward(ch: IChallenge, revealed: boolean): ResolvedReward
 			break;
 		case 'mod':
 			resolved.mod = base.mod;
-			break;
-		case 'skill':
-			resolved.skill = base.skill;
 			break;
 	}
 	return resolved;

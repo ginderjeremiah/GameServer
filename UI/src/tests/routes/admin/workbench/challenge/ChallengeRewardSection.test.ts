@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { ERarity, ESkillAcquisition, type IChallenge } from '$lib/api';
+import { ERarity, type IChallenge } from '$lib/api';
 
 const ITEMS: { id: number; name: string; rarityId: ERarity; retiredAt?: string }[] = [
 	{ id: 0, name: 'Iron Helm', rarityId: ERarity.Common },
@@ -10,17 +10,11 @@ const ITEMS: { id: number; name: string; rarityId: ERarity; retiredAt?: string }
 const MODS: { id: number; name: string; itemModTypeId: number; retiredAt?: string }[] = [
 	{ id: 0, name: 'Sharp', itemModTypeId: 2 }
 ];
-const SKILLS: { id: number; name: string; baseDamage: number; acquisition: ESkillAcquisition; retiredAt?: string }[] = [
-	{ id: 0, name: 'Cleave', baseDamage: 12, acquisition: ESkillAcquisition.Player },
-	// An Enemy-only skill: it can't be a challenge reward, so the picker must omit it.
-	{ id: 1, name: 'Enemy Roar', baseDamage: 8, acquisition: ESkillAcquisition.Enemy }
-];
 
 const { mockReference } = vi.hoisted(() => ({
 	mockReference: {
 		itemRecords: vi.fn(() => ITEMS),
 		itemModRecords: vi.fn(() => MODS),
-		skillRecords: vi.fn(() => SKILLS),
 		itemRecName: vi.fn((id: number) => ITEMS.find((i) => i.id === id)?.name),
 		itemRarityId: vi.fn((id: number) => ITEMS.find((i) => i.id === id)?.rarityId),
 		rarityName: vi.fn(() => 'Legendary'),
@@ -28,11 +22,8 @@ const { mockReference } = vi.hoisted(() => ({
 		itemModName: vi.fn((id: number) => MODS.find((m) => m.id === id)?.name),
 		itemModTypeName: vi.fn(() => 'Prefix'),
 		modTypeName: vi.fn(() => 'Prefix'),
-		skillName: vi.fn((id: number) => SKILLS.find((s) => s.id === id)?.name),
-		skillBaseDamage: vi.fn((id: number) => SKILLS.find((s) => s.id === id)?.baseDamage),
 		itemRetired: vi.fn((id: number) => !!ITEMS.find((i) => i.id === id)?.retiredAt),
-		itemModRetired: vi.fn((id: number) => !!MODS.find((m) => m.id === id)?.retiredAt),
-		skillRetired: vi.fn((id: number) => !!SKILLS.find((s) => s.id === id)?.retiredAt)
+		itemModRetired: vi.fn((id: number) => !!MODS.find((m) => m.id === id)?.retiredAt)
 	}
 }));
 vi.mock('$routes/admin/workbench/reference.svelte', () => ({ reference: mockReference }));
@@ -80,12 +71,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('ChallengeRewardSection', () => {
-	it('renders the three reward slots', () => {
+	it('renders the two reward slots', () => {
 		const { store, record, baseline } = setup();
 		render(ChallengeRewardSection, { props: { record, baseline, store } });
 		expect(screen.getByText('Item Reward')).toBeTruthy();
 		expect(screen.getByText('Item Mod Reward')).toBeTruthy();
-		expect(screen.getByText('Skill Reward')).toBeTruthy();
+		expect(screen.queryByText('Skill Reward')).toBeNull();
 	});
 
 	it('warns when the challenge unlocks nothing', () => {
@@ -155,25 +146,6 @@ describe('ChallengeRewardSection', () => {
 		await fireEvent.click(screen.getByText('Sharp'));
 		expect((store.items[0] as unknown as IChallenge).rewardItemModId).toBe(0);
 		expect(container.querySelector('.ch-picker')).toBeNull();
-	});
-
-	it('opens the skill picker and assigns the chosen skill', async () => {
-		const { store, record, baseline } = setup();
-		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
-		await fireEvent.click(screen.getByText('Choose skill…'));
-		expect(container.querySelector('.ch-picker')).toBeTruthy();
-		await fireEvent.click(screen.getByText('Cleave'));
-		expect((store.items[0] as unknown as IChallenge).rewardSkillId).toBe(0);
-		expect(container.querySelector('.ch-picker')).toBeNull();
-	});
-
-	it('offers only Player-flagged skills in the picker, omitting an Enemy-only skill', async () => {
-		const { store, record, baseline } = setup();
-		render(ChallengeRewardSection, { props: { record, baseline, store } });
-		await fireEvent.click(screen.getByText('Choose skill…'));
-		// Cleave is Player-acquirable; Enemy Roar is Enemy-only and can't be a challenge reward.
-		expect(screen.getByText('Cleave')).toBeTruthy();
-		expect(screen.queryByText('Enemy Roar')).toBeNull();
 	});
 
 	it('collapses an open picker when the rendered record switches to a different challenge', async () => {

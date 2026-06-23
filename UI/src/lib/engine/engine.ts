@@ -17,7 +17,6 @@ import {
 	navigation
 } from '$stores';
 import { apiSocket, type IApiSocketResponse } from '$lib/api';
-import { playerManager } from './player/player-manager';
 
 export const inventoryManager = statify(new InventoryManager());
 export const enemyManager = statify(new EnemyManager());
@@ -73,8 +72,8 @@ export const handleServerCommandFailed = (response: IApiSocketResponse<'ServerCo
 /**
  * Applies a completed-challenge push from the server: marks the challenge complete (so completion-gated
  * UI like zone navigation and the reward reveal update without a refetch), unlocks each reward it carries
- * so the player can use it immediately — equip the item/mod, select the skill — instead of only after a
- * page refresh, and surfaces a success toast announcing the completion and what it unlocked.
+ * so the player can use it immediately — equip the item/mod — instead of only after a page refresh, and
+ * surfaces a success toast announcing the completion and what it unlocked.
  */
 export const handleChallengeCompleted = (response: IApiSocketResponse<'ChallengeCompleted'>) => {
 	const data = response.data;
@@ -95,9 +94,6 @@ export const handleChallengeCompleted = (response: IApiSocketResponse<'Challenge
 	if (data.rewardItemModId != null) {
 		inventoryManager.addUnlockedMod(data.rewardItemModId);
 	}
-	if (data.rewardSkillId != null) {
-		playerManager.addUnlockedSkill(data.rewardSkillId);
-	}
 
 	notifyChallengeCompleted(data.challengeId);
 };
@@ -115,8 +111,7 @@ const notifyChallengeCompleted = (challengeId: number) => {
 	}
 	const reward = resolveUnlockReward(challenge, {
 		items: staticData.items,
-		itemMods: staticData.itemMods,
-		skills: staticData.skills
+		itemMods: staticData.itemMods
 	});
 	toastSuccess(challengeCompletedMessage(challenge.name, reward), {
 		action: { label: 'View', onClick: () => navigation.requestScreen('challenges') }

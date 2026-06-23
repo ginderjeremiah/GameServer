@@ -64,11 +64,10 @@ const challengeReferences = (id: number, { zones }: ReferenceSources): Reference
 
 const skillReferences = (id: number, { enemies, challenges }: ReferenceSources): ReferenceGroup[] => {
 	const inPool = enemies.filter((e) => e.skillPool.includes(id)).map((e) => e.name);
-	const rewardOf = challenges.filter((c) => c.rewardSkillId === id).map((c) => c.name);
 	const targetOf = challenges
 		.filter((c) => c.entityType === EEntityType.Skill && c.targetEntityId === id)
 		.map((c) => c.name);
-	return [...group('enemySkill', inPool), ...group('challengeReward', rewardOf), ...group('challengeTarget', targetOf)];
+	return [...group('enemySkill', inPool), ...group('challengeTarget', targetOf)];
 };
 
 const rewardReferences = (

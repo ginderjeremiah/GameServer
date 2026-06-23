@@ -58,8 +58,7 @@ const reward = $derived(
 	challenge
 		? resolveUnlockReward(challenge, {
 				items: staticData.items,
-				itemMods: staticData.itemMods,
-				skills: staticData.skills
+				itemMods: staticData.itemMods
 			})
 		: null
 );

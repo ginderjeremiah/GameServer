@@ -72,8 +72,7 @@ const completedChallenges = $derived(
 	resolveCompletedChallenges(summary.completedChallenges, {
 		challenges: staticData.challenges,
 		items: staticData.items,
-		itemMods: staticData.itemMods,
-		skills: staticData.skills
+		itemMods: staticData.itemMods
 	})
 );
 </script>
