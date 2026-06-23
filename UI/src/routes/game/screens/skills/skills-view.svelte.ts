@@ -457,7 +457,7 @@ export class SkillsView {
 		this.pendingLoadout = next;
 		playerManager.setSelectedSkills(next);
 		const seq = ++this.commitSeq;
-		this.lastCommit = this.lastCommit.then(async () => {
+		const result = this.lastCommit.then(async () => {
 			const response = await apiSocket.sendSocketCommand('SetSelectedSkills', next);
 			const isLatest = seq === this.commitSeq;
 			if (response.error) {
@@ -473,5 +473,8 @@ export class SkillsView {
 				}
 			}
 		});
+		// Keep the queue tail always-fulfilled: a rejecting callback would otherwise make every later
+		// commit skip its persist and raise an unhandled rejection (mirrors the inventory manager's serialize).
+		this.lastCommit = result.catch(() => undefined);
 	}
 }
