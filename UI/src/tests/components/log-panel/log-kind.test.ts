@@ -109,6 +109,13 @@ describe('logKind', () => {
 		expect(result.label).toBe('Level');
 	});
 
+	it('returns the reward treatment for ELogType.Proficiency', () => {
+		const result = logKind(makeLog(ELogType.Proficiency, 'Fire Magic reached level 5'));
+		expect(result.color).toBe(logColors.reward);
+		expect(result.glyph).toBe('crit');
+		expect(result.label).toBe('Prof');
+	});
+
 	it('returns the effect treatment for ELogType.SkillEffect', () => {
 		const result = logKind(makeLog(ELogType.SkillEffect, 'You are empowered: +15 Strength for 5s'));
 		expect(result.color).toBe(logColors.effect);

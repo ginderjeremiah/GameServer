@@ -3,6 +3,7 @@ export * from './rarity';
 export * from './challenge-type';
 export * from './tag-color';
 export * from './challenge-unlocks';
+export * from './proficiency-feedback';
 export * from './zone-progression';
 export * from './enemy-attributes';
 export * from './attribute-display';

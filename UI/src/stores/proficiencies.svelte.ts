@@ -4,7 +4,7 @@
    composes its per-level/milestone attribute bonuses (spike #982 area E) from these levels against the
    proficiency reference data, mirroring the backend battle snapshot. */
 
-import { fetchSocketData, type IPlayerProficiency } from '$lib/api';
+import { fetchSocketData, type IPlayerProficiency, type IProficiencyXpGainedModel } from '$lib/api';
 import { proficiencyModifiers } from '$lib/battle/proficiency-modifiers';
 import type { AttributeModifier } from '$lib/battle/attribute-modifier';
 import { staticData } from './static-data.svelte';
@@ -62,6 +62,39 @@ export const playerProficiencies = {
 	/** The player's proficiency attribute bonuses for the live battler (see {@link battleModifiers}). */
 	get battleModifiers() {
 		return battleModifiers;
+	},
+
+	/** The player's current level in a proficiency, or 0 if they have not opened it yet. Read before
+	 *  {@link applyXpGained} to detect a level-up (the push carries the new level, not the prior one). */
+	levelOf(proficiencyId: number) {
+		return proficiencies.find((p) => p.proficiencyId === proficiencyId)?.level ?? 0;
+	},
+
+	/** Apply a `ProficiencyXpGained` push so progress-derived UI — the tree and the live battler's
+	 *  attribute bonuses — reflects it immediately without a refetch. Each result's new level/xp is set
+	 *  (inserting the proficiency if it was previously unopened), and any newly-opened proficiency the
+	 *  battle did not also train is added at level 0 so it appears straight away. A later `load(force)`
+	 *  reconciles against the authoritative server progress. The array is reassigned (not mutated) so the
+	 *  `battleModifiers` derived recomputes and the battle engine's by-reference change detection fires. */
+	applyXpGained(model: IProficiencyXpGainedModel) {
+		// Update each already-tracked proficiency in place to its new level/xp.
+		let next = proficiencies.map((existing): IPlayerProficiency => {
+			const result = model.proficiencies.find((r) => r.proficiencyId === existing.proficiencyId);
+			return result ? { proficiencyId: result.proficiencyId, level: result.newLevel, xp: result.newXp } : existing;
+		});
+		// Append any result for a proficiency the player had not yet opened.
+		for (const result of model.proficiencies) {
+			if (!next.some((p) => p.proficiencyId === result.proficiencyId)) {
+				next = [...next, { proficiencyId: result.proficiencyId, level: result.newLevel, xp: result.newXp }];
+			}
+		}
+		// Append any newly-opened proficiency the battle did not also train, at level 0.
+		for (const opened of model.opened) {
+			if (!next.some((p) => p.proficiencyId === opened.proficiencyId)) {
+				next = [...next, { proficiencyId: opened.proficiencyId, level: 0, xp: 0 }];
+			}
+		}
+		proficiencies = next;
 	},
 
 	/** Fetch the player's proficiency progress. Idempotent — only hits the network the first time
