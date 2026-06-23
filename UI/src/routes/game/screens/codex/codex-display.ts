@@ -90,7 +90,7 @@ export function formatBaseDamage(baseDamage: number): string {
 
 /** Lead-in for a concrete acquisition source. Items are the only concrete player source surfaced
  *  here (challenges no longer grant skills — spike #982). */
-export const skillSourceLabel = (): string => 'Granted by';
+export const SKILL_SOURCE_LABEL = 'Granted by';
 
 /** Wording for the no-source acquisition cases (empty for an obtainable skill, which lists sources). */
 export const SKILL_ACQUISITION_EMPTY: Record<SkillAcquisitionStatus, string> = {

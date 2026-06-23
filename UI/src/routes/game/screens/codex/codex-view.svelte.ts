@@ -60,11 +60,11 @@ import {
 	formatCooldown,
 	matchesEnemySearch,
 	resolveZoneStatus,
-	skillSourceLabel,
 	sortEnemyRows,
 	tabAccent,
 	tabLabel,
-	SKILL_ACQUISITION_EMPTY
+	SKILL_ACQUISITION_EMPTY,
+	SKILL_SOURCE_LABEL
 } from './codex-display';
 import { type LevelRange, levelRange, spawnShare, zoneTotalWeight } from './enemy-level';
 import { type SkillAcquisitionStatus, resolveSkillProvenance } from './skill-provenance';
@@ -682,7 +682,7 @@ export class CodexView {
 		const sources = provenance.sources.map<SkillSourceVM>((src) => ({
 			kind: src.kind,
 			id: src.id,
-			label: skillSourceLabel(),
+			label: SKILL_SOURCE_LABEL,
 			name: src.name,
 			accent: rarityColor(allItems[src.id]?.rarityId ?? ERarity.Common)
 		}));
