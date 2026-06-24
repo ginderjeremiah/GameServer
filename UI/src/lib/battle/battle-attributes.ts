@@ -125,6 +125,8 @@ export class BattleAttributes {
 	 *  `attributeValues` keeps `$derived` consumers tracking changes; the projections themselves cache
 	 *  in non-reactive `#` fields, so this lazy write is legal mid-derivation. */
 	#ensureProjections(): { all: AttributeEntry[]; nonZero: AttributeEntry[] } {
+		// Must read attributeValues unconditionally (not inside the `if`): on a cache hit this read is
+		// the only thing registering the $derived dependency, so consumers re-derive on recompute.
 		const values = this.attributeValues;
 		let all = this.#attributeMap;
 		let nonZero = this.#nonZeroAttributeMap;
