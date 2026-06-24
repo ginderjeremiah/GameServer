@@ -25,21 +25,25 @@ export interface AttributeEntry {
  * path the breakdown screen uses — only when the modifier set changes, and memoised between changes.
  *
  * Two reactivity rules make this safe once an instance is made reactive (`statify`):
- * - The recompute is **eager** (on each `setData`/`addModifier`/`removeModifier`), so
- *   {@link getValue}/{@link getAttributeMap} are pure reads. Those reads happen inside Svelte
- *   `$derived` (e.g. a battler card's MaxHealth bar); a lazy recompute would be an illegal
- *   mid-derivation `$state` write (`state_unsafe_mutation`).
- * - The modifier list and the `calcDerived` flag are **private (`#`) fields**, invisible to
- *   `statify`, so they stay non-reactive. That keeps `removeModifier`'s reference identity intact
- *   (a reactive array would deep-proxy its elements, so the stored modifier would no longer be
- *   `===` the reference the caller holds). Only the reactive fields — what the UI reads — are
- *   reassigned on each recompute.
+ * - The per-attribute totals recompute is **eager** (on each `setData`/`addModifier`/`removeModifier`),
+ *   so {@link getValue} is a pure read. That read happens inside Svelte `$derived` (e.g. a battler
+ *   card's MaxHealth bar); a lazy total recompute would be an illegal mid-derivation `$state` write
+ *   (`state_unsafe_mutation`).
+ * - The modifier list, the `calcDerived` flag, and the memoised display projections are **private
+ *   (`#`) fields**, invisible to `statify`, so they stay non-reactive. For the modifier list that
+ *   keeps `removeModifier`'s reference identity intact (a reactive array would deep-proxy its
+ *   elements, so the stored modifier would no longer be `===` the reference the caller holds). Only
+ *   the reactive `attributeValues` — what combat reads — is reassigned on each recompute.
  *
- * The named display projections ({@link getAttributeMap}/{@link getAttributeCount}) are memoised
- * alongside the totals (they depend only on the values), so every `$derived` tooltip/inventory
- * consumer reads a shared cached array instead of rebuilding its own per call site. Names resolve
- * through the documented {@link attributeName} convention against the live `Attributes` reference
- * set, the single source other display surfaces use.
+ * The named display projections ({@link getAttributeMap}/{@link getAttributeCount}) are nothing the
+ * combat loop consumes — they back the inventory/breakdown/tooltip surfaces only — so they are built
+ * **lazily on first read** and memoised, then invalidated on the next recompute. This keeps the
+ * per-modifier hot path (every effect application/expiry, for both battlers, up to each tick) off the
+ * per-attribute `.map` + `attributeName` reference scans; the projections rebuild once, the next time
+ * a UI surface reads them. Caching them in non-reactive `#` fields makes the lazy build's write legal
+ * mid-derivation (it is not a `$state` write), while a read of the reactive `attributeValues` keeps
+ * the `$derived` consumers tracking changes. Names resolve through the documented {@link attributeName}
+ * convention against the live `Attributes` reference set, the single source other display surfaces use.
  */
 export class BattleAttributes {
 	/** Every modifier composing this set, in the order the backend applies them. */
@@ -48,10 +52,10 @@ export class BattleAttributes {
 	#calcDerived = true;
 	/** The memoised per-attribute totals, recomputed only when the modifier set changes. */
 	private attributeValues: number[] = new Array<number>(attributesMaxId + 1).fill(0);
-	/** Memoised display projection of every attribute (including zeroes), recomputed alongside the totals. */
-	private attributeMap: AttributeEntry[] = [];
-	/** Memoised display projection of only the non-zero attributes. */
-	private nonZeroAttributeMap: AttributeEntry[] = [];
+	/** Lazily-built display projection of every attribute (including zeroes); null when invalidated. */
+	#attributeMap: AttributeEntry[] | null = null;
+	/** Lazily-built display projection of only the non-zero attributes; null when invalidated. */
+	#nonZeroAttributeMap: AttributeEntry[] | null = null;
 
 	constructor(attList: IBattlerAttribute[] = [], calcDerivedStats: boolean = true) {
 		this.setData(attList, calcDerivedStats);
@@ -107,16 +111,35 @@ export class BattleAttributes {
 		return this.attributeValues[attId];
 	}
 
-	/** The memoised named projection — by default only the non-zero attributes; `includeZeroes`
-	 *  returns every attribute. Both arrays are rebuilt only on recompute, so this is an O(1) read. */
-	public getAttributeMap = (includeZeroes: boolean = false): AttributeEntry[] =>
-		includeZeroes ? this.attributeMap : this.nonZeroAttributeMap;
+	/** The named display projection — by default only the non-zero attributes; `includeZeroes`
+	 *  returns every attribute. Built lazily on first read and memoised until the next recompute. */
+	public getAttributeMap = (includeZeroes: boolean = false): AttributeEntry[] => {
+		const { all, nonZero } = this.#ensureProjections();
+		return includeZeroes ? all : nonZero;
+	};
 
-	/** The memoised count of non-zero attributes, for consumers that only need the size. */
-	public getAttributeCount = (): number => this.nonZeroAttributeMap.length;
+	/** The count of non-zero attributes, for consumers that only need the size. */
+	public getAttributeCount = (): number => this.#ensureProjections().nonZero.length;
 
-	/** Recomputes the per-attribute totals and their named projections from the current modifiers.
-	 *  Called only when the modifier set changes; reads then return the memoised results. */
+	/** Builds and memoises the named display projections on demand. A read of the reactive
+	 *  `attributeValues` keeps `$derived` consumers tracking changes; the projections themselves cache
+	 *  in non-reactive `#` fields, so this lazy write is legal mid-derivation. */
+	#ensureProjections(): { all: AttributeEntry[]; nonZero: AttributeEntry[] } {
+		const values = this.attributeValues;
+		let all = this.#attributeMap;
+		let nonZero = this.#nonZeroAttributeMap;
+		if (all === null || nonZero === null) {
+			all = values.map((value, id) => ({ name: attributeName(id, staticData.attributes), value }));
+			nonZero = all.filter((entry) => entry.value != 0);
+			this.#attributeMap = all;
+			this.#nonZeroAttributeMap = nonZero;
+		}
+		return { all, nonZero };
+	}
+
+	/** Recomputes the per-attribute totals from the current modifiers and invalidates the lazy
+	 *  display projections. Called only when the modifier set changes; the combat loop reads only
+	 *  `attributeValues`, so the projections rebuild on the next UI read rather than here. */
 	private recompute() {
 		const values = new Array<number>(attributesMaxId + 1).fill(0);
 		if (this.#calcDerived) {
@@ -129,7 +152,7 @@ export class BattleAttributes {
 			}
 		}
 		this.attributeValues = values;
-		this.attributeMap = values.map((value, id) => ({ name: attributeName(id, staticData.attributes), value }));
-		this.nonZeroAttributeMap = this.attributeMap.filter((entry) => entry.value != 0);
+		this.#attributeMap = null;
+		this.#nonZeroAttributeMap = null;
 	}
 }

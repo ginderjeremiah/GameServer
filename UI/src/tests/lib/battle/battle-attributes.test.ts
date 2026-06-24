@@ -236,6 +236,32 @@ describe('BattleAttributes', () => {
 			expect(ba.getAttributeMap(true)).toBe(ba.getAttributeMap(true));
 		});
 
+		it('does not rebuild the projection on the modifier hot path until it is read again', async () => {
+			const { staticData } = await import('$stores');
+			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10]), false);
+
+			// First read builds the projection, scanning the reference set once per attribute.
+			ba.getAttributeMap();
+			const getter = vi.spyOn(staticData, 'attributes', 'get');
+
+			// The combat hot path (add/remove modifiers) only touches the totals — no projection scans.
+			const transient = additive(EAttribute.Agility, 6);
+			ba.addModifier(transient);
+			ba.removeModifier(transient);
+			ba.addModifier(additive(EAttribute.Agility, 3));
+			expect(getter).not.toHaveBeenCalled();
+
+			// The next UI read rebuilds it lazily, reflecting the accumulated changes.
+			const rebuilt = ba.getAttributeMap();
+			expect(getter).toHaveBeenCalled();
+			expect(rebuilt).toEqual([
+				{ name: 'Strength', value: 10 },
+				{ name: 'Agility', value: 3 }
+			]);
+
+			getter.mockRestore();
+		});
+
 		it('rebuilds the projection after a modifier change', () => {
 			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10]), false);
 			const before = ba.getAttributeMap();
