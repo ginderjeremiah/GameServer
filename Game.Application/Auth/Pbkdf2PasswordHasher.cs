@@ -25,16 +25,23 @@ namespace Game.Application.Auth
         private const string FormatPrefix = "$pbkdf2-sha256$";
         private const int KeyLengthBytes = 32;
         private const int SaltLengthBytes = 16;
+        // A fixed plaintext whose hash an unknown-user login verifies against; its content is irrelevant
+        // since the comparison is never expected to match — only the derivation cost matters.
+        private const string DummyPassword = "unknown-user-timing-mitigation";
         private static readonly HashAlgorithmName DerivationAlgorithm = HashAlgorithmName.SHA256;
 
         private readonly int _iterations;
         private readonly byte[] _pepper;
+        // A dummy hash at the current work factor, derived once on first use. Verifying a supplied password
+        // against it costs the same PBKDF2 work as a real account, masking the unknown-user branch.
+        private readonly Lazy<string> _dummyHash;
 
         public Pbkdf2PasswordHasher(IOptions<PasswordHashingOptions> options)
         {
             var value = options.Value;
             _iterations = value.Iterations;
             _pepper = Encoding.UTF8.GetBytes(value.Pepper);
+            _dummyHash = new Lazy<string>(() => Hash(DummyPassword));
         }
 
         public string Hash(string password)
@@ -67,6 +74,13 @@ namespace Game.Application.Auth
             return iterations == _iterations
                 ? PasswordVerificationResult.Success
                 : PasswordVerificationResult.SuccessRehashNeeded;
+        }
+
+        public void VerifyDummy(string password)
+        {
+            // Run a full verify (derivation + constant-time compare) against the dummy hash and discard the
+            // outcome — the call exists only to spend the same work a real verify would on a known username.
+            Verify(password, _dummyHash.Value);
         }
 
         private byte[] Derive(string password, byte[] salt, int iterations)

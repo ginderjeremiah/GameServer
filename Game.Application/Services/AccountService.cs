@@ -84,6 +84,9 @@ namespace Game.Application.Services
             var account = await _users.GetUser(username);
             if (account is null)
             {
+                // Spend the same PBKDF2 work a real account's verify would, so an unknown username is not
+                // distinguishable by response time (defeating timing-based username enumeration).
+                _passwordHasher.VerifyDummy(password);
                 await _backoffGuard.RegisterFailure(username);
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }

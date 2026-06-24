@@ -214,6 +214,7 @@ namespace Game.Api.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost]
         public async Task<ApiResponse> Logout([FromBody] RefreshRequest request)
         {
