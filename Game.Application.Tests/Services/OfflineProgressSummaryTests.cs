@@ -15,20 +15,20 @@ namespace Game.Application.Tests.Services
             int battlesWon = 0,
             IReadOnlyList<ProficiencyXpResult>? proficiencyGains = null,
             IReadOnlyList<ProficiencyOpened>? openedProficiencies = null) => new()
-        {
-            AwayMs = 1000,
-            AutoChallengeBoss = false,
-            ZoneId = 1,
-            BattlesWon = battlesWon,
-            BattlesLost = 0,
-            BattlesDrawn = 0,
-            TotalExp = 0,
-            LevelsGained = 0,
-            StatPointsGained = 0,
-            CompletedChallenges = [],
-            ProficiencyGains = proficiencyGains ?? [],
-            OpenedProficiencies = openedProficiencies ?? [],
-        };
+            {
+                AwayMs = 1000,
+                AutoChallengeBoss = false,
+                ZoneId = 1,
+                BattlesWon = battlesWon,
+                BattlesLost = 0,
+                BattlesDrawn = 0,
+                TotalExp = 0,
+                LevelsGained = 0,
+                StatPointsGained = 0,
+                CompletedChallenges = [],
+                ProficiencyGains = proficiencyGains ?? [],
+                OpenedProficiencies = openedProficiencies ?? [],
+            };
 
         [Fact]
         public void HasProgress_EmptySummary_IsFalse()
