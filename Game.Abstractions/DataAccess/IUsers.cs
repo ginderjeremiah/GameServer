@@ -83,7 +83,7 @@ namespace Game.Abstractions.DataAccess
         /// active-username uniqueness guard can be honoured: returns <see langword="false"/> when the
         /// username was claimed by a concurrently-created active account, <see langword="true"/> otherwise.
         /// </summary>
-        Task<bool> CreateAccount(NewAccount account, NewPlayer player);
+        Task<bool> CreateAccount(NewAccount account, NewPlayer player, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Creates an additional character on an existing account from the <paramref name="player"/>
@@ -93,7 +93,7 @@ namespace Game.Abstractions.DataAccess
         /// <see cref="CreatePlayerOutcome.CapReached"/> when the account is already at the cap and
         /// <see cref="CreatePlayerOutcome.UserNotFound"/> when no active account matches.
         /// </summary>
-        Task<CreatePlayerResult> CreatePlayer(int userId, NewPlayer player, int maxPlayersPerAccount);
+        Task<CreatePlayerResult> CreatePlayer(int userId, NewPlayer player, int maxPlayersPerAccount, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Loads the credentials of the non-archived account with the given username — the data the login
@@ -102,45 +102,45 @@ namespace Game.Abstractions.DataAccess
         /// distinct reason. Returns <see langword="null"/> when no such account matches (archived accounts
         /// are excluded, freeing the username for reuse).
         /// </summary>
-        Task<AccountCredentials?> GetUser(string username);
+        Task<AccountCredentials?> GetUser(string username, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Returns the ids of the active (non-archived) user's players. Used to validate that a selected
         /// player belongs to the authenticated account (anti-cheat) before binding the session. Empty when
         /// the user does not exist, is archived, or has no players.
         /// </summary>
-        Task<IReadOnlyList<int>> GetPlayerIds(int userId);
+        Task<IReadOnlyList<int>> GetPlayerIds(int userId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Returns lightweight summaries of the active (non-archived) user's players for the login
         /// player-selection list (name, level, current zone). Empty when the user does not exist, is
         /// archived, or has no players.
         /// </summary>
-        Task<IReadOnlyList<PlayerSummary>> GetPlayerSummaries(int userId);
+        Task<IReadOnlyList<PlayerSummary>> GetPlayerSummaries(int userId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Determines whether the username is taken by an active (non-archived) account. Archived users
         /// do not count, so their usernames are available for reuse.
         /// </summary>
-        Task<bool> CheckIfUsernameExists(string userName);
+        Task<bool> CheckIfUsernameExists(string userName, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Replaces the stored password hash for the given user. Used to transparently upgrade a
         /// credential to the current work factor after a successful login. No-op if the user does not exist.
         /// </summary>
-        Task UpdatePasswordHash(int userId, string passHash);
+        Task UpdatePasswordHash(int userId, string passHash, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Returns a page of users (with their roles and player summaries), optionally filtered by a
         /// case-insensitive search matched against the username and the names of the user's players,
         /// and/or membership in a given role and/or archived state.
         /// </summary>
-        Task<List<AdminUser>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take);
+        Task<List<AdminUser>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Counts the users matching the same filters as <see cref="SearchUsers"/>.
         /// </summary>
-        Task<int> CountUsers(string? search, int? roleId, bool? archived);
+        Task<int> CountUsers(string? search, int? roleId, bool? archived, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Replaces the set of roles granted to the target user with the given role ids, validating that
@@ -149,7 +149,7 @@ namespace Game.Abstractions.DataAccess
         /// matching <see cref="SetUserRolesStatus"/> for each rejection, or
         /// <see cref="SetUserRolesStatus.Success"/> when the change is applied.
         /// </summary>
-        Task<SetUserRolesStatus> SetUserRoles(int actingUserId, int targetUserId, IReadOnlyCollection<int> roleIds);
+        Task<SetUserRolesStatus> SetUserRoles(int actingUserId, int targetUserId, IReadOnlyCollection<int> roleIds, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Archives (soft-deletes) the target user, freeing their username for reuse. Enforces the
@@ -158,7 +158,7 @@ namespace Game.Abstractions.DataAccess
         /// (<see cref="UserActionStatus.LastAdmin"/>). Returns <see cref="UserActionStatus.UserNotFound"/>
         /// if the user does not exist.
         /// </summary>
-        Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId);
+        Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Bans the target user while keeping their username reserved. Enforces the admin-lockout rules:
@@ -166,6 +166,6 @@ namespace Game.Abstractions.DataAccess
         /// banning the last usable admin (<see cref="UserActionStatus.LastAdmin"/>). Returns
         /// <see cref="UserActionStatus.UserNotFound"/> if the user does not exist.
         /// </summary>
-        Task<UserActionStatus> BanUser(int actingUserId, int targetUserId);
+        Task<UserActionStatus> BanUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default);
     }
 }

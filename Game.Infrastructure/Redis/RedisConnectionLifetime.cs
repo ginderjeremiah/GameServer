@@ -23,6 +23,20 @@ namespace Game.Infrastructure.Redis
 
         public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task StopAsync(CancellationToken cancellationToken) => _disposeConnections();
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            // Honor the host's shutdown deadline: multiplexer disposal is normally fast, but a hung close must
+            // not stall host shutdown past the deadline. If the token trips first, stop awaiting and let the
+            // process exit reclaim the connection — the same bounded give-up the socket drain and write-behind
+            // drain apply. The disposal task is left to finish (or die with the process) in the background.
+            try
+            {
+                await _disposeConnections().WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown deadline reached before disposal completed; unwinding is the deliberate give-up.
+            }
+        }
     }
 }

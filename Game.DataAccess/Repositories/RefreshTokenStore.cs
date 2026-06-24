@@ -25,21 +25,21 @@ namespace Game.DataAccess.Repositories
             _cache = cache;
         }
 
-        public async Task<string> Issue(int userId, IReadOnlyList<string> roles, int? playerId, TimeSpan lifetime)
+        public async Task<string> Issue(int userId, IReadOnlyList<string> roles, int? playerId, TimeSpan lifetime, CancellationToken cancellationToken = default)
         {
             var token = GenerateToken();
-            await _cache.Set(Key(token), new RefreshTokenData(userId, roles, playerId), lifetime);
+            await _cache.Set(Key(token), new RefreshTokenData(userId, roles, playerId), lifetime, cancellationToken);
             return token;
         }
 
-        public async Task<RefreshTokenData?> Consume(string refreshToken)
+        public async Task<RefreshTokenData?> Consume(string refreshToken, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(refreshToken))
             {
                 return null;
             }
 
-            return await _cache.GetDelete<RefreshTokenData>(Key(refreshToken));
+            return await _cache.GetDelete<RefreshTokenData>(Key(refreshToken), cancellationToken);
         }
 
         private static string Key(string token)

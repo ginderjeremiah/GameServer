@@ -194,8 +194,10 @@ namespace Game.DataAccess
             // anywhere in between leaves the item on the processing list to be reclaimed on next startup rather
             // than lost (#769). At-least-once is safe because the handlers are idempotent. Stopping is both
             // checked between items and threaded into the reserve, so a shutdown ends at a clean boundary while a
-            // wedged reserve still unwinds promptly. Once an item is reserved it is processed and acknowledged
-            // without the token so the in-flight apply finishes cleanly — the just-acknowledged item is durable
+            // wedged reserve still unwinds promptly. Once an item is reserved its apply and acknowledge run
+            // without the token so the in-flight write finishes cleanly — only the dead-time retry backoff
+            // between failed attempts honors the token (a stop during it abandons the retry, and the reserved
+            // item is reclaimed and re-applied on the next startup) — so the just-acknowledged item is durable
             // and anything still queued is reclaimed on the next startup.
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -205,7 +207,7 @@ namespace Game.DataAccess
                     break;
                 }
 
-                await ProcessMessage(next, deadLetterQueue);
+                await ProcessMessage(next, deadLetterQueue, cancellationToken);
                 await queue.AcknowledgeAsync(next);
             }
 
@@ -237,9 +239,11 @@ namespace Game.DataAccess
         /// Processes a single queued message. Malformed payloads (which can never succeed) are dead-lettered
         /// immediately, while a valid event that fails on an unexpected error (e.g. a transient database error)
         /// is retried with exponential backoff per <see cref="PlayerUpdateRetryPolicy"/> and dead-lettered only
-        /// once the retries are exhausted, so the change is never silently dropped.
+        /// once the retries are exhausted, so the change is never silently dropped. The apply itself runs
+        /// uncancelled (so a reserved item finishes cleanly); only the dead-time backoff between failed
+        /// attempts honors <paramref name="cancellationToken"/>, so a shutdown isn't stalled waiting one out.
         /// </summary>
-        private async Task ProcessMessage(string message, IPubSubQueue deadLetterQueue)
+        private async Task ProcessMessage(string message, IPubSubQueue deadLetterQueue, CancellationToken cancellationToken)
         {
             DomainEventEnvelope? envelope;
             try
@@ -285,9 +289,11 @@ namespace Game.DataAccess
                 }
                 catch (Exception ex) when (attempt < _retryPolicy.MaxAttempts)
                 {
-                    // An unexpected failure (e.g. a transient database error) may succeed on a retry.
+                    // An unexpected failure (e.g. a transient database error) may succeed on a retry. The
+                    // backoff is dead time, not an in-flight write, so a shutdown cancels it rather than
+                    // waiting it out against the bounded drain budget — the reserved item is reclaimed next startup.
                     _logger.LogWarning(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' on attempt {Attempt} of {MaxAttempts}; retrying.", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, attempt, _retryPolicy.MaxAttempts);
-                    await Task.Delay(_retryPolicy.DelayAfterAttempt(attempt));
+                    await Task.Delay(_retryPolicy.DelayAfterAttempt(attempt), cancellationToken);
                 }
                 catch (Exception ex)
                 {

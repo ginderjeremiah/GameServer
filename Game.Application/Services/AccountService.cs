@@ -44,9 +44,9 @@ namespace Game.Application.Services
         /// graphs. The up-front check is a fast path; the data tier's active-username uniqueness guard is
         /// the authority, so a username claimed concurrently (past the check) is still reported as taken.
         /// </summary>
-        public async Task<CreateAccountStatus> CreateAccount(string username, string password)
+        public async Task<CreateAccountStatus> CreateAccount(string username, string password, CancellationToken cancellationToken = default)
         {
-            if (await _users.CheckIfUsernameExists(username))
+            if (await _users.CheckIfUsernameExists(username, cancellationToken))
             {
                 return CreateAccountStatus.UsernameTaken;
             }
@@ -57,7 +57,7 @@ namespace Game.Application.Services
                 PassHash = _passwordHasher.Hash(password),
             };
 
-            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username, RootSeedSkillIds()));
+            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username, RootSeedSkillIds()), cancellationToken);
 
             return created ? CreateAccountStatus.Success : CreateAccountStatus.UsernameTaken;
         }
@@ -69,38 +69,38 @@ namespace Game.Application.Services
         /// rotates the tokens to carry the chosen player. Distinct failure reasons are reported via the
         /// result status so the caller can surface the appropriate message.
         /// </summary>
-        public async Task<AccountLoginResult> Login(string username, string password)
+        public async Task<AccountLoginResult> Login(string username, string password, CancellationToken cancellationToken = default)
         {
             // Defence-in-depth on top of the per-IP rate limiter: if too many consecutive failures have
             // accrued for this account, reject before any database hit or PBKDF2 work. Keyed per account so a
             // slow distributed guess is slowed regardless of source IP; it is a bounded backoff (never a hard
             // lockout), so an attacker who knows a username can only briefly slow the owner, not lock them out.
-            var activeBackoff = await _backoffGuard.GetActiveBackoff(username);
+            var activeBackoff = await _backoffGuard.GetActiveBackoff(username, cancellationToken);
             if (activeBackoff is TimeSpan retryAfter)
             {
                 return AccountLoginResult.BackedOff(retryAfter);
             }
 
-            var account = await _users.GetUser(username);
+            var account = await _users.GetUser(username, cancellationToken);
             if (account is null)
             {
                 // Spend the same PBKDF2 work a real account's verify would, so an unknown username is not
                 // distinguishable by response time (defeating timing-based username enumeration).
                 _passwordHasher.VerifyDummy(password);
-                await _backoffGuard.RegisterFailure(username);
+                await _backoffGuard.RegisterFailure(username, cancellationToken);
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
             var verification = _passwordHasher.Verify(password, account.PassHash);
             if (verification == PasswordVerificationResult.Failed)
             {
-                await _backoffGuard.RegisterFailure(username);
+                await _backoffGuard.RegisterFailure(username, cancellationToken);
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
             // Credentials verified — the attempt is not a brute-force guess, so reset the failure streak
             // before any later (ban / no-player) rejection, which is not a credential failure.
-            await _backoffGuard.Reset(username);
+            await _backoffGuard.Reset(username, cancellationToken);
 
             // Reject a banned account only after its credentials check out, so an anonymous probe can't
             // enumerate ban status — only the account owner learns they are banned. This is also the first
@@ -118,7 +118,7 @@ namespace Game.Application.Services
             {
                 try
                 {
-                    await _users.UpdatePasswordHash(account.Id, _passwordHasher.Hash(password));
+                    await _users.UpdatePasswordHash(account.Id, _passwordHasher.Hash(password), cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -127,8 +127,8 @@ namespace Game.Application.Services
             }
 
             // List the account's characters for the select step; the pre-selection token carries no player.
-            var summaries = await _users.GetPlayerSummaries(account.Id);
-            var tokens = await IssueTokens(account.Id, account.Roles, playerId: null);
+            var summaries = await _users.GetPlayerSummaries(account.Id, cancellationToken);
+            var tokens = await IssueTokens(account.Id, account.Roles, playerId: null, cancellationToken);
 
             return AccountLoginResult.Succeeded(tokens, summaries, account.Id);
         }
@@ -140,15 +140,15 @@ namespace Game.Application.Services
         /// the refresh token is consumed, so a rejected selection leaves the caller's token intact. Distinct
         /// failure reasons are reported via the result status so the caller can surface the right message.
         /// </summary>
-        public async Task<AccountSelectPlayerResult> SelectPlayer(int userId, int playerId, string refreshToken)
+        public async Task<AccountSelectPlayerResult> SelectPlayer(int userId, int playerId, string refreshToken, CancellationToken cancellationToken = default)
         {
-            var playerIds = await _users.GetPlayerIds(userId);
+            var playerIds = await _users.GetPlayerIds(userId, cancellationToken);
             if (!playerIds.Contains(playerId))
             {
                 return AccountSelectPlayerResult.Failed(SelectPlayerStatus.NotOwned);
             }
 
-            var player = await _playerRepo.GetPlayer(playerId);
+            var player = await _playerRepo.GetPlayer(playerId, cancellationToken);
             if (player is null)
             {
                 return AccountSelectPlayerResult.Failed(SelectPlayerStatus.PlayerDataNotFound);
@@ -159,13 +159,13 @@ namespace Game.Application.Services
             // burning the token on a rejected selection. The roles come from the consumed token (the "roles
             // are fixed for the session" model), and the user it resolves to must match the authenticated
             // caller.
-            var session = await _refreshTokenStore.Consume(refreshToken);
+            var session = await _refreshTokenStore.Consume(refreshToken, cancellationToken);
             if (session is null || session.UserId != userId)
             {
                 return AccountSelectPlayerResult.Failed(SelectPlayerStatus.InvalidToken);
             }
 
-            var tokens = await IssueTokens(userId, session.Roles, playerId);
+            var tokens = await IssueTokens(userId, session.Roles, playerId, cancellationToken);
             return AccountSelectPlayerResult.Succeeded(tokens, player);
         }
 
@@ -175,9 +175,9 @@ namespace Game.Application.Services
         /// authoritative (token-rotating) <see cref="SelectPlayer"/> runs, so a rejected switch never mutates
         /// the departed character.
         /// </summary>
-        public async Task<bool> OwnsPlayer(int userId, int playerId)
+        public async Task<bool> OwnsPlayer(int userId, int playerId, CancellationToken cancellationToken = default)
         {
-            var playerIds = await _users.GetPlayerIds(userId);
+            var playerIds = await _users.GetPlayerIds(userId, cancellationToken);
             return playerIds.Contains(playerId);
         }
 
@@ -187,9 +187,9 @@ namespace Game.Application.Services
         /// with no login handoff to draw on, so the client re-fetches the current list here. Same projection
         /// the login step uses.
         /// </summary>
-        public async Task<IReadOnlyList<PlayerSummary>> GetPlayers(int userId)
+        public async Task<IReadOnlyList<PlayerSummary>> GetPlayers(int userId, CancellationToken cancellationToken = default)
         {
-            return await _users.GetPlayerSummaries(userId);
+            return await _users.GetPlayerSummaries(userId, cancellationToken);
         }
 
         /// <summary>
@@ -200,7 +200,7 @@ namespace Game.Application.Services
         /// status so the caller can surface the right message; on success the new character's summary is
         /// returned so the client can add it to the select list.
         /// </summary>
-        public async Task<AccountCreatePlayerResult> CreatePlayer(int userId, string? name)
+        public async Task<AccountCreatePlayerResult> CreatePlayer(int userId, string? name, CancellationToken cancellationToken = default)
         {
             if (!PlayerName.TryNormalize(name, out var normalized))
             {
@@ -208,7 +208,7 @@ namespace Game.Application.Services
             }
 
             var blueprint = _newPlayerFactory.Create(normalized, RootSeedSkillIds());
-            var result = await _users.CreatePlayer(userId, blueprint, _playerCreationOptions.MaxPlayersPerAccount);
+            var result = await _users.CreatePlayer(userId, blueprint, _playerCreationOptions.MaxPlayersPerAccount, cancellationToken);
 
             return result.Outcome switch
             {
@@ -239,15 +239,15 @@ namespace Game.Application.Services
         /// brand-new token pair carrying the same user, roles, and selected player. Returns
         /// <see langword="null"/> when the supplied token is missing, expired, or already consumed.
         /// </summary>
-        public async Task<AuthTokenPair?> Refresh(string refreshToken)
+        public async Task<AuthTokenPair?> Refresh(string refreshToken, CancellationToken cancellationToken = default)
         {
-            var session = await _refreshTokenStore.Consume(refreshToken);
+            var session = await _refreshTokenStore.Consume(refreshToken, cancellationToken);
             if (session is null)
             {
                 return null;
             }
 
-            return await IssueTokens(session.UserId, session.Roles, session.PlayerId);
+            return await IssueTokens(session.UserId, session.Roles, session.PlayerId, cancellationToken);
         }
 
         /// <summary>
@@ -256,9 +256,9 @@ namespace Game.Application.Services
         /// even when the access token has already expired, or <see langword="null"/> when the token was
         /// missing, expired, or already consumed.
         /// </summary>
-        public async Task<int?> Logout(string refreshToken)
+        public async Task<int?> Logout(string refreshToken, CancellationToken cancellationToken = default)
         {
-            var session = await _refreshTokenStore.Consume(refreshToken);
+            var session = await _refreshTokenStore.Consume(refreshToken, cancellationToken);
             return session?.UserId;
         }
 
@@ -267,10 +267,10 @@ namespace Game.Application.Services
         /// id (<see langword="null"/> before selection). The refresh token is rotated on every use (login,
         /// select, and refresh all call this), so a previously issued refresh token is never reused.
         /// </summary>
-        private async Task<AuthTokenPair> IssueTokens(int userId, IReadOnlyList<string> roles, int? playerId)
+        private async Task<AuthTokenPair> IssueTokens(int userId, IReadOnlyList<string> roles, int? playerId, CancellationToken cancellationToken = default)
         {
             var accessToken = _accessTokenService.CreateAccessToken(userId, roles, playerId);
-            var refreshToken = await _refreshTokenStore.Issue(userId, roles, playerId, AuthConstants.RefreshTokenLifetime);
+            var refreshToken = await _refreshTokenStore.Issue(userId, roles, playerId, AuthConstants.RefreshTokenLifetime, cancellationToken);
             return new AuthTokenPair(accessToken, refreshToken);
         }
     }

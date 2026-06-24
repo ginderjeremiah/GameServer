@@ -107,6 +107,37 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Fact]
+        public async Task Dispose_WithoutStopAsync_DoesNotThrowAndIsIdempotent()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+
+            // An empty cache set leaves the reload loop parked in its wait, still observing the stopping token —
+            // the exact state in which a naive Dispose would dispose the token source out from under the loop.
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.FromMilliseconds(50), maxAttempts: 1, baseDelay: TimeSpan.Zero);
+            var reloader = new CoalescingReferenceCacheReloader(
+                [],
+                policy,
+                scope.ServiceProvider.GetRequiredService<ILogger<CoalescingReferenceCacheReloader>>());
+            var synchronizer = new ReferenceCacheSynchronizer(pubsub, reloader);
+
+            await synchronizer.StartAsync(CancellationToken);
+            try
+            {
+                // Dispose without an intervening StopAsync (the loop still running) must neither throw nor fail
+                // on a second call.
+                synchronizer.Dispose();
+                synchronizer.Dispose();
+            }
+            finally
+            {
+                // Dispose doesn't remove the subscription StartAsync registered, so clean it up to avoid
+                // leaking a handler on the shared channel for later tests.
+                await pubsub.UnSubscribe(Constants.PUBSUB_REFERENCE_DATA_CHANNEL, synchronizer.InstanceId);
+            }
+        }
+
         private string? GetCachedItemName(int itemId)
         {
             using var scope = CreateScope();

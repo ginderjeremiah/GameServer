@@ -13,14 +13,14 @@ namespace Game.Abstractions.DataAccess
         /// before player selection. Returns the raw token value to hand back to the client (only the hash
         /// is stored).
         /// </summary>
-        Task<string> Issue(int userId, IReadOnlyList<string> roles, int? playerId, TimeSpan lifetime);
+        Task<string> Issue(int userId, IReadOnlyList<string> roles, int? playerId, TimeSpan lifetime, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Atomically validates and invalidates a refresh token (single use). Returns the associated
         /// session data when the token was valid, or <see langword="null"/> when it was missing,
         /// expired, or already consumed.
         /// </summary>
-        Task<RefreshTokenData?> Consume(string refreshToken);
+        Task<RefreshTokenData?> Consume(string refreshToken, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

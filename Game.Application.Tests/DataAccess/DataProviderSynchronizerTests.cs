@@ -819,6 +819,47 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_StopDuringRetryBackoff_CancelsTheBackoffAndLeavesItemReclaimable()
+        {
+            // A long backoff makes a prompt unwind provably the threaded cancellation at work rather than the
+            // delay simply elapsing.
+            var slowBackoff = new PlayerUpdateRetryPolicy(maxAttempts: 3, baseDelay: TimeSpan.FromSeconds(30));
+
+            // An empty provider has no GameContext, so HandleEvent throws on every attempt — the event enters
+            // the retry backoff between attempts, which is the dead time this exercises.
+            var brokenServices = new ServiceCollection().BuildServiceProvider();
+
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, slowBackoff);
+
+            var queue = new InMemoryPubSubQueue(Serialize(new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false)));
+
+            using var cts = new CancellationTokenSource();
+            var drainTask = synchronizer.ProcessQueue(queue, cts.Token);
+
+            // Wait until the first attempt has failed and the drain is parked inside the 30s backoff.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (!logger.Entries.Any(e => e.Level == LogLevel.Warning && e.Message.Contains("retrying")))
+            {
+                Assert.True(DateTime.UtcNow < deadline, "Timed out waiting for the retry backoff to begin.");
+                await Task.Delay(10, CancellationToken);
+            }
+
+            // Cancelling unwinds the backoff at once rather than waiting the 30s out; the OCE is a clean stop,
+            // never surfaced as an error.
+            await cts.CancelAsync();
+            await drainTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            // The reserved item was never acknowledged, so it stays on the processing list to be reclaimed on
+            // the next startup rather than being lost.
+            Assert.Equal(1, await queue.ReclaimProcessingAsync());
+        }
+
+        [Fact]
         public async Task StartAsync_SubscribeThrows_PropagatesException()
         {
             using var scope = CreateScope();

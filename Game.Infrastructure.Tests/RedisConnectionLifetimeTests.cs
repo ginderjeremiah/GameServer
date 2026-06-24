@@ -27,6 +27,20 @@ namespace Game.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task StopAsync_DisposalHangs_GivesUpWhenTheShutdownDeadlineTrips()
+        {
+            // A disposal that never completes models a hung multiplexer close. StopAsync must honor the host's
+            // shutdown token and return rather than block host shutdown indefinitely.
+            var lifetime = new RedisConnectionLifetime(() => new TaskCompletionSource().Task);
+
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            // Returns (does not throw, does not hang) once the deadline has tripped.
+            await lifetime.StopAsync(cts.Token).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        [Fact]
         public async Task StartAsync_DoesNotDispose()
         {
             var disposed = false;
