@@ -181,8 +181,12 @@ namespace Game.Infrastructure.PubSub.Redis
         {
             if (_handles.TryRemove(id, out var handle))
             {
-                handle.worker?.Dispose();
+                // Unsubscribe the handler before disposing the worker, not after. The handler is worker.Start(),
+                // so disposing first leaves a window where a message still routed to the (now-removed-but-still-
+                // subscribed) handler calls Start() on a disposed worker — an ObjectDisposedException thrown on the
+                // StackExchange.Redis subscriber thread. Removing the subscription first closes that window.
                 await Subscriber.UnsubscribeAsync(RedisChannel.Literal(channel), handle.handler);
+                handle.worker?.Dispose();
             }
         }
     }

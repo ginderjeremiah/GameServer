@@ -45,7 +45,7 @@ namespace Game.TestInfrastructure.Fixtures
                 _suiteLock = await CrossProcessLock.AcquireAsync(SuiteLockPath);
             }
 
-            RedisMultiplexerFactory.ResetForTesting();
+            await RedisMultiplexerFactory.ResetForTesting();
             await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
         }
 
