@@ -162,8 +162,11 @@ namespace Game.Application.Tests.Services
             await TestDataSeeder.AddPlayerProficiencyAsync(context, playerId, prereqA.Id, level: 1);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
-            var (player, _) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
+            var (player, results) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
 
+            // Prereq B genuinely maxed (so the gateway's prerequisites are all satisfied) — what's suppressed is
+            // the gateway open, not a dead accrual.
+            Assert.Equal(1, Assert.Single(results).NewLevel);
             Assert.DoesNotContain(player.Skills, s => s.Id == gatewaySeed.Id);
         }
 
