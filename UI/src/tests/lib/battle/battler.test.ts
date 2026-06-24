@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ERarity, EAttribute, ESkillAcquisition } from '$lib/api';
+import { ERarity, EAttribute, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { EModifierType, EAttributeModifierSource } from '$lib/battle/attribute-modifier';
+import { makeEffect } from './battle-sim-test-utils';
 
 const mockSkills: ISkill[] = [];
 
@@ -302,6 +303,25 @@ describe('Battler', () => {
 			battler.takeDamage(99999);
 			expect(battler.isDead).toBe(true);
 			expect(battler.currentHealth).toBeLessThan(0);
+		});
+	});
+
+	describe('applyEffect MaxHealth clamp', () => {
+		// A MaxHealth debuff lowers health through the clamp, NOT a damage mutation (#1145). Deriving isDead
+		// keeps it correct on this path by construction; a cached flag re-synced only at the damage mutations
+		// would have missed it.
+		it('reports isDead when a MaxHealth debuff clamps health to <= 0', () => {
+			const battler = new Battler(
+				makeBattlerData({ selectedSkills: [], attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] })
+			); // MaxHealth 100, currentHealth 100
+			expect(battler.isDead).toBe(false);
+
+			battler.applyEffect(
+				makeEffect(0, ESkillEffectTarget.Opponent, EAttribute.MaxHealth, EModifierType.Additive, -200, 1000)
+			);
+
+			expect(battler.currentHealth).toBeLessThanOrEqual(0);
+			expect(battler.isDead).toBe(true);
 		});
 	});
 
