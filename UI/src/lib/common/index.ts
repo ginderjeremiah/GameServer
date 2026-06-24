@@ -12,4 +12,5 @@ export * from './item-display';
 export * from './types';
 export * from './hooks';
 export * from './event-measuring';
+export * from './serialized-queue';
 export * from './statify.svelte';

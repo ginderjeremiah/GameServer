@@ -2,6 +2,7 @@ import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, EEquipmentS
 import { playerManager } from '$lib/engine';
 import { BattleAttributes, Item, newItem, newItemMod } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
+import { SerializedQueue } from '$lib/common';
 
 // Re-exported from the generated client so the established `$lib/engine` import sites keep resolving
 // it here while the single source of truth is the codegen'd enum.
@@ -66,8 +67,8 @@ export class InventoryManager {
 	 */
 	private grantedSkillIdsCache: number[] = [];
 
-	/** Tail of the optimistic-mutation queue; each mutation chains off it so rollback baselines never interleave. */
-	private lastOperation: Promise<unknown> = Promise.resolve();
+	/** Serializes the optimistic mutations so rollback baselines never interleave (see {@link serialize}). */
+	private queue = new SerializedQueue();
 
 	public initialize() {
 		this.unlockedItems.clear();
@@ -318,16 +319,11 @@ export class InventoryManager {
 	 * included. Overlapping callers (a double-click equip, dragging a second item while the first
 	 * persist is still in flight) would otherwise interleave baselines: one operation's rollback could
 	 * restore a snapshot taken before another's optimistic change, silently discarding it and leaving
-	 * local state diverged from the server. Chaining onto a single promise — the same "collapse
-	 * concurrency" spirit as auth.ts's single-flight refresh — queues the actions instead, which is
-	 * better UX than dropping the second one.
+	 * local state diverged from the server. The shared {@link SerializedQueue} queues the actions instead,
+	 * which is better UX than dropping the second one.
 	 */
 	private serialize<T>(operation: () => Promise<T>): Promise<T> {
-		const result = this.lastOperation.then(operation, operation);
-		// The queue tracks settlement only — swallowing a failure here keeps one operation's rejection
-		// from breaking the chain or surfacing as an unhandled rejection on the shared promise.
-		this.lastOperation = result.catch(() => undefined);
-		return result;
+		return this.queue.run(operation);
 	}
 
 	/** The equip mutation, reassigning a fresh slot array so a captured snapshot stays a valid baseline. */
