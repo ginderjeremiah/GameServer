@@ -315,14 +315,13 @@ export class Battler {
 				? [...battlerData.attributes, ...additionalAtttributes]
 				: battlerData.attributes;
 
-			this.attributes.setData(atts);
 			// Proficiency bonuses ride the modifier pipeline (additive/multiplicative by their type), not the
 			// flat base data, so they compose through computeAttributes exactly like the backend's
-			// AttributeCollection — the proficiency parity surface (#982 area E). setData replaced the modifier
-			// list, so re-add them here; applied before MaxHealth is read below so the bonus is reflected.
-			for (const modifier of additionalModifiers ?? []) {
-				this.attributes.addModifier(modifier);
-			}
+			// AttributeCollection — the proficiency parity surface (#982 area E). They are handed to setData so
+			// they sit with the base set BEFORE the static engine modifiers, matching the backend's additive
+			// accumulation order exactly (#1189); appending them afterwards would diverge on attributes that
+			// carry a static additive base (e.g. MaxHealth).
+			this.attributes.setData(atts, true, additionalModifiers ?? []);
 			this.level = battlerData.level;
 			this.name = battlerData.name;
 			this.skills = this.fillSkills(battlerData, grantedSkillIds ?? []);
