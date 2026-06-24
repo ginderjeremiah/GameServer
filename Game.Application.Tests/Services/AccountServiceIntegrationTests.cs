@@ -289,6 +289,42 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task Login_NonexistentUser_PerformsEquivalentPasswordWork()
+        {
+            using var scope = CreateScope();
+            var hasher = new RecordingPasswordHasher(TestPepper);
+            var accountService = CreateAccountService(scope.ServiceProvider, passwordHasher: hasher);
+
+            var result = await accountService.Login("ghost", "whatever");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.InvalidCredentials, result.Status);
+            // The unknown-user branch must spend the dummy derivation work (and never a real verify it has no
+            // hash for), so its response time matches a known-user verify and can't be used to enumerate names.
+            Assert.Equal(1, hasher.VerifyDummyCalls);
+            Assert.Equal(0, hasher.VerifyCalls);
+        }
+
+        [Fact]
+        public async Task Login_WrongPassword_PerformsRealVerifyNotDummy()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateUserAsync(context, "knownuser", "correctpass");
+
+            var hasher = new RecordingPasswordHasher(TestPepper);
+            var accountService = CreateAccountService(scope.ServiceProvider, passwordHasher: hasher);
+
+            var result = await accountService.Login("knownuser", "incorrect");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.InvalidCredentials, result.Status);
+            // A known username takes the real verify path; the dummy path is for unknown users only.
+            Assert.Equal(1, hasher.VerifyCalls);
+            Assert.Equal(0, hasher.VerifyDummyCalls);
+        }
+
+        [Fact]
         public async Task Login_UserWithoutPlayer_SucceedsWithEmptySummaries()
         {
             using var scope = CreateScope();
@@ -763,12 +799,14 @@ namespace Game.Application.Tests.Services
             int iterations = 1000,
             LoginBackoffOptions? backoffOptions = null,
             TimeProvider? timeProvider = null,
-            int maxPlayersPerAccount = 6)
+            int maxPlayersPerAccount = 6,
+            IPasswordHasher? passwordHasher = null)
         {
             // A real PBKDF2 hasher (cheap iteration count) using the same pepper the seeder hashed with,
             // so seeded credentials verify exactly as they would in production. A higher iteration count
-            // can be supplied to exercise the transparent work-factor upgrade on login.
-            var hasher = new Pbkdf2PasswordHasher(Options.Create(new PasswordHashingOptions
+            // can be supplied to exercise the transparent work-factor upgrade on login, or a custom hasher
+            // injected to observe which derivation path a login took.
+            var hasher = passwordHasher ?? new Pbkdf2PasswordHasher(Options.Create(new PasswordHashingOptions
             {
                 Pepper = TestPepper,
                 Iterations = iterations,
@@ -801,6 +839,36 @@ namespace Game.Application.Tests.Services
         /// (<c>LoginControllerTests</c>); these tests exercise the account orchestration against the real
         /// Postgres/Redis collaborators, for which the access-token contents are irrelevant.
         /// </summary>
+        /// <summary>
+        /// A real PBKDF2 hasher that records which derivation path each login took, so a test can assert the
+        /// unknown-user branch spends the dummy work rather than short-circuiting (the timing-oracle fix).
+        /// </summary>
+        private sealed class RecordingPasswordHasher(string pepper) : IPasswordHasher
+        {
+            private readonly Pbkdf2PasswordHasher _inner = new(Options.Create(new PasswordHashingOptions
+            {
+                Pepper = pepper,
+                Iterations = 1000,
+            }));
+
+            public int VerifyCalls { get; private set; }
+            public int VerifyDummyCalls { get; private set; }
+
+            public string Hash(string password) => _inner.Hash(password);
+
+            public PasswordVerificationResult Verify(string password, string storedHash)
+            {
+                VerifyCalls++;
+                return _inner.Verify(password, storedHash);
+            }
+
+            public void VerifyDummy(string password)
+            {
+                VerifyDummyCalls++;
+                _inner.VerifyDummy(password);
+            }
+        }
+
         private sealed class StubAccessTokenService : IAccessTokenService
         {
             public string CreateAccessToken(int userId, IReadOnlyList<string> roles, int? playerId = null)

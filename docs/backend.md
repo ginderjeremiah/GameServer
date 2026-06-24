@@ -174,7 +174,7 @@ The **token is the sole authorization source of truth** (roles are read off the 
 
 ### Password hashing
 
-Passwords use **PBKDF2-HMAC-SHA256** behind an `IPasswordHasher` abstraction. A hash is stored in a self-contained, tunable format carrying the iteration count and a per-hash salt (default 600k iterations, the OWASP floor); an application-wide pepper is folded in via HMAC and validated at startup so a missing pepper fails fast. Verification is constant-time, and a valid credential stored with an outdated work factor is transparently re-hashed on next login.
+Passwords use **PBKDF2-HMAC-SHA256** behind an `IPasswordHasher` abstraction. A hash is stored in a self-contained, tunable format carrying the iteration count and a per-hash salt (default 600k iterations, the OWASP floor); an application-wide pepper is folded in via HMAC and validated at startup so a missing pepper fails fast. Verification is constant-time, and a valid credential stored with an outdated work factor is transparently re-hashed on next login. An **unknown username** still runs equivalent derivation work via `IPasswordHasher.VerifyDummy` (against a fixed dummy hash), so the login response time does not reveal whether an account exists — a constant-time hash compare alone cannot cover the present-vs-absent-account branch.
 
 ### Account/login orchestration
 

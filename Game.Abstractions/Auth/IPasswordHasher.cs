@@ -23,6 +23,14 @@ namespace Game.Abstractions.Auth
         /// caller to re-hash and persist it.
         /// </summary>
         PasswordVerificationResult Verify(string password, string storedHash);
+
+        /// <summary>
+        /// Performs password-derivation work equivalent to a real <see cref="Verify"/> against a fixed
+        /// internal dummy hash, discarding the result. Called on the unknown-username login branch so it
+        /// spends the same time as a known-username verify, preventing username enumeration by response
+        /// timing (the present-vs-absent-account branch a constant-time hash comparison alone cannot cover).
+        /// </summary>
+        void VerifyDummy(string password);
     }
 
     /// <summary>
