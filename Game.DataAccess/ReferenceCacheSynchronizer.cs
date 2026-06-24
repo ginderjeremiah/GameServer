@@ -75,7 +75,13 @@ namespace Game.DataAccess
 
             _disposed = true;
             _stopping.Cancel();
-            _stopping.Dispose();
+
+            // Dispose the token source only once the reload loop it feeds has finished. The host always calls
+            // StopAsync (which awaits the loop) before Dispose, so this normally disposes immediately — but a
+            // Dispose without a preceding StopAsync would otherwise dispose the source out from under a loop
+            // still observing the (now-cancelled) token, an ObjectDisposedException race. Deferring to the
+            // loop's completion closes that window while still guaranteeing eventual disposal.
+            _reloadLoop.ContinueWith(_ => _stopping.Dispose(), TaskScheduler.Default);
         }
     }
 }

@@ -42,8 +42,8 @@ namespace Game.Api.Controllers.Admin
             page = Math.Max(page, 1);
             pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-            var totalCount = await _users.CountUsers(search, roleId, archived);
-            var matches = await _users.SearchUsers(search, roleId, archived, (page - 1) * pageSize, pageSize);
+            var totalCount = await _users.CountUsers(search, roleId, archived, HttpContext.RequestAborted);
+            var matches = await _users.SearchUsers(search, roleId, archived, (page - 1) * pageSize, pageSize, HttpContext.RequestAborted);
 
             return ApiResponse.Success(new AdminUserSearchResults
             {
@@ -63,7 +63,7 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public async Task<ApiResponse> SetUserRoles([FromBody] SetUserRolesData data)
         {
-            var status = await _users.SetUserRoles(_session.UserId, data.UserId, data.RoleIds);
+            var status = await _users.SetUserRoles(_session.UserId, data.UserId, data.RoleIds, HttpContext.RequestAborted);
             return status switch
             {
                 SetUserRolesStatus.Success => ApiResponse.Success(),
@@ -78,14 +78,14 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public async Task<ApiResponse> ArchiveUser([FromBody] UserActionData data)
         {
-            var status = await _users.ArchiveUser(_session.UserId, data.UserId);
+            var status = await _users.ArchiveUser(_session.UserId, data.UserId, HttpContext.RequestAborted);
             return MapUserAction(status, "You cannot archive your own account.", "Cannot archive the last remaining admin.");
         }
 
         [HttpPost]
         public async Task<ApiResponse> BanUser([FromBody] UserActionData data)
         {
-            var status = await _users.BanUser(_session.UserId, data.UserId);
+            var status = await _users.BanUser(_session.UserId, data.UserId, HttpContext.RequestAborted);
             return MapUserAction(status, "You cannot ban your own account.", "Cannot ban the last remaining admin.");
         }
 

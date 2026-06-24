@@ -38,7 +38,7 @@ namespace Game.Api.Controllers
         [HttpPost("/api/[controller]")]
         public async Task<ApiResponse<LoginResult>> Login([FromBody] LoginCredentials creds)
         {
-            var result = await _accountService.Login(creds.Username, creds.Password);
+            var result = await _accountService.Login(creds.Username, creds.Password, HttpContext.RequestAborted);
             if (!result.Success)
             {
                 // A backoff rejection surfaces as a 429 with a Retry-After hint (mirroring the IP rate
@@ -76,7 +76,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
             }
 
-            var result = await _accountService.SelectPlayer(_sessionService.UserId, request.PlayerId, request.RefreshToken);
+            var result = await _accountService.SelectPlayer(_sessionService.UserId, request.PlayerId, request.RefreshToken, HttpContext.RequestAborted);
             if (!result.Success)
             {
                 return ApiResponse.Error(SelectPlayerErrorMessage(result.Status), SelectPlayerErrorCategory(result.Status));
@@ -111,10 +111,12 @@ namespace Game.Api.Controllers
             }
 
             // Validate the switch target up front (read-only, no token rotation) so an unowned switch never
-            // credits or mutates the departed character. SelectPlayer below re-validates and may also fail on an
-            // invalid refresh token, in which case the departed character has been credited and re-anchored (benign:
-            // the progress is legitimate and re-anchoring makes a retry near-idempotent).
-            if (!await _accountService.OwnsPlayer(_sessionService.UserId, request.PlayerId))
+            // credits or mutates the departed character. This repeats the ownership (GetPlayerIds) read that
+            // SelectPlayer below performs authoritatively — the duplicate is deliberate: only this early gate can
+            // stop the departed-character credit before it runs. SelectPlayer below re-validates and may also fail
+            // on an invalid refresh token, in which case the departed character has been credited and re-anchored
+            // (benign: the progress is legitimate and re-anchoring makes a retry near-idempotent).
+            if (!await _accountService.OwnsPlayer(_sessionService.UserId, request.PlayerId, HttpContext.RequestAborted))
             {
                 return ApiResponse.Error(SelectPlayerErrorMessage(SelectPlayerStatus.NotOwned), SelectPlayerErrorCategory(SelectPlayerStatus.NotOwned));
             }
@@ -123,7 +125,7 @@ namespace Game.Api.Controllers
             // battle are credited rather than discarded when the session is rebound below.
             await CreditDepartedCharacter(request.PlayerId, HttpContext.RequestAborted);
 
-            var result = await _accountService.SelectPlayer(_sessionService.UserId, request.PlayerId, request.RefreshToken);
+            var result = await _accountService.SelectPlayer(_sessionService.UserId, request.PlayerId, request.RefreshToken, HttpContext.RequestAborted);
             if (!result.Success)
             {
                 return ApiResponse.Error(SelectPlayerErrorMessage(result.Status), SelectPlayerErrorCategory(result.Status));
@@ -177,7 +179,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
             }
 
-            var result = await _accountService.CreatePlayer(_sessionService.UserId, request.Name);
+            var result = await _accountService.CreatePlayer(_sessionService.UserId, request.Name, HttpContext.RequestAborted);
             if (!result.Success)
             {
                 return ApiResponse.Error(CreatePlayerErrorMessage(result.Status), CreatePlayerErrorCategory(result.Status));
@@ -191,7 +193,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse<AuthTokens>> Refresh([FromBody] RefreshRequest request)
         {
-            var tokens = await _accountService.Refresh(request.RefreshToken);
+            var tokens = await _accountService.Refresh(request.RefreshToken, HttpContext.RequestAborted);
             return tokens is null
                 ? ApiResponse.Error("Invalid or expired refresh token")
                 : ApiResponse.Success(ToAuthTokens(tokens));
@@ -202,7 +204,7 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
         {
-            var status = await _accountService.CreateAccount(creds.Username, creds.Password);
+            var status = await _accountService.CreateAccount(creds.Username, creds.Password, HttpContext.RequestAborted);
             // Exhaustive map (mirrors the login/role mappings) so a newly-added failure status is a build-time
             // gap to fill rather than a silent success reported to the client.
             return status switch
@@ -220,7 +222,7 @@ namespace Game.Api.Controllers
             // Consuming the refresh token resolves the owning user, so the session is evicted by that id
             // even on the common path where the access token has already expired and no request principal
             // (and thus no SessionService.UserId) is present.
-            var userId = await _accountService.Logout(request.RefreshToken);
+            var userId = await _accountService.Logout(request.RefreshToken, HttpContext.RequestAborted);
             _sessionService.ClearSession(userId);
             return ApiResponse.Success();
         }
@@ -282,7 +284,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
             }
 
-            var players = await _accountService.GetPlayers(_sessionService.UserId);
+            var players = await _accountService.GetPlayers(_sessionService.UserId, HttpContext.RequestAborted);
             return ApiResponse.Success(players);
         }
 

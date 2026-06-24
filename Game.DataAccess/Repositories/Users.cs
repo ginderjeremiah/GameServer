@@ -52,7 +52,7 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public async Task<bool> CreateAccount(NewAccount account, NewPlayer player)
+        public async Task<bool> CreateAccount(NewAccount account, NewPlayer player, CancellationToken cancellationToken = default)
         {
             // The account graph carries no cache write or domain events: a freshly created player is only
             // loaded into the cache later, on login. The player links to the user via navigation, so EF
@@ -72,7 +72,7 @@ namespace Game.DataAccess.Repositories
                 // Commit here (rather than deferring to the per-request unit of work) so the active-username
                 // unique index's rejection of a concurrent duplicate surfaces as a result, not a 500 raised
                 // outside the action by the commit filter.
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
                 return true;
             }
             catch (DbUpdateException ex) when (ex.IsUniqueViolation())
@@ -86,26 +86,26 @@ namespace Game.DataAccess.Repositories
             }
         }
 
-        public async Task<CreatePlayerResult> CreatePlayer(int userId, NewPlayer player, int maxPlayersPerAccount)
+        public async Task<CreatePlayerResult> CreatePlayer(int userId, NewPlayer player, int maxPlayersPerAccount, CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
             // Lock the owning user row so the cap check and the insert it gates can't be split by a
             // concurrent CreatePlayer for the same account — without it two parallel requests could both
             // observe an under-cap count and both insert, exceeding the cap the check exists to enforce.
             await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT 1 FROM \"Users\" WHERE \"Id\" = {userId} FOR UPDATE");
+                $"SELECT 1 FROM \"Users\" WHERE \"Id\" = {userId} FOR UPDATE", cancellationToken);
 
             // Resolve the (tracked) user under the lock; an archived account no longer owns characters, so
             // it can't create one. Loading the user also supplies the navigation the mapper links the new
             // player to, mirroring the account-creation path.
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.ArchivedAt == null);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.ArchivedAt == null, cancellationToken);
             if (user is null)
             {
                 return CreatePlayerResult.Failed(CreatePlayerOutcome.UserNotFound);
             }
 
-            var playerCount = await _context.Players.CountAsync(p => p.UserId == userId);
+            var playerCount = await _context.Players.CountAsync(p => p.UserId == userId, cancellationToken);
             if (playerCount >= maxPlayersPerAccount)
             {
                 return CreatePlayerResult.Failed(CreatePlayerOutcome.CapReached);
@@ -119,8 +119,8 @@ namespace Game.DataAccess.Repositories
                 // Commit in-tier (like CreateAccount) so the insert is serialized with the cap check under
                 // the same lock, rather than deferring to the per-request unit of work that runs after the
                 // lock drops.
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
             }
             catch
             {
@@ -135,23 +135,23 @@ namespace Game.DataAccess.Repositories
             return CreatePlayerResult.Created(PlayerMapper.ToSummary(entity));
         }
 
-        public Task<AccountCredentials?> GetUser(string username)
+        public Task<AccountCredentials?> GetUser(string username, CancellationToken cancellationToken = default)
         {
             return _context.Users
                 .Where(u => u.Username == username && u.ArchivedAt == null)
                 .Select(ToCredentials)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
-        public async Task<IReadOnlyList<int>> GetPlayerIds(int userId)
+        public async Task<IReadOnlyList<int>> GetPlayerIds(int userId, CancellationToken cancellationToken = default)
         {
             return await _context.Users
                 .Where(u => u.Id == userId && u.ArchivedAt == null)
                 .SelectMany(u => u.Players.Select(p => p.Id))
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task<IReadOnlyList<PlayerSummary>> GetPlayerSummaries(int userId)
+        public async Task<IReadOnlyList<PlayerSummary>> GetPlayerSummaries(int userId, CancellationToken cancellationToken = default)
         {
             // Mirrors the ToAdminUser player projection above — keep the two in step.
             return await _context.Users
@@ -164,24 +164,24 @@ namespace Game.DataAccess.Repositories
                     CurrentZoneId = p.CurrentZoneId,
                     LastActivity = p.LastActivity,
                 }))
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task<bool> CheckIfUsernameExists(string username)
+        public async Task<bool> CheckIfUsernameExists(string username, CancellationToken cancellationToken = default)
         {
-            return await _context.Users.AnyAsync(u => u.Username == username && u.ArchivedAt == null);
+            return await _context.Users.AnyAsync(u => u.Username == username && u.ArchivedAt == null, cancellationToken);
         }
 
-        public Task UpdatePasswordHash(int userId, string passHash)
+        public Task UpdatePasswordHash(int userId, string passHash, CancellationToken cancellationToken = default)
         {
             // A targeted, immediate update keyed on the id — independent of the per-action unit of work,
             // since the credential upgrade is self-contained and re-applying it converges to the same state.
             return _context.Users
                 .Where(u => u.Id == userId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.PassHash, passHash));
+                .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.PassHash, passHash), cancellationToken);
         }
 
-        public async Task<List<AdminUser>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take)
+        public async Task<List<AdminUser>> SearchUsers(string? search, int? roleId, bool? archived, int skip, int take, CancellationToken cancellationToken = default)
         {
             return await FilteredUsers(search, roleId, archived)
                 .OrderBy(u => u.Username)
@@ -189,19 +189,19 @@ namespace Game.DataAccess.Repositories
                 .Skip(skip)
                 .Take(take)
                 .Select(ToAdminUser)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
 
-        public Task<int> CountUsers(string? search, int? roleId, bool? archived)
+        public Task<int> CountUsers(string? search, int? roleId, bool? archived, CancellationToken cancellationToken = default)
         {
-            return FilteredUsers(search, roleId, archived).CountAsync();
+            return FilteredUsers(search, roleId, archived).CountAsync(cancellationToken);
         }
 
-        public async Task<SetUserRolesStatus> SetUserRoles(int actingUserId, int targetUserId, IReadOnlyCollection<int> roleIds)
+        public async Task<SetUserRolesStatus> SetUserRoles(int actingUserId, int targetUserId, IReadOnlyCollection<int> roleIds, CancellationToken cancellationToken = default)
         {
             var user = await _context.Users
                 .Include(u => u.Roles)
-                .FirstOrDefaultAsync(u => u.Id == targetUserId);
+                .FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
 
             if (user is null)
             {
@@ -213,7 +213,7 @@ namespace Game.DataAccess.Repositories
             var requestedRoleIds = roleIds.Distinct().ToList();
             var knownRoles = await _context.Roles
                 .Where(r => requestedRoleIds.Contains(r.Id))
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             if (knownRoles.Count != requestedRoleIds.Count)
             {
@@ -233,7 +233,7 @@ namespace Game.DataAccess.Repositories
             }
 
             return await RemoveAdminRoleAtomically(
-                actingUserId, user, requestedRoleIds, knownRoles, adminRoleId, targetHasAdminRole, requestedRolesIncludeAdmin);
+                actingUserId, user, requestedRoleIds, knownRoles, adminRoleId, targetHasAdminRole, requestedRolesIncludeAdmin, cancellationToken);
         }
 
         /// <summary>
@@ -252,18 +252,19 @@ namespace Game.DataAccess.Repositories
             List<RoleEntity> knownRoles,
             int adminRoleId,
             bool targetHasAdminRole,
-            bool requestedRolesIncludeAdmin)
+            bool requestedRolesIncludeAdmin,
+            CancellationToken cancellationToken)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
             // Lock the Admin role row; the lock is held until commit, serializing concurrent demotions.
             await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE");
+                $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE", cancellationToken);
 
             // Gather the surviving-admin fact under the lock, then let the domain policy decide. A removal
             // that strands the system with only banned admins is as much a lockout as one that leaves none,
             // so the count uses the same usable-admin definition as the archive/ban guard.
-            var otherUsableAdminsRemain = await OtherUsableAdminsRemainAsync(user.Id);
+            var otherUsableAdminsRemain = await OtherUsableAdminsRemainAsync(user.Id, cancellationToken);
 
             var protection = AdminLockoutPolicy.CheckRoleChange(
                 actingUserId, user.Id, targetHasAdminRole, requestedRolesIncludeAdmin, otherUsableAdminsRemain);
@@ -276,8 +277,8 @@ namespace Game.DataAccess.Repositories
             }
 
             ApplyRequestedRoles(user, requestedRoleIds, knownRoles);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return SetUserRolesStatus.Success;
         }
 
@@ -289,17 +290,17 @@ namespace Game.DataAccess.Repositories
             user.Roles.AddRange(knownRoles.Where(r => !existingRoleIds.Contains(r.Id)));
         }
 
-        public Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId)
+        public Task<UserActionStatus> ArchiveUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default)
         {
-            return SetUserTimestamp(actingUserId, targetUserId, user => user.ArchivedAt = DateTime.UtcNow);
+            return SetUserTimestamp(actingUserId, targetUserId, user => user.ArchivedAt = DateTime.UtcNow, cancellationToken);
         }
 
-        public Task<UserActionStatus> BanUser(int actingUserId, int targetUserId)
+        public Task<UserActionStatus> BanUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default)
         {
-            return SetUserTimestamp(actingUserId, targetUserId, user => user.BannedAt = DateTime.UtcNow);
+            return SetUserTimestamp(actingUserId, targetUserId, user => user.BannedAt = DateTime.UtcNow, cancellationToken);
         }
 
-        private async Task<UserActionStatus> SetUserTimestamp(int actingUserId, int targetUserId, Action<UserEntity> setTimestamp)
+        private async Task<UserActionStatus> SetUserTimestamp(int actingUserId, int targetUserId, Action<UserEntity> setTimestamp, CancellationToken cancellationToken)
         {
             // Cheap self-target rejection before touching the database — an admin can never archive or ban
             // their own account regardless of who else holds the role.
@@ -310,7 +311,7 @@ namespace Game.DataAccess.Repositories
 
             var user = await _context.Users
                 .Include(u => u.Roles)
-                .FirstOrDefaultAsync(u => u.Id == targetUserId);
+                .FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
             if (user is null)
             {
                 return UserActionStatus.UserNotFound;
@@ -326,7 +327,7 @@ namespace Game.DataAccess.Repositories
                 return UserActionStatus.Success;
             }
 
-            return await ApplyLifecycleActionToAdminAtomically(actingUserId, user, setTimestamp, adminRoleId);
+            return await ApplyLifecycleActionToAdminAtomically(actingUserId, user, setTimestamp, adminRoleId, cancellationToken);
         }
 
         /// <summary>
@@ -342,18 +343,19 @@ namespace Game.DataAccess.Repositories
             int actingUserId,
             UserEntity user,
             Action<UserEntity> setTimestamp,
-            int adminRoleId)
+            int adminRoleId,
+            CancellationToken cancellationToken)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
             // Lock the Admin role row; the lock is held until commit, serializing concurrent admin changes.
             await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE");
+                $"SELECT 1 FROM \"Roles\" WHERE \"Id\" = {adminRoleId} FOR UPDATE", cancellationToken);
 
             // Gather the surviving-admin fact under the lock, then let the domain policy decide. Both
             // archiving and banning the target take it out of the usable-admin pool, so the policy must
             // reject the action that would empty it.
-            var otherUsableAdminsRemain = await OtherUsableAdminsRemainAsync(user.Id);
+            var otherUsableAdminsRemain = await OtherUsableAdminsRemainAsync(user.Id, cancellationToken);
 
             var protection = AdminLockoutPolicy.CheckUserAction(
                 actingUserId, user.Id, targetHasAdminRole: true, otherUsableAdminsRemain);
@@ -366,8 +368,8 @@ namespace Game.DataAccess.Repositories
             }
 
             setTimestamp(user);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return UserActionStatus.Success;
         }
 
@@ -377,14 +379,14 @@ namespace Game.DataAccess.Repositories
         /// both admin-lockout guards (role removal and archive/ban) so they enforce one definition of the
         /// surviving-admin pool. Call within the Admin-role lock so the read is serialized with the mutation.
         /// </summary>
-        private Task<bool> OtherUsableAdminsRemainAsync(int excludingUserId)
+        private Task<bool> OtherUsableAdminsRemainAsync(int excludingUserId, CancellationToken cancellationToken)
         {
             const int adminRoleId = (int)ERole.Admin;
             return _context.Users.AnyAsync(u =>
                 u.Id != excludingUserId
                 && u.ArchivedAt == null
                 && u.BannedAt == null
-                && u.Roles.Any(r => r.Id == adminRoleId));
+                && u.Roles.Any(r => r.Id == adminRoleId), cancellationToken);
         }
 
         private IQueryable<UserEntity> FilteredUsers(string? search, int? roleId, bool? archived)
