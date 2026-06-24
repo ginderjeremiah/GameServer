@@ -20,7 +20,6 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(1, context.Stats.PlayerSkillsUsed);
             var skill = Assert.Contains(5, (IReadOnlyDictionary<int, SkillStats>)context.Stats.SkillStats);
-            Assert.Equal(5, skill.SkillId);
             Assert.Equal(1, skill.Uses);
             Assert.Equal(30.0, skill.TotalDamage);
             Assert.Equal(30.0, skill.HighestSingleAttack);

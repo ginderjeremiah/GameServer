@@ -286,8 +286,8 @@ namespace Game.Core.Tests.Progress
                 PlayerSkillsUsed = 3,
                 SkillStats =
                 {
-                    [10] = new SkillStats { SkillId = 10, Uses = 2, TotalDamage = 60.0, HighestSingleAttack = 35.0 },
-                    [20] = new SkillStats { SkillId = 20, Uses = 1, TotalDamage = 15.0, HighestSingleAttack = 15.0 },
+                    [10] = new SkillStats { Uses = 2, TotalDamage = 60.0, HighestSingleAttack = 35.0 },
+                    [20] = new SkillStats { Uses = 1, TotalDamage = 15.0, HighestSingleAttack = 15.0 },
                 },
             };
 

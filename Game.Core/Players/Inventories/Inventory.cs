@@ -8,8 +8,6 @@ namespace Game.Core.Players.Inventories
     /// </summary>
     public class Inventory
     {
-        private static readonly int EquipSlots = (int)Enum.GetValues<EEquipmentSlot>().Max();
-
         /// <summary>
         /// All unlocked items indexed by <see cref="UnlockedItemSlot.ItemId"/>. The index is the backing
         /// store for the public <see cref="UnlockedItems"/> view, so every per-item lookup
@@ -107,16 +105,20 @@ namespace Game.Core.Players.Inventories
             return true;
         }
 
-        public bool TryUnequipItem(EEquipmentSlot slot)
+        /// <summary>
+        /// Clears the equipment slot for <paramref name="slot"/>, returning the id of the item that was
+        /// unequipped, or null when the slot was already empty (a no-op).
+        /// </summary>
+        public int? TryUnequipItem(EEquipmentSlot slot)
         {
             var equipSlot = EquipmentSlots.FirstOrDefault(s => s.Value == slot);
-            if (equipSlot is null || !equipSlot.ItemId.HasValue)
+            if (equipSlot?.ItemId is not int itemId)
             {
-                return false;
+                return null;
             }
 
             equipSlot.Clear();
-            return true;
+            return itemId;
         }
 
         public bool TryApplyMod(int itemId, int itemModId, int itemModSlotId, ItemMod mod)
@@ -220,8 +222,10 @@ namespace Game.Core.Players.Inventories
 
         private static List<EquipmentSlot> NewEquippedList()
         {
-            return Enumerable.Range(0, EquipSlots + 1)
-                .Select(index => new EquipmentSlot((EEquipmentSlot)index)
+            // Derive one slot per equipment-slot enum value directly, so the slot set tracks the enum
+            // without depending on it being contiguous or 0-based.
+            return Enum.GetValues<EEquipmentSlot>()
+                .Select(slot => new EquipmentSlot(slot)
                 {
                     Item = null,
                 }).ToList();

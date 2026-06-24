@@ -134,7 +134,6 @@ namespace Game.Api.Sockets
         /// </summary>
         internal async Task<SocketCommandOutcome> ExecuteServerCommand(SocketCommandInfo commandInfo)
         {
-            var now = Stopwatch.GetTimestamp();
             _logger.LogTrace("Executing server-initiated command: {CommandInfo} on socket: {Id}", commandInfo, Id);
             var (outcome, fault) = await RunCommandUnderLock(commandInfo);
             if (outcome is SocketCommandOutcome.Faulted)

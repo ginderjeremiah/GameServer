@@ -161,20 +161,20 @@ namespace Game.Core.Tests.Players
 
             var result = inventory.TryUnequipItem(EEquipmentSlot.AccessorySlot);
 
-            Assert.True(result);
+            Assert.Equal(1, result);
             var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
             Assert.Null(slot.ItemId);
             Assert.Null(slot.Item);
         }
 
         [Fact]
-        public void TryUnequipItem_EmptySlot_ReturnsFalse()
+        public void TryUnequipItem_EmptySlot_ReturnsNull()
         {
             var inventory = new Inventory();
 
             var result = inventory.TryUnequipItem(EEquipmentSlot.AccessorySlot);
 
-            Assert.False(result);
+            Assert.Null(result);
         }
 
         // ── TryApplyMod ─────────────────────────────────────────────────────

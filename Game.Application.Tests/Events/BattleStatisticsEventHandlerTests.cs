@@ -197,7 +197,7 @@ namespace Game.Application.Tests.Events
             // The skill fired once in the won battle, so its proficiency is represented and (being the only one)
             // takes the whole pie; below the first threshold it accrues without leveling.
             var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { SkillId = skill.Id, Uses = 1 };
+            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1 };
             await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
@@ -248,7 +248,7 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedEnemy);
 
             var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { SkillId = skill.Id, Uses = 1 };
+            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1 };
             await MakeHandler(scope).HandleAsync(
                 VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
 
@@ -323,7 +323,7 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedEnemy);
 
             var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { SkillId = skill.Id, Uses = 1 };
+            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1 };
             const double multiplier = 1.5;
 
             var liveLoaded = await playerRepo.GetPlayer(livePlayer.Id);

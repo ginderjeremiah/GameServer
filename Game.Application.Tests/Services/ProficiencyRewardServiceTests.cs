@@ -260,7 +260,7 @@ namespace Game.Application.Tests.Services
         private static BattleStats FireSkill(int skillId)
         {
             var stats = new BattleStats();
-            stats.SkillStats[skillId] = new SkillStats { SkillId = skillId, Uses = 1 };
+            stats.SkillStats[skillId] = new SkillStats { Uses = 1 };
             return stats;
         }
     }

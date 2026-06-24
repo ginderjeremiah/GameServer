@@ -153,7 +153,7 @@ namespace Game.Core.Battle
                 Stats.PlayerSkillsUsed++;
                 if (!Stats.SkillStats.TryGetValue(skillId, out var value))
                 {
-                    value = new SkillStats { SkillId = skillId };
+                    value = new SkillStats();
                     Stats.SkillStats[skillId] = value;
                 }
 
