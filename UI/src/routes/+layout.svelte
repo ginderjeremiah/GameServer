@@ -129,6 +129,9 @@ $effect(() => {
 	--panel-2: #{colors.$panel-2};
 	--mono: 'Geist Mono', ui-monospace, monospace;
 	--sans: Geist, system-ui, sans-serif;
+	// Decorative conlang face for proficiency "words of power" (see WordOfPower).
+	// Falls back to --sans so a failed font load degrades to the legible romanization.
+	--conlang: 'Aetheric', var(--sans);
 	--enemy: #{colors.$enemy-accent};
 	--error: #{colors.$error};
 	--accent: #{colors.$accent};

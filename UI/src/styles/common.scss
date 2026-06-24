@@ -1,5 +1,18 @@
 @use 'colors';
 
+// Self-hosted conlang display face ("Aetheric") used only for the proficiency
+// "words of power" — decorative, never readable copy. Generated, not hand-drawn
+// (see UI/scripts/conlang). `swap` lets the romanization fallback show while it
+// loads; the WordOfPower component keeps the romanization as the DOM text so a
+// failed load degrades to legible Latin rather than nothing.
+@font-face {
+	font-family: 'Aetheric';
+	src: url('/fonts/Aetheric.woff2') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
 :root {
 	font-size: 16px;
 	font-family: Geist, Arial, Helvetica, sans-serif;
