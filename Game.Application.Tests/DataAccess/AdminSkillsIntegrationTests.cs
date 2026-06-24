@@ -259,6 +259,27 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Fact]
+        public void SaveSkills_UndefinedRarity_ReturnsFailureWithoutPersisting()
+        {
+            // A missing/0 RarityId has no Rarities row; the up-front guard rejects it as a clean BadRequest
+            // instead of letting it surface as an opaque FK 500 at commit.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminSkills>();
+
+            var result = admin.SaveSkills(
+            [
+                new Change<Contracts.Skill>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewSkill("Bad Rarity Skill", (ERarity)0),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("0 is not a valid skill rarity.", result.ErrorMessage);
+        }
+
         private static Contracts.Skill NewSkill(string name, ERarity rarity, int id = 0)
         {
             return new Contracts.Skill
