@@ -29,6 +29,27 @@ namespace Game.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task Read_AwaitCancelledThenCommandFaults_DoesNotSurfaceTheAbandonedFault()
+        {
+            var command = new TaskCompletionSource<int>();
+            using var cts = new CancellationTokenSource();
+
+            var read = RedisCommandBudget.Read(command.Task, cts.Token);
+
+            // The await unwinds promptly on cancellation even though the command is still in flight.
+            await cts.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read);
+
+            // The abandoned command later faults. The Read path attaches a silent fault-observing continuation, so
+            // the exception is observed rather than left to surface via TaskScheduler.UnobservedTaskException — and
+            // nothing escapes back to the already-unwound caller.
+            command.SetException(new InvalidOperationException("redis blew up"));
+
+            Assert.True(command.Task.IsFaulted);
+            Assert.True(read.IsCanceled);
+        }
+
+        [Fact]
         public async Task Write_AwaitCancelledThenCommandFaults_LogsTheAbandonedFault()
         {
             var command = new TaskCompletionSource<int>();

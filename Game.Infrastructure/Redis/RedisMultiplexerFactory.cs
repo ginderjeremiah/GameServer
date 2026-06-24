@@ -99,17 +99,11 @@ namespace Game.Infrastructure.Redis
             }
         }
 
-        internal static void ResetForTesting()
+        // Delegates to the production drain-clear-dispose so the test reset can't drift from it (it previously
+        // duplicated the logic with synchronous Dispose() where the production seam uses DisposeAsync()).
+        internal static Task ResetForTesting()
         {
-            lock (_lock)
-            {
-                foreach (var multiplexer in _multiplexers.Values)
-                {
-                    multiplexer.Dispose();
-                }
-
-                _multiplexers.Clear();
-            }
+            return DisposeAllAsync();
         }
 
         /// <summary>
