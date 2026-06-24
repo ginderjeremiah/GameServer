@@ -139,6 +139,38 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task MaxingThePrerequisitesOfARetiredGateway_DoesNotOpenOrSeedIt()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The gateway tier lives on a retired (frozen) path; its prerequisites are on live paths. Maxing
+            // both prerequisites here would open and seed the gateway if it were live, but a retired track must
+            // never be granted via the open logic — so its seed skill is not granted.
+            var prereqA = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
+            var prereqB = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Earth", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
+            var retiredPath = await TestDataSeeder.CreatePathAsync(context, name: "Retired Lava", retiredAt: DateTime.UtcNow);
+            var gatewaySeed = await TestDataSeeder.CreateSkillAsync(context, name: "Lava Seed");
+            var gateway = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Lava", maxLevel: 10, baseXp: 100m, pathId: retiredPath.Id, pathOrdinal: 0,
+                startsUnlocked: false, seedSkillId: gatewaySeed.Id);
+            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqA.Id);
+            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqB.Id);
+
+            // Prereq A is already maxed; this battle maxes prereq B, which would otherwise satisfy the gateway.
+            var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, prereqB.Id);
+            await TestDataSeeder.AddPlayerProficiencyAsync(context, playerId, prereqA.Id, level: 1);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (player, results) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
+
+            // Prereq B genuinely maxed (so the gateway's prerequisites are all satisfied) — what's suppressed is
+            // the gateway open, not a dead accrual.
+            Assert.Equal(1, Assert.Single(results).NewLevel);
+            Assert.DoesNotContain(player.Skills, s => s.Id == gatewaySeed.Id);
+        }
+
+        [Fact]
         public async Task LivePath_RaisesTheEventCarryingGrantedSkillsAndOpenedTiers()
         {
             using var scope = CreateScope();

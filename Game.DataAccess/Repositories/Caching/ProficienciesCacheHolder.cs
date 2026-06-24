@@ -48,6 +48,19 @@ namespace Game.DataAccess.Repositories.Caching
 
             entities.AssertZeroBasedContiguity("Proficiencies");
 
+            var paths = await context.Paths
+                .AsNoTracking()
+                .Include(p => p.SkillContributions)
+                .OrderBy(p => p.Id)
+                .ToListAsync(cancellationToken);
+
+            paths.AssertZeroBasedContiguity("Paths");
+
+            var retiredPathIds = paths
+                .Where(path => path.RetiredAt is not null)
+                .Select(path => path.Id)
+                .ToHashSet();
+
             // Build-time invariant: the authored prerequisite graph must be acyclic, since a cycle would
             // soft-lock every node on it under the "open once prerequisites are maxed" rule. The admin save
             // rejects a cycle before it commits; this is the backstop against a seed/migration mistake (it
@@ -63,20 +76,16 @@ namespace Game.DataAccess.Repositories.Caching
 
             // The reverse prerequisite index the open logic consumes: each proficiency → the proficiencies that
             // gate on it, so maxing a node can resolve the gateways it might open without rescanning the set.
+            // Proficiencies on a retired path are excluded from the gated side: a retired track is frozen (see
+            // contributionsBySkill below), so it must never be opened as a cross-path gateway and granted its
+            // seed skill when its live prerequisites max — mirroring the accrual freeze at the open choke point.
             var dependentsByProficiency = entities
+                .Where(p => !retiredPathIds.Contains(p.PathId))
                 .SelectMany(p => p.Prerequisites.Select(pr => (Gated: p.Id, Prerequisite: pr.PrerequisiteProficiencyId)))
                 .GroupBy(x => x.Prerequisite)
                 .ToDictionary(
                     g => g.Key,
                     g => (IReadOnlyList<int>)g.Select(x => x.Gated).OrderBy(id => id).ToList());
-
-            var paths = await context.Paths
-                .AsNoTracking()
-                .Include(p => p.SkillContributions)
-                .OrderBy(p => p.Id)
-                .ToListAsync(cancellationToken);
-
-            paths.AssertZeroBasedContiguity("Paths");
 
             // The routing models: each path's falloff base plus its tiers ordered by ordinal (the proficiencies
             // carrying its id), so the accrual can resolve a contribution's frontier tier off the player's
@@ -105,7 +114,7 @@ namespace Game.DataAccess.Repositories.Caching
             // no contribution into it, a retired track accrues no XP, levels nothing, and grants no further
             // skills (already-accrued levels/grants are untouched — retirement only stops further accrual).
             var contributionsBySkill = paths
-                .Where(path => path.RetiredAt is null)
+                .Where(path => !retiredPathIds.Contains(path.Id))
                 .SelectMany(path => path.SkillContributions.Select(c => (c.SkillId, Contribution: new SkillContribution
                 {
                     PathId = path.Id,
