@@ -304,14 +304,7 @@ namespace Game.Core.Players
 
         public bool TryUnequipItem(EEquipmentSlot slot)
         {
-            var equipSlot = Inventory.EquipmentSlots.FirstOrDefault(s => s.Value == slot);
-            if (equipSlot?.ItemId is null)
-            {
-                return false;
-            }
-
-            var itemId = equipSlot.ItemId.Value;
-            if (!Inventory.TryUnequipItem(slot))
+            if (Inventory.TryUnequipItem(slot) is not int itemId)
             {
                 return false;
             }

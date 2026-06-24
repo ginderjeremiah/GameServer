@@ -12,7 +12,6 @@ namespace Game.Core.Battle
 
     public class SkillStats
     {
-        public int SkillId { get; set; }
         public int Uses { get; set; }
         public double TotalDamage { get; set; }
         public double HighestSingleAttack { get; set; }

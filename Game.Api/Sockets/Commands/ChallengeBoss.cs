@@ -27,6 +27,11 @@ namespace Game.Api.Sockets.Commands
         {
             var state = context.Session.PlayerState;
             var player = context.Session.Player;
+            // Deliberate asymmetry with the auto-loop sibling SetAutoChallengeBoss (which always uses the
+            // current zone): the interactive challenge lets the client name a zone so a player can re-farm a
+            // previously-cleared boss without walking back. This can't reach locked content — StartBossBattle
+            // still gates on the zone being unlocked and not retired — so a client can only name a zone it has
+            // already unlocked.
             var zoneId = Parameters.ZoneId ?? player.CurrentZoneId;
 
             var result = await _battleService.StartBossBattle(player, state, zoneId, Parameters.ClientBattleMs, cancellationToken);
