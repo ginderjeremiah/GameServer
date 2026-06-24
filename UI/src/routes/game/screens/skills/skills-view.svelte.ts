@@ -25,7 +25,7 @@ import {
 	skillContributions,
 	type SkillContribution
 } from '$lib/battle';
-import { enemyDefense } from '$lib/common';
+import { enemyDefense, SerializedQueue } from '$lib/common';
 import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -130,9 +130,9 @@ export class SkillsView {
 	private pendingLoadout = $state<number[] | null>(null);
 	/** Last loadout the server confirmed — the rollback target when the latest commit fails. */
 	private committed: number[] = [];
-	/** Tail of the optimistic-commit queue; each commit chains off it so persists apply in edit order
-	 *  and rollback baselines never interleave (mirrors the inventory manager's serialized mutations). */
-	private lastCommit: Promise<unknown> = Promise.resolve();
+	/** Serializes the optimistic commits so persists apply in edit order and rollback baselines never
+	 *  interleave (mirrors the inventory manager's serialized mutations). */
+	private queue = new SerializedQueue();
 	/** Monotonic edit counter; a failed persist rolls back only when it was the latest edit issued. */
 	private commitSeq = 0;
 	search = $state('');
@@ -448,16 +448,16 @@ export class SkillsView {
 	/** Optimistically apply a new loadout, persist it atomically, and revert on failure. The player
 	 *  manager owns the loadout mutation (so battles/other screens see it without a reload).
 	 *
-	 *  Commits are serialized on {@link lastCommit} so their persists apply in edit order and never
-	 *  interleave rollback baselines: only the *latest* edit's failure rolls back — to the last
-	 *  server-confirmed loadout ({@link committed}), not a per-call snapshot — so an earlier failure
-	 *  can't silently discard a later successful edit. The optimistic write itself is synchronous, so
-	 *  rapid edits read fresh state and queue rather than racing. */
+	 *  Commits are serialized on {@link queue} so their persists apply in edit order and never interleave
+	 *  rollback baselines: only the *latest* edit's failure rolls back — to the last server-confirmed
+	 *  loadout ({@link committed}), not a per-call snapshot — so an earlier failure can't silently discard
+	 *  a later successful edit. The optimistic write itself is synchronous, so rapid edits read fresh state
+	 *  and queue rather than racing. */
 	private commit(next: number[]): void {
 		this.pendingLoadout = next;
 		playerManager.setSelectedSkills(next);
 		const seq = ++this.commitSeq;
-		const result = this.lastCommit.then(async () => {
+		this.queue.run(async () => {
 			const response = await apiSocket.sendSocketCommand('SetSelectedSkills', next);
 			const isLatest = seq === this.commitSeq;
 			if (response.error) {
@@ -473,8 +473,5 @@ export class SkillsView {
 				}
 			}
 		});
-		// Keep the queue tail always-fulfilled: a rejecting callback would otherwise make every later
-		// commit skip its persist and raise an unhandled rejection (mirrors the inventory manager's serialize).
-		this.lastCommit = result.catch(() => undefined);
 	}
 }
