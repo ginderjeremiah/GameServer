@@ -123,6 +123,100 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(2.5m, contribution.Weight);
         }
 
+        [Fact]
+        public async Task SavePaths_RetiringPathThatGatesLiveGateway_ReturnsFailure()
+        {
+            int prereqPathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                prereqPathId = await SeedPathAsync(context, "Fire");
+                var prereqProficiencyId = await SeedProficiencyAsync(context, prereqPathId, "Fire Magic");
+                var gatewayPathId = await SeedPathAsync(context, "Inferno");
+                var gatewayProficiencyId = await SeedProficiencyAsync(context, gatewayPathId, "Inferno Magic");
+                await SeedPrerequisiteAsync(context, gatewayProficiencyId, prereqProficiencyId);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminPaths>();
+
+            var result = admin.SavePaths([RetirePathChange(prereqPathId, "Fire")]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("soft-lock", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SavePaths_RetiringPathThatGatesOnlyRetiredGateway_Succeeds()
+        {
+            int prereqPathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                prereqPathId = await SeedPathAsync(context, "Fire");
+                var prereqProficiencyId = await SeedProficiencyAsync(context, prereqPathId, "Fire Magic");
+                // The dependent gateway's path is already retired, so retiring its prerequisite's path
+                // soft-locks nothing live.
+                var gatewayPathId = await SeedPathAsync(context, "Inferno", retired: true);
+                var gatewayProficiencyId = await SeedProficiencyAsync(context, gatewayPathId, "Inferno Magic");
+                await SeedPrerequisiteAsync(context, gatewayProficiencyId, prereqProficiencyId);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminPaths>();
+
+            Assert.True(admin.SavePaths([RetirePathChange(prereqPathId, "Fire")]).Succeeded);
+        }
+
+        [Fact]
+        public async Task SavePaths_RetiringPathThatGatesNothing_Succeeds()
+        {
+            int pathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                pathId = await SeedPathAsync(context, "Fire");
+                await SeedProficiencyAsync(context, pathId, "Fire Magic");
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminPaths>();
+
+            Assert.True(admin.SavePaths([RetirePathChange(pathId, "Fire")]).Succeeded);
+        }
+
+        [Fact]
+        public async Task SavePaths_RetiringBothThePrerequisiteAndGatewayPaths_Succeeds()
+        {
+            int prereqPathId, gatewayPathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                prereqPathId = await SeedPathAsync(context, "Fire");
+                var prereqProficiencyId = await SeedProficiencyAsync(context, prereqPathId, "Fire Magic");
+                gatewayPathId = await SeedPathAsync(context, "Inferno");
+                var gatewayProficiencyId = await SeedProficiencyAsync(context, gatewayPathId, "Inferno Magic");
+                await SeedPrerequisiteAsync(context, gatewayProficiencyId, prereqProficiencyId);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminPaths>();
+
+            // Retiring the gateway's path in the same batch leaves no live dependent, so the prerequisite
+            // path can retire too.
+            var result = admin.SavePaths(
+            [
+                RetirePathChange(prereqPathId, "Fire"),
+                RetirePathChange(gatewayPathId, "Inferno"),
+            ]);
+
+            Assert.True(result.Succeeded);
+        }
+
         /// <summary>Seeds a path with a single tier (a proficiency at ordinal 0) and returns that tier.</summary>
         private async Task<Entities.Proficiency> SeedPathWithTierAsync(IServiceScope scope)
         {
@@ -169,6 +263,66 @@ namespace Game.Application.Tests.DataAccess
             await context.SaveChangesAsync(CancellationToken);
             return skill;
         }
+
+        private async Task<int> SeedPathAsync(GameContext context, string name, bool retired = false)
+        {
+            var path = new Entities.Path
+            {
+                Name = name,
+                Description = "",
+                FalloffBase = 0.3m,
+                RetiredAt = retired ? DateTime.UtcNow : null,
+            };
+            context.Paths.Add(path);
+            await context.SaveChangesAsync(CancellationToken);
+            return path.Id;
+        }
+
+        private async Task<int> SeedProficiencyAsync(GameContext context, int pathId, string name)
+        {
+            var proficiency = new Entities.Proficiency
+            {
+                Name = name,
+                Description = "",
+                IconPath = "",
+                PathId = pathId,
+                PathOrdinal = 0,
+                MaxLevel = 10,
+                BaseXp = 100m,
+                XpGrowth = 2m,
+                StartsUnlocked = false,
+                LevelModifiers = [],
+                LevelRewards = [],
+                Prerequisites = [],
+            };
+            context.Proficiencies.Add(proficiency);
+            await context.SaveChangesAsync(CancellationToken);
+            return proficiency.Id;
+        }
+
+        private async Task SeedPrerequisiteAsync(GameContext context, int gatewayProficiencyId, int prerequisiteProficiencyId)
+        {
+            context.ProficiencyPrerequisites.Add(new Entities.ProficiencyPrerequisite
+            {
+                ProficiencyId = gatewayProficiencyId,
+                PrerequisiteProficiencyId = prerequisiteProficiencyId,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+        }
+
+        private static Change<Contracts.Path> RetirePathChange(int id, string name) => new()
+        {
+            ChangeType = EChangeType.Edit,
+            Item = new Contracts.Path
+            {
+                Id = id,
+                Name = name,
+                Description = "",
+                FalloffBase = 0.3m,
+                RetiredAt = DateTime.UtcNow,
+                Contributions = [],
+            },
+        };
 
         private static Contracts.Path NewPath(int id = 0, string name = "Fire") => new()
         {
