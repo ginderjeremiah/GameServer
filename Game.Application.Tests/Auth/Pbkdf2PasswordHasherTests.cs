@@ -88,6 +88,21 @@ namespace Game.Application.Tests.Auth
         }
 
         [Theory]
+        [InlineData(Password)]
+        [InlineData("")]
+        [InlineData("any other password")]
+        public void VerifyDummy_DoesNotThrow_ForAnyInput(string password)
+        {
+            var hasher = Create();
+
+            // The unknown-user timing mitigation must run derivation work for any supplied password without
+            // throwing — including the empty string and a password that never matches a real account.
+            var exception = Record.Exception(() => hasher.VerifyDummy(password));
+
+            Assert.Null(exception);
+        }
+
+        [Theory]
         [InlineData("")]
         [InlineData("not-a-real-hash")]
         [InlineData("$pbkdf2-sha256$")]

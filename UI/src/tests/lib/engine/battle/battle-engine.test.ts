@@ -13,26 +13,37 @@ vi.mock('svelte', async (importOriginal) => ({
 	onDestroy: vi.fn()
 }));
 
-const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventoryManager } = vi.hoisted(() => {
-	const mockSkills: ISkill[] = [];
-	const mockEnemies: IEnemy[] = [];
-	const mockAttributes: { id: number; name: string }[] = [{ id: 0, name: 'Strength' }];
-	const mockPlayerManager = {
-		name: 'TestPlayer',
-		level: 5,
-		selectedSkills: [0],
-		attributes: [
-			{ attributeId: 0, amount: 50 },
-			{ attributeId: 1, amount: 30 }
-		]
-	};
-	const mockInventoryManager = {
-		equipmentStats: [] as { attributeId: number; amount: number }[],
-		grantedSkillIds: [] as number[]
-	};
+const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventoryManager, mockPlayerProficiencies } =
+	vi.hoisted(() => {
+		const mockSkills: ISkill[] = [];
+		const mockEnemies: IEnemy[] = [];
+		const mockAttributes: { id: number; name: string }[] = [{ id: 0, name: 'Strength' }];
+		const mockPlayerManager = {
+			name: 'TestPlayer',
+			level: 5,
+			selectedSkills: [0],
+			attributes: [
+				{ attributeId: 0, amount: 50 },
+				{ attributeId: 1, amount: 30 }
+			]
+		};
+		const mockInventoryManager = {
+			equipmentStats: [] as { attributeId: number; amount: number }[],
+			grantedSkillIds: [] as number[]
+		};
+		// The player's proficiency battle modifiers — a stable reference (the real store memoises via a
+		// `$derived`) the battle engine compares by identity, so reassigning it simulates a proficiency change.
+		const mockPlayerProficiencies = { battleModifiers: [] as unknown[] };
 
-	return { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventoryManager };
-});
+		return {
+			mockSkills,
+			mockEnemies,
+			mockAttributes,
+			mockPlayerManager,
+			mockInventoryManager,
+			mockPlayerProficiencies
+		};
+	});
 
 let { logicalUpdateCallbacks, renderUpdateCallbacks, enemyLoadedCallbacks } = vi.hoisted(() => {
 	const logicalUpdateCallbacks: DeltaCallback[] = [];
@@ -52,6 +63,11 @@ vi.mock('$stores', () => ({
 		},
 		get attributes() {
 			return mockAttributes;
+		}
+	},
+	playerProficiencies: {
+		get battleModifiers() {
+			return mockPlayerProficiencies.battleModifiers;
 		}
 	}
 }));
@@ -732,11 +748,13 @@ describe('BattleEngine', () => {
 		const defaultAttributes = mockPlayerManager.attributes;
 		const defaultEquipmentStats = mockInventoryManager.equipmentStats;
 		const defaultLevel = mockPlayerManager.level;
+		const defaultProficiencyModifiers = mockPlayerProficiencies.battleModifiers;
 
 		afterEach(() => {
 			mockPlayerManager.attributes = defaultAttributes;
 			mockInventoryManager.equipmentStats = defaultEquipmentStats;
 			mockPlayerManager.level = defaultLevel;
+			mockPlayerProficiencies.battleModifiers = defaultProficiencyModifiers;
 		});
 
 		it('re-arms the player without re-deriving when the inputs are unchanged between spawns', () => {
@@ -758,7 +776,12 @@ describe('BattleEngine', () => {
 			mockInventoryManager.equipmentStats = newStats;
 			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 
-			expect(resetSpy).toHaveBeenCalledWith(mockPlayerManager, newStats, mockInventoryManager.grantedSkillIds);
+			expect(resetSpy).toHaveBeenCalledWith(
+				mockPlayerManager,
+				newStats,
+				mockInventoryManager.grantedSkillIds,
+				mockPlayerProficiencies.battleModifiers
+			);
 		});
 
 		it('re-derives the player when the level changes between spawns (keeps the fight card level fresh)', () => {
@@ -771,8 +794,38 @@ describe('BattleEngine', () => {
 			expect(resetSpy).toHaveBeenCalledWith(
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
-				mockInventoryManager.grantedSkillIds
+				mockInventoryManager.grantedSkillIds,
+				mockPlayerProficiencies.battleModifiers
 			);
+		});
+
+		// Proficiency bonuses (#982 area E / #1119) are a derivation input too: a level-up while idling
+		// changes the player's proficiency modifiers, so the next spawn must rebuild the attribute graph
+		// rather than re-arm the stale battler.
+		it('re-derives the player when the proficiency modifiers change between spawns', () => {
+			engine.start();
+			const resetSpy = vi.spyOn(engine.player, 'reset');
+
+			const newModifiers = [{ attribute: EAttribute.Strength, amount: 3, type: EModifierType.Additive, source: 4 }];
+			mockPlayerProficiencies.battleModifiers = newModifiers;
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			expect(resetSpy).toHaveBeenCalledWith(
+				mockPlayerManager,
+				mockInventoryManager.equipmentStats,
+				mockInventoryManager.grantedSkillIds,
+				newModifiers
+			);
+		});
+
+		it('re-arms (no re-derive) when the proficiency modifiers reference is unchanged', () => {
+			engine.start();
+			const resetSpy = vi.spyOn(engine.player, 'reset');
+
+			// Same equipment/attributes/loadout/level and the same proficiency-modifiers reference.
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			expect(resetSpy).toHaveBeenCalledWith();
 		});
 	});
 });

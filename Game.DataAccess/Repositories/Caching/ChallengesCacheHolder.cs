@@ -41,7 +41,6 @@ namespace Game.DataAccess.Repositories.Caching
                     ProgressGoal = c.ProgressGoal,
                     RewardItemId = c.RewardItemId,
                     RewardItemModId = c.RewardItemModId,
-                    RewardSkillId = c.RewardSkillId,
                     RetiredAt = c.RetiredAt,
                 })
                 .ToListAsync(cancellationToken);

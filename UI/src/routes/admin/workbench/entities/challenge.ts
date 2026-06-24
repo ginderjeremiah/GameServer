@@ -13,8 +13,7 @@ const refresh = async (): Promise<IChallenge[]> => {
 	return challenges;
 };
 
-const rewardCount = (c: IChallenge): number =>
-	(c.rewardItemId != null ? 1 : 0) + (c.rewardItemModId != null ? 1 : 0) + (c.rewardSkillId != null ? 1 : 0);
+const rewardCount = (c: IChallenge): number => (c.rewardItemId != null ? 1 : 0) + (c.rewardItemModId != null ? 1 : 0);
 
 export const challengeEntity: EntityConfig<IChallenge> = {
 	key: 'challenges',
@@ -90,11 +89,8 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 			desc: 'What the player unlocks on completion',
 			kind: 'challenge-reward',
 			count: rewardCount,
-			dirtyKeys: ['rewardItemId', 'rewardItemModId', 'rewardSkillId'],
-			warn: (c) =>
-				c.rewardItemId == null && c.rewardItemModId == null && c.rewardSkillId == null
-					? 'No reward — unlocks nothing'
-					: null
+			dirtyKeys: ['rewardItemId', 'rewardItemModId'],
+			warn: (c) => (c.rewardItemId == null && c.rewardItemModId == null ? 'No reward — unlocks nothing' : null)
 		}
 	],
 	refresh,

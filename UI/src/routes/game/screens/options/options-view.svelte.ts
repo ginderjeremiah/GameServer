@@ -79,6 +79,14 @@ export const LOG_TYPES: LogTypeDef[] = [
 		color: logColors.reward
 	},
 	{
+		id: ELogType.Proficiency,
+		group: 'progression',
+		name: 'Proficiency',
+		desc: 'Proficiency XP, level-ups, milestones, and unlocks from won battles.',
+		glyph: 'crit',
+		color: logColors.reward
+	},
+	{
 		id: ELogType.ItemFound,
 		group: 'items',
 		name: 'Items Found',

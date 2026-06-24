@@ -3,8 +3,7 @@ using Game.Api.Models.Progress;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the intrinsic statistic-type reference-data collection. WebSocket
-    /// equivalent of the <c>GET /api/Statistics/StatisticTypes</c> endpoint.
+    /// Serves the intrinsic statistic-type reference-data set over the socket.
     /// </summary>
     public class GetStatisticTypes : AbstractReferenceDataCommand<StatisticType>
     {

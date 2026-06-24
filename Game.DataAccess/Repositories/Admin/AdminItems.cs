@@ -23,9 +23,21 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveItems(IReadOnlyList<Change<Contracts.Item>> changes)
         {
-            // Authoring guard (anti-tamper): a skill an item grants must declare itself Item-acquirable. The
-            // flag is the declared intent; this reference is the reality, so the save bridges them — rejected
-            // up front before anything is staged (a tampered admin client can't bypass the filtered picker).
+            // Authoring guards (rejected up front before anything is staged). The rarity/category FKs point at
+            // enum-seeded reference tables, so an unmapped value would 500 on the FK at commit — reject it cleanly.
+            if (ReferenceFieldValidation.FindUndefinedEnum(changes, i => i.RarityId, "item rarity") is { } rarityRejection)
+            {
+                return rarityRejection;
+            }
+
+            if (ReferenceFieldValidation.FindUndefinedEnum(changes, i => i.ItemCategoryId, "item category") is { } categoryRejection)
+            {
+                return categoryRejection;
+            }
+
+            // Anti-tamper: a skill an item grants must declare itself Item-acquirable. The flag is the declared
+            // intent; this reference is the reality, so the save bridges them (a tampered admin client can't
+            // bypass the filtered picker).
             if (FindGrantedSkillFlagViolation(changes) is { } rejection)
             {
                 return rejection;

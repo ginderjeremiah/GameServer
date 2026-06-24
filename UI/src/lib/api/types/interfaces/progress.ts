@@ -12,7 +12,6 @@ export interface IChallengeCompletedModel {
 	challengeId: number;
 	rewardItemId?: number;
 	rewardItemModId?: number;
-	rewardSkillId?: number;
 }
 
 export interface IChallengeType {
@@ -34,6 +33,8 @@ export interface IOfflineProgressModel {
 	statPointsGained: number;
 	hasProgress: boolean;
 	completedChallenges: IChallengeCompletedModel[];
+	proficiencyGains: IProficiencyXpResultModel[];
+	openedProficiencies: IProficiencyOpenedModel[];
 }
 
 export interface IPlayerChallenge {

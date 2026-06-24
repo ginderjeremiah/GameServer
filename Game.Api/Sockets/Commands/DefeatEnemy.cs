@@ -43,14 +43,20 @@ namespace Game.Api.Sockets.Commands
                     player.Id, rewards.ExpReward);
 
                 // Prefetch and bundle the next idle battle so the client can begin it the instant the
-                // post-battle cooldown elapses, hiding the NewEnemy round-trip under the cooldown.
+                // post-battle cooldown elapses, hiding the NewEnemy round-trip under the cooldown. The prefetch
+                // is best-effort: the victory is already durably credited and its battle-cleared PlayerState is
+                // saved below regardless, so a prefetch failure must not strand that resolved state (which a
+                // reconnect would re-abandon and re-credit). The client round-trips NewEnemy when none is bundled.
                 EnemyInstance? nextEnemy = null;
                 int? nextZoneId = null;
                 if (!wasBossBattle)
                 {
-                    var next = await _battleService.PrepareNextIdleBattle(player, state, cancellationToken);
-                    nextEnemy = EnemyInstance.FromSource(next);
-                    nextZoneId = player.CurrentZoneId;
+                    var next = await _battleService.TryPrepareNextIdleBattle(player, state, cancellationToken);
+                    if (next is not null)
+                    {
+                        nextEnemy = EnemyInstance.FromSource(next);
+                        nextZoneId = player.CurrentZoneId;
+                    }
                 }
 
                 context.Session.SavePlayerState();

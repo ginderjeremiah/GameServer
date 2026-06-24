@@ -9,7 +9,7 @@ import { resolveUnlockReward, type RewardRefs, type UnlockReward } from '$lib/co
 export interface CompletedChallengeView {
 	challengeId: number;
 	name: string;
-	/** The unlocked item/mod/skill, or null for a challenge that grants no direct reward. */
+	/** The unlocked item/mod, or null for a challenge that grants no direct reward. */
 	reward: UnlockReward | null;
 }
 

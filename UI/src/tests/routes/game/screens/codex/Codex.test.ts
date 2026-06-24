@@ -118,8 +118,7 @@ function seedStaticData(): void {
 			challengeTypeId: EChallengeType.EnemiesKilled,
 			entityType: EEntityType.Enemy,
 			targetEntityId: 0,
-			progressGoal: 100,
-			rewardSkillId: 0
+			progressGoal: 100
 		}
 	];
 	// War Cry (skill 1) is granted by a Rare staff — the Item acquisition channel.
@@ -290,13 +289,12 @@ describe('Codex screen', () => {
 		expect(screen.getByText('Damage Dealt')).toBeTruthy();
 	});
 
-	it('shows how a skill is obtained in its dossier (challenge reward, then item grant)', async () => {
+	it('shows how a skill is obtained in its dossier (item grant)', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-skills'));
-		// Cleave (head of the table) is rewarded by a challenge.
+		// The dossier surfaces the "How to obtain" section.
 		const cleaveDossier = screen.getByTestId('codex-skill-dossier');
 		expect(cleaveDossier.textContent).toContain('How to obtain');
-		expect(screen.getByTestId('codex-skill-source-challenge-0').textContent).toContain('Cull the Skitterers');
 		// War Cry is granted by the Ember Staff item.
 		await fireEvent.click(screen.getByTestId('codex-skill-1'));
 		expect(screen.getByTestId('codex-skill-source-item-0').textContent).toContain('Ember Staff');

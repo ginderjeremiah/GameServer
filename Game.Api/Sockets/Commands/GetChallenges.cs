@@ -6,8 +6,7 @@ using CoreChallenge = Game.Core.Progress.Challenge;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the full challenge reference-data collection. WebSocket equivalent
-    /// of the <c>GET /api/Challenges</c> endpoint.
+    /// Serves the full challenge reference-data set over the socket.
     /// </summary>
     public class GetChallenges : AbstractReferenceDataCommand<Challenge>
     {
@@ -44,7 +43,6 @@ namespace Game.Api.Sockets.Commands
                 ProgressGoal = challenge.ProgressGoal,
                 RewardItemId = challenge.RewardItemId,
                 RewardItemModId = challenge.RewardItemModId,
-                RewardSkillId = challenge.RewardSkillId,
                 RetiredAt = challenge.RetiredAt,
             };
         }

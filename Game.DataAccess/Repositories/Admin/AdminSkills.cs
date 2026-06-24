@@ -18,6 +18,13 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveSkills(IReadOnlyList<Change<Contracts.Skill>> changes)
         {
+            // Authoring guard: a skill's rarity is a FK into the enum-seeded Rarities table, so an unmapped
+            // tier (a missing/0 payload) would 500 on the FK at commit — reject it up front as a clean failure.
+            if (ReferenceFieldValidation.FindUndefinedEnum(changes, s => s.RarityId, "skill rarity") is { } rejection)
+            {
+                return rejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Skill
                 {

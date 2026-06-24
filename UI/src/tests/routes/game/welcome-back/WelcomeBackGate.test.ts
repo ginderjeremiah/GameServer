@@ -10,10 +10,9 @@ const { staticData } = vi.hoisted(() => ({
 			{ id: 0, name: 'Verdant Hollow' },
 			{ id: 1, name: 'Ashen Wastes' }
 		],
-		challenges: [{ id: 0, name: 'First Blood', rewardSkillId: 0 }],
-		items: [],
-		itemMods: [],
-		skills: [{ id: 0, name: 'Firebolt' }]
+		challenges: [{ id: 0, name: 'First Blood', rewardItemId: 0 }],
+		items: [{ id: 0, name: 'Aegis Greathelm', rarityId: 0, itemCategoryId: 0 }],
+		itemMods: []
 	}
 }));
 vi.mock('$stores', () => ({ staticData }));
@@ -34,6 +33,8 @@ const summary = (overrides: Partial<IOfflineProgressModel> = {}): IOfflineProgre
 	statPointsGained: 10,
 	hasProgress: true,
 	completedChallenges: [],
+	proficiencyGains: [],
+	openedProficiencies: [],
 	...overrides
 });
 
@@ -56,12 +57,12 @@ describe('WelcomeBackGate', () => {
 
 	it('lists completed challenges with the reward they unlocked', () => {
 		render(WelcomeBackGate, {
-			props: { summary: summary({ completedChallenges: [{ challengeId: 0, rewardSkillId: 0 }] }), onEnter: vi.fn() }
+			props: { summary: summary({ completedChallenges: [{ challengeId: 0, rewardItemId: 0 }] }), onEnter: vi.fn() }
 		});
 
 		expect(screen.getByText('Challenges completed')).toBeTruthy();
 		expect(screen.getByText('First Blood')).toBeTruthy();
-		expect(screen.getByText('Firebolt')).toBeTruthy();
+		expect(screen.getByText('Aegis Greathelm')).toBeTruthy();
 	});
 
 	it('omits the challenges section when none completed', () => {

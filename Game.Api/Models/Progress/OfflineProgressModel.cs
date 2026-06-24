@@ -5,8 +5,10 @@ namespace Game.Api.Models.Progress
     /// <summary>
     /// The welcome-back summary returned by <c>GetOfflineProgress</c>: what the player's idle loop earned while
     /// they were away. The client gate renders it (away duration, loop mode, battle tally, exp/levels/stat
-    /// points, and the challenges completed with what they unlocked), then re-syncs authoritative state on
-    /// entering the game. An empty summary (<see cref="HasProgress"/> false) skips the gate.
+    /// points, the challenges completed with what they unlocked, and the proficiency gains / opened nodes), then
+    /// re-syncs authoritative state on entering the game. An empty summary (<see cref="HasProgress"/> false)
+    /// skips the gate. The proficiency fields reuse the live push's models, so the gate renders offline and live
+    /// proficiency gains the same way.
     /// </summary>
     public class OfflineProgressModel : IModelFromSource<OfflineProgressModel, OfflineProgressSummary>
     {
@@ -21,6 +23,8 @@ namespace Game.Api.Models.Progress
         public int StatPointsGained { get; set; }
         public bool HasProgress { get; set; }
         public required List<ChallengeCompletedModel> CompletedChallenges { get; set; }
+        public required List<ProficiencyXpResultModel> ProficiencyGains { get; set; }
+        public required List<ProficiencyOpenedModel> OpenedProficiencies { get; set; }
 
         public static OfflineProgressModel FromSource(OfflineProgressSummary source)
         {
@@ -42,7 +46,24 @@ namespace Game.Api.Models.Progress
                         ChallengeId = c.ChallengeId,
                         RewardItemId = c.RewardItemId,
                         RewardItemModId = c.RewardItemModId,
-                        RewardSkillId = c.RewardSkillId,
+                    })
+                    .ToList(),
+                ProficiencyGains = source.ProficiencyGains
+                    .Select(p => new ProficiencyXpResultModel
+                    {
+                        ProficiencyId = p.ProficiencyId,
+                        XpGained = p.XpGained,
+                        NewLevel = p.NewLevel,
+                        NewXp = p.NewXp,
+                        MilestonesCrossed = p.MilestonesCrossed.ToList(),
+                        GrantedSkillIds = p.GrantedSkillIds.ToList(),
+                    })
+                    .ToList(),
+                OpenedProficiencies = source.OpenedProficiencies
+                    .Select(o => new ProficiencyOpenedModel
+                    {
+                        ProficiencyId = o.ProficiencyId,
+                        SeedSkillId = o.SeedSkillId,
                     })
                     .ToList(),
             };

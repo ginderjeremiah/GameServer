@@ -3,8 +3,7 @@ using Attribute = Game.Api.Models.Attributes.Attribute;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the intrinsic attribute reference-data collection. WebSocket
-    /// equivalent of the <c>GET /api/Attributes</c> endpoint.
+    /// Serves the intrinsic attribute reference-data set over the socket.
     /// </summary>
     public class GetAttributes : AbstractReferenceDataCommand<Attribute>
     {

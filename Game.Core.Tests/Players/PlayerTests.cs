@@ -373,15 +373,11 @@ namespace Game.Core.Tests.Players
         {
             var player = MakePlayer();
             var item = MakeItem(id: 10);
-            var skill = MakeSkill(id: 7);
 
-            player.CompleteChallenge(challengeId: 3, rewardItem: item, rewardItemModId: 5, rewardSkill: skill);
+            player.CompleteChallenge(challengeId: 3, rewardItem: item, rewardItemModId: 5);
 
             Assert.Contains(player.Inventory.UnlockedItems, u => u.Item == item);
             Assert.Contains(5, player.Inventory.UnlockedMods);
-            Assert.Contains(player.Skills, s => s.Id == 7);
-            // A reward skill is unlocked unselected — completing a challenge never equips it.
-            Assert.DoesNotContain(player.SelectedSkills, s => s.Id == 7);
         }
 
         [Fact]
@@ -389,7 +385,7 @@ namespace Game.Core.Tests.Players
         {
             var player = MakePlayer();
 
-            player.CompleteChallenge(challengeId: 3, rewardItem: MakeItem(id: 10), rewardItemModId: 5, rewardSkill: MakeSkill(id: 7));
+            player.CompleteChallenge(challengeId: 3, rewardItem: MakeItem(id: 10), rewardItemModId: 5);
 
             var evt = player.DomainEvents.OfType<ChallengeCompletedEvent>().SingleOrDefault();
             Assert.NotNull(evt);
@@ -397,7 +393,6 @@ namespace Game.Core.Tests.Players
             Assert.Equal(3, evt.ChallengeId);
             Assert.Equal(10, evt.RewardItemId);
             Assert.Equal(5, evt.RewardItemModId);
-            Assert.Equal(7, evt.RewardSkillId);
         }
 
         [Fact]
@@ -405,11 +400,10 @@ namespace Game.Core.Tests.Players
         {
             var player = MakePlayer();
 
-            player.CompleteChallenge(challengeId: 3, rewardItem: null, rewardItemModId: null, rewardSkill: null);
+            player.CompleteChallenge(challengeId: 3, rewardItem: null, rewardItemModId: null);
 
             Assert.Empty(player.Inventory.UnlockedItems);
             Assert.Empty(player.Inventory.UnlockedMods);
-            Assert.Empty(player.Skills);
             // The completion is still announced (e.g. a zone-gating challenge with no item reward) with
             // all reward ids null.
             var evt = player.DomainEvents.OfType<ChallengeCompletedEvent>().SingleOrDefault();
@@ -417,7 +411,6 @@ namespace Game.Core.Tests.Players
             Assert.Equal(3, evt.ChallengeId);
             Assert.Null(evt.RewardItemId);
             Assert.Null(evt.RewardItemModId);
-            Assert.Null(evt.RewardSkillId);
         }
 
         [Fact]
@@ -425,20 +418,17 @@ namespace Game.Core.Tests.Players
         {
             var player = MakePlayer();
             var item = MakeItem(id: 10);
-            var skill = MakeSkill(id: 7);
 
             // The offline batch completes challenges with the push suppressed: rewards are still unlocked (and
             // persisted via their own unlock events), but no ChallengeCompletedEvent is raised — the
             // welcome-back summary is the notification (spike #879 decision 7).
-            player.CompleteChallenge(challengeId: 3, rewardItem: item, rewardItemModId: 5, rewardSkill: skill, notify: false);
+            player.CompleteChallenge(challengeId: 3, rewardItem: item, rewardItemModId: 5, notify: false);
 
             Assert.Contains(player.Inventory.UnlockedItems, u => u.Item == item);
             Assert.Contains(5, player.Inventory.UnlockedMods);
-            Assert.Contains(player.Skills, s => s.Id == 7);
             Assert.Empty(player.DomainEvents.OfType<ChallengeCompletedEvent>());
             // The reward unlocks still raise their (persistence-only) events, so the completion persists.
             Assert.Single(player.DomainEvents.OfType<ItemUnlockedEvent>());
-            Assert.Single(player.DomainEvents.OfType<SkillUnlockedEvent>());
         }
 
         // ── TrySetSelectedSkills ─────────────────────────────────────────────

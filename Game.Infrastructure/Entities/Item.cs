@@ -9,8 +9,8 @@
         public required string IconPath { get; set; }
         public int RarityId { get; set; }
 
-        /// <summary>The skill this item grants while equipped, or null for none. Mirrors
-        /// <see cref="Challenge.RewardSkillId"/>: the id is the only persisted link (an optional FK).</summary>
+        /// <summary>The skill this item grants while equipped, or null for none. The id is the only
+        /// persisted link (an optional FK).</summary>
         public int? GrantedSkillId { get; set; }
 
         /// <summary>When set, the record is <em>retired</em>: out of circulation for new acquisition but

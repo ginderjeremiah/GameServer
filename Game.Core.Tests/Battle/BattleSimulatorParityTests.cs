@@ -294,6 +294,28 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2000),
 
+                // MaxHealth debuff is LETHAL via the clamp (#1145): an Opponent MaxHealth additive −200 debuff
+                // drives the enemy's maximum below zero, so the clamp pulls its current health to ≤ 0 and the
+                // live IsDead getter reports death — a kill with NO direct damage, exercising the clamp path a
+                // cached isDead flag (re-synced only at the damage mutations) would miss. This is the frontend
+                // parity gap #1145 fixed by deriving isDead; the backend already derives IsDead so it passes here.
+                //   Player: skill baseDamage 0, no multiplier, cooldown 400 → fires tick 10. Effect: Opponent
+                //     −200 MaxHealth (additive), permanent.
+                //   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+                //   Tick 10: 0 direct damage, then −200 MaxHealth → MaxHealth −100, clamp 100→−100 → dead at 400ms.
+                ["maxHealthDebuffIsLethal"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 400,
+                                effects: [MakeEffect(105, ESkillEffectTarget.Opponent, EAttribute.MaxHealth, EModifierType.Additive, -200, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 400),
+
                 // Same-tick CDR ordering: slot 0's self CooldownRecovery buff (applied after it fires) speeds
                 // up slot 1's charge accrual ON THE SAME TICK, because each slot reads the cooldown multiplier
                 // live in loadout order — so an earlier slot's effect influences a later slot firing that tick.

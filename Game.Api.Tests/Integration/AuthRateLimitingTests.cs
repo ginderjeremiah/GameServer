@@ -68,6 +68,23 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task Logout_DrawsFromThePerIpBudget()
+        {
+            // Exhaust the budget via Login.
+            for (var i = 0; i < PermitLimit; i++)
+            {
+                await Client.PostAsJsonAsync(
+                    "/api/Login", new { Username = "nobody", Password = "wrong" }, CancellationToken);
+            }
+
+            // Logout is anonymous like its siblings, so it must also be throttled once the shared budget is
+            // spent — closing the gap where it could be spammed unthrottled as a token-revocation surface.
+            var loggedOut = await Client.PostAsJsonAsync(
+                "/api/Login/Logout", new { RefreshToken = "any-token" }, CancellationToken);
+            Assert.Equal(HttpStatusCode.TooManyRequests, loggedOut.StatusCode);
+        }
+
+        [Fact]
         public async Task SingleRequest_UnderLimit_IsNotThrottled()
         {
             var response = await Client.PostAsJsonAsync(

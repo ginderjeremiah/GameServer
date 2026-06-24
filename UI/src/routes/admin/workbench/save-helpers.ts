@@ -1,7 +1,37 @@
 import { EChangeType, type IChange, type IItemModSlot, type ISkillEffect } from '$lib/api';
 import type { Identified, SaveDiff } from './entities/types';
 
-export const listsEqual = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Recursively normalise a value to a canonical shape: object keys sorted, and `null`/`undefined`/
+ * absent keys collapsed to the same (omitted) state. Lets structural comparison ignore key order
+ * and treat a server `null` for an unset optional as equal to a locally-absent key — both of which
+ * a raw `JSON.stringify` compare would otherwise read as a (phantom) difference.
+ */
+const canonicalize = (value: unknown): unknown => {
+	if (value === null || value === undefined) {
+		return null;
+	}
+	if (Array.isArray(value)) {
+		return value.map(canonicalize);
+	}
+	if (typeof value === 'object') {
+		const out: Record<string, unknown> = {};
+		for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+			const normalized = canonicalize((value as Record<string, unknown>)[key]);
+			if (normalized !== null) {
+				out[key] = normalized;
+			}
+		}
+		return out;
+	}
+	return value;
+};
+
+/** Structural equality that is insensitive to object key order and to `null`-vs-absent optionals. */
+export const canonicalEqual = (a: unknown, b: unknown): boolean =>
+	JSON.stringify(canonicalize(a)) === JSON.stringify(canonicalize(b));
+
+export const listsEqual = canonicalEqual;
 
 /** True when a child collection differs from its saved baseline (added records have none). */
 export const childChanged = <T>(current: T, baseline: T | undefined): boolean =>
@@ -22,10 +52,28 @@ interface PersistOptions<T extends Identified, D> {
 }
 
 /**
+ * Thrown by {@link persistEntity} when the primary Add/Edit/Delete batch (or an earlier child
+ * saver) already committed before a later step failed. The server is then ahead of the caller's
+ * baseline, so the caller must re-seed from server truth — otherwise a retry would re-Add the
+ * already-persisted records. A *pre-commit* failure (e.g. `postPrimary` itself throwing before any
+ * write lands) committed nothing and propagates the raw error instead, so the caller can keep the
+ * user's unsaved edits for a clean retry.
+ */
+export class PersistFailedError extends Error {
+	constructor(cause: unknown) {
+		super(cause instanceof Error ? cause.message : 'Failed to save changes.', { cause });
+		this.name = 'PersistFailedError';
+	}
+}
+
+/**
  * Generic per-entity save: persists identity-level Add/Edit/Delete in one call,
  * refetches to resolve the ids of newly-added records (positionally — the backend
  * appends adds in send order), then runs each child-section persister for every
  * added/modified record against its real id. Returns the final saved list.
+ *
+ * A failure once anything has committed is rethrown as {@link PersistFailedError}; a pre-commit
+ * failure propagates raw (see that type's docs).
  */
 export async function persistEntity<T extends Identified, D>(opts: PersistOptions<T, D>): Promise<T[]> {
 	const { diff, toPrimaryDto, postPrimary, refresh, childSavers = [] } = opts;
@@ -45,40 +93,52 @@ export async function persistEntity<T extends Identified, D>(opts: PersistOption
 		...diff.deleted.map((record) => ({ changeType: EChangeType.Delete, item: toPrimaryDto(record) }))
 	];
 
-	if (changes.length) {
-		await postPrimary(changes);
-	}
-
-	const fresh = await refresh();
-
-	// Records present after save but absent before are the persisted adds; the
-	// backend inserts them in send order, so the k-th added record maps to the
-	// k-th lowest new id.
-	const existing = new Set(diff.existingIds);
-	const newlyPersisted = fresh.filter((record) => !existing.has(record.id)).sort((a, b) => a.id - b.id);
-	const idFor = new Map<number, number>();
-	diff.added.forEach((record, index) => {
-		const persisted = newlyPersisted[index];
-		if (persisted) {
-			idFor.set(record.id, persisted.id);
+	// `committed` flips the moment a write has definitely landed; it gates whether a later failure
+	// is recoverable-by-keeping-edits (pre-commit) or requires the caller to re-seed (post-commit).
+	let committed = false;
+	try {
+		if (changes.length) {
+			await postPrimary(changes);
+			committed = true;
 		}
-	});
 
-	const childTargets: { id: number; record: T; baseline: T | undefined }[] = [
-		...diff.added.map((record) => ({ id: idFor.get(record.id) ?? record.id, record, baseline: undefined })),
-		...diff.modified.map(({ record, baseline }) => ({ id: record.id, record, baseline }))
-	];
+		const fresh = await refresh();
 
-	if (childSavers.length && childTargets.length) {
-		for (const target of childTargets) {
-			for (const saver of childSavers) {
-				await saver(target.id, target.record, target.baseline);
+		// Records present after save but absent before are the persisted adds; the
+		// backend inserts them in send order, so the k-th added record maps to the
+		// k-th lowest new id.
+		const existing = new Set(diff.existingIds);
+		const newlyPersisted = fresh.filter((record) => !existing.has(record.id)).sort((a, b) => a.id - b.id);
+		const idFor = new Map<number, number>();
+		diff.added.forEach((record, index) => {
+			const persisted = newlyPersisted[index];
+			if (persisted) {
+				idFor.set(record.id, persisted.id);
 			}
-		}
-		return refresh();
-	}
+		});
 
-	return fresh;
+		const childTargets: { id: number; record: T; baseline: T | undefined }[] = [
+			...diff.added.map((record) => ({ id: idFor.get(record.id) ?? record.id, record, baseline: undefined })),
+			...diff.modified.map(({ record, baseline }) => ({ id: record.id, record, baseline }))
+		];
+
+		if (childSavers.length && childTargets.length) {
+			for (const target of childTargets) {
+				for (const saver of childSavers) {
+					await saver(target.id, target.record, target.baseline);
+					committed = true;
+				}
+			}
+			return await refresh();
+		}
+
+		return fresh;
+	} catch (ex) {
+		if (committed) {
+			throw new PersistFailedError(ex);
+		}
+		throw ex;
+	}
 }
 
 interface AttributeRow {
@@ -176,7 +236,10 @@ export function skillEffectChanges(
 			a.amount === b.amount &&
 			a.durationMs === b.durationMs &&
 			a.scalingAttributeId === b.scalingAttributeId &&
-			a.scalingAmount === b.scalingAmount
+			a.scalingAmount === b.scalingAmount,
+		// New, unsaved effects carry a unique negative client id; normalise it to 0 so the wire
+		// payload marks an Add the same way regardless of the local id.
+		(effect) => ({ ...effect, id: effect.id <= 0 ? 0 : effect.id })
 	);
 }
 

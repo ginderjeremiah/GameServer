@@ -51,6 +51,24 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task HandleMessage_UnknownCommandName_RejectsWithUnknownCommandErrorInsteadOfFaulting()
+        {
+            // A frame naming a command with no registered generator (a stale/garbage name) is a bad request,
+            // not an internal fault: it must be rejected with a structured "Unknown command." error rather than
+            // reaching the command lookup, whose throw would be logged at error and surfaced as an
+            // "Internal Server Error".
+            var (socket, handler) = CreateHandler(_ => null);
+
+            await handler.HandleMessage("{\"id\":\"c1\",\"name\":\"Unknown\",\"parameters\":null}");
+
+            Assert.Contains(socket.SentMessages, m => m.Contains("Unknown command.") && m.Contains("c1"));
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("unknown socket command"));
+            // It never reached the fault path: no error-level log, no "Internal Server Error" frame.
+            Assert.DoesNotContain(_logs.Entries, e => e.Level == LogLevel.Error);
+            Assert.DoesNotContain(socket.SentMessages, m => m.Contains("Internal Server Error"));
+        }
+
+        [Fact]
         public async Task ExecuteCommand_CommandFaults_SurfacesInternalServerErrorToTheClient()
         {
             var (socket, handler) = CreateHandler(name => name == "Boom" ? new InvalidOperationException("boom") : null);
@@ -138,6 +156,10 @@ namespace Game.Api.Tests.Unit
             {
                 return new StubCommand(commandInfo.Name, throwOn(commandInfo.Name)) { Id = commandInfo.Id };
             }
+
+            // Every name is treated as registered except the explicit "Unknown" sentinel, so the
+            // HandleMessage unknown-command guard can be exercised without populating the static registry.
+            public override bool IsKnownCommand(string commandName) => commandName != "Unknown";
         }
 
         private sealed class StubCommand(string name, Exception? toThrow) : AbstractSocketCommand

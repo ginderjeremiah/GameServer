@@ -49,6 +49,10 @@ const SAMPLES: { logType: ELogType; messages: string[] }[] = [
 	{ logType: ELogType.ItemFound, messages: ['Found a Sapphire Shard.'] },
 	{ logType: ELogType.Exp, messages: ['Earned 47 exp.'] },
 	{ logType: ELogType.LevelUp, messages: ['Congratulations, you leveled up!'] },
+	{
+		logType: ELogType.Proficiency,
+		messages: ['Fire Magic: +12 proficiency XP', 'Fire Magic milestone reached: level 5 — unlocked Fireball']
+	},
 	{ logType: ELogType.Debug, messages: ['battle.tick resolved in 4ms.'] }
 ];
 
@@ -62,6 +66,7 @@ const WEIGHTS: ELogType[] = [
 	ELogType.Exp,
 	ELogType.EnemyDefeated,
 	ELogType.LevelUp,
+	ELogType.Proficiency,
 	ELogType.Debug
 ];
 

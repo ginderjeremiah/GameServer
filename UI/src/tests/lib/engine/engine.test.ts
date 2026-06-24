@@ -12,22 +12,33 @@ vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 // Use the real modal store (so the full show → acknowledge → navigate flow is exercised) but stub
 // staticData so we can toggle whether startGame runs.
-const { staticDataStub, statisticsStub, playerChallengesStub, resetLogs, toastSuccess, navigation } = vi.hoisted(
-	() => ({
-		staticDataStub: { loaded: true } as {
-			loaded: boolean;
-			challenges?: ({ id: number; name: string; rewardItemId?: number } | undefined)[];
-			items?: ({ id: number; name: string; rarityId: number; itemCategoryId: number } | undefined)[];
-			itemMods?: unknown[];
-			skills?: unknown[];
-		},
-		statisticsStub: { load: vi.fn(), reset: vi.fn() },
-		playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
-		resetLogs: vi.fn(),
-		toastSuccess: vi.fn(),
-		navigation: { requestScreen: vi.fn() }
-	})
-);
+const {
+	staticDataStub,
+	statisticsStub,
+	playerChallengesStub,
+	playerProficienciesStub,
+	resetLogs,
+	toastSuccess,
+	navigation
+} = vi.hoisted(() => ({
+	staticDataStub: { loaded: true } as {
+		loaded: boolean;
+		challenges?: ({ id: number; name: string; rewardItemId?: number } | undefined)[];
+		items?: ({ id: number; name: string; rarityId: number; itemCategoryId: number } | undefined)[];
+		itemMods?: unknown[];
+		skills?: ({ id: number; name: string } | undefined)[];
+		proficiencies?: (
+			| { id: number; name: string; levelRewards: { level: number; rewardSkillId: number }[] }
+			| undefined
+		)[];
+	},
+	statisticsStub: { load: vi.fn(), reset: vi.fn() },
+	playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
+	playerProficienciesStub: { load: vi.fn(), reset: vi.fn(), levelOf: vi.fn(() => 0), applyXpGained: vi.fn() },
+	resetLogs: vi.fn(),
+	toastSuccess: vi.fn(),
+	navigation: { requestScreen: vi.fn() }
+}));
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
 	return {
@@ -35,37 +46,51 @@ vi.mock('$stores', async () => {
 		staticData: staticDataStub,
 		statistics: statisticsStub,
 		playerChallenges: playerChallengesStub,
+		playerProficiencies: playerProficienciesStub,
 		resetLogs,
 		toastSuccess,
 		navigation
 	};
 });
 
-const { listenCommand, disconnect, unlistenSocketReplaced, unlistenChallengeCompleted, unlistenServerCommandFailed } =
-	vi.hoisted(() => {
-		const unlistenSocketReplaced = vi.fn();
-		const unlistenChallengeCompleted = vi.fn();
-		const unlistenServerCommandFailed = vi.fn();
-		const listenCommand = vi.fn().mockImplementation((command: string) => {
-			if (command === 'SocketReplaced') {
-				return unlistenSocketReplaced;
-			}
-			if (command === 'ChallengeCompleted') {
-				return unlistenChallengeCompleted;
-			}
-			if (command === 'ServerCommandFailed') {
-				return unlistenServerCommandFailed;
-			}
-		});
-		const disconnect = vi.fn();
-		return {
-			listenCommand,
-			disconnect,
-			unlistenSocketReplaced,
-			unlistenChallengeCompleted,
-			unlistenServerCommandFailed
-		};
+const {
+	listenCommand,
+	disconnect,
+	unlistenSocketReplaced,
+	unlistenChallengeCompleted,
+	unlistenProficiencyXpGained,
+	unlistenServerCommandFailed
+} = vi.hoisted(() => {
+	const unlistenSocketReplaced = vi.fn();
+	const unlistenChallengeCompleted = vi.fn();
+	const unlistenProficiencyXpGained = vi.fn();
+	const unlistenServerCommandFailed = vi.fn();
+	const listenCommand = vi.fn().mockImplementation((command: string) => {
+		if (command === 'SocketReplaced') {
+			return unlistenSocketReplaced;
+		}
+		if (command === 'ChallengeCompleted') {
+			return unlistenChallengeCompleted;
+		}
+		if (command === 'ProficiencyXpGained') {
+			return unlistenProficiencyXpGained;
+		}
+		if (command === 'ServerCommandFailed') {
+			return unlistenServerCommandFailed;
+		}
 	});
+	const disconnect = vi.fn();
+	return {
+		listenCommand,
+		disconnect,
+		unlistenSocketReplaced,
+		unlistenChallengeCompleted,
+		unlistenProficiencyXpGained,
+		unlistenServerCommandFailed
+	};
+});
+const { logMessage } = vi.hoisted(() => ({ logMessage: vi.fn() }));
+const { addUnlockedSkill } = vi.hoisted(() => ({ addUnlockedSkill: vi.fn() }));
 // Partial mock: keep $lib/api's real exports (other modules in the graph, e.g. $lib/common, rely on
 // them) but swap apiSocket for a stub whose listenCommand/disconnect we can assert against.
 vi.mock('$lib/api', async (importOriginal) => ({
@@ -106,14 +131,14 @@ vi.mock('$lib/engine/player/inventory-manager', () => ({
 		addUnlockedMod = vi.fn();
 	}
 }));
-
-const { addUnlockedSkill } = vi.hoisted(() => ({ addUnlockedSkill: vi.fn() }));
 vi.mock('$lib/engine/player/player-manager', () => ({ playerManager: { addUnlockedSkill } }));
+vi.mock('$lib/engine/log', () => ({ logMessage }));
 
 import {
 	startGame,
 	handleSocketReplaced,
 	handleChallengeCompleted,
+	handleProficiencyXpGained,
 	handleServerCommandFailed,
 	SESSION_REPLACED_TITLE,
 	SESSION_REPLACED_BODY,
@@ -124,7 +149,14 @@ import {
 	inventoryManager
 } from '$lib/engine/engine';
 import { activeModal, clearModals, confirmActiveModal } from '$stores/modal.svelte';
-import { EItemCategory, ERarity, type IApiSocketResponse } from '$lib/api';
+import {
+	EItemCategory,
+	ELogType,
+	ERarity,
+	type IApiSocketResponse,
+	type IProficiencyXpResultModel,
+	type IProficiencyOpenedModel
+} from '$lib/api';
 
 /** Builds a ChallengeCompleted push response with the given reward ids (defaults: no rewards). */
 const challengeCompletedResponse = (
@@ -140,6 +172,7 @@ beforeEach(() => {
 	staticDataStub.items = undefined;
 	staticDataStub.itemMods = undefined;
 	staticDataStub.skills = undefined;
+	staticDataStub.proficiencies = undefined;
 });
 
 afterEach(() => {
@@ -188,12 +221,16 @@ describe('startGame', () => {
 		startGame();
 
 		expect(inventoryManager.initialize).toHaveBeenCalledTimes(1);
+		// Player progress the live battler needs is loaded before the engines start.
+		expect(playerChallengesStub.load).toHaveBeenCalledTimes(1);
+		expect(playerProficienciesStub.load).toHaveBeenCalledTimes(1);
 		expect(logicEngine.start).toHaveBeenCalledTimes(1);
 		expect(renderEngine.start).toHaveBeenCalledTimes(1);
 		expect(enemyManager.start).toHaveBeenCalledTimes(1);
 		expect(battleEngine.start).toHaveBeenCalledTimes(1);
 		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced, true);
 		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted, true);
+		expect(listenCommand).toHaveBeenCalledWith('ProficiencyXpGained', handleProficiencyXpGained, true);
 		expect(listenCommand).toHaveBeenCalledWith('ServerCommandFailed', handleServerCommandFailed, true);
 	});
 
@@ -216,12 +253,13 @@ describe('startGame', () => {
 		expect(activeModal.current?.body).toBe(SESSION_REPLACED_BODY);
 	});
 
-	it('stopGame unregisters SocketReplaced, ChallengeCompleted and ServerCommandFailed listeners', () => {
+	it('stopGame unregisters SocketReplaced, ChallengeCompleted, ProficiencyXpGained and ServerCommandFailed listeners', () => {
 		startGame();
 		void handleSocketReplaced();
 
 		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
 		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
+		expect(unlistenProficiencyXpGained).toHaveBeenCalledTimes(1);
 		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
 	});
 
@@ -250,7 +288,6 @@ describe('handleChallengeCompleted', () => {
 			appliedMods: []
 		});
 		expect(inventoryManager.addUnlockedMod).not.toHaveBeenCalled();
-		expect(addUnlockedSkill).not.toHaveBeenCalled();
 	});
 
 	it('unlocks a mod reward', () => {
@@ -260,20 +297,11 @@ describe('handleChallengeCompleted', () => {
 		expect(inventoryManager.addUnlockedItem).not.toHaveBeenCalled();
 	});
 
-	it('unlocks a skill reward', () => {
-		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardSkillId: 9 }));
-
-		expect(addUnlockedSkill).toHaveBeenCalledWith(9);
-	});
-
 	it('unlocks every reward kind a single challenge carries', () => {
-		handleChallengeCompleted(
-			challengeCompletedResponse({ challengeId: 7, rewardItemId: 3, rewardItemModId: 5, rewardSkillId: 9 })
-		);
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7, rewardItemId: 3, rewardItemModId: 5 }));
 
 		expect(inventoryManager.addUnlockedItem).toHaveBeenCalledTimes(1);
 		expect(inventoryManager.addUnlockedMod).toHaveBeenCalledWith(5);
-		expect(addUnlockedSkill).toHaveBeenCalledWith(9);
 	});
 
 	it('does nothing when the push carries no data', () => {
@@ -324,6 +352,119 @@ describe('handleChallengeCompleted', () => {
 	});
 });
 
+/** Builds a ProficiencyXpGained push response with the given results / opened nodes. */
+const proficiencyXpResult = (
+	over: Partial<IProficiencyXpResultModel> & { proficiencyId: number }
+): IProficiencyXpResultModel => ({
+	xpGained: 10,
+	newLevel: 1,
+	newXp: 0,
+	milestonesCrossed: [],
+	grantedSkillIds: [],
+	...over
+});
+const proficiencyXpGainedResponse = (
+	proficiencies: IProficiencyXpResultModel[],
+	opened: IProficiencyOpenedModel[] = []
+): IApiSocketResponse<'ProficiencyXpGained'> =>
+	({
+		id: '',
+		name: 'ProficiencyXpGained',
+		data: { proficiencies, opened }
+	}) as IApiSocketResponse<'ProficiencyXpGained'>;
+
+describe('handleProficiencyXpGained', () => {
+	beforeEach(() => {
+		staticDataStub.proficiencies = [];
+		staticDataStub.proficiencies[0] = { id: 0, name: 'Fire Magic', levelRewards: [{ level: 5, rewardSkillId: 12 }] };
+		staticDataStub.skills = [];
+		staticDataStub.skills[12] = { id: 12, name: 'Fireball' };
+	});
+
+	it('applies the push to the proficiency store', () => {
+		const response = proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 2 })]);
+		handleProficiencyXpGained(response);
+
+		expect(playerProficienciesStub.applyXpGained).toHaveBeenCalledWith(response.data);
+	});
+
+	it('logs the XP gained on the Proficiency channel, rounding the decimal', () => {
+		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, xpGained: 11.6 })]));
+
+		expect(logMessage).toHaveBeenCalledWith(ELogType.Proficiency, 'Fire Magic: +12 proficiency XP');
+	});
+
+	it('does not log an XP line when the rounded gain is zero', () => {
+		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, xpGained: 0 })]));
+
+		expect(logMessage).not.toHaveBeenCalledWith(ELogType.Proficiency, expect.stringContaining('proficiency XP'));
+	});
+
+	it('toasts and logs a plain level-up when no milestone was crossed', () => {
+		playerProficienciesStub.levelOf.mockReturnValueOnce(1);
+		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 2 })]));
+
+		expect(logMessage).toHaveBeenCalledWith(ELogType.Proficiency, 'Fire Magic reached level 2');
+		expect(toastSuccess).toHaveBeenCalledWith('Fire Magic reached level 2');
+	});
+
+	it('does not announce a level-up when the level is unchanged', () => {
+		playerProficienciesStub.levelOf.mockReturnValueOnce(2);
+		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 2 })]));
+
+		expect(toastSuccess).not.toHaveBeenCalledWith(expect.stringContaining('reached level'));
+	});
+
+	it('toasts and logs a milestone naming the granted skill, and suppresses the redundant plain level-up toast', () => {
+		playerProficienciesStub.levelOf.mockReturnValueOnce(4);
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([
+				proficiencyXpResult({ proficiencyId: 0, newLevel: 5, milestonesCrossed: [5], grantedSkillIds: [12] })
+			])
+		);
+
+		const milestone = 'Fire Magic milestone reached: level 5 — unlocked Fireball';
+		expect(toastSuccess).toHaveBeenCalledWith(milestone);
+		expect(logMessage).toHaveBeenCalledWith(ELogType.Proficiency, milestone);
+		expect(toastSuccess).not.toHaveBeenCalledWith('Fire Magic reached level 5');
+	});
+
+	it('unlocks milestone-granted skills so they are usable immediately', () => {
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, grantedSkillIds: [12] })])
+		);
+
+		expect(addUnlockedSkill).toHaveBeenCalledWith(12);
+	});
+
+	it('toasts a newly-opened proficiency and unlocks its seed skill', () => {
+		staticDataStub.proficiencies = [];
+		staticDataStub.proficiencies[3] = { id: 3, name: 'Inferno Magic', levelRewards: [] };
+		staticDataStub.skills = [];
+		staticDataStub.skills[7] = { id: 7, name: 'Ember' };
+
+		handleProficiencyXpGained(proficiencyXpGainedResponse([], [{ proficiencyId: 3, seedSkillId: 7 }]));
+
+		expect(toastSuccess).toHaveBeenCalledWith('New proficiency unlocked: Inferno Magic — granted Ember');
+		expect(addUnlockedSkill).toHaveBeenCalledWith(7);
+	});
+
+	it('does nothing when the push carries no data', () => {
+		handleProficiencyXpGained({ id: '', name: 'ProficiencyXpGained' } as IApiSocketResponse<'ProficiencyXpGained'>);
+
+		expect(playerProficienciesStub.applyXpGained).not.toHaveBeenCalled();
+		expect(toastSuccess).not.toHaveBeenCalled();
+	});
+
+	it('skips feedback for an unknown proficiency reference id but still applies the store update', () => {
+		const response = proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 99, newLevel: 2 })]);
+		handleProficiencyXpGained(response);
+
+		expect(toastSuccess).not.toHaveBeenCalled();
+		expect(playerProficienciesStub.applyXpGained).toHaveBeenCalledWith(response.data);
+	});
+});
+
 /** Builds a ServerCommandFailed notice naming the server-pushed command that failed. */
 const serverCommandFailedResponse = (commandName: string): IApiSocketResponse<'ServerCommandFailed'> =>
 	({ id: '', name: 'ServerCommandFailed', data: { commandName } }) as IApiSocketResponse<'ServerCommandFailed'>;
@@ -333,6 +474,12 @@ describe('handleServerCommandFailed', () => {
 		handleServerCommandFailed(serverCommandFailedResponse('ChallengeCompleted'));
 
 		expect(playerChallengesStub.load).toHaveBeenCalledWith(true);
+	});
+
+	it('force-reloads proficiency progress when a ProficiencyXpGained push was dead-lettered', () => {
+		handleServerCommandFailed(serverCommandFailedResponse('ProficiencyXpGained'));
+
+		expect(playerProficienciesStub.load).toHaveBeenCalledWith(true);
 	});
 
 	it('does not reload challenges for an unrelated failed command', () => {

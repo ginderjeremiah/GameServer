@@ -140,78 +140,14 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal("The submitted challenge change set contains duplicate entries.", result.ErrorMessage);
         }
 
-        [Fact]
-        public async Task SaveChallenges_RewardSkillNotPlayerFlagged_ReturnsFailure()
-        {
-            int skillId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                // An enemy-only skill is not Player-acquirable, so it can't be a challenge reward.
-                var skill = await TestDataSeeder.CreateSkillAsync(context, "Enemy Roar", acquisition: ESkillAcquisition.Enemy);
-                skillId = skill.Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var admin = scope.ServiceProvider.GetRequiredService<IAdminChallenges>();
-
-            var result = admin.SaveChallenges(
-            [
-                new Change<Contracts.Challenge>
-                {
-                    ChangeType = EChangeType.Add,
-                    Item = NewChallenge(name: "Bad Reward", rewardSkillId: skillId),
-                },
-            ]);
-
-            Assert.False(result.Succeeded);
-            Assert.Equal(
-                "Skill 'Enemy Roar' is not flagged as Player-acquirable and cannot be a challenge reward.",
-                result.ErrorMessage);
-        }
-
-        [Fact]
-        public async Task SaveChallenges_RewardSkillPlayerFlagged_Succeeds()
-        {
-            int skillId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                var skill = await TestDataSeeder.CreateSkillAsync(context, "Player Bolt", acquisition: ESkillAcquisition.Player);
-                skillId = skill.Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            var changes = new List<Change<Contracts.Challenge>>
-            {
-                new() { ChangeType = EChangeType.Add, Item = NewChallenge(name: "Good Reward", rewardSkillId: skillId) },
-            };
-
-            using (var writeScope = CreateScope())
-            {
-                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminChallenges>();
-                Assert.True(admin.SaveChallenges(changes).Succeeded);
-                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-            }
-
-            using (var assertScope = CreateScope())
-            {
-                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
-                var created = await context.Challenges.AsNoTracking().SingleAsync(c => c.Name == "Good Reward", CancellationToken);
-                Assert.Equal(skillId, created.RewardSkillId);
-            }
-        }
-
         private static Contracts.Challenge NewChallenge(
-            int id = 0, string name = "Test Challenge", decimal progressGoal = 10m, int? rewardSkillId = null) => new()
+            int id = 0, string name = "Test Challenge", decimal progressGoal = 10m) => new()
             {
                 Id = id,
                 Name = name,
                 Description = "",
                 ChallengeTypeId = EChallengeType.EnemiesKilled,
                 ProgressGoal = progressGoal,
-                RewardSkillId = rewardSkillId,
             };
     }
 }

@@ -31,18 +31,19 @@ namespace Game.Application.Services
 
         /// <summary>
         /// Accrues a won battle's proficiency XP onto <paramref name="progress"/> and returns the per-proficiency
-        /// results. Call only for a victory — XP is earned on victory. <paramref name="difficultyMultiplier"/> is
-        /// the <c>DefeatRewards</c> difficulty factor for the battle; pass <paramref name="notify"/> <c>true</c>
-        /// on the live path to raise the client push, or <c>false</c> for the offline batch.
+        /// results plus any nodes opened. Call only for a victory — XP is earned on victory.
+        /// <paramref name="difficultyMultiplier"/> is the <c>DefeatRewards</c> difficulty factor for the battle;
+        /// pass <paramref name="notify"/> <c>true</c> on the live path to raise the client push, or <c>false</c>
+        /// for the offline batch (which folds the returned results onto the welcome-back summary instead).
         /// </summary>
-        public IReadOnlyList<ProficiencyXpResult> AccrueAndApply(
+        public ProficiencyAccrualResult AccrueAndApply(
             PlayerProgress progress, BattleStats stats, double difficultyMultiplier, Player player, bool notify)
         {
             var slices = ProficiencyXpCalculator.Split(
                 ServerGameConstants.ProficiencyXpPerVictory, difficultyMultiplier, BuildContributions(stats, progress));
             if (slices.Count == 0)
             {
-                return [];
+                return ProficiencyAccrualResult.Empty;
             }
 
             var results = new List<ProficiencyXpResult>();
@@ -97,7 +98,7 @@ namespace Game.Application.Services
                 player.RaiseProficiencyXpGained(results, opened);
             }
 
-            return results;
+            return new ProficiencyAccrualResult(results, opened);
         }
 
         // Opens the nodes a just-maxed proficiency unlocks: the next tier within its own path (revealed by

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ERarity, EAttribute, ESkillAcquisition } from '$lib/api';
+import { ERarity, EAttribute, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { EModifierType, EAttributeModifierSource } from '$lib/battle/attribute-modifier';
+import { makeEffect } from './battle-sim-test-utils';
 
 const mockSkills: ISkill[] = [];
 
@@ -122,6 +123,69 @@ describe('Battler', () => {
 			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 		});
 
+		// Proficiency bonuses (#982 area E / #1119) ride the modifier pipeline (by their additive/
+		// multiplicative type), composing through computeAttributes exactly like the backend's snapshot.
+		it('applies additional (proficiency) modifiers through the attribute pipeline', () => {
+			const battler = new Battler(
+				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				undefined,
+				undefined,
+				[
+					{
+						attribute: EAttribute.Strength,
+						amount: 5,
+						type: EModifierType.Additive,
+						source: EAttributeModifierSource.Proficiency
+					},
+					{
+						attribute: EAttribute.Strength,
+						amount: 2,
+						type: EModifierType.Multiplicative,
+						source: EAttributeModifierSource.Proficiency
+					}
+				]
+			);
+
+			// (10 alloc + 5 additive) * 2 multiplicative = 30, the additive-then-multiplicative order.
+			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(30);
+		});
+
+		it('reflects additional modifiers in derived MaxHealth (applied before health is read)', () => {
+			const battler = new Battler(makeBattlerData({ attributes: [] }), undefined, undefined, [
+				{
+					attribute: EAttribute.Endurance,
+					amount: 10,
+					type: EModifierType.Additive,
+					source: EAttributeModifierSource.Proficiency
+				}
+			]);
+
+			// MaxHealth = 50 base + 20·Endurance(10) = 250, so the proficiency Endurance bonus is in currentHealth.
+			expect(battler.currentHealth).toBe(250);
+		});
+
+		it('drops the additional modifiers on a data-less re-arm (setData replaced them; #811)', () => {
+			const battler = new Battler(
+				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				undefined,
+				undefined,
+				[
+					{
+						attribute: EAttribute.Strength,
+						amount: 5,
+						type: EModifierType.Additive,
+						source: EAttributeModifierSource.Proficiency
+					}
+				]
+			);
+			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
+
+			// A data-less re-arm keeps the existing attribute set (proficiency modifier included) — the engine
+			// re-derives with fresh modifiers only when they actually change.
+			battler.reset();
+			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
+		});
+
 		it('re-arms skill charges on a data-less reset so an unchanged re-spawn starts at zero charge (#811)', () => {
 			const battler = new Battler(makeBattlerData({ selectedSkills: [0] }));
 			battler.skills[0]!.chargeTime = 300;
@@ -239,6 +303,25 @@ describe('Battler', () => {
 			battler.takeDamage(99999);
 			expect(battler.isDead).toBe(true);
 			expect(battler.currentHealth).toBeLessThan(0);
+		});
+	});
+
+	describe('applyEffect MaxHealth clamp', () => {
+		// A MaxHealth debuff lowers health through the clamp, NOT a damage mutation (#1145). Deriving isDead
+		// keeps it correct on this path by construction; a cached flag re-synced only at the damage mutations
+		// would have missed it.
+		it('reports isDead when a MaxHealth debuff clamps health to <= 0', () => {
+			const battler = new Battler(
+				makeBattlerData({ selectedSkills: [], attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] })
+			); // MaxHealth 100, currentHealth 100
+			expect(battler.isDead).toBe(false);
+
+			battler.applyEffect(
+				makeEffect(0, ESkillEffectTarget.Opponent, EAttribute.MaxHealth, EModifierType.Additive, -200, 1000)
+			);
+
+			expect(battler.currentHealth).toBeLessThanOrEqual(0);
+			expect(battler.isDead).toBe(true);
 		});
 	});
 

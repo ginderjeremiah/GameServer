@@ -97,11 +97,11 @@ describe('challengeEntity', () => {
 			['', 'global'],
 			['reward', 0]
 		]);
-		const scoped = { ...base, targetEntityId: 2, rewardItemId: 5, rewardItemModId: 9, rewardSkillId: 3 };
+		const scoped = { ...base, targetEntityId: 2, rewardItemId: 5, rewardItemModId: 9 };
 		expect(challengeEntity.meta(scoped)).toEqual([
 			['goal', '1,500'],
 			['', 'scoped'],
-			['reward', 3]
+			['reward', 2]
 		]);
 	});
 

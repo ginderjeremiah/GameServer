@@ -98,7 +98,7 @@ function seed(): void {
 		{ id: 2, name: 'Cinder Tyrant', isBoss: true, attributeDistribution: dist(), skillPool: [0, 1], spawns: [] }
 	];
 	staticData.skills = [
-		// Cleave: a Strength-scaling attack used by two enemies (one a boss); rewarded by challenge 0.
+		// Cleave: a Strength-scaling attack used by two enemies (one a boss).
 		{
 			id: 0,
 			name: 'Cleave',
@@ -163,8 +163,7 @@ function seed(): void {
 			challengeTypeId: EChallengeType.EnemiesKilled,
 			entityType: EEntityType.Enemy,
 			targetEntityId: 0,
-			progressGoal: 100,
-			rewardSkillId: 0
+			progressGoal: 100
 		},
 		{
 			id: 1,
@@ -637,16 +636,6 @@ describe('CodexView skill dossier', () => {
 		// A skill with no recorded statistics yields an empty record.
 		view.selectSkill(2);
 		expect(view.skillStatistics).toEqual([]);
-	});
-
-	it('surfaces a challenge reward as a "Rewarded by" source', () => {
-		const view = new CodexView();
-		view.selectSkill(0); // Cleave — rewarded by challenge 0
-		expect(view.skillProvenance.status).toBe('obtainable');
-		expect(view.skillProvenance.sources).toEqual([
-			{ kind: 'challenge', id: 0, label: 'Rewarded by', name: 'Cull the Skitterers', accent: 'var(--attr-intellect)' }
-		]);
-		expect(view.skillProvenance.emptyLabel).toBe('');
 	});
 
 	it('surfaces an item grant as a "Granted by" source, tinted by the item rarity', () => {

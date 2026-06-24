@@ -6,6 +6,7 @@ using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Battle.Offline;
 using Game.Core.Players;
+using Game.Core.Proficiencies;
 using Game.Core.Progress;
 using Microsoft.Extensions.Logging;
 using CoreEnemy = Game.Core.Enemies.Enemy;
@@ -133,6 +134,31 @@ namespace Game.Application.Services
         public Task<BattleStartResult> PrepareNextIdleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             return StartBattle(player, state, player.CurrentZoneId, scheduledStartTime: state.EnemyCooldown, cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Best-effort <see cref="PrepareNextIdleBattle"/> for the battle-end commands: on any prefetch failure
+        /// it logs and returns <c>null</c> instead of throwing. The victory/loss is already durably credited and
+        /// has cleared the in-flight battle on the <see cref="PlayerState"/>, but that resolved state is only
+        /// persisted to the session cache <em>after</em> this prefetch. Letting the prefetch throw would strand
+        /// the resolved state (the cleared battle is lost), so on reconnect the stale session still shows the
+        /// already-credited battle as active and the next <c>StartBattle</c> re-abandons — and thus re-credits —
+        /// it. Swallowing here keeps the caller on its path to save the resolved state; the client round-trips
+        /// <c>NewEnemy</c> when no next battle is bundled.
+        /// </summary>
+        public async Task<BattleStartResult?> TryPrepareNextIdleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await PrepareNextIdleBattle(player, state, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Next-idle-battle prefetch failed for player {PlayerId}; returning without a bundled next enemy.",
+                    player.Id);
+                return null;
+            }
         }
 
         /// <summary>
@@ -408,7 +434,7 @@ namespace Game.Application.Services
 
             var levelBefore = player.Level;
             var statPointsBefore = player.StatPoints.StatPointsGained;
-            var completedChallenges = await ApplyOfflineRewards(player, result, cancellationToken);
+            var rewards = await ApplyOfflineRewards(player, result, cancellationToken);
 
             // Re-anchor the away clock and persist the player (exp/levels/unlocks) in one save. The exp batch
             // already raised its own single core update in ApplyOfflineRewards; this re-anchor raises one more.
@@ -428,7 +454,9 @@ namespace Game.Application.Services
                 TotalExp = result.TotalExp,
                 LevelsGained = player.Level - levelBefore,
                 StatPointsGained = player.StatPoints.StatPointsGained - statPointsBefore,
-                CompletedChallenges = completedChallenges,
+                CompletedChallenges = rewards.CompletedChallenges,
+                ProficiencyGains = rewards.ProficiencyGains.Results,
+                OpenedProficiencies = rewards.ProficiencyGains.Opened,
             };
         }
 
@@ -503,17 +531,19 @@ namespace Game.Application.Services
         // (spike #879 decisions 6 & 7): each battle feeds the same per-battle statistics path the live handler
         // uses, exp is granted per victory (so the per-grant clamp never truncates a haul and levels accrue),
         // and the affected challenges are evaluated once at the end with the live per-challenge push suppressed
-        // (the summary is the notification). Returns the completed challenges for the summary.
-        private async Task<IReadOnlyList<CompletedChallenge>> ApplyOfflineRewards(Player player, OfflineProgressResult result, CancellationToken cancellationToken)
+        // (the summary is the notification). Returns the completed challenges and the folded proficiency gains
+        // (spike #982 decision 9 — the offline accrual's notification rides the summary, not a per-battle push).
+        private async Task<OfflineRewards> ApplyOfflineRewards(Player player, OfflineProgressResult result, CancellationToken cancellationToken)
         {
             if (result.BattlesSimulated == 0)
             {
-                return [];
+                return OfflineRewards.Empty;
             }
 
             var progress = await _progressRepo.Load(player, cancellationToken);
 
             var victoryExpRewards = new List<int>();
+            var proficiencyGains = new ProficiencyGainAccumulator();
             // Union the statistic rows touched across every battle, so the end-of-window challenge evaluation
             // sees every moved statistic. RecordBattleCompleted currently returns the progress aggregate's
             // cumulative dirty set (it is loaded once for the whole window), but unioning each call's result
@@ -537,9 +567,9 @@ namespace Game.Application.Services
                     // Accrue proficiency XP per won battle, exactly as the live handler does — same inputs
                     // (this battle's skill stats + difficulty multiplier), same service — so the offline
                     // accrual matches what the player would have earned live (the "offline == live" invariant).
-                    // The push is suppressed; the welcome-back summary is the offline notification.
-                    _proficiencyRewards.AccrueAndApply(
-                        progress, battle.Result.Stats, battle.DifficultyMultiplier, player, notify: false);
+                    // The push is suppressed; the folded results ride the welcome-back summary instead.
+                    proficiencyGains.Add(_proficiencyRewards.AccrueAndApply(
+                        progress, battle.Result.Stats, battle.DifficultyMultiplier, player, notify: false));
                 }
             }
 
@@ -554,7 +584,7 @@ namespace Game.Application.Services
             var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, notify: false);
 
             await _progressRepo.Save(progress, cancellationToken);
-            return completed;
+            return new OfflineRewards(completed, proficiencyGains.Build());
         }
 
         private async Task AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
@@ -806,12 +836,23 @@ namespace Game.Application.Services
         /// <summary>The challenges completed over the window, each with the reward ids it unlocked.</summary>
         public required IReadOnlyList<CompletedChallenge> CompletedChallenges { get; init; }
 
+        /// <summary>The proficiency gains accrued over the window, folded across every won battle: each trained
+        /// proficiency's total XP gained, its final level/residual XP, the milestones it crossed, and the reward
+        /// skills granted (spike #982 decision 9 — the offline accrual's notification rides this summary).</summary>
+        public required IReadOnlyList<ProficiencyXpResult> ProficiencyGains { get; init; }
+
+        /// <summary>The proficiency nodes opened over the window (a maxed tier's next tier or a newly-satisfied
+        /// gateway), each with the seed skill it granted (if any).</summary>
+        public required IReadOnlyList<ProficiencyOpened> OpenedProficiencies { get; init; }
+
         /// <summary>
         /// Whether the window produced anything worth gating on. The frontend skips the welcome-back gate for
         /// an empty summary (a sub-threshold absence, or one that earned nothing) and enters the game directly.
+        /// A window that only advanced proficiencies (e.g. a maxed-XP-level character) still reports progress.
         /// </summary>
         public bool HasProgress =>
-            BattlesWon > 0 || BattlesLost > 0 || BattlesDrawn > 0 || CompletedChallenges.Count > 0;
+            BattlesWon > 0 || BattlesLost > 0 || BattlesDrawn > 0
+            || CompletedChallenges.Count > 0 || ProficiencyGains.Count > 0 || OpenedProficiencies.Count > 0;
 
         /// <summary>An empty summary: away time recorded but nothing simulated (a sub-threshold return).</summary>
         public static OfflineProgressSummary Empty(long awayMs, bool autoChallengeBoss, int zoneId) => new()
@@ -826,6 +867,21 @@ namespace Game.Application.Services
             LevelsGained = 0,
             StatPointsGained = 0,
             CompletedChallenges = [],
+            ProficiencyGains = [],
+            OpenedProficiencies = [],
         };
+    }
+
+    /// <summary>
+    /// The rewards a simulated away window applied, returned by <see cref="BattleService"/>'s offline-rewards
+    /// pass: the challenges completed and the folded proficiency gains (XP/levels/milestones/skills) plus opened
+    /// nodes. Both feed the welcome-back summary; the per-challenge and per-battle live pushes are suppressed.
+    /// </summary>
+    public record OfflineRewards(
+        IReadOnlyList<CompletedChallenge> CompletedChallenges,
+        ProficiencyAccrualResult ProficiencyGains)
+    {
+        /// <summary>No rewards: nothing was simulated in the window.</summary>
+        public static OfflineRewards Empty { get; } = new([], ProficiencyAccrualResult.Empty);
     }
 }

@@ -351,7 +351,6 @@ namespace Game.TestInfrastructure.Helpers
             int? targetEntityId = null,
             int? rewardItemId = null,
             int? rewardItemModId = null,
-            int? rewardSkillId = null,
             DateTime? retiredAt = null)
         {
             var challenge = new Challenge
@@ -363,7 +362,6 @@ namespace Game.TestInfrastructure.Helpers
                 TargetEntityId = targetEntityId,
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
-                RewardSkillId = rewardSkillId,
                 RetiredAt = retiredAt,
             };
 

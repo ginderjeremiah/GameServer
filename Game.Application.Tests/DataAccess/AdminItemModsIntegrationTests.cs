@@ -42,6 +42,36 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public void SaveItemMods_UndefinedRarity_ReturnsFailureWithoutPersisting()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItemMods>();
+
+            var result = admin.SaveItemMods(
+            [
+                new Change<Contracts.ItemMod> { ChangeType = EChangeType.Add, Item = NewItemMod(name: "Bad Rarity", rarity: (ERarity)0) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("0 is not a valid item mod rarity.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public void SaveItemMods_UndefinedType_ReturnsFailureWithoutPersisting()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItemMods>();
+
+            var result = admin.SaveItemMods(
+            [
+                new Change<Contracts.ItemMod> { ChangeType = EChangeType.Add, Item = NewItemMod(name: "Bad Type", type: (EItemModType)0) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("0 is not a valid item mod type.", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveItemMods_AddAndEdit_PersistAndUpdateInPlace()
         {
             int modId;

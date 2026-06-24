@@ -18,6 +18,18 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveItemMods(IReadOnlyList<Change<Contracts.ItemMod>> changes)
         {
+            // Authoring guards: the rarity/type FKs point at enum-seeded reference tables, so an unmapped value
+            // (a missing/0 payload) would 500 on the FK at commit — reject it up front as a clean failure.
+            if (ReferenceFieldValidation.FindUndefinedEnum(changes, m => m.RarityId, "item mod rarity") is { } rarityRejection)
+            {
+                return rarityRejection;
+            }
+
+            if (ReferenceFieldValidation.FindUndefinedEnum(changes, m => m.ItemModTypeId, "item mod type") is { } typeRejection)
+            {
+                return typeRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.ItemMod
                 {

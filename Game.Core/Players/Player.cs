@@ -184,11 +184,15 @@ namespace Game.Core.Players
         }
 
         /// <summary>
-        /// Completes a challenge for the player: unlocks each reward the challenge carries (item, mod,
-        /// and/or skill — any of which may be absent) and, when <paramref name="notify"/> is <c>true</c>,
+        /// Completes a challenge for the player: unlocks each reward the challenge carries (item and/or
+        /// mod — either of which may be absent) and, when <paramref name="notify"/> is <c>true</c>,
         /// raises a single <see cref="ChallengeCompletedEvent"/> describing the completion and what it
         /// unlocked. Consolidates the per-challenge reward orchestration in the domain so the application
         /// layer only has to resolve the reward reference data and hand it over.
+        /// <para>
+        /// Challenges no longer grant skills (skills come from the starter kit, item grants, and proficiency
+        /// milestones — spike #982); the skill-unlock path now lives on the proficiency reward layer.
+        /// </para>
         /// <para>
         /// <paramref name="notify"/> is the live client-push toggle. The live battle-completion path notifies
         /// (the push makes a just-unlocked reward usable without a refresh); the offline-rewards batch passes
@@ -198,7 +202,7 @@ namespace Game.Core.Players
         /// durably recorded regardless of <paramref name="notify"/>.
         /// </para>
         /// </summary>
-        public void CompleteChallenge(int challengeId, Item? rewardItem, int? rewardItemModId, Skill? rewardSkill, bool notify = true)
+        public void CompleteChallenge(int challengeId, Item? rewardItem, int? rewardItemModId, bool notify = true)
         {
             if (rewardItem is not null)
             {
@@ -208,15 +212,11 @@ namespace Game.Core.Players
             {
                 UnlockMod(rewardItemModId.Value);
             }
-            if (rewardSkill is not null)
-            {
-                UnlockSkill(rewardSkill);
-            }
 
             if (notify)
             {
                 RaiseEvent(new ChallengeCompletedEvent(
-                    Id, challengeId, rewardItem?.Id, rewardItemModId, rewardSkill?.Id));
+                    Id, challengeId, rewardItem?.Id, rewardItemModId));
             }
         }
 
