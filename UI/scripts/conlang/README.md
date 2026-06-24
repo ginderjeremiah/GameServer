@@ -19,10 +19,12 @@ player must actually read stays in the normal UI font.
 
 The font is **generated, not hand-drawn** — every glyph is a parametric set of
 strokes in `generate_font.py`, so the script is the source of truth. Edit the
-glyph definitions there and rebuild:
+glyph definitions there and rebuild **both** outputs (the committed
+`specimen.png` is generated documentation and drifts if only the font is
+rebuilt):
 
 ```sh
-pip install fonttools brotli pillow   # brotli: woff2 output · pillow: specimen
+pip install -r requirements.txt                 # pinned fonttools / brotli / pillow
 python3 UI/scripts/conlang/generate_font.py     # -> UI/static/fonts/Aetheric.woff2
 python3 UI/scripts/conlang/render_specimen.py   # -> UI/scripts/conlang/specimen.png
 ```

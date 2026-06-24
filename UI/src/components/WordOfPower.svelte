@@ -49,7 +49,10 @@ let fontSize = $derived(typeof size === 'number' ? `${size}px` : size);
 <style lang="scss">
 .word-of-power {
 	// Decorative conlang face; colour is inherited so the theme/consumer controls it.
-	font-family: var(--conlang, 'Aetheric');
+	// Fallback chain keeps the romanization legible unconditionally: if --conlang is
+	// absent (component rendered outside the layout) we still try the Aetheric face,
+	// then degrade to --sans rather than the browser default serif.
+	font-family: var(--conlang, 'Aetheric', var(--sans));
 	letter-spacing: 0.04em;
 	line-height: 1.1;
 	display: inline-block;
