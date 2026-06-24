@@ -4,6 +4,7 @@ using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using CoreSkill = Game.Core.Skills.Skill;
 using EnemyTemplate = Game.Core.Enemies.EnemyTemplate;
 
 namespace Game.DataAccess.Repositories.Caching
@@ -58,7 +59,11 @@ namespace Game.DataAccess.Repositories.Caching
             enemies.AssertZeroBasedContiguity("Enemies");
             skills.AssertZeroBasedContiguity("Skills");
 
-            var templates = enemies.Select(enemy => EnemyMapper.ToTemplate(enemy, skills)).ToList();
+            // Share one build-scoped skill cache across every template so each distinct skill is mapped to its
+            // immutable core instance once, rather than re-mapping it for every (enemy, skill) pair that
+            // references it.
+            var mappedSkills = new Dictionary<int, CoreSkill>();
+            var templates = enemies.Select(enemy => EnemyMapper.ToTemplate(enemy, skills, mappedSkills)).ToList();
 
             return new EnemySnapshot(enemies, templates, BuildZoneEnemyTables(enemies));
         }

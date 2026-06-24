@@ -12,63 +12,64 @@ namespace Game.DataAccess.Repositories
 {
     internal class Proficiencies(ProficienciesCacheHolder holder) : IProficiencies, IProficiencyEntityCache
     {
-        private IReadOnlyList<Proficiency> Entities => holder.Current.Entities;
-        private IReadOnlyList<Path> PathEntities => holder.Current.Paths;
+        // Read the immutable snapshot once per logical operation (docs/backend.md → Reference-data snapshot
+        // read-once idiom) so a build-then-swap between reads can't mix an old and a new snapshot in one call.
+        private ProficiencySnapshot Snapshot => holder.Current;
 
         // The snapshot instance changes on every build-then-swap, so it doubles as the content-version key.
-        public object VersionKey => holder.Current;
+        public object VersionKey => Snapshot;
 
         public List<Contracts.Proficiency> AllProficiencies()
         {
-            return [.. Entities.Select(ProficiencyMapper.ToContract)];
+            return [.. Snapshot.Entities.Select(ProficiencyMapper.ToContract)];
         }
 
         public List<Contracts.Path> AllPaths()
         {
-            return [.. PathEntities.Select(PathMapper.ToContract)];
+            return [.. Snapshot.Paths.Select(PathMapper.ToContract)];
         }
 
         public Proficiency? LookupProficiency(int proficiencyId)
         {
-            return Entities.Lookup(proficiencyId);
+            return Snapshot.Entities.Lookup(proficiencyId);
         }
 
         public Path? LookupPath(int pathId)
         {
-            return PathEntities.Lookup(pathId);
+            return Snapshot.Paths.Lookup(pathId);
         }
 
         public Proficiency? LookupProficiencyByTier(int pathId, int ordinal)
         {
-            return Entities.FirstOrDefault(p => p.PathId == pathId && p.PathOrdinal == ordinal);
+            return Snapshot.Entities.FirstOrDefault(p => p.PathId == pathId && p.PathOrdinal == ordinal);
         }
 
         public IReadOnlyList<Proficiency> AllProficiencyEntities()
         {
-            return Entities;
+            return Snapshot.Entities;
         }
 
         public CoreProficiency GetProficiency(int proficiencyId)
         {
             // Returns the snapshot's shared, pre-materialized immutable instance rather than re-mapping.
-            return holder.Current.CoreProficiencies.GetById(proficiencyId, "proficiency");
+            return Snapshot.CoreProficiencies.GetById(proficiencyId, "proficiency");
         }
 
         public CorePath GetPath(int pathId)
         {
-            return holder.Current.CorePaths.GetById(pathId, "path");
+            return Snapshot.CorePaths.GetById(pathId, "path");
         }
 
         public IReadOnlyList<SkillContribution> ContributionsForSkill(int skillId)
         {
-            return holder.Current.ContributionsBySkill.TryGetValue(skillId, out var contributions)
+            return Snapshot.ContributionsBySkill.TryGetValue(skillId, out var contributions)
                 ? contributions
                 : [];
         }
 
         public IReadOnlyList<int> DependentsOf(int proficiencyId)
         {
-            return holder.Current.DependentsByProficiency.TryGetValue(proficiencyId, out var dependents)
+            return Snapshot.DependentsByProficiency.TryGetValue(proficiencyId, out var dependents)
                 ? dependents
                 : [];
         }

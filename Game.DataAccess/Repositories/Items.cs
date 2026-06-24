@@ -9,19 +9,21 @@ namespace Game.DataAccess.Repositories
 {
     internal class Items(ItemsCacheHolder holder) : IItems, IItemEntityCache
     {
-        private IReadOnlyList<Item> Entities => holder.Current.Entities;
+        // Read the immutable snapshot once per logical operation (docs/backend.md → Reference-data snapshot
+        // read-once idiom) so a build-then-swap between reads can't mix an old and a new snapshot in one call.
+        private ItemSnapshot Snapshot => holder.Current;
 
         // The snapshot instance changes on every build-then-swap, so it doubles as the content-version key.
-        public object VersionKey => holder.Current;
+        public object VersionKey => Snapshot;
 
         public List<Contracts.Item> All()
         {
-            return [.. Entities.Select(ItemMapper.ToContract)];
+            return [.. Snapshot.Entities.Select(ItemMapper.ToContract)];
         }
 
         public Item? LookupItem(int itemId)
         {
-            return Entities.Lookup(itemId);
+            return Snapshot.Entities.Lookup(itemId);
         }
 
         public CoreItem GetItem(int itemId)
@@ -30,7 +32,7 @@ namespace Game.DataAccess.Repositories
             // per call. The model is reference data treated as immutable by every caller (the battle path
             // composes modifiers into a separate AttributeCollection; applied mods live on the player's
             // UnlockedItemSlot, never on the shared Item.ModSlots), so sharing is safe.
-            return holder.Current.CoreItems.GetById(itemId, "item");
+            return Snapshot.CoreItems.GetById(itemId, "item");
         }
     }
 }

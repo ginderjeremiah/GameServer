@@ -42,9 +42,12 @@ namespace Game.DataAccess.Mapping
         /// <see cref="EnemyTemplate"/>: the pre-mapped attribute distributions and available-skill loadout that
         /// a per-encounter <see cref="Enemy"/> is cloned from. Built once per snapshot so the gameplay reads
         /// (<c>GetDomainEnemy</c>/<c>GetRandomDomainEnemy</c>) reuse this graph rather than re-mapping it on
-        /// every battle setup (#584).
+        /// every battle setup (#584). <paramref name="mappedSkills"/> is a build-scoped cache shared across all
+        /// templates so each distinct skill is mapped to its immutable <see cref="CoreSkill"/> once, not once
+        /// per (enemy, skill) pair; sharing the instance is safe because reference-data skills are immutable
+        /// (docs/backend.md → Reference Data).
         /// </summary>
-        public static EnemyTemplate ToTemplate(EntityEnemy entity, IReadOnlyList<EntitySkill> allSkills)
+        public static EnemyTemplate ToTemplate(EntityEnemy entity, IReadOnlyList<EntitySkill> allSkills, Dictionary<int, CoreSkill> mappedSkills)
         {
             return new EnemyTemplate
             {
@@ -59,21 +62,27 @@ namespace Game.DataAccess.Mapping
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
                 AvailableSkills = entity.EnemySkills
-                    .Select(es => ResolveSkill(entity, es.SkillId, allSkills))
+                    .Select(es => ResolveSkill(entity, es.SkillId, allSkills, mappedSkills))
                     .ToList(),
             };
         }
 
         /// <summary>
         /// Resolves an enemy's available skill by direct index into the cached, zero-based, contiguous-id
-        /// skill set (docs/backend.md → Reference Data). A persisted <c>EnemySkill.SkillId</c> is
-        /// FK-guaranteed in range against the (contiguity-asserted) skill set, so this always resolves; an
-        /// out-of-range id can only be content-data corruption and fails loudly with a diagnosable message
-        /// naming the enemy and offending id — mirroring the player-load loud-fail policy rather than the
-        /// prior filter that silently dropped the skill from the loadout.
+        /// skill set (docs/backend.md → Reference Data), memoizing each distinct id into the build-scoped
+        /// <paramref name="mappedSkills"/> cache so the same skill is mapped once and the immutable instance is
+        /// shared across templates. A persisted <c>EnemySkill.SkillId</c> is FK-guaranteed in range against the
+        /// (contiguity-asserted) skill set, so this always resolves; an out-of-range id can only be content-data
+        /// corruption and fails loudly with a diagnosable message naming the enemy and offending id — mirroring
+        /// the player-load loud-fail policy rather than the prior filter that silently dropped the skill.
         /// </summary>
-        private static CoreSkill ResolveSkill(EntityEnemy enemy, int skillId, IReadOnlyList<EntitySkill> allSkills)
+        private static CoreSkill ResolveSkill(EntityEnemy enemy, int skillId, IReadOnlyList<EntitySkill> allSkills, Dictionary<int, CoreSkill> mappedSkills)
         {
+            if (mappedSkills.TryGetValue(skillId, out var mapped))
+            {
+                return mapped;
+            }
+
             if (skillId < 0 || skillId >= allSkills.Count)
             {
                 throw new InvalidOperationException(
@@ -81,7 +90,9 @@ namespace Game.DataAccess.Mapping
                     "resolve against the skill catalog (a content-data mistake — a referenced id is out of range).");
             }
 
-            return SkillMapper.ToCore(allSkills[skillId]);
+            mapped = SkillMapper.ToCore(allSkills[skillId]);
+            mappedSkills[skillId] = mapped;
+            return mapped;
         }
     }
 }
