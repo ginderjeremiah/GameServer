@@ -205,7 +205,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Theory]
-        [InlineData(0)]  // level 0 is the untrained state, never a payout level
+        [InlineData(-1)] // below the just-opened state, never a payout level
         [InlineData(11)] // past the cap (MaxLevel 10), so it would never fire
         public async Task SetModifiers_LevelOutOfRange_ReturnsFailure(int level)
         {
@@ -230,6 +230,38 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetModifiers_LevelZero_IsAllowedAndPersisted()
+        {
+            // Level 0 is the just-opened state: a modifier authored there is an "on-open" bonus that the domain
+            // honors cumulatively (Proficiency.ModifiersForLevel uses l.Level <= level). The authoring path must
+            // accept what the domain is built and tested to apply.
+            int proficiencyId;
+            using (var seedScope = CreateScope())
+            {
+                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+                Assert.True(admin.SetModifiers(new SetProficiencyModifiersData
+                {
+                    Id = proficiencyId,
+                    Modifiers = [Modifier(level: 0, EAttribute.Strength, 7m)],
+                }).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var modifier = await assertContext.ProficiencyLevelModifiers
+                .SingleAsync(m => m.ProficiencyId == proficiencyId, CancellationToken);
+            Assert.Equal(0, modifier.Level);
+            Assert.Equal(7m, modifier.Amount);
+        }
+
+        [Fact]
         public async Task SetRewards_LevelOutOfRange_ReturnsFailureBeforeTheSkillCheck()
         {
             int proficiencyId;
@@ -247,6 +279,32 @@ namespace Game.Application.Tests.DataAccess
             {
                 Id = proficiencyId,
                 Rewards = [new Contracts.ProficiencyLevelReward { Level = 11, RewardSkillId = 99999 }],
+            });
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("out of range", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetRewards_LevelZero_ReturnsFailure()
+        {
+            // Unlike modifiers, a level-0 reward is rejected: a reward fires only by crossing a milestone
+            // (RewardSkillsCrossed uses l.Level > fromLevel), which a level-0 reward never does — the on-open
+            // grant is the proficiency's SeedSkillId. The level check fires before the skill id is resolved.
+            int proficiencyId;
+            using (var seedScope = CreateScope())
+            {
+                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SetRewards(new SetProficiencyRewardsData
+            {
+                Id = proficiencyId,
+                Rewards = [new Contracts.ProficiencyLevelReward { Level = 0, RewardSkillId = 99999 }],
             });
 
             Assert.False(result.Succeeded);
