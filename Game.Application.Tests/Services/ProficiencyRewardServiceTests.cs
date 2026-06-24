@@ -192,6 +192,32 @@ namespace Game.Application.Tests.Services
             Assert.Single(player.Skills, s => s.Id == rewardSkill.Id);
         }
 
+        [Fact]
+        public async Task RetiredPath_FreezesTheTrack_AccruesNothingAndGrantsNoSkill()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A path taken out of circulation: a fired skill contributing to it routes no XP, so the tier never
+            // levels and its cap milestone reward is never granted — the whole track is frozen. The curve would
+            // otherwise max the tier (cap 1, cost 1) and grant the reward on a single victory.
+            var path = await TestDataSeeder.CreatePathAsync(context, retiredAt: DateTime.UtcNow);
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(
+                context, maxLevel: 1, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var rewardSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Milestone Reward");
+            await TestDataSeeder.AddProficiencyLevelRewardAsync(context, proficiency.Id, level: 1, rewardSkill.Id);
+
+            var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, proficiency.Id);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (player, results) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
+
+            Assert.Empty(results);
+            Assert.DoesNotContain(player.Skills, s => s.Id == rewardSkill.Id);
+            // The player owns only the starter skill they fired — no proficiency reward was granted.
+            Assert.Single(player.Skills);
+        }
+
         // Seeds a fresh player whose one (selected) starter skill contributes to a single-tier proficiency, so
         // a won battle that fires it routes the whole pie there. Returns the player, fired skill, and proficiency.
         private static async Task<(int PlayerId, int FiredSkillId, Game.Infrastructure.Entities.Proficiency Proficiency)> SeedSingleTierAsync(

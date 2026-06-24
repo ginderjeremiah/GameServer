@@ -409,13 +409,15 @@ namespace Game.TestInfrastructure.Helpers
         public static async Task<Path> CreatePathAsync(
             GameContext context,
             string name = "Test Path",
-            decimal falloffBase = 0.3m)
+            decimal falloffBase = 0.3m,
+            DateTime? retiredAt = null)
         {
             var path = new Path
             {
                 Name = name,
                 Description = "",
                 FalloffBase = falloffBase,
+                RetiredAt = retiredAt,
             };
 
             context.Paths.Add(path);

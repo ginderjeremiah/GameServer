@@ -165,6 +165,41 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ContributionsForSkill_ReturnsEmpty_WhenSkillOnlyFeedsARetiredPath()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
+
+                // A retired path: a skill that only contributes to it must drop out of the reverse index, so
+                // the accrual routes no XP into the frozen track (the path is out of circulation).
+                var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m, RetiredAt = DateTime.UtcNow };
+                context.Paths.Add(path);
+                await context.SaveChangesAsync(CancellationToken);
+
+                context.Proficiencies.Add(NewTier(path.Id, ordinal: 0, name: "Fire Magic"));
+                await context.SaveChangesAsync(CancellationToken);
+
+                context.SkillPathContributions.Add(new Entities.SkillPathContribution
+                {
+                    SkillId = skillId,
+                    PathId = path.Id,
+                    HomeTier = 0,
+                    Weight = 2m,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+
+            Assert.Empty(proficiencies.ContributionsForSkill(skillId));
+        }
+
+        [Fact]
         public async Task GetPath_ExposesFalloffBaseAndTiersOrderedByOrdinal()
         {
             int pathId, tierZeroId, tierOneId;
