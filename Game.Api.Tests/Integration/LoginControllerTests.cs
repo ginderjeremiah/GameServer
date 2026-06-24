@@ -326,6 +326,62 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SwitchPlayer_DepartedCharacterStillHasLiveSocket_SkipsCreditButStillSwitches()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The same winning idle setup as the credit test, so the departed character *would* level up over
+            // its credited away window — making a skipped credit observable as "no level gained".
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context, "switchlivesocket", "pass");
+            var departed = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Alpha", zoneId: zone.Id);
+            var target = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Beta", zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, departed.Id, playerSkill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, target.Id, playerSkill.Id);
+
+            var departedLevelBefore = departed.Level;
+            departed.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+            await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchlivesocket", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, departed.Id);
+
+            // The client kept the departed character's game socket open instead of tearing it down before the
+            // switch — the misbehaving/malicious case the server-side guard defends against.
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, user.Id, departed.Id);
+            // Round-trip a command so the connection is fully registered (the presence key is set before the
+            // command listener, so any response guarantees registration completed).
+            await socketClient.SendCommandAsync<object>("GetStatisticTypes");
+
+            var switched = await SwitchPlayerAsync(select.Tokens, target.Id);
+
+            // The switch itself still proceeds — the target is bound and the token rotated.
+            Assert.Equal(target.Id, switched.Player.Id);
+            Assert.NotEqual(select.Tokens.RefreshToken, switched.Tokens.RefreshToken);
+
+            // The cached session is now bound to the target character.
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var session = await sessionStore.GetSession(user.Id);
+            Assert.NotNull(session);
+            Assert.Equal(target.Id, session.PlayerId);
+
+            // But the departed character's credit was skipped: its live battle loop owns its saves under the
+            // per-socket command lock, so the off-lock HTTP credit must not run and its level does not advance.
+            await AssertPlayerNotCreditedAsync(departed.Id, departedLevelBefore);
+        }
+
+        [Fact]
         public async Task Players_AuthenticatedAccount_ListsAllItsCharacters()
         {
             using var scope = CreateScope();
@@ -389,6 +445,21 @@ namespace Game.Api.Tests.Integration
             }
 
             Assert.Fail("The departed character was not credited (its level did not advance) after the switch.");
+        }
+
+        // The inverse of AssertPlayerLeveledAboveAsync: gives any write-behind credit a window to surface and
+        // asserts the persisted level never advances. The credit test shows a real credit lands well within
+        // this window, so a regression (credit not skipped while a socket is live) is caught here.
+        private async Task AssertPlayerNotCreditedAsync(int playerId, int levelBefore)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+            while (DateTime.UtcNow < deadline)
+            {
+                var persisted = await GetPersistedPlayerAsync(playerId);
+                Assert.False(persisted.Level > levelBefore,
+                    "The departed character was credited despite holding a live socket; the off-lock credit should have been skipped.");
+                await Task.Delay(25, CancellationToken);
+            }
         }
 
         [Fact]

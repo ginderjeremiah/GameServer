@@ -57,7 +57,19 @@ export class BattleAttributes {
 		this.setData(attList, calcDerivedStats);
 	}
 
-	public setData(attList: IBattlerAttribute[] = [], calcDerivedStats: boolean = true) {
+	/**
+	 * Rebuilds the modifier set from the raw attribute amounts plus any caller-supplied
+	 * `additionalModifiers` (the player's proficiency bonuses). The additional modifiers sit with the base
+	 * set — **before** the static engine modifiers — mirroring the backend, where `BattleSnapshot.GetModifiers`
+	 * concatenates the proficiency modifiers onto the base set and `AttributeCollection` appends
+	 * `StaticAttributeModifiers` last. Keeping that order identical to the backend makes the additive
+	 * accumulation bit-identical on both sides, which the anti-cheat replay depends on (#1189).
+	 */
+	public setData(
+		attList: IBattlerAttribute[] = [],
+		calcDerivedStats: boolean = true,
+		additionalModifiers: readonly AttributeModifier[] = []
+	) {
 		this.#calcDerived = calcDerivedStats;
 		const base = attList.map(
 			(att): BaseAttributeModifier => ({
@@ -67,7 +79,9 @@ export class BattleAttributes {
 				source: EAttributeModifierSource.AttributeDistribution
 			})
 		);
-		this.#modifiers = calcDerivedStats ? [...base, ...STATIC_ATTRIBUTE_MODIFIERS] : base;
+		this.#modifiers = calcDerivedStats
+			? [...base, ...additionalModifiers, ...STATIC_ATTRIBUTE_MODIFIERS]
+			: [...base, ...additionalModifiers];
 		this.recompute();
 	}
 

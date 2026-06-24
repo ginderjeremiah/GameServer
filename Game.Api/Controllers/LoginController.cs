@@ -23,7 +23,8 @@ namespace Game.Api.Controllers
         LoginTrackingService loginTrackingService,
         SocketManagerService socketManager,
         PlayerService playerService,
-        BattleService battleService) : ControllerBase
+        BattleService battleService,
+        ILogger<LoginController> logger) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
         private readonly SessionInitializer _sessionInitializer = sessionInitializer;
@@ -32,6 +33,7 @@ namespace Game.Api.Controllers
         private readonly SocketManagerService _socketManager = socketManager;
         private readonly PlayerService _playerService = playerService;
         private readonly BattleService _battleService = battleService;
+        private readonly ILogger<LoginController> _logger = logger;
 
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
@@ -100,7 +102,8 @@ namespace Game.Api.Controllers
         /// so a deliberate switch loses no progress, then binds and loads the newly selected character through
         /// the same path as <see cref="SelectPlayer"/> (validating ownership and rotating the token). The client
         /// must tear down its game socket before calling this, since the departed-character credit runs over
-        /// HTTP, off that character's battle loop.
+        /// HTTP, off that character's battle loop; the credit is skipped server-side if that socket is still
+        /// live, so a misbehaving client cannot race the credit against the live loop's saves.
         /// </summary>
         [HttpPost]
         public async Task<ApiResponse<SelectPlayerResult>> SwitchPlayer([FromBody] SelectPlayerRequest request)
@@ -143,13 +146,28 @@ namespace Game.Api.Controllers
         /// <summary>
         /// Credits the character the caller is switching away from (the token's currently-selected player) for
         /// any elapsed idle time, resolving its in-flight battle. A no-op when there is no departed character to
-        /// settle — a pre-selection token (no bound player) or a switch to the same character — or when that
-        /// character's aggregate can no longer be loaded.
+        /// settle — a pre-selection token (no bound player) or a switch to the same character — when that
+        /// character can no longer be loaded, or when it still has a live socket (its battle loop owns its saves,
+        /// so crediting it here would race that loop — see the server-side guard below).
         /// </summary>
         private async Task CreditDepartedCharacter(int targetPlayerId, CancellationToken cancellationToken)
         {
             if (_sessionService.TokenSelectedPlayerId is not int departedPlayerId || departedPlayerId == targetPlayerId)
             {
+                return;
+            }
+
+            // The credit is a read-modify-write against the departed character's aggregate, run here over HTTP
+            // off its battle loop. If that character still has a live socket, its battle-completion commands are
+            // mutating the same cached aggregate under the per-socket command lock — crediting it here would
+            // reintroduce the exact lost-update race that lock exists to prevent. The client is expected to tear
+            // its game socket down before switching, so a live socket means a misbehaving/malicious client: skip
+            // the credit (the live loop owns its own saves) and proceed with the switch rather than racing it.
+            if (await _socketManager.HasActiveSocket(departedPlayerId))
+            {
+                _logger.LogWarning(
+                    "Skipping the switch-away credit for player {DepartedPlayerId}: it still has a live socket, so its battle loop owns its saves. The client should close its game socket before switching.",
+                    departedPlayerId);
                 return;
             }
 
@@ -216,6 +234,7 @@ namespace Game.Api.Controllers
         }
 
         [AllowAnonymous]
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost]
         public async Task<ApiResponse> Logout([FromBody] RefreshRequest request)
         {

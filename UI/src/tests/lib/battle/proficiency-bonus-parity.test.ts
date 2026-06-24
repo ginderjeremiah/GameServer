@@ -19,9 +19,14 @@ vi.mock('$stores', () => ({
 // mirrored — with identical inputs (the same name, allocations, authored level payouts, and player level) and
 // identical expected attribute values — in the backend suite
 // Game.Core.Tests/Attributes/ProficiencyBonusParityTests.cs. The proficiency bonuses compose through the same
-// additive-then-multiplicative path as stat allocations, so they participate identically on both sides; the
-// expectations are asserted on the core attributes the bonuses land on directly (stable literals, independent
-// of the derived-stat coefficients the BattleAttributes parity suite already pins).
+// additive-then-multiplicative path as stat allocations, so they participate identically on both sides.
+//
+// The values are asserted **bit-exactly** (toBe / Assert.Equal without tolerance): this is an anti-cheat
+// parity surface, so the two simulators must agree to the last bit, not merely within a tolerance. A loose
+// tolerance previously masked the ordering divergence fixed in #1189 — the proficiency modifiers must compose
+// with the base set BEFORE the static engine modifiers (mirroring the backend) so the additive accumulation
+// order is identical; the `maxHealthDerivedAdditive` scenario lands an additive bonus on a derived attribute
+// (MaxHealth, which carries a static additive base) to pin exactly that order.
 describe('proficiency bonus (parity)', () => {
 	type Allocation = [EAttribute, number];
 	type ModifierSpec = [EAttribute, EModifierType, number];
@@ -87,6 +92,23 @@ describe('proficiency bonus (parity)', () => {
 				[EAttribute.Strength, 3],
 				[EAttribute.Endurance, 8]
 			]
+		},
+
+		// Additive bonus on a DERIVED attribute (MaxHealth = 50 + 20·Endurance + 5·Strength). This is the case
+		// the core-attribute scenarios above can't exercise: MaxHealth carries a static additive base, so the
+		// proficiency additive must accumulate in the same order relative to those statics on both sides. The
+		// allocations (Endurance 34, Strength 59) and bonus (3.14) are chosen so the order is observable in the
+		// last bits — MaxHealth = 3.14 + 50 + 680 + 295 = 1028.1399999999999, which differs from the buggy
+		// "statics first" order (1028.14) past the 10th decimal. The expectation is written as the exact double
+		// the canonical (backend) order produces, so a regression to the old ordering fails this row.
+		maxHealthDerivedAdditive: {
+			allocations: [
+				[EAttribute.Endurance, 34],
+				[EAttribute.Strength, 59]
+			],
+			levels: [{ level: 1, modifiers: [[EAttribute.MaxHealth, EModifierType.Additive, 3.14]] }],
+			playerLevel: 1,
+			expected: [[EAttribute.MaxHealth, 1028.1399999999999]]
 		}
 	};
 
@@ -102,19 +124,18 @@ describe('proficiency bonus (parity)', () => {
 			}))
 		);
 
-	it.each(Object.keys(scenarios))('composes %s proficiency bonuses onto core attributes', (name) => {
+	it.each(Object.keys(scenarios))('composes %s proficiency bonuses onto attributes', (name) => {
 		const { allocations, levels, playerLevel, expected } = scenarios[name];
-		// Use the real (derived) composition path — like the backend's AttributeCollection — so the
-		// additive-then-multiplicative ordering is honoured. Core attributes carry no static modifier, so the
-		// derived pass leaves the asserted values as allocation + proficiency bonus alone.
-		const ba = new BattleAttributes(makeAttrs(...allocations));
-
-		for (const modifier of proficiencyModifiers(toLevelModifiers(levels), playerLevel)) {
-			ba.addModifier(modifier);
-		}
+		// Compose through the production path: setData places the proficiency modifiers with the base set,
+		// BEFORE the static engine modifiers, exactly as Battler.reset feeds them in a live battle and as the
+		// backend's BattleSnapshot.GetModifiers + AttributeCollection do. This is what makes the additive
+		// accumulation order identical across FE/BE; adding them afterwards (the old approach) diverges on
+		// derived attributes that carry a static additive base (#1189).
+		const ba = new BattleAttributes();
+		ba.setData(makeAttrs(...allocations), true, proficiencyModifiers(toLevelModifiers(levels), playerLevel));
 
 		for (const [attribute, value] of expected) {
-			expect(ba.getValue(attribute)).toBeCloseTo(value, 10);
+			expect(ba.getValue(attribute)).toBe(value);
 		}
 	});
 });

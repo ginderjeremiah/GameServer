@@ -234,6 +234,14 @@ namespace Game.Application.Tests.Services
                 cumulative += (decimal)(100 * Math.Pow(2, level));
             }
             Assert.Equal((decimal)(summary.BattlesWon * ServerGameConstants.ProficiencyXpPerVictory), cumulative);
+
+            // The summary carries the folded gain (spike #982 decision 9) — the window's total XP and the final
+            // level/residual XP match the persisted state, so the welcome-back gate can report it.
+            var gain = Assert.Single(summary.ProficiencyGains);
+            Assert.Equal(proficiency.Id, gain.ProficiencyId);
+            Assert.Equal((decimal)(summary.BattlesWon * ServerGameConstants.ProficiencyXpPerVictory), gain.XpGained);
+            Assert.Equal(stored.Level, gain.NewLevel);
+            Assert.Equal(stored.Xp, gain.NewXp);
         }
 
         [Fact]

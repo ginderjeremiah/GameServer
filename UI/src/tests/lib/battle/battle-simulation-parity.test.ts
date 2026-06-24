@@ -389,6 +389,41 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
+	// MaxHealth debuff is LETHAL via the clamp (#1145): an Opponent MaxHealth additive −200 debuff drives the
+	// enemy's maximum below zero, so the clamp pulls its current health to ≤ 0 and the live isDead getter
+	// reports death — a kill with NO direct damage, exercising the clamp path a cached isDead flag (re-synced
+	// only at the damage mutations) would miss. Mirrors the backend `maxHealthDebuffIsLethal` scenario.
+	//   Player: skill baseDamage 0, no multiplier, cooldown 400 (fires tick 10). Effect: Opponent −200 MaxHealth
+	//     (additive), permanent.
+	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Tick 10: 0 direct damage, then −200 MaxHealth → MaxHealth −100, clamp 100→−100 → dead at 400ms.
+	{
+		name: 'maxHealthDebuffIsLethal',
+		player: () =>
+			makeBattler(
+				[],
+				[
+					makeSkill(
+						0,
+						400,
+						[],
+						[
+							makeEffect(
+								105,
+								ESkillEffectTarget.Opponent,
+								EAttribute.MaxHealth,
+								EModifierType.Additive,
+								-200,
+								PERMANENT
+							)
+						]
+					)
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 400 }
+	},
+
 	// Same-tick CDR ordering: slot 0's self CooldownRecovery buff speeds up slot 1's accrual on the same
 	// tick, because each slot reads the cooldown multiplier live in loadout order; slot 0 fires every tick
 	// and its buff STACKS, so cdMult climbs 1→2→3→… Mirrors the backend `cdrBuffSpeedsLaterSlotSameTick`.

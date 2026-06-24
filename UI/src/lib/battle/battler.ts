@@ -79,7 +79,14 @@ export class Battler {
 	public currentHealth = 0;
 	public attributes: BattleAttributes = new BattleAttributes();
 	public skills: (Skill | undefined)[] = [];
-	public isDead = true;
+
+	/** Live-derived death state, mirroring the backend's `IsDead => CurrentHealth <= 0` getter so the two
+	 *  simulators agree by construction. Deriving it (rather than caching a flag re-synced at every
+	 *  currentHealth mutation) removes the whole "forgot to re-sync" class of parity drift — notably the
+	 *  MaxHealth-debuff clamp path, which lowers health without going through a damage mutation. */
+	public get isDead(): boolean {
+		return this.currentHealth <= 0;
+	}
 
 	/** The active timed effects on this battler, folded to one {@link ActiveEffectView} per (attribute,
 	 *  modifier type), as a reactive (`statify`) projection the active-effect chips render. Display-only
@@ -150,7 +157,6 @@ export class Battler {
 	public takeDamage(rawDamage: number, blockReduction = 0) {
 		const damage = applyDefense(rawDamage, this.attributes.getValue(EAttribute.Defense), blockReduction);
 		this.currentHealth -= damage;
-		this.isDead = this.currentHealth <= 0;
 		return damage;
 	}
 
@@ -165,7 +171,6 @@ export class Battler {
 	public applyDamageOverTime(timeDelta: number) {
 		const damage = (this.attributes.getValue(EAttribute.DamageTakenPerSecond) * timeDelta) / 1000;
 		this.currentHealth -= damage;
-		this.isDead = this.currentHealth <= 0;
 		return damage;
 	}
 
@@ -176,9 +181,6 @@ export class Battler {
 		const healed = Math.min(heal, this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth);
 		if (healed > 0) {
 			this.currentHealth += healed;
-			// Keep the cached flag in sync with currentHealth, mirroring takeDamage/applyDamageOverTime and
-			// the backend's always-live IsDead, so isDead is correct regardless of mutation ordering.
-			this.isDead = this.currentHealth <= 0;
 			return healed;
 		}
 
@@ -315,14 +317,13 @@ export class Battler {
 				? [...battlerData.attributes, ...additionalAtttributes]
 				: battlerData.attributes;
 
-			this.attributes.setData(atts);
 			// Proficiency bonuses ride the modifier pipeline (additive/multiplicative by their type), not the
 			// flat base data, so they compose through computeAttributes exactly like the backend's
-			// AttributeCollection — the proficiency parity surface (#982 area E). setData replaced the modifier
-			// list, so re-add them here; applied before MaxHealth is read below so the bonus is reflected.
-			for (const modifier of additionalModifiers ?? []) {
-				this.attributes.addModifier(modifier);
-			}
+			// AttributeCollection — the proficiency parity surface (#982 area E). They are handed to setData so
+			// they sit with the base set BEFORE the static engine modifiers, matching the backend's additive
+			// accumulation order exactly (#1189); appending them afterwards would diverge on attributes that
+			// carry a static additive base (e.g. MaxHealth).
+			this.attributes.setData(atts, true, additionalModifiers ?? []);
 			this.level = battlerData.level;
 			this.name = battlerData.name;
 			this.skills = this.fillSkills(battlerData, grantedSkillIds ?? []);
@@ -340,7 +341,6 @@ export class Battler {
 		}
 
 		this.currentHealth = this.attributes.getValue(EAttribute.MaxHealth);
-		this.isDead = false;
 	}
 
 	/** Assembles the battler's loadout: the player-selected skills first (in their chosen order, padded to
