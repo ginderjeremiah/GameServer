@@ -7,6 +7,18 @@ namespace Game.Core.Tests.Players
 {
     public class InventoryTests
     {
+        // ── Equipment slots ─────────────────────────────────────────────────
+
+        [Fact]
+        public void NewInventory_HasExactlyOneSlotPerEquipmentSlotValue()
+        {
+            var inventory = new Inventory();
+
+            var slotValues = inventory.EquipmentSlots.Select(s => s.Value).ToList();
+            Assert.Equal(Enum.GetValues<EEquipmentSlot>().Length, slotValues.Count);
+            Assert.Equal(Enum.GetValues<EEquipmentSlot>().ToHashSet(), slotValues.ToHashSet());
+        }
+
         // ── UnlockItem ──────────────────────────────────────────────────────
 
         [Fact]
