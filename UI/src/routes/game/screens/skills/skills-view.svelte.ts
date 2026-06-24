@@ -467,6 +467,10 @@ export class SkillsView {
 					toastError('Your loadout could not be saved. Please try again.');
 				}
 			} else {
+				// Advance the baseline on *every* success, not just the latest edit's: persists are
+				// serialized, so when an earlier edit succeeds and a later one then fails, the server
+				// holds the earlier edit's loadout — which is exactly what the latest failure must roll
+				// back to. Advancing only for the latest would roll back past that confirmed state.
 				this.committed = next;
 				if (isLatest) {
 					this.pendingLoadout = null;
