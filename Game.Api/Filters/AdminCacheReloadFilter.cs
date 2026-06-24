@@ -30,6 +30,14 @@ namespace Game.Api.Filters
         /// </summary>
         public const int FilterOrder = int.MinValue;
 
+        /// <summary>
+        /// Upper bound on the awaited local reload. The reload queries the database on a fresh context, so a
+        /// wedged connection would otherwise hold the admin request open indefinitely (no request-token tie —
+        /// see below). On timeout the reload is abandoned and a <see cref="TimeoutException"/> surfaces as an
+        /// error on the admin response; the write persisted, so the admin can retry the reload by re-saving.
+        /// </summary>
+        private static readonly TimeSpan ReloadTimeout = TimeSpan.FromSeconds(30);
+
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             var executedContext = await next();
@@ -40,6 +48,12 @@ namespace Game.Api.Filters
                 // pays its own awaited reload below. The broadcast is best-effort — a failure must never
                 // abort the local read-your-writes reload, so it is swallowed with a warning (other
                 // instances stay stale until the next notification, an accepted cost).
+                //
+                // Accepted asymmetry: because the broadcast runs *before* the local reload, a local-reload
+                // failure (or timeout) after a successful broadcast leaves the serving instance as the *only*
+                // stale one — the inverse of the intended read-your-writes guarantee — until its next admin
+                // write or notification. Ordering it this way is deliberate (it overlaps the cross-instance
+                // reloads with the local one); the window is small and self-heals on the next reload.
                 try
                 {
                     await changeNotifier.NotifyChangedAsync();
@@ -53,8 +67,9 @@ namespace Game.Api.Filters
                 // own DI-scoped context and swaps it atomically, and no holder depends on another's reload
                 // order, so a serial pass only adds latency and could leave some sets fresh and some stale if
                 // one query failed mid-list. Not tied to the request's cancellation token: the write has
-                // committed, so the caches must reflect it even if the client has disconnected.
-                await Task.WhenAll(caches.Select(cache => cache.ReloadAsync()));
+                // committed, so the caches must reflect it even if the client has disconnected — but bounded by
+                // ReloadTimeout so a wedged database connection can't hold the admin request open forever.
+                await Task.WhenAll(caches.Select(cache => cache.ReloadAsync())).WaitAsync(ReloadTimeout);
             }
         }
     }

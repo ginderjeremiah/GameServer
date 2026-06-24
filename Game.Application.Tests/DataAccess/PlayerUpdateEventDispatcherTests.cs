@@ -72,5 +72,29 @@ namespace Game.Application.Tests.DataAccess
 
             await Assert.ThrowsAsync<JsonException>(() => dispatcher.DispatchAsync(envelope));
         }
+
+        // The dispatch key is the unqualified type name the persisted envelope carries (see Register), so two
+        // event types with the same simple name across namespaces would collide. Registration fails loud rather
+        // than silently overwriting and misrouting one type's writes to the other's handler.
+        private static class NamespaceA { public sealed record Collide(int Value); }
+        private static class NamespaceB { public sealed record Collide(int Value); }
+
+        [Fact]
+        public void Register_DifferentTypeWithCollidingSimpleName_Throws()
+        {
+            PlayerUpdateEventDispatcher.Register<NamespaceA.Collide>();
+
+            Assert.Throws<InvalidOperationException>(PlayerUpdateEventDispatcher.Register<NamespaceB.Collide>);
+        }
+
+        [Fact]
+        public void Register_SameTypeTwice_IsIdempotent()
+        {
+            PlayerUpdateEventDispatcher.Register<FakeUpdateEvent>();
+
+            // Re-registering the identical type is the normal startup case (the test suite itself does it across
+            // methods) and must not throw the collision guard.
+            PlayerUpdateEventDispatcher.Register<FakeUpdateEvent>();
+        }
     }
 }

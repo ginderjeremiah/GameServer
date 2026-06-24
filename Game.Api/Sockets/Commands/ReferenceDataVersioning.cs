@@ -16,7 +16,9 @@ namespace Game.Api.Sockets.Commands
         // is the first thing the loading screen pulls). Keying on the snapshot reference makes invalidation
         // automatic: a build-then-swap publishes a new snapshot object, which is a cache miss, while the old
         // entry is collected once no caller holds the prior snapshot. ConditionalWeakTable is itself
-        // thread-safe, and GetValue computes the value at most once per key under concurrent connects.
+        // thread-safe; its GetValue may run the factory more than once under a concurrent first-touch of the
+        // same key (only one result is published and returned), which is harmless here because the hash is a
+        // pure, idempotent function of the snapshot — a redundant recompute yields the identical value.
         private static readonly ConditionalWeakTable<object, string> _versions = new();
 
         /// <summary>
