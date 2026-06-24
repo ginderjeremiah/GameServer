@@ -125,9 +125,16 @@ export function zoneSpawnLevel(zone: IZone): number {
 export class SkillsView {
 	/** The inspected skill (rail/band selection). */
 	selectedId = $state<number>(-1);
-	/** Working equipped loadout, ordered by priority. Optimistically updated, then
-	 *  persisted via {@link commit}; reverted if the persist fails. */
-	equipped = $state<number[]>([]);
+	/** Pending optimistic loadout while a commit is in flight (or after the latest commit failed without
+	 *  a newer edit); null when the screen mirrors the player manager. {@link equipped} reads through it. */
+	private pendingLoadout = $state<number[] | null>(null);
+	/** Last loadout the server confirmed — the rollback target when the latest commit fails. */
+	private committed: number[] = [];
+	/** Tail of the optimistic-commit queue; each commit chains off it so persists apply in edit order
+	 *  and rollback baselines never interleave (mirrors the inventory manager's serialized mutations). */
+	private lastCommit: Promise<unknown> = Promise.resolve();
+	/** Monotonic edit counter; a failed persist rolls back only when it was the latest edit issued. */
+	private commitSeq = 0;
 	search = $state('');
 	sort = $state<SkillSort>('dps');
 	filterAttributes = $state<EAttribute[]>([]);
@@ -145,13 +152,19 @@ export class SkillsView {
 		this.syncFromPlayer();
 	}
 
-	/** (Re)seed the working loadout + selection from the player manager. */
+	/** (Re)seed the committed baseline + inspector selection from the player manager. */
 	syncFromPlayer(): void {
-		this.equipped = [...playerManager.selectedSkills];
+		this.committed = [...playerManager.selectedSkills];
+		this.pendingLoadout = null;
 		if (this.selectedId < 0) {
 			this.selectedId = this.equipped[0] ?? staticData.skills?.[0]?.id ?? -1;
 		}
 	}
+
+	/** Working equipped loadout, ordered by priority: the pending optimistic edit while a commit is in
+	 *  flight, otherwise the player manager's committed loadout — so an external loadout change (e.g. a
+	 *  challenge skill unlock or server reconciliation) is reflected once no edit is pending. */
+	readonly equipped = $derived(this.pendingLoadout ?? [...playerManager.selectedSkills]);
 
 	/** The loadout cap (number of equip slots) — the single generated game constant. */
 	readonly cap = MAX_SELECTED_SKILLS;
@@ -368,9 +381,9 @@ export class SkillsView {
 			return;
 		}
 		if (this.isEquipped(id)) {
-			void this.commit(this.equipped.filter((x) => x !== id));
+			this.commit(this.equipped.filter((x) => x !== id));
 		} else if (this.equipped.length < this.cap) {
-			void this.commit([...this.equipped, id]);
+			this.commit([...this.equipped, id]);
 		} else {
 			this.pendingSwap = id;
 		}
@@ -385,7 +398,7 @@ export class SkillsView {
 		const next = this.equipped.map((x, i) => (i === slotIndex ? incoming : x));
 		this.selectedId = incoming;
 		this.pendingSwap = null;
-		void this.commit(next);
+		this.commit(next);
 	}
 
 	cancelSwap(): void {
@@ -400,7 +413,7 @@ export class SkillsView {
 		const next = [...this.equipped];
 		const [moved] = next.splice(from, 1);
 		next.splice(to, 0, moved);
-		void this.commit(next);
+		this.commit(next);
 	}
 
 	setDefense(defense: number): void {
@@ -433,16 +446,35 @@ export class SkillsView {
 	/* ── persistence ─────────────────────────────────────────────────────────── */
 
 	/** Optimistically apply a new loadout, persist it atomically, and revert on failure. The player
-	 *  manager owns the loadout mutation (so battles/other screens see it without a reload). */
-	private async commit(next: number[]): Promise<void> {
-		const previous = this.equipped;
-		this.equipped = next;
+	 *  manager owns the loadout mutation (so battles/other screens see it without a reload).
+	 *
+	 *  Commits are serialized on {@link lastCommit} so their persists apply in edit order and never
+	 *  interleave rollback baselines: only the *latest* edit's failure rolls back — to the last
+	 *  server-confirmed loadout ({@link committed}), not a per-call snapshot — so an earlier failure
+	 *  can't silently discard a later successful edit. The optimistic write itself is synchronous, so
+	 *  rapid edits read fresh state and queue rather than racing. */
+	private commit(next: number[]): void {
+		this.pendingLoadout = next;
 		playerManager.setSelectedSkills(next);
-		const response = await apiSocket.sendSocketCommand('SetSelectedSkills', next);
-		if (response.error) {
-			this.equipped = previous;
-			playerManager.setSelectedSkills(previous);
-			toastError('Your loadout could not be saved. Please try again.');
-		}
+		const seq = ++this.commitSeq;
+		const result = this.lastCommit.then(async () => {
+			const response = await apiSocket.sendSocketCommand('SetSelectedSkills', next);
+			const isLatest = seq === this.commitSeq;
+			if (response.error) {
+				if (isLatest) {
+					playerManager.setSelectedSkills(this.committed);
+					this.pendingLoadout = null;
+					toastError('Your loadout could not be saved. Please try again.');
+				}
+			} else {
+				this.committed = next;
+				if (isLatest) {
+					this.pendingLoadout = null;
+				}
+			}
+		});
+		// Keep the queue tail always-fulfilled: a rejecting callback would otherwise make every later
+		// commit skip its persist and raise an unhandled rejection (mirrors the inventory manager's serialize).
+		this.lastCommit = result.catch(() => undefined);
 	}
 }

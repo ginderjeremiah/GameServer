@@ -38,6 +38,7 @@ namespace Game.Api.Tests.Integration
             await TestDataSeeder.CreateZoneAsync(context, "RefZone");
             await TestDataSeeder.CreateItemAsync(context, "RefSword");
             await TestDataSeeder.CreateItemModAsync(context, "RefMod");
+            await TestDataSeeder.CreateProficiencyAsync(context, "RefBlades");
 
             var user = await TestDataSeeder.CreateUserAsync(context, "refdatauser", "refdatapass");
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
@@ -236,6 +237,19 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetProficiencies_ReturnsSeededProficiencies()
+        {
+            var userId = await SeedReferenceDataAndLoginAsync();
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<Proficiency>>("GetProficiencies");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.Contains(response.Data, p => p.Name == "RefBlades");
+        }
+
+        [Fact]
         public async Task GetStatisticTypes_ReturnsIntrinsicStatisticTypes()
         {
             var userId = await SeedReferenceDataAndLoginAsync();
@@ -266,7 +280,7 @@ namespace Game.Api.Tests.Integration
             // One entry per Get* reference-data command the loading screen pulls.
             Assert.Equal(
                 ["GetAttributes", "GetChallengeTypes", "GetChallenges", "GetEnemies", "GetItemMods",
-                 "GetItems", "GetSkills", "GetStatisticTypes", "GetZones"],
+                 "GetItems", "GetProficiencies", "GetSkills", "GetStatisticTypes", "GetZones"],
                 response.Data.Select(v => v.Command).OrderBy(c => c, StringComparer.Ordinal));
             Assert.All(response.Data, v => Assert.False(string.IsNullOrEmpty(v.Version)));
         }

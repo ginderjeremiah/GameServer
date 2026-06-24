@@ -371,17 +371,18 @@ describe('SkillsView — rail filtering & sorting', () => {
 });
 
 describe('SkillsView — loadout edits persist the ordered loadout', () => {
-	it('unequips a skill and sends the reduced loadout', () => {
+	it('unequips a skill and sends the reduced loadout', async () => {
 		view.toggle(0);
-		expect(view.equipped).toEqual([1, 2]);
-		expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [1, 2]);
+		expect(view.equipped).toEqual([1, 2]); // optimistic, synchronous
+		// The persist is serialized, so the dispatch lands on a microtask.
+		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('SetSelectedSkills', [1, 2]));
 	});
 
-	it('equips into a free slot and sends the extended loadout', () => {
+	it('equips into a free slot and sends the extended loadout', async () => {
 		view.toggle(0); // free a slot first (cap is 3)
 		view.toggle(3);
 		expect(view.equipped).toEqual([1, 2, 3]);
-		expect(lastPayload()).toEqual([1, 2, 3]);
+		await vi.waitFor(() => expect(lastPayload()).toEqual([1, 2, 3]));
 	});
 
 	it('starts a swap (no command) when equipping into a full loadout', () => {
@@ -391,19 +392,19 @@ describe('SkillsView — loadout edits persist the ordered loadout', () => {
 		expect(sendSocketCommand).not.toHaveBeenCalled();
 	});
 
-	it('resolves a swap by replacing the chosen slot', () => {
+	it('resolves a swap by replacing the chosen slot', async () => {
 		view.toggle(3); // full → pending swap
 		view.swapInto(1);
 		expect(view.equipped).toEqual([0, 3, 2]);
 		expect(view.selectedId).toBe(3);
 		expect(view.pendingSwap).toBeNull();
-		expect(lastPayload()).toEqual([0, 3, 2]);
+		await vi.waitFor(() => expect(lastPayload()).toEqual([0, 3, 2]));
 	});
 
-	it('reorders the loadout', () => {
+	it('reorders the loadout', async () => {
 		view.reorder(0, 2);
 		expect(view.equipped).toEqual([1, 2, 0]);
-		expect(lastPayload()).toEqual([1, 2, 0]);
+		await vi.waitFor(() => expect(lastPayload()).toEqual([1, 2, 0]));
 	});
 
 	it('ignores toggling a skill the player has not unlocked', () => {
@@ -431,6 +432,41 @@ describe('SkillsView — persistence failure', () => {
 		// …then reverted once the failed command resolves.
 		expect(view.equipped).toEqual([0, 1, 2]);
 		expect(mockPlayerManager.selectedSkills).toEqual([0, 1, 2]);
+	});
+
+	it('keeps a later successful edit when an earlier overlapping commit fails', async () => {
+		// Two rapid edits: the first persist fails, the second succeeds. Because commits are serialized
+		// and only the latest edit's failure rolls back, the stale first failure must NOT clobber the
+		// second edit (the bug this guards against).
+		sendSocketCommand.mockReset();
+		sendSocketCommand.mockResolvedValueOnce({ error: 'nope' }).mockResolvedValue({});
+		view.toggle(0); // → [1, 2]
+		view.toggle(3); // → [1, 2, 3] (the later, winning edit)
+		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledTimes(2));
+		await vi.waitFor(() => expect(view.equipped).toEqual([1, 2, 3]));
+		expect(mockPlayerManager.selectedSkills).toEqual([1, 2, 3]);
+		expect(toastError).not.toHaveBeenCalled();
+	});
+
+	it('reverts only to the last confirmed loadout when the latest edit fails', async () => {
+		view.toggle(0); // [0, 1, 2] → [1, 2], succeeds and is confirmed
+		await vi.waitFor(() => expect(mockPlayerManager.selectedSkills).toEqual([1, 2]));
+		sendSocketCommand.mockResolvedValueOnce({ error: 'nope' });
+		view.reorder(0, 1); // [1, 2] → [2, 1], fails
+		expect(view.equipped).toEqual([2, 1]); // optimistic
+		await vi.waitFor(() => expect(toastError).toHaveBeenCalled());
+		// Rolls back to the previously-confirmed [1, 2], not the original [0, 1, 2].
+		expect(view.equipped).toEqual([1, 2]);
+		expect(mockPlayerManager.selectedSkills).toEqual([1, 2]);
+	});
+
+	it('reconciles with the player manager once no edit is pending', async () => {
+		// An external loadout change (e.g. a challenge skill unlock) lands while a commit is in flight;
+		// once the queue drains the screen reflects the manager rather than the stale optimistic copy.
+		// (In production the statified manager also propagates such changes live while idle.)
+		view.toggle(0); // → [1, 2], in flight
+		mockPlayerManager.setSelectedSkills([3]); // external write
+		await vi.waitFor(() => expect(view.equipped).toEqual([3]));
 	});
 });
 

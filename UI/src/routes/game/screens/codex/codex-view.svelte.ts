@@ -7,9 +7,9 @@
    cleared / unlocked / locked) beside a zone dossier — level band, spawn pool, boss card, spawn table
    and unlock condition — whose boss card and spawn rows cross-link into the enemy dossier. The Skills
    tab is a master/detail skill catalogue: a skill table (base damage / cooldown / used-by count)
-   beside a dossier — base damage, cooldown, how to obtain the skill (derived from actual challenge
-   reward / item grant references, with the acquisition flag wording the enemy-only / not-obtainable
-   case), the attributes it scales with, its authored effects (via the shared
+   beside a dossier — base damage, cooldown, how to obtain the skill (derived from actual item-grant
+   references, with the acquisition flag wording the enemy-only / not-obtainable case), the
+   attributes it scales with, its authored effects (via the shared
    `$lib/common/skill-effect-display` helper) and the enemies that use it, which cross-link into the
    enemy dossier. The data is all live reference/runtime data — the screen reuses the real
    `BattleAttributes` enemy build for stat scaling (`$lib/common/enemy-attributes`), the Statistics
@@ -60,11 +60,11 @@ import {
 	formatCooldown,
 	matchesEnemySearch,
 	resolveZoneStatus,
-	skillSourceLabel,
 	sortEnemyRows,
 	tabAccent,
 	tabLabel,
-	SKILL_ACQUISITION_EMPTY
+	SKILL_ACQUISITION_EMPTY,
+	SKILL_SOURCE_LABEL
 } from './codex-display';
 import { type LevelRange, levelRange, spawnShare, zoneTotalWeight } from './enemy-level';
 import { type SkillAcquisitionStatus, resolveSkillProvenance } from './skill-provenance';
@@ -216,14 +216,14 @@ export interface SkillUserVM {
 	accent: string;
 }
 
-/** A "how to obtain" source row — a challenge that rewards the skill or an item that grants it. */
+/** A "how to obtain" source row — an item that grants the skill. */
 export interface SkillSourceVM {
-	kind: 'challenge' | 'item';
+	kind: 'item';
 	id: number;
-	/** "Rewarded by" / "Granted by" lead-in. */
+	/** "Granted by" lead-in. */
 	label: string;
 	name: string;
-	/** Themed accent: challenge → the dossier's intellect section accent; item → its rarity hue. */
+	/** Themed accent: the granting item's rarity hue. */
 	accent: string;
 }
 
@@ -667,7 +667,7 @@ export class CodexView {
 			}));
 	});
 
-	/** How the selected skill is obtained — derived from actual challenge/item references, with the
+	/** How the selected skill is obtained — derived from actual item-grant references, with the
 	 *  acquisition flag wording the no-source case. Item sources tint by the granting item's rarity. */
 	readonly skillProvenance = $derived.by<SkillProvenanceVM>(() => {
 		const sk = this.selectedSkill;
@@ -677,15 +677,14 @@ export class CodexView {
 		const allItems = staticData.items ?? [];
 		const provenance = resolveSkillProvenance(
 			sk,
-			(staticData.challenges ?? []).filter((c) => !c.retiredAt),
 			allItems.filter((i) => !i.retiredAt)
 		);
 		const sources = provenance.sources.map<SkillSourceVM>((src) => ({
 			kind: src.kind,
 			id: src.id,
-			label: skillSourceLabel(src.kind),
+			label: SKILL_SOURCE_LABEL,
 			name: src.name,
-			accent: src.kind === 'item' ? rarityColor(allItems[src.id]?.rarityId ?? ERarity.Common) : 'var(--attr-intellect)'
+			accent: rarityColor(allItems[src.id]?.rarityId ?? ERarity.Common)
 		}));
 		return {
 			status: provenance.status,

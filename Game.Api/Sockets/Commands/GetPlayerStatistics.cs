@@ -7,10 +7,9 @@ namespace Game.Api.Sockets.Commands
     /// <summary>
     /// Returns the connected player's tracked statistics (player progress). Unlike the reference-data
     /// commands this is player-scoped: it resolves the player from the socket session and delegates to
-    /// <see cref="IPlayerProgressRepository.GetStatistics"/> — the same read the <c>GET /api/Statistics</c>
-    /// endpoint runs (cache-first, so it serves warm cached progress). Named to stay unambiguous against
-    /// the reference-data <see cref="GetStatisticTypes"/> command, which returns statistic metadata rather
-    /// than the player's values.
+    /// <see cref="IPlayerProgressRepository.GetStatistics"/> (cache-first, so it serves warm cached
+    /// progress). Named to stay unambiguous against the reference-data <see cref="GetStatisticTypes"/>
+    /// command, which returns statistic metadata rather than the player's values.
     /// </summary>
     public class GetPlayerStatistics : AbstractSocketCommandWithResponseData<IEnumerable<PlayerStatistic>>
     {

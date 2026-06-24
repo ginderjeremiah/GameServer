@@ -18,9 +18,9 @@ namespace Game.Application.Tests.Events
     /// <summary>
     /// Handler-level coverage for <see cref="BattleStatisticsEventHandler"/>'s challenge-reward
     /// orchestration: when a battle completes a challenge, the handler resolves the reward id via the
-    /// relevant provider (<see cref="IItems"/> / <see cref="ISkills"/>; mods are unlocked by id directly)
-    /// and applies the matching unlock to the player aggregate. Each reward kind is exercised the same
-    /// way, alongside the additive multi-reward case and the null-reward edge (#292).
+    /// relevant provider (<see cref="IItems"/>; mods are unlocked by id directly) and applies the matching
+    /// unlock to the player aggregate. Each reward kind is exercised the same way, alongside the additive
+    /// multi-reward case and the null-reward edge (#292). Challenges no longer grant skills (spike #982).
     /// </summary>
     [Collection("Integration")]
     public class BattleStatisticsEventHandlerTests : ApplicationIntegrationTestBase
@@ -32,67 +32,46 @@ namespace Game.Application.Tests.Events
         public async Task CompletingChallengeWithItemReward_UnlocksItemOnPlayer()
         {
             using var scope = CreateScope();
-            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: false, skillReward: false);
+            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: false);
 
             var player = await CompleteChallengeVictoryAsync(scope, setup);
 
             Assert.Contains(player.Inventory.UnlockedItems, u => u.ItemId == setup.ItemId);
-            // The mod and skill reward ids were null, so neither kind is unlocked.
+            // The mod reward id was null, so it is not unlocked.
             Assert.Empty(player.Inventory.UnlockedMods);
-            Assert.DoesNotContain(player.Skills, s => s.Id == setup.RewardSkillId);
         }
 
         [Fact]
         public async Task CompletingChallengeWithModReward_UnlocksModOnPlayer()
         {
             using var scope = CreateScope();
-            var setup = await SeedScenarioAsync(scope, itemReward: false, modReward: true, skillReward: false);
+            var setup = await SeedScenarioAsync(scope, itemReward: false, modReward: true);
 
             var player = await CompleteChallengeVictoryAsync(scope, setup);
 
             Assert.Contains(setup.ModId, player.Inventory.UnlockedMods);
-            // The item and skill reward ids were null, so neither kind is unlocked.
+            // The item reward id was null, so it is not unlocked.
             Assert.Empty(player.Inventory.UnlockedItems);
-            Assert.DoesNotContain(player.Skills, s => s.Id == setup.RewardSkillId);
-        }
-
-        [Fact]
-        public async Task CompletingChallengeWithSkillReward_UnlocksSkillUnselectedOnPlayer()
-        {
-            using var scope = CreateScope();
-            var setup = await SeedScenarioAsync(scope, itemReward: false, modReward: false, skillReward: true);
-
-            var player = await CompleteChallengeVictoryAsync(scope, setup);
-
-            // Earning a skill adds it to the unlocked set but does not equip it (the loadout is chosen
-            // separately) — the orchestration-level complement to the Player.UnlockSkill domain test.
-            Assert.Contains(player.Skills, s => s.Id == setup.RewardSkillId);
-            Assert.DoesNotContain(player.SelectedSkills, s => s.Id == setup.RewardSkillId);
-            // The item and mod reward ids were null, so neither kind is unlocked.
-            Assert.Empty(player.Inventory.UnlockedItems);
-            Assert.Empty(player.Inventory.UnlockedMods);
         }
 
         [Fact]
         public async Task CompletingChallengeWithMultipleRewards_AppliesAllAdditively()
         {
             using var scope = CreateScope();
-            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: true, skillReward: true);
+            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: true);
 
             var player = await CompleteChallengeVictoryAsync(scope, setup);
 
             // A single challenge carrying every reward kind unlocks all of them.
             Assert.Contains(player.Inventory.UnlockedItems, u => u.ItemId == setup.ItemId);
             Assert.Contains(setup.ModId, player.Inventory.UnlockedMods);
-            Assert.Contains(player.Skills, s => s.Id == setup.RewardSkillId);
-            Assert.DoesNotContain(player.SelectedSkills, s => s.Id == setup.RewardSkillId);
         }
 
         [Fact]
         public async Task CompletingChallenge_RaisesChallengeCompletedEventWithRewardIds()
         {
             using var scope = CreateScope();
-            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: true, skillReward: true);
+            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: true);
 
             var player = await CompleteChallengeVictoryAsync(scope, setup);
 
@@ -102,14 +81,13 @@ namespace Game.Application.Tests.Events
             Assert.Equal(player.Id, evt.PlayerId);
             Assert.Equal(setup.ItemId, evt.RewardItemId);
             Assert.Equal(setup.ModId, evt.RewardItemModId);
-            Assert.Equal(setup.RewardSkillId, evt.RewardSkillId);
         }
 
         [Fact]
         public async Task CompletingChallengeWithNoRewards_UnlocksNothing()
         {
             using var scope = CreateScope();
-            var setup = await SeedScenarioAsync(scope, itemReward: false, modReward: false, skillReward: false);
+            var setup = await SeedScenarioAsync(scope, itemReward: false, modReward: false);
 
             var player = await CompleteChallengeVictoryAsync(scope, setup);
 
@@ -122,7 +100,6 @@ namespace Game.Application.Tests.Events
             // A challenge with all-null reward ids is a clean no-op for unlocks.
             Assert.Empty(player.Inventory.UnlockedItems);
             Assert.Empty(player.Inventory.UnlockedMods);
-            Assert.DoesNotContain(player.Skills, s => s.Id == setup.RewardSkillId);
         }
 
         [Fact]
@@ -386,15 +363,14 @@ namespace Game.Application.Tests.Events
         /// providers resolve exactly what was seeded.
         /// </summary>
         private async Task<Setup> SeedScenarioAsync(
-            IServiceScope scope, bool itemReward, bool modReward, bool skillReward)
+            IServiceScope scope, bool itemReward, bool modReward)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
-            // A distinct, already-equipped starter skill so "unlocked unselected" is observable against a
-            // non-empty selected loadout.
+            // A distinct, already-equipped starter skill so the player has a non-empty selected loadout.
             var starterSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Starter");
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, starterSkill.Id);
 
@@ -402,21 +378,19 @@ namespace Game.Application.Tests.Events
 
             var item = await TestDataSeeder.CreateItemAsync(context);
             var mod = await TestDataSeeder.CreateItemModAsync(context);
-            var rewardSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Reward");
 
             await TestDataSeeder.CreateChallengeAsync(
                 context,
                 challengeTypeId: EChallengeType.EnemiesKilled,
                 progressGoal: 1m,
                 rewardItemId: itemReward ? item.Id : null,
-                rewardItemModId: modReward ? mod.Id : null,
-                rewardSkillId: skillReward ? rewardSkill.Id : null);
+                rewardItemModId: modReward ? mod.Id : null);
 
             // The caches no longer lazily refill, so reload them to pick up the rows just seeded before the
             // handler reads through its providers.
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
-            return new Setup(player.Id, enemy.Id, item.Id, mod.Id, rewardSkill.Id);
+            return new Setup(player.Id, enemy.Id, item.Id, mod.Id);
         }
 
         /// <summary>
@@ -446,6 +420,6 @@ namespace Game.Application.Tests.Events
             return player;
         }
 
-        private sealed record Setup(int PlayerId, int EnemyId, int ItemId, int ModId, int RewardSkillId);
+        private sealed record Setup(int PlayerId, int EnemyId, int ItemId, int ModId);
     }
 }

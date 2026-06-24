@@ -42,7 +42,6 @@ namespace Game.Api.Models.Progress
                         ChallengeId = c.ChallengeId,
                         RewardItemId = c.RewardItemId,
                         RewardItemModId = c.RewardItemModId,
-                        RewardSkillId = c.RewardSkillId,
                     })
                     .ToList(),
             };

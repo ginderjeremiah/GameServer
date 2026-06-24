@@ -1,14 +1,16 @@
-import { ERarity, type IChallenge, type IItem, type IItemMod, type ISkill, type IZone } from '$lib/api';
+import { ERarity, type IChallenge, type IItem, type IItemMod, type IZone } from '$lib/api';
 import { itemCategoryName, modTypeLabel } from './item-display';
 import { rarityColor, rarityLabel } from './rarity';
 
 /* What completing a challenge grants. A challenge can unlock zones (those gated on it via
-   `unlockChallengeId`) and award a single reward (an item, a mod, or a skill). These pure helpers
-   resolve that "what does this unlock" view from the reference data so it can be surfaced wherever
-   a challenge appears — the locked-zone tooltip, the challenges screen, etc. — without each call
-   site re-deriving the relationship. This is the single home for the item > mod > skill precedence
-   and the rarity/accent/sub-label of a reward; richer surfaces (the challenges screen's
-   `resolveReward`) build their preview on top of this resolution rather than re-deriving it. */
+   `unlockChallengeId`) and award a single reward (an item or a mod). Skills no longer come from
+   challenges (they come from the starter kit, item grants, and proficiency milestones — spike
+   #982). These pure helpers resolve that "what does this unlock" view from the reference data so it
+   can be surfaced wherever a challenge appears — the locked-zone tooltip, the challenges screen,
+   etc. — without each call site re-deriving the relationship. This is the single home for the
+   item > mod precedence and the rarity/accent/sub-label of a reward; richer surfaces (the
+   challenges screen's `resolveReward`) build their preview on top of this resolution rather than
+   re-deriving it. */
 
 interface UnlockRewardBase {
 	/** The reward's real name. Callers mask it themselves (e.g. `???`) while the challenge is sealed. */
@@ -33,19 +35,12 @@ export interface ModUnlockReward extends UnlockRewardBase {
 	mod: IItemMod;
 }
 
-export interface SkillUnlockReward extends UnlockRewardBase {
-	kind: 'skill';
-	/** The rewarded skill's reference record, passed through to the skill tooltip. */
-	skill: ISkill;
-}
-
-export type UnlockReward = ItemUnlockReward | ModUnlockReward | SkillUnlockReward;
+export type UnlockReward = ItemUnlockReward | ModUnlockReward;
 
 /** The zero-based-id reference pools the reward resolver reads (any may be undefined before load). */
 export interface RewardRefs {
 	items?: (IItem | undefined)[];
 	itemMods?: (IItemMod | undefined)[];
-	skills?: (ISkill | undefined)[];
 }
 
 /**
@@ -60,9 +55,9 @@ export function zonesUnlockedBy(challengeId: number, zones: (IZone | undefined)[
 }
 
 /**
- * Resolve a challenge's single reward (item, mod, or skill) from the reference pools. Item > mod >
- * skill precedence mirrors the challenges-screen reward resolution. Returns null when the challenge
- * grants no reward (or the referenced record is missing/unloaded).
+ * Resolve a challenge's single reward (item or mod) from the reference pools. Item > mod precedence
+ * mirrors the challenges-screen reward resolution. Returns null when the challenge grants no reward
+ * (or the referenced record is missing/unloaded).
  */
 export function resolveUnlockReward(challenge: IChallenge, refs: RewardRefs): UnlockReward | null {
 	if (challenge.rewardItemId != null) {
@@ -91,26 +86,13 @@ export function resolveUnlockReward(challenge: IChallenge, refs: RewardRefs): Un
 			};
 		}
 	}
-	if (challenge.rewardSkillId != null) {
-		const skill = refs.skills?.[challenge.rewardSkillId];
-		if (skill) {
-			return {
-				kind: 'skill',
-				skill,
-				name: skill.name,
-				accent: rarityColor(skill.rarityId),
-				sub: `${rarityLabel(skill.rarityId)} · Skill`,
-				rarity: skill.rarityId
-			};
-		}
-	}
 	return null;
 }
 
 /**
  * The player-facing message announcing a completed challenge and what it unlocked, used by the
- * completion success-toast. The reward (item / mod / skill) is named when present so the player sees
- * their gain at a glance; a challenge carrying no direct reward just announces the completion.
+ * completion success-toast. The reward (item / mod) is named when present so the player sees their
+ * gain at a glance; a challenge carrying no direct reward just announces the completion.
  */
 export function challengeCompletedMessage(challengeName: string, reward: UnlockReward | null): string {
 	if (reward) {

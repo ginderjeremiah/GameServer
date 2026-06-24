@@ -105,6 +105,14 @@ export interface FieldsSectionConfig<T> extends BaseSection<T> {
 export interface TableSectionConfig<T> extends BaseSection<T> {
 	kind: 'table';
 	itemsKey: keyof T & string;
+	/**
+	 * The row field that uniquely identifies a row within the collection — `id` for surrogate-id
+	 * collections (skill effects, item mod slots) and the natural key for attribute/relation tables
+	 * (`attributeId`, `enemyId`, `zoneId`). Used to key the rendered rows and match them to their
+	 * baseline by identity rather than array position, so a mid-list delete can't corrupt the
+	 * dirty edges or reuse a row's input state.
+	 */
+	rowKey: string;
 	addLabel: string;
 	emptyIcon: WorkbenchIconKind;
 	emptyTitle: string;

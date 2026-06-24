@@ -48,5 +48,26 @@ namespace Game.Api.Tests.Unit
 
             Assert.False(factory.IsServerInitiatedOnly(commandName));
         }
+
+        [Theory]
+        [InlineData("GetZones")]
+        [InlineData("DefeatEnemy")]
+        [InlineData("SocketReplaced")]
+        public void IsKnownCommand_ReturnsTrue_ForRegisteredCommands(string commandName)
+        {
+            var factory = new SocketCommandFactory();
+
+            Assert.True(factory.IsKnownCommand(commandName));
+        }
+
+        [Theory]
+        [InlineData("NonExistentCommand")]
+        [InlineData("")]
+        public void IsKnownCommand_ReturnsFalse_ForUnregisteredCommands(string commandName)
+        {
+            var factory = new SocketCommandFactory();
+
+            Assert.False(factory.IsKnownCommand(commandName));
+        }
     }
 }

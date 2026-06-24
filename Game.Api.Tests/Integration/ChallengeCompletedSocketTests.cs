@@ -73,7 +73,6 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(scenario.ChallengeId, push.Data.ChallengeId);
             Assert.Equal(scenario.ItemId, push.Data.RewardItemId);
             Assert.Null(push.Data.RewardItemModId);
-            Assert.Null(push.Data.RewardSkillId);
         }
 
         /// <summary>

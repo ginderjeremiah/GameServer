@@ -1,15 +1,15 @@
 <!--
-	Reward section: grant an item, a mod, and/or a skill, with hard exclusivity across
+	Reward section: grant an item and/or a mod, with hard exclusivity across
 	every challenge in the catalogue (a reward unlocked elsewhere can't be re-assigned).
 	The current sibling challenges are read live from the store so exclusivity
-	reflects unsaved edits too.
+	reflects unsaved edits too. Challenges no longer grant skills (spike #982).
 -->
 <div>
 	<div class="ch-reward-intro">
 		<WorkbenchIcon kind="gift" size={13} stroke="var(--text-tertiary)" />
 		<span>
-			Grant an item, a mod, and/or a skill. Each unlock belongs to exactly one challenge — already-claimed rewards are
-			disabled below.
+			Grant an item and/or a mod. Each unlock belongs to exactly one challenge — already-claimed rewards are disabled
+			below.
 		</span>
 	</div>
 
@@ -44,19 +44,6 @@
 			onClear={() => setMod(undefined)}
 			onOpen={() => (open = open === 'mod' ? null : 'mod')}
 		/>
-		<RewardSlot
-			kind="skill"
-			label="Skill Reward"
-			valueId={challenge.rewardSkillId}
-			name={challenge.rewardSkillId != null ? reference.skillName(challenge.rewardSkillId) : undefined}
-			sub={challenge.rewardSkillId != null ? `${reference.skillBaseDamage(challenge.rewardSkillId) ?? 0} dmg` : ''}
-			color={challenge.rewardSkillId != null ? 'var(--accent)' : null}
-			retired={challenge.rewardSkillId != null && reference.skillRetired(challenge.rewardSkillId)}
-			dirty={skillDirty}
-			open={open === 'skill'}
-			onClear={() => setSkill(undefined)}
-			onOpen={() => (open = open === 'skill' ? null : 'skill')}
-		/>
 	</div>
 
 	{#if open === 'item'}
@@ -77,15 +64,6 @@
 			onPick={setMod}
 			onClose={() => (open = null)}
 		/>
-	{:else if open === 'skill'}
-		<RewardPicker
-			kind="skill"
-			records={skillPickRecords}
-			currentId={challenge.rewardSkillId}
-			claimed={claimedSkills}
-			onPick={setSkill}
-			onClose={() => (open = null)}
-		/>
 	{/if}
 
 	{#if none}
@@ -97,12 +75,11 @@
 </div>
 
 <script lang="ts">
-import { ERarity, ESkillAcquisition, type IChallenge } from '$lib/api';
-import { hasFlag } from '$lib/common';
+import { ERarity, type IChallenge } from '$lib/api';
 import { reference } from '../../reference.svelte';
 import type { EntityStore } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';
-import { claimedItemMap, claimedModMap, claimedSkillMap } from '../../entities/challenge-helpers';
+import { claimedItemMap, claimedModMap } from '../../entities/challenge-helpers';
 import WorkbenchIcon from '../../WorkbenchIcon.svelte';
 import RewardSlot from './RewardSlot.svelte';
 import RewardPicker from './RewardPicker.svelte';
@@ -118,7 +95,7 @@ const { record, baseline, store }: Props = $props();
 const challenge = $derived(record as unknown as IChallenge);
 const base = $derived(baseline as unknown as IChallenge | undefined);
 
-let open = $state<'item' | 'mod' | 'skill' | null>(null);
+let open = $state<'item' | 'mod' | null>(null);
 // Collapse any open picker when switching to a different record.
 let openForId = $state<number>();
 $effect(() => {
@@ -131,14 +108,10 @@ $effect(() => {
 const liveChallenges = $derived(store.items.filter((it) => store.status(it) !== 'deleted') as unknown as IChallenge[]);
 const claimedItems = $derived(claimedItemMap(liveChallenges, challenge.id));
 const claimedMods = $derived(claimedModMap(liveChallenges, challenge.id));
-const claimedSkills = $derived(claimedSkillMap(liveChallenges, challenge.id));
 
 const itemDirty = $derived(base ? challenge.rewardItemId !== base.rewardItemId : false);
 const modDirty = $derived(base ? challenge.rewardItemModId !== base.rewardItemModId : false);
-const skillDirty = $derived(base ? challenge.rewardSkillId !== base.rewardSkillId : false);
-const none = $derived(
-	challenge.rewardItemId == null && challenge.rewardItemModId == null && challenge.rewardSkillId == null
-);
+const none = $derived(challenge.rewardItemId == null && challenge.rewardItemModId == null);
 
 // Retired records drop out of the pick list (can't be newly granted) unless they're the
 // challenge's current reward, which stays visible (marked retired) so it isn't silently lost.
@@ -163,22 +136,6 @@ const modPickRecords = $derived(
 		retired: !!m.retiredAt
 	}))
 );
-// Only Player-flagged skills can be newly granted (the backend enforces this too); the current
-// reward stays visible even if it isn't Player-flagged or is retired, so it's never silently lost.
-const skillPickRecords = $derived(
-	reference
-		.skillRecords()
-		.filter(
-			(s) => s.id === challenge.rewardSkillId || (!s.retiredAt && hasFlag(s.acquisition, ESkillAcquisition.Player))
-		)
-		.map((s) => ({
-			id: s.id,
-			name: s.name,
-			color: 'var(--accent)',
-			tag: `${s.baseDamage} dmg`,
-			retired: !!s.retiredAt
-		}))
-);
 
 const setItem = (id: number | undefined) => {
 	store.patch(challenge.id, (d) => ((d as unknown as IChallenge).rewardItemId = id));
@@ -186,10 +143,6 @@ const setItem = (id: number | undefined) => {
 };
 const setMod = (id: number | undefined) => {
 	store.patch(challenge.id, (d) => ((d as unknown as IChallenge).rewardItemModId = id));
-	open = null;
-};
-const setSkill = (id: number | undefined) => {
-	store.patch(challenge.id, (d) => ((d as unknown as IChallenge).rewardSkillId = id));
 	open = null;
 };
 </script>

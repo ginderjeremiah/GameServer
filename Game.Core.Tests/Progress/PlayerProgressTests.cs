@@ -453,7 +453,7 @@ namespace Game.Core.Tests.Progress
         [Fact]
         public void EvaluateChallenges_StatisticMeetsGoal_CompletesAndReturnsReward()
         {
-            var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5, rewardItemId: 42, rewardItemModId: 7, rewardSkillId: 3);
+            var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5, rewardItemId: 42, rewardItemModId: 7);
             var progress = MakeProgress(statistics:
             [
                 Stat(EStatisticType.EnemiesKilled, null, 5m),
@@ -465,7 +465,6 @@ namespace Game.Core.Tests.Progress
             Assert.Equal(0, result.ChallengeId);
             Assert.Equal(42, result.RewardItemId);
             Assert.Equal(7, result.RewardItemModId);
-            Assert.Equal(3, result.RewardSkillId);
 
             var playerChallenge = Assert.Single(progress.ChallengeProgress);
             Assert.True(playerChallenge.Completed);
@@ -886,7 +885,6 @@ namespace Game.Core.Tests.Progress
             int? targetEntityId = null,
             int? rewardItemId = null,
             int? rewardItemModId = null,
-            int? rewardSkillId = null,
             DateTime? retiredAt = null) => new()
             {
                 Id = id,
@@ -897,7 +895,6 @@ namespace Game.Core.Tests.Progress
                 ProgressGoal = goal,
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
-                RewardSkillId = rewardSkillId,
                 RetiredAt = retiredAt,
             };
 

@@ -41,12 +41,12 @@ describe('NumInput — valid input', () => {
 		expect(onChange).toHaveBeenCalledWith(3.14);
 	});
 
-	it('calls onChange(0) when the input is cleared', async () => {
+	it('does not call onChange when the input is cleared (no coercion to 0)', async () => {
 		const onChange = vi.fn();
 		const { container } = render(NumInput, { props: { value: 5, onChange } });
 		const input = container.querySelector('input') as HTMLInputElement;
 		await fireEvent.input(input, { target: { value: '' } });
-		expect(onChange).toHaveBeenCalledWith(0);
+		expect(onChange).not.toHaveBeenCalled();
 	});
 });
 
@@ -92,6 +92,17 @@ describe('NumInput — in-progress text', () => {
 		const { container } = render(NumInput, { props: { value: 0, onChange } });
 		const input = container.querySelector('input') as HTMLInputElement;
 		await fireEvent.input(input, { target: { value: '.' } });
-		expect(onChange).toHaveBeenCalledWith(0);
+		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it('preserves the in-progress text without committing a value', async () => {
+		const onChange = vi.fn();
+		const { container } = render(NumInput, { props: { value: 5, onChange } });
+		const input = container.querySelector('input') as HTMLInputElement;
+		// While focused the cleared text is kept (not re-coerced), and the stored value is untouched.
+		await fireEvent.focus(input);
+		await fireEvent.input(input, { target: { value: '' } });
+		expect(input.value).toBe('');
+		expect(onChange).not.toHaveBeenCalled();
 	});
 });

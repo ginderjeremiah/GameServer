@@ -58,10 +58,9 @@ const handleInput = (event: Event) => {
 		return;
 	}
 	inputText = raw;
-	if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
-		onChange(0);
-		return;
-	}
+	// Only commit a fully-parseable number. An empty or in-progress field ("", "-", ".", "-.")
+	// leaves the stored value untouched rather than coercing it to 0 — navigating away mid-edit
+	// then restores the prior value (via the blur effect) instead of silently persisting 0.
 	const parsed = parseFloat(raw);
 	if (!Number.isNaN(parsed)) {
 		onChange(parsed);

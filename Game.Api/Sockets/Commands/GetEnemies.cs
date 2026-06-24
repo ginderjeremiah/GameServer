@@ -4,8 +4,7 @@ using Game.Abstractions.DataAccess;
 namespace Game.Api.Sockets.Commands
 {
     /// <summary>
-    /// Returns the full enemy reference-data collection. WebSocket equivalent of
-    /// the <c>GET /api/Enemies</c> endpoint.
+    /// Serves the full enemy reference-data set over the socket.
     /// </summary>
     public class GetEnemies : AbstractReferenceDataCommand<Enemy>
     {

@@ -12,7 +12,6 @@ export interface IChallengeCompletedModel {
 	challengeId: number;
 	rewardItemId?: number;
 	rewardItemModId?: number;
-	rewardSkillId?: number;
 }
 
 export interface IChallengeType {

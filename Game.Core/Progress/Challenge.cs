@@ -1,7 +1,7 @@
 namespace Game.Core.Progress
 {
     /// <summary>
-    /// Represents a challenge that can be completed to unlock an item, modifier, and/or skill. Shared, cached
+    /// Represents a challenge that can be completed to unlock an item and/or modifier. Shared, cached
     /// reference-data instance: structurally immutable (init-only) so the cached snapshot handed to every
     /// battle's challenge evaluation cannot be corrupted (#547).
     /// </summary>
@@ -15,7 +15,6 @@ namespace Game.Core.Progress
         public required decimal ProgressGoal { get; init; }
         public int? RewardItemId { get; init; }
         public int? RewardItemModId { get; init; }
-        public int? RewardSkillId { get; init; }
 
         /// <summary>When set, the challenge is retired: out of circulation for new authoring but kept
         /// resolvable by id so existing references (and completions) stay valid. Null while active.</summary>

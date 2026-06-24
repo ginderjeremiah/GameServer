@@ -92,7 +92,7 @@ namespace Game.Core.Tests.Players
                 preference => preference.LogType,
                 preference => preference.Enabled);
 
-            Assert.Equal(7, enabledByType.Count);
+            Assert.Equal(8, enabledByType.Count);
             Assert.False(enabledByType[ELogType.Damage]);
             Assert.False(enabledByType[ELogType.Debug]);
             Assert.True(enabledByType[ELogType.Exp]);
@@ -100,6 +100,7 @@ namespace Game.Core.Tests.Players
             Assert.True(enabledByType[ELogType.ItemFound]);
             Assert.True(enabledByType[ELogType.EnemyDefeated]);
             Assert.True(enabledByType[ELogType.SkillEffect]);
+            Assert.True(enabledByType[ELogType.Proficiency]);
         }
     }
 }

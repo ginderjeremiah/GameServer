@@ -2,8 +2,8 @@ namespace Game.Infrastructure.Entities
 {
     /// <summary>
     /// A skill granted when a proficiency reaches a given level (the "milestone" payout), mirroring
-    /// <see cref="Challenge.RewardSkillId"/>. Sparse — only levels that grant a skill have a row, and a level
-    /// grants at most one. Keyed by (proficiency, level).
+    /// <see cref="Item.GrantedSkillId"/> — the id is the only persisted link. Sparse — only levels that grant
+    /// a skill have a row, and a level grants at most one. Keyed by (proficiency, level).
     /// </summary>
     public class ProficiencyLevelReward
     {

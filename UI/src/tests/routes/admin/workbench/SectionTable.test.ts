@@ -26,6 +26,7 @@ const section: TableSectionConfig<Row> = {
 	glyph: 'pin',
 	kind: 'table',
 	itemsKey: 'spawns',
+	rowKey: 'zoneId',
 	addLabel: 'Assign zone',
 	emptyIcon: 'pin',
 	emptyTitle: 'Not assigned to any zone',
@@ -129,5 +130,81 @@ describe('SectionTable', () => {
 		const { container } = renderTable(store, store.items[0], store.baselineOf(1));
 		const edges = container.querySelectorAll('.row-edge');
 		expect((edges[1] as HTMLElement).getAttribute('style')).toContain('var(--change-added)');
+	});
+
+	it('keeps a clean row clean after a non-last row is removed (identity, not index, diffing)', async () => {
+		// Removing the first of two baseline-equal rows must not make the surviving row flash
+		// "modified" — index-keyed diffing compared it against the wrong (shifted) baseline.
+		const { store, record, baseline } = setup([
+			{ zoneId: 0, weight: 5 },
+			{ zoneId: 1, weight: 3 }
+		]);
+		const { container } = renderTable(store, record, baseline);
+		await fireEvent.click(container.querySelector('.row-x') as HTMLElement);
+
+		expect(store.items[0].spawns).toEqual([{ zoneId: 1, weight: 3 }]);
+		// A clean row gets the transparent edge (no glow); index-keyed diffing would have shown
+		// the survivor as modified by comparing it against the wrong (shifted) baseline.
+		const edge = container.querySelector('.row-edge') as HTMLElement;
+		expect(edge.getAttribute('style')).toContain('box-shadow: none');
+		expect(edge.getAttribute('style')).not.toContain('var(--change-modified)');
+	});
+});
+
+interface Effect {
+	id: number;
+	amount: number;
+}
+interface EffectRow extends Identified {
+	effects: Effect[];
+}
+
+const effectSection: TableSectionConfig<EffectRow> = {
+	key: 'effects',
+	label: 'Effects',
+	glyph: 'bolt',
+	kind: 'table',
+	itemsKey: 'effects',
+	rowKey: 'id',
+	addLabel: 'Add effect',
+	emptyIcon: 'bolt',
+	emptyTitle: 'No effects',
+	emptySub: '',
+	newRow: () => ({ id: 0, amount: 0 }),
+	columns: [{ key: 'amount', label: 'Amount', type: 'number' }]
+};
+
+describe('SectionTable — surrogate-id collections', () => {
+	const config = (): EntityConfig<EffectRow> =>
+		({
+			key: 'rows',
+			label: 'Rows',
+			singular: 'Row',
+			glyph: 'box',
+			blankName: 'Unnamed',
+			newItem: (id: number) => ({ id, effects: [] }),
+			meta: () => [],
+			sections: [effectSection],
+			refresh: async () => [],
+			persist: async () => []
+		}) as unknown as EntityConfig<EffectRow>;
+
+	it('assigns each new row a unique negative id so identities never collide', async () => {
+		const store = new EntityStore(config(), [{ id: 1, effects: [] }]);
+		render(SectionTable, {
+			props: {
+				section: effectSection as unknown as TableSectionConfig<Identified>,
+				record: store.items[0] as Identified,
+				baseline: store.baselineOf(1),
+				store: store as unknown as EntityStore<Identified>
+			}
+		});
+
+		await fireEvent.click(screen.getByText('Add effect'));
+		await fireEvent.click(screen.getByText('Add effect'));
+
+		const ids = store.items[0].effects.map((e) => e.id);
+		expect(ids.every((id) => id < 0)).toBe(true);
+		expect(new Set(ids).size).toBe(ids.length);
 	});
 });

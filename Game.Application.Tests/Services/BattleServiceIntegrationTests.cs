@@ -420,6 +420,52 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task TryPrepareNextIdleBattle_PrefetchFails_SwallowsAndLeavesResolvedStateCleared()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // Win and resolve a battle: EndBattleVictory durably credits the win and clears the in-flight battle.
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            var victory = await battleService.EndBattleVictory(player, state);
+            Assert.NotNull(victory);
+            Assert.False(state.HasActiveBattle);
+
+            // Force an unexpected prefetch failure: an out-of-range CurrentZoneId makes the prefetch's zone
+            // resolution throw (GetDomainZone) after the win is already credited — exactly the window that would
+            // otherwise strand the resolved state and let a reconnect re-abandon (and re-credit) the battle.
+            player.ChangeZone(999);
+            var next = await battleService.TryPrepareNextIdleBattle(player, state);
+
+            // The best-effort prefetch swallows the failure (no bundled next battle) and leaves the resolved
+            // (battle-cleared) state intact, so the command's SavePlayerState persists the credited outcome
+            // rather than stranding a stale active battle.
+            Assert.Null(next);
+            Assert.False(state.HasActiveBattle);
+            Assert.Null(state.ActiveEnemyId);
+        }
+
+        [Fact]
         public async Task EndBattleVictory_Success_PersistsPlayerToCache()
         {
             using var scope = CreateScope();

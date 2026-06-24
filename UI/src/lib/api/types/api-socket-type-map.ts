@@ -24,6 +24,7 @@ import type {
 	IPlayerChallenge,
 	IPlayerProficiency,
 	IPlayerStatistic,
+	IProficiency,
 	IProficiencyXpGainedModel,
 	IReferenceDataVersion,
 	IRemoveModRequest,
@@ -51,6 +52,7 @@ export type ApiSocketResponseTypes = {
 	'GetPlayerChallenges': IPlayerChallenge[];
 	'GetPlayerProficiencies': IPlayerProficiency[];
 	'GetPlayerStatistics': IPlayerStatistic[];
+	'GetProficiencies': IProficiency[];
 	'GetReferenceDataVersions': IReferenceDataVersion[];
 	'GetSkills': ISkill[];
 	'GetStatisticTypes': IStatisticType[];
