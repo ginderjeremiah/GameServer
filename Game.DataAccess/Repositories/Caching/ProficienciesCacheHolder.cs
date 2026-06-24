@@ -100,8 +100,12 @@ namespace Game.DataAccess.Repositories.Caching
                 .ToList();
 
             // The reverse index the accrual consumes: each skill → its path contributions (path, home tier,
-            // weight). The frontier routing and home-tier falloff are resolved at battle completion.
+            // weight). The frontier routing and home-tier falloff are resolved at battle completion. Retired
+            // paths are excluded here so retirement freezes the track at this single routing choke point: with
+            // no contribution into it, a retired track accrues no XP, levels nothing, and grants no further
+            // skills (already-accrued levels/grants are untouched — retirement only stops further accrual).
             var contributionsBySkill = paths
+                .Where(path => path.RetiredAt is null)
                 .SelectMany(path => path.SkillContributions.Select(c => (c.SkillId, Contribution: new SkillContribution
                 {
                     PathId = path.Id,

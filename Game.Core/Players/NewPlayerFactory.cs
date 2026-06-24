@@ -30,13 +30,17 @@ namespace Game.Core.Players
         /// </summary>
         public NewPlayer Create(string name, IReadOnlyList<int> rootSeedSkillIds)
         {
-            // Starter skills are selected (ids 0..N-1); root seed skills are appended unselected, dropping any
-            // already covered by a starter skill so a player never gets a duplicate skill row.
+            // Starter skills are selected; root seed skills are appended unselected, dropping any already
+            // covered by a starter skill so a player never gets a duplicate skill row. Dedup runs against the
+            // actual starter id set (not a positional id-range assumption), so it stays correct if starter id
+            // assignment ever changes.
             var starterSkills = Enumerable.Range(0, StarterSkillCount)
-                .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index });
+                .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index })
+                .ToList();
+            var starterSkillIds = starterSkills.Select(skill => skill.SkillId).ToHashSet();
             var seedSkills = rootSeedSkillIds
                 .Distinct()
-                .Where(id => id >= StarterSkillCount)
+                .Where(id => !starterSkillIds.Contains(id))
                 .Select((id, index) => new NewPlayerSkill
                 {
                     SkillId = id,
