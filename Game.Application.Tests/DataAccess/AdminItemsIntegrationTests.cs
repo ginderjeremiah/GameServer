@@ -89,6 +89,36 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public void SaveItems_UndefinedRarity_ReturnsFailureWithoutPersisting()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            var item = NewItem(name: "Bad Rarity Item");
+            item.RarityId = (ERarity)0;
+
+            var result = admin.SaveItems([new Change<Contracts.Item> { ChangeType = EChangeType.Add, Item = item }]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("0 is not a valid item rarity.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public void SaveItems_UndefinedCategory_ReturnsFailureWithoutPersisting()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            var item = NewItem(name: "Bad Category Item");
+            item.ItemCategoryId = (EItemCategory)0;
+
+            var result = admin.SaveItems([new Change<Contracts.Item> { ChangeType = EChangeType.Add, Item = item }]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("0 is not a valid item category.", result.ErrorMessage);
+        }
+
+        [Fact]
         public void SaveModSlots_AddForUnknownItem_ReturnsNotFound()
         {
             using var scope = CreateScope();
