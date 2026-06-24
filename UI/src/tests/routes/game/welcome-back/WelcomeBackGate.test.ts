@@ -33,6 +33,8 @@ const summary = (overrides: Partial<IOfflineProgressModel> = {}): IOfflineProgre
 	statPointsGained: 10,
 	hasProgress: true,
 	completedChallenges: [],
+	proficiencyGains: [],
+	openedProficiencies: [],
 	...overrides
 });
 

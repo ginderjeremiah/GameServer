@@ -220,8 +220,8 @@ namespace Game.Application.Tests.Services
             var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
             var player = await LoadPlayerAsync(scope, playerId);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            var results = service.AccrueAndApply(progress, FireSkill(firedSkillId), difficultyMultiplier: 1.0, player, notify);
-            return (player, results);
+            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), difficultyMultiplier: 1.0, player, notify);
+            return (player, accrual.Results);
         }
 
         private static async Task<Player> LoadPlayerAsync(IServiceScope scope, int playerId)

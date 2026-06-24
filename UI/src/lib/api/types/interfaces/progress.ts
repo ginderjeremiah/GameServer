@@ -33,6 +33,8 @@ export interface IOfflineProgressModel {
 	statPointsGained: number;
 	hasProgress: boolean;
 	completedChallenges: IChallengeCompletedModel[];
+	proficiencyGains: IProficiencyXpResultModel[];
+	openedProficiencies: IProficiencyOpenedModel[];
 }
 
 export interface IPlayerChallenge {
