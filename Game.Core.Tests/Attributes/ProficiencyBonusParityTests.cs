@@ -15,10 +15,17 @@ namespace Game.Core.Tests.Attributes
     /// A proficiency's payouts (<see cref="ProficiencyModifier"/>) become <see cref="AttributeModifier"/>s with
     /// a <see cref="EAttributeModifierSource.Proficiency"/> source and compose through the same
     /// <see cref="AttributeCollection"/> path as stat allocations and gear, so the bonus participates in the
-    /// additive-then-multiplicative ordering identically on both sides. The expected values are deliberately
-    /// asserted on the core attributes the bonuses land on directly (stable literals, independent of the
-    /// derived-stat coefficients the <see cref="BattleAttributesParityTests"/> already pin), so a coefficient
-    /// retune cannot rot them — the derived propagation of a proficiency bonus is covered by that suite.
+    /// additive-then-multiplicative ordering identically on both sides. Most scenarios assert on the core
+    /// attributes the bonuses land on directly (stable literals, independent of the derived-stat coefficients
+    /// the <see cref="BattleAttributesParityTests"/> already pin). The <c>maxHealthDerivedAdditive</c> scenario
+    /// deliberately lands on a derived attribute that carries a static additive base, to pin the additive
+    /// accumulation order of the proficiency bonus relative to the static modifiers (the divergence behind
+    /// #1189); its expectation moves only if those base coefficients are retuned.
+    /// </para>
+    /// <para>
+    /// Values are asserted <b>bit-exactly</b> (no tolerance): this is an anti-cheat parity surface, so the two
+    /// simulators must agree to the last bit, and a loose tolerance is exactly what let the #1189 ordering
+    /// divergence go unnoticed.
     /// </para>
     /// </summary>
     public class ProficiencyBonusParityTests
@@ -86,6 +93,19 @@ namespace Game.Core.Tests.Attributes
                     ],
                     PlayerLevel: 1,
                     Expected: [(EAttribute.Strength, 3), (EAttribute.Endurance, 8)]),
+
+                // Additive bonus on a DERIVED attribute (MaxHealth = 50 + 20·Endurance + 5·Strength). MaxHealth
+                // carries a static additive base, so the proficiency additive must accumulate in the same order
+                // relative to those statics as the frontend. The allocations (Endurance 34, Strength 59) and
+                // bonus (3.14) make that order observable in the last bits: MaxHealth = 3.14 + 50 + 680 + 295 =
+                // 1028.1399999999999, distinct from the "statics first" order (1028.14) past the 10th decimal.
+                // The expectation is the exact double the canonical order produces, so a regression to the old
+                // frontend ordering fails this row.
+                ["maxHealthDerivedAdditive"] = new Scenario(
+                    Allocations: [(EAttribute.Endurance, 34), (EAttribute.Strength, 59)],
+                    Levels: [new LevelSpec(1, [(EAttribute.MaxHealth, EModifierType.Additive, 3.14)])],
+                    PlayerLevel: 1,
+                    Expected: [(EAttribute.MaxHealth, 1028.1399999999999)]),
             };
 
         public static IEnumerable<object[]> ScenarioNames =>
@@ -112,7 +132,9 @@ namespace Game.Core.Tests.Attributes
 
             foreach (var (attribute, expected) in scenario.Expected)
             {
-                Assert.Equal(expected, collection[attribute], 10);
+                // Bit-exact, not a tolerance: this is an anti-cheat parity surface, so the two simulators must
+                // agree to the last bit. A loose tolerance previously masked the ordering divergence in #1189.
+                Assert.Equal(expected, collection[attribute]);
             }
         }
 
