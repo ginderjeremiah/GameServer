@@ -93,6 +93,11 @@ namespace Game.DataAccess.Repositories
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
             // Serialize the lean model rather than the aggregate, so the cached blob never holds reference data.
+            // Deliberately fire-and-forget: the in-memory aggregate (not this blob) is the read-modify-write base
+            // during a session — loaded once at connect and re-saved per command without being re-read — so a dropped
+            // write is invisible to the live session and self-heals on the next save, while the awaited queue write
+            // above still carries the change to Postgres. Awaiting this would put a Redis round-trip on the per-battle
+            // hot path for no durability gain. See docs/backend-persistence.md (write-behind player cache).
             _cache.SetAndForget(playerKey, PlayerCacheMapper.ToCacheModel(player), PlayerCacheTtl);
         }
 
