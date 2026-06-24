@@ -6,11 +6,15 @@
 
 		<div class="main-content">
 			<div class="screen-container" data-testid="screen-container">
-				{#if CurrentScreen}
-					<CurrentScreen />
-				{:else}
-					<PlaceholderScreen label={currentScreenDef?.label ?? ''} />
-				{/if}
+				<!-- Keyed on `screenNonce` so a same-screen deep-link can force a remount (see the navigation
+				     effect); a cross-screen switch remounts on its own as the dynamic component changes. -->
+				{#key screenNonce}
+					{#if CurrentScreen}
+						<CurrentScreen />
+					{:else}
+						<PlaceholderScreen label={currentScreenDef?.label ?? ''} />
+					{/if}
+				{/key}
 			</div>
 			<LogPanel />
 		</div>
@@ -29,7 +33,7 @@ import { GAME_SCREENS, visibleScreens } from './screens/screen-defs';
 import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
 import { startGame, stopEngines, enemyManager } from '$lib/engine';
 import { refreshPlayer } from '$lib/engine/session';
-import { navigation } from '$stores';
+import { navigation, requiresRemount } from '$stores';
 import { apiSocket, getRoles } from '$lib/api';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -70,6 +74,9 @@ if (browser) {
 }
 
 let currentScreen = $state<string>('fight');
+// Bumped to force the active screen to remount when a deep-link targets the screen that's already
+// active — it otherwise wouldn't remount, so its one-shot `consumePayload` (on mount) never runs.
+let screenNonce = $state(0);
 let sidebarPinned = $state(false);
 // Whether the in-game character switcher overlay is open (the game keeps running behind it).
 let showSwitcher = $state(false);
@@ -111,7 +118,13 @@ const handleNavigate = (key: string) => {
 $effect(() => {
 	const requested = navigation.requestedScreen;
 	if (requested) {
+		// Capture whether the target is already active before switching: such a request won't remount
+		// the screen, so force one (the dynamic component remounts itself on a cross-screen switch).
+		const remount = requiresRemount(requested, currentScreen, navigation.hasPendingPayload);
 		handleNavigate(requested);
+		if (remount) {
+			screenNonce++;
+		}
 		navigation.clear();
 	}
 });

@@ -460,6 +460,21 @@ describe('SkillsView — persistence failure', () => {
 		expect(mockPlayerManager.selectedSkills).toEqual([1, 2]);
 	});
 
+	it('rolls back to an earlier overlapping commit that succeeded when the latest fails', async () => {
+		// Two rapid overlapping edits: the FIRST persist succeeds (the server now holds [1, 2]), the
+		// SECOND (latest) fails. The rollback target must be the server's actual current state — the
+		// earlier success [1, 2] — NOT the pre-sequence loadout [0, 1, 2]. This is why a superseded
+		// success must still advance `committed` (guards against the proposed "advance only for latest").
+		sendSocketCommand.mockReset();
+		sendSocketCommand.mockResolvedValueOnce({}).mockResolvedValueOnce({ error: 'nope' });
+		view.toggle(0); // [0, 1, 2] → [1, 2] (succeeds, server-confirmed)
+		view.toggle(3); // [1, 2] → [1, 2, 3] (latest, fails)
+		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledTimes(2));
+		await vi.waitFor(() => expect(toastError).toHaveBeenCalled());
+		expect(view.equipped).toEqual([1, 2]);
+		expect(mockPlayerManager.selectedSkills).toEqual([1, 2]);
+	});
+
 	it('reconciles with the player manager once no edit is pending', async () => {
 		// An external loadout change (e.g. a challenge skill unlock) lands while a commit is in flight;
 		// once the queue drains the screen reflects the manager rather than the stale optimistic copy.
