@@ -80,8 +80,10 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             // A per-level bonus only pays out at a level the proficiency can actually reach (the curve is
-            // interpreted in #1116), so a level outside 1..MaxLevel would author a payout that never fires.
-            if (FindLevelOutOfRange(proficiency, data.Modifiers.Select(m => m.Level), "level modifier") is { } rejection)
+            // interpreted in #1116), so a level outside 0..MaxLevel would author a payout that never fires.
+            // Level 0 is allowed for modifiers: the cumulative bonus rule (Proficiency.ModifiersForLevel uses
+            // l.Level <= level) honors a payout authored at the just-opened state.
+            if (FindLevelOutOfRange(proficiency, data.Modifiers.Select(m => m.Level), "level modifier", minLevel: 0) is { } rejection)
             {
                 return rejection;
             }
@@ -110,9 +112,12 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Proficiency");
             }
 
-            // A milestone reward only pays out at a reachable level (see SetModifiers), so reject one authored
-            // outside 1..MaxLevel before the anti-tamper skill check.
-            if (FindLevelOutOfRange(proficiency, data.Rewards.Select(r => r.Level), "level reward") is { } levelRejection)
+            // A milestone reward only pays out at a reachable, crossable level, so reject one authored outside
+            // 1..MaxLevel before the anti-tamper skill check. Unlike modifiers, level 0 is not allowed: a reward
+            // is granted by crossing a milestone (Proficiency.RewardSkillsCrossed uses l.Level > fromLevel, and
+            // fromLevel is never below 0), so a level-0 reward could never fire — the on-open grant is the
+            // proficiency's SeedSkillId.
+            if (FindLevelOutOfRange(proficiency, data.Rewards.Select(r => r.Level), "level reward", minLevel: 1) is { } levelRejection)
             {
                 return levelRejection;
             }
@@ -235,17 +240,18 @@ namespace Game.DataAccess.Repositories.Admin
             return null;
         }
 
-        /// <summary>Returns a rejection if any authored level falls outside <c>1..MaxLevel</c>, else null. A
-        /// payout level must be reachable: level 0 is the untrained state and levels past the cap never
-        /// fire.</summary>
-        private static AdminSaveResult? FindLevelOutOfRange(Entities.Proficiency proficiency, IEnumerable<int> levels, string role)
+        /// <summary>Returns a rejection if any authored level falls outside <c><paramref name="minLevel"/>..MaxLevel</c>,
+        /// else null. A payout level must be reachable, and levels past the cap never fire. <paramref name="minLevel"/>
+        /// is 0 for modifiers (a payout authored at the just-opened state is honored cumulatively) and 1 for rewards
+        /// (a reward fires only by crossing a milestone, which a level-0 reward never does).</summary>
+        private static AdminSaveResult? FindLevelOutOfRange(Entities.Proficiency proficiency, IEnumerable<int> levels, string role, int minLevel)
         {
             foreach (var level in levels)
             {
-                if (level < 1 || level > proficiency.MaxLevel)
+                if (level < minLevel || level > proficiency.MaxLevel)
                 {
                     return AdminSaveResult.Failure(
-                        $"Proficiency {role} level {level} is out of range (must be between 1 and the cap of {proficiency.MaxLevel}).");
+                        $"Proficiency {role} level {level} is out of range (must be between {minLevel} and the cap of {proficiency.MaxLevel}).");
                 }
             }
 
