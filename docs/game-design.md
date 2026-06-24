@@ -88,6 +88,8 @@ Effects are deterministic in this version (they always apply when the skill fire
 
 A **proficiency** is a mastery track for a category of skills — a progression layer *over* the skills you collect, not a source of them (full design in [the proficiency spike](./spikes/982-proficiency-system.md)). Proficiencies are organized into **paths**: a path is a linear sequence of proficiency **tiers** sharing an identity arc (Fire Magic → Inferno Magic), and the next tier opens once the current one is maxed. Using a path's contributing skills in won battles levels its tiers, and levels pay out permanent bonuses (and, at milestones, skills and access to deeper tiers or cross-path gateways). A skill contributes to a path at a **home tier** through a weighted join; a skill may feed more than one path (a cross-school skill).
 
+Each proficiency identity is also surfaced cosmetically as a **word of power** — its name rendered in an invented, decorative arcane script. This is pure flavour (never information the player must read); the frontend implementation lives in [frontend.md](./frontend.md#conlang-script-words-of-power).
+
 ## Proficiency XP — victory-based, difficulty-scaled, absolute-falloff
 
 XP is earned **on victory only** and computed **server-side at battle completion** — it is *not* part of the deterministic battle simulation, so it carries no frontend/backend parity surface (only the eventual attribute *bonus* is parity-sensitive, computed from player state at snapshot time). Each won battle pays out a pie of XP (`ServerGameConstants.ProficiencyXpPerVictory`), **scaled by the same difficulty multiplier as `DefeatRewards`** — so a trivial enemy pays little (anti-grind) and an appropriately-matched (or over-level) one pays full or more.
