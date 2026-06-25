@@ -38,9 +38,9 @@ afterEach(() => {
 });
 
 describe('ClassPicker', () => {
-	it('shows an empty message when no classes are available', () => {
+	it('renders nothing when there are no classes (hide-on-empty)', () => {
 		render(ClassPicker, { classes: [], selectedClassId: null, onSelect: vi.fn() });
-		expect(screen.getByTestId('class-picker-empty')).toBeTruthy();
+		expect(screen.queryByTestId('class-picker')).toBeNull();
 	});
 
 	it('renders an option per class', () => {

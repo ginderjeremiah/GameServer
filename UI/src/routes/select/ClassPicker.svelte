@@ -4,10 +4,10 @@
      resolved — is supplied by the host from the bespoke `Login/CharacterCreationData` payload, so this
      component is presentational and needs no reference data of its own (only attribute display metadata,
      which degrades to enum names before the reference sets load). -->
-<div class="class-picker" data-testid="class-picker">
-	{#if classes.length === 0}
-		<p class="picker-empty" data-testid="class-picker-empty">No classes are available yet.</p>
-	{:else}
+<!-- Hide-on-empty lives here so the picker is self-contained: the host always renders it and it draws
+     nothing until the class options arrive (or if they fail to load). -->
+{#if classes.length > 0}
+	<div class="class-picker" data-testid="class-picker">
 		<div class="class-options" role="radiogroup" aria-label="Class">
 			{#each classes as cls (cls.id)}
 				<button
@@ -65,8 +65,8 @@
 				{/if}
 			</div>
 		{/if}
-	{/if}
-</div>
+	</div>
+{/if}
 
 <script lang="ts">
 import type { ICreatableClass } from '$lib/api';
@@ -101,14 +101,6 @@ const passive = $derived(selected ? passiveSummary(selected, staticData.attribut
 <style lang="scss">
 .class-picker {
 	margin-bottom: 14px;
-}
-
-.picker-empty {
-	margin: 0 0 8px;
-	font-size: 12.5px;
-	color: var(--text-tertiary);
-	font-family: var(--mono);
-	letter-spacing: 0.4px;
 }
 
 .class-options {

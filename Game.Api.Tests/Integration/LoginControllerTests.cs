@@ -1121,6 +1121,16 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(weapon.Id, equipment.ItemId);
             Assert.Equal(EEquipmentSlot.WeaponSlot, equipment.EquipmentSlot);
             Assert.Equal("Iron Sword", equipment.Name);
+            // The signature passive and attribute fingerprint are projected through verbatim.
+            Assert.Equal(EAttribute.Strength, creatable.PassiveAttributeId);
+            Assert.Equal(5m, creatable.PassiveAmount);
+            Assert.Null(creatable.PassiveScalingAttributeId);
+            Assert.Equal(0m, creatable.PassiveScalingAmount);
+            Assert.Equal(EModifierType.Additive, creatable.PassiveModifierType);
+            var distribution = Assert.Single(creatable.AttributeDistributions);
+            Assert.Equal(EAttribute.Strength, distribution.AttributeId);
+            Assert.Equal(10m, distribution.BaseAmount);
+            Assert.Equal(1m, distribution.AmountPerLevel);
             // The retired class is out of circulation for new characters.
             Assert.DoesNotContain(result.Data, c => c.Name == "Retired Class");
         }

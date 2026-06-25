@@ -1,7 +1,5 @@
 <form class="create-form" onsubmit={preventDefault(onSubmit)} data-testid="create-form">
-	{#if classes.length > 0}
-		<ClassPicker {classes} {selectedClassId} onSelect={onSelectClass} disabled={creating} />
-	{/if}
+	<ClassPicker {classes} {selectedClassId} onSelect={onSelectClass} disabled={creating} />
 
 	<UnderlineInput
 		testid="new-name-input"
