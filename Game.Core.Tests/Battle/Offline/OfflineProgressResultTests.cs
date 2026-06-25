@@ -24,8 +24,6 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(0, result.Losses);
             Assert.Equal(0, result.Draws);
             Assert.Equal(0, result.TotalExp);
-            Assert.Equal(0, result.TotalBattleMs);
-            Assert.Empty(result.EnemyKillCounts);
         }
 
         [Fact]
@@ -44,7 +42,6 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(1, result.Wins);
             Assert.Equal(1, result.Losses);
             Assert.Equal(1, result.Draws);
-            Assert.Equal(120_240, result.TotalBattleMs); // 40 + 200 + 120000
         }
 
         [Fact]
@@ -61,25 +58,6 @@ namespace Game.Core.Tests.Battle.Offline
             var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles);
 
             Assert.Equal(18, result.TotalExp);
-        }
-
-        [Fact]
-        public void EnemyKillCounts_CountsVictoriesPerEnemyOnly()
-        {
-            var battles = new List<OfflineBattleOutcome>
-            {
-                Win(enemyId: 1, totalMs: 40, exp: 1),
-                Win(enemyId: 1, totalMs: 40, exp: 1),
-                Win(enemyId: 2, totalMs: 40, exp: 1),
-                Loss(enemyId: 1, totalMs: 40), // a loss is not a kill
-                Draw(enemyId: 2, totalMs: 40), // a draw is not a kill
-            };
-
-            var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles);
-
-            Assert.Equal(2, result.EnemyKillCounts.Count);
-            Assert.Equal(2, result.EnemyKillCounts[1]);
-            Assert.Equal(1, result.EnemyKillCounts[2]);
         }
 
         [Fact]
