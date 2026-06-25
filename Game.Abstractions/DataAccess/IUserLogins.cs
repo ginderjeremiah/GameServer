@@ -4,7 +4,8 @@ namespace Game.Abstractions.DataAccess
     /// Persists lightweight user-connection tracking: a per-(user, IP, device) <c>UserLogin</c> whose
     /// last-connection timestamp is continually refreshed, the <c>Device</c> (deduplicated by fingerprint)
     /// the login references, and the <c>BrowserInfo</c> (deduplicated by user-agent) the device reports.
-    /// Mutations are queued on the change tracker; the caller commits the unit of work.
+    /// Each operation <b>owns its own commit</b> (like account creation) because it runs outside the
+    /// per-action commit filter and must retry its build-and-save on a concurrent-insert unique violation.
     /// </summary>
     public interface IUserLogins
     {
