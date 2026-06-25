@@ -36,7 +36,7 @@
 					size={33}
 					glow={tier.decipher !== 'undeciphered'}
 				/>
-				<div class="reveal stage-{tier.decipher}">{revealText}</div>
+				<div class="reveal stage-{tier.decipher}">{reveal}</div>
 			</div>
 
 			<div class="meta">
@@ -57,6 +57,7 @@ import { WordOfPower } from '$components';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import PipTrack from './PipTrack.svelte';
 import type { TierView } from './proficiencies-lexicon';
+import { decipherReveal } from './word-detail';
 import { wordHover, type WordTooltipController } from './word-hover';
 
 interface Props {
@@ -74,15 +75,7 @@ interface Props {
 
 const { tier, selected, last, onSelect, controller }: Props = $props();
 
-const revealText = $derived.by(() => {
-	if (tier.decipher === 'translated') {
-		return tier.translation;
-	}
-	if (tier.decipher === 'pronunciation') {
-		return `“${tier.pronunciation}”`;
-	}
-	return '⟨ undeciphered ⟩';
-});
+const reveal = $derived(decipherReveal(tier));
 </script>
 
 <style lang="scss">

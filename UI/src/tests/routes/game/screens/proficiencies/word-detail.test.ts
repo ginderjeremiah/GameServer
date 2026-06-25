@@ -10,6 +10,7 @@ import {
 } from '$lib/api';
 import {
 	buildLadder,
+	decipherReveal,
 	formatModifier,
 	statePill,
 	trainedBy,
@@ -102,6 +103,24 @@ describe('xpProgressText', () => {
 	it('treats a tier at its (lower) cap as maxed regardless of state', () => {
 		const tier = tierView({ id: 3, level: 5, maxLevel: 5 });
 		expect(xpProgressText(tier)).toBe('maxed out — fully translated');
+	});
+});
+
+/* ── decipherReveal ────────────────────────────────────────────────────────── */
+
+describe('decipherReveal', () => {
+	it('shows the undeciphered placeholder before the pronunciation is learned', () => {
+		expect(decipherReveal(tierView({ id: 1, decipher: 'undeciphered' }))).toBe('⟨ undeciphered ⟩');
+	});
+
+	it('quotes the pronunciation at the pronunciation stage', () => {
+		expect(decipherReveal(tierView({ id: 1, decipher: 'pronunciation', pronunciation: 'AYN-kor' }))).toBe('“AYN-kor”');
+	});
+
+	it('shows the translation once translated', () => {
+		expect(decipherReveal(tierView({ id: 1, decipher: 'translated', translation: 'The First Flame' }))).toBe(
+			'The First Flame'
+		);
 	});
 });
 

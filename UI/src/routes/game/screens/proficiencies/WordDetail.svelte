@@ -16,10 +16,13 @@
 	</div>
 
 	<!-- The word being deciphered: the glyph illuminates dim → accent → gold as it levels, over a reveal
-	     line, and the whole block surfaces the shared decipher tooltip on hover/focus. -->
-	<button
-		type="button"
+	     line, and the whole block surfaces the shared decipher tooltip on hover/focus. A focusable
+	     presentational trigger (not a `<button>` — it has no action, only the tooltip), per the a11y
+	     pattern in docs/frontend.md for an otherwise-presentational tooltip trigger. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div
 		class="word-block"
+		tabindex="0"
 		use:wordHover={{ controller, tier }}
 		use:describedByTooltip={controller.describedById}
 	>
@@ -30,20 +33,15 @@
 			size={30}
 			glow={tier.decipher !== 'undeciphered'}
 		/>
-		<div class="reveal stage-{tier.decipher}">{revealText}</div>
-	</button>
+		<div class="reveal stage-{tier.decipher}">{reveal}</div>
+	</div>
 
-	<div class="xp" style:--bar-fill={tier.state === 'maxed' ? 'var(--gold)' : 'var(--accent)'}>
+	<div class="xp" style:--bar-fill={maxed ? 'var(--gold)' : 'var(--accent)'}>
 		<div class="xp-row">
 			<span class="xp-level">LV {tier.level} / {tier.maxLevel}</span>
 			<span class="xp-text">{xpText}</span>
 		</div>
-		<Bar
-			value={tier.xpForNext > 0 ? tier.xp : 1}
-			max={tier.xpForNext > 0 ? tier.xpForNext : 1}
-			presentational
-			testId="xp-bar"
-		/>
+		<Bar value={maxed ? 1 : tier.xp} max={maxed ? 1 : tier.xpForNext} presentational testId="xp-bar" />
 	</div>
 
 	<div class="section-head">Per-level breakdown<span class="rule"></span></div>
@@ -85,7 +83,7 @@ import { Bar, WordOfPower } from '$components';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import { staticData } from '$stores';
 import type { PathView, TierView } from './proficiencies-lexicon';
-import { buildLadder, statePill, trainedBy, xpProgressText } from './word-detail';
+import { buildLadder, decipherReveal, statePill, trainedBy, xpProgressText } from './word-detail';
 import { wordHover, type WordTooltipController } from './word-hover';
 
 interface Props {
@@ -103,21 +101,16 @@ const { tier, path, controller }: Props = $props();
 // granted-skill resolution); the pure module formats from these.
 const resolveSkill = (id: number): string | undefined => staticData.skills?.[id]?.name;
 
+// A tier is maxed iff its state is `maxed` (⟺ level ≥ cap ⟺ xpForNext 0 under the view-model's invariants);
+// kept as one derived so the bar fill and its full-when-maxed value can't drift apart.
+const maxed = $derived(tier.state === 'maxed');
+
 const pill = $derived(statePill(tier.state));
 const xpText = $derived(xpProgressText(tier));
+const reveal = $derived(decipherReveal(tier));
 const ladder = $derived(buildLadder(tier, staticData.attributes, resolveSkill));
 const chips = $derived(trainedBy(path.contributions, resolveSkill));
 const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.seedSkillId) : undefined);
-
-const revealText = $derived.by(() => {
-	if (tier.decipher === 'translated') {
-		return tier.translation;
-	}
-	if (tier.decipher === 'pronunciation') {
-		return `“${tier.pronunciation}”`;
-	}
-	return '⟨ undeciphered ⟩';
-});
 </script>
 
 <style lang="scss">
@@ -196,19 +189,18 @@ const revealText = $derived.by(() => {
 	border-color: var(--border-medium);
 }
 
-// The decipher word block — a full-width, focusable hover target (surfacing the shared decipher tooltip
-// on hover/focus, mirroring the spine cards) with no button chrome; `help` cursor signals it is purely
-// informational, not an action.
+// The decipher word block — a focusable presentational trigger surfacing the shared decipher tooltip on
+// hover/focus (mirroring the spine cards); `help` cursor signals it is informational, not an action.
 .word-block {
 	margin-top: 14px;
 	display: block;
-	width: 100%;
-	padding: 0;
-	border: none;
-	background: transparent;
-	color: inherit;
-	text-align: left;
 	cursor: help;
+
+	&:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
+		border-radius: var(--border-radius);
+	}
 }
 
 // The glyph is the child WordOfPower element, reached through `:global()` anchored under `.word-block`

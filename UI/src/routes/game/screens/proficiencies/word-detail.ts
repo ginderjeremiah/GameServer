@@ -56,6 +56,19 @@ export function xpProgressText(tier: TierView): string {
 	return `${formatNum(tier.xp)} / ${formatNum(tier.xpForNext)} XP → level ${tier.level + 1}`;
 }
 
+/** The decipher reveal line for a tier, gated by its stage: the translation once translated, the quoted
+ *  pronunciation once it is learned, otherwise the undeciphered placeholder. Shared by the spine card and
+ *  the inspector so the two surfaces always agree on the reveal string. */
+export function decipherReveal(tier: TierView): string {
+	if (tier.decipher === 'translated') {
+		return tier.translation;
+	}
+	if (tier.decipher === 'pronunciation') {
+		return `“${tier.pronunciation}”`;
+	}
+	return '⟨ undeciphered ⟩';
+}
+
 /** Formats a single proficiency level modifier as a magnitude + attribute name, e.g. `+2% Fire Damage`
  *  or `×1.5 Critical Damage`. Reuses the attribute-tooltip formatters: a multiplicative factor renders
  *  as `×factor`; an additive amount goes through `formatAttributeDelta`, which is signed and honours the
