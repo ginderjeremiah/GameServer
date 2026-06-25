@@ -6,6 +6,7 @@ import type {
 	EDeadLetterReason,
 	IAttributeDistribution,
 	IBattlerAttribute,
+	IClassStarterEquipment,
 	IEnemySpawn,
 	IProficiencyLevelModifier,
 	IProficiencyLevelReward,
@@ -45,6 +46,21 @@ export interface IDeadLetterReplayResult {
 export interface IReplayDeadLettersData {
 	all: boolean;
 	payloads?: string[];
+}
+
+export interface ISetClassAttributeDistributionsData {
+	classId: number;
+	attributeDistributions: IAttributeDistribution[];
+}
+
+export interface ISetClassStarterEquipmentData {
+	classId: number;
+	equipment: IClassStarterEquipment[];
+}
+
+export interface ISetClassStarterSkillsData {
+	classId: number;
+	skillIds: number[];
 }
 
 export interface ISetEnemyAttributeDistributions {

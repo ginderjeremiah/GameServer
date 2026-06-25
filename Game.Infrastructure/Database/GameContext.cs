@@ -27,6 +27,10 @@ namespace Game.Infrastructure.Database
         public DbSet<Attribute> Attributes { get; set; }
         public DbSet<Challenge> Challenges { get; set; }
         public DbSet<ChallengeType> ChallengeTypes { get; set; }
+        public DbSet<Class> Classes { get; set; }
+        public DbSet<ClassStarterSkill> ClassStarterSkills { get; set; }
+        public DbSet<ClassStarterEquipment> ClassStarterEquipment { get; set; }
+        public DbSet<ClassAttributeDistribution> ClassAttributeDistributions { get; set; }
         public DbSet<Enemy> Enemies { get; set; }
         public DbSet<EnemySkill> EnemySkills { get; set; }
         public DbSet<EquipmentSlot> EquipmentSlots { get; set; }
@@ -139,6 +143,73 @@ namespace Game.Infrastructure.Database
                         StatisticTypeId = (int?)type.StatisticType?.Id,
                     };
                 }));
+            });
+
+            modelBuilder.Entity<Class>(entity =>
+            {
+                entity.Property(c => c.Id)
+                    .HasIdentityOptions(0, 1, 0);
+
+                entity.Property(c => c.Name)
+                    .HasMaxLength(50);
+
+                entity.Property(c => c.Description)
+                    .HasMaxLength(500);
+
+                entity.Property(c => c.Word)
+                    .HasMaxLength(50);
+
+                entity.Property(c => c.PassiveAmount)
+                    .HasPrecision(18, 3);
+
+                entity.Property(c => c.PassiveScalingAmount)
+                    .HasPrecision(18, 3);
+            });
+
+            modelBuilder.Entity<ClassAttributeDistribution>(entity =>
+            {
+                entity.HasKey(ad => new { ad.ClassId, ad.AttributeId });
+
+                entity.Property(ad => ad.BaseAmount)
+                    .HasPrecision(18, 3);
+
+                entity.Property(ad => ad.AmountPerLevel)
+                    .HasPrecision(18, 3);
+
+                entity.HasOne(ad => ad.Class)
+                    .WithMany(c => c.AttributeDistributions)
+                    .HasForeignKey(ad => ad.ClassId);
+
+                entity.HasOne(ad => ad.Attribute)
+                    .WithMany()
+                    .HasForeignKey(ad => ad.AttributeId);
+            });
+
+            modelBuilder.Entity<ClassStarterSkill>(entity =>
+            {
+                entity.HasKey(s => new { s.ClassId, s.SkillId });
+
+                entity.HasOne(s => s.Class)
+                    .WithMany(c => c.StarterSkills)
+                    .HasForeignKey(s => s.ClassId);
+
+                entity.HasOne(s => s.Skill)
+                    .WithMany()
+                    .HasForeignKey(s => s.SkillId);
+            });
+
+            modelBuilder.Entity<ClassStarterEquipment>(entity =>
+            {
+                // One starter item per equipment slot — the slot is the natural key.
+                entity.HasKey(e => new { e.ClassId, e.EquipmentSlotId });
+
+                entity.HasOne(e => e.Class)
+                    .WithMany(c => c.StarterEquipment)
+                    .HasForeignKey(e => e.ClassId);
+
+                entity.HasOne(e => e.Item)
+                    .WithMany()
+                    .HasForeignKey(e => e.ItemId);
             });
 
             modelBuilder.Entity<Enemy>(entity =>

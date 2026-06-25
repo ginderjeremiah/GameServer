@@ -8,6 +8,7 @@ import type {
 	IAuthTokens,
 	IChallenge,
 	IChange,
+	IClass,
 	ICreatePlayerRequest,
 	IDeadLetterInspection,
 	IDeadLetterReplayResult,
@@ -27,6 +28,9 @@ import type {
 	IRole,
 	ISelectPlayerRequest,
 	ISelectPlayerResult,
+	ISetClassAttributeDistributionsData,
+	ISetClassStarterEquipmentData,
+	ISetClassStarterSkillsData,
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
@@ -47,6 +51,7 @@ import type {
 
 export type ApiResponseTypes = {
 	'AdminTools/AddEditChallenges': undefined;
+	'AdminTools/AddEditClasses': undefined;
 	'AdminTools/AddEditEnemies': undefined;
 	'AdminTools/AddEditItemAttributes': undefined;
 	'AdminTools/AddEditItemModAttributes': undefined;
@@ -64,6 +69,9 @@ export type ApiResponseTypes = {
 	'AdminTools/GetRoles': IRole[];
 	'AdminTools/GetUsers': IAdminUserSearchResults;
 	'AdminTools/ReplayPlayerUpdateDeadLetters': IDeadLetterReplayResult;
+	'AdminTools/SetClassAttributeDistributions': undefined;
+	'AdminTools/SetClassStarterEquipment': undefined;
+	'AdminTools/SetClassStarterSkills': undefined;
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
@@ -94,6 +102,7 @@ export type ApiResponseTypes = {
 
 export type ApiRequestTypes = {
 	'AdminTools/AddEditChallenges': IChange<IChallenge>[];
+	'AdminTools/AddEditClasses': IChange<IClass>[];
 	'AdminTools/AddEditEnemies': IChange<IEnemy>[];
 	'AdminTools/AddEditItemAttributes': IAddEditAttributesData;
 	'AdminTools/AddEditItemModAttributes': IAddEditAttributesData;
@@ -110,6 +119,9 @@ export type ApiRequestTypes = {
 	'AdminTools/GetPlayerUpdateDeadLetters': { max?: number } | undefined;
 	'AdminTools/GetUsers': { search?: string, roleId?: number, archived?: boolean, page?: number, pageSize?: number } | undefined;
 	'AdminTools/ReplayPlayerUpdateDeadLetters': IReplayDeadLettersData;
+	'AdminTools/SetClassAttributeDistributions': ISetClassAttributeDistributionsData;
+	'AdminTools/SetClassStarterEquipment': ISetClassStarterEquipmentData;
+	'AdminTools/SetClassStarterSkills': ISetClassStarterSkillsData;
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;

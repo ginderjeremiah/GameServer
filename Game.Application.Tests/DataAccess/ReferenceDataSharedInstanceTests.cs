@@ -151,6 +151,32 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task GetClass_ReturnsSharedInstanceAndCorrectData()
+        {
+            int classId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateClassAsync(context, name: "Shared Class")).Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var classes = scope.ServiceProvider.GetRequiredService<IClasses>();
+
+            var first = classes.GetClass(classId);
+            var second = classes.GetClass(classId);
+
+            // The optimization: repeated reads hand back the same pre-materialized instance, not a fresh graph.
+            Assert.NotNull(first);
+            Assert.Same(first, second);
+            Assert.Equal(classId, first.Id);
+            Assert.Equal("Shared Class", first.Name);
+            Assert.Equal(EAttribute.Strength, first.SignaturePassive.Attribute);
+        }
+
+        [Fact]
         public async Task GetDomainEnemy_ReusesPreMappedTemplateAcrossCalls()
         {
             int enemyId;
