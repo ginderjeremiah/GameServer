@@ -13,6 +13,8 @@
 		<path d="M8.7 1.3L2 9.3H8l-.7 5.4L14 6.7H8z" stroke-linejoin="round" stroke-linecap="round" />
 	{:else if kind === 'attributes'}
 		<path d="M8 1.5l4.7 2v4.7c0 2.9-2.3 4.7-4.7 5.8-2.4-1.1-4.7-2.9-4.7-5.8V3.5z" stroke-linejoin="round" />
+	{:else if kind === 'proficiencies'}
+		<path d="M8 1.5l1.4 5.1 5.1 1.4-5.1 1.4L8 14.5l-1.4-5.1L1.5 8l5.1-1.4z" stroke-linejoin="round" />
 	{:else if kind === 'attributeBreakdown'}
 		<rect x="2" y="6.3" width="12" height="3.4" rx="1" />
 		<path d="M6.3 6.3v3.4M9.3 6.3v3.4" stroke-linecap="round" />
