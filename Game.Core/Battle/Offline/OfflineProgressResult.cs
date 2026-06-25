@@ -38,14 +38,6 @@ namespace Game.Core.Battle.Offline
         /// <see cref="OfflineBattleOutcome.ExpReward"/>.</summary>
         public long TotalExp { get; }
 
-        /// <summary>The total simulated battle time, in milliseconds, excluding the inter-battle cooldown
-        /// gaps.</summary>
-        public long TotalBattleMs { get; }
-
-        /// <summary>Per-enemy victory (kill) counts, keyed by enemy id. Only victories contribute, mirroring
-        /// the live <c>EnemiesKilled</c> statistic.</summary>
-        public IReadOnlyDictionary<int, int> EnemyKillCounts { get; }
-
         public OfflineProgressResult(OfflineLoopMode mode, int zoneId, IReadOnlyList<OfflineBattleOutcome> battles)
         {
             Mode = mode;
@@ -54,16 +46,12 @@ namespace Game.Core.Battle.Offline
 
             // Fold the per-battle outcomes into the run-level aggregates in a single pass, keeping the
             // outcome list the one source of truth (the summary is a materialized view of it).
-            var killCounts = new Dictionary<int, int>();
             foreach (var battle in battles)
             {
-                TotalBattleMs += battle.Result.TotalMs;
-
                 if (battle.Result.Victory)
                 {
                     Wins++;
                     TotalExp += battle.ExpReward;
-                    killCounts[battle.Enemy.Id] = killCounts.GetValueOrDefault(battle.Enemy.Id) + 1;
                 }
                 else if (battle.Result.PlayerDied)
                 {
@@ -74,8 +62,6 @@ namespace Game.Core.Battle.Offline
                     Draws++;
                 }
             }
-
-            EnemyKillCounts = killCounts;
         }
     }
 }

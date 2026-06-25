@@ -80,7 +80,7 @@ namespace Game.Application.Tests.Services
             var seedSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Inferno Seed");
             await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Inferno", maxLevel: 10, baseXp: 100m, pathId: path.Id, pathOrdinal: 1,
-                startsUnlocked: false, seedSkillId: seedSkill.Id);
+                seedSkillId: seedSkill.Id);
 
             var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, tier0.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
@@ -88,6 +88,28 @@ namespace Game.Application.Tests.Services
             var (player, _) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
 
             Assert.Contains(player.Skills, s => s.Id == seedSkill.Id);
+        }
+
+        [Fact]
+        public async Task FreshKitSkill_OpensItsPathOnFirstContribution_WithoutStartsUnlocked()
+        {
+            // Regression for the StartsUnlocked retirement (spike #1126): roots are no longer authored as
+            // "universally open" — they emerge from the class kit. A brand-new player (every proficiency at
+            // level 0) whose starter skill contributes to a path's root tier accrues XP to that tier on the
+            // first won battle, levelling it from 0 — i.e. the kit opens the path with no StartsUnlocked seeding.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var path = await TestDataSeeder.CreatePathAsync(context);
+            var root = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Fire", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, root.Id);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, results) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
+
+            // The root tier accrued from level 0 on the first contribution — the path opened without a flag.
+            Assert.True(Assert.Single(results).NewLevel >= 1);
         }
 
         [Fact]
@@ -101,7 +123,7 @@ namespace Game.Application.Tests.Services
             var prereqB = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Earth", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
             var gatewaySeed = await TestDataSeeder.CreateSkillAsync(context, name: "Lava Seed");
             var gateway = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Lava", maxLevel: 10, baseXp: 100m, startsUnlocked: false, seedSkillId: gatewaySeed.Id);
+                context, name: "Lava", maxLevel: 10, baseXp: 100m, seedSkillId: gatewaySeed.Id);
             await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqA.Id);
             await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqB.Id);
 
@@ -125,7 +147,7 @@ namespace Game.Application.Tests.Services
             var prereqB = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Earth", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
             var gatewaySeed = await TestDataSeeder.CreateSkillAsync(context, name: "Lava Seed");
             var gateway = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Lava", maxLevel: 10, baseXp: 100m, startsUnlocked: false, seedSkillId: gatewaySeed.Id);
+                context, name: "Lava", maxLevel: 10, baseXp: 100m, seedSkillId: gatewaySeed.Id);
             await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqA.Id);
             await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqB.Id);
 
@@ -153,7 +175,7 @@ namespace Game.Application.Tests.Services
             var gatewaySeed = await TestDataSeeder.CreateSkillAsync(context, name: "Lava Seed");
             var gateway = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Lava", maxLevel: 10, baseXp: 100m, pathId: retiredPath.Id, pathOrdinal: 0,
-                startsUnlocked: false, seedSkillId: gatewaySeed.Id);
+                seedSkillId: gatewaySeed.Id);
             await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqA.Id);
             await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqB.Id);
 
@@ -185,7 +207,7 @@ namespace Game.Application.Tests.Services
             var seedSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Inferno Seed");
             var tier1 = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Inferno", maxLevel: 10, baseXp: 100m, pathId: path.Id, pathOrdinal: 1,
-                startsUnlocked: false, seedSkillId: seedSkill.Id);
+                seedSkillId: seedSkill.Id);
 
             var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, tier0.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);

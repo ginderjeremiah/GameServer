@@ -267,6 +267,62 @@ namespace Game.Application.Tests.Events
         }
 
         [Fact]
+        public async Task Victory_RarerFiredSkill_PullsALargerShareOfThePie(/* #1123 */)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            // Two single-tier paths, each fed on-tier by one skill, both fired in the won battle. The skills
+            // differ only in rarity — Common (tier weight 1) vs Rare (tier weight 1.5² = 2.25) — so the pie
+            // splits by their attention ratio: the rare skill's path claims 2.25 / 3.25 of the pie, the common
+            // path 1 / 3.25. Tier weight is the only thing differing, so this isolates the #1123 curve.
+            var commonSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", rarity: ERarity.Common);
+            var rareSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Stoneskin", rarity: ERarity.Rare);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, commonSkill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, rareSkill.Id);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+
+            var firePath = await TestDataSeeder.CreatePathAsync(context, name: "Fire");
+            var earthPath = await TestDataSeeder.CreatePathAsync(context, name: "Earth");
+            var fireTier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Fire Magic", pathId: firePath.Id, pathOrdinal: 0);
+            var earthTier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Earth Magic", pathId: earthPath.Id, pathOrdinal: 0);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, fireTier.Id, commonSkill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, earthTier.Id, rareSkill.Id, weight: 1m);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
+            Assert.NotNull(loadedPlayer);
+            var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(loadedEnemy);
+
+            var stats = new BattleStats();
+            stats.SkillStats[commonSkill.Id] = new SkillStats { Uses = 1 };
+            stats.SkillStats[rareSkill.Id] = new SkillStats { Uses = 1 };
+            await MakeHandler(scope).HandleAsync(
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
+
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var stored = await progressRepo.GetProficiencies(player.Id);
+
+            const double commonWeight = 1.0;
+            const double rareWeight = 1.5 * 1.5;
+            const double totalWeight = commonWeight + rareWeight;
+            var pie = ServerGameConstants.ProficiencyXpPerVictory;
+
+            var fire = Assert.Single(stored, p => p.ProficiencyId == fireTier.Id);
+            Assert.Equal((decimal)(pie * commonWeight / totalWeight), fire.Xp, precision: 3);
+            var earth = Assert.Single(stored, p => p.ProficiencyId == earthTier.Id);
+            Assert.Equal((decimal)(pie * rareWeight / totalWeight), earth.Xp, precision: 3);
+            // The rarer skill's path banks strictly more of the same pie.
+            Assert.True(earth.Xp > fire.Xp);
+        }
+
+        [Fact]
         public async Task Victory_SkillThatDidNotFire_AccruesNoProficiencyXp()
         {
             using var scope = CreateScope();

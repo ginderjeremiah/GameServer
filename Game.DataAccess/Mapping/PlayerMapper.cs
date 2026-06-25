@@ -20,6 +20,7 @@ namespace Game.DataAccess.Mapping
             var player = new EntityPlayer
             {
                 User = user,
+                ClassId = newPlayer.ClassId,
                 Name = newPlayer.Name,
                 Level = newPlayer.Level,
                 Exp = newPlayer.Exp,

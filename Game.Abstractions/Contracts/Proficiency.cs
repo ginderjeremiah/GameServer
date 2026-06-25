@@ -10,13 +10,19 @@ namespace Game.Abstractions.Contracts
         public required string Description { get; set; }
         public required string IconPath { get; set; }
 
+        /// <summary>The Aetheric conlang "word of power" (romanization rendered as glyphs, e.g. <c>aenkor</c>),
+        /// its <see cref="Pronunciation"/>, and its <see cref="Translation"/> — the three decipher strings the
+        /// proficiency screen reveals as the tier levels (thresholds derived, not stored).</summary>
+        public required string Word { get; set; }
+        public required string Pronunciation { get; set; }
+        public required string Translation { get; set; }
+
         /// <summary>The path this proficiency is a tier of, and its 0-based position (tier) within it.</summary>
         public int PathId { get; set; }
         public int PathOrdinal { get; set; }
         public int MaxLevel { get; set; }
         public decimal BaseXp { get; set; }
         public decimal XpGrowth { get; set; }
-        public bool StartsUnlocked { get; set; }
         public int? SeedSkillId { get; set; }
 
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).</summary>

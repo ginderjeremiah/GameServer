@@ -319,6 +319,26 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void ToBattler_DuplicateSelectedSkill_AppearsOnce()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [],
+                SkillIds = [3, 3],
+            };
+
+            var battler = snapshot.ToBattler(
+                ThrowItem,
+                ThrowMod,
+                SkillResolver(MakeSkill(3)));
+
+            // The same skill selected twice is de-duplicated within the selected loadout (first wins).
+            Assert.Equal([3], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
         public void ToBattler_TwoItemsGrantingSameSkill_AppearsOnce()
         {
             var snapshot = new BattleSnapshot
@@ -524,7 +544,6 @@ namespace Game.Core.Tests.Battle
             MaxLevel = 10,
             BaseXp = 100,
             XpGrowth = 2,
-            StartsUnlocked = true,
             SeedSkillId = null,
             PrerequisiteIds = [],
             Levels = levels.Select(l => new ProficiencyLevel

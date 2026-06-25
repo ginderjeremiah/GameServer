@@ -441,6 +441,45 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ItemEquipped_DifferentItemsRacingIntoSameSlot_ConvergesToASingleOccupant()
+        {
+            // Two *different* items race into the same slot from independent scopes — the cross-instance case the
+            // (player, slot) unique index guards, and the one ItemEquippedHandler's retry can re-violate (an equip
+            // evicts a different item, so vacate-then-place is two writes with a race window, unlike
+            // ModAppliedHandler's single-row settle). The bounded in-handler retry converges transient
+            // re-occupation; whatever still loses the race past that bound surfaces to the queue, which redelivers.
+            // Regardless of interleaving the slot must never end doubly occupied, and the at-least-once redelivery
+            // (applied in order below) deterministically settles the later item in with the earlier unequipped.
+            var playerId = await SeedPlayerAsync();
+            var firstItemId = await SeedItemAsync();
+            var secondItemId = await SeedItemAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, firstItemId);
+                await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, secondItemId);
+            }
+
+            var slot = (int)EEquipmentSlot.HelmSlot;
+            await ApplyRacingThenRedeliverAsync(
+                new ItemEquippedEvent(playerId, firstItemId, slot),
+                new ItemEquippedEvent(playerId, secondItemId, slot));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            // The unique index guarantees at most one occupant; the redelivery applied both, so exactly one item
+            // holds the slot — the later one wins — and the other is unequipped. Never two occupants, never a lost row.
+            var occupant = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.EquipmentSlotId == slot)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(secondItemId, occupant.ItemId);
+            var displaced = Assert.Single(await verifyContext.UnlockedItems.AsNoTracking()
+                .Where(ui => ui.PlayerId == playerId && ui.ItemId == firstItemId)
+                .ToListAsync(CancellationToken));
+            Assert.Null(displaced.EquipmentSlotId);
+        }
+
+        [Fact]
         public async Task ItemUnequipped_AppliedTwice_ClearsSlotAndConverges()
         {
             var playerId = await SeedPlayerAsync();
@@ -778,6 +817,42 @@ namespace Game.Application.Tests.DataAccess
                 {
                     scope.Dispose();
                 }
+            }
+        }
+
+        // Races the given events through independent scopes (the cross-instance slot contention), then redelivers
+        // them in order. A handler that exhausts its in-handler retries under contention is the queue's cue to
+        // redeliver, so a throw in the concurrent phase is the designed backstop rather than a failure — it is
+        // swallowed, and the sequential redelivery (no contention, so the later event wins) settles the final state.
+        private async Task ApplyRacingThenRedeliverAsync<TEvent>(params TEvent[] events)
+        {
+            var scopes = events.Select(_ => CreateScope()).ToList();
+            try
+            {
+                await Task.WhenAll(events.Zip(scopes, (evt, scope) => Task.Run(async () =>
+                {
+                    var handler = scope.ServiceProvider.GetRequiredService<IPlayerUpdateHandler<TEvent>>();
+                    try
+                    {
+                        await handler.HandleAsync(evt);
+                    }
+                    catch (DbUpdateException)
+                    {
+                        // Lost the race past the in-handler bound; the redelivery below converges it, as the queue would.
+                    }
+                })));
+            }
+            finally
+            {
+                foreach (var scope in scopes)
+                {
+                    scope.Dispose();
+                }
+            }
+
+            foreach (var evt in events)
+            {
+                await ApplyAsync(evt);
             }
         }
 

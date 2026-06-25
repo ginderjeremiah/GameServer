@@ -344,6 +344,111 @@ namespace Game.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Game.Infrastructure.Entities.Class", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("PassiveAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<int>("PassiveAttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PassiveModifierType")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PassiveScalingAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<int?>("PassiveScalingAttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Classes");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.ClassAttributeDistribution", b =>
+                {
+                    b.Property<int>("ClassId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttributeId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("AmountPerLevel")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<decimal>("BaseAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("ClassId", "AttributeId");
+
+                    b.HasIndex("AttributeId");
+
+                    b.ToTable("ClassAttributeDistributions");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.ClassStarterEquipment", b =>
+                {
+                    b.Property<int>("ClassId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EquipmentSlotId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ClassId", "EquipmentSlotId");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("ClassStarterEquipment");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.ClassStarterSkill", b =>
+                {
+                    b.Property<int>("ClassId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SkillId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ClassId", "SkillId");
+
+                    b.HasIndex("SkillId");
+
+                    b.ToTable("ClassStarterSkills");
+                });
+
             modelBuilder.Entity("Game.Infrastructure.Entities.Device", b =>
                 {
                     b.Property<int>("Id")
@@ -853,6 +958,9 @@ namespace Game.Infrastructure.Migrations
                     b.Property<bool>("AutoChallengeBoss")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("ClassId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("CurrentZoneId")
                         .HasColumnType("integer");
 
@@ -1043,14 +1151,26 @@ namespace Game.Infrastructure.Migrations
                     b.Property<int>("PathOrdinal")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Pronunciation")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime?>("RetiredAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("SeedSkillId")
                         .HasColumnType("integer");
 
-                    b.Property<bool>("StartsUnlocked")
-                        .HasColumnType("boolean");
+                    b.Property<string>("Translation")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Word")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("XpGrowth")
                         .HasPrecision(18, 3)
@@ -1787,6 +1907,63 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("StatisticType");
                 });
 
+            modelBuilder.Entity("Game.Infrastructure.Entities.ClassAttributeDistribution", b =>
+                {
+                    b.HasOne("Game.Infrastructure.Entities.Attribute", "Attribute")
+                        .WithMany()
+                        .HasForeignKey("AttributeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Infrastructure.Entities.Class", "Class")
+                        .WithMany("AttributeDistributions")
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Attribute");
+
+                    b.Navigation("Class");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.ClassStarterEquipment", b =>
+                {
+                    b.HasOne("Game.Infrastructure.Entities.Class", "Class")
+                        .WithMany("StarterEquipment")
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Infrastructure.Entities.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Class");
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.ClassStarterSkill", b =>
+                {
+                    b.HasOne("Game.Infrastructure.Entities.Class", "Class")
+                        .WithMany("StarterSkills")
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Infrastructure.Entities.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Class");
+
+                    b.Navigation("Skill");
+                });
+
             modelBuilder.Entity("Game.Infrastructure.Entities.Device", b =>
                 {
                     b.HasOne("Game.Infrastructure.Entities.BrowserInfo", "BrowserInfo")
@@ -2366,6 +2543,15 @@ namespace Game.Infrastructure.Migrations
             modelBuilder.Entity("Game.Infrastructure.Entities.BrowserInfo", b =>
                 {
                     b.Navigation("Devices");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.Class", b =>
+                {
+                    b.Navigation("AttributeDistributions");
+
+                    b.Navigation("StarterEquipment");
+
+                    b.Navigation("StarterSkills");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.Device", b =>

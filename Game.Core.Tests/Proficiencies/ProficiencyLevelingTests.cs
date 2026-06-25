@@ -130,7 +130,6 @@ namespace Game.Core.Tests.Proficiencies
                 MaxLevel = maxLevel,
                 BaseXp = baseXp,
                 XpGrowth = xpGrowth,
-                StartsUnlocked = true,
                 SeedSkillId = null,
                 PrerequisiteIds = [],
                 Levels = (rewardLevels ?? (payoutLevels ?? []).Select(level => (level, (int?)null)).ToArray())

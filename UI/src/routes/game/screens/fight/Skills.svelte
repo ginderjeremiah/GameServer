@@ -4,7 +4,7 @@
 			{#if skill}
 				<!-- Charge sweep/ready computed once per skill per frame (this row re-renders
 				     every animation frame for the player, enemy, and boss cards). -->
-				{@const charge = chargeState(skill)}
+				{@const charge = chargeProjection(skill.renderChargeTime, skill.cooldownMs)}
 				<!-- A focusable button so the per-skill combat tooltip is reachable by keyboard
 				     and screen reader, not just on hover. Its accessible name is the icon's alt. -->
 				<button
@@ -38,7 +38,7 @@
 </div>
 
 <script lang="ts">
-import type { Battler, Skill } from '$lib/battle';
+import type { Battler } from '$lib/battle';
 import { tintColor } from '$lib/common';
 import {
 	anchorPosition,
@@ -51,6 +51,7 @@ import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 import CooldownOverlay from '$components/CooldownOverlay.svelte';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import SkillTooltip from './SkillTooltip.svelte';
+import { chargeProjection } from './skill-cooldown';
 
 type Props = {
 	battler: Battler;
@@ -101,14 +102,6 @@ const handleLeave = (index: number) => {
 		tooltipSkillIndex = -1;
 		hideTooltip();
 	}
-};
-
-/** Per-frame charge projection for a slot, computed once per skill from the raw charge
- *  fraction — no string round-trip. `sweep` feeds the cooldown conic-gradient (in degrees)
- *  and `ready` thresholds the (clamped-to-1) fraction at 99.9%. */
-const chargeState = (skill: Skill) => {
-	const fraction = skill.renderChargeTime / skill.cooldownMs;
-	return { sweep: fraction * 360, ready: fraction >= 0.999 };
 };
 </script>
 

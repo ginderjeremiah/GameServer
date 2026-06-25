@@ -1,69 +1,64 @@
 using Game.Core.Attributes;
+using Game.Core.Classes;
 
 namespace Game.Core.Players
 {
     /// <summary>
-    /// Builds the <see cref="NewPlayer"/> blueprint for a freshly created account. The new-player
-    /// defaults — the starter skill set, the base attribute spread, and the default log
-    /// preferences — are game rules ("what does a new player look like?"), so they live in the
-    /// domain rather than in the orchestration layer.
+    /// Builds the <see cref="NewPlayer"/> blueprint for a freshly created character from its chosen
+    /// <see cref="Class"/>. "What does a new player look like?" is a game rule, so it lives in the domain
+    /// rather than the orchestration layer; the class is the parameter that drives it — the starter kit
+    /// and the starting attribute spread come from class data, replacing the former hardcoded constants.
     /// </summary>
     public class NewPlayerFactory
     {
-        /// <summary>Number of starter skills granted to a new player (skill ids 0..N-1), all selected.</summary>
-        public const int StarterSkillCount = 3;
-
-        /// <summary>The starting amount for each of a new player's core attributes.</summary>
-        public const double StartingAttributeAmount = 5d;
-
         /// <summary>The zone a new player begins in.</summary>
         public const int StartingZoneId = 0;
 
         /// <summary>
-        /// Creates the blueprint for a brand-new player with the given <paramref name="name"/>: the
-        /// starter skills (all selected), the root-proficiency seed skills (unselected — a tree-seeded root
-        /// with no world skill source grants its native skill so the root is trainable from creation; spike
-        /// #982 area D), the base attribute spread, and the default log preferences. Root proficiencies are
-        /// open by construction (their <c>StartsUnlocked</c> flag), so only the seed-skill grant is seeded
-        /// here, not any per-player open state. <paramref name="rootSeedSkillIds"/> is resolved from the
-        /// proficiency catalogue by the orchestration layer; it is empty until roots are authored.
+        /// Creates the blueprint for a brand-new player with the given <paramref name="name"/> of the chosen
+        /// <paramref name="class"/>: the class's starter skills (all selected, in authored order), the starting
+        /// attribute allocation sourced from the class's attribute distribution base spread, and the default
+        /// log preferences. The character's proficiency roots are no longer seeded here — they emerge from the
+        /// kit, whose skills open their paths through derived openness on the first won battle (spike #1126).
         /// </summary>
-        public NewPlayer Create(string name, IReadOnlyList<int> rootSeedSkillIds)
+        public NewPlayer Create(string name, Class @class)
         {
-            // Starter skills are selected; root seed skills are appended unselected, dropping any already
-            // covered by a starter skill so a player never gets a duplicate skill row. Dedup runs against the
-            // actual starter id set (not a positional id-range assumption), so it stays correct if starter id
-            // assignment ever changes.
-            var starterSkills = Enumerable.Range(0, StarterSkillCount)
+            // Starter skills come from the class kit, all selected, in authored order. Dedup by id (first wins)
+            // so a kit that lists the same skill twice — e.g. the shared path-less "punch" already covered — never
+            // produces a duplicate skill row.
+            var seen = new HashSet<int>();
+            var starterSkills = @class.StarterSkillIds
+                .Where(seen.Add)
                 .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index })
                 .ToList();
-            var starterSkillIds = starterSkills.Select(skill => skill.SkillId).ToHashSet();
-            var seedSkills = rootSeedSkillIds
-                .Distinct()
-                .Where(id => !starterSkillIds.Contains(id))
-                .Select((id, index) => new NewPlayerSkill
-                {
-                    SkillId = id,
-                    Selected = false,
-                    Order = StarterSkillCount + index,
-                });
+
+            // The class's base attribute spread, keyed by attribute. This is the level-1 base only; the
+            // level-scaled, non-reallocatable locked base and the reduced free pool are introduced in #1223.
+            var baseByAttribute = @class.AttributeDistributions
+                .ToDictionary(distribution => distribution.AttributeId, distribution => (double)distribution.BaseAmount);
 
             return new NewPlayer
             {
+                ClassId = @class.Id,
                 Name = name,
                 Level = 1,
                 Exp = 0,
                 CurrentZoneId = StartingZoneId,
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
-                Skills = [.. starterSkills, .. seedSkills],
-                // Seed an allocation row for exactly the core (directly-allocatable) attributes, derived from
-                // the attribute set itself rather than a hardcoded count — so adding a seventh core attribute
-                // automatically grants new players its allocation row (without one, PlayerStatPoints rejects
-                // every allocation into it, permanently blocking the stat).
+                Skills = starterSkills,
+                // Seed an allocation row for exactly the core (directly-allocatable) attributes, derived from the
+                // attribute set itself rather than a hardcoded count — so adding a seventh core attribute
+                // automatically grants new players its allocation row (without one, PlayerStatPoints rejects every
+                // allocation into it, permanently blocking the stat). The amount is the class's base spread for
+                // that attribute, or 0 for an attribute the class does not invest in.
                 Attributes = Enum.GetValues<EAttribute>()
                     .Where(Attribute.IsCore)
-                    .Select(attribute => new StatAllocation { Attribute = attribute, Amount = StartingAttributeAmount })
+                    .Select(attribute => new StatAllocation
+                    {
+                        Attribute = attribute,
+                        Amount = baseByAttribute.TryGetValue(attribute, out var amount) ? amount : 0d,
+                    })
                     .ToList(),
                 LogPreferences = CreateDefaultLogPreferences(),
             };

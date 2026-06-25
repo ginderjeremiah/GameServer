@@ -3,11 +3,12 @@
 namespace Game.Core.Attributes
 {
     /// <summary>
-    /// Represents the distribution of an attribute. Part of the shared, cached <see cref="Enemies.EnemyTemplate"/>
-    /// graph (reused by reference across every <see cref="Enemies.Enemy"/> produced from a template) and
-    /// therefore structurally immutable (init-only) so a consumer cannot corrupt the cache for every player (#547).
-    /// Properties are <c>required</c> (matching its sibling reference models) so a distribution can never be
-    /// silently built with the default enum-0 attribute and zero amounts.
+    /// Represents the level-scaled distribution of an attribute (<c>BaseAmount + AmountPerLevel × level</c>).
+    /// Reused as a shared, cached reference-data value by both the <see cref="Enemies.EnemyTemplate"/> graph
+    /// (across every <see cref="Enemies.Enemy"/> produced from a template) and a <see cref="Classes.Class"/>'s
+    /// attribute fingerprint (#1126), so it is structurally immutable (init-only) — a consumer cannot corrupt
+    /// the cache for every player (#547). Properties are <c>required</c> (matching its sibling reference models)
+    /// so a distribution can never be silently built with the default enum-0 attribute and zero amounts.
     /// </summary>
     public sealed class AttributeDistribution
     {

@@ -162,8 +162,9 @@ namespace Game.Application.Services
         // The weighted contributions of every skill that fired in the battle, routed to each path's frontier
         // tier. A path is represented if at least one contributing skill fired (representation, not frequency —
         // a fast-cooldown skill earns no more pie than a slow one). A fired skill's pull on the frontier tier
-        // is its falloff-free attention (skillTierWeight × contributionWeight, tier weight flat 1 until #979)
-        // paired with the absolute falloff over the home-tier→frontier distance, so a stale skill supplements
+        // is its falloff-free attention (skillTierWeight × contributionWeight, the tier weight derived from the
+        // skill's rarity — see ProficiencyTierWeight, #1123) paired with the absolute falloff over the
+        // home-tier→frontier distance, so a stale skill supplements
         // the current tier only at a discount. A fully-maxed path (no frontier) banks nothing; a skill homed
         // deeper than the frontier never trains a tier below where it was acquired.
         private List<WeightedContribution> BuildContributions(BattleStats stats, PlayerProgress progress)

@@ -38,12 +38,14 @@ namespace Game.Application.Tests.DataAccess
                     Name = "Blades",
                     Description = "d",
                     IconPath = "i",
+                    Word = "aenkor",
+                    Pronunciation = "AYN-kor",
+                    Translation = "The First Flame",
                     PathId = path.Id,
                     PathOrdinal = 0,
                     MaxLevel = 10,
                     BaseXp = 100m,
                     XpGrowth = 2m,
-                    StartsUnlocked = true,
                     LevelModifiers = [],
                     LevelRewards = [],
                     Prerequisites = [],
@@ -100,7 +102,12 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(0, contribution.HomeTier);
             Assert.Equal(1.5d, contribution.Weight);
 
-            Assert.Contains(proficiencies.AllProficiencies(), p => p.Id == proficiencyId && p.Name == "Blades");
+            // The decipher "words of power" round-trip through GetProficiencies onto the contract verbatim.
+            var contract = proficiencies.AllProficiencies().Single(p => p.Id == proficiencyId);
+            Assert.Equal("Blades", contract.Name);
+            Assert.Equal("aenkor", contract.Word);
+            Assert.Equal("AYN-kor", contract.Pronunciation);
+            Assert.Equal("The First Flame", contract.Translation);
             Assert.Contains(
                 proficiencies.AllPaths(),
                 p => p.Name == "Fire" && p.Contributions.Any(c => c.SkillId == skillId && c.HomeTier == 0));
@@ -241,12 +248,14 @@ namespace Game.Application.Tests.DataAccess
             Name = name,
             Description = "d",
             IconPath = "i",
+            Word = "w",
+            Pronunciation = "p",
+            Translation = "t",
             PathId = pathId,
             PathOrdinal = ordinal,
             MaxLevel = 10,
             BaseXp = 100m,
             XpGrowth = 2m,
-            StartsUnlocked = ordinal == 0,
             LevelModifiers = [],
             LevelRewards = [],
             Prerequisites = [],

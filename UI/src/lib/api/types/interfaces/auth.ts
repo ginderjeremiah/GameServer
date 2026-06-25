@@ -12,8 +12,15 @@ export interface IAuthTokens {
 	refreshToken: string;
 }
 
+export interface ICreateAccountRequest {
+	username: string;
+	password: string;
+	classId: number;
+}
+
 export interface ICreatePlayerRequest {
 	name: string;
+	classId: number;
 }
 
 export interface IDeviceInfoRequest {

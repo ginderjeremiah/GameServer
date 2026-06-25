@@ -704,6 +704,21 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2000),
 
+                // The SAME skill selected twice is de-duplicated WITHIN the selected loadout (first wins): the
+                // player fields S1 once (22−2 = 20/hit, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50
+                // → 2000ms. (Without intra-selected dedupe the two copies — 40/tick — would kill on hit 3 at
+                // 1200ms.) Pins the single Distinct() over the full loadout that the frontend mirrors.
+                ["duplicateSelectedSkill"] = new ParityScenario(
+                    Player: () => MakeBattlerWithGrants(
+                        strength: 10,
+                        selectedSkillIds: [1, 1],
+                        grants: [],
+                        skillPool: [MakeSkill(1, baseDamage: 22, cooldownMs: 400)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
                 // A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a
                 // skill whose self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw less
                 // 2 Def deals 8,18,28,38,48,58 (Str climbing 10→60); cumulative 8,26,54,92,140,198 drops the

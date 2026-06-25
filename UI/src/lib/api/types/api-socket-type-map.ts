@@ -11,6 +11,7 @@ import type {
 	IChallengeBossRequest,
 	IChallengeCompletedModel,
 	IChallengeType,
+	IClass,
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
 	IEnemy,
@@ -21,6 +22,7 @@ import type {
 	INewEnemyModel,
 	INewEnemyRequest,
 	IOfflineProgressModel,
+	IPath,
 	IPlayerChallenge,
 	IPlayerProficiency,
 	IPlayerStatistic,
@@ -45,10 +47,12 @@ export type ApiSocketResponseTypes = {
 	'GetAttributes': IAttribute[];
 	'GetChallenges': IChallenge[];
 	'GetChallengeTypes': IChallengeType[];
+	'GetClasses': IClass[];
 	'GetEnemies': IEnemy[];
 	'GetItemMods': IItemMod[];
 	'GetItems': IItem[];
 	'GetOfflineProgress': IOfflineProgressModel;
+	'GetPaths': IPath[];
 	'GetPlayerChallenges': IPlayerChallenge[];
 	'GetPlayerProficiencies': IPlayerProficiency[];
 	'GetPlayerStatistics': IPlayerStatistic[];

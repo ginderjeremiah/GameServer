@@ -9,6 +9,10 @@ namespace Game.Core.Players
     /// </summary>
     public class NewPlayer
     {
+        /// <summary>The class chosen at character creation — the archetype that parameterized this
+        /// blueprint (starter kit + attribute spread). Persisted as the permanent <see cref="Player.ClassId"/>
+        /// seam.</summary>
+        public required int ClassId { get; init; }
         public required string Name { get; init; }
         public required int Level { get; init; }
         public required int Exp { get; init; }

@@ -2,6 +2,7 @@ import {
 	ApiRequest,
 	EAttribute,
 	EEntityType,
+	EEquipmentSlot,
 	EItemCategory,
 	EItemModType,
 	EModifierType,
@@ -86,6 +87,9 @@ class WorkbenchReference {
 			.map((r) => ({ value: r.id, text: r.retiredAt ? `${label(r)} · retired` : label(r) }));
 
 	attributeOptions = (): SelectOption[] => toOptions(enumPairs(EAttribute));
+	/** Attribute picker that also offers a "None" sentinel (-1), for an optional scaling attribute. */
+	optionalAttributeOptions = (): SelectOption[] => [{ value: -1, text: 'None' }, ...this.attributeOptions()];
+	equipmentSlotOptions = (): SelectOption[] => toOptions(enumPairs(EEquipmentSlot));
 	itemCategoryOptions = (): SelectOption[] => toOptions(enumPairs(EItemCategory));
 	rarityOptions = (): SelectOption[] => toOptions(enumPairs(ERarity));
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
@@ -120,6 +124,8 @@ class WorkbenchReference {
 			keep
 		)
 	];
+	/** Item picker options (active items, plus the current value even if retired). */
+	itemOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.items ?? [], keep);
 	skillCatalogue = () =>
 		(staticData.skills ?? []).map((s) => ({
 			id: s.id,

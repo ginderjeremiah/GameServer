@@ -63,7 +63,6 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(10, core.MaxLevel);
             Assert.Equal(100d, core.BaseXp);
             Assert.Equal(1.5d, core.XpGrowth);
-            Assert.True(core.StartsUnlocked);
             Assert.Equal(4, core.SeedSkillId);
             Assert.Equal([2], core.PrerequisiteIds);
         }
@@ -78,6 +77,9 @@ namespace Game.Application.Tests.Mapping
             var contract = ProficiencyMapper.ToContract(entity);
 
             Assert.Equal("Blades", contract.Name);
+            Assert.Equal("aenkor", contract.Word);
+            Assert.Equal("AYN-kor", contract.Pronunciation);
+            Assert.Equal("The First Flame", contract.Translation);
             Assert.Equal(1, contract.PathId);
             Assert.Equal(2, contract.PathOrdinal);
             Assert.Equal(100m, contract.BaseXp);
@@ -138,12 +140,14 @@ namespace Game.Application.Tests.Mapping
                 Name = "Blades",
                 Description = "A blade discipline.",
                 IconPath = "blades.png",
+                Word = "aenkor",
+                Pronunciation = "AYN-kor",
+                Translation = "The First Flame",
                 PathId = 1,
                 PathOrdinal = 2,
                 MaxLevel = 10,
                 BaseXp = 100m,
                 XpGrowth = 1.5m,
-                StartsUnlocked = true,
                 SeedSkillId = seedSkillId,
                 LevelModifiers = modifiers ?? [],
                 LevelRewards = rewards ?? [],

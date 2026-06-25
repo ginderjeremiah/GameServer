@@ -11,6 +11,7 @@ using System.Net.Http.Json;
 using System.Net.WebSockets;
 using Xunit;
 using Attribute = Game.Api.Models.Attributes.Attribute;
+using Path = Game.Abstractions.Contracts.Path;
 
 namespace Game.Api.Tests.Integration
 {
@@ -39,6 +40,7 @@ namespace Game.Api.Tests.Integration
             await TestDataSeeder.CreateItemAsync(context, "RefSword");
             await TestDataSeeder.CreateItemModAsync(context, "RefMod");
             await TestDataSeeder.CreateProficiencyAsync(context, "RefBlades");
+            await TestDataSeeder.CreateClassAsync(context, "RefWarrior");
 
             var user = await TestDataSeeder.CreateUserAsync(context, "refdatauser", "refdatapass");
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
@@ -237,6 +239,19 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetClasses_ReturnsSeededClasses()
+        {
+            var userId = await SeedReferenceDataAndLoginAsync();
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<Class>>("GetClasses");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.Contains(response.Data, c => c.Name == "RefWarrior");
+        }
+
+        [Fact]
         public async Task GetProficiencies_ReturnsSeededProficiencies()
         {
             var userId = await SeedReferenceDataAndLoginAsync();
@@ -247,6 +262,33 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
             Assert.Contains(response.Data, p => p.Name == "RefBlades");
+        }
+
+        [Fact]
+        public async Task GetPaths_ReturnsSeededPaths()
+        {
+            int userId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var path = await TestDataSeeder.CreatePathAsync(context, "RefPyromancy");
+                await TestDataSeeder.CreateProficiencyAsync(context, "RefFlameTier", pathId: path.Id);
+
+                var user = await TestDataSeeder.CreateUserAsync(context, "pathsocketuser", "pathsocketpass");
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                userId = user.Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+            await LoginAsync("pathsocketuser", "pathsocketpass");
+
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<Path>>("GetPaths");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.Contains(response.Data, p => p.Name == "RefPyromancy");
         }
 
         [Fact]
@@ -279,8 +321,8 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Data);
             // One entry per Get* reference-data command the loading screen pulls.
             Assert.Equal(
-                ["GetAttributes", "GetChallengeTypes", "GetChallenges", "GetEnemies", "GetItemMods",
-                 "GetItems", "GetProficiencies", "GetSkills", "GetStatisticTypes", "GetZones"],
+                ["GetAttributes", "GetChallengeTypes", "GetChallenges", "GetClasses", "GetEnemies", "GetItemMods",
+                 "GetItems", "GetPaths", "GetProficiencies", "GetSkills", "GetStatisticTypes", "GetZones"],
                 response.Data.Select(v => v.Command).OrderBy(c => c, StringComparer.Ordinal));
             Assert.All(response.Data, v => Assert.False(string.IsNullOrEmpty(v.Version)));
         }

@@ -110,12 +110,14 @@ namespace Game.Application.Tests.DataAccess
                     Name = "Shared Proficiency",
                     Description = "",
                     IconPath = "",
+                    Word = "",
+                    Pronunciation = "",
+                    Translation = "",
                     PathId = path.Id,
                     PathOrdinal = 0,
                     MaxLevel = 10,
                     BaseXp = 100m,
                     XpGrowth = 2m,
-                    StartsUnlocked = true,
                     LevelModifiers = [],
                     LevelRewards = [],
                     Prerequisites = [],
@@ -148,6 +150,32 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(proficiencyId, first.Id);
             Assert.Equal("Shared Proficiency", first.Name);
             Assert.NotEmpty(first.Levels);
+        }
+
+        [Fact]
+        public async Task GetClass_ReturnsSharedInstanceAndCorrectData()
+        {
+            int classId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateClassAsync(context, name: "Shared Class")).Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var classes = scope.ServiceProvider.GetRequiredService<IClasses>();
+
+            var first = classes.GetClass(classId);
+            var second = classes.GetClass(classId);
+
+            // The optimization: repeated reads hand back the same pre-materialized instance, not a fresh graph.
+            Assert.NotNull(first);
+            Assert.Same(first, second);
+            Assert.Equal(classId, first.Id);
+            Assert.Equal("Shared Class", first.Name);
+            Assert.Equal(EAttribute.Strength, first.SignaturePassive.Attribute);
         }
 
         [Fact]

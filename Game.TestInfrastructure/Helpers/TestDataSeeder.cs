@@ -406,6 +406,88 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        public static async Task<Class> CreateClassAsync(
+            GameContext context,
+            string name = "Test Class",
+            string word = "aenkor",
+            EAttribute passiveAttribute = EAttribute.Strength,
+            decimal passiveAmount = 5m,
+            EAttribute? passiveScalingAttribute = null,
+            decimal passiveScalingAmount = 0m,
+            EModifierType passiveModifierType = EModifierType.Additive,
+            DateTime? retiredAt = null)
+        {
+            var @class = new Class
+            {
+                Name = name,
+                Description = "",
+                Word = word,
+                PassiveAttributeId = (int)passiveAttribute,
+                PassiveAmount = passiveAmount,
+                PassiveScalingAttributeId = (int?)passiveScalingAttribute,
+                PassiveScalingAmount = passiveScalingAmount,
+                PassiveModifierType = (int)passiveModifierType,
+                RetiredAt = retiredAt,
+            };
+
+            context.Classes.Add(@class);
+            await context.SaveChangesAsync();
+            return @class;
+        }
+
+        /// <summary>Seeds a class with a kit: the given starter skills and an optional attribute distribution
+        /// (each <c>{ Attribute, BaseAmount, AmountPerLevel }</c>). The referenced skills must already exist.</summary>
+        public static async Task<Class> CreateClassWithKitAsync(
+            GameContext context,
+            IReadOnlyList<int> starterSkillIds,
+            IReadOnlyList<(EAttribute Attribute, decimal BaseAmount, decimal AmountPerLevel)>? attributeDistributions = null,
+            string name = "Test Class",
+            DateTime? retiredAt = null)
+        {
+            var @class = await CreateClassAsync(context, name: name, retiredAt: retiredAt);
+
+            foreach (var skillId in starterSkillIds)
+            {
+                context.ClassStarterSkills.Add(new ClassStarterSkill { ClassId = @class.Id, SkillId = skillId });
+            }
+
+            foreach (var (attribute, baseAmount, amountPerLevel) in attributeDistributions ?? [])
+            {
+                context.ClassAttributeDistributions.Add(new ClassAttributeDistribution
+                {
+                    ClassId = @class.Id,
+                    AttributeId = (int)attribute,
+                    BaseAmount = baseAmount,
+                    AmountPerLevel = amountPerLevel,
+                });
+            }
+
+            await context.SaveChangesAsync();
+            return @class;
+        }
+
+        /// <summary>The standard character-creation fixture: seeds skills <c>0..starterSkillCount-1</c> and a
+        /// class whose kit is exactly those skills with a uniform <paramref name="coreAttributeBase"/> spread
+        /// across the six core attributes (ids 0-5), so a created player's starter graph is fully determined.
+        /// Returns the class (its zero-based <c>Id</c> is the class to create characters as).</summary>
+        public static async Task<Class> CreateStandardCreatableClassAsync(
+            GameContext context,
+            int starterSkillCount = 3,
+            decimal coreAttributeBase = 5m)
+        {
+            var starterSkillIds = new List<int>();
+            for (var i = 0; i < starterSkillCount; i++)
+            {
+                starterSkillIds.Add((await CreateSkillAsync(context, $"Skill{i}")).Id);
+            }
+
+            var distributions = Enumerable.Range(0, 6)
+                .Select(id => ((EAttribute)id, coreAttributeBase, 0m))
+                .ToList();
+
+            return await CreateClassWithKitAsync(context, starterSkillIds, distributions);
+        }
+
         public static async Task<Path> CreatePathAsync(
             GameContext context,
             string name = "Test Path",
@@ -435,8 +517,10 @@ namespace Game.TestInfrastructure.Helpers
             decimal xpGrowth = 2m,
             int? pathId = null,
             int pathOrdinal = 0,
-            bool startsUnlocked = true,
-            int? seedSkillId = null)
+            int? seedSkillId = null,
+            string word = "",
+            string pronunciation = "",
+            string translation = "")
         {
             pathId ??= (await CreatePathAsync(context)).Id;
 
@@ -445,12 +529,14 @@ namespace Game.TestInfrastructure.Helpers
                 Name = name,
                 Description = "",
                 IconPath = "",
+                Word = word,
+                Pronunciation = pronunciation,
+                Translation = translation,
                 PathId = pathId.Value,
                 PathOrdinal = pathOrdinal,
                 MaxLevel = maxLevel,
                 BaseXp = baseXp,
                 XpGrowth = xpGrowth,
-                StartsUnlocked = startsUnlocked,
                 SeedSkillId = seedSkillId,
                 LevelModifiers = [],
                 LevelRewards = [],

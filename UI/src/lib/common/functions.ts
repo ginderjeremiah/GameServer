@@ -3,6 +3,12 @@ export function formatNum(num: number): string {
 	return '' + parseFloat(num.toFixed(2));
 }
 
+/** Damage per second for a damage value over a cooldown in seconds. A non-positive cooldown yields 0
+ *  (rather than Infinity/NaN), so a zero-cooldown skill reads as 0 DPS consistently across surfaces. */
+export function damagePerSecond(damage: number, cooldown: number): number {
+	return cooldown > 0 ? damage / cooldown : 0;
+}
+
 export async function delay(delay: number) {
 	return new Promise<void>((res) => {
 		setTimeout(res, delay);

@@ -5,6 +5,7 @@ import type {
 	EAttribute,
 	EChallengeType,
 	EEntityType,
+	EEquipmentSlot,
 	EItemCategory,
 	EItemModType,
 	EModifierType,
@@ -42,6 +43,27 @@ export interface IChallenge {
 	rewardItemId?: number;
 	rewardItemModId?: number;
 	retiredAt?: string;
+}
+
+export interface IClass {
+	id: number;
+	name: string;
+	description: string;
+	word: string;
+	passiveAttributeId: EAttribute;
+	passiveAmount: number;
+	passiveScalingAttributeId?: EAttribute;
+	passiveScalingAmount: number;
+	passiveModifierType: EModifierType;
+	starterSkillIds: number[];
+	starterEquipment: IClassStarterEquipment[];
+	attributeDistributions: IAttributeDistribution[];
+	retiredAt?: string;
+}
+
+export interface IClassStarterEquipment {
+	itemId: number;
+	equipmentSlot: EEquipmentSlot;
 }
 
 export interface IEnemy {
@@ -104,12 +126,14 @@ export interface IProficiency {
 	name: string;
 	description: string;
 	iconPath: string;
+	word: string;
+	pronunciation: string;
+	translation: string;
 	pathId: number;
 	pathOrdinal: number;
 	maxLevel: number;
 	baseXp: number;
 	xpGrowth: number;
-	startsUnlocked: boolean;
 	seedSkillId?: number;
 	retiredAt?: string;
 	levelModifiers: IProficiencyLevelModifier[];
