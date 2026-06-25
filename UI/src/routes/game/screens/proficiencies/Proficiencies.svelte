@@ -1,9 +1,9 @@
 <!-- Proficiencies screen — "The Lexicon".
 
      The mastery tree rendered as per-path spines (#1217): a rail of discovered paths beside the selected
-     path's spine, whose tiers are words of power that illuminate as they decipher. The word-detail
-     inspector is the sibling sub-issue (#1218); this screen owns the rail, the spine, and the shared
-     decipher tooltip the spine cards drive on hover.
+     path's spine, whose tiers are words of power that illuminate as they decipher, beside a word-detail
+     inspector for the selected tier (#1218). This screen owns the rail, the spine, the inspector, and the
+     shared decipher tooltip the spine cards and the inspector drive on hover.
 
      Progress is re-fetched on mount (mirroring the Statistics screen) so the lexicon reflects play since
      the store was last loaded at game boot; the reference data is already in `staticData`. -->
@@ -40,6 +40,9 @@
 						{controller}
 					/>
 				</div>
+				{#if view.selectedTier}
+					<WordDetail tier={view.selectedTier} path={view.selectedPath} {controller} />
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -63,6 +66,7 @@ import {
 } from '$stores';
 import LexiconRail from './LexiconRail.svelte';
 import TierSpine from './TierSpine.svelte';
+import WordDetail from './WordDetail.svelte';
 import WordOfPowerTooltip from './WordOfPowerTooltip.svelte';
 import type { TierView } from './proficiencies-lexicon';
 import { ProficienciesView } from './proficiencies-view.svelte';

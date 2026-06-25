@@ -13,6 +13,8 @@ const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	state: 'unlocked',
 	frontier: false,
 	milestoneLevels: [],
+	levelModifiers: [],
+	levelRewards: [],
 	decipher: 'undeciphered',
 	word: `word${o.id}`,
 	pronunciation: `pron${o.id}`,

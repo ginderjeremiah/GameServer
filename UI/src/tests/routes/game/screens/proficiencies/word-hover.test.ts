@@ -16,6 +16,8 @@ const tierView = (id: number): TierView => ({
 	state: 'unlocked',
 	frontier: false,
 	milestoneLevels: [],
+	levelModifiers: [],
+	levelRewards: [],
 	decipher: 'undeciphered',
 	word: `word${id}`,
 	pronunciation: `pron${id}`,
