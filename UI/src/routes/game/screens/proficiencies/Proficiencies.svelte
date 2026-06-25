@@ -38,6 +38,8 @@
 							type="button"
 							class="rail-row"
 							class:active={path.id === view.selectedPath?.id}
+							aria-current={path.id === view.selectedPath?.id ? 'true' : undefined}
+							data-testid="rail-{path.id}"
 							onclick={() => view.selectPath(path.id)}
 						>
 							<WordOfPower text={path.word} label={path.name} size={18} />
@@ -53,6 +55,8 @@
 							type="button"
 							class="tier"
 							class:active={tier.id === view.selectedTier?.id}
+							aria-current={tier.id === view.selectedTier?.id ? 'true' : undefined}
+							data-testid="tier-{tier.id}"
 							onclick={() => view.selectTier(tier.id)}
 						>
 							<WordOfPower text={tier.word} label={tier.name} size={26} glow={tier.decipher === 'translated'} />

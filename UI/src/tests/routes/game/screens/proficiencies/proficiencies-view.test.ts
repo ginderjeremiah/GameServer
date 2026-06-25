@@ -5,19 +5,22 @@ import type { IPath, IPlayerProficiency, IProficiency, ISkillPathContribution } 
    ProficienciesView reads the live stores, so those are stubbed with mutable stand-ins the view-class
    tests populate before constructing the view. The real $lib/api types stay intact (buildLexicon only
    uses them as erased types). */
-const { mockStaticData, mockPlayerProficiencies, mockPlayerManager, toastError } = vi.hoisted(() => ({
-	mockStaticData: { proficiencies: undefined as IProficiency[] | undefined, paths: undefined as IPath[] | undefined },
-	mockPlayerProficiencies: { all: [] as IPlayerProficiency[], error: false, load: vi.fn() },
-	mockPlayerManager: { selectedSkills: [] as number[] },
-	toastError: vi.fn()
-}));
+const { mockStaticData, mockPlayerProficiencies, mockPlayerManager, mockInventoryManager, toastError } = vi.hoisted(
+	() => ({
+		mockStaticData: { proficiencies: undefined as IProficiency[] | undefined, paths: undefined as IPath[] | undefined },
+		mockPlayerProficiencies: { all: [] as IPlayerProficiency[], error: false, load: vi.fn() },
+		mockPlayerManager: { selectedSkills: [] as number[] },
+		mockInventoryManager: { grantedSkillIds: [] as number[] },
+		toastError: vi.fn()
+	})
+);
 
 vi.mock('$stores', () => ({
 	staticData: mockStaticData,
 	playerProficiencies: mockPlayerProficiencies,
 	toastError
 }));
-vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
+vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
 
 import {
 	buildLexicon,
@@ -81,8 +84,8 @@ const PATHS: IPath[] = [
 // Fire maxed, Inferno mid-journey, Sword maxed (at its lower cap of 5). Pyroclasm / Lava / Blade unopened.
 const PROGRESS: IPlayerProficiency[] = [row(0, 10), row(1, 6, 40), row(4, 5)];
 
-const build = (over?: { player?: IPlayerProficiency[]; loadout?: number[] }) =>
-	buildLexicon(PROFICIENCIES, PATHS, over?.player ?? PROGRESS, over?.loadout ?? [100]);
+const build = (over?: { player?: IPlayerProficiency[]; firing?: number[] }) =>
+	buildLexicon(PROFICIENCIES, PATHS, over?.player ?? PROGRESS, over?.firing ?? [100]);
 
 const byId = (lexicon: ReturnType<typeof build>, id: number) => lexicon.find((p) => p.id === id);
 const tier = (lexicon: ReturnType<typeof build>, pathId: number, tierId: number) =>
@@ -201,18 +204,18 @@ describe('buildLexicon — tier state', () => {
 	});
 
 	it('marks the frontier training when an equipped skill feeds the path', () => {
-		expect(tier(build({ loadout: [100] }), 0, 1)?.state).toBe('training');
+		expect(tier(build({ firing: [100] }), 0, 1)?.state).toBe('training');
 	});
 
 	it('marks the frontier unlocked (not training) without an equipped contributing skill', () => {
-		expect(tier(build({ loadout: [] }), 0, 1)?.state).toBe('unlocked');
+		expect(tier(build({ firing: [] }), 0, 1)?.state).toBe('unlocked');
 		// Blade's path is fed by skill 200, which is not equipped here.
-		expect(tier(build({ loadout: [100] }), 2, 5)?.state).toBe('unlocked');
+		expect(tier(build({ firing: [100] }), 2, 5)?.state).toBe('unlocked');
 	});
 
 	it('only the frontier can be training — a maxed tier stays maxed even when fed', () => {
 		// Equip Sword's feeder (200): Blade (frontier) trains, Sword (maxed) does not.
-		const lexicon = build({ loadout: [200] });
+		const lexicon = build({ firing: [200] });
 		expect(tier(lexicon, 2, 5)?.state).toBe('training');
 		expect(tier(lexicon, 2, 4)?.state).toBe('maxed');
 	});
@@ -322,6 +325,7 @@ describe('ProficienciesView', () => {
 		mockPlayerProficiencies.all = PROGRESS;
 		mockPlayerProficiencies.error = false;
 		mockPlayerManager.selectedSkills = [100];
+		mockInventoryManager.grantedSkillIds = [];
 		toastError.mockReset();
 	});
 
@@ -335,6 +339,16 @@ describe('ProficienciesView', () => {
 		const view = new ProficienciesView();
 		expect(view.paths.map((p) => p.id)).toEqual([0, 2]);
 		expect(view.isEmpty).toBe(false);
+	});
+
+	it('trains a frontier fed only by an innate item-granted skill (not just the selected loadout)', () => {
+		// The battler fires the selected loadout *plus* equipment-granted skills, so a frontier fed solely
+		// by a granted skill must read as training. Nothing selected; skill 100 granted by gear feeds path 0.
+		mockPlayerManager.selectedSkills = [];
+		mockInventoryManager.grantedSkillIds = [100];
+		const view = new ProficienciesView();
+		const inferno = view.paths.find((p) => p.id === 0)?.tiers.find((t) => t.id === 1);
+		expect(inferno?.state).toBe('training');
 	});
 
 	it('defaults the selection to the first path and its representative tier', () => {

@@ -83,11 +83,12 @@ export function representativeTier(path: PathView): TierView | undefined {
 	return path.tiers.find((t) => t.frontier) ?? path.tiers.at(-1);
 }
 
-/** Whether the equipped loadout feeds the path's frontier tier — any equipped skill that contributes to
- *  the path at a home tier at or below the frontier (a skill never trains a tier below where it was
- *  acquired, so the distance is always ≥ 0; spike #982 decision 12). */
-function hasContributingSkill(path: IPath, frontierOrdinal: number, loadout: ReadonlySet<number>): boolean {
-	return path.contributions.some((c) => c.homeTier <= frontierOrdinal && loadout.has(c.skillId));
+/** Whether the player's firing skills feed the path's frontier tier — any skill that fires in battle
+ *  (a selected loadout skill or an innate item-granted skill) and contributes to the path at a home tier
+ *  at or below the frontier (a skill never trains a tier below where it was acquired, so the distance is
+ *  always ≥ 0; spike #982 decision 12). */
+function hasContributingSkill(path: IPath, frontierOrdinal: number, firingSkills: ReadonlySet<number>): boolean {
+	return path.contributions.some((c) => c.homeTier <= frontierOrdinal && firingSkills.has(c.skillId));
 }
 
 /**
@@ -103,7 +104,7 @@ export function buildLexicon(
 	proficiencies: readonly IProficiency[],
 	paths: readonly IPath[],
 	player: readonly IPlayerProficiency[],
-	loadout: readonly number[]
+	firingSkills: readonly number[]
 ): PathView[] {
 	// Index the player's progress; an absent proficiency is unopened (level 0, no row).
 	const levelById = new Map<number, number>();
@@ -144,7 +145,7 @@ export function buildLexicon(
 		}
 	}
 
-	const loadoutSet = new Set(loadout);
+	const firingSet = new Set(firingSkills);
 	const result: PathView[] = [];
 	for (const [pathId, tierProfs] of tiersByPath) {
 		const path = pathById.get(pathId);
@@ -152,7 +153,7 @@ export function buildLexicon(
 			continue;
 		}
 		const ordered = [...tierProfs].sort((a, b) => a.pathOrdinal - b.pathOrdinal);
-		const tiers = derivePathSpine(path, ordered, levelById, xpById, maxedIds, openedIds, loadoutSet);
+		const tiers = derivePathSpine(path, ordered, levelById, xpById, maxedIds, openedIds, firingSet);
 		if (tiers.length === 0) {
 			continue;
 		}
@@ -174,7 +175,7 @@ function derivePathSpine(
 	xpById: ReadonlyMap<number, number>,
 	maxedIds: ReadonlySet<number>,
 	openedIds: ReadonlySet<number>,
-	loadout: ReadonlySet<number>
+	firingSkills: ReadonlySet<number>
 ): TierView[] {
 	// Reachability builds a contiguous prefix from the root — a tier whose predecessor is un-maxed (so
 	// hidden) keeps every deeper tier hidden too. The root reveals when the path is discovered: a pure root
@@ -206,7 +207,7 @@ function derivePathSpine(
 		let state: TierState;
 		if (maxed) {
 			state = 'maxed';
-		} else if (isFrontier && hasContributingSkill(path, prof.pathOrdinal, loadout)) {
+		} else if (isFrontier && hasContributingSkill(path, prof.pathOrdinal, firingSkills)) {
 			state = 'training';
 		} else {
 			state = 'unlocked';
