@@ -33,7 +33,8 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 			// last at the reset seam. A flat no-op (amount 0) here so it doesn't perturb the attribute assertions.
 			// Raw numeric enum values (hoisted mock runs before imports): type 1 = EModifierType.Additive,
 			// source 9 = EAttributeModifierSource.Class — a flat additive 0 leaves every attribute untouched.
-			battleSignaturePassiveModifier: (_resolveScalingValue: (attribute: number) => number) => ({
+			// Ignores its scaling-resolver arg, so it's declared param-less (JS tolerates the extra call arg).
+			battleSignaturePassiveModifier: () => ({
 				attribute: 0,
 				amount: 0,
 				type: 1,
