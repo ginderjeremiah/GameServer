@@ -13,7 +13,14 @@
    cross-path it also needs every `prerequisiteId` maxed. A tampered client reading ahead is an accepted
    non-goal. */
 
-import type { IPath, IPlayerProficiency, IProficiency } from '$lib/api';
+import type {
+	IPath,
+	IPlayerProficiency,
+	IProficiency,
+	IProficiencyLevelModifier,
+	IProficiencyLevelReward,
+	ISkillPathContribution
+} from '$lib/api';
 
 /** The visible state of a tier on its path. Hidden/locked tiers are absent from the view-model entirely
  *  (decision 14), so this enumerates only the drawn states. */
@@ -41,6 +48,12 @@ export interface TierView {
 	/** Levels (1..maxLevel) that grant a reward — the milestones drawn as diamonds on the spine's pip
 	 *  track. Distinct and ascending, derived from the authored `levelRewards`. */
 	milestoneLevels: number[];
+	/** The authored per-level attribute payouts (the increments granted at a level), carried raw so the
+	 *  inspector can format the per-level breakdown ladder via the shared attribute-modifier formatters. */
+	levelModifiers: IProficiencyLevelModifier[];
+	/** The authored milestone reward skills (`{ level, rewardSkillId }`), carried raw so the inspector can
+	 *  resolve and label the skill each milestone grants. */
+	levelRewards: IProficiencyLevelReward[];
 	decipher: DecipherStage;
 	/** The romanized word of power (rendered as conlang glyphs by the spine/rail). */
 	word: string;
@@ -57,6 +70,9 @@ export interface PathView {
 	/** The rail reuses the root tier's word/icon — there is no path-level word. */
 	word: string;
 	iconPath: string;
+	/** The skills that train this path (`{ skillId, homeTier, weight }`), for the inspector's "Trained by"
+	 *  chips. Path-level (a skill feeds the path, not an individual tier — spike #982 decision 12). */
+	contributions: ISkillPathContribution[];
 	/** Visible tiers in ascending `pathOrdinal` (root first); the spine reverses for display. */
 	tiers: TierView[];
 }
@@ -174,7 +190,14 @@ export function buildLexicon(
 		}
 		// A non-empty spine always starts at the root (a non-root tier is hidden until its predecessor
 		// maxes), so the rail reuses tiers[0]'s word/icon.
-		result.push({ id: path.id, name: path.name, word: tiers[0].word, iconPath: tiers[0].iconPath, tiers });
+		result.push({
+			id: path.id,
+			name: path.name,
+			word: tiers[0].word,
+			iconPath: tiers[0].iconPath,
+			contributions: path.contributions,
+			tiers
+		});
 	}
 	result.sort((a, b) => a.id - b.id);
 	return result;
@@ -238,6 +261,8 @@ function derivePathSpine(
 			state,
 			frontier: isFrontier,
 			milestoneLevels: milestoneLevels(prof),
+			levelModifiers: prof.levelModifiers,
+			levelRewards: prof.levelRewards,
 			decipher: decipherStage(level, prof.maxLevel),
 			word: prof.word,
 			pronunciation: prof.pronunciation,

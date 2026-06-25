@@ -14,6 +14,8 @@ const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	state: 'unlocked',
 	frontier: false,
 	milestoneLevels: [],
+	levelModifiers: [],
+	levelRewards: [],
 	decipher: 'undeciphered',
 	word: `word${o.id}`,
 	pronunciation: `pron${o.id}`,
@@ -27,6 +29,7 @@ const pathView = (tiers: TierView[]): PathView => ({
 	name: 'Pyromancy',
 	word: tiers[0]?.word ?? '',
 	iconPath: '',
+	contributions: [],
 	tiers
 });
 
