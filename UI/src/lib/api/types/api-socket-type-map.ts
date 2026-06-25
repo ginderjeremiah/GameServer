@@ -21,6 +21,7 @@ import type {
 	INewEnemyModel,
 	INewEnemyRequest,
 	IOfflineProgressModel,
+	IPath,
 	IPlayerChallenge,
 	IPlayerProficiency,
 	IPlayerStatistic,
@@ -49,6 +50,7 @@ export type ApiSocketResponseTypes = {
 	'GetItemMods': IItemMod[];
 	'GetItems': IItem[];
 	'GetOfflineProgress': IOfflineProgressModel;
+	'GetPaths': IPath[];
 	'GetPlayerChallenges': IPlayerChallenge[];
 	'GetPlayerProficiencies': IPlayerProficiency[];
 	'GetPlayerStatistics': IPlayerStatistic[];
