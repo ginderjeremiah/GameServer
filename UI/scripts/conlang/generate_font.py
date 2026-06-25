@@ -118,7 +118,7 @@ def alphabet():
     a['o'] = glyph([qb((SX, 0), (20, 330), (SX, 660)), qb((SX, 660), (340, 330), (SX, 0)),
                     ln((55, 330), (305, 330))])                            # almond + crossbar
     a['u'] = glyph([qb((120, 640), (250, 40), (380, 640)), ln((250, 335), (250, 0))])
-    a['q'] = glyph([stem(SX, 305, 660), ring(300, 160, 150)])               # stem meets the loop at its tangent
+    a['q'] = glyph([stem(SX, 260, 660), ring(300, 160, 150)])               # stem seated into the loop wall
     # short forms
     a['i'] = glyph([stem(SX, 0, 560), twig(SX, 540, 130, -55), twig(SX, 430, 130, 55)])  # short stem + chevron
     a['l'] = glyph([stem(230, 0, 700), twig(230, 540, -150, 0)])
