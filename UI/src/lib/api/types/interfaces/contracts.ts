@@ -104,6 +104,9 @@ export interface IProficiency {
 	name: string;
 	description: string;
 	iconPath: string;
+	word: string;
+	pronunciation: string;
+	translation: string;
 	pathId: number;
 	pathOrdinal: number;
 	maxLevel: number;

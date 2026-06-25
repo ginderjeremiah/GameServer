@@ -15,6 +15,20 @@ namespace Game.Infrastructure.Entities
         public required string Description { get; set; }
         public required string IconPath { get; set; }
 
+        /// <summary>The proficiency's Aetheric conlang "word of power" — the romanization rendered as glyphs
+        /// (e.g. <c>aenkor</c>). Decorative flavour that deciphers as the tier levels: undeciphered glyphs →
+        /// <see cref="Pronunciation"/> → <see cref="Translation"/>. The reveal thresholds are derived, not
+        /// stored (pronunciation at <c>ceil(MaxLevel / 2)</c>, translation at <c>MaxLevel</c>).</summary>
+        public required string Word { get; set; }
+
+        /// <summary>The pronunciation of the <see cref="Word"/> (e.g. <c>AYN-kor</c>), revealed at the
+        /// half-level decipher threshold.</summary>
+        public required string Pronunciation { get; set; }
+
+        /// <summary>The translation of the <see cref="Word"/> (e.g. <c>The First Flame</c>), revealed when the
+        /// tier is maxed.</summary>
+        public required string Translation { get; set; }
+
         /// <summary>The path this proficiency is a tier of (a standalone proficiency is a length-one path).</summary>
         public int PathId { get; set; }
 
