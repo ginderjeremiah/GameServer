@@ -19,8 +19,9 @@ export interface PlayerSelectDeps {
 	/** Binds the session to the chosen character (rotating the token) and loads it; resolves the
 	 *  player on success or a surfaced error message on failure. */
 	selectPlayer: (playerId: number) => Promise<SelectResult>;
-	/** Creates a new character on the account; resolves its summary or a surfaced error message. */
-	createPlayer: (name: string) => Promise<CreateResult>;
+	/** Creates a new character of the chosen class on the account; resolves its summary or a surfaced
+	 *  error message. */
+	createPlayer: (name: string, classId: number) => Promise<CreateResult>;
 	/** Confirms the active-session takeover after selection (a per-player presence check). Returns
 	 *  true to proceed into the game, false when the player declined. */
 	confirmTakeover: () => Promise<boolean>;
@@ -41,6 +42,9 @@ export class PlayerSelectView {
 	showCreate = $state(false);
 	/** The in-progress new-character name. */
 	newName = $state('');
+	/** The class chosen for the new character, or null before the catalogue loads / a choice is made.
+	 *  The picker defaults it to the first available class once classes load. */
+	selectedClassId = $state<number | null>(null);
 	/** Whether a `CreatePlayer` request is in flight. */
 	creating = $state(false);
 	/** A surfaced create error (name rejected or cap reached), cleared on the next attempt. */
@@ -99,6 +103,12 @@ export class PlayerSelectView {
 		}
 	}
 
+	/** Records the class chosen in the picker, clearing any prior create error. */
+	selectClass(classId: number): void {
+		this.selectedClassId = classId;
+		this.createError = null;
+	}
+
 	/**
 	 * Creates a new character and appends it to the list. Validates the name client-side first (the
 	 * backend re-validates and enforces the per-account cap as anti-cheat), then surfaces any backend
@@ -113,10 +123,14 @@ export class PlayerSelectView {
 			this.createError = validation.msg;
 			return;
 		}
+		if (this.selectedClassId == null) {
+			this.createError = 'Choose a class for your character.';
+			return;
+		}
 
 		this.creating = true;
 		this.createError = null;
-		const result = await this.deps.createPlayer(validation.name);
+		const result = await this.deps.createPlayer(validation.name, this.selectedClassId);
 		this.creating = false;
 
 		if (!result.ok) {

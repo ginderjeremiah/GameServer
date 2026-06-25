@@ -18,7 +18,10 @@ const { postMock, setTokensMock, getRefreshTokenMock, gotoMock, takeMock, initia
 vi.mock('$app/environment', () => ({ browser: true }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/paths', () => ({ resolve: (p: string) => p }));
-vi.mock('$lib/api', () => ({
+// Spread the real module so the enums/values the class picker's display helpers read at import stay
+// intact; only the I/O entry points are replaced with spies.
+vi.mock('$lib/api', async (importOriginal) => ({
+	...((await importOriginal()) as Record<string, unknown>),
 	ApiRequest: class {
 		constructor(private route: string) {}
 		post = (body: unknown) => postMock(this.route, body);
@@ -30,10 +33,29 @@ vi.mock('$lib/api', () => ({
 	logout: vi.fn()
 }));
 vi.mock('$lib/engine', () => ({ playerManager: { initialize: initializeMock } }));
+// The class picker's reference load is exercised in reference-data.test.ts; stub it here so the page
+// renders without real socket I/O.
+vi.mock('$lib/engine/reference-data', () => ({ loadClassPickerData: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('$routes/login/session-takeover', () => ({ confirmSessionTakeover: confirmTakeoverMock }));
 vi.mock('$routes/select/player-select-handoff', () => ({ playerSelectHandoff: { take: takeMock, set: vi.fn() } }));
 
 import SelectPage from '../../../routes/select/+page.svelte';
+import { staticData } from '$stores/static-data.svelte';
+
+// A minimal active class so the picker has an option to default to (id 0 → the create call sends it).
+const PICKER_CLASS = {
+	id: 0,
+	name: 'Warrior',
+	description: 'A frontline fighter.',
+	word: 'kor',
+	passiveAttributeId: 1,
+	passiveAmount: 5,
+	passiveScalingAmount: 0,
+	passiveModifierType: 1,
+	starterSkillIds: [],
+	starterEquipment: [],
+	attributeDistributions: []
+} as unknown as NonNullable<typeof staticData.classes>[number];
 
 const SUMMARIES = [
 	{ id: 1, name: 'Hero', level: 3, currentZoneId: 0, lastActivity: '2026-06-20T00:00:00Z' },
@@ -49,9 +71,13 @@ beforeEach(() => {
 	initializeMock.mockClear();
 	confirmTakeoverMock.mockReset();
 	confirmTakeoverMock.mockResolvedValue(true);
+	staticData.classes = [PICKER_CLASS];
 });
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	staticData.classes = undefined;
+});
 
 describe('Select page', () => {
 	it('redirects to login when reached without a handoff', async () => {

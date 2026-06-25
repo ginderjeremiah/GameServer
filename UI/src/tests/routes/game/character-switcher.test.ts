@@ -16,7 +16,10 @@ const { getMock, postMock, disconnectMock, stopEnginesMock, getRefreshTokenMock,
 		confirmTakeoverMock: vi.fn()
 	}));
 
-vi.mock('$lib/api', () => ({
+// Spread the real module so the enums/values the class picker's display helpers read at import stay
+// intact; only the I/O entry points are replaced with spies.
+vi.mock('$lib/api', async (importOriginal) => ({
+	...((await importOriginal()) as Record<string, unknown>),
 	ApiRequest: class {
 		constructor(private route: string) {}
 		get = () => getMock(this.route);
@@ -33,11 +36,28 @@ vi.mock('$lib/engine', () => ({
 vi.mock('$routes/login/session-takeover', () => ({ confirmSessionTakeover: confirmTakeoverMock }));
 
 import CharacterSwitcher from '../../../routes/game/CharacterSwitcher.svelte';
+import { staticData } from '$stores/static-data.svelte';
 
 const SUMMARIES = [
 	{ id: 1, name: 'Hero', level: 3, currentZoneId: 0, lastActivity: '2026-06-20T00:00:00Z' },
 	{ id: 2, name: 'Rogue', level: 7, currentZoneId: 1, lastActivity: '2026-06-19T00:00:00Z' }
 ];
+
+// In-game the class catalogue is already loaded, so the create form's picker has options. Seed a
+// single active class (id 0) so creating a character defaults to and sends it.
+const PICKER_CLASS = {
+	id: 0,
+	name: 'Warrior',
+	description: 'A frontline fighter.',
+	word: 'kor',
+	passiveAttributeId: 1,
+	passiveAmount: 5,
+	passiveScalingAmount: 0,
+	passiveModifierType: 1,
+	starterSkillIds: [],
+	starterEquipment: [],
+	attributeDistributions: []
+} as unknown as NonNullable<typeof staticData.classes>[number];
 
 let originalLocation: Location;
 
@@ -49,6 +69,7 @@ beforeEach(() => {
 	getRefreshTokenMock.mockReset().mockReturnValue('r');
 	setTokensMock.mockReset();
 	confirmTakeoverMock.mockReset().mockResolvedValue(true);
+	staticData.classes = [PICKER_CLASS];
 	originalLocation = window.location;
 	Object.defineProperty(window, 'location', {
 		configurable: true,
@@ -60,6 +81,7 @@ beforeEach(() => {
 afterEach(() => {
 	Object.defineProperty(window, 'location', { configurable: true, writable: true, value: originalLocation });
 	cleanup();
+	staticData.classes = undefined;
 });
 
 describe('CharacterSwitcher', () => {

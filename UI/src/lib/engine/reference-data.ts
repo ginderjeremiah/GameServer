@@ -128,8 +128,21 @@ export const REFERENCE_DATA: RefDataSource[] = [
 		'GetPaths',
 		() => staticData.paths,
 		(d) => (staticData.paths = d)
+	),
+	refSource(
+		'classes',
+		'Classes',
+		'GetClasses',
+		() => staticData.classes,
+		(d) => (staticData.classes = d)
 	)
 ];
+
+/* The reference sets the create-character class picker needs before the main loading screen runs:
+   the class catalogue plus the skills/items/attributes its kit preview resolves names and accents
+   from. Character creation happens on the select screen, ahead of the `/loading` reference-data
+   load, so the picker pulls these on demand. */
+const CLASS_PICKER_KEYS = new Set(['classes', 'skills', 'items', 'attributes']);
 
 /** Server-reported content version per set, keyed by its socket command. */
 export type ReferenceVersions = Map<string, string>;
@@ -240,4 +253,27 @@ export async function hydrateAllFromCache(): Promise<boolean> {
 	}
 
 	return true;
+}
+
+/**
+ * Ensures the reference sets the create-character class picker renders from are in memory — the class
+ * catalogue and the skills/items/attributes its kit preview resolves. Used by the select screen, which
+ * runs before the main loading screen, so the picker has data without waiting for world entry.
+ *
+ * Reuses the same version-check/cache path as the loading screen: a set already loaded or current in
+ * the cache is hydrated without a download; the rest are fetched and cached, so the later loading
+ * screen serves them straight from cache. A failed fetch rejects, so the caller can surface it.
+ */
+export async function loadClassPickerData(): Promise<void> {
+	const sources = REFERENCE_DATA.filter((source) => CLASS_PICKER_KEYS.has(source.key));
+	const versions = await fetchReferenceVersions();
+	await Promise.all(
+		sources.map(async (source) => {
+			if (versions && hydrateFromCacheIfCurrent(source, versions)) {
+				return;
+			}
+			await dedupedFetch(source.key, source.load);
+			cacheSet(source, versions);
+		})
+	);
 }

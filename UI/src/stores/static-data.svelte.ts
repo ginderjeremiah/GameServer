@@ -2,6 +2,7 @@ import {
 	IAttribute,
 	IChallenge,
 	IChallengeType,
+	IClass,
 	IEnemy,
 	IItem,
 	IItemMod,
@@ -23,6 +24,7 @@ let challengeTypes = $state<IChallengeType[]>();
 let statisticTypes = $state<IStatisticType[]>();
 let proficiencies = $state<IProficiency[]>();
 let paths = $state<IPath[]>();
+let classes = $state<IClass[]>();
 
 /* The backing `$state` slots are genuinely `undefined` until the loading screen (or the silent
    session-resume path) populates them, so the getters honestly expose `T[] | undefined` rather than
@@ -96,6 +98,12 @@ export const staticData = {
 	set paths(value: IPath[] | undefined) {
 		paths = value;
 	},
+	get classes(): IClass[] | undefined {
+		return classes;
+	},
+	set classes(value: IClass[] | undefined) {
+		classes = value;
+	},
 	get loaded(): boolean {
 		return [
 			zones,
@@ -108,7 +116,8 @@ export const staticData = {
 			challengeTypes,
 			statisticTypes,
 			proficiencies,
-			paths
+			paths,
+			classes
 		].every((set) => set != null);
 	}
 };

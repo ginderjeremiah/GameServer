@@ -86,9 +86,8 @@ const switchPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 	return { ok: true, player: response.data.player };
 };
 
-const createPlayer: PlayerSelectDeps['createPlayer'] = async (name) => {
-	// TODO(#1225): send the class chosen in the create-character class picker (placeholder until it ships).
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId: 0 });
+const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
+	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}

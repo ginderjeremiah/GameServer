@@ -17,6 +17,7 @@ import { resolve } from '$app/paths';
 import { ApiRequest, getRefreshToken, logout, reportDeviceInfo, setTokens } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
 import { playerManager } from '$lib/engine';
+import { loadClassPickerData } from '$lib/engine/reference-data';
 import { confirmSessionTakeover } from '../login/session-takeover';
 import PlayerSelectPanel from './PlayerSelectPanel.svelte';
 import { PlayerSelectView, type PlayerSelectDeps } from './player-select-view.svelte';
@@ -41,9 +42,8 @@ const selectPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 	return { ok: true, player: response.data.player };
 };
 
-const createPlayer: PlayerSelectDeps['createPlayer'] = async (name) => {
-	// TODO(#1225): send the class chosen in the create-character class picker (placeholder until it ships).
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId: 0 });
+const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
+	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}
@@ -75,6 +75,11 @@ onMount(() => {
 		{ selectPlayer, createPlayer, confirmTakeover: confirmSessionTakeover, enterWorld },
 		summaries
 	);
+
+	// Character creation happens here, ahead of the main loading screen, so pull the class catalogue
+	// (and the skills/items the kit preview names) now. Fire-and-forget: the picker reacts to the
+	// static store as the sets arrive, and a failure just leaves it showing "No classes available".
+	void loadClassPickerData();
 });
 </script>
 
