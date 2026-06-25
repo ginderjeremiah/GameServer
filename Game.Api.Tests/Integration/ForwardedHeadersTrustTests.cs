@@ -23,15 +23,24 @@ namespace Game.Api.Tests.Integration
         protected const string Fingerprint = "fp-fwd-headers";
         protected const string SimulatedPeerIp = "203.0.113.9";
         protected const string SpoofedClientIp = "9.9.9.9";
+        // A second proxy hop (e.g. a CDN sitting in front of the ingress) for the multi-hop ForwardLimit cases.
+        protected const string IntermediateProxyIp = "203.0.113.50";
 
         protected ForwardedHeadersTrustTestsBase(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
 
-        protected abstract string? KnownProxy { get; }
+        /// <summary>The proxy IPs trusted by this scenario (empty trusts nothing).</summary>
+        protected abstract IReadOnlyList<string> KnownProxies { get; }
+
+        /// <summary>The trust-chain depth to configure; null leaves the deployment default (1) in place.</summary>
+        protected virtual int? ForwardLimit => null;
+
+        /// <summary>The X-Forwarded-For value the client sends; a single spoofed entry by default.</summary>
+        protected virtual string ForwardedForHeader => SpoofedClientIp;
 
         protected override GameServerFactory CreateFactory(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
         {
-            return new ForwardedHeadersFactory(containers, testOutputHelper, SimulatedPeerIp, KnownProxy);
+            return new ForwardedHeadersFactory(containers, testOutputHelper, SimulatedPeerIp, KnownProxies, ForwardLimit);
         }
 
         protected async Task<string> ReadRecordedIpAsync(int userId)
@@ -58,7 +67,7 @@ namespace Game.Api.Tests.Integration
         {
             var (client, _) = await LoginAndBuildClientAsync(username, password);
             client.DefaultRequestHeaders.TryAddWithoutValidation(ClientHints.DeviceFingerprintHeader, Fingerprint);
-            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-For", SpoofedClientIp);
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-For", ForwardedForHeader);
             return client;
         }
 
@@ -70,20 +79,27 @@ namespace Game.Api.Tests.Integration
             IntegrationTestContainers containers,
             ITestOutputHelper testOutputHelper,
             string simulatedPeerIp,
-            string? knownProxy) : GameServerFactory(containers, testOutputHelper)
+            IReadOnlyList<string> knownProxies,
+            int? forwardLimit) : GameServerFactory(containers, testOutputHelper)
         {
             protected override void ConfigureWebHost(IWebHostBuilder builder)
             {
                 base.ConfigureWebHost(builder);
 
-                if (knownProxy is not null)
+                if (knownProxies.Count > 0 || forwardLimit is not null)
                 {
                     builder.ConfigureAppConfiguration((_, config) =>
                     {
-                        config.AddInMemoryCollection(new Dictionary<string, string?>
+                        var settings = new Dictionary<string, string?>();
+                        for (var i = 0; i < knownProxies.Count; i++)
                         {
-                            ["ForwardedHeaders:KnownProxies:0"] = knownProxy,
-                        });
+                            settings[$"ForwardedHeaders:KnownProxies:{i}"] = knownProxies[i];
+                        }
+                        if (forwardLimit is not null)
+                        {
+                            settings["ForwardedHeaders:ForwardLimit"] = forwardLimit.Value.ToString();
+                        }
+                        config.AddInMemoryCollection(settings);
                     });
                 }
 
@@ -121,7 +137,7 @@ namespace Game.Api.Tests.Integration
             : base(containers, testOutputHelper) { }
 
         // No proxy is trusted, so a spoofed X-Forwarded-For must be ignored.
-        protected override string? KnownProxy => null;
+        protected override IReadOnlyList<string> KnownProxies => [];
 
         [Fact]
         public async Task SpoofedForwardedFor_FromUntrustedPeer_IsIgnored()
@@ -145,7 +161,7 @@ namespace Game.Api.Tests.Integration
             : base(containers, testOutputHelper) { }
 
         // The simulated socket peer is configured as a known proxy, so its X-Forwarded-For is honoured.
-        protected override string? KnownProxy => SimulatedPeerIp;
+        protected override IReadOnlyList<string> KnownProxies => [SimulatedPeerIp];
 
         [Fact]
         public async Task ForwardedFor_FromTrustedProxy_IsHonoured()
@@ -158,6 +174,59 @@ namespace Game.Api.Tests.Integration
 
             var recordedIp = await ReadRecordedIpAsync(userId);
             Assert.Equal(SpoofedClientIp, recordedIp);
+        }
+    }
+
+    [Collection("Integration")]
+    public class ForwardedHeadersMultiHopTests : ForwardedHeadersTrustTestsBase
+    {
+        public ForwardedHeadersMultiHopTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
+            : base(containers, testOutputHelper) { }
+
+        // Both hops of a CDN → ingress chain are trusted and ForwardLimit matches the chain depth (2),
+        // so the walk reaches the original client entry rather than stopping at the intermediate proxy.
+        protected override IReadOnlyList<string> KnownProxies => [SimulatedPeerIp, IntermediateProxyIp];
+        protected override int? ForwardLimit => 2;
+        protected override string ForwardedForHeader => $"{SpoofedClientIp}, {IntermediateProxyIp}";
+
+        [Fact]
+        public async Task ForwardedFor_AcrossTrustedChain_ResolvesTheRealClient()
+        {
+            var userId = await SeedUserAsync("fwdmultihop", "fwdpass");
+            using var client = await LoginWithDeviceAsync("fwdmultihop", "fwdpass");
+
+            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var recordedIp = await ReadRecordedIpAsync(userId);
+            Assert.Equal(SpoofedClientIp, recordedIp);
+        }
+    }
+
+    [Collection("Integration")]
+    public class ForwardedHeadersDefaultLimitMultiHopTests : ForwardedHeadersTrustTestsBase
+    {
+        public ForwardedHeadersDefaultLimitMultiHopTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
+            : base(containers, testOutputHelper) { }
+
+        // Both hops are trusted but the default ForwardLimit (1) is left in place, so the walk stops at the
+        // intermediate proxy — the real client is never reached. This pins the exact behaviour #1236 fixes:
+        // a multi-hop deployment must raise ForwardLimit to reach the true client IP.
+        protected override IReadOnlyList<string> KnownProxies => [SimulatedPeerIp, IntermediateProxyIp];
+        protected override string ForwardedForHeader => $"{SpoofedClientIp}, {IntermediateProxyIp}";
+
+        [Fact]
+        public async Task ForwardedFor_WithDefaultLimit_StopsAtTheIntermediateProxy()
+        {
+            var userId = await SeedUserAsync("fwddefaultlimit", "fwdpass");
+            using var client = await LoginWithDeviceAsync("fwddefaultlimit", "fwdpass");
+
+            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var recordedIp = await ReadRecordedIpAsync(userId);
+            Assert.Equal(IntermediateProxyIp, recordedIp);
+            Assert.NotEqual(SpoofedClientIp, recordedIp);
         }
     }
 }

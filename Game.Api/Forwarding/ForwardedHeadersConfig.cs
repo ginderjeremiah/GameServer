@@ -22,6 +22,16 @@ namespace Game.Api.Forwarding
         public List<string> KnownNetworks { get; set; } = [];
 
         /// <summary>
+        /// How many <c>X-Forwarded-For</c> entries to walk back from the socket peer inward — the depth of
+        /// the trusted proxy chain. Defaults to <c>1</c> (a single proxy), matching the framework default,
+        /// so single-proxy deployments are unchanged. A legitimate multi-hop chain (e.g. CDN → ingress) must
+        /// raise this to the chain length so the real client IP — not the last proxy's — reaches
+        /// <c>RemoteIpAddress</c> (and therefore the rate-limiter/login-backoff partition key). <c>null</c>
+        /// disables the limit (walk every entry), which is only safe when every hop is on the trust allowlist.
+        /// </summary>
+        public int? ForwardLimit { get; set; } = 1;
+
+        /// <summary>
         /// Whether any trusted proxy is configured. When false the forwarded-headers middleware must not
         /// run at all: with an empty allowlist it would skip its known-proxy check and trust the header
         /// unconditionally, which is exactly the spoofing we are guarding against.
@@ -33,10 +43,12 @@ namespace Game.Api.Forwarding
         /// <c>X-Forwarded-For</c> from the configured proxies/networks. ASP.NET Core defaults the known
         /// proxies/networks to loopback, so the framework lists are cleared first and repopulated solely
         /// from configuration — making the trust set entirely explicit and "trust nothing" the safe default.
+        /// The trust depth (<see cref="ForwardLimit"/>) is the other half of that explicit trust set.
         /// </summary>
         public void Apply(ForwardedHeadersOptions options)
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+            options.ForwardLimit = ForwardLimit;
             options.KnownProxies.Clear();
             options.KnownIPNetworks.Clear();
 

@@ -84,7 +84,14 @@ namespace Game.Api
             // when at least one is configured, so by default a spoofed X-Forwarded-For from a direct client
             // is ignored and the recorded IP stays the socket peer address (#910).
             builder.Services.AddOptions<ForwardedHeadersConfig>()
-                .BindConfiguration(ForwardedHeadersConfig.SectionName);
+                .BindConfiguration(ForwardedHeadersConfig.SectionName)
+                // ForwardLimit is the trust-chain depth: null means "no limit" (walk every entry), otherwise
+                // it must be at least 1. Validated on start so a misconfigured zero/negative fails fast rather
+                // than silently dropping all forwarded entries even when trusted proxies are configured.
+                .Validate(
+                    options => options.ForwardLimit is null || options.ForwardLimit >= 1,
+                    "ForwardedHeaders:ForwardLimit must be null (no limit) or at least 1")
+                .ValidateOnStart();
             builder.Services.AddOptions<ForwardedHeadersOptions>()
                 .Configure<IOptions<ForwardedHeadersConfig>>((options, config) => config.Value.Apply(options));
 
