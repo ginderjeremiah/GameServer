@@ -345,19 +345,23 @@ export class Battler {
 
 	/** Assembles the battler's loadout: the player-selected skills first (in their chosen order, padded to
 	 *  the loadout cap so the fight screen keeps its fixed slots), then the item-granted skills (already
-	 *  gathered in EEquipmentSlot order) de-duplicated by id against the selected skills and each other —
-	 *  first occurrence wins. Mirrors the backend `BattleSnapshot.ToBattler` / `BattleLoadout.OrderSkillIds`
-	 *  assembly so the two simulators field the same skills (battle parity). */
+	 *  gathered in EEquipmentSlot order) — the whole sequence de-duplicated by id, first occurrence wins.
+	 *  Mirrors the backend `BattleSnapshot.ToBattler` / `BattleLoadout.OrderSkillIds` assembly (a single
+	 *  `Distinct()` over selected + granted) so the two simulators field the same skills (battle parity). */
 	private fillSkills(battlerData: BattlerData, grantedSkillIds: number[]) {
 		const skillData = staticData.skills ?? [];
-		const skills: (Skill | undefined)[] = battlerData.selectedSkills.map(
-			(skillId) => new Skill(skillData[skillId], this)
-		);
+		const seen = new Set<number>();
+		const skills: (Skill | undefined)[] = [];
+		for (const skillId of battlerData.selectedSkills) {
+			if (!seen.has(skillId)) {
+				seen.add(skillId);
+				skills.push(new Skill(skillData[skillId], this));
+			}
+		}
 		while (skills.length < MAX_SELECTED_SKILLS) {
 			skills.push(undefined);
 		}
 
-		const seen = new Set(battlerData.selectedSkills);
 		for (const skillId of grantedSkillIds) {
 			if (!seen.has(skillId)) {
 				seen.add(skillId);
