@@ -1,16 +1,18 @@
 """Render a reference specimen of the Aetheric conlang to specimen.png.
 
-This documents the committed font visually (alphabet, numerals, ligatures, and
-sample proficiency "words of power") without anyone needing to install the font.
-Draws from the same glyph geometry as generate_font.py, supersampled for clean
-edges. Requires Pillow:
+Documents the committed font visually (alphabet, numerals, ligatures, and sample
+proficiency "words of power") without anyone needing to install the font. Draws
+the same stroked-Bezier outlines the font ships, filled with the even-odd rule so
+loop counters (o, n, d, q, 6, 9) render hollow. Requires Pillow:
 
-    pip install pillow
+    pip install -r requirements.txt
     python3 UI/scripts/conlang/render_specimen.py
 """
 import os
-from PIL import Image, ImageDraw, ImageFont
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
 import generate_font as gf
+from PIL import Image, ImageDraw, ImageChops, ImageFont
 
 BG = (12, 14, 20)
 INK = (150, 214, 240)
@@ -21,38 +23,49 @@ HEAD = (220, 228, 240)
 SS = 3                                            # supersample factor
 A = gf.alphabet()
 
-def lab(size):
+def font(size):
     return ImageFont.load_default(size=size * SS)
 
-class Canvas:
-    def __init__(self, draw):
-        self.d = draw
-    def text(self, xy, t, size, fill):
-        self.d.text((xy[0] * SS, xy[1] * SS), t, font=lab(size), fill=fill)
-    def poly(self, pts, fill):
-        self.d.polygon([(x * SS, y * SS) for x, y in pts], fill=fill)
-    def line(self, pts, fill, w=1):
-        self.d.line([(x * SS, y * SS) for x, y in pts], fill=fill, width=w * SS)
-    def tlen(self, t, size):
-        return self.d.textlength(t, font=lab(size)) / SS
+def glyph_tile(cs, scale, color):
+    """Even-odd filled RGBA tile for shifted contours; returns (tile, minx, maxy)."""
+    xs = [x for c in cs for x, y in c]
+    ys = [y for c in cs for x, y in c]
+    minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
+    pad = 2
+    w = int((maxx - minx) * scale) + pad * 2
+    h = int((maxy - miny) * scale) + pad * 2
+    acc = Image.new('1', (w * SS, h * SS), 0)
+    for c in cs:
+        if len(c) < 3:
+            continue
+        pts = [(((x - minx) * scale + pad) * SS, ((maxy - y) * scale + pad) * SS) for x, y in c]
+        tmp = Image.new('1', (w * SS, h * SS), 0)
+        ImageDraw.Draw(tmp).polygon(pts, fill=1)
+        acc = ImageChops.logical_xor(acc, tmp)
+    tile = Image.new('RGBA', (w * SS, h * SS), (0, 0, 0, 0))
+    solid = Image.new('RGBA', (w * SS, h * SS), color + (255,))
+    return Image.composite(solid, tile, acc.convert('L')), minx, maxy
 
-def draw_glyph(c, contours, ox, baseline, color, scale):
-    for ct in contours:
-        if len(ct) >= 3:
-            c.poly([(ox + x * scale, baseline - y * scale) for x, y in ct], color)
+def paste_glyph(img, gd, x0, base, scale, color):
+    """Paste a glyph so glyph-x 0 lands at x0 and the baseline at `base` (px)."""
+    cs, adv = gf.shaped(gd)
+    tile, minx, maxy = glyph_tile(cs, scale, color)
+    px = round((x0 + minx * scale - 2) * SS)
+    py = round((base - maxy * scale - 2) * SS)
+    img.paste(tile, (px, py), tile)
+    return adv
 
 def shape(text):
-    """Greedy digraph -> ligature shaper. Yields (shifted_contours|None, advance),
-    using the same ink-normalized metrics the font ships with."""
+    """Greedy digraph -> ligature shaper. Yields (glyph_data|None, advance)."""
     out, i, t = [], 0, text.lower()
     while i < len(t):
         two = t[i:i + 2]
         if two in gf.LIGS:
-            out.append(gf.normalized(gf.LIGS[two])); i += 2
+            out.append((gf.LIGS[two], gf.shaped(gf.LIGS[two])[1])); i += 2
         elif t[i] == ' ':
             out.append((None, gf.SPACE_ADV)); i += 1
         elif t[i] in A:
-            out.append(gf.normalized(A[t[i]])); i += 1
+            out.append((A[t[i]], gf.shaped(A[t[i]])[1])); i += 1
         else:
             i += 1
     return out
@@ -66,38 +79,41 @@ def main():
     w = 40 + cols * cw + 20
     h = 90 + rows_a * ch + 60 + rows_d * ch + 80 + len(words) * 250 + 40
     img = Image.new('RGB', (w * SS, h * SS), BG)
-    c = Canvas(ImageDraw.Draw(img))
-    c.text((40, 26), 'AETHERIC — conlang words of power', 22, HEAD)
+    dd = ImageDraw.Draw(img)
+    dd.text((40 * SS, 26 * SS), 'AETHERIC — stroked-Bezier outlines', font=font(22), fill=HEAD)
 
-    def cell(contours, label, gx, gy, color):
+    def hline(y, x0, x1, fill):
+        dd.line([(x0 * SS, y * SS), (x1 * SS, y * SS)], fill=fill, width=SS)
+
+    def cell(gd, label, gx, gy, color):
         base = gy + 200
-        shifted, adv = gf.normalized(contours)
-        c.line([(gx, base), (gx + cw - 16, base)], GUIDE, 1)
-        c.line([(gx, base + gf.DDEPTH * scale), (gx + cw - 16, base + gf.DDEPTH * scale)], GUIDE, 1)
-        draw_glyph(c, shifted, gx + (cw - 16 - adv * scale) / 2, base, color, scale)
-        c.text((gx + 6, base + 36), label, 14, LABEL)
+        _, adv = gf.shaped(gd)
+        hline(base, gx, gx + cw - 16, GUIDE)
+        hline(base - gf.DDEPTH * scale, gx, gx + cw - 16, GUIDE)
+        paste_glyph(img, gd, gx + (cw - 16 - adv * scale) / 2, base, scale, color)
+        dd.text(((gx + 6) * SS, (base + 36) * SS), label, font=font(14), fill=LABEL)
 
     y0 = 80
     for i, chl in enumerate('abcdefghijklmnopqrstuvwxyz'):
         cell(A[chl], chl, 40 + (i % cols) * cw, y0 + (i // cols) * ch, INK)
 
     yd = y0 + rows_a * ch + 30
-    c.text((40, yd), 'NUMERALS', 18, HEAD)
+    dd.text((40 * SS, yd * SS), 'NUMERALS', font=font(18), fill=HEAD)
     for i, dl in enumerate('0123456789'):
         cell(gf.DIGITS[dl], dl, 40 + (i % cols) * cw, yd + 30 + (i // cols) * ch, GOLD)
 
     yw = yd + 30 + rows_d * ch + 40
-    c.text((40, yw), 'WORDS OF POWER', 18, HEAD)
+    dd.text((40 * SS, yw * SS), 'WORDS OF POWER', font=font(18), fill=HEAD)
     yw += 24
     for wd in words:
         base = yw + int(gf.CAP * scale)
-        c.line([(40, base), (w - 40, base)], GUIDE, 1)
+        hline(base, 40, w - 40, GUIDE)
         x = 60
-        for contours, adv in shape(wd):
-            if contours is not None:
-                draw_glyph(c, contours, x, base, GOLD, scale)
-            x += int(adv * scale)
-        c.text((x + 20, base - 24), wd, 15, LABEL)
+        for gd, adv in shape(wd):
+            if gd is not None:
+                paste_glyph(img, gd, x, base, scale, GOLD)
+            x += adv * scale
+        dd.text(((x + 20) * SS, (base - 24) * SS), wd, font=font(15), fill=LABEL)
         yw += 250
 
     img = img.resize((w, h), Image.LANCZOS)

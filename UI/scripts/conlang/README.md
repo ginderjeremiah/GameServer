@@ -5,7 +5,7 @@ proficiency **words of power**. It is **decorative flavour, never readable
 copy** — the glyphs are deliberately abstract and non-Latin, so anything a
 player must actually read stays in the normal UI font.
 
-- **Font asset:** [`UI/static/fonts/Aetheric.woff2`](../../static/fonts/Aetheric.woff2) (~5 KB), served at `/fonts/Aetheric.woff2`.
+- **Font asset:** [`UI/static/fonts/Aetheric.woff2`](../../static/fonts/Aetheric.woff2) (~4 KB), served at `/fonts/Aetheric.woff2`.
 - **In the app:** `@font-face` in `src/styles/common.scss`, exposed as the
   `--conlang` CSS token, and consumed through the
   [`WordOfPower`](../../src/components/WordOfPower.svelte) component (which keeps
@@ -18,13 +18,15 @@ player must actually read stays in the normal UI font.
 ## Regenerating
 
 The font is **generated, not hand-drawn** — every glyph is a parametric set of
-strokes in `generate_font.py`, so the script is the source of truth. Edit the
+**centerline** strokes in `generate_font.py`, so the script is the source of
+truth. Those centerlines are stroked into smooth filled outlines (round caps +
+joins, via `skia-pathops`) and emitted as TrueType quadratic curves. Edit the
 glyph definitions there and rebuild **both** outputs (the committed
 `specimen.png` is generated documentation and drifts if only the font is
 rebuilt):
 
 ```sh
-pip install -r requirements.txt                 # pinned fonttools / brotli / pillow
+pip install -r requirements.txt                 # pinned fonttools / brotli / skia-pathops / pillow
 python3 UI/scripts/conlang/generate_font.py     # -> UI/static/fonts/Aetheric.woff2
 python3 UI/scripts/conlang/render_specimen.py   # -> UI/scripts/conlang/specimen.png
 ```
@@ -45,10 +47,11 @@ The forms are intentionally constrained so edits stay coherent:
 - Six digraph ligatures (`th sh ch ng ph kh`) fuse into single forms via the
   `liga` feature.
 
-## Caveats
+## Outlines
 
-Curves are approximated by chains of overlapping straight quads (smooth at UI
-sizes; faint faceting only appears at very large display sizes). Outlines
-self-overlap and rely on the non-zero winding rule — fine for browsers; if a
-stricter consumer ever needs clean outlines, run `removeOverlaps` over the glyf
-table.
+Each glyph is a real stroked outline: the centerlines are expanded with the Skia
+stroker (round caps + round joins) and unioned with any solid decorations
+(`pathops.op(..., UNION)`), so the shipped contours are non-self-intersecting
+quadratics — smooth at any size, including large display use. Round caps overshoot
+the baseline/centerline ends by half the stroke width (the intentional rounded
+terminals); circles are emitted as quadratic arcs.
