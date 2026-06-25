@@ -7,21 +7,31 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
 {
     internal sealed class ItemEquippedHandler(GameContext context) : IPlayerUpdateHandler<ItemEquippedEvent>
     {
+        // Bounded re-attempts on a (player, slot) unique violation, mirroring UserLogins.SaveWithConflictRetry.
+        // Unlike ModAppliedHandler — whose conflict is the row it already owns (its key includes the slot),
+        // settled by a single ExecuteUpdate that can't re-violate — an equip must *evict a different item* from
+        // the destination slot, so the vacate and the place are two writes with an unavoidable window. A
+        // concurrent apply of the same at-least-once event, an ItemUnlockedEvent reordered behind this one, or a
+        // cross-instance writer can re-occupy the slot between the vacate and the save and re-trip the index, so
+        // the retry here genuinely can re-violate (ModAppliedHandler's cannot). Each pass re-vacates whoever won
+        // that race and re-places this item, so transient contention converges in-handler instead of burning the
+        // queue's coarser per-event attempt budget; a still-failing final attempt propagates to that queue
+        // retry/dead-letter backstop (at-least-once + idempotent handlers, so nothing is lost) rather than looping.
+        private const int MaxSaveAttempts = 3;
+
         public async Task HandleAsync(ItemEquippedEvent evt)
         {
-            // The clear-then-upsert isn't atomic, so a concurrent apply of the same at-least-once event — or an
-            // ItemUnlockedEvent reordered behind this one — can take the destination slot between our clear and
-            // save. On the resulting unique violation, re-run once: the re-run's server-side clear vacates the
-            // row that won the race, so the second pass converges. A second failure propagates to the queue's
-            // retry policy rather than looping. (Mirrors ModAppliedHandler.)
-            try
+            for (var attempt = 1; ; attempt++)
             {
-                await ApplyAsync(evt);
-            }
-            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
-            {
-                context.ChangeTracker.Clear();
-                await ApplyAsync(evt);
+                try
+                {
+                    await ApplyAsync(evt);
+                    return;
+                }
+                catch (DbUpdateException ex) when (attempt < MaxSaveAttempts && ex.IsUniqueViolation())
+                {
+                    context.ChangeTracker.Clear();
+                }
             }
         }
 

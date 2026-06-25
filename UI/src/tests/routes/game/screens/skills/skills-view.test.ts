@@ -67,11 +67,11 @@ vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
 
 import {
 	SkillsView,
-	damagePerSecond,
 	sortMetrics,
 	zoneSpawnLevel,
 	type SkillMetrics
 } from '$routes/game/screens/skills/skills-view.svelte';
+import { damagePerSecond } from '$lib/common';
 import { expectedCritMultiplier } from '$lib/battle';
 
 /* A skill with sensible defaults so each test only states what matters. */

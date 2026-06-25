@@ -25,7 +25,7 @@ import {
 	skillContributions,
 	type SkillContribution
 } from '$lib/battle';
-import { enemyDefense, SerializedQueue } from '$lib/common';
+import { damagePerSecond, enemyDefense, SerializedQueue } from '$lib/common';
 import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -84,9 +84,6 @@ export interface ComparePreset {
 }
 
 /* ── pure helpers (no reactive state — unit-tested directly) ───────────────── */
-
-/** Damage per second for a damage value over a cooldown (0 for a non-positive cooldown). */
-export const damagePerSecond = (damage: number, cooldown: number): number => (cooldown > 0 ? damage / cooldown : 0);
 
 /** Comparator over `SkillMetrics` for the given sort + Compare-vs defense.
  *  DPS/Damage rank by *effective* value (defense-aware), descending. The crit multiplier scales raw

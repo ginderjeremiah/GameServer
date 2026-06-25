@@ -90,6 +90,8 @@ A **proficiency** is a mastery track for a category of skills — a progression 
 
 Each proficiency identity is also surfaced cosmetically as a **word of power** — its name rendered in an invented, decorative arcane script. This is pure flavour (never information the player must read); the frontend implementation lives in [frontend.md](./frontend.md#conlang-script-words-of-power).
 
+The word **deciphers as you level the tier**: it starts as undeciphered glyphs, reveals its *pronunciation* at the half-way mark, and reveals its *translation* once the tier is maxed. Each proficiency therefore carries three authored strings — the romanized `Word`, its `Pronunciation`, and its `Translation` — delivered to the client on the proficiency reference data. The two reveal thresholds are **derived, not stored**: pronunciation unlocks at `ceil(maxLevel / 2)` and translation at `maxLevel`.
+
 ## Proficiency XP — victory-based, difficulty-scaled, absolute-falloff
 
 XP is earned **on victory only** and computed **server-side at battle completion** — it is *not* part of the deterministic battle simulation, so it carries no frontend/backend parity surface (only the eventual attribute *bonus* is parity-sensitive, computed from player state at snapshot time). Each won battle pays out a pie of XP (`ServerGameConstants.ProficiencyXpPerVictory`), **scaled by the same difficulty multiplier as `DefeatRewards`** — so a trivial enemy pays little (anti-grind) and an appropriately-matched (or over-level) one pays full or more.
