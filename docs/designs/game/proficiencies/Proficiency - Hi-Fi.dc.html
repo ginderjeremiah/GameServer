@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @font-face { font-family:'Aetheric'; src:url('fonts/Aetheric.woff2') format('woff2'); font-display:swap; }
+  html,body{margin:0;padding:0;background:#0f1014;}
+  *{box-sizing:border-box;}
+  .hf-scroll::-webkit-scrollbar{width:9px;height:9px;}
+  .hf-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:6px;}
+  .hf-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28);}
+  @keyframes hfpulse { 0%,100%{box-shadow:0 0 6px rgba(161,194,247,.4);} 50%{box-shadow:0 0 13px rgba(161,194,247,.85);} }
+  @keyframes hfdot { 0%,100%{opacity:.55;} 50%{opacity:1;} }
+</style>
+</helmet>
+
+<div style="display:flex; height:100vh; min-height:700px; background:linear-gradient(0deg,#000 0%,#3c3c3c 100%); font-family:Geist,system-ui,sans-serif; color:#f0f0f0;">
+
+  <!-- ===== GLOBAL GAME NAV RAIL (collapsed 60px) ===== -->
+  <div style="flex:none; width:60px; background:#14151b; border-right:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; align-items:stretch;">
+    <div style="height:58px; display:flex; align-items:center; justify-content:center; border-bottom:1px solid rgba(255,255,255,.06);">
+      <div style="width:13px; height:13px; transform:rotate(45deg); border:1px solid #a1c2f7; position:relative; animation:hfpulse 1.8s ease-in-out infinite;"><div style="position:absolute; inset:3px; background:#a1c2f7;"></div></div>
+    </div>
+    <div style="flex:1; padding:12px 0; display:flex; flex-direction:column; gap:2px;">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="6">
+        <div title="{{ n.label }}" style="{{ n.style }}"><span style="{{ n.iconStyle }}">{{ n.icon }}</span><sc-if value="{{ n.active }}" hint-placeholder-val="{{ false }}"><span style="position:absolute; left:0; top:7px; bottom:7px; width:2px; background:#a1c2f7; box-shadow:0 0 10px rgba(161,194,247,.75);"></span></sc-if></div>
+      </sc-for>
+    </div>
+    <div style="height:44px; border-top:1px solid rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center;"><div style="width:6px; height:6px; border-radius:50%; background:#a1c2f7; box-shadow:0 0 8px rgba(161,194,247,.8); animation:hfdot 1.6s ease-in-out infinite;"></div></div>
+  </div>
+
+  <!-- ===== SCREEN ===== -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+
+    <!-- screen header -->
+    <div style="flex:none; display:flex; align-items:flex-end; gap:14px; padding:18px 24px 14px; border-bottom:1px solid rgba(255,255,255,.08);">
+      <div style="width:9px; height:9px; transform:rotate(45deg); border:1px solid #a1c2f7; position:relative; margin-bottom:6px;"><div style="position:absolute; inset:2px; background:#a1c2f7;"></div></div>
+      <div>
+        <div style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:rgba(192,216,255,.7);">Proficiencies</div>
+        <div style="font-size:22px; font-weight:500; letter-spacing:.2px; margin-top:3px;">The Lexicon</div>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="text-align:right; line-height:1.5; margin-bottom:3px;">
+        <div style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.5px; color:rgba(240,240,240,.4);">◇ emoji icons are placeholder — final icon art TBD</div>
+        <div style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.5px; color:rgba(240,240,240,.4);">◇ detail pane is always shown — no toggle button</div>
+      </div>
+    </div>
+
+    <!-- body -->
+    <div style="flex:1; display:flex; min-height:0;">
+
+      <!-- LEXICON PATH RAIL -->
+      <div class="hf-scroll" style="flex:none; width:182px; overflow-y:auto; background:#16171e; border-right:1px solid rgba(255,255,255,.08); padding:12px 8px;">
+        <div style="font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.8px; text-transform:uppercase; color:rgba(240,240,240,.4); padding:4px 8px 8px;">the lexicon</div>
+        <sc-for list="{{ railEntries }}" as="e" hint-placeholder-count="7">
+          <div onClick="{{ e.onClick }}" title="{{ e.title }}" style="{{ e.rowStyle }}">
+            <div style="{{ e.iconChip }}">{{ e.icon }}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="{{ e.wordStyle }}">{{ e.word }}</div>
+            </div>
+            <sc-if value="{{ e.active }}" hint-placeholder-val="{{ false }}"><span style="position:absolute; left:0; top:6px; bottom:6px; width:2px; background:#a1c2f7; box-shadow:0 0 10px rgba(161,194,247,.7);"></span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- JOURNEY -->
+      <div class="hf-scroll" style="flex:1; overflow:auto; min-width:0; position:relative;">
+        <div style="padding:26px 36px 38px; min-width:440px;">
+
+          <!-- path header -->
+          <div style="display:flex; align-items:center; gap:14px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,.07);">
+            <div style="{{ pathIconChip }}">{{ pathIcon }}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-family:'Aetheric',serif; font-size:46px; color:#f0f0f0; line-height:1;">{{ pathWord }}</div>
+              <div style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.8px; color:rgba(240,240,240,.5); margin-top:7px;">{{ pathName }} · {{ pathCount }} WORD{{ pathCountPlural }} KNOWN</div>
+            </div>
+          </div>
+
+          <!-- spine -->
+          <div style="margin-top:4px;">
+            <sc-for list="{{ spine }}" as="w" hint-placeholder-count="3">
+              <div style="display:flex; gap:16px; align-items:stretch; margin-bottom:16px;">
+                <!-- connector -->
+                <div style="flex:none; width:18px; display:flex; flex-direction:column; align-items:center; padding-top:30px;">
+                  <div style="{{ w.nodeStyle }}"></div>
+                  <div style="{{ w.lineStyle }}"></div>
+                </div>
+                <!-- card -->
+                <div onClick="{{ w.onClick }}" title="{{ w.tip }}" style="{{ w.cardStyle }}" style-hover="border-color:rgba(161,194,247,.6); box-shadow:0 0 0 2px rgba(161,194,247,.45);">
+                  <div style="display:flex; align-items:center; gap:14px;">
+                    <div style="{{ w.iconChip }}">{{ w.icon }}</div>
+                    <div style="flex:1; min-width:0;">
+                      <div style="{{ w.wordStyle }}">{{ w.word }}</div>
+                      <div style="font-family:'Geist Mono',monospace; font-size:12px; letter-spacing:.4px; color:{{ w.revealColor }}; margin-top:6px; font-style:{{ w.revealStyle }};">{{ w.reveal }}</div>
+                    </div>
+                    <!-- level / milestone pips (right of each section) -->
+                    <div style="flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                      <div style="display:flex; align-items:center; gap:7px; height:16px;">
+                        <sc-for list="{{ w.pips }}" as="p" hint-placeholder-count="10"><span style="{{ p }}"></span></sc-for>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <sc-if value="{{ w.training }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.4px; text-transform:uppercase; color:#a1c2f7;">training</span></sc-if>
+                        <span style="font-family:'Geist Mono',monospace; font-size:12px; letter-spacing:.5px; color:rgba(240,240,240,.7);">{{ w.levelTag }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <!-- WORD DETAIL -->
+      <sc-if value="{{ showInspector }}" hint-placeholder-val="{{ true }}">
+        <div class="hf-scroll" style="flex:none; width:312px; overflow:auto; background:#16171e; border-left:1px solid rgba(255,255,255,.08); padding:18px 18px 24px;">
+
+          <div style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:1.8px; text-transform:uppercase; color:rgba(240,240,240,.4);">word detail</div>
+
+          <!-- compact header -->
+          <div style="margin-top:10px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+            <div style="min-width:0;">
+              <div style="font-size:21px; font-weight:600; line-height:1.1; color:#f0f0f0;">{{ insName }}</div>
+              <div style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.6px; color:rgba(240,240,240,.5); margin-top:4px;">{{ insSchool }}</div>
+            </div>
+            <div style="{{ insStatePill }}">{{ insStateLabel }}</div>
+          </div>
+
+          <!-- progress -->
+          <div style="margin-top:14px; display:flex; align-items:baseline; justify-content:space-between;">
+            <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.5px; color:rgba(240,240,240,.55);">LV {{ insLevel }} / 10</span>
+            <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.3px; color:rgba(240,240,240,.45);">{{ xpText }}</span>
+          </div>
+          <div style="margin-top:7px; position:relative; height:8px; border-radius:4px; background:rgba(255,255,255,.06); overflow:hidden;"><div style="{{ xpFillStyle }}"></div></div>
+
+          <!-- per-level breakdown -->
+          <div style="margin-top:22px; font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.8px; text-transform:uppercase; color:rgba(240,240,240,.4); display:flex; align-items:center; gap:8px;">Per-level breakdown<div style="flex:1; height:1px; background:rgba(240,240,240,.07);"></div></div>
+          <div style="margin-top:10px; display:flex; flex-direction:column; gap:3px;">
+            <sc-for list="{{ ladder }}" as="r" hint-placeholder-count="10">
+              <div style="{{ r.rowStyle }}">
+                <span style="{{ r.dotStyle }}"></span>
+                <span style="font-family:'Geist Mono',monospace; font-size:11px; width:20px; flex:none; color:{{ r.numColor }};">{{ r.lvl }}</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:13.5px; font-weight:{{ r.weight }}; color:{{ r.textColor }}; line-height:1.25;">{{ r.text }}</div>
+                  <sc-if value="{{ r.hasSkill }}" hint-placeholder-val="{{ false }}"><div style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.2px; color:rgba(232,200,120,.75); margin-top:2px;">{{ r.skill }}</div></sc-if>
+                </div>
+                <sc-if value="{{ r.isMilestone }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:1.2px; text-transform:uppercase; color:{{ r.numColor }}; flex:none;">★ milestone</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- seed + trained-by -->
+          <div style="margin-top:22px; font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.8px; text-transform:uppercase; color:rgba(240,240,240,.4); display:flex; align-items:center; gap:8px;">Seed skill<div style="flex:1; height:1px; background:rgba(240,240,240,.07);"></div></div>
+          <div style="font-size:16px; margin-top:8px; color:#f0f0f0;">{{ insSeed }}</div>
+
+          <div style="margin-top:18px; font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.8px; text-transform:uppercase; color:rgba(240,240,240,.4); display:flex; align-items:center; gap:8px;">Trained by<div style="flex:1; height:1px; background:rgba(240,240,240,.07);"></div></div>
+          <div style="display:flex; flex-wrap:wrap; gap:7px; margin-top:9px;">
+            <sc-for list="{{ insContribs }}" as="c" hint-placeholder-count="3"><span style="{{ c.chipStyle }}">{{ c.label }}</span></sc-for>
+          </div>
+
+          <!-- tooltip spec note -->
+          <div style="margin-top:24px; border-top:1px dashed rgba(255,255,255,.12); padding-top:16px;">
+            <div style="font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.8px; text-transform:uppercase; color:rgba(240,240,240,.4);">on hover ⟶ spec note</div>
+            <div style="font-family:'Geist Mono',monospace; font-size:11px; line-height:1.6; letter-spacing:.2px; color:rgba(240,240,240,.55); margin-top:8px;">Hovering a word of power surfaces its decipher state in the <span style="color:#c0d8ff;">existing in-game tooltip</span> (<span style="color:#c0d8ff;">components/tooltip</span>) — not a native title. Mock of that chrome below:</div>
+            <!-- mini render of the standard game tooltip -->
+            <div style="margin-top:12px; width:268px; max-width:100%; background:rgba(20,21,27,.96); border:1px solid rgba(255,255,255,.14); border-left:3px solid {{ insAccent }}; border-radius:3px; box-shadow:0 12px 28px rgba(0,0,0,.55); overflow:hidden;">
+              <div style="padding:12px 14px 10px; border-bottom:1px solid rgba(240,240,240,.08);">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+                  <div style="width:5px; height:5px; transform:rotate(45deg); background:{{ insAccent }}; box-shadow:0 0 6px {{ insAccent }};"></div>
+                  <div style="font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.8px; text-transform:uppercase; color:{{ insAccent }};">Word of Power</div>
+                </div>
+                <div style="font-family:'Aetheric',serif; font-size:24px; color:#f0f0f0; line-height:1.1;">{{ insWord }}</div>
+              </div>
+              <div style="padding:11px 14px 13px; display:flex; flex-direction:column; gap:7px;">
+                <div style="display:flex; justify-content:space-between; gap:10px; font-size:11.5px;"><span style="color:rgba(240,240,240,.5); font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.2px; text-transform:uppercase;">Pron</span><span style="color:{{ pronColor }}; font-family:'Geist Mono',monospace; font-size:11px;">{{ ttPron }}</span></div>
+                <div style="display:flex; justify-content:space-between; gap:10px; font-size:11.5px;"><span style="color:rgba(240,240,240,.5); font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.2px; text-transform:uppercase;">Means</span><span style="color:{{ transColor }}; font-weight:500;">{{ ttTrans }}</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  state = { selected: 'inferno', showInspector: true };
+
+  navItems = [
+    { key:'fight', label:'Fight', icon:'⚔', active:false },
+    { key:'challenges', label:'Challenges', icon:'❖', active:false },
+    { key:'inventory', label:'Inventory', icon:'▦', active:false },
+    { key:'prof', label:'Proficiencies', icon:'✦', active:true },
+    { key:'stats', label:'Stats', icon:'▤', active:false },
+    { key:'options', label:'Options', icon:'⚙', active:false },
+  ];
+
+  rawPaths = [
+    { id:'pyromancy', name:'Pyromancy', icon:'🔥', word:'aenkor', tiers:[
+      { id:'fire', name:'Fire Magic', lvl:10, st:'maxed', per:'+2% Fire damage', seed:'Spark — starter kit', contrib:['Fireball','Ember Strike','Cinder Brand'], m:{5:['+5% Fire crit','grants Flame Burst'],10:['+10% Fire dmg','opens Inferno Magic']} },
+      { id:'inferno', name:'Inferno Magic', lvl:6, st:'training', per:'+3% Burn damage', seed:'Spark (carried up)', contrib:['Fireball','Ember Strike','Cinder Brand'], xp:[340,600], m:{5:['+8% Burn duration','grants Conflagration'],10:['+15% Fire dmg','opens Pyroclasm + Lava']} },
+      { id:'pyro', name:'Pyroclasm', lvl:0, st:'locked' },
+    ]},
+    { id:'geomancy', name:'Geomancy', icon:'⛰️', word:'gorrun', tiers:[
+      { id:'earth', name:'Earth Magic', lvl:10, st:'maxed', per:'+2% Armor', seed:'Pebble Toss — starter kit', contrib:['Stone Spear','Boulder'], m:{5:['+6% Block','grants Stoneskin'],10:['+12% Armor','opens Tectonic Magic']} },
+      { id:'tectonic', name:'Tectonic Magic', lvl:3, st:'training', per:'+3% Stagger', seed:'Pebble Toss (carried up)', contrib:['Stone Spear'], xp:[120,520], m:{5:['+10% Stagger','grants Fault Line'],10:['+15% Earth dmg','opens Seismic + Lava']} },
+      { id:'seismic', name:'Seismic Mastery', lvl:0, st:'locked' },
+    ]},
+    { id:'blade', name:'Blade Arts', icon:'⚔️', word:'kaeth', tiers:[
+      { id:'sword', name:'Sword Arts', lvl:7, st:'training', per:'+2% Phys damage', seed:'Slash — starter kit', contrib:['Cleave','Slash'], xp:[410,520], m:{5:['+5% Parry','grants Riposte'],10:['+10% Phys dmg','opens Blade Mastery']} },
+      { id:'blade', name:'Blade Mastery', lvl:0, st:'unlocked', per:'+3% Crit damage', seed:'unlocks at Sword Arts L10', contrib:['Cleave','Slash'], xp:[0,480], m:{5:['+8% Crit','grants Blade Dance'],10:['+15% Crit dmg','opens Way of the Blade']} },
+      { id:'wayblade', name:'Way of the Blade', lvl:0, st:'locked' },
+    ]},
+    { id:'hydromancy', name:'Hydromancy', icon:'💧', word:'shaelis', tiers:[
+      { id:'water', name:'Water Magic', lvl:5, st:'unlocked', per:'+2% Water damage', seed:'Splash — item seed', contrib:['Water Jet'], xp:[80,420], m:{5:['+10% Slow','grants Tidal Surge'],10:['+12% Water dmg','opens Tide Magic']} },
+      { id:'tide', name:'Tide Magic', lvl:0, st:'locked' },
+    ]},
+    { id:'aeromancy', name:'Aeromancy', icon:'🌪️', word:'zefra', tiers:[
+      { id:'wind', name:'Wind Magic', lvl:2, st:'unlocked', per:'+2% Haste', seed:'Gust — item seed', contrib:['Gust'], xp:[40,360], m:{5:['+8% Evasion','grants Updraft'],10:['+12% Air dmg','opens Gale Magic']} },
+      { id:'gale', name:'Gale Magic', lvl:0, st:'locked' },
+    ]},
+    { id:'marksman', name:'Marksmanship', icon:'🏹', word:'telmar', tiers:[
+      { id:'archery', name:'Archery', lvl:4, st:'unlocked', per:'+2% Range damage', seed:'Quick Shot — starter', contrib:['Quick Shot'], xp:[60,400], m:{5:['+8% far crit','grants Aimed Shot'],10:['+12% Range dmg','opens Volley Mastery']} },
+      { id:'volley', name:'Volley Mastery', lvl:0, st:'locked' },
+    ]},
+    { id:'verdancy', name:'Verdancy', icon:'🌿', word:'thalor', tiers:[
+      { id:'nature', name:'Nature Magic', lvl:3, st:'unlocked', per:'+2% Regen', seed:'Thorn — item seed', contrib:['Thorn Whip'], xp:[100,380], m:{5:['+8% Heal','grants Entangle'],10:['+12% Nature dmg','opens Bloom Magic']} },
+      { id:'bloom', name:'Bloom Magic', lvl:0, st:'locked' },
+    ]},
+  ];
+
+  AETHER = {
+    fire:{aether:'aenkor',pron:'AYN-kor',trans:'The First Flame'},
+    inferno:{aether:'vael aenkor',pron:'vayl AYN-kor',trans:'The Deepening Fire'},
+    earth:{aether:'gorrun',pron:'GOR-run',trans:'The Standing Stone'},
+    tectonic:{aether:'vael gorrun',pron:'vayl GOR-run',trans:'The Shifting Deep'},
+    sword:{aether:'kaeth',pron:'KAYTH',trans:'The Drawn Edge'},
+    blade:{aether:'vael kaeth',pron:'vayl KAYTH',trans:'The Honed Edge'},
+    water:{aether:'shaelis',pron:'SHAY-lis',trans:'The Falling Tide'},
+    wind:{aether:'zefra',pron:'ZEFF-ra',trans:'The First Breath'},
+    archery:{aether:'telmar',pron:'TEL-mar',trans:'The True Mark'},
+    nature:{aether:'thalor',pron:'THAH-lor',trans:'The Green Word'},
+  };
+
+  selectNode = (id) => this.setState({ selected: id });
+  selectPath = (p) => this.setState({ selected: this.repTier(p).id });
+  toggleInspector = () => this.setState(s => ({ showInspector: !s.showInspector }));
+
+  buildData() {
+    if (this._data) return this._data;
+    const D = (t) => ({
+      id:t.id, name:t.name, level:t.lvl||0, max:10, state:t.st,
+      perLevel:t.per||'+ small bonus', seed:t.seed||'—', contrib:t.contrib||[],
+      xp:t.xp?{cur:t.xp[0],next:t.xp[1]}:(t.st==='training'?{cur:200,next:500}:null),
+      milestones:t.m?{5:{bonus:t.m[5][0],skill:t.m[5][1]},10:{bonus:t.m[10][0],skill:t.m[10][1]}}:null,
+    });
+    const paths = this.rawPaths.map(p => {
+      const tiers = p.tiers.map((t,i)=>{ const n=D(t); n.path=p.name; n.school=p.icon+' '+p.name; n.tier=i; n.icon=p.icon; return n; });
+      return { id:p.id, name:p.name, icon:p.icon, word:p.word, tiers };
+    });
+    const index={}; paths.forEach(p=>p.tiers.forEach(n=>{ index[n.id]=n; }));
+    this._data={paths,index}; return this._data;
+  }
+  repTier(p){ return p.tiers.find(t=>t.state==='training')||p.tiers.find(t=>t.state==='unlocked')||[...p.tiers].reverse().find(t=>t.state==='maxed')||p.tiers.find(t=>t.state!=='locked')||p.tiers[0]; }
+  pathOf(id){ const {paths}=this.buildData(); return paths.find(p=>p.tiers.some(t=>t.id===id))||paths[0]; }
+  stageOf(level){ return level>=10?'translated':(level>=5?'pronunciation':'undeciphered'); }
+
+  // illumination on the dark theme: dim → accent-light → gold
+  illum(level){
+    if(level>=10) return { ink:'#e8c878', glow:'text-shadow:0 0 12px rgba(232,200,120,.5);' };
+    if(level>=5)  return { ink:'#c0d8ff', glow:'text-shadow:0 0 8px rgba(192,216,255,.3);' };
+    return { ink:'rgba(240,240,240,.5)', glow:'' };
+  }
+
+  // level/milestone pip track: 10 pips, diamonds at 5 & 10
+  pips(level, sizeMode){
+    const big = sizeMode==='lg';
+    const out=[];
+    for(let i=1;i<=10;i++){
+      const filled=i<=level, ms=(i===5||i===10);
+      let s='display:inline-block;box-sizing:border-box;flex:none;';
+      if(ms){
+        const d = big?12:11;
+        s+=`width:${d}px;height:${d}px;transform:rotate(45deg);border:1.5px solid ${filled?'#e8c878':'rgba(255,255,255,.28)'};`;
+        s+= filled?'background:#e8c878;box-shadow:0 0 7px rgba(232,200,120,.6);':'background:transparent;';
+      } else {
+        const w=big?5:4, h=big?15:13;
+        s+=`width:${w}px;height:${h}px;border-radius:1.5px;`;
+        s+= filled?'background:#e8c878;':'background:rgba(255,255,255,.14);';
+      }
+      out.push(s);
+    }
+    return out;
+  }
+
+  decipherTip(tier){
+    const a=this.AETHER[tier.id]||{}; const stage=this.stageOf(tier.level);
+    if(stage==='translated') return a.aether+'  —  "'+a.pron+'"  —  '+a.trans;
+    if(stage==='pronunciation') return a.aether+'  —  "'+a.pron+'"  —  meaning unknown (master to Lv 10)';
+    return 'undeciphered — train to Lv 5 to learn its pronunciation';
+  }
+
+  renderVals(){
+    const st=this.state; const {paths,index}=this.buildData();
+    const sel = index[st.selected]||index.inferno;
+    const selPath = this.pathOf(st.selected);
+
+    const navItems = this.navItems.map(n=>({
+      label:n.label, icon:n.icon, active:n.active,
+      style:'position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;'+(n.active?'background:rgba(161,194,247,.08);':''),
+      iconStyle:'font-size:17px; color:'+(n.active?'#a1c2f7':'rgba(240,240,240,.5)')+';',
+    }));
+
+    // rail — discovered paths only
+    const railEntries = paths.filter(p=>p.tiers.some(t=>t.state!=='locked')).map(p=>{
+      const open=p.id===selPath.id;
+      let rowStyle='position:relative; display:flex; align-items:center; gap:11px; padding:9px 9px; margin:1px 0; border-radius:3px; cursor:pointer;';
+      rowStyle += open?'background:rgba(161,194,247,.08);':'';
+      return { icon:p.icon, name:p.name, word:p.word, title:p.name, active:open,
+        iconChip:'flex:none; width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:15px; border:1px dashed rgba(255,255,255,.18); border-radius:3px; background:rgba(255,255,255,.03);',
+        wordStyle:"font-family:'Aetheric',serif; font-size:20px; color:#f0f0f0; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;",
+        rowStyle, onClick:()=>this.selectPath(p) };
+    });
+
+    // spine — non-locked tiers, most-advanced at top → initial at bottom
+    const shown = selPath.tiers.filter(t=>t.state!=='locked').reverse();
+    const spine = shown.map((t,i)=>{
+      const a=this.AETHER[t.id]||{}; const stage=this.stageOf(t.level); const il=this.illum(t.level);
+      const isSel=t.id===st.selected; const last=i===shown.length-1;
+      let reveal,revealColor='rgba(240,240,240,.45)',revealStyle='italic';
+      if(stage==='translated'){reveal=a.trans;revealColor='#e8c878';revealStyle='normal';}
+      else if(stage==='pronunciation'){reveal='“'+a.pron+'”';revealColor='#c0d8ff';revealStyle='normal';}
+      else {reveal='⟨ undeciphered ⟩';}
+      let card='flex:1; min-width:0; cursor:pointer; border:1px solid '+(isSel?'rgba(161,194,247,.55)':'rgba(255,255,255,.1)')+'; border-radius:3px; background:'+(isSel?'rgba(161,194,247,.07)':'rgba(255,255,255,.03)')+'; padding:24px 26px; transition:border-color 130ms, box-shadow 130ms;';
+      if(isSel) card+='box-shadow:inset 0 0 0 1px rgba(161,194,247,.25);';
+      return {
+        word:a.aether||t.name, wordStyle:`font-family:'Aetheric',serif; font-size:33px; line-height:1.05; color:${il.ink}; ${il.glow}`,
+        reveal, revealColor, revealStyle, cardStyle:card,
+        icon:t.icon, iconChip:'flex:none; width:38px; height:38px; display:flex; align-items:center; justify-content:center; font-size:19px; border:1px dashed rgba(255,255,255,.18); border-radius:3px; background:rgba(255,255,255,.03);'+(stage==='undeciphered'?'opacity:.55;':''),
+        pips:this.pips(t.level,'sm'),
+        levelTag:t.level+'/10', training:t.state==='training',
+        nodeStyle:'flex:none; width:13px; height:13px; transform:rotate(45deg); border:1.5px solid '+(t.state==='maxed'?'#e8c878':(t.state==='training'?'#a1c2f7':'rgba(255,255,255,.3)'))+'; background:'+(t.state==='maxed'?'#e8c878':(t.state==='training'?'#a1c2f7':'transparent'))+';'+(t.state==='training'?'box-shadow:0 0 8px rgba(161,194,247,.6);':(t.state==='maxed'?'box-shadow:0 0 7px rgba(232,200,120,.5);':'')),
+        lineStyle:last?'':'flex:1; width:1px; background:repeating-linear-gradient(rgba(255,255,255,.2) 0 4px, transparent 4px 9px); margin:6px 0; min-height:46px;',
+        tip:this.decipherTip(t),
+        onClick:()=>this.selectNode(t.id),
+      };
+    });
+
+    // inspector
+    const a=this.AETHER[sel.id]||{}; const stage=this.stageOf(sel.level); const il=this.illum(sel.level);
+    const maxed=sel.state==='maxed', training=sel.state==='training';
+    const insAccent = maxed?'#e8c878':'#a1c2f7';
+    const pronKnown=stage!=='undeciphered', transKnown=stage==='translated';
+    const lockRow='border:1px dashed rgba(255,255,255,.14); border-radius:3px; background:rgba(255,255,255,.015); padding:11px 13px;';
+    const openRow='border:1px solid rgba(255,255,255,.1); border-radius:3px; background:rgba(255,255,255,.03); padding:11px 13px;';
+
+    let xpPct=0,xpText=''; if(maxed){xpPct=100;xpText='maxed out — fully translated';} else if(sel.xp){xpPct=Math.round(100*sel.xp.cur/sel.xp.next);xpText=sel.xp.cur+' / '+sel.xp.next+' XP → level '+(sel.level+1);}
+
+    let trainText,tBg,tBd,tFg;
+    if(training){trainText='● Currently training — fed by your equipped loadout';tBg='rgba(161,194,247,.1)';tBd='rgba(161,194,247,.45)';tFg='#c0d8ff';}
+    else if(maxed){trainText='✓ Maxed — no longer earns XP';tBg='rgba(189,224,180,.08)';tBd='rgba(189,224,180,.4)';tFg='#bde0b4';}
+    else {trainText='○ Not training — equip a skill that feeds this word';tBg='rgba(255,255,255,.03)';tBd='rgba(255,255,255,.14)';tFg='rgba(240,240,240,.6)';}
+
+    // state pill
+    const stateMap = { maxed:['MASTERED','#e8c878','rgba(232,200,120,.12)','rgba(232,200,120,.4)'], training:['TRAINING','#a1c2f7','rgba(161,194,247,.12)','rgba(161,194,247,.4)'], unlocked:['LEARNING','rgba(240,240,240,.7)','rgba(255,255,255,.05)','rgba(255,255,255,.18)'] };
+    const sm = stateMap[sel.state] || stateMap.unlocked;
+    const insStatePill = `flex:none; font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.4px; padding:4px 9px; border-radius:3px; color:${sm[1]}; background:${sm[2]}; border:1px solid ${sm[3]};`;
+
+    // per-level breakdown ladder (1–10)
+    const ladder = [];
+    for(let i=1;i<=10;i++){
+      const reached=sel.level>=i, ms=(i===5||i===10);
+      const m=sel.milestones&&sel.milestones[i];
+      let text = (ms&&m)?m.bonus : sel.perLevel;
+      let dot='display:inline-block; box-sizing:border-box; flex:none;';
+      if(ms){ dot+='width:11px; height:11px; transform:rotate(45deg); border:1.5px solid '+(reached?'#e8c878':'rgba(255,255,255,.28)')+';'+(reached?'background:#e8c878; box-shadow:0 0 6px rgba(232,200,120,.6);':'background:transparent;'); }
+      else { dot+='width:7px; height:7px; border-radius:50%; background:'+(reached?'#e8c878':'rgba(255,255,255,.16)')+';'; }
+      let rowStyle='display:flex; align-items:center; gap:10px; padding:'+(ms?'8px 9px':'4px 9px')+'; border-radius:3px;';
+      if(ms) rowStyle+='background:rgba(232,200,120,'+(reached?'.07':'.025')+'); border:1px solid rgba(232,200,120,'+(reached?'.28':'.12')+');';
+      if(!reached) rowStyle+='opacity:.55;';
+      ladder.push({ lvl:i, text, skill:(ms&&m)?m.skill:'', hasSkill:!!(ms&&m&&m.skill), isMilestone:ms,
+        dotStyle:dot, rowStyle, weight:ms?'600':'400',
+        numColor:reached?'#e8c878':'rgba(240,240,240,.4)', textColor:reached?'#f0f0f0':'rgba(240,240,240,.55)' });
+    }
+
+    return {
+      navItems, railEntries, spine,
+      toggleInspector:this.toggleInspector, showInspector:st.showInspector,
+      inspectorBtnStyle:this.toggleBtn(st.showInspector),
+      pathIcon:selPath.icon, pathIconChip:'flex:none; width:48px; height:48px; display:flex; align-items:center; justify-content:center; font-size:24px; border:1px dashed rgba(255,255,255,.18); border-radius:3px; background:rgba(255,255,255,.03);',
+      pathWord:selPath.word, pathName:selPath.name, pathCount:shown.length, pathCountPlural:shown.length===1?'':'S',
+      insAccent,
+      insName:sel.name, insSchool:sel.school, insLevel:sel.level,
+      insStatePill, insStateLabel:sm[0],
+      insWord:a.aether||sel.name,
+      xpFillStyle:`position:absolute; left:0; top:0; bottom:0; width:${xpPct}%; background:linear-gradient(90deg,#a1c2f7,#6f9fd9);`,
+      xpText,
+      ladder, insSeed:sel.seed,
+      insContribs:(sel.contrib&&sel.contrib.length?sel.contrib:['— none yet —']).map(c=>({label:c,chipStyle:"font-family:Geist,sans-serif; font-size:12.5px; font-weight:500; padding:4px 11px; border:1px solid rgba(255,255,255,.14); border-radius:3px; background:rgba(255,255,255,.04); color:#f0f0f0; white-space:nowrap;"})),
+      ttPron:pronKnown?('“'+a.pron+'”'):'— sealed —',
+      ttTrans:transKnown?a.trans:'— sealed —',
+      pronColor:pronKnown?'#c0d8ff':'rgba(240,240,240,.4)',
+      transColor:transKnown?'#e8c878':'rgba(240,240,240,.4)',
+    };
+  }
+
+  toggleBtn(on){ let s="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.5px; text-transform:uppercase; cursor:pointer; padding:6px 13px; border-radius:3px; margin-bottom:4px; transition:all 140ms;"; s+=on?'background:rgba(161,194,247,.12); color:#c0d8ff; border:1px solid rgba(161,194,247,.4);':'background:rgba(255,255,255,.03); color:rgba(240,240,240,.5); border:1px solid rgba(255,255,255,.14);'; return s; }
+}
+</script>
+</body>
+</html>

@@ -104,7 +104,9 @@ New `EAttributeModifierSource.Proficiency`; at battler assembly, generate modifi
 `GetProficiencies` (reference, version-keyed) + `GetPlayerProficiencies` (player) socket commands; codegen contracts; `staticData` slot + a `playerProficiencies` store; reference-data registration + local cache. Depends on **A**, **B**.
 
 ### G. Client: Proficiencies tree screen (greenfield)
-A `Proficiencies` entry in `GAME_SCREENS` + screen/view-model; render the **tree** (nodes with level/progress, prerequisite edges, milestone markers, locked/seeded states) — greenfield SVG/layout, no graph dependency unless justified. Depends on **F**.
+A `Proficiencies` entry in `GAME_SCREENS` + screen/view-model rendering each **path as a linear spine** (tiers most-advanced → root), with cross-path **gateways** as the DAG edges and **locked tiers hidden** (client-derived from player levels + the path/gateway structure — no teasers). Per-tier level/progress, milestone markers, seed/training states; a path **rail** and a per-tier **detail inspector**. Greenfield inline SVG/flex, no graph dependency.
+
+A later design refinement reframed the screen as **"The Lexicon"**: each tier is a **word of power** in the Aetheric conlang (`WordOfPower`, font #1211) that **deciphers as it levels** — undeciphered → *pronunciation* (at `ceil(maxLevel/2)`) → *translation* (at `maxLevel`; both thresholds derived, not stored). This adds three authored strings (`Word`/`Pronunciation`/`Translation`) to the `Proficiency` reference data — no path-level word, the rail reuses the root tier's. Broken into five sub-issues under umbrella #1120 — see [Area G breakdown](#area-g-breakdown). Depends on **F**; conlang authoring rides the proficiency editor #1132, real content is #1127.
 
 ### H. Client: XP / level-up / milestone feedback
 On the server push: update the store, toast level-ups and milestone unlocks (mirroring challenge-completion), and add combat-log lines for proficiency XP / level / unlock. Depends on **C**, **D**, **F**.
@@ -124,7 +126,7 @@ Created as native sub-issues of #982:
 | [#1117](https://github.com/ginderjeremiah/GameServer/issues/1117) — Proficiency bonuses → attribute pipeline (parity) | E | #1114, #1115 | medium |
 | [#1118](https://github.com/ginderjeremiah/GameServer/issues/1118) — Milestone & unlock effects + proficiency-open triggers | D | #1114, #1115, #1116 (+ #1101, merged) | large |
 | [#1119](https://github.com/ginderjeremiah/GameServer/issues/1119) — Client: proficiency reference + player data delivery | F | #1114, #1115 | medium |
-| [#1120](https://github.com/ginderjeremiah/GameServer/issues/1120) — Client: Proficiencies tree screen | G | #1119 | large |
+| [#1120](https://github.com/ginderjeremiah/GameServer/issues/1120) — Client: Proficiencies tree screen (umbrella — see [Area G breakdown](#area-g-breakdown)) | G | #1119 | large |
 | [#1121](https://github.com/ginderjeremiah/GameServer/issues/1121) — Client: XP / level-up / milestone feedback | H | #1116, #1118, #1119 | medium |
 | [#1122](https://github.com/ginderjeremiah/GameServer/issues/1122) — Remove skill rewards from challenges + re-home | I | #1118 | medium |
 
@@ -141,11 +143,25 @@ The [Paths refinement](#paths-refinement) lands after #1114–#1116 (merged). It
 
 Adjusted open issues: **#1118** — open-triggers become path-aware (within-path reveal-on-max is implicit from `PathOrdinal`; gateways stay explicit; each tier grants its seed skill on open). **#1120** — the tree screen renders paths as spines and **hides locked tiers** (client-derived, no teasers for now). **#1117** / **#1119** / **#1121** / **#1122** are largely unaffected (per-tier bonuses, broadcast delivery, feedback, and the challenge cleanup are unchanged by Paths). When #1160 / #1161 land, refresh the Proficiency section of `docs/game-design.md` for the path model + absolute falloff.
 
+### Area G breakdown
+
+The Proficiencies tree screen (#1120, area G) is an **umbrella**; the work is split into five native sub-issues that also fold in the **Lexicon / words-of-power decipher** layer from the post-spike design refinement (design: `docs/designs/game/proficiencies/`). The backend pair is independent; the client work fans out from the view-model.
+
+| Issue | Part | Depends on | Scope |
+| --- | --- | --- | --- |
+| [#1214](https://github.com/ginderjeremiah/GameServer/issues/1214) — Deliver Path reference data to the client (`GetPaths`) | path delivery (closes an area-F gap) | — | small |
+| [#1215](https://github.com/ginderjeremiah/GameServer/issues/1215) — Conlang "words of power" fields on the `Proficiency` reference model | decipher data | — | small |
+| [#1216](https://github.com/ginderjeremiah/GameServer/issues/1216) — Screen scaffold + view-model (state derivation) | logic core | #1214 | large |
+| [#1217](https://github.com/ginderjeremiah/GameServer/issues/1217) — Lexicon path rail + tier spine rendering | main visual | #1216, #1215 | large |
+| [#1218](https://github.com/ginderjeremiah/GameServer/issues/1218) — Word-detail inspector pane | detail pane | #1216, #1215 | medium |
+
+Shape: #1214 ∥ #1215 → #1216 → { #1217, #1218 }. The screen builds and unit-tests against fixtures; visual verification needs the proficiency editor (#1132) + authored content (#1127). Admin authoring of the conlang fields is #1132's responsibility (cross-referenced there).
+
 ## Documentation to update on landing
 
 - `docs/game-design.md` — a **Proficiency** section: the mastery-layer model, skill sources (starter/item/milestone; challenges no longer grant skills), the tree + low cap + milestones, victory-based fixed-pie difficulty-scaled XP, multi-contribution, the two-layer (loadout + gear) opportunity cost, bonuses via the attribute pipeline. (With **A**–**E**, **I**.)
 - `docs/backend.md` — the proficiency reference-data + `PlayerProficiency` persistence note, and the **battle-completion XP hook** (backend-authoritative, off the tick loop). (With **A**–**D**.)
-- `docs/frontend.md` / `docs/frontend-screens.md` — the Proficiencies tree screen and the XP/milestone feedback. (With **G**, **H**.)
+- `docs/frontend.md` / `docs/frontend-screens.md` — the Proficiencies "Lexicon" tree screen (paths-as-spines, words-of-power decipher) and the XP/milestone feedback. (With **G**, **H**.)
 
 ## Out of scope / deferred
 
