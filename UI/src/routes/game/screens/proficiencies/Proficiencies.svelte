@@ -1,12 +1,12 @@
 <!-- Proficiencies screen — "The Lexicon".
 
-     A minimal scaffold over the {@link ProficienciesView} logic core: a rail of discovered paths and the
-     selected path's spine of tiers. The rich visuals (illuminated spine + pips, the word-detail inspector)
-     land in the rail/spine (#1217) and inspector (#1218) sub-issues — this proves the view-model end-to-end
-     and registers the screen in the nav.
+     The mastery tree rendered as per-path spines (#1217): a rail of discovered paths beside the selected
+     path's spine, whose tiers are words of power that illuminate as they decipher. The word-detail
+     inspector is the sibling sub-issue (#1218); this screen owns the rail, the spine, and the shared
+     decipher tooltip the spine cards drive on hover.
 
-     Progress is re-fetched on mount (mirroring the Statistics screen) so the lexicon reflects play since the
-     store was last loaded at game boot; the reference data is already in `staticData`. -->
+     Progress is re-fetched on mount (mirroring the Statistics screen) so the lexicon reflects play since
+     the store was last loaded at game boot; the reference data is already in `staticData`. -->
 <div class="prof-frame" data-testid="proficiencies-screen">
 	<div class="header">
 		<div class="eyebrow">Character · Proficiencies</div>
@@ -31,45 +31,14 @@
 			</div>
 		{:else if view.selectedPath}
 			<div class="cols">
-				<!-- rail: discovered paths -->
-				<nav class="rail" aria-label="Lexicon paths">
-					{#each view.paths as path (path.id)}
-						<button
-							type="button"
-							class="rail-row"
-							class:active={path.id === view.selectedPath?.id}
-							aria-current={path.id === view.selectedPath?.id ? 'true' : undefined}
-							data-testid="rail-{path.id}"
-							onclick={() => view.selectPath(path.id)}
-						>
-							<WordOfPower text={path.word} label={path.name} size={18} />
-							<span class="rail-name">{path.name}</span>
-						</button>
-					{/each}
-				</nav>
-
-				<!-- spine: the selected path's tiers, most-advanced first -->
-				<div class="spine">
-					{#each [...view.selectedPath.tiers].reverse() as tier (tier.id)}
-						<button
-							type="button"
-							class="tier"
-							class:active={tier.id === view.selectedTier?.id}
-							aria-current={tier.id === view.selectedTier?.id ? 'true' : undefined}
-							data-testid="tier-{tier.id}"
-							onclick={() => view.selectTier(tier.id)}
-						>
-							<WordOfPower text={tier.word} label={tier.name} size={26} glow={tier.decipher === 'translated'} />
-							<div class="tier-meta">
-								<span class="tier-name">{tier.name}</span>
-								<span class="tier-tags">
-									<span class="tag state-{tier.state}">{tier.state}</span>
-									<span class="tag">Lv {tier.level}/{tier.maxLevel}</span>
-									<span class="tag">{tier.decipher}</span>
-								</span>
-							</div>
-						</button>
-					{/each}
+				<LexiconRail paths={view.paths} selectedId={view.selectedPath.id} onSelect={(id) => view.selectPath(id)} />
+				<div class="journey">
+					<TierSpine
+						path={view.selectedPath}
+						selectedTierId={view.selectedTier?.id}
+						onSelect={(id) => view.selectTier(id)}
+						{controller}
+					/>
 				</div>
 			</div>
 		{/if}
@@ -78,15 +47,47 @@
 	{#if view.loading}
 		<Loading delay={100} />
 	{/if}
+
+	<WordOfPowerTooltip bind:this={tooltip} tier={hoveredTier} />
 </div>
 
 <script lang="ts">
 import { onMount } from 'svelte';
-import { Loading, WordOfPower } from '$components';
-import { playerProficiencies, toastError } from '$stores';
+import { Loading } from '$components';
+import {
+	anchorPosition,
+	playerProficiencies,
+	registerTooltipComponent,
+	toastError,
+	type TooltipComponent
+} from '$stores';
+import LexiconRail from './LexiconRail.svelte';
+import TierSpine from './TierSpine.svelte';
+import WordOfPowerTooltip from './WordOfPowerTooltip.svelte';
+import type { TierView } from './proficiencies-lexicon';
 import { ProficienciesView } from './proficiencies-view.svelte';
+import type { WordTooltipController } from './word-hover';
 
 const view = new ProficienciesView();
+
+// One decipher tooltip for the whole spine, driven through a controller passed down to the tier cards
+// (mirroring the challenges reward tooltip) so the cards don't thread hover handlers back up.
+let tooltip = $state<TooltipComponent>();
+let hoveredTier = $state<TierView | undefined>();
+const { describedById, setTooltipPosition, showTooltip, hideTooltip } = registerTooltipComponent(() => tooltip);
+const controller: WordTooltipController = {
+	describedById,
+	show: (tier, anchor) => {
+		hoveredTier = tier;
+		setTooltipPosition(anchorPosition(anchor));
+		showTooltip();
+	},
+	move: (anchor) => setTooltipPosition(anchorPosition(anchor)),
+	hide: () => {
+		hoveredTier = undefined;
+		hideTooltip();
+	}
+};
 
 onMount(async () => {
 	// Force a fresh fetch so progress reflects play since the store was last loaded at game boot.
@@ -111,8 +112,9 @@ onMount(async () => {
 }
 
 .header {
-	padding: 20px 28px 0;
+	padding: 18px 24px 14px;
 	flex-shrink: 0;
+	border-bottom: 1px solid var(--border-subtle);
 }
 
 .eyebrow {
@@ -148,7 +150,6 @@ onMount(async () => {
 	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	padding: 16px 28px 28px;
 }
 
 .state {
@@ -181,117 +182,12 @@ onMount(async () => {
 	flex: 1;
 	min-height: 0;
 	display: flex;
-	gap: 18px;
 }
 
-.rail {
-	flex: none;
-	width: 190px;
-	overflow-y: auto;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	border-right: 1px solid var(--border-subtle);
-	padding-right: 8px;
-}
-
-.rail-row {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 9px 10px;
-	border: 1px solid transparent;
-	border-radius: var(--border-radius);
-	background: transparent;
-	color: inherit;
-	cursor: pointer;
-	text-align: left;
-
-	&:hover {
-		background: var(--surface-alpha);
-	}
-
-	&.active {
-		background: var(--surface-alpha);
-		border-color: var(--border-medium);
-	}
-}
-
-.rail-name {
-	font-size: 12.5px;
-	color: var(--text-secondary);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.spine {
+// The scrolling centre column hosting the spine.
+.journey {
 	flex: 1;
 	min-width: 0;
-	overflow-y: auto;
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	padding-right: 4px;
-}
-
-.tier {
-	display: flex;
-	align-items: center;
-	gap: 16px;
-	padding: 18px 20px;
-	border: 1px solid var(--border-subtle);
-	border-radius: var(--border-radius);
-	background: var(--surface);
-	color: inherit;
-	cursor: pointer;
-	text-align: left;
-
-	&:hover {
-		border-color: var(--border-medium);
-	}
-
-	&.active {
-		border-color: var(--accent);
-	}
-}
-
-.tier-meta {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	min-width: 0;
-}
-
-.tier-name {
-	font-size: 14px;
-	font-weight: 500;
-}
-
-.tier-tags {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 7px;
-}
-
-.tag {
-	font-family: var(--mono);
-	font-size: 10px;
-	letter-spacing: 0.5px;
-	text-transform: uppercase;
-	padding: 3px 8px;
-	border-radius: var(--border-radius);
-	border: 1px solid var(--border-subtle);
-	color: var(--text-tertiary);
-
-	&.state-training {
-		color: var(--accent);
-		border-color: var(--accent);
-	}
-
-	&.state-maxed {
-		color: var(--gold);
-		border-color: var(--gold);
-	}
+	overflow: auto;
 }
 </style>
