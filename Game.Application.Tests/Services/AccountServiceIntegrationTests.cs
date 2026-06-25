@@ -632,6 +632,29 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task CreatePlayer_RetiredClass_ReturnsInvalidClass()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "wantsretiredchar", "pass");
+            // A retired class stays resolvable by id but is out of circulation for new characters.
+            var retired = await TestDataSeeder.CreateClassWithKitAsync(
+                context, starterSkillIds: [], name: "Retired", retiredAt: DateTime.UtcNow);
+            await ReloadReferenceCachesAsync();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var result = await accountService.CreatePlayer(user.Id, "Nameless", retired.Id);
+
+            Assert.False(result.Success);
+            Assert.Equal(CreatePlayerStatus.InvalidClass, result.Status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(0, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+        }
+
+        [Fact]
         public async Task CreatePlayer_AtCap_IsRejected()
         {
             using var scope = CreateScope();
