@@ -132,7 +132,7 @@ namespace Game.Api.Tests.Integration
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerId);
             Assert.NotNull(player);
-            return PlayerData.FromPlayer(player);
+            return PlayerData.FromPlayer(player, []);
         }
 
         /// <summary>

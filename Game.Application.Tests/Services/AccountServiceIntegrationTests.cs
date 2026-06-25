@@ -75,7 +75,9 @@ namespace Game.Application.Tests.Services
                 .Where(attribute => attribute.PlayerId == createdPlayer.Id)
                 .ToListAsync(CancellationToken);
             Assert.Equal(new[] { 0, 1, 2, 3, 4, 5 }, attributes.Select(attribute => attribute.AttributeId).OrderBy(id => id));
-            Assert.All(attributes, attribute => Assert.Equal(5m, attribute.Amount));
+            // The free pool starts empty — the class's starting spread is delivered by the level-scaled locked
+            // base at battler assembly (#1223), not seeded into the persisted allocations.
+            Assert.All(attributes, attribute => Assert.Equal(0m, attribute.Amount));
 
             var logPreferencesByType = await verifyContext.Set<LogPreference>()
                 .Where(preference => preference.PlayerId == createdPlayer.Id)

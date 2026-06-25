@@ -1,6 +1,8 @@
 using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Battle.Offline;
+using Game.Core.Classes;
+using CoreClass = Game.Core.Classes.Class;
 using Game.Core.Enemies;
 using Game.Core.Items;
 using Game.Core.Players;
@@ -381,6 +383,34 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(42, result.ZoneId);
         }
 
+        // ── Class locked base ────────────────────────────────────────────────
+
+        [Fact]
+        public void Simulate_AppliesClassLockedBase_FromTheFrozenSnapshotLevel()
+        {
+            // The player's free pool is empty, so the class locked base is its entire attribute spread. With a
+            // strong fingerprint the player wins idle battles it wins none of without one — proving the offline
+            // path composes the locked base. The base is derived from the snapshot's frozen level, so (like
+            // every other captured input) it is stationary across the away window.
+            var zone = MakeZone(levelMin: 1, levelMax: 1);
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+
+            OfflineProgressResult Run(params AttributeDistribution[] distributions)
+            {
+                var scenario = new Scenario { Zone = zone, Snapshot = snapshot, ResolveEnemy = level => WeakEnemy(level) };
+                return _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario) with
+                {
+                    ResolveClass = ClassResolver(2, distributions),
+                });
+            }
+
+            var withoutFingerprint = Run();
+            var withFingerprint = Run(Distribution(Strength, 100m), Distribution(Endurance, 100m));
+
+            Assert.Equal(0, withoutFingerprint.Wins);
+            Assert.True(withFingerprint.Wins > 0);
+        }
+
         // ── Scenario plumbing ────────────────────────────────────────────────
 
         private const int EnemyId = 1;
@@ -410,6 +440,7 @@ namespace Game.Core.Tests.Battle.Offline
                 ResolveMod = scenario.ResolveMod,
                 ResolveSkill = scenario.ResolveSkill,
                 ResolveProficiency = ThrowProficiency,
+                ResolveClass = ThrowClass,
                 SeedSource = () => 0,
             };
 
@@ -529,6 +560,40 @@ namespace Game.Core.Tests.Battle.Offline
             };
         }
 
+        private static BattleSnapshot ClassPlayerSnapshot(int level, int classId) => new()
+        {
+            Level = level,
+            ClassId = classId,
+            StatAllocations = [],
+            EquippedItems = [],
+            SkillIds = [0],
+        };
+
+        private static Func<int, CoreClass> ClassResolver(int classId, params AttributeDistribution[] distributions) =>
+            id => id == classId
+                ? MakeClass(classId, distributions)
+                : throw new InvalidOperationException($"Unexpected class resolve for {id}");
+
+        private static CoreClass MakeClass(int id, params AttributeDistribution[] distributions) => new()
+        {
+            Id = id,
+            Name = $"Class {id}",
+            StarterSkillIds = [],
+            StarterEquipment = [],
+            AttributeDistributions = distributions,
+            SignaturePassive = new ClassSignaturePassive
+            {
+                Attribute = Strength,
+                Amount = 0m,
+                ScalingAttribute = null,
+                ScalingAmount = 0m,
+                ModifierType = EModifierType.Additive,
+            },
+        };
+
+        private static AttributeDistribution Distribution(EAttribute attribute, decimal baseAmount, decimal amountPerLevel = 0m) =>
+            new() { AttributeId = attribute, BaseAmount = baseAmount, AmountPerLevel = amountPerLevel };
+
         private static Enemy WeakEnemy(int level, int skillCount = 1) =>
             MakeEnemy(level, strength: 5, endurance: 5, skillCount: skillCount);
 
@@ -613,5 +678,8 @@ namespace Game.Core.Tests.Battle.Offline
         // These scenarios capture no proficiency levels, so the snapshot never resolves a proficiency.
         private static readonly Func<int, Proficiency> ThrowProficiency =
             id => throw new InvalidOperationException($"Unexpected proficiency resolve for {id}");
+        // These scenarios capture no class (the snapshot's ClassId is null), so it never resolves a class.
+        private static readonly Func<int, CoreClass> ThrowClass =
+            id => throw new InvalidOperationException($"Unexpected class resolve for {id}");
     }
 }

@@ -63,14 +63,16 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void GrantExp_LevelUp_GrantsSixStatPoints()
+        public void GrantExp_LevelUp_GrantsTheFreePoolStatPoints()
         {
             var player = MakePlayer(level: 1, exp: 0);
             var before = player.StatPoints.StatPointsGained;
 
             player.GrantExp(101);
 
-            Assert.Equal(before + 6, player.StatPoints.StatPointsGained);
+            // One level grants one free pool's worth of stat points (the reduced per-level grant; the locked
+            // base supplies the rest of the attribute growth — #1223).
+            Assert.Equal(before + GameConstants.StatPointsPerLevel, player.StatPoints.StatPointsGained);
         }
 
         // ── GrantExp — multi-level-up ────────────────────────────────────────
@@ -106,7 +108,8 @@ namespace Game.Core.Tests.Players
 
             player.GrantExp(301);
 
-            Assert.Equal(12, player.StatPoints.StatPointsGained); // 6 per level * 2
+            // Two levels' worth of the per-level free pool grant.
+            Assert.Equal(2 * GameConstants.StatPointsPerLevel, player.StatPoints.StatPointsGained);
         }
 
         [Fact]

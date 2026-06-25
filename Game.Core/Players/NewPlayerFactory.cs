@@ -16,10 +16,13 @@ namespace Game.Core.Players
 
         /// <summary>
         /// Creates the blueprint for a brand-new player with the given <paramref name="name"/> of the chosen
-        /// <paramref name="class"/>: the class's starter skills (all selected, in authored order), the starting
-        /// attribute allocation sourced from the class's attribute distribution base spread, and the default
-        /// log preferences. The character's proficiency roots are no longer seeded here — they emerge from the
-        /// kit, whose skills open their paths through derived openness on the first won battle (spike #1126).
+        /// <paramref name="class"/>: the class's starter skills (all selected, in authored order), an empty
+        /// free pool of stat allocations, and the default log preferences. The starting attribute spread is the
+        /// class's level-scaled locked base, derived from <c>(class, level)</c> at battler assembly and never
+        /// stored (spike #1126 area D) — so the free pool the player allocates starts at zero, not seeded with
+        /// the base spread (which the locked base would then double-count). The character's proficiency roots
+        /// are not seeded here either — they emerge from the kit, whose skills open their paths through derived
+        /// openness on the first won battle (spike #1126).
         /// </summary>
         public NewPlayer Create(string name, Class @class)
         {
@@ -44,11 +47,6 @@ namespace Game.Core.Players
                 })
                 .ToList();
 
-            // The class's base attribute spread, keyed by attribute. This is the level-1 base only; the
-            // level-scaled, non-reallocatable locked base and the reduced free pool are introduced in #1223.
-            var baseByAttribute = @class.AttributeDistributions
-                .ToDictionary(distribution => distribution.AttributeId, distribution => (double)distribution.BaseAmount);
-
             return new NewPlayer
             {
                 ClassId = @class.Id,
@@ -60,18 +58,16 @@ namespace Game.Core.Players
                 StatPointsUsed = 0,
                 Skills = starterSkills,
                 Equipment = starterEquipment,
-                // Seed an allocation row for exactly the core (directly-allocatable) attributes, derived from the
-                // attribute set itself rather than a hardcoded count — so adding a seventh core attribute
-                // automatically grants new players its allocation row (without one, PlayerStatPoints rejects every
-                // allocation into it, permanently blocking the stat). The amount is the class's base spread for
-                // that attribute, or 0 for an attribute the class does not invest in.
+                // Seed an empty allocation row for exactly the core (directly-allocatable) attributes, derived
+                // from the attribute set itself rather than a hardcoded count — so adding a seventh core
+                // attribute automatically grants new players its allocation row (without one, PlayerStatPoints
+                // rejects every allocation into it, permanently blocking the stat). The amount is zero: the
+                // class's starting spread is delivered by the level-scaled locked base at battler assembly, not
+                // seeded here, so the free pool the player allocates begins empty and the locked base is never
+                // double-counted.
                 Attributes = Enum.GetValues<EAttribute>()
                     .Where(Attribute.IsCore)
-                    .Select(attribute => new StatAllocation
-                    {
-                        Attribute = attribute,
-                        Amount = baseByAttribute.TryGetValue(attribute, out var amount) ? amount : 0d,
-                    })
+                    .Select(attribute => new StatAllocation { Attribute = attribute, Amount = 0d })
                     .ToList(),
                 LogPreferences = CreateDefaultLogPreferences(),
             };

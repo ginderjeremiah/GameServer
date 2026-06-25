@@ -18,7 +18,16 @@ namespace Game.Api.Models.Player
         public required List<LogPreference> LogPreferences { get; set; }
         public required InventoryData InventoryData { get; set; }
 
-        public static PlayerData FromPlayer(CorePlayer player)
+        /// <summary>
+        /// The player's class attribute fingerprint — the distributions the live frontend battler resolves
+        /// into the level-scaled, non-reallocatable locked base (spike #1126 area D), so its battle attributes
+        /// match the backend snapshot (<c>BattleSnapshot.GetModifiers</c>) the anti-cheat replay measures
+        /// against. Delivered with the player (its class is fixed) and carried as the distribution
+        /// (base + per-level), not a resolved amount, so a client-side level-up rescales it correctly.
+        /// </summary>
+        public required List<AttributeDistribution> LockedBaseDistribution { get; set; }
+
+        public static PlayerData FromPlayer(CorePlayer player, IReadOnlyList<AttributeDistribution> lockedBaseDistribution)
         {
             var inventory = player.Inventory;
 
@@ -96,6 +105,7 @@ namespace Game.Api.Models.Player
                         .ToList(),
                     UnlockedMods = inventory.UnlockedMods.ToList(),
                 },
+                LockedBaseDistribution = lockedBaseDistribution.ToList(),
             };
         }
     }

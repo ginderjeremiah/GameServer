@@ -3,6 +3,7 @@ import { PlayerManager } from '$lib/engine/player/player-manager';
 import { logMessage } from '$lib/engine/log';
 import { EAttribute, ELogType } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
+import { STAT_POINTS_PER_LEVEL } from '$lib/api/types/game-constants';
 
 // PlayerManager only depends on logMessage; mock it so the unit under test is
 // isolated and the spy assertions below work (mirrors inventory-manager.test.ts).
@@ -22,6 +23,7 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 		{ attributeId: EAttribute.Strength, amount: 10 },
 		{ attributeId: EAttribute.Endurance, amount: 8 }
 	],
+	lockedBaseDistribution: [],
 	unlockedSkills: [
 		{ skillId: 0, selected: true, order: 1 },
 		{ skillId: 1, selected: true, order: 0 },
@@ -136,7 +138,7 @@ describe('PlayerManager', () => {
 
 			expect(manager.level).toBe(2);
 			expect(manager.exp).toBe(0);
-			expect(manager.statPointsGained).toBe(36);
+			expect(manager.statPointsGained).toBe(30 + STAT_POINTS_PER_LEVEL);
 		});
 
 		it('does not level up when exp is below threshold', () => {
@@ -165,13 +167,13 @@ describe('PlayerManager', () => {
 	});
 
 	describe('levelUp', () => {
-		it('increments level and grants 6 stat points', () => {
+		it('increments level and grants the per-level free pool stat points', () => {
 			manager.initialize(makePlayerData({ level: 3, exp: 300, statPointsGained: 12 }));
 			manager.levelUp();
 
 			expect(manager.level).toBe(4);
 			expect(manager.exp).toBe(0);
-			expect(manager.statPointsGained).toBe(18);
+			expect(manager.statPointsGained).toBe(12 + STAT_POINTS_PER_LEVEL);
 		});
 
 		it('logs level-up messages', () => {
@@ -180,6 +182,45 @@ describe('PlayerManager', () => {
 
 			expect(logMessage).toHaveBeenCalledWith(ELogType.LevelUp, 'Congratulations, you leveled up!');
 			expect(logMessage).toHaveBeenCalledWith(ELogType.LevelUp, 'You are now level 2.');
+		});
+	});
+
+	describe('battleLockedBaseModifiers', () => {
+		const distribution = [
+			{ attributeId: EAttribute.Strength, baseAmount: 10, amountPerLevel: 2 },
+			{ attributeId: EAttribute.Endurance, baseAmount: 5, amountPerLevel: 0 }
+		];
+
+		it('composes the class locked base from the distribution at the current level', () => {
+			manager.initialize(makePlayerData({ level: 3, lockedBaseDistribution: distribution }));
+
+			const modifiers = manager.battleLockedBaseModifiers;
+
+			// BaseAmount + AmountPerLevel × level: Strength = 10 + 2·3 = 16; Endurance = 5 + 0·3 = 5.
+			expect(modifiers.map((m) => [m.attribute, m.amount])).toEqual([
+				[EAttribute.Strength, 16],
+				[EAttribute.Endurance, 5]
+			]);
+		});
+
+		it('memoises a stable reference until the level changes, then recomputes', () => {
+			manager.initialize(makePlayerData({ level: 3, exp: 0, lockedBaseDistribution: distribution }));
+
+			const first = manager.battleLockedBaseModifiers;
+			// Same level → same reference (the battle engine's by-reference change-detection relies on this).
+			expect(manager.battleLockedBaseModifiers).toBe(first);
+
+			manager.levelUp();
+			const afterLevelUp = manager.battleLockedBaseModifiers;
+			expect(afterLevelUp).not.toBe(first);
+			// Strength rescales with the new level: 10 + 2·4 = 18.
+			expect(afterLevelUp.find((m) => m.attribute === EAttribute.Strength)?.amount).toBe(18);
+		});
+
+		it('is empty for a class with no attribute distribution', () => {
+			manager.initialize(makePlayerData({ lockedBaseDistribution: [] }));
+
+			expect(manager.battleLockedBaseModifiers).toEqual([]);
 		});
 	});
 

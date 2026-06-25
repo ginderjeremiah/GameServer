@@ -22,7 +22,13 @@ namespace Game.Core
         /// <summary>The experience required to advance a level scales linearly as <c>Level * <see cref="ExpPerLevel"/></c>.</summary>
         public const int ExpPerLevel = 100;
 
-        /// <summary>The number of stat points awarded on each level-up.</summary>
-        public const int StatPointsPerLevel = 6;
+        /// <summary>
+        /// The size of the per-level <em>free pool</em> — the stat points awarded on each level-up for the
+        /// player to allocate manually (through <c>PlayerStatPoints.TryUpdateAttributes</c>). This is the
+        /// reduced share of attribute growth; the level-scaled class locked base (the attribute fingerprint)
+        /// supplies the rest and is non-reallocatable (spike #1126 area D). A strawman to tune during
+        /// balancing — the auto/free split.
+        /// </summary>
+        public const int StatPointsPerLevel = 2;
     }
 }

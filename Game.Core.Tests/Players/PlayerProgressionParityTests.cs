@@ -32,22 +32,24 @@ namespace Game.Core.Tests.Players
         public static readonly IReadOnlyDictionary<string, ProgressionScenario> Scenarios =
             new Dictionary<string, ProgressionScenario>
             {
+                // Stat points accrue at GameConstants.StatPointsPerLevel (the reduced free pool, currently 2)
+                // per level gained; each scenario's starting stat points are (StartLevel - 1) × that rate.
                 // Below the level threshold: exp accrues, no level-up, no stat points.
                 ["belowThreshold"] = new(1, 0, 0, 50, 1, 50, 0),
                 // Exactly at the threshold (>= 100) levels once with no carryover.
-                ["exactThreshold"] = new(1, 0, 0, 100, 2, 0, 6),
+                ["exactThreshold"] = new(1, 0, 0, 100, 2, 0, 2),
                 // One level with carryover exp.
-                ["thresholdWithCarryover"] = new(1, 0, 0, 101, 2, 1, 6),
+                ["thresholdWithCarryover"] = new(1, 0, 0, 101, 2, 1, 2),
                 // Spans two levels in one grant (100 + 200 = 300 to reach level 3).
-                ["twoLevels"] = new(1, 0, 0, 301, 3, 1, 12),
+                ["twoLevels"] = new(1, 0, 0, 301, 3, 1, 4),
                 // Starts mid-level with existing exp and stat points: one more level, points accumulate.
-                ["partialStartExp"] = new(2, 50, 6, 199, 3, 49, 12),
+                ["partialStartExp"] = new(2, 50, 2, 199, 3, 49, 4),
                 // Multi-level from a higher level (thresholds 300 and 400 consumed; 500 not reached).
-                ["multiLevelFromHigherLevel"] = new(3, 0, 12, 1000, 5, 300, 24),
+                ["multiLevelFromHigherLevel"] = new(3, 0, 4, 1000, 5, 300, 8),
                 // A large but sub-clamp grant levels many times: thresholds 100..900 consumed, 500 left.
-                ["largeGrantManyLevels"] = new(1, 0, 0, 5000, 10, 500, 54),
+                ["largeGrantManyLevels"] = new(1, 0, 0, 5000, 10, 500, 18),
                 // A grant just shy of a high-level threshold (10 * 100) does not level up.
-                ["noLevelAtHighLevel"] = new(10, 0, 54, 999, 10, 999, 54),
+                ["noLevelAtHighLevel"] = new(10, 0, 18, 999, 10, 999, 18),
             };
 
         public static IEnumerable<object[]> ScenarioNames =>

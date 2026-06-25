@@ -25,7 +25,10 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 			attributes: [
 				{ attributeId: 0, amount: 50 },
 				{ attributeId: 1, amount: 30 }
-			]
+			],
+			// The class locked-base battle modifiers — a stable reference (the real manager memoises it) the
+			// battle engine compares by identity, so reassigning it simulates a class/level change.
+			battleLockedBaseModifiers: [] as unknown[]
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],
@@ -749,12 +752,14 @@ describe('BattleEngine', () => {
 		const defaultEquipmentStats = mockInventoryManager.equipmentStats;
 		const defaultLevel = mockPlayerManager.level;
 		const defaultProficiencyModifiers = mockPlayerProficiencies.battleModifiers;
+		const defaultLockedBaseModifiers = mockPlayerManager.battleLockedBaseModifiers;
 
 		afterEach(() => {
 			mockPlayerManager.attributes = defaultAttributes;
 			mockInventoryManager.equipmentStats = defaultEquipmentStats;
 			mockPlayerManager.level = defaultLevel;
 			mockPlayerProficiencies.battleModifiers = defaultProficiencyModifiers;
+			mockPlayerManager.battleLockedBaseModifiers = defaultLockedBaseModifiers;
 		});
 
 		it('re-arms the player without re-deriving when the inputs are unchanged between spawns', () => {
@@ -826,6 +831,45 @@ describe('BattleEngine', () => {
 			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 
 			expect(resetSpy).toHaveBeenCalledWith();
+		});
+
+		// The class locked base (#1126 area D) is a derivation input too: a level-up while idling rescales it,
+		// so the next spawn must rebuild the attribute graph rather than re-arm the stale battler.
+		it('re-derives the player when the class locked base changes between spawns', () => {
+			engine.start();
+			const resetSpy = vi.spyOn(engine.player, 'reset');
+
+			const newLockedBase = [{ attribute: EAttribute.Endurance, amount: 8, type: EModifierType.Additive, source: 3 }];
+			mockPlayerManager.battleLockedBaseModifiers = newLockedBase;
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			expect(resetSpy).toHaveBeenCalledWith(
+				mockPlayerManager,
+				mockInventoryManager.equipmentStats,
+				mockInventoryManager.grantedSkillIds,
+				newLockedBase
+			);
+		});
+
+		// The additionalModifiers passed to reset must be [...lockedBase, ...proficiency] in that order — the
+		// same order the backend BattleSnapshot.GetModifiers composes them, since additive accumulation is not
+		// associative in floating point. Asserted with both lists non-empty so the order is observable.
+		it('composes the locked base before the proficiency modifiers at the reset seam', () => {
+			engine.start();
+			const resetSpy = vi.spyOn(engine.player, 'reset');
+
+			const lockedBase = [{ attribute: EAttribute.Strength, amount: 4, type: EModifierType.Additive, source: 3 }];
+			const proficiency = [{ attribute: EAttribute.Strength, amount: 2, type: EModifierType.Additive, source: 8 }];
+			mockPlayerManager.battleLockedBaseModifiers = lockedBase;
+			mockPlayerProficiencies.battleModifiers = proficiency;
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			expect(resetSpy).toHaveBeenCalledWith(
+				mockPlayerManager,
+				mockInventoryManager.equipmentStats,
+				mockInventoryManager.grantedSkillIds,
+				[...lockedBase, ...proficiency]
+			);
 		});
 	});
 });

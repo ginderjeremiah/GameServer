@@ -27,6 +27,8 @@ interface ProgressionScenario {
 	expected: { level: number; exp: number; statPointsGained: number };
 }
 
+// Stat points accrue at STAT_POINTS_PER_LEVEL (the reduced free pool, currently 2) per level gained;
+// each scenario's starting stat points are (startLevel - 1) × that rate.
 const scenarios: ProgressionScenario[] = [
 	// Below the level threshold: exp accrues, no level-up, no stat points.
 	{
@@ -44,7 +46,7 @@ const scenarios: ProgressionScenario[] = [
 		startExp: 0,
 		startStatPoints: 0,
 		grant: 100,
-		expected: { level: 2, exp: 0, statPointsGained: 6 }
+		expected: { level: 2, exp: 0, statPointsGained: 2 }
 	},
 	// One level with carryover exp.
 	{
@@ -53,7 +55,7 @@ const scenarios: ProgressionScenario[] = [
 		startExp: 0,
 		startStatPoints: 0,
 		grant: 101,
-		expected: { level: 2, exp: 1, statPointsGained: 6 }
+		expected: { level: 2, exp: 1, statPointsGained: 2 }
 	},
 	// Spans two levels in one grant (100 + 200 = 300 to reach level 3).
 	{
@@ -62,25 +64,25 @@ const scenarios: ProgressionScenario[] = [
 		startExp: 0,
 		startStatPoints: 0,
 		grant: 301,
-		expected: { level: 3, exp: 1, statPointsGained: 12 }
+		expected: { level: 3, exp: 1, statPointsGained: 4 }
 	},
 	// Starts mid-level with existing exp and stat points: one more level, points accumulate.
 	{
 		name: 'partialStartExp',
 		startLevel: 2,
 		startExp: 50,
-		startStatPoints: 6,
+		startStatPoints: 2,
 		grant: 199,
-		expected: { level: 3, exp: 49, statPointsGained: 12 }
+		expected: { level: 3, exp: 49, statPointsGained: 4 }
 	},
 	// Multi-level from a higher level (thresholds 300 and 400 consumed; 500 not reached).
 	{
 		name: 'multiLevelFromHigherLevel',
 		startLevel: 3,
 		startExp: 0,
-		startStatPoints: 12,
+		startStatPoints: 4,
 		grant: 1000,
-		expected: { level: 5, exp: 300, statPointsGained: 24 }
+		expected: { level: 5, exp: 300, statPointsGained: 8 }
 	},
 	// A large but sub-clamp grant levels many times: thresholds 100..900 consumed, 500 left.
 	{
@@ -89,16 +91,16 @@ const scenarios: ProgressionScenario[] = [
 		startExp: 0,
 		startStatPoints: 0,
 		grant: 5000,
-		expected: { level: 10, exp: 500, statPointsGained: 54 }
+		expected: { level: 10, exp: 500, statPointsGained: 18 }
 	},
 	// A grant just shy of a high-level threshold (10 * 100) does not level up.
 	{
 		name: 'noLevelAtHighLevel',
 		startLevel: 10,
 		startExp: 0,
-		startStatPoints: 54,
+		startStatPoints: 18,
 		grant: 999,
-		expected: { level: 10, exp: 999, statPointsGained: 54 }
+		expected: { level: 10, exp: 999, statPointsGained: 18 }
 	}
 ];
 

@@ -1,5 +1,7 @@
+using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
+using Game.Core.Classes;
 using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Players.Inventories;
@@ -7,6 +9,7 @@ using Game.Core.Proficiencies;
 using Game.Core.Skills;
 using Game.Core.TestInfrastructure.Builders;
 using Xunit;
+using CoreClass = Game.Core.Classes.Class;
 
 namespace Game.Core.Tests.Battle
 {
@@ -232,6 +235,75 @@ namespace Game.Core.Tests.Battle
             Assert.Throws<InvalidOperationException>(() => snapshot.GetModifiers(ThrowItem, ThrowMod).ToList());
         }
 
+        // ── Class locked base ────────────────────────────────────────────────
+
+        [Fact]
+        public void FromPlayer_CapturesClassId()
+        {
+            var player = new PlayerBuilder().WithClassId(4).Build();
+
+            var snapshot = BattleSnapshot.FromPlayer(player);
+
+            Assert.Equal(4, snapshot.ClassId);
+        }
+
+        [Fact]
+        public void ToBattler_AppliesClassLockedBaseDistribution()
+        {
+            // The class's locked base scales with the captured level (BaseAmount + AmountPerLevel × level), the
+            // same math an enemy's distribution uses, and composes additively with the free-pool allocation.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 5,
+                ClassId = 2,
+                StatAllocations = [Alloc(EAttribute.Strength, 4)],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+                resolveClass: ClassResolver(MakeClass(2,
+                    Distribution(EAttribute.Strength, 10m, amountPerLevel: 2m),
+                    Distribution(EAttribute.Endurance, 3m))));
+
+            // Strength = 4 (free pool) + (10 + 2 × 5) (locked base) = 24; Endurance = 0 + (3 + 0 × 5) = 3.
+            Assert.Equal(24, battler.GetAttributeValue(EAttribute.Strength));
+            Assert.Equal(3, battler.GetAttributeValue(EAttribute.Endurance));
+        }
+
+        [Fact]
+        public void GetModifiers_ClassCapturedButNoResolver_Throws()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                ClassId = 0,
+                StatAllocations = [],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            Assert.Throws<InvalidOperationException>(() => snapshot.GetModifiers(ThrowItem, ThrowMod).ToList());
+        }
+
+        [Fact]
+        public void GetModifiers_NoClassCaptured_OmitsLockedBase()
+        {
+            // A hand-built snapshot with no ClassId resolves no locked base and needs no class resolver.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 9,
+                StatAllocations = [Alloc(EAttribute.Strength, 7)],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            var modifier = Assert.Single(snapshot.GetModifiers(ThrowItem, ThrowMod));
+            Assert.Equal(EAttribute.Strength, modifier.Attribute);
+            Assert.Equal(7, modifier.Amount);
+            Assert.Equal(EAttributeModifierSource.PlayerStatPoints, modifier.Source);
+        }
+
         // ── Item-granted skills (append + order + dedupe) ────────────────────
 
         [Fact]
@@ -442,7 +514,8 @@ namespace Game.Core.Tests.Battle
 
             // Pin the exact ordered set so a divergence is reported directly rather than only via parity.
             var battler = BattleSnapshot.FromPlayer(player)
-                .ToBattler(ItemResolver(helm, accessory), ThrowMod, SkillResolver(selected, helmSkill, accessorySkill));
+                .ToBattler(ItemResolver(helm, accessory), ThrowMod, SkillResolver(selected, helmSkill, accessorySkill),
+                    resolveClass: ClassResolver(MakeClass(player.ClassId)));
             Assert.Equal([5, 6, 7], battler.Skills.Select(s => s.Skill.Id));
         }
 
@@ -451,9 +524,13 @@ namespace Game.Core.Tests.Battle
         private static void AssertBattlerParity(Player player,
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
         {
+            // The live battler (Player.GetAllModifiers) composes only stat allocations + gear — the class locked
+            // base is a snapshot-only contributor, like proficiency bonuses — so this stat/gear/skill round-trip
+            // resolves the player's class to one with no attribute distributions (an empty locked base). The
+            // locked-base composition itself is pinned by ToBattler_AppliesClassLockedBaseDistribution.
             var liveBattler = BattlerFactory.FromPlayer(player, resolveSkill);
             var snapshotBattler = BattleSnapshot.FromPlayer(player)
-                .ToBattler(resolveItem, resolveMod, resolveSkill);
+                .ToBattler(resolveItem, resolveMod, resolveSkill, resolveClass: ClassResolver(MakeClass(player.ClassId)));
 
             foreach (var attribute in Enum.GetValues<EAttribute>())
             {
@@ -530,6 +607,33 @@ namespace Game.Core.Tests.Battle
             var map = proficiencies.ToDictionary(p => p.Id);
             return id => map[id];
         }
+
+        private static Func<int, CoreClass> ClassResolver(params CoreClass[] classes)
+        {
+            var map = classes.ToDictionary(c => c.Id);
+            return id => map[id];
+        }
+
+        /// <summary>A minimal class with the given locked-base distributions and a no-op signature passive.</summary>
+        private static CoreClass MakeClass(int id, params AttributeDistribution[] distributions) => new()
+        {
+            Id = id,
+            Name = $"Class {id}",
+            StarterSkillIds = [],
+            StarterEquipment = [],
+            AttributeDistributions = distributions,
+            SignaturePassive = new ClassSignaturePassive
+            {
+                Attribute = EAttribute.Strength,
+                Amount = 0m,
+                ScalingAttribute = null,
+                ScalingAmount = 0m,
+                ModifierType = EModifierType.Additive,
+            },
+        };
+
+        private static AttributeDistribution Distribution(EAttribute attribute, decimal baseAmount, decimal amountPerLevel = 0m) =>
+            new() { AttributeId = attribute, BaseAmount = baseAmount, AmountPerLevel = amountPerLevel };
 
         private static ProficiencyModifier ProfMod(EAttribute attribute, double amount) =>
             new() { Attribute = attribute, ModifierType = EModifierType.Additive, Amount = amount };

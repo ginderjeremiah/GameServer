@@ -1,6 +1,16 @@
-import { ELogType, IBattlerAttribute, IInventoryData, ILogPreference, IPlayerData, IUnlockedSkill } from '$lib/api';
+import {
+	ELogType,
+	IAttributeDistribution,
+	IBattlerAttribute,
+	IInventoryData,
+	ILogPreference,
+	IPlayerData,
+	IUnlockedSkill
+} from '$lib/api';
 import { EXP_PER_LEVEL, STAT_POINTS_PER_LEVEL } from '$lib/api/types/game-constants';
 import { formatNum, statify } from '$lib/common';
+import { classLockedBaseModifiers } from '$lib/battle/class-modifiers';
+import type { AttributeModifier } from '$lib/battle/attribute-modifier';
 import { logMessage } from '../log';
 
 export class PlayerManager implements IPlayerData {
@@ -12,6 +22,7 @@ export class PlayerManager implements IPlayerData {
 	public statPointsGained = 0;
 	public statPointsUsed = 0;
 	public attributes: IBattlerAttribute[] = [];
+	public lockedBaseDistribution: IAttributeDistribution[] = [];
 	public unlockedSkills: IUnlockedSkill[] = [];
 	private logPreferenceList: ILogPreference[] = [];
 	public inventoryData: IInventoryData = {
@@ -36,6 +47,29 @@ export class PlayerManager implements IPlayerData {
 
 	public get selectedSkills(): number[] {
 		return this.selectedSkillsCache;
+	}
+
+	/**
+	 * Memoised class locked-base attribute modifiers — the level-scaled, non-reallocatable attribute
+	 * fingerprint (spike #1126 area D) composed into the live battler so its attributes match the backend
+	 * battle snapshot (the frontend↔backend parity surface the class system adds). Recomputed only when the
+	 * level or the delivered distribution changes — so the battle engine's per-spawn change-detection (#811)
+	 * reads a stable reference and an idle farm re-arms the existing battler instead of rebuilding it. The
+	 * cache is `#`-private so `statify` leaves it non-reactive: the recompute writes it during the getter,
+	 * which would be an illegal `$state` mutation mid-derivation if it were reactive (the reactive `level`/
+	 * `lockedBaseDistribution` reads are what consumers track).
+	 */
+	#lockedBaseCache: AttributeModifier[] = [];
+	#lockedBaseCacheLevel = -1;
+	#lockedBaseCacheSource: IAttributeDistribution[] | null = null;
+
+	public get battleLockedBaseModifiers(): AttributeModifier[] {
+		if (this.#lockedBaseCacheLevel !== this.level || this.#lockedBaseCacheSource !== this.lockedBaseDistribution) {
+			this.#lockedBaseCache = classLockedBaseModifiers(this.lockedBaseDistribution, this.level);
+			this.#lockedBaseCacheLevel = this.level;
+			this.#lockedBaseCacheSource = this.lockedBaseDistribution;
+		}
+		return this.#lockedBaseCache;
 	}
 
 	/** Recomputes the memoised {@link selectedSkills} from the current unlocked set's selected/order. */
@@ -87,6 +121,7 @@ export class PlayerManager implements IPlayerData {
 		this.statPointsGained = data.statPointsGained;
 		this.statPointsUsed = data.statPointsUsed;
 		this.attributes = data.attributes;
+		this.lockedBaseDistribution = data.lockedBaseDistribution;
 		this.unlockedSkills = data.unlockedSkills;
 		this.logPreferences = data.logPreferences;
 		this.inventoryData = data.inventoryData;
