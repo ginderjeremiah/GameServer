@@ -1,6 +1,8 @@
 # Pinned dependencies for regenerating the Aetheric conlang font + specimen.
 #   pip install -r requirements.txt
-# fonttools: builds the TTF/woff2 · brotli: woff2 compression · pillow: specimen render
+# fonttools: builds the TTF/woff2 · brotli: woff2 compression
+# skia-pathops: strokes centerlines into outlines (round caps/joins) · pillow: specimen render
 fonttools==4.63.0
 brotli==1.2.0
+skia-pathops==0.9.2
 pillow==12.2.0
