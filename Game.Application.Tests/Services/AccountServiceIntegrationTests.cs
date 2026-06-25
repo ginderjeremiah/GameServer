@@ -967,6 +967,8 @@ namespace Game.Application.Tests.Services
                 backoffGuard,
                 new NewPlayerFactory(),
                 provider.GetRequiredService<IClasses>(),
+                provider.GetRequiredService<ISkills>(),
+                provider.GetRequiredService<IItems>(),
                 Options.Create(new PlayerCreationOptions { MaxPlayersPerAccount = maxPlayersPerAccount }),
                 NullLogger<AccountService>.Instance);
         }

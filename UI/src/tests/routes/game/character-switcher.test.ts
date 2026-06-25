@@ -16,7 +16,10 @@ const { getMock, postMock, disconnectMock, stopEnginesMock, getRefreshTokenMock,
 		confirmTakeoverMock: vi.fn()
 	}));
 
-vi.mock('$lib/api', () => ({
+// Spread the real module so the enums/values the class picker's display helpers read at import stay
+// intact; only the I/O entry points are replaced with spies.
+vi.mock('$lib/api', async (importOriginal) => ({
+	...((await importOriginal()) as Record<string, unknown>),
 	ApiRequest: class {
 		constructor(private route: string) {}
 		get = () => getMock(this.route);
@@ -39,10 +42,32 @@ const SUMMARIES = [
 	{ id: 2, name: 'Rogue', level: 7, currentZoneId: 1, lastActivity: '2026-06-19T00:00:00Z' }
 ];
 
+// The create form's class options come from Login/CharacterCreationData; one active class (id 0) so
+// creating a character defaults to and sends it.
+const CREATABLE_CLASS = {
+	id: 0,
+	name: 'Warrior',
+	description: 'A frontline fighter.',
+	word: 'kor',
+	passiveAttributeId: 1,
+	passiveAmount: 5,
+	passiveScalingAmount: 0,
+	passiveModifierType: 1,
+	attributeDistributions: [],
+	starterSkills: [],
+	starterEquipment: []
+};
+
+// The switcher issues two GETs — the character list and the class options — so route the doubles.
+const getByRoute = (route: string) =>
+	route === 'Login/CharacterCreationData'
+		? Promise.resolve({ status: 200, data: [CREATABLE_CLASS] })
+		: Promise.resolve({ status: 200, data: SUMMARIES });
+
 let originalLocation: Location;
 
 beforeEach(() => {
-	getMock.mockReset().mockResolvedValue({ status: 200, data: SUMMARIES });
+	getMock.mockReset().mockImplementation(getByRoute);
 	postMock.mockReset();
 	disconnectMock.mockReset();
 	stopEnginesMock.mockReset();

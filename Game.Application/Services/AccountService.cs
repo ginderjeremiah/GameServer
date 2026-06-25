@@ -6,6 +6,7 @@ using Game.Core.Classes;
 using Game.Core.Players;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Application.Services
 {
@@ -23,6 +24,8 @@ namespace Game.Application.Services
         LoginBackoffGuard backoffGuard,
         NewPlayerFactory newPlayerFactory,
         IClasses classes,
+        ISkills skills,
+        IItems items,
         IOptions<PlayerCreationOptions> playerCreationOptions,
         ILogger<AccountService> logger)
     {
@@ -34,6 +37,8 @@ namespace Game.Application.Services
         private readonly LoginBackoffGuard _backoffGuard = backoffGuard;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
         private readonly IClasses _classes = classes;
+        private readonly ISkills _skills = skills;
+        private readonly IItems _items = items;
         private readonly PlayerCreationOptions _playerCreationOptions = playerCreationOptions.Value;
         private readonly ILogger<AccountService> _logger = logger;
 
@@ -248,6 +253,45 @@ namespace Game.Application.Services
             // corrupt cache, not a bad request.
             return _classes.GetClass(classId)
                 ?? throw new InvalidOperationException($"Class {classId} resolved as a live contract but is missing from the gameplay cache.");
+        }
+
+        /// <summary>
+        /// The classes a new character can be created as — the catalogue minus retired entries — projected
+        /// into the create-character view model with starter-skill and starter-equipment <em>names</em>
+        /// resolved server-side. The create-character screens run pre-player-selection (no socket, so no
+        /// reference data), so this self-contained payload is what the class picker previews, delivered over
+        /// HTTP. A starter skill/item the catalogue references but that is missing is a corrupt cache (the
+        /// authoring guards keep kits well-formed), so resolution fails loud rather than dropping the name.
+        /// </summary>
+        public IReadOnlyList<Contracts.CreatableClass> GetCreatableClasses()
+        {
+            return [.. _classes.All().Where(@class => @class.RetiredAt is null).Select(ToCreatableClass)];
+        }
+
+        private Contracts.CreatableClass ToCreatableClass(Contracts.Class @class)
+        {
+            return new Contracts.CreatableClass
+            {
+                Id = @class.Id,
+                Name = @class.Name,
+                Description = @class.Description,
+                Word = @class.Word,
+                PassiveAttributeId = @class.PassiveAttributeId,
+                PassiveAmount = @class.PassiveAmount,
+                PassiveScalingAttributeId = @class.PassiveScalingAttributeId,
+                PassiveScalingAmount = @class.PassiveScalingAmount,
+                PassiveModifierType = @class.PassiveModifierType,
+                AttributeDistributions = [.. @class.AttributeDistributions],
+                StarterSkills = [.. @class.StarterSkillIds.Select(id =>
+                    new Contracts.CreatableClassSkill { Id = id, Name = _skills.GetSkill(id).Name })],
+                StarterEquipment = [.. @class.StarterEquipment.Select(equipment =>
+                    new Contracts.CreatableClassEquipment
+                    {
+                        ItemId = equipment.ItemId,
+                        EquipmentSlot = equipment.EquipmentSlot,
+                        Name = _items.GetItem(equipment.ItemId).Name,
+                    })],
+            };
         }
 
         /// <summary>

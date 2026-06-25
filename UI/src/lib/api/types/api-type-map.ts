@@ -9,6 +9,7 @@ import type {
 	IChallenge,
 	IChange,
 	IClass,
+	ICreatableClass,
 	ICreateAccountRequest,
 	ICreatePlayerRequest,
 	IDeadLetterInspection,
@@ -88,6 +89,7 @@ export type ApiResponseTypes = {
 	'AdminTools/SetZoneEnemies': undefined;
 	'Login': ILoginResult;
 	'Login/ActiveSession': IActiveSessionResult;
+	'Login/CharacterCreationData': ICreatableClass[];
 	'Login/CreateAccount': undefined;
 	'Login/CreatePlayer': IPlayerSummary;
 	'Login/DeviceInfo': undefined;

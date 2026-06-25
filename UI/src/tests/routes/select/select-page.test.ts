@@ -4,25 +4,52 @@ import { render, fireEvent, cleanup, screen, waitFor } from '@testing-library/sv
 // Doubles for the select page's wiring: the handoff supplies the character list, ApiRequest.post is
 // keyed by route, and the navigation / takeover / world-entry side effects are mocked so the page can
 // be driven without real I/O.
-const { postMock, setTokensMock, getRefreshTokenMock, gotoMock, takeMock, initializeMock, confirmTakeoverMock } =
-	vi.hoisted(() => ({
-		postMock: vi.fn(),
-		setTokensMock: vi.fn(),
-		getRefreshTokenMock: vi.fn(),
-		gotoMock: vi.fn(),
-		takeMock: vi.fn(),
-		initializeMock: vi.fn(),
-		confirmTakeoverMock: vi.fn()
-	}));
+const {
+	postMock,
+	getMock,
+	setTokensMock,
+	getRefreshTokenMock,
+	gotoMock,
+	takeMock,
+	initializeMock,
+	confirmTakeoverMock
+} = vi.hoisted(() => ({
+	postMock: vi.fn(),
+	getMock: vi.fn(),
+	setTokensMock: vi.fn(),
+	getRefreshTokenMock: vi.fn(),
+	gotoMock: vi.fn(),
+	takeMock: vi.fn(),
+	initializeMock: vi.fn(),
+	confirmTakeoverMock: vi.fn()
+}));
+
+// One creatable class so the picker has an option to default to (id 0 → the create call sends it).
+const CREATABLE_CLASS = {
+	id: 0,
+	name: 'Warrior',
+	description: 'A frontline fighter.',
+	word: 'kor',
+	passiveAttributeId: 1,
+	passiveAmount: 5,
+	passiveScalingAmount: 0,
+	passiveModifierType: 1,
+	attributeDistributions: [],
+	starterSkills: [],
+	starterEquipment: []
+};
 
 vi.mock('$app/environment', () => ({ browser: true }));
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 vi.mock('$app/paths', () => ({ resolve: (p: string) => p }));
-vi.mock('$lib/api', () => ({
+// Spread the real module so the enums/values the class picker's display helpers read at import stay
+// intact; only the I/O entry points are replaced with spies.
+vi.mock('$lib/api', async (importOriginal) => ({
+	...((await importOriginal()) as Record<string, unknown>),
 	ApiRequest: class {
 		constructor(private route: string) {}
 		post = (body: unknown) => postMock(this.route, body);
-		get = vi.fn();
+		get = () => getMock(this.route);
 	},
 	setTokens: setTokensMock,
 	getRefreshToken: getRefreshTokenMock,
@@ -42,6 +69,9 @@ const SUMMARIES = [
 
 beforeEach(() => {
 	postMock.mockReset();
+	getMock.mockReset();
+	// The create form fetches its class options over HTTP (Login/CharacterCreationData).
+	getMock.mockResolvedValue({ status: 200, data: [CREATABLE_CLASS] });
 	setTokensMock.mockClear();
 	getRefreshTokenMock.mockReturnValue('r');
 	gotoMock.mockClear();

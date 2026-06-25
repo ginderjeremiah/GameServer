@@ -128,6 +128,13 @@ export const REFERENCE_DATA: RefDataSource[] = [
 		'GetPaths',
 		() => staticData.paths,
 		(d) => (staticData.paths = d)
+	),
+	refSource(
+		'classes',
+		'Classes',
+		'GetClasses',
+		() => staticData.classes,
+		(d) => (staticData.classes = d)
 	)
 ];
 

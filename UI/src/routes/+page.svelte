@@ -179,9 +179,9 @@ const handleSubmit = async () => {
 	submitting = true;
 
 	if (mode === 'signup') {
-		// TODO(#1225): send the class chosen in the create-character class picker. Until it (and authored
-		// class content, #1226) ships, creation is wired but not usable end-to-end; this placeholder keeps
-		// the call type-correct.
+		// TODO(#1256): the signup path creates the account's first character but has no class picker yet,
+		// so it sends a placeholder classId. Closing that gap is a UX fork (pick-at-signup vs. defer
+		// first-character creation to the select screen) tracked in #1256.
 		const created = await new ApiRequest('Login/CreateAccount').post({ username, password, classId: 0 });
 		if (created.status !== 200) {
 			submitting = false;

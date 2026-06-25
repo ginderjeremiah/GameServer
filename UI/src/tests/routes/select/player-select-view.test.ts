@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PlayerSelectView, type PlayerSelectDeps } from '$routes/select/player-select-view.svelte';
-import type { IPlayerData, IPlayerSummary } from '$lib/api';
+import type { ICreatableClass, IPlayerData, IPlayerSummary } from '$lib/api';
 
 const summary = (id: number, name = `Hero${id}`): IPlayerSummary => ({
 	id,
@@ -12,13 +12,26 @@ const summary = (id: number, name = `Hero${id}`): IPlayerSummary => ({
 
 const player = (id: number): IPlayerData => ({ id, name: `Hero${id}` }) as IPlayerData;
 
+const creatable = (id: number): ICreatableClass =>
+	({
+		id,
+		name: `Class${id}`,
+		starterSkills: [],
+		starterEquipment: [],
+		attributeDistributions: []
+	}) as unknown as ICreatableClass;
+
 const makeDeps = (overrides: Partial<PlayerSelectDeps> = {}): PlayerSelectDeps => ({
 	selectPlayer: vi.fn().mockResolvedValue({ ok: true, player: player(1) }),
 	createPlayer: vi.fn().mockResolvedValue({ ok: true, summary: summary(2) }),
 	confirmTakeover: vi.fn().mockResolvedValue(true),
 	enterWorld: vi.fn(),
+	loadCreationData: vi.fn().mockResolvedValue([]),
 	...overrides
 });
+
+/** Flush microtasks so the constructor's fire-and-forget class load settles. */
+const flush = () => new Promise((resolve) => setTimeout(resolve));
 
 describe('PlayerSelectView — select', () => {
 	let deps: PlayerSelectDeps;
@@ -74,16 +87,38 @@ describe('PlayerSelectView — select', () => {
 	});
 });
 
+describe('PlayerSelectView — class loading', () => {
+	it('loads the creatable classes and defaults the selection to the first', async () => {
+		const deps = makeDeps({ loadCreationData: vi.fn().mockResolvedValue([creatable(3), creatable(5)]) });
+		const view = new PlayerSelectView(deps, [summary(1)]);
+
+		await flush();
+
+		expect(view.classes.map((c) => c.id)).toEqual([3, 5]);
+		expect(view.selectedClassId).toBe(3);
+	});
+
+	it('leaves the selection null when no classes load', async () => {
+		const view = new PlayerSelectView(makeDeps(), [summary(1)]);
+
+		await flush();
+
+		expect(view.classes).toEqual([]);
+		expect(view.selectedClassId).toBeNull();
+	});
+});
+
 describe('PlayerSelectView — create', () => {
-	it('appends the created character and closes the form on success', async () => {
+	it('sends the name and chosen class, appends the character, and closes the form on success', async () => {
 		const deps = makeDeps();
 		const view = new PlayerSelectView(deps, [summary(1)]);
 		view.showCreate = true;
 		view.newName = 'NewHero';
+		view.selectClass(3);
 
 		await view.create();
 
-		expect(deps.createPlayer).toHaveBeenCalledWith('NewHero');
+		expect(deps.createPlayer).toHaveBeenCalledWith('NewHero', 3);
 		expect(view.players.map((p) => p.id)).toEqual([1, 2]);
 		expect(view.showCreate).toBe(false);
 		expect(view.newName).toBe('');
@@ -93,11 +128,33 @@ describe('PlayerSelectView — create', () => {
 		const deps = makeDeps();
 		const view = new PlayerSelectView(deps, [summary(1)]);
 		view.newName = '   ';
+		view.selectClass(0);
 
 		await view.create();
 
 		expect(deps.createPlayer).not.toHaveBeenCalled();
 		expect(view.createError).toBeTruthy();
+	});
+
+	it('creates with a null class when the picker is inactive (host coerces to its placeholder)', async () => {
+		const deps = makeDeps();
+		const view = new PlayerSelectView(deps, [summary(1)]);
+		view.newName = 'NewHero';
+		// selectedClassId stays null — e.g. the pre-selection select screen, where the picker is hidden.
+
+		await view.create();
+
+		expect(deps.createPlayer).toHaveBeenCalledWith('NewHero', null);
+	});
+
+	it('selectClass records the choice and clears a prior create error', () => {
+		const view = new PlayerSelectView(makeDeps(), [summary(1)]);
+		view.createError = 'stale';
+
+		view.selectClass(2);
+
+		expect(view.selectedClassId).toBe(2);
+		expect(view.createError).toBeNull();
 	});
 
 	it('surfaces a backend create error (e.g. cap reached) and keeps the list unchanged', async () => {
@@ -107,6 +164,7 @@ describe('PlayerSelectView — create', () => {
 		const view = new PlayerSelectView(deps, [summary(1)]);
 		view.showCreate = true;
 		view.newName = 'NewHero';
+		view.selectClass(0);
 
 		await view.create();
 
@@ -120,9 +178,10 @@ describe('PlayerSelectView — create', () => {
 		const deps = makeDeps();
 		const view = new PlayerSelectView(deps, [summary(1)]);
 		view.newName = '  Spaced  ';
+		view.selectClass(1);
 
 		await view.create();
 
-		expect(deps.createPlayer).toHaveBeenCalledWith('Spaced');
+		expect(deps.createPlayer).toHaveBeenCalledWith('Spaced', 1);
 	});
 });

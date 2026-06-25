@@ -8,7 +8,7 @@
    I/O; the `+page.svelte` wires the real `SelectPlayer`/`CreatePlayer` calls, token storage, the
    takeover confirm, and world entry. Mirrors the reactive-view-model split the other screens use. */
 
-import type { IPlayerData, IPlayerSummary } from '$lib/api';
+import type { ICreatableClass, IPlayerData, IPlayerSummary } from '$lib/api';
 import { validatePlayerName } from './player-name';
 
 export type SelectResult = { ok: true; player: IPlayerData } | { ok: false; error: string };
@@ -19,13 +19,18 @@ export interface PlayerSelectDeps {
 	/** Binds the session to the chosen character (rotating the token) and loads it; resolves the
 	 *  player on success or a surfaced error message on failure. */
 	selectPlayer: (playerId: number) => Promise<SelectResult>;
-	/** Creates a new character on the account; resolves its summary or a surfaced error message. */
-	createPlayer: (name: string) => Promise<CreateResult>;
+	/** Creates a new character on the account, of the chosen class when the picker is active (the host
+	 *  coerces a null class to its placeholder where the catalogue isn't available — see the select
+	 *  screen). Resolves its summary or a surfaced error message. */
+	createPlayer: (name: string, classId: number | null) => Promise<CreateResult>;
 	/** Confirms the active-session takeover after selection (a per-player presence check). Returns
 	 *  true to proceed into the game, false when the player declined. */
 	confirmTakeover: () => Promise<boolean>;
 	/** Initializes the player manager from the loaded character and navigates into the game. */
 	enterWorld: (player: IPlayerData) => void;
+	/** Loads the create-character class options (the bespoke `Login/CharacterCreationData` payload,
+	 *  reachable pre-player-selection over HTTP). Resolves [] on failure so the picker stays hidden. */
+	loadCreationData: () => Promise<ICreatableClass[]>;
 }
 
 export class PlayerSelectView {
@@ -41,6 +46,12 @@ export class PlayerSelectView {
 	showCreate = $state(false);
 	/** The in-progress new-character name. */
 	newName = $state('');
+	/** The creatable class options, loaded from the bespoke character-creation payload. Empty until they
+	 *  load (and on failure), which keeps the picker hidden and creation on its placeholder fallback. */
+	classes = $state<ICreatableClass[]>([]);
+	/** The class chosen for the new character, or null before the options load / a choice is made.
+	 *  Defaulted to the first option once they load. */
+	selectedClassId = $state<number | null>(null);
 	/** Whether a `CreatePlayer` request is in flight. */
 	creating = $state(false);
 	/** A surfaced create error (name rejected or cap reached), cleared on the next attempt. */
@@ -51,6 +62,17 @@ export class PlayerSelectView {
 		initial: IPlayerSummary[]
 	) {
 		this.players = initial;
+		void this.loadClasses();
+	}
+
+	/** Loads the creatable class options and defaults the selection to the first one, so the create form
+	 *  is submittable without an extra click. A failure leaves the list empty (picker hidden). */
+	private async loadClasses(): Promise<void> {
+		const classes = await this.deps.loadCreationData();
+		this.classes = classes;
+		if (this.selectedClassId == null && classes.length > 0) {
+			this.selectedClassId = classes[0].id;
+		}
 	}
 
 	/** Live validation of the new-character name, mirroring the backend rule. */
@@ -99,6 +121,12 @@ export class PlayerSelectView {
 		}
 	}
 
+	/** Records the class chosen in the picker, clearing any prior create error. */
+	selectClass(classId: number): void {
+		this.selectedClassId = classId;
+		this.createError = null;
+	}
+
 	/**
 	 * Creates a new character and appends it to the list. Validates the name client-side first (the
 	 * backend re-validates and enforces the per-account cap as anti-cheat), then surfaces any backend
@@ -116,7 +144,7 @@ export class PlayerSelectView {
 
 		this.creating = true;
 		this.createError = null;
-		const result = await this.deps.createPlayer(validation.name);
+		const result = await this.deps.createPlayer(validation.name, this.selectedClassId);
 		this.creating = false;
 
 		if (!result.ok) {

@@ -335,6 +335,24 @@ namespace Game.Api.Controllers
         }
 
         /// <summary>
+        /// The data the create-character class picker needs: the classes a character can be created as, each
+        /// with its kit (starter skills + equipment, names resolved) and signature passive. Served over HTTP
+        /// because character creation happens before a player is selected — where the socket, and the
+        /// reference data it delivers, is unavailable — so it requires authentication but no selected player.
+        /// Kept distinct from the reference class catalogue (`GetClasses`).
+        /// </summary>
+        [HttpGet]
+        public ApiEnumerableResponse<CreatableClass> CharacterCreationData()
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            return ApiResponse.Success(_accountService.GetCreatableClasses());
+        }
+
+        /// <summary>
         /// Records the device capabilities the frontend reports once after login, enriching the device
         /// identified by the fingerprint header of this request. Requires authentication so it can only be
         /// sent by a logged-in client. Returns an error when the request carries no device fingerprint.

@@ -41,13 +41,22 @@ const selectPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 	return { ok: true, player: response.data.player };
 };
 
-const createPlayer: PlayerSelectDeps['createPlayer'] = async (name) => {
-	// TODO(#1225): send the class chosen in the create-character class picker (placeholder until it ships).
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId: 0 });
+const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
+	// classId is the picker's choice; `?? 0` is a safety net for the (not-expected) case where the
+	// class options failed to load, leaving the picker hidden.
+	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId: classId ?? 0 });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}
 	return { ok: true, summary: response.data };
+};
+
+// The class picker's options come over HTTP so they're reachable here, before a player is selected
+// (the socket — and the reference data it serves — requires a selected player). Resolve [] on failure
+// so the picker simply stays hidden.
+const loadCreationData: PlayerSelectDeps['loadCreationData'] = async () => {
+	const response = await new ApiRequest('Login/CharacterCreationData').get();
+	return response.status === 200 ? response.data : [];
 };
 
 // Enter the game as the loaded character: report this device's capabilities (fire-and-forget) now
@@ -72,7 +81,7 @@ onMount(() => {
 	}
 
 	view = new PlayerSelectView(
-		{ selectPlayer, createPlayer, confirmTakeover: confirmSessionTakeover, enterWorld },
+		{ selectPlayer, createPlayer, confirmTakeover: confirmSessionTakeover, enterWorld, loadCreationData },
 		summaries
 	);
 });

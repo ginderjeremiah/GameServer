@@ -1,4 +1,6 @@
 <form class="create-form" onsubmit={preventDefault(onSubmit)} data-testid="create-form">
+	<ClassPicker {classes} {selectedClassId} onSelect={onSelectClass} disabled={creating} />
+
 	<UnderlineInput
 		testid="new-name-input"
 		id="new-character-name"
@@ -22,10 +24,12 @@
 </form>
 
 <script lang="ts">
+import type { ICreatableClass } from '$lib/api';
 import { preventDefault } from '$lib/common/event-wrappers';
 import UnderlineInput from '../login/UnderlineInput.svelte';
 import StatusLine from '../login/StatusLine.svelte';
 import SubmitButton from '../login/SubmitButton.svelte';
+import ClassPicker from './ClassPicker.svelte';
 
 interface Props {
 	/** Two-way bound name input. */
@@ -38,11 +42,29 @@ interface Props {
 	error: string | null;
 	/** Whether a create request is in flight. */
 	creating: boolean;
+	/** The creatable class options; the picker shows only when this is non-empty (it's empty on the
+	 *  pre-selection screens until the bespoke payload loads). */
+	classes: ICreatableClass[];
+	/** The chosen class id, or null before the options load / a choice is made. */
+	selectedClassId: number | null;
+	/** Notifies the parent of a class choice. */
+	onSelectClass: (classId: number) => void;
 	onSubmit: () => void;
 	onCancel: () => void;
 }
 
-let { value = $bindable(), valid, validationMsg, error, creating, onSubmit, onCancel }: Props = $props();
+let {
+	value = $bindable(),
+	valid,
+	validationMsg,
+	error,
+	creating,
+	classes,
+	selectedClassId,
+	onSelectClass,
+	onSubmit,
+	onCancel
+}: Props = $props();
 
 // Don't nag with the validation hint before the field has been touched; once it has (or a backend
 // error arrived) surface whichever message applies — a backend error takes precedence.
