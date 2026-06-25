@@ -17,12 +17,14 @@ namespace Game.DataAccess.Repositories
         GameContext context,
         IChallenges challenges,
         ICacheService cache,
-        IPubSubService pubsub) : IPlayerProgressRepository
+        IPubSubService pubsub,
+        PlayerUpdateBatch updateBatch) : IPlayerProgressRepository
     {
         private readonly GameContext _context = context;
         private readonly IChallenges _challenges = challenges;
         private readonly ICacheService _cache = cache;
         private readonly IPubSubService _pubsub = pubsub;
+        private readonly PlayerUpdateBatch _updateBatch = updateBatch;
 
         // Sliding idle TTL for the cached progress aggregate, mirroring the player cache (#439): written on
         // every save and load-miss re-cache, refreshed on every hit, so an active player never ages out while
@@ -79,11 +81,10 @@ namespace Game.DataAccess.Repositories
 
             var playerId = progress.Player.Id;
 
-            // Enqueue the durable write-behind event first, then advance the cache — matching SavePlayer. If
-            // the publish throws, the cache must not have moved on to a snapshot that was never enqueued (and
-            // never will be), which would be a silently lost write once the cache later evicts. Persist only
-            // the rows that changed this save, as one batched event; the consumer upserts them to their
-            // absolute values off the response path.
+            // Enqueue the durable write-behind event first, then advance the cache. If the enqueue throws, the
+            // cache must not have moved on to a snapshot that was never enqueued (and never will be), which
+            // would be a silently lost write once the cache later evicts. Persist only the rows that changed
+            // this save, as one event; the consumer upserts them to their absolute values off the response path.
             var envelope = new DomainEventEnvelope
             {
                 Type = nameof(ProgressUpdatedEvent),
@@ -95,11 +96,28 @@ namespace Game.DataAccess.Repositories
                     Proficiencies = changed.Proficiencies,
                 }.Serialize(),
             };
-            await _pubsub.Publish(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, envelope, cancellationToken);
+            _updateBatch.Add(envelope);
 
-            // The cache is the source of truth, so write the full current snapshot (absolute values).
+            // The cache is the source of truth, so the advance writes the full current snapshot (absolute
+            // values). Capture it now (off the live progress aggregate) so a deferred advance still snapshots
+            // this save's state, not a later mutation's.
             var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress, progress.Proficiencies);
-            _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
+            void AdvanceCache() => _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
+
+            if (_updateBatch.PlayerSaveInProgress)
+            {
+                // Riding the in-flight player save's single flush (the live battle-completion hot path): the
+                // event is already buffered above; defer the cache advance so SavePlayer runs it only after
+                // that flush enqueues the event, collapsing both writes onto one queue round-trip (#1237).
+                _updateBatch.OnFlushed(AdvanceCache);
+            }
+            else
+            {
+                // Standalone progress save (e.g. the offline-rewards batch): flush our own event, then advance
+                // the cache — preserving publish-before-cache so the write is never stranded.
+                await _pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _updateBatch.Drain(), cancellationToken);
+                AdvanceCache();
+            }
         }
 
         private async Task<CachedPlayerProgress> GetCachedProgress(int playerId, CancellationToken cancellationToken)
