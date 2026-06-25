@@ -32,6 +32,18 @@ namespace Game.Core.Players
                 .Select((id, index) => new NewPlayerSkill { SkillId = id, Selected = true, Order = index })
                 .ToList();
 
+            // The class's starting equipment — unlocked and equipped at creation. The slot↔category match is
+            // an authoring-time guard (AdminClasses.SetStarterEquipment), so the kit is trusted well-formed
+            // here, mirroring how the starter skills trust their authored Player-acquirable flag. The weapon's
+            // innate skill (Item.GrantedSkillId) comes online through the normal equip path at battle assembly.
+            var starterEquipment = @class.StarterEquipment
+                .Select(equipment => new NewPlayerEquipment
+                {
+                    ItemId = equipment.ItemId,
+                    EquipmentSlot = equipment.EquipmentSlot,
+                })
+                .ToList();
+
             // The class's base attribute spread, keyed by attribute. This is the level-1 base only; the
             // level-scaled, non-reallocatable locked base and the reduced free pool are introduced in #1223.
             var baseByAttribute = @class.AttributeDistributions
@@ -47,6 +59,7 @@ namespace Game.Core.Players
                 StatPointsGained = 0,
                 StatPointsUsed = 0,
                 Skills = starterSkills,
+                Equipment = starterEquipment,
                 // Seed an allocation row for exactly the core (directly-allocatable) attributes, derived from the
                 // attribute set itself rather than a hardcoded count — so adding a seventh core attribute
                 // automatically grants new players its allocation row (without one, PlayerStatPoints rejects every

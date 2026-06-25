@@ -4,6 +4,7 @@ using EntityLogPreference = Game.Infrastructure.Entities.LogPreference;
 using EntityPlayer = Game.Infrastructure.Entities.Player;
 using EntityPlayerAttribute = Game.Infrastructure.Entities.PlayerAttribute;
 using EntityPlayerSkill = Game.Infrastructure.Entities.PlayerSkill;
+using EntityUnlockedItem = Game.Infrastructure.Entities.UnlockedItem;
 using EntityUser = Game.Infrastructure.Entities.User;
 
 namespace Game.DataAccess.Mapping
@@ -39,6 +40,17 @@ namespace Game.DataAccess.Mapping
                     SkillId = skill.SkillId,
                     Selected = skill.Selected,
                     Order = skill.Order,
+                }).ToList();
+
+            // The class's starter equipment, unlocked and equipped. The equipped slot is stored on the
+            // unlocked-item row itself (a non-null EquipmentSlotId), the same shape the player-load path reads
+            // back to populate the inventory's equipment slots.
+            player.UnlockedItems = newPlayer.Equipment
+                .Select(equipment => new EntityUnlockedItem
+                {
+                    Player = player,
+                    ItemId = equipment.ItemId,
+                    EquipmentSlotId = (int)equipment.EquipmentSlot,
                 }).ToList();
 
             player.PlayerAttributes = newPlayer.Attributes

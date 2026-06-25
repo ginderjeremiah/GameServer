@@ -10,11 +10,12 @@ namespace Game.Core.Tests.Players
     {
         private readonly NewPlayerFactory _factory = new();
 
-        /// <summary>Builds a minimal class for creation: the given starter skills and attribute distribution,
-        /// with a no-op signature passive and no starter equipment (consumed by later sub-issues).</summary>
+        /// <summary>Builds a minimal class for creation: the given starter skills, starter equipment, and
+        /// attribute distribution, with a no-op signature passive.</summary>
         private static Class CreateClass(
             int id = 0,
             IReadOnlyList<int>? starterSkillIds = null,
+            IReadOnlyList<ClassStarterEquipment>? starterEquipment = null,
             IReadOnlyList<AttributeDistribution>? attributeDistributions = null)
         {
             return new Class
@@ -22,7 +23,7 @@ namespace Game.Core.Tests.Players
                 Id = id,
                 Name = "Test Class",
                 StarterSkillIds = starterSkillIds ?? [0, 1, 2],
-                StarterEquipment = [],
+                StarterEquipment = starterEquipment ?? [],
                 AttributeDistributions = attributeDistributions ?? [],
                 SignaturePassive = new ClassSignaturePassive
                 {
@@ -72,6 +73,28 @@ namespace Game.Core.Tests.Players
 
             Assert.Equal([5, 9], newPlayer.Skills.Select(skill => skill.SkillId));
             Assert.Equal([0, 1], newPlayer.Skills.Select(skill => skill.Order));
+        }
+
+        [Fact]
+        public void Create_EquipsTheClassStarterEquipment_InAuthoredOrder()
+        {
+            var newPlayer = _factory.Create("hero", CreateClass(starterEquipment:
+            [
+                new ClassStarterEquipment { ItemId = 7, EquipmentSlot = EEquipmentSlot.WeaponSlot },
+                new ClassStarterEquipment { ItemId = 3, EquipmentSlot = EEquipmentSlot.ChestSlot },
+            ]));
+
+            Assert.Equal(
+                [(7, EEquipmentSlot.WeaponSlot), (3, EEquipmentSlot.ChestSlot)],
+                newPlayer.Equipment.Select(equipment => (equipment.ItemId, equipment.EquipmentSlot)));
+        }
+
+        [Fact]
+        public void Create_NoStarterEquipment_LeavesEquipmentEmpty()
+        {
+            var newPlayer = _factory.Create("hero", CreateClass());
+
+            Assert.Empty(newPlayer.Equipment);
         }
 
         [Fact]
