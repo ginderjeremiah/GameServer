@@ -117,9 +117,39 @@ namespace Game.Core.Battle
             Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
         {
             var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass));
+            ComposeSignaturePassive(attributes, resolveClass);
             var skills = GetBattleSkillIds(resolveItem).Select(resolveSkill);
 
             return new Battler(attributes, skills, Level);
+        }
+
+        /// <summary>
+        /// Composes the captured class's signature passive into the already-assembled <paramref name="attributes"/>
+        /// as the final contributor (spike #1126 area E). It is added <b>last</b> — after the free pool, gear,
+        /// locked base, proficiency bonuses, and the static engine modifiers — so an attribute-scaled passive reads
+        /// the fully-resolved value of its scaling attribute (the snapshot state a V1 passive sees, like a skill
+        /// effect reading its caster), and so the frontend mirror (which adds it after building the battler) lands
+        /// it in the identical place in the per-attribute apply order — floating-point addition is not associative,
+        /// so the anti-cheat replay depends on that order matching bit-for-bit. A snapshot built without class state
+        /// (a hand-built test snapshot) carries no passive; a captured <see cref="ClassId"/> requires a resolver,
+        /// failing loudly rather than silently dropping the passive (mirroring the locked-base guard in
+        /// <see cref="GetModifiers"/>).
+        /// </summary>
+        private void ComposeSignaturePassive(AttributeCollection attributes, Func<int, Class>? resolveClass)
+        {
+            if (ClassId is not int classId)
+            {
+                return;
+            }
+
+            if (resolveClass is null)
+            {
+                throw new InvalidOperationException(
+                    "A battle snapshot with a captured class requires a class resolver to compose its signature passive.");
+            }
+
+            var passive = resolveClass(classId).SignaturePassive;
+            attributes.AddModifier(passive.GetModifier(attributes.GetAttributeValue));
         }
 
         /// <summary>

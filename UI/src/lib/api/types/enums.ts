@@ -31,6 +31,7 @@ export enum EAttributeModifierSource {
 	ItemMod = 6,
 	SkillEffect = 7,
 	Proficiency = 8,
+	Class = 9,
 }
 
 export enum EAttributeType {

@@ -132,7 +132,17 @@ namespace Game.Api.Tests.Integration
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerId);
             Assert.NotNull(player);
-            return PlayerData.FromPlayer(player, []);
+            // The locked base and signature passive are class-resolved in the controller; this cache-write
+            // assertion helper doesn't exercise them, so it projects with empty/neutral placeholders.
+            var passive = new Game.Abstractions.Contracts.SignaturePassive
+            {
+                AttributeId = default,
+                Amount = 0m,
+                ScalingAttributeId = null,
+                ScalingAmount = 0m,
+                ModifierType = Game.Core.EModifierType.Additive,
+            };
+            return PlayerData.FromPlayer(player, [], passive);
         }
 
         /// <summary>

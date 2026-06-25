@@ -272,6 +272,65 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void ToBattler_ComposesFlatClassSignaturePassive()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                ClassId = 3,
+                StatAllocations = [Alloc(EAttribute.Strength, 6)],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            var passive = new ClassSignaturePassive
+            {
+                Attribute = EAttribute.Strength,
+                Amount = 4m,
+                ScalingAttribute = null,
+                ScalingAmount = 0m,
+                ModifierType = EModifierType.Additive,
+            };
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+                resolveClass: ClassResolver(MakeClassWithPassive(3, passive)));
+
+            // Strength = 6 (free pool) + 4 (flat signature passive) = 10.
+            Assert.Equal(10, battler.GetAttributeValue(EAttribute.Strength));
+        }
+
+        [Fact]
+        public void ToBattler_ComposesAttributeScaledClassSignaturePassive_OffAssembledValue()
+        {
+            // The passive scales off the fully-assembled Endurance (free pool + locked base), landing on Defense
+            // which also carries the static Endurance-derived term — pinning that the passive reads the same
+            // resolved Endurance and accumulates after the statics.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 2,
+                ClassId = 3,
+                StatAllocations = [Alloc(EAttribute.Endurance, 5)],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            var passive = new ClassSignaturePassive
+            {
+                Attribute = EAttribute.Defense,
+                Amount = 2m,
+                ScalingAttribute = EAttribute.Endurance,
+                ScalingAmount = 0.5m,
+                ModifierType = EModifierType.Additive,
+            };
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+                resolveClass: ClassResolver(MakeClassWithPassive(3, passive, Distribution(EAttribute.Endurance, 4m, amountPerLevel: 3m))));
+
+            // Endurance = 5 (free pool) + (4 + 3 × 2) locked base = 15.
+            // Defense (static 2 + 1·Endurance + 0.5·Agility) + passive (2 + 0.5 × 15 = 9.5) = 2 + 15 + 0 + 9.5 = 26.5.
+            Assert.Equal(15, battler.GetAttributeValue(EAttribute.Endurance));
+            Assert.Equal(26.5, battler.GetAttributeValue(EAttribute.Defense));
+        }
+
+        [Fact]
         public void GetModifiers_ClassCapturedButNoResolver_Throws()
         {
             var snapshot = new BattleSnapshot
@@ -630,6 +689,17 @@ namespace Game.Core.Tests.Battle
                 ScalingAmount = 0m,
                 ModifierType = EModifierType.Additive,
             },
+        };
+
+        /// <summary>A class carrying the given signature passive (and optional locked-base distributions).</summary>
+        private static CoreClass MakeClassWithPassive(int id, ClassSignaturePassive passive, params AttributeDistribution[] distributions) => new()
+        {
+            Id = id,
+            Name = $"Class {id}",
+            StarterSkillIds = [],
+            StarterEquipment = [],
+            AttributeDistributions = distributions,
+            SignaturePassive = passive,
         };
 
         private static AttributeDistribution Distribution(EAttribute attribute, decimal baseAmount, decimal amountPerLevel = 0m) =>

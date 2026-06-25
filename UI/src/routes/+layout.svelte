@@ -267,5 +267,6 @@ $effect(() => {
 	--source-item: #{colors.$source-item};
 	--source-mod: #{colors.$source-mod};
 	--source-derived: #{colors.$source-derived};
+	--source-class: #{colors.$source-class};
 }
 </style>

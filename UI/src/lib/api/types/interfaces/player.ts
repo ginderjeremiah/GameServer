@@ -5,7 +5,8 @@ import type {
 	ELogType,
 	IAttributeDistribution,
 	IBattlerAttribute,
-	IInventoryData
+	IInventoryData,
+	ISignaturePassive
 } from '../';
 
 export interface ILoginCredentials {
@@ -31,6 +32,7 @@ export interface IPlayerData {
 	logPreferences: ILogPreference[];
 	inventoryData: IInventoryData;
 	lockedBaseDistribution: IAttributeDistribution[];
+	signaturePassive: ISignaturePassive;
 }
 
 export interface IUnlockedSkill {

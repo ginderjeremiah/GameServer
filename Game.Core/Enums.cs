@@ -467,6 +467,12 @@ namespace Game.Core
         /// battle snapshot at battle start).
         /// </summary>
         Proficiency = 8,
+
+        /// <summary>
+        /// The modifier came from the player's class signature passive — the durable combat-identity bonus
+        /// (flat or attribute-scaled) composed into the battler at assembly (spike #1126 area E).
+        /// </summary>
+        Class = 9,
     }
 
     /// <summary>

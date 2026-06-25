@@ -153,6 +153,14 @@ export interface IProficiencyLevelReward {
 	rewardSkillId: number;
 }
 
+export interface ISignaturePassive {
+	attributeId: EAttribute;
+	amount: number;
+	scalingAttributeId?: EAttribute;
+	scalingAmount: number;
+	modifierType: EModifierType;
+}
+
 export interface ISkill {
 	id: number;
 	name: string;

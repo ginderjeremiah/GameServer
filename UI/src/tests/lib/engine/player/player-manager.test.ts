@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PlayerManager } from '$lib/engine/player/player-manager';
 import { logMessage } from '$lib/engine/log';
-import { EAttribute, ELogType } from '$lib/api';
+import { EAttribute, ELogType, EModifierType } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
 import { STAT_POINTS_PER_LEVEL } from '$lib/api/types/game-constants';
 
@@ -24,6 +24,12 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 		{ attributeId: EAttribute.Endurance, amount: 8 }
 	],
 	lockedBaseDistribution: [],
+	signaturePassive: {
+		attributeId: EAttribute.Strength,
+		amount: 0,
+		scalingAmount: 0,
+		modifierType: EModifierType.Additive
+	},
 	unlockedSkills: [
 		{ skillId: 0, selected: true, order: 1 },
 		{ skillId: 1, selected: true, order: 0 },

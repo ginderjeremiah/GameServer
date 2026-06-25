@@ -28,7 +28,17 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 			],
 			// The class locked-base battle modifiers — a stable reference (the real manager memoises it) the
 			// battle engine compares by identity, so reassigning it simulates a class/level change.
-			battleLockedBaseModifiers: [] as unknown[]
+			battleLockedBaseModifiers: [] as unknown[],
+			// The class signature passive modifier, resolved against the assembled battler attributes and added
+			// last at the reset seam. A flat no-op (amount 0) here so it doesn't perturb the attribute assertions.
+			// Raw numeric enum values (hoisted mock runs before imports): type 1 = EModifierType.Additive,
+			// source 9 = EAttributeModifierSource.Class — a flat additive 0 leaves every attribute untouched.
+			battleSignaturePassiveModifier: (_resolveScalingValue: (attribute: number) => number) => ({
+				attribute: 0,
+				amount: 0,
+				type: 1,
+				source: 9
+			})
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],

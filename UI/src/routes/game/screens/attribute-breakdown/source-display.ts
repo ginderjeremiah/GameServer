@@ -23,7 +23,11 @@ const SOURCE_KEY: Record<EAttributeModifierSource, string> = {
 	[EAttributeModifierSource.SkillEffect]: 'derived',
 	// Proficiency is a permanent progression bonus; it is not yet surfaced in the player breakdown (that
 	// lands with the proficiency client work), so it falls back to the stat-points hue until then.
-	[EAttributeModifierSource.Proficiency]: 'points'
+	[EAttributeModifierSource.Proficiency]: 'points',
+	// Class is the signature-passive bonus composed at battler assembly (#1126 area E); like the locked base
+	// and proficiency bonuses it is not yet surfaced in the player breakdown, so it gets its own hue ready for
+	// when those battle-assembly modifiers are wired in (follow-up).
+	[EAttributeModifierSource.Class]: 'class'
 };
 
 const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
@@ -34,7 +38,8 @@ const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
 	[EAttributeModifierSource.Derived]: 'Derived',
 	[EAttributeModifierSource.AttributeDistribution]: 'Distribution',
 	[EAttributeModifierSource.SkillEffect]: 'Skill effect',
-	[EAttributeModifierSource.Proficiency]: 'Proficiency'
+	[EAttributeModifierSource.Proficiency]: 'Proficiency',
+	[EAttributeModifierSource.Class]: 'Class'
 };
 
 /** Themeable source accent hue, e.g. `var(--source-points)`. */
