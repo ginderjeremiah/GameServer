@@ -40,7 +40,8 @@ const SETS = [
 	'challenges',
 	'challengeTypes',
 	'statisticTypes',
-	'proficiencies'
+	'proficiencies',
+	'paths'
 ];
 
 const COMMANDS = [
@@ -53,7 +54,8 @@ const COMMANDS = [
 	'GetChallenges',
 	'GetChallengeTypes',
 	'GetStatisticTypes',
-	'GetProficiencies'
+	'GetProficiencies',
+	'GetPaths'
 ];
 
 /** Builds the GetReferenceDataVersions payload, defaulting every set to "v1". */

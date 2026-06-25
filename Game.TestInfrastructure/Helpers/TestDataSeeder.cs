@@ -465,7 +465,10 @@ namespace Game.TestInfrastructure.Helpers
             int? pathId = null,
             int pathOrdinal = 0,
             bool startsUnlocked = true,
-            int? seedSkillId = null)
+            int? seedSkillId = null,
+            string word = "",
+            string pronunciation = "",
+            string translation = "")
         {
             pathId ??= (await CreatePathAsync(context)).Id;
 
@@ -474,6 +477,9 @@ namespace Game.TestInfrastructure.Helpers
                 Name = name,
                 Description = "",
                 IconPath = "",
+                Word = word,
+                Pronunciation = pronunciation,
+                Translation = translation,
                 PathId = pathId.Value,
                 PathOrdinal = pathOrdinal,
                 MaxLevel = maxLevel,

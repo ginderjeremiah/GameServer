@@ -9,15 +9,22 @@ namespace Game.Api.Middleware
     /// the user's last-connection timestamp. Runs after <see cref="SessionLoaderMiddleware"/> so the
     /// request's user identity is available. Recording is keyed on the device fingerprint the frontend
     /// sends as a header, so a request without one (e.g. a WebSocket handshake, which cannot set custom
-    /// headers) is skipped. Tracking is best-effort: any failure is logged and swallowed so it never
-    /// affects the response.
+    /// headers) is skipped.
+    /// <para>
+    /// Tracking is best-effort and <b>structurally isolated</b>: it runs on its own DI scope (its own
+    /// <c>GameContext</c>) and self-commits there, so a tracking save failure — which the swallow below
+    /// hides — can neither ride along on nor break the request's own unit of work (the per-action
+    /// <see cref="Filters.CommitFilter"/> commits a different context). Any failure is logged and
+    /// swallowed so it never affects the response, and the scope is disposed regardless of how the save
+    /// ended, discarding anything it queued.
+    /// </para>
     /// </summary>
     public class LoginTrackingMiddleware(RequestDelegate next, ILogger<LoginTrackingMiddleware> logger)
     {
         private readonly RequestDelegate _next = next;
         private readonly ILogger<LoginTrackingMiddleware> _logger = logger;
 
-        public async Task InvokeAsync(HttpContext context, SessionService sessionService, LoginTrackingService trackingService)
+        public async Task InvokeAsync(HttpContext context, SessionService sessionService, IServiceScopeFactory scopeFactory)
         {
             var fingerprint = ClientHints.DeviceFingerprint(context.Request.Headers);
             if (sessionService.Authenticated && fingerprint is not null)
@@ -25,6 +32,12 @@ namespace Game.Api.Middleware
                 try
                 {
                     var hints = ClientHints.FromHeaders(context.Request.Headers);
+                    // Resolve tracking from a dedicated scope so its GameContext is independent of the
+                    // request's. RecordConnection self-commits; sharing the request context would let a
+                    // non-unique save failure leave queued inserts that the later per-request commit
+                    // re-flushes (or breaks on). The scope is disposed here whatever the outcome.
+                    await using var scope = scopeFactory.CreateAsyncScope();
+                    var trackingService = scope.ServiceProvider.GetRequiredService<LoginTrackingService>();
                     await trackingService.RecordConnection(
                         sessionService.UserId,
                         ClientIp.Resolve(context),

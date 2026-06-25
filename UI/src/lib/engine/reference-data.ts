@@ -121,6 +121,13 @@ export const REFERENCE_DATA: RefDataSource[] = [
 		'GetProficiencies',
 		() => staticData.proficiencies,
 		(d) => (staticData.proficiencies = d)
+	),
+	refSource(
+		'paths',
+		'Paths',
+		'GetPaths',
+		() => staticData.paths,
+		(d) => (staticData.paths = d)
 	)
 ];
 

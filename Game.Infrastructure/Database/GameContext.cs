@@ -502,6 +502,15 @@ namespace Game.Infrastructure.Database
                 entity.Property(p => p.IconPath)
                     .HasMaxLength(50);
 
+                entity.Property(p => p.Word)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.Pronunciation)
+                    .HasMaxLength(50);
+
+                entity.Property(p => p.Translation)
+                    .HasMaxLength(100);
+
                 entity.Property(p => p.BaseXp)
                     .HasPrecision(18, 3);
 

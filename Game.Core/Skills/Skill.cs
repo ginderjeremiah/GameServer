@@ -19,9 +19,10 @@
         public required int CooldownMs { get; init; }
 
         /// <summary>
-        /// The skill's rarity tier. Authoring/display metadata today (the battle never reads it), but a
-        /// reserved logic hook: it is the tier weight the proficiency XP accrual reads by id at battle
-        /// completion (#982/#1123). See <see cref="Items.Item.Rarity"/> for the shared convention.
+        /// The skill's rarity tier. The battle simulation never reads it, but the proficiency XP accrual does:
+        /// at battle completion it maps the rarity to a tier weight (<see cref="Proficiencies.ProficiencyTierWeight"/>,
+        /// #982/#1123) so a rarer fired skill pulls a larger share of the pie. See
+        /// <see cref="Items.Item.Rarity"/> for the shared convention.
         /// </summary>
         public required ERarity Rarity { get; init; }
 

@@ -18,7 +18,7 @@
 	</TooltipSection>
 
 	<TooltipSection label="Tempo" last={effectLines.length === 0}>
-		<TempoMetrics cooldown={adjustedCd} dps={total / adjustedCd} />
+		<TempoMetrics cooldown={adjustedCd} dps={damagePerSecond(total, adjustedCd)} />
 	</TooltipSection>
 
 	{#if effectLines.length > 0}
@@ -31,7 +31,14 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { applyDefense, expectedCritMultiplier, scaledEffectAmount, skillContributions, type Skill } from '$lib/battle';
-import { attributeIsHarmful, attributeName, describeEffect, formatAttributeValue, rarityColor } from '$lib/common';
+import {
+	attributeIsHarmful,
+	attributeName,
+	damagePerSecond,
+	describeEffect,
+	formatAttributeValue,
+	rarityColor
+} from '$lib/common';
 import { battleEngine } from '$lib/engine';
 import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
@@ -41,6 +48,7 @@ import CooldownPill from './skill-tooltip/CooldownPill.svelte';
 import DamageBreakdown from './skill-tooltip/DamageBreakdown.svelte';
 import EffectLines from './skill-tooltip/EffectLines.svelte';
 import TempoMetrics from './skill-tooltip/TempoMetrics.svelte';
+import { cooldownReadout } from './skill-cooldown';
 
 export const getBaseNode = () => container;
 
@@ -89,11 +97,12 @@ const crit = $derived(
 );
 const total = $derived(applyDefense(totalDamage + critBonus, enemyDefense));
 const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);
-const adjustedCd = $derived((skill?.cooldownMs ?? 0) / 1000 / cdMultiplier);
-const remainingCd = $derived(Math.max(adjustedCd - (skill?.renderChargeTime ?? 0) / 1000 / cdMultiplier, 0));
-const isReady = $derived(remainingCd <= 0.01);
-const cooldownProgress = $derived(isReady ? 100 : Math.max(0, ((adjustedCd - remainingCd) / adjustedCd) * 100));
-const remainingCdFormatted = $derived(remainingCd.toFixed(2));
+// Pure readout guards a zero/non-positive cooldown (an always-ready skill) against NaN/Infinity.
+const cooldown = $derived(cooldownReadout(skill?.cooldownMs ?? 0, skill?.renderChargeTime ?? 0, cdMultiplier));
+const adjustedCd = $derived(cooldown.adjustedCd);
+const isReady = $derived(cooldown.isReady);
+const cooldownProgress = $derived(cooldown.progress);
+const remainingCdFormatted = $derived(cooldown.remainingCd.toFixed(2));
 
 // Show each effect's magnitude resolved against the caster's (owner's) attributes, so a scaling effect
 // reads like the damage total does — the number the skill would actually apply right now.
