@@ -913,6 +913,20 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
+	// The SAME skill selected twice is de-duplicated WITHIN the selected loadout (first wins): the player
+	// fields it once (22−2 = 20/hit, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50 → 2000ms.
+	// (Without intra-selected dedupe the two copies — 40/tick — would kill on hit 3 at 1200ms.) Pins that the
+	// frontend mirrors the backend's single Distinct() over the full loadout, not just granted-vs-selected.
+	{
+		name: 'duplicateSelectedSkill',
+		player: () => {
+			const skill = granted.register(makeSkill(22, 400));
+			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [skill, skill], []);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
+	},
+
 	// A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a skill whose
 	// self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw less 2 Def deals
 	// 8,18,28,38,48,58 (Str climbing 10→60); cumulative 8,26,54,92,140,198 drops the 150-HP enemy on fire 6 at
