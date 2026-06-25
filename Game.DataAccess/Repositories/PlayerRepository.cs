@@ -87,8 +87,19 @@ namespace Game.DataAccess.Repositories
             // Dispatching the player's events buffers each one into the scoped PlayerUpdateBatch (via
             // PlayerPersistencePublisher) rather than publishing it individually; flushing the whole batch
             // here as a single multi-value LPUSH collapses a multi-event save into one queue round-trip (#559).
-            await _dispatcher.DispatchAsync(player, cancellationToken);
+            // The dispatch runs inside a player-save window so a progress save it triggers (the live
+            // battle-completion path: BattleCompletedEvent -> BattleStatisticsEventHandler -> progress save)
+            // joins this batch instead of issuing its own round-trip, collapsing the player and progress
+            // writes onto this one flush (#1237).
+            using (_updateBatch.BeginPlayerSave())
+            {
+                await _dispatcher.DispatchAsync(player, cancellationToken);
+            }
             await _pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _updateBatch.Drain(), cancellationToken);
+
+            // Run any deferred cache advances a batched progress save registered, now that the flush above has
+            // enqueued their events — keeping progress's publish-before-cache ordering across the shared batch.
+            _updateBatch.RunFlushedCallbacks();
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 

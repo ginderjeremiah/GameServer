@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
 using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Enemies;
@@ -152,6 +153,49 @@ namespace Game.Application.Tests.DataAccess
                 var kills = Assert.Single(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
                 Assert.Equal(1m, kills.Value);
             }
+        }
+
+        [Fact]
+        public async Task Save_DuringAPlayerSave_DefersToTheSharedBatchFlush_InsteadOfItsOwnRoundTrip()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+            Assert.Equal(0, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            using var scope = CreateScope();
+            // The repo and the batch are resolved from the same scope, so they share the one scoped instance —
+            // exactly as PlayerRepository and PlayerProgressRepository do within a socket command.
+            var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var batch = scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+
+            var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []);
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            // A progress save raised within a player save (the live battle-completion path) must NOT publish on
+            // its own — it buffers into the shared batch so the player save's single flush carries it (#1237).
+            using (batch.BeginPlayerSave())
+            {
+                await repo.Save(progress);
+            }
+            Assert.Equal(0, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            // The player save then flushes the shared batch once and runs the deferred cache advance — the event
+            // reaches the queue (collapsed onto that single flush) and the cache serves the snapshot afterwards.
+            await pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, batch.Drain());
+            batch.RunFlushedCallbacks();
+
+            Assert.Equal(1, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+            var evt = await DequeueProgressEvent(redis);
+            Assert.Equal(playerId, evt.PlayerId);
+            Assert.Contains(evt.Statistics, s => s.StatisticTypeId == (int)EStatisticType.EnemiesKilled && s.EntityId == null);
+
+            using var readScope = CreateScope();
+            var readRepo = readScope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var stats = await readRepo.GetStatistics(playerId);
+            Assert.Contains(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null && s.Value == 1m);
         }
 
         [Fact]

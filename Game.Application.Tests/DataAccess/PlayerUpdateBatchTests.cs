@@ -41,5 +41,46 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.Empty(batch.Drain());
         }
+
+        [Fact]
+        public void PlayerSaveInProgress_IsFalseUntilBegun_AndResetOnScopeDisposal()
+        {
+            var batch = new PlayerUpdateBatch();
+            Assert.False(batch.PlayerSaveInProgress);
+
+            // A progress save raised within this window joins the player save's flush rather than publishing
+            // on its own; disposing the scope (SavePlayer's dispatch having settled) ends the window.
+            using (batch.BeginPlayerSave())
+            {
+                Assert.True(batch.PlayerSaveInProgress);
+            }
+
+            Assert.False(batch.PlayerSaveInProgress);
+        }
+
+        [Fact]
+        public void RunFlushedCallbacks_RunsRegisteredActionsInOrder_ThenClearsThem()
+        {
+            var batch = new PlayerUpdateBatch();
+            var ran = new List<string>();
+            batch.OnFlushed(() => ran.Add("first"));
+            batch.OnFlushed(() => ran.Add("second"));
+
+            batch.RunFlushedCallbacks();
+            Assert.Equal(["first", "second"], ran);
+
+            // A second flush in the same scope must not re-run the first flush's deferred cache advances.
+            batch.RunFlushedCallbacks();
+            Assert.Equal(["first", "second"], ran);
+        }
+
+        [Fact]
+        public void RunFlushedCallbacks_WithNoneRegistered_IsNoOp()
+        {
+            var batch = new PlayerUpdateBatch();
+
+            // No deferred callbacks (e.g. a plain player save with no nested progress save) — must not throw.
+            batch.RunFlushedCallbacks();
+        }
     }
 }
