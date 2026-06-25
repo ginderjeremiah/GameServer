@@ -20,6 +20,10 @@ namespace Game.Core.Players
         public required int StatPointsGained { get; init; }
         public required int StatPointsUsed { get; init; }
         public required IReadOnlyList<NewPlayerSkill> Skills { get; init; }
+
+        /// <summary>The items the player starts with unlocked and equipped (from the class kit).</summary>
+        public required IReadOnlyList<NewPlayerEquipment> Equipment { get; init; }
+
         public required IReadOnlyList<StatAllocation> Attributes { get; init; }
         public required IReadOnlyList<LogPreference> LogPreferences { get; init; }
     }

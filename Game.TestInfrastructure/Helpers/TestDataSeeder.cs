@@ -103,15 +103,18 @@ namespace Game.TestInfrastructure.Helpers
             GameContext context,
             string name = "Test Item",
             EAttribute attributeId = EAttribute.Strength,
-            decimal attributeAmount = 5m)
+            decimal attributeAmount = 5m,
+            EItemCategory category = EItemCategory.Weapon,
+            int? grantedSkillId = null)
         {
             var item = new Item
             {
                 Name = name,
                 Description = "",
-                ItemCategoryId = (int)EItemCategory.Weapon,
+                ItemCategoryId = (int)category,
                 RarityId = (int)ERarity.Common,
                 IconPath = "",
+                GrantedSkillId = grantedSkillId,
             };
 
             context.Items.Add(item);
@@ -435,20 +438,33 @@ namespace Game.TestInfrastructure.Helpers
             return @class;
         }
 
-        /// <summary>Seeds a class with a kit: the given starter skills and an optional attribute distribution
-        /// (each <c>{ Attribute, BaseAmount, AmountPerLevel }</c>). The referenced skills must already exist.</summary>
+        /// <summary>Seeds a class with a kit: the given starter skills, optional starter equipment (each
+        /// <c>{ ItemId, EquipmentSlot }</c>, equipped at creation), and an optional attribute distribution
+        /// (each <c>{ Attribute, BaseAmount, AmountPerLevel }</c>). The referenced skills/items must already
+        /// exist.</summary>
         public static async Task<Class> CreateClassWithKitAsync(
             GameContext context,
             IReadOnlyList<int> starterSkillIds,
             IReadOnlyList<(EAttribute Attribute, decimal BaseAmount, decimal AmountPerLevel)>? attributeDistributions = null,
             string name = "Test Class",
-            DateTime? retiredAt = null)
+            DateTime? retiredAt = null,
+            IReadOnlyList<(int ItemId, EEquipmentSlot Slot)>? starterEquipment = null)
         {
             var @class = await CreateClassAsync(context, name: name, retiredAt: retiredAt);
 
             foreach (var skillId in starterSkillIds)
             {
                 context.ClassStarterSkills.Add(new ClassStarterSkill { ClassId = @class.Id, SkillId = skillId });
+            }
+
+            foreach (var (itemId, slot) in starterEquipment ?? [])
+            {
+                context.ClassStarterEquipment.Add(new ClassStarterEquipment
+                {
+                    ClassId = @class.Id,
+                    ItemId = itemId,
+                    EquipmentSlotId = (int)slot,
+                });
             }
 
             foreach (var (attribute, baseAmount, amountPerLevel) in attributeDistributions ?? [])

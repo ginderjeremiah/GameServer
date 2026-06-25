@@ -4,6 +4,7 @@ using Game.Infrastructure.Entities;
 using Game.Application.Auth;
 using Game.Application.Services;
 using Game.Core;
+using Game.Core.Battle;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -88,6 +89,59 @@ namespace Game.Application.Tests.Services
             Assert.True(logPreferencesByType[(int)ELogType.EnemyDefeated]);
             Assert.True(logPreferencesByType[(int)ELogType.SkillEffect]);
             Assert.True(logPreferencesByType[(int)ELogType.Proficiency]);
+        }
+
+        [Fact]
+        public async Task CreateAccount_ClassWithStarterEquipment_UnlocksAndEquipsItWithItsGrantedSkillActive()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A class whose kit includes a weapon carrying an innate (granted) skill, equipped at creation —
+            // the one net-new mechanism of #1222 (new players carried no inventory before).
+            var starterSkills = new[]
+            {
+                (await TestDataSeeder.CreateSkillAsync(context, "Starter0")).Id,
+                (await TestDataSeeder.CreateSkillAsync(context, "Starter1")).Id,
+                (await TestDataSeeder.CreateSkillAsync(context, "Starter2")).Id,
+            };
+            // The weapon's innate skill is Item-acquirable and additive to the selected loadout (#980).
+            var grantedSkill = await TestDataSeeder.CreateSkillAsync(context, "Fireball", acquisition: ESkillAcquisition.Item);
+            var weapon = await TestDataSeeder.CreateItemAsync(
+                context, "Staff", category: EItemCategory.Weapon, grantedSkillId: grantedSkill.Id);
+            var chosenClass = await TestDataSeeder.CreateClassWithKitAsync(
+                context,
+                starterSkillIds: starterSkills,
+                starterEquipment: [(weapon.Id, EEquipmentSlot.WeaponSlot)]);
+            await ReloadReferenceCachesAsync();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var status = await accountService.CreateAccount("equipped", "pass", chosenClass.Id);
+            Assert.Equal(CreateAccountStatus.Success, status);
+
+            // Re-read the persisted player through the canonical load path on a fresh scope (the cache-flush
+            // equivalent), so the equipment graph is asserted as it round-trips, not just as it was written.
+            using var verifyScope = CreateScope();
+            var verifyProvider = verifyScope.ServiceProvider;
+            var verifyContext = verifyProvider.GetRequiredService<GameContext>();
+            var playerId = await verifyContext.Players
+                .Where(p => p.Name == "equipped")
+                .Select(p => p.Id)
+                .SingleAsync(CancellationToken);
+
+            var player = await verifyProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerId, CancellationToken);
+            Assert.NotNull(player);
+
+            // The weapon is unlocked and equipped in its slot.
+            Assert.NotNull(player.Inventory.GetUnlockedItem(weapon.Id));
+            var weaponSlot = player.Inventory.EquipmentSlots.Single(slot => slot.Value == EEquipmentSlot.WeaponSlot);
+            Assert.Equal(weapon.Id, weaponSlot.ItemId);
+
+            // The weapon's innate skill comes online in the assembled battler, additive to the starter skills.
+            var items = verifyProvider.GetRequiredService<IItems>();
+            var battleSkillIds = BattleSnapshot.FromPlayer(player).GetBattleSkillIds(items.GetItem).ToList();
+            Assert.Contains(grantedSkill.Id, battleSkillIds);
+            Assert.Equal(starterSkills, battleSkillIds.Where(id => starterSkills.Contains(id)));
         }
 
         [Fact]
