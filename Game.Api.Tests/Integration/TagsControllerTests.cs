@@ -36,6 +36,10 @@ namespace Game.Api.Tests.Integration
                 await TestDataSeeder.CreateTagAsync(context, tagName, ETagCategory.Accessory);
             }
 
+            // CreatePlayerAsync seeds the player's class directly; reload the reference caches so SelectPlayer
+            // can resolve it when projecting the player's locked-base fingerprint (#1223).
+            await ReloadReferenceCachesAsync();
+
             var (client, _) = await LoginAndBuildClientAsync(Username, Password);
             return client;
         }

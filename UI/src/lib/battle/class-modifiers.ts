@@ -16,9 +16,11 @@ export interface ClassAttributeDistribution {
  *  amountPerLevel × level` additively, the exact mirror of the backend's
  *  `AttributeDistribution.GetDistributionModifier` (and the same math an enemy's distribution uses), so the
  *  locked base composes into a battler's attributes identically on both sides — a frontend↔backend parity
- *  surface the class system adds (spike #1126 area D). The produced modifiers are fed into the player battler
- *  at assembly — alongside the proficiency bonuses, before the static engine modifiers — once the class
- *  reference data and the player's class id reach the client (#1225). */
+ *  surface the class system adds (spike #1126 area D). The arithmetic is done in IEEE-754 double here **and on
+ *  the backend** (which casts each `decimal` operand to double before the add/multiply, rather than computing
+ *  in decimal then casting), so a fractional `amountPerLevel`/`baseAmount` stays bit-exact across the boundary
+ *  — the anti-cheat replay compares with no tolerance. The produced modifiers are fed into the player battler
+ *  at assembly, alongside the proficiency bonuses and before the static engine modifiers. */
 export function classLockedBaseModifiers(
 	distributions: readonly ClassAttributeDistribution[],
 	level: number

@@ -23,11 +23,12 @@ vi.mock('$stores', () => ({
 // static engine modifiers), since floating-point addition is not associative.
 //
 // The values are asserted bit-exactly (toBe / Assert.Equal without tolerance): this is an anti-cheat parity
-// surface, so the two simulators must agree to the last bit. The leveled scenarios use integer base/perLevel so
-// the backend's decimal `BaseAmount + AmountPerLevel × level` and the frontend's double arithmetic agree
-// exactly; the `maxHealthDerivedAdditive` scenario lands an additive on a derived attribute (MaxHealth, which
-// carries a static additive base) with a fractional base (perLevel 0, so no arithmetic divergence) to pin the
-// additive accumulation order of the locked base relative to the static modifiers.
+// surface, so the two simulators must agree to the last bit. The backend's `AttributeDistribution.GetDistributionModifier`
+// does the `BaseAmount + AmountPerLevel × level` arithmetic in double (not decimal-then-cast), matching this
+// module, so a fractional per-level value stays exact — the `fractionalPerLevel` scenario pins the case
+// (perLevel 0.1, level 3) decimal-then-cast would have diverged on (0.3 vs the double 0.30000000000000004).
+// The `maxHealthDerivedAdditive` scenario lands an additive on a derived attribute (MaxHealth, which carries a
+// static additive base) to pin the additive accumulation order of the locked base relative to the statics.
 describe('class locked base (parity)', () => {
 	type Allocation = [EAttribute, number];
 	// [attribute, baseAmount, amountPerLevel]
@@ -46,6 +47,16 @@ describe('class locked base (parity)', () => {
 			distributions: [[EAttribute.Strength, 10, 2]],
 			level: 5,
 			expected: [[EAttribute.Strength, 20]]
+		},
+
+		// Fractional per-level: Strength = 0 + (0 + 0.1 × 3) = 0.30000000000000004 (double). The backend's old
+		// decimal-then-cast path produced 0.3, which would have flagged the replay; both sides now share double
+		// arithmetic, so a fractional distribution is exact.
+		fractionalPerLevel: {
+			allocations: [],
+			distributions: [[EAttribute.Strength, 0, 0.1]],
+			level: 3,
+			expected: [[EAttribute.Strength, 0.30000000000000004]]
 		},
 
 		// Locked base composes additively with the free-pool allocation. Endurance = 5 (alloc) + (4 + 3 × 2) = 15.

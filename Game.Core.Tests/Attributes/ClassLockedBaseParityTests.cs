@@ -22,9 +22,11 @@ namespace Game.Core.Tests.Attributes
     /// </para>
     /// <para>
     /// Values are asserted <b>bit-exactly</b> (no tolerance): this is an anti-cheat parity surface, so the two
-    /// simulators must agree to the last bit. The leveled scenarios use integer base/per-level so the backend's
-    /// decimal arithmetic and the frontend's double arithmetic agree exactly; the fractional MaxHealth term uses
-    /// a zero per-level so the per-level multiplication introduces no decimal-vs-double divergence.
+    /// simulators must agree to the last bit. <see cref="AttributeDistribution.GetDistributionModifier"/> does
+    /// the <c>BaseAmount + AmountPerLevel × level</c> arithmetic in <see cref="double"/> (not decimal-then-cast),
+    /// matching the frontend, so a fractional per-level value stays exact — the <c>fractionalPerLevel</c>
+    /// scenario pins exactly the case (per-level <c>0.1</c>, level <c>3</c>) that decimal-then-cast would have
+    /// diverged on (<c>0.3</c> vs the double <c>0.30000000000000004</c>).
     /// </para>
     /// </summary>
     public class ClassLockedBaseParityTests
@@ -52,6 +54,15 @@ namespace Game.Core.Tests.Attributes
                     Distributions: [new DistributionSpec(EAttribute.Strength, 10m, 2m)],
                     Level: 5,
                     Expected: [(EAttribute.Strength, 20)]),
+
+                // Fractional per-level: Strength = 0 + (0 + 0.1 × 3). In double this is 0.30000000000000004;
+                // the old decimal-then-cast path produced (double)0.3m = 0.3, which would have flagged the
+                // replay. Pins that both sides now share double arithmetic so a fractional distribution is exact.
+                ["fractionalPerLevel"] = new Scenario(
+                    Allocations: [],
+                    Distributions: [new DistributionSpec(EAttribute.Strength, 0m, 0.1m)],
+                    Level: 3,
+                    Expected: [(EAttribute.Strength, 0.30000000000000004)]),
 
                 // Locked base composes additively with the free-pool allocation.
                 // Endurance = 5 (alloc) + (4 + 3 × 2) = 15.

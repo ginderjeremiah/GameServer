@@ -41,10 +41,16 @@ namespace Game.Api.Controllers
 
         // Projects the player to its wire DTO, resolving its class's attribute distributions (the locked-base
         // fingerprint #1126 area D) so the client battler composes the same locked base the backend snapshot
-        // does. An unresolvable class yields an empty fingerprint rather than throwing — the player still loads.
+        // does. A player's ClassId is validated at creation, so an unresolvable class here is a corrupt cache,
+        // not a bad request — fail loudly (matching BattleService.ResolveClass and AccountService's creatable-
+        // class resolve) rather than serving an empty fingerprint, which would load fine but 500 every battle.
         private PlayerData BuildPlayerData(Player player)
         {
-            var lockedBaseDistribution = (_classes.GetClass(player.ClassId)?.AttributeDistributions ?? [])
+            var @class = _classes.GetClass(player.ClassId)
+                ?? throw new InvalidOperationException(
+                    $"Class {player.ClassId} for player {player.Id} could not be resolved from the catalogue.");
+
+            var lockedBaseDistribution = @class.AttributeDistributions
                 .Select(distribution => new AttributeDistribution
                 {
                     AttributeId = distribution.AttributeId,
