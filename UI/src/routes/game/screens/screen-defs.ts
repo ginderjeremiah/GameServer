@@ -6,6 +6,7 @@ import Challenges from './challenges/Challenges.svelte';
 import Inventory from './inventory/Inventory.svelte';
 import Skills from './skills/Skills.svelte';
 import Attributes from './attributes/Attributes.svelte';
+import Proficiencies from './proficiencies/Proficiencies.svelte';
 import AttributeBreakdown from './attribute-breakdown/AttributeBreakdown.svelte';
 import Statistics from './stats/Statistics.svelte';
 import Codex from './codex/Codex.svelte';
@@ -42,6 +43,7 @@ export const GAME_SCREENS: ScreenDef[] = [
 	{ key: 'inventory', label: 'Inventory', group: 'character', built: true, component: Inventory },
 	{ key: 'skills', label: 'Skills', group: 'character', built: true, component: Skills },
 	{ key: 'attributes', label: 'Attributes', group: 'character', built: true, component: Attributes },
+	{ key: 'proficiencies', label: 'Proficiencies', group: 'character', built: true, component: Proficiencies },
 	{
 		key: 'attributeBreakdown',
 		label: 'Attribute Breakdown',
