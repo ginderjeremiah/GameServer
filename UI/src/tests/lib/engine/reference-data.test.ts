@@ -245,63 +245,6 @@ describe('cacheSet', () => {
 	});
 });
 
-describe('loadClassPickerData', () => {
-	// The picker sets — the class catalogue plus the reference sets its kit preview resolves names from.
-	const PICKER_SETS = ['classes', 'skills', 'items', 'attributes'];
-
-	it('hydrates every picker set from a current cache without downloading', async () => {
-		readReferenceCache.mockImplementation((key: string) => ({ version: 'v1', data: [`cached-${key}`] }));
-		const { loadClassPickerData } = await loadModule();
-
-		await loadClassPickerData();
-
-		// Only the version check went over the socket; each picker set came from the cache.
-		expect(sendSocketCommand).toHaveBeenCalledTimes(1);
-		expect(sendSocketCommand).toHaveBeenCalledWith('GetReferenceDataVersions');
-		for (const k of PICKER_SETS) {
-			expect(staticData[k]).toEqual([`cached-${k}`]);
-		}
-	});
-
-	it('fetches and caches only the picker sets, leaving other sets untouched', async () => {
-		sendSocketCommand.mockImplementation((command: string) => {
-			if (command === 'GetReferenceDataVersions') {
-				return Promise.resolve(versionsResponse());
-			}
-			return Promise.resolve({ data: [`fetched-${command}`] });
-		});
-		const { loadClassPickerData } = await loadModule();
-
-		await loadClassPickerData();
-
-		expect(staticData.classes).toEqual(['fetched-GetClasses']);
-		expect(staticData.skills).toEqual(['fetched-GetSkills']);
-		expect(staticData.items).toEqual(['fetched-GetItems']);
-		expect(staticData.attributes).toEqual(['fetched-GetAttributes']);
-		// A non-picker set (zones) is never loaded by the picker path.
-		expect(staticData.zones).toBeUndefined();
-		// Each freshly-fetched picker set is written back to the cache for the later loading screen.
-		expect(writeReferenceCache).toHaveBeenCalledWith('classes', 'v1', ['fetched-GetClasses']);
-		expect(writeReferenceCache).toHaveBeenCalledWith('skills', 'v1', ['fetched-GetSkills']);
-	});
-
-	it('skips a picker set already present in memory', async () => {
-		staticData.classes = ['in-memory'];
-		sendSocketCommand.mockImplementation((command: string) => {
-			if (command === 'GetReferenceDataVersions') {
-				return Promise.resolve(versionsResponse());
-			}
-			return Promise.resolve({ data: [`fetched-${command}`] });
-		});
-		const { loadClassPickerData } = await loadModule();
-
-		await loadClassPickerData();
-
-		expect(staticData.classes).toEqual(['in-memory']);
-		expect(sendSocketCommand).not.toHaveBeenCalledWith('GetClasses');
-	});
-});
-
 describe('dedupedFetch', () => {
 	it('shares a single in-flight promise for the same key', async () => {
 		const { dedupedFetch } = await loadModule();

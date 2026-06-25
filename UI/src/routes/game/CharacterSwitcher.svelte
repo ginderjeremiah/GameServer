@@ -87,7 +87,9 @@ const switchPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 };
 
 const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId });
+	// In-game the class catalogue is loaded, so the picker is active and supplies a classId; the `?? 0`
+	// is a defensive fallback for the (not-expected) case where it hasn't.
+	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId: classId ?? 0 });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}

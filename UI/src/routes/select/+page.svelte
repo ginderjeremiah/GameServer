@@ -17,7 +17,6 @@ import { resolve } from '$app/paths';
 import { ApiRequest, getRefreshToken, logout, reportDeviceInfo, setTokens } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
 import { playerManager } from '$lib/engine';
-import { loadClassPickerData } from '$lib/engine/reference-data';
 import { confirmSessionTakeover } from '../login/session-takeover';
 import PlayerSelectPanel from './PlayerSelectPanel.svelte';
 import { PlayerSelectView, type PlayerSelectDeps } from './player-select-view.svelte';
@@ -43,7 +42,11 @@ const selectPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 };
 
 const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId });
+	// The login→select flow runs on a pre-selection token, so the socket (and the reference data it
+	// serves, incl. the class catalogue) isn't available here — the class picker can't be populated
+	// before a player is selected. Until that pre-selection class delivery is designed (#1256), the
+	// picker stays inert on this screen and creation falls back to the placeholder class.
+	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId: classId ?? 0 });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}
@@ -75,11 +78,6 @@ onMount(() => {
 		{ selectPlayer, createPlayer, confirmTakeover: confirmSessionTakeover, enterWorld },
 		summaries
 	);
-
-	// Character creation happens here, ahead of the main loading screen, so pull the class catalogue
-	// (and the skills/items the kit preview names) now. Fire-and-forget: the picker reacts to the
-	// static store as the sets arrive, and a failure just leaves it showing "No classes available".
-	void loadClassPickerData();
 });
 </script>
 

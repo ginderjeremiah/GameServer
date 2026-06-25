@@ -19,9 +19,10 @@ export interface PlayerSelectDeps {
 	/** Binds the session to the chosen character (rotating the token) and loads it; resolves the
 	 *  player on success or a surfaced error message on failure. */
 	selectPlayer: (playerId: number) => Promise<SelectResult>;
-	/** Creates a new character of the chosen class on the account; resolves its summary or a surfaced
-	 *  error message. */
-	createPlayer: (name: string, classId: number) => Promise<CreateResult>;
+	/** Creates a new character on the account, of the chosen class when the picker is active (the host
+	 *  coerces a null class to its placeholder where the catalogue isn't available — see the select
+	 *  screen). Resolves its summary or a surfaced error message. */
+	createPlayer: (name: string, classId: number | null) => Promise<CreateResult>;
 	/** Confirms the active-session takeover after selection (a per-player presence check). Returns
 	 *  true to proceed into the game, false when the player declined. */
 	confirmTakeover: () => Promise<boolean>;
@@ -121,10 +122,6 @@ export class PlayerSelectView {
 		const validation = this.nameValidation;
 		if (!validation.ok) {
 			this.createError = validation.msg;
-			return;
-		}
-		if (this.selectedClassId == null) {
-			this.createError = 'Choose a class for your character.';
 			return;
 		}
 

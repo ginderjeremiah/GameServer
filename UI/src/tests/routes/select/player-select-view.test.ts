@@ -102,16 +102,15 @@ describe('PlayerSelectView — create', () => {
 		expect(view.createError).toBeTruthy();
 	});
 
-	it('rejects creation when no class is selected, without calling the backend', async () => {
+	it('creates with a null class when the picker is inactive (host coerces to its placeholder)', async () => {
 		const deps = makeDeps();
 		const view = new PlayerSelectView(deps, [summary(1)]);
 		view.newName = 'NewHero';
-		// selectedClassId stays null (no class chosen).
+		// selectedClassId stays null — e.g. the pre-selection select screen, where the picker is hidden.
 
 		await view.create();
 
-		expect(deps.createPlayer).not.toHaveBeenCalled();
-		expect(view.createError).toBeTruthy();
+		expect(deps.createPlayer).toHaveBeenCalledWith('NewHero', null);
 	});
 
 	it('selectClass records the choice and clears a prior create error', () => {

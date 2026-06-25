@@ -33,29 +33,10 @@ vi.mock('$lib/api', async (importOriginal) => ({
 	logout: vi.fn()
 }));
 vi.mock('$lib/engine', () => ({ playerManager: { initialize: initializeMock } }));
-// The class picker's reference load is exercised in reference-data.test.ts; stub it here so the page
-// renders without real socket I/O.
-vi.mock('$lib/engine/reference-data', () => ({ loadClassPickerData: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('$routes/login/session-takeover', () => ({ confirmSessionTakeover: confirmTakeoverMock }));
 vi.mock('$routes/select/player-select-handoff', () => ({ playerSelectHandoff: { take: takeMock, set: vi.fn() } }));
 
 import SelectPage from '../../../routes/select/+page.svelte';
-import { staticData } from '$stores/static-data.svelte';
-
-// A minimal active class so the picker has an option to default to (id 0 → the create call sends it).
-const PICKER_CLASS = {
-	id: 0,
-	name: 'Warrior',
-	description: 'A frontline fighter.',
-	word: 'kor',
-	passiveAttributeId: 1,
-	passiveAmount: 5,
-	passiveScalingAmount: 0,
-	passiveModifierType: 1,
-	starterSkillIds: [],
-	starterEquipment: [],
-	attributeDistributions: []
-} as unknown as NonNullable<typeof staticData.classes>[number];
 
 const SUMMARIES = [
 	{ id: 1, name: 'Hero', level: 3, currentZoneId: 0, lastActivity: '2026-06-20T00:00:00Z' },
@@ -71,13 +52,9 @@ beforeEach(() => {
 	initializeMock.mockClear();
 	confirmTakeoverMock.mockReset();
 	confirmTakeoverMock.mockResolvedValue(true);
-	staticData.classes = [PICKER_CLASS];
 });
 
-afterEach(() => {
-	cleanup();
-	staticData.classes = undefined;
-});
+afterEach(cleanup);
 
 describe('Select page', () => {
 	it('redirects to login when reached without a handoff', async () => {
