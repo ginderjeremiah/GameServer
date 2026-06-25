@@ -9,6 +9,7 @@ using Game.Core.Players;
 using Game.Core.Proficiencies;
 using Game.Core.Progress;
 using Microsoft.Extensions.Logging;
+using CoreClass = Game.Core.Classes.Class;
 using CoreEnemy = Game.Core.Enemies.Enemy;
 using CoreZone = Game.Core.Zones.Zone;
 
@@ -23,6 +24,7 @@ namespace Game.Application.Services
         IItemMods itemMods,
         ISkills skills,
         IProficiencies proficiencies,
+        IClasses classes,
         BattleFactory battleFactory,
         OfflineProgressSimulator offlineSimulator,
         ChallengeRewardService challengeRewards,
@@ -37,6 +39,7 @@ namespace Game.Application.Services
         private readonly IItemMods _itemMods = itemMods;
         private readonly ISkills _skills = skills;
         private readonly IProficiencies _proficiencies = proficiencies;
+        private readonly IClasses _classes = classes;
         private readonly BattleFactory _battleFactory = battleFactory;
         private readonly OfflineProgressSimulator _offlineSimulator = offlineSimulator;
         private readonly ChallengeRewardService _challengeRewards = challengeRewards;
@@ -510,6 +513,7 @@ namespace Game.Application.Services
                 ResolveMod = _itemMods.GetItemMod,
                 ResolveSkill = _skills.GetSkill,
                 ResolveProficiency = _proficiencies.GetProficiency,
+                ResolveClass = ResolveClass,
                 SeedSource = CreateBattleSeed,
                 StalemateCutoffBattles = StalemateCutoffBattles,
             };
@@ -660,7 +664,7 @@ namespace Game.Application.Services
             }
 
             var rewards = new DefeatRewards(
-                snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency), enemy);
+                snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
 
             player.GrantExp(rewards.ExpReward);
             // Thread the difficulty multiplier onto the battle-completed event so the progress handler can
@@ -778,12 +782,19 @@ namespace Game.Application.Services
             return true;
         }
 
+        // Resolves the player's class for the locked-base distribution, failing loudly on an unresolvable id
+        // (a content-data mistake) rather than silently dropping the attribute fingerprint — the player-load
+        // missing-reference policy applied to the battle-assembly path.
+        private CoreClass ResolveClass(int classId) =>
+            _classes.GetClass(classId)
+            ?? throw new InvalidOperationException($"Class {classId} could not be resolved from the catalogue.");
+
         private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, uint seed, int? maxMs = null)
         {
             enemy.SetBattleSkills(enemySkillIds);
 
             var playerBattler = snapshot.ToBattler(
-                _items.GetItem, _itemMods.GetItemMod, _skills.GetSkill, _proficiencies.GetProficiency);
+                _items.GetItem, _itemMods.GetItemMod, _skills.GetSkill, _proficiencies.GetProficiency, ResolveClass);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()),
                 enemy.BattleSkills,

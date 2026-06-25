@@ -1,5 +1,6 @@
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
+using Game.Core.Classes;
 using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Proficiencies;
@@ -18,6 +19,15 @@ namespace Game.Core.Battle
         /// The player's level at battle start.
         /// </summary>
         public required int Level { get; set; }
+
+        /// <summary>
+        /// The id of the player's class at battle start, or <c>null</c> for a snapshot built without class
+        /// state (e.g. a hand-built test snapshot). The class's <see cref="Class.AttributeDistributions"/>
+        /// resolve into the level-scaled, non-reallocatable locked base — the class attribute fingerprint —
+        /// at battler assembly (spike #1126 area D), exactly like an enemy's distributions. Derived purely from
+        /// <c>(class, <see cref="Level"/>)</c>, never stored, so it re-tunes for free when growth vectors change.
+        /// </summary>
+        public int? ClassId { get; set; }
 
         /// <summary>
         /// The raw stat allocations (core attributes) at battle start.
@@ -79,6 +89,9 @@ namespace Game.Core.Battle
             return new BattleSnapshot
             {
                 Level = player.Level,
+                // The class is permanent, so its id is captured straight off the aggregate; the locked-base
+                // distribution it drives is re-derived from (class, level) at assembly rather than stored.
+                ClassId = player.ClassId,
                 // Copy each allocation so a later in-place stat reallocation on the live player cannot
                 // retroactively mutate this snapshot, consistent with the other projected fields.
                 StatAllocations = player.StatPoints.StatAllocations.Select(allocation => allocation.Copy()).ToList(),
@@ -101,9 +114,9 @@ namespace Game.Core.Battle
         /// </summary>
         public Battler ToBattler(
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill,
-            Func<int, Proficiency>? resolveProficiency = null)
+            Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
         {
-            var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod, resolveProficiency));
+            var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass));
             var skills = GetBattleSkillIds(resolveItem).Select(resolveSkill);
 
             return new Battler(attributes, skills, Level);
@@ -129,16 +142,42 @@ namespace Game.Core.Battle
         /// milestone bonuses of the captured proficiency levels — resolving the captured ids against the
         /// in-memory catalogs. Shared by <see cref="ToBattler"/> (the simulation) and the exp-reward power
         /// measurement (<see cref="DefeatRewards"/>), so both read the player's power from the same frozen
-        /// snapshot rather than the live aggregate. The <paramref name="resolveProficiency"/> resolver is
-        /// required only when proficiency levels were captured (it is unused for a proficiency-less snapshot).
+        /// snapshot rather than the live aggregate.
+        /// <para>
+        /// The composition order is part of the frontend/backend parity contract: stat allocations (the free
+        /// pool), then gear, then the class locked base, then the proficiency bonuses — all additive, but
+        /// floating-point addition is not associative, so the order is mirrored bit-for-bit by the frontend
+        /// (<c>BattleAttributes.setData</c> places the class locked base and proficiency bonuses in its
+        /// <c>additionalModifiers</c> in this same order, before the static engine modifiers). The
+        /// <paramref name="resolveProficiency"/> and <paramref name="resolveClass"/> resolvers are required
+        /// only when the corresponding state was captured (a captured <see cref="ClassId"/> always needs one,
+        /// since every real player has a class).
         /// </summary>
         public IEnumerable<AttributeModifier> GetModifiers(
-            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Proficiency>? resolveProficiency = null)
+            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod,
+            Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
         {
             var modifiers = StatAllocations.Select(allocation => allocation.ToModifier())
                 .Concat(EquippedItems.SelectMany(equipped =>
                     resolveItem(equipped.ItemId)
                         .GetAttributeModifiers(equipped.AppliedModIds.Select(resolveMod))));
+
+            // The class locked base: the class's attribute fingerprint scaled to the captured level, via the
+            // same BaseAmount + AmountPerLevel × level math an enemy's distributions use. A captured class
+            // always requires a resolver — fail loudly rather than silently dropping the locked base, which
+            // would validate a replay against weaker attributes than the client simulated (as the proficiency
+            // guard below does).
+            if (ClassId is int classId)
+            {
+                if (resolveClass is null)
+                {
+                    throw new InvalidOperationException(
+                        "A battle snapshot with a captured class requires a class resolver to compose its locked-base distribution.");
+                }
+
+                modifiers = modifiers.Concat(resolveClass(classId).AttributeDistributions
+                    .Select(distribution => distribution.GetDistributionModifier(Level)));
+            }
 
             if (ProficiencyLevels.Count == 0)
             {

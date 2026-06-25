@@ -3,6 +3,7 @@ import { PlayerManager } from '$lib/engine/player/player-manager';
 import { logMessage } from '$lib/engine/log';
 import { EAttribute, ELogType } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
+import { STAT_POINTS_PER_LEVEL } from '$lib/api/types/game-constants';
 
 // PlayerManager only depends on logMessage; mock it so the unit under test is
 // isolated and the spy assertions below work (mirrors inventory-manager.test.ts).
@@ -136,7 +137,7 @@ describe('PlayerManager', () => {
 
 			expect(manager.level).toBe(2);
 			expect(manager.exp).toBe(0);
-			expect(manager.statPointsGained).toBe(36);
+			expect(manager.statPointsGained).toBe(30 + STAT_POINTS_PER_LEVEL);
 		});
 
 		it('does not level up when exp is below threshold', () => {
@@ -165,13 +166,13 @@ describe('PlayerManager', () => {
 	});
 
 	describe('levelUp', () => {
-		it('increments level and grants 6 stat points', () => {
+		it('increments level and grants the per-level free pool stat points', () => {
 			manager.initialize(makePlayerData({ level: 3, exp: 300, statPointsGained: 12 }));
 			manager.levelUp();
 
 			expect(manager.level).toBe(4);
 			expect(manager.exp).toBe(0);
-			expect(manager.statPointsGained).toBe(18);
+			expect(manager.statPointsGained).toBe(12 + STAT_POINTS_PER_LEVEL);
 		});
 
 		it('logs level-up messages', () => {

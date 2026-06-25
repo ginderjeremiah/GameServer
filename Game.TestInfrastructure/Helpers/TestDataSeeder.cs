@@ -41,11 +41,19 @@ namespace Game.TestInfrastructure.Helpers
             int userId,
             string name = "TestPlayer",
             int level = 5,
-            int zoneId = 0)
+            int zoneId = 0,
+            int? classId = null)
         {
+            // Every player references a resolvable class — battle assembly composes the class locked base from
+            // it (#1223). Reuse the caller-supplied class, or seed a minimal one with no attribute distributions
+            // (an empty locked base), so a directly-seeded player's battle attributes stay exactly its stat
+            // allocations + gear and existing reward/exp expectations are unaffected.
+            var resolvedClassId = classId ?? (await CreateClassAsync(context)).Id;
+
             var player = new Player
             {
                 UserId = userId,
+                ClassId = resolvedClassId,
                 Name = name,
                 Level = level,
                 Exp = 0,

@@ -36,7 +36,7 @@ namespace Game.Core.Battle.Offline
             // The player's power is stationary offline, so the modifier set that measures each victory's exp
             // reward never changes — materialize it once and reuse it for every battle's DefeatRewards.
             var playerModifiers = parameters.Snapshot
-                .GetModifiers(parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveProficiency)
+                .GetModifiers(parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveProficiency, parameters.ResolveClass)
                 .ToList();
 
             // Tracks whether any battle has produced progress (a win or a loss). A run that is nothing but
@@ -100,7 +100,8 @@ namespace Game.Core.Battle.Offline
         private static BattleResult SimulateBattle(OfflineSimulationParameters parameters, Enemy enemy)
         {
             var playerBattler = parameters.Snapshot.ToBattler(
-                parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill, parameters.ResolveProficiency);
+                parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
+                parameters.ResolveProficiency, parameters.ResolveClass);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level);
 

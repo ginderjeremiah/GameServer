@@ -1,3 +1,4 @@
+using Game.Core.Classes;
 using Game.Core.Enemies;
 using Game.Core.Items;
 using Game.Core.Proficiencies;
@@ -64,6 +65,12 @@ namespace Game.Core.Battle.Offline
         /// <summary>Resolves a proficiency definition by id when composing the snapshot's per-level/milestone
         /// bonuses (used only when the snapshot captured proficiency levels).</summary>
         public required Func<int, Proficiency> ResolveProficiency { get; init; }
+
+        /// <summary>Resolves the player's class by id when composing the snapshot's level-scaled locked-base
+        /// distribution. The whole away window fights at the snapshot's frozen level, so the locked base — a
+        /// deterministic function of <c>(class, level)</c> — is stationary across the window like every other
+        /// captured input.</summary>
+        public required Func<int, Class> ResolveClass { get; init; }
 
         /// <summary>
         /// Supplies a fresh battle RNG seed for each simulated battle, mirroring the live path's per-battle

@@ -98,10 +98,11 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void Create_GrantsAnAllocationRowForEveryCoreAttribute_FromClassBaseSpread()
+        public void Create_GrantsAnEmptyAllocationRowForEveryCoreAttribute()
         {
-            // The class invests a base spread into Strength/Endurance; the remaining core attributes get a row
-            // at 0 (a row is required for each so PlayerStatPoints can later allocate into it).
+            // The free pool starts empty: the class's starting spread is delivered by the level-scaled locked
+            // base at battler assembly (#1223), not seeded into the allocations (which would double-count it).
+            // A zero row is still required for each core attribute so PlayerStatPoints can later allocate into it.
             var newPlayer = _factory.Create("hero", CreateClass(attributeDistributions:
             [
                 Distribution(EAttribute.Strength, 8m, amountPerLevel: 2m),
@@ -111,15 +112,9 @@ namespace Game.Core.Tests.Players
             var expectedCoreAttributes = Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore).ToList();
             Assert.Equal(expectedCoreAttributes, newPlayer.Attributes.Select(attribute => attribute.Attribute));
 
-            var amountByAttribute = newPlayer.Attributes.ToDictionary(a => a.Attribute, a => a.Amount);
-            // The base spread is taken from BaseAmount only (level scaling/locked base is #1223), so AmountPerLevel
-            // does not inflate the starting allocation.
-            Assert.Equal(8d, amountByAttribute[EAttribute.Strength]);
-            Assert.Equal(5d, amountByAttribute[EAttribute.Endurance]);
-            // Every other core attribute is seeded at 0.
-            Assert.All(
-                amountByAttribute.Where(kvp => kvp.Key is not (EAttribute.Strength or EAttribute.Endurance)),
-                kvp => Assert.Equal(0d, kvp.Value));
+            // Every core attribute is seeded at 0, regardless of the class's distribution — the distribution
+            // feeds the non-reallocatable locked base, never the free pool.
+            Assert.All(newPlayer.Attributes, allocation => Assert.Equal(0d, allocation.Amount));
         }
 
         [Fact]
