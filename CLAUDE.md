@@ -25,7 +25,7 @@ VERY IMPORTANT: if you are working on game features or mechanics, you MUST read 
 - Keep in mind that the code already in the codebase may violate the rules/suggestions in the documentation, but that does NOT mean that the code is "ok". You should not copy the style or patterns of existing code if it contradicts the recommendations from documentation. In fact if you do see such code, you should mention it as a follow-up comment (or create a follow-up GitHub issue) and suggest refactoring it to align with the current guidelines. The documentation should be considered the source of truth for how code should be written in this project, and all code (new and old) should be held to those standards.
 - When you are altering existing code check that you are not leaving dead code behind. If you are removing or replacing functionality, make sure to remove any code that is no longer being used as well. This includes things like unused variables, functions, classes, and imports.
 - Remember that as code evolves over time, some code may become unused, redundant, or overly complex. It is important to regularly review and refactor code to keep it clean and maintainable. If you are working on a piece of code and notice that it has become unwieldy or difficult to understand, take the time to refactor it and improve its readability and maintainability or create a follow-up task to address it later if it would increase the scope of your work by a significant amount.
-- Whenever working on a spike make sure you document the final results in the `docs/spikes` folder and include references to the created issues (and that the issues are linked to the parent spike for tracking). If you are collaborating on the spike, make sure to give your collaborator a chance to review your research and proposed direction before finalizing it and creating the issues.
+- Whenever working on a spike make sure you document the final results in the `docs/spikes` folder and include references to the created issues (and that the issues are linked to the parent spike issue for tracking). If you are collaborating on a spike/ideation issue, make sure to give your collaborator a chance to offer their input and perspective after your research before beginning any actual planning. Ideation spikes should always explore (and document) the potential directions for a feature and and should NOT be strictly limited to what was in the issue or prior research.
 
 ## Follow-up issues
 
@@ -36,6 +36,7 @@ When creating follow-up issues, add any of the follow tags (if applicable):
 - tech debt - This issue is for refactoring or cleanup of existing code to increase code maintainability. In other words, there should be no tangible user-facing effect from the change.
 - enhancement - The issue implements new or previously unimplemented functionality.
 - spike - This issue is for researching a large-scale problem or refactor and creating new issues to resolve it
+- ideation - Often paired with spike. This issue is for evaluating and/or refining a feature
 - scope: [small/medium/large] - Roughly alludes to the amount of changes required to complete the issue:
   - small - Small, self-contained, low-risk, no unmet open-issue dependency.
   - medium - Moderate scope, some design ambiguity, or multi-file but bounded.
