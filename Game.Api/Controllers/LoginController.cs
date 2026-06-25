@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts;
 using Game.Abstractions.Contracts.Identity;
 using Game.Api.Http;
 using Game.Api.Models.Auth;
@@ -306,6 +307,24 @@ namespace Game.Api.Controllers
 
             var players = await _accountService.GetPlayers(_sessionService.UserId, HttpContext.RequestAborted);
             return ApiResponse.Success(players);
+        }
+
+        /// <summary>
+        /// The data the create-character class picker needs: the classes a character can be created as, each
+        /// with its kit (starter skills + equipment, names resolved) and signature passive. Served over HTTP
+        /// because character creation happens before a player is selected — where the socket, and the
+        /// reference data it delivers, is unavailable — so it requires authentication but no selected player.
+        /// Kept distinct from the reference class catalogue (`GetClasses`).
+        /// </summary>
+        [HttpGet]
+        public ApiEnumerableResponse<CreatableClass> CharacterCreationData()
+        {
+            if (!_sessionService.Authenticated)
+            {
+                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
+            }
+
+            return ApiResponse.Success(_accountService.GetCreatableClasses());
         }
 
         /// <summary>

@@ -1075,5 +1075,62 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
             authClient.Dispose();
         }
+
+        [Fact]
+        public async Task CharacterCreationData_ReturnsCreatableClassesWithResolvedKitNames_ExcludingRetired()
+        {
+            // Arrange — a class with a kit (a starter skill + an equipped weapon) plus a retired class.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateUserAsync(context, "creationuser", "creationpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Fireball");
+            var weapon = await TestDataSeeder.CreateItemAsync(context, "Iron Sword", category: EItemCategory.Weapon);
+            var active = await TestDataSeeder.CreateClassWithKitAsync(
+                context,
+                starterSkillIds: [skill.Id],
+                attributeDistributions: [(EAttribute.Strength, 10m, 1m)],
+                name: "Warrior",
+                starterEquipment: [(weapon.Id, EEquipmentSlot.WeaponSlot)]);
+            await TestDataSeeder.CreateClassWithKitAsync(context, [skill.Id], name: "Retired Class", retiredAt: DateTime.UtcNow);
+            // Reload the in-memory reference caches so the freshly-seeded classes/skills/items resolve.
+            await ReloadReferenceCachesAsync();
+
+            // The endpoint is reachable pre-selection, so the login (pre-selection) token suffices.
+            var login = await LoginAsync("creationuser", "creationpass");
+            using var authClient = Factory.CreateClient();
+            authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.Tokens.AccessToken);
+
+            // Act
+            var response = await authClient.GetAsync("/api/Login/CharacterCreationData", CancellationToken);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content
+                .ReadFromJsonAsync<ApiEnumerableResponse<Game.Abstractions.Contracts.CreatableClass>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+            Assert.NotNull(result.Data);
+
+            var creatable = Assert.Single(result.Data, c => c.Id == active.Id);
+            Assert.Equal("Warrior", creatable.Name);
+            // Starter skill/item names are resolved server-side (the screen has no reference data yet).
+            var starterSkill = Assert.Single(creatable.StarterSkills);
+            Assert.Equal(skill.Id, starterSkill.Id);
+            Assert.Equal("Fireball", starterSkill.Name);
+            var equipment = Assert.Single(creatable.StarterEquipment);
+            Assert.Equal(weapon.Id, equipment.ItemId);
+            Assert.Equal(EEquipmentSlot.WeaponSlot, equipment.EquipmentSlot);
+            Assert.Equal("Iron Sword", equipment.Name);
+            // The retired class is out of circulation for new characters.
+            Assert.DoesNotContain(result.Data, c => c.Name == "Retired Class");
+        }
+
+        [Fact]
+        public async Task CharacterCreationData_WithoutAuthentication_IsRejected()
+        {
+            // No bearer token — a pre-authentication request never reaches the creatable-class payload.
+            var response = await Client.GetAsync("/api/Login/CharacterCreationData", CancellationToken);
+            Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        }
     }
 }

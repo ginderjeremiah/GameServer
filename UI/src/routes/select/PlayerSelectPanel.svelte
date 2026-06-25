@@ -30,6 +30,7 @@
 			validationMsg={view.nameValidation.msg}
 			error={view.createError}
 			creating={view.creating}
+			classes={view.classes}
 			selectedClassId={view.selectedClassId}
 			onSelectClass={(id) => view.selectClass(id)}
 			onSubmit={() => view.create()}

@@ -36,16 +36,15 @@ vi.mock('$lib/engine', () => ({
 vi.mock('$routes/login/session-takeover', () => ({ confirmSessionTakeover: confirmTakeoverMock }));
 
 import CharacterSwitcher from '../../../routes/game/CharacterSwitcher.svelte';
-import { staticData } from '$stores/static-data.svelte';
 
 const SUMMARIES = [
 	{ id: 1, name: 'Hero', level: 3, currentZoneId: 0, lastActivity: '2026-06-20T00:00:00Z' },
 	{ id: 2, name: 'Rogue', level: 7, currentZoneId: 1, lastActivity: '2026-06-19T00:00:00Z' }
 ];
 
-// In-game the class catalogue is already loaded, so the create form's picker has options. Seed a
-// single active class (id 0) so creating a character defaults to and sends it.
-const PICKER_CLASS = {
+// The create form's class options come from Login/CharacterCreationData; one active class (id 0) so
+// creating a character defaults to and sends it.
+const CREATABLE_CLASS = {
 	id: 0,
 	name: 'Warrior',
 	description: 'A frontline fighter.',
@@ -54,22 +53,27 @@ const PICKER_CLASS = {
 	passiveAmount: 5,
 	passiveScalingAmount: 0,
 	passiveModifierType: 1,
-	starterSkillIds: [],
-	starterEquipment: [],
-	attributeDistributions: []
-} as unknown as NonNullable<typeof staticData.classes>[number];
+	attributeDistributions: [],
+	starterSkills: [],
+	starterEquipment: []
+};
+
+// The switcher issues two GETs — the character list and the class options — so route the doubles.
+const getByRoute = (route: string) =>
+	route === 'Login/CharacterCreationData'
+		? Promise.resolve({ status: 200, data: [CREATABLE_CLASS] })
+		: Promise.resolve({ status: 200, data: SUMMARIES });
 
 let originalLocation: Location;
 
 beforeEach(() => {
-	getMock.mockReset().mockResolvedValue({ status: 200, data: SUMMARIES });
+	getMock.mockReset().mockImplementation(getByRoute);
 	postMock.mockReset();
 	disconnectMock.mockReset();
 	stopEnginesMock.mockReset();
 	getRefreshTokenMock.mockReset().mockReturnValue('r');
 	setTokensMock.mockReset();
 	confirmTakeoverMock.mockReset().mockResolvedValue(true);
-	staticData.classes = [PICKER_CLASS];
 	originalLocation = window.location;
 	Object.defineProperty(window, 'location', {
 		configurable: true,
@@ -81,7 +85,6 @@ beforeEach(() => {
 afterEach(() => {
 	Object.defineProperty(window, 'location', { configurable: true, writable: true, value: originalLocation });
 	cleanup();
-	staticData.classes = undefined;
 });
 
 describe('CharacterSwitcher', () => {

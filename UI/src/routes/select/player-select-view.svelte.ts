@@ -8,7 +8,7 @@
    I/O; the `+page.svelte` wires the real `SelectPlayer`/`CreatePlayer` calls, token storage, the
    takeover confirm, and world entry. Mirrors the reactive-view-model split the other screens use. */
 
-import type { IPlayerData, IPlayerSummary } from '$lib/api';
+import type { ICreatableClass, IPlayerData, IPlayerSummary } from '$lib/api';
 import { validatePlayerName } from './player-name';
 
 export type SelectResult = { ok: true; player: IPlayerData } | { ok: false; error: string };
@@ -28,6 +28,9 @@ export interface PlayerSelectDeps {
 	confirmTakeover: () => Promise<boolean>;
 	/** Initializes the player manager from the loaded character and navigates into the game. */
 	enterWorld: (player: IPlayerData) => void;
+	/** Loads the create-character class options (the bespoke `Login/CharacterCreationData` payload,
+	 *  reachable pre-player-selection over HTTP). Resolves [] on failure so the picker stays hidden. */
+	loadCreationData: () => Promise<ICreatableClass[]>;
 }
 
 export class PlayerSelectView {
@@ -43,8 +46,11 @@ export class PlayerSelectView {
 	showCreate = $state(false);
 	/** The in-progress new-character name. */
 	newName = $state('');
-	/** The class chosen for the new character, or null before the catalogue loads / a choice is made.
-	 *  The picker defaults it to the first available class once classes load. */
+	/** The creatable class options, loaded from the bespoke character-creation payload. Empty until they
+	 *  load (and on failure), which keeps the picker hidden and creation on its placeholder fallback. */
+	classes = $state<ICreatableClass[]>([]);
+	/** The class chosen for the new character, or null before the options load / a choice is made.
+	 *  Defaulted to the first option once they load. */
 	selectedClassId = $state<number | null>(null);
 	/** Whether a `CreatePlayer` request is in flight. */
 	creating = $state(false);
@@ -56,6 +62,17 @@ export class PlayerSelectView {
 		initial: IPlayerSummary[]
 	) {
 		this.players = initial;
+		void this.loadClasses();
+	}
+
+	/** Loads the creatable class options and defaults the selection to the first one, so the create form
+	 *  is submittable without an extra click. A failure leaves the list empty (picker hidden). */
+	private async loadClasses(): Promise<void> {
+		const classes = await this.deps.loadCreationData();
+		this.classes = classes;
+		if (this.selectedClassId == null && classes.length > 0) {
+			this.selectedClassId = classes[0].id;
+		}
 	}
 
 	/** Live validation of the new-character name, mirroring the backend rule. */

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PlayerSelectView, type PlayerSelectDeps } from '$routes/select/player-select-view.svelte';
-import type { IPlayerData, IPlayerSummary } from '$lib/api';
+import type { ICreatableClass, IPlayerData, IPlayerSummary } from '$lib/api';
 
 const summary = (id: number, name = `Hero${id}`): IPlayerSummary => ({
 	id,
@@ -12,13 +12,26 @@ const summary = (id: number, name = `Hero${id}`): IPlayerSummary => ({
 
 const player = (id: number): IPlayerData => ({ id, name: `Hero${id}` }) as IPlayerData;
 
+const creatable = (id: number): ICreatableClass =>
+	({
+		id,
+		name: `Class${id}`,
+		starterSkills: [],
+		starterEquipment: [],
+		attributeDistributions: []
+	}) as unknown as ICreatableClass;
+
 const makeDeps = (overrides: Partial<PlayerSelectDeps> = {}): PlayerSelectDeps => ({
 	selectPlayer: vi.fn().mockResolvedValue({ ok: true, player: player(1) }),
 	createPlayer: vi.fn().mockResolvedValue({ ok: true, summary: summary(2) }),
 	confirmTakeover: vi.fn().mockResolvedValue(true),
 	enterWorld: vi.fn(),
+	loadCreationData: vi.fn().mockResolvedValue([]),
 	...overrides
 });
+
+/** Flush microtasks so the constructor's fire-and-forget class load settles. */
+const flush = () => new Promise((resolve) => setTimeout(resolve));
 
 describe('PlayerSelectView — select', () => {
 	let deps: PlayerSelectDeps;
@@ -71,6 +84,27 @@ describe('PlayerSelectView — select', () => {
 		expect(selectPlayer).toHaveBeenCalledTimes(1);
 		resolve({ ok: true, player: player(1) });
 		await first;
+	});
+});
+
+describe('PlayerSelectView — class loading', () => {
+	it('loads the creatable classes and defaults the selection to the first', async () => {
+		const deps = makeDeps({ loadCreationData: vi.fn().mockResolvedValue([creatable(3), creatable(5)]) });
+		const view = new PlayerSelectView(deps, [summary(1)]);
+
+		await flush();
+
+		expect(view.classes.map((c) => c.id)).toEqual([3, 5]);
+		expect(view.selectedClassId).toBe(3);
+	});
+
+	it('leaves the selection null when no classes load', async () => {
+		const view = new PlayerSelectView(makeDeps(), [summary(1)]);
+
+		await flush();
+
+		expect(view.classes).toEqual([]);
+		expect(view.selectedClassId).toBeNull();
 	});
 });
 

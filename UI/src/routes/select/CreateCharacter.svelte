@@ -1,6 +1,6 @@
 <form class="create-form" onsubmit={preventDefault(onSubmit)} data-testid="create-form">
-	{#if classesLoaded}
-		<ClassPicker {selectedClassId} onSelect={onSelectClass} disabled={creating} />
+	{#if classes.length > 0}
+		<ClassPicker {classes} {selectedClassId} onSelect={onSelectClass} disabled={creating} />
 	{/if}
 
 	<UnderlineInput
@@ -26,8 +26,8 @@
 </form>
 
 <script lang="ts">
+import type { ICreatableClass } from '$lib/api';
 import { preventDefault } from '$lib/common/event-wrappers';
-import { staticData } from '$stores';
 import UnderlineInput from '../login/UnderlineInput.svelte';
 import StatusLine from '../login/StatusLine.svelte';
 import SubmitButton from '../login/SubmitButton.svelte';
@@ -44,9 +44,12 @@ interface Props {
 	error: string | null;
 	/** Whether a create request is in flight. */
 	creating: boolean;
-	/** The chosen class id, or null before the catalogue loads / a choice is made. */
+	/** The creatable class options; the picker shows only when this is non-empty (it's empty on the
+	 *  pre-selection screens until the bespoke payload loads). */
+	classes: ICreatableClass[];
+	/** The chosen class id, or null before the options load / a choice is made. */
 	selectedClassId: number | null;
-	/** Notifies the parent of a class choice (also fired to default once classes load). */
+	/** Notifies the parent of a class choice. */
 	onSelectClass: (classId: number) => void;
 	onSubmit: () => void;
 	onCancel: () => void;
@@ -58,17 +61,12 @@ let {
 	validationMsg,
 	error,
 	creating,
+	classes,
 	selectedClassId,
 	onSelectClass,
 	onSubmit,
 	onCancel
 }: Props = $props();
-
-// The picker is shown only where the class catalogue is loaded — i.e. the in-game character switcher,
-// which runs after world entry. The login→select flow has a pre-selection token and so no socket /
-// reference data yet, so the picker stays hidden there and creation falls back to a placeholder class
-// (pre-selection class delivery is deferred — #1256).
-const classesLoaded = $derived((staticData.classes?.length ?? 0) > 0);
 
 // Don't nag with the validation hint before the field has been touched; once it has (or a backend
 // error arrived) surface whichever message applies — a backend error takes precedence.

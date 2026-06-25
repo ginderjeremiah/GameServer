@@ -66,6 +66,32 @@ export interface IClassStarterEquipment {
 	equipmentSlot: EEquipmentSlot;
 }
 
+export interface ICreatableClass {
+	id: number;
+	name: string;
+	description: string;
+	word: string;
+	passiveAttributeId: EAttribute;
+	passiveAmount: number;
+	passiveScalingAttributeId?: EAttribute;
+	passiveScalingAmount: number;
+	passiveModifierType: EModifierType;
+	attributeDistributions: IAttributeDistribution[];
+	starterSkills: ICreatableClassSkill[];
+	starterEquipment: ICreatableClassEquipment[];
+}
+
+export interface ICreatableClassEquipment {
+	itemId: number;
+	equipmentSlot: EEquipmentSlot;
+	name: string;
+}
+
+export interface ICreatableClassSkill {
+	id: number;
+	name: string;
+}
+
 export interface IEnemy {
 	id: number;
 	name: string;
