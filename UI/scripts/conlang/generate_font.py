@@ -92,7 +92,7 @@ def glyph(strokes, decos=()):
 def alphabet():
     a = {}
     # single stem + bow(s) — the thorn family
-    a['a'] = glyph([stem(SX), bow(560, 320, 300)], [dot(SX, 40, 26)])
+    a['a'] = glyph([stem(SX), bow(560, 320, 300)])
     a['b'] = glyph([stem(SX), bow(560, 320, -300)])
     a['c'] = glyph([stem(SX), bow(560, 360, 260), bow(320, 90, -260)])
     a['e'] = glyph([stem(SX), bow(620, 380, 300), bow(380, 140, 300)])
@@ -103,7 +103,7 @@ def alphabet():
                     qb((SX, 640), (340, 340), (SX, 40))])                    # almond bisected by stem
     # twin stems + bridge
     a['h'] = glyph([stem(120), stem(320), bridge(120, 320, 560, 140)])
-    a['m'] = glyph([stem(120), stem(320), bridge(120, 320, 360, 140)], [dot(220, 580, 28)])
+    a['m'] = glyph([stem(120), stem(320), bridge(120, 320, 360, 140)])  # mid bridge (vs h's high bridge)
     a['n'] = glyph([stem(SX, 0, 372), ring(SX, 520, 150)])                  # lollipop: loop atop a stem
     a['w'] = glyph([stem(110), stem(330), twig(110, 560, 220, -420), twig(110, 140, 220, 420)])  # twin + X
     # stem + twigs
@@ -113,12 +113,12 @@ def alphabet():
     a['d'] = glyph([ln((140, 0), (310, 660)), ring(385, 470, 120)])
     a['v'] = glyph([ln((120, 0), (300, 660)), qb((300, 560), (480, 400), (300, 240))])
     a['y'] = glyph([ln((110, 0), (300, 660)), qb((250, 520), (60, 380), (250, 240))])  # leaning stem + left bow
-    a['z'] = glyph([stem(SX, 0, 520), qb((SX, 520), (430, 650), (430, 420))], [dot(SX, 40, 26)])  # stem + top crook
+    a['z'] = glyph([stem(SX, 0, 520), qb((SX, 520), (430, 650), (430, 420))])  # stem + top crook
     # bowls / cradles that sit on the baseline
     a['o'] = glyph([qb((SX, 0), (20, 330), (SX, 660)), qb((SX, 660), (340, 330), (SX, 0)),
                     ln((55, 330), (305, 330))])                            # almond + crossbar
     a['u'] = glyph([qb((120, 640), (250, 40), (380, 640)), ln((250, 335), (250, 0))])
-    a['q'] = glyph([stem(SX, 235, 660), ring(300, 160, 150)])
+    a['q'] = glyph([stem(SX, 305, 660), ring(300, 160, 150)])               # stem meets the loop at its tangent
     # short forms
     a['i'] = glyph([stem(SX, 0, 560), twig(SX, 540, 130, -55), twig(SX, 430, 130, 55)])  # short stem + chevron
     a['l'] = glyph([stem(230, 0, 700), twig(230, 540, -150, 0)])
@@ -149,9 +149,9 @@ DIGITS = {
 # digraph ligatures — grounded fused forms (a base carrying both features)
 LIGS = {
     'th': glyph([stem(SX, 0, 700), bow(640, 380, 300), bow(380, 120, -300)]),
-    'sh': glyph([stem(SX), qb((SX, 640), (540, 360), (SX, 80))], [dot(SX, 40, 26)]),
+    'sh': glyph([stem(SX), qb((SX, 640), (540, 360), (SX, 80)), twig(SX, 600, -140, 30)]),  # s + upper-left twig
     'ch': glyph([stem(SX), bow(560, 360, 260), bow(320, 90, -260), qb((SX, 90), (360, 40), (440, 120))]),
-    'ng': glyph([stem(120), stem(320), bridge(120, 320, 560, 140)], [dot(220, 580, 26)]),
+    'ng': glyph([stem(120), stem(320, -120, 660), bridge(120, 320, 560, 140)]),  # h-form + right descender tail
     'ph': glyph([stem(SX, DDEPTH, 700), bow(600, 360, 300), twig(SX, 640, 150, 40)]),
     'kh': glyph([stem(120), twig(120, 520, 250, 140), twig(120, 300, 250, -140), twig(120, 560, -120, 40)]),
 }
