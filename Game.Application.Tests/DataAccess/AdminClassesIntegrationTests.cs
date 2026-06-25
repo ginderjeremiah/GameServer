@@ -109,6 +109,70 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetStarterSkills_RemovesSkillsNoLongerDesired()
+        {
+            int classId, firstSkillId, secondSkillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateClassAsync(context, "Warrior")).Id;
+                firstSkillId = (await TestDataSeeder.CreateSkillAsync(context, "Cleave")).Id;
+                secondSkillId = (await TestDataSeeder.CreateSkillAsync(context, "Bash")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var firstScope = CreateScope())
+            {
+                var admin = firstScope.ServiceProvider.GetRequiredService<IAdminClasses>();
+                Assert.True(admin.SetStarterSkills(new SetClassStarterSkillsData { ClassId = classId, SkillIds = [firstSkillId] }).Succeeded);
+                await firstScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+            // Reload so the reconciler sees the first skill as the existing set, then swap it for the second.
+            await ReloadReferenceCachesAsync();
+
+            using (var secondScope = CreateScope())
+            {
+                var admin = secondScope.ServiceProvider.GetRequiredService<IAdminClasses>();
+                Assert.True(admin.SetStarterSkills(new SetClassStarterSkillsData { ClassId = classId, SkillIds = [secondSkillId] }).Succeeded);
+                await secondScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var context2 = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            // The reconciler deleted the no-longer-desired first skill and inserted the second.
+            var starter = Assert.Single(await context2.ClassStarterSkills.Where(s => s.ClassId == classId).ToListAsync(CancellationToken));
+            Assert.Equal(secondSkillId, starter.SkillId);
+        }
+
+        [Fact]
+        public async Task SaveClasses_RetiredClass_StaysResolvableById()
+        {
+            int classId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateClassAsync(context, "Warrior")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminClasses>();
+                var retire = NewClass(id: classId);
+                retire.RetiredAt = DateTime.UtcNow;
+                Assert.True(admin.SaveClasses([new Change<Contracts.Class> { ChangeType = EChangeType.Edit, Item = retire }]).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var context2 = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            // Retirement is a soft flag, not a delete: the row is still present and resolvable by id.
+            var saved = await context2.Classes.FindAsync([classId], CancellationToken);
+            Assert.NotNull(saved);
+            Assert.NotNull(saved.RetiredAt);
+        }
+
+        [Fact]
         public async Task SetStarterEquipment_ItemCategoryMismatch_ReturnsFailure()
         {
             int classId, weaponItemId;
