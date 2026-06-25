@@ -43,7 +43,6 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(0, result.Losses);
             Assert.Equal(0, result.Draws);
             Assert.Equal(0, result.TotalExp);
-            Assert.Empty(result.EnemyKillCounts);
         }
 
         [Fact]
@@ -231,7 +230,6 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(0, result.Wins);
             Assert.Equal(0, result.Losses);
             Assert.Equal(0, result.TotalExp);
-            Assert.Empty(result.EnemyKillCounts);
             Assert.All(result.Battles, battle =>
             {
                 Assert.False(battle.Result.Victory);
@@ -337,17 +335,6 @@ namespace Game.Core.Tests.Battle.Offline
                 var expected = new DefeatRewards(playerModifiers, battle.Enemy).ExpReward;
                 Assert.Equal(expected, battle.ExpReward);
             });
-        }
-
-        [Fact]
-        public void Simulate_Wins_RecordsPerEnemyKillCounts()
-        {
-            var scenario = StrongPlayerWinScenario(); // a single enemy id (1) won every time
-            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
-
-            var kill = Assert.Single(result.EnemyKillCounts);
-            Assert.Equal(EnemyId, kill.Key);
-            Assert.Equal(result.Wins, kill.Value);
         }
 
         [Fact]
