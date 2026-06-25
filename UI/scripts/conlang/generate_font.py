@@ -117,13 +117,13 @@ def alphabet():
     # bowls / cradles that sit on the baseline
     a['o'] = glyph([qb((SX, 0), (20, 330), (SX, 660)), qb((SX, 660), (340, 330), (SX, 0)),
                     ln((55, 330), (305, 330))])                            # almond + crossbar
-    a['u'] = glyph([qb((120, 640), (250, 40), (380, 640)), ln((250, 360), (250, 40))])
-    a['q'] = glyph([stem(SX, 300, 660), ring(300, 160, 150)])
+    a['u'] = glyph([qb((120, 640), (250, 40), (380, 640)), ln((250, 335), (250, 0))])
+    a['q'] = glyph([stem(SX, 235, 660), ring(300, 160, 150)])
     # short forms
     a['i'] = glyph([stem(SX, 0, 560), twig(SX, 540, 130, -55), twig(SX, 430, 130, 55)])  # short stem + chevron
     a['l'] = glyph([stem(230, 0, 700), twig(230, 540, -150, 0)])
     # the deliberate descenders
-    a['g'] = glyph([stem(SX, DDEPTH, 660), bow(560, 320, 300)])
+    a['g'] = glyph([stem(SX, -8, 660), bow(560, 320, 300), ring(SX, -90, 80)])  # bowl + looped tail
     a['j'] = glyph([qb((SX, 600), (SX, DDEPTH), (70, DDEPTH - 30)), bow(580, 400, 210)])  # hooked cane + bow
     a['p'] = glyph([stem(SX, DDEPTH, 660), bow(600, 360, 300), bow(360, 60, 300)])
     return a
