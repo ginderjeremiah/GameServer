@@ -44,12 +44,11 @@ When creating follow-up issues, add any of the follow tags (if applicable):
 # Overall Project Guidelines
 
 - If you ever have questions or want to work together to refine ideas, please ask! It is better to ask and get clarification than to make assumptions and potentially write code that does not fit well with the overall architecture or the future direction of the project.
-- You may receive suggestions or ideas when writing code or designing features, BUT you should always evaluate those suggestions critically and ask questions if you think there is a better approach or alternative. Do not latch onto suggestions or ideas without fully considering alternative approaches. This includes any notes contained in GitHub Issues you may be working on.
+- You may receive suggestions or ideas when writing code or designing features, BUT you should always evaluate those suggestions critically and ask questions if you think there is a better approach or alternative. Do not latch onto suggestions or ideas without fully considering alternative approaches. This includes any information or directions contained in GitHub Issues you may be working on. You should never assume that whoever wrote the github issue completely analyzed the code you are updating. You should verify that what the issues claims is 100% correct.
 - All code should be written in a clean, maintainable, and scalable manner, following best practices and design patterns. Remember, the code you write will likely be around for a long time and will be read and maintained by other developers, so it is important to prioritize readability and maintainability over short-term convenience.
 - Make sure all new or updated code includes unit tests covering all domain logic, integration tests covering the interactions between dependencies, and (if needed) end-to-end tests covering the complete user flow (only for critical paths). All domain logic should be thoroughly tested for a wide range of scenarios, including edge cases and error conditions.
 - Battle logic is implemented in both the frontend and backend, and the results must be consistent between the two. Any tests for battle logic should have the same scenarios and expected results in both the frontend and backend test suites to ensure consistency.
-
-- It is not required, but feel free to check any open issues in the repository as they may point out things that are known to be broken or planned in the future. In some cases that info may be relevant to what you are doing or may provide useful context.
+- It is not required, but consider checking open issues in the repository as they may point out things that are known to be broken or planned in the future. In some cases that info may be relevant to what you are doing or may provide useful context.
 
 ## Documentation
 
