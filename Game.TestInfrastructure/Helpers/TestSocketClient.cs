@@ -145,8 +145,18 @@ namespace Game.TestInfrastructure.Helpers
         private async Task<string> ReadMessageAsync()
         {
             var buffer = new byte[4096];
-            var result = await _socket.ReceiveAsync(buffer, _cts.Token);
-            return Encoding.UTF8.GetString(buffer, 0, result.Count);
+            using var message = new MemoryStream();
+            WebSocketReceiveResult result;
+            // Reassemble the whole message: a single logical frame is delivered in buffer-sized chunks, so a
+            // payload larger than the buffer (a growing reference-data set) spans multiple reads until EndOfMessage.
+            do
+            {
+                result = await _socket.ReceiveAsync(buffer, _cts.Token);
+                message.Write(buffer, 0, result.Count);
+            }
+            while (!result.EndOfMessage);
+
+            return Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
         }
 
         private async Task SendPongAsync()

@@ -406,6 +406,35 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
+        public static async Task<Class> CreateClassAsync(
+            GameContext context,
+            string name = "Test Class",
+            string word = "aenkor",
+            EAttribute passiveAttribute = EAttribute.Strength,
+            decimal passiveAmount = 5m,
+            EAttribute? passiveScalingAttribute = null,
+            decimal passiveScalingAmount = 0m,
+            EModifierType passiveModifierType = EModifierType.Additive,
+            DateTime? retiredAt = null)
+        {
+            var @class = new Class
+            {
+                Name = name,
+                Description = "",
+                Word = word,
+                PassiveAttributeId = (int)passiveAttribute,
+                PassiveAmount = passiveAmount,
+                PassiveScalingAttributeId = (int?)passiveScalingAttribute,
+                PassiveScalingAmount = passiveScalingAmount,
+                PassiveModifierType = (int)passiveModifierType,
+                RetiredAt = retiredAt,
+            };
+
+            context.Classes.Add(@class);
+            await context.SaveChangesAsync();
+            return @class;
+        }
+
         public static async Task<Path> CreatePathAsync(
             GameContext context,
             string name = "Test Path",

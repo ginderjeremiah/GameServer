@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260625062216_AddClassSystem")]
+    partial class AddClassSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1148,11 +1151,6 @@ namespace Game.Infrastructure.Migrations
                     b.Property<int>("PathOrdinal")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Pronunciation")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.Property<DateTime?>("RetiredAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1161,16 +1159,6 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<bool>("StartsUnlocked")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("Translation")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Word")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("XpGrowth")
                         .HasPrecision(18, 3)

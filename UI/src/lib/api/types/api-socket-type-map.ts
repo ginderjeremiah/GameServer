@@ -11,6 +11,7 @@ import type {
 	IChallengeBossRequest,
 	IChallengeCompletedModel,
 	IChallengeType,
+	IClass,
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
 	IEnemy,
@@ -46,6 +47,7 @@ export type ApiSocketResponseTypes = {
 	'GetAttributes': IAttribute[];
 	'GetChallenges': IChallenge[];
 	'GetChallengeTypes': IChallengeType[];
+	'GetClasses': IClass[];
 	'GetEnemies': IEnemy[];
 	'GetItemMods': IItemMod[];
 	'GetItems': IItem[];
