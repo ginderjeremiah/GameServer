@@ -19,6 +19,8 @@ interface Props {
 
 const { level, maxLevel, milestoneLevels }: Props = $props();
 
+// One pip per level. Proficiencies use a low level cap (~10, per spike #982), so the row stays short;
+// `.pips` wraps rather than overflowing should a tier ever be authored with an unusually high cap.
 const pips = $derived.by(() => {
 	const milestones = new Set(milestoneLevels);
 	return Array.from({ length: maxLevel }, (_, i) => {
@@ -31,9 +33,11 @@ const pips = $derived.by(() => {
 <style lang="scss">
 .pips {
 	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
 	align-items: center;
 	gap: 7px;
-	height: 16px;
+	min-height: 16px;
 }
 
 .pip {
