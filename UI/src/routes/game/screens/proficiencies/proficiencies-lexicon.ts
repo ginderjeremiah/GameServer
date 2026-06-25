@@ -38,6 +38,9 @@ export interface TierView {
 	state: TierState;
 	/** The path's current frontier — the lowest un-maxed visible tier (the one XP routes to). */
 	frontier: boolean;
+	/** Levels (1..maxLevel) that grant a reward — the milestones drawn as diamonds on the spine's pip
+	 *  track. Distinct and ascending, derived from the authored `levelRewards`. */
+	milestoneLevels: number[];
 	decipher: DecipherStage;
 	/** The romanized word of power (rendered as conlang glyphs by the spine/rail). */
 	word: string;
@@ -75,6 +78,18 @@ export function decipherStage(level: number, maxLevel: number): DecipherStage {
  *  residual XP compare on the same grid — mirroring the backend `Proficiency.XpForLevel`. */
 export function xpForLevel(baseXp: number, xpGrowth: number, level: number): number {
 	return Math.round(baseXp * Math.pow(xpGrowth, level) * 1000) / 1000;
+}
+
+/** The distinct, ascending milestone levels of a proficiency (the levels that grant a reward), clamped
+ *  to `1..maxLevel` so a stray authored reward can't draw a pip outside the track. */
+export function milestoneLevels(prof: IProficiency): number[] {
+	const levels = new Set<number>();
+	for (const reward of prof.levelRewards) {
+		if (reward.level >= 1 && reward.level <= prof.maxLevel) {
+			levels.add(reward.level);
+		}
+	}
+	return [...levels].sort((a, b) => a - b);
 }
 
 /** The tier a path opens to when selected: its frontier if it has one, otherwise the most-advanced
@@ -222,6 +237,7 @@ function derivePathSpine(
 			xpForNext: maxed ? 0 : xpForLevel(prof.baseXp, prof.xpGrowth, level),
 			state,
 			frontier: isFrontier,
+			milestoneLevels: milestoneLevels(prof),
 			decipher: decipherStage(level, prof.maxLevel),
 			word: prof.word,
 			pronunciation: prof.pronunciation,

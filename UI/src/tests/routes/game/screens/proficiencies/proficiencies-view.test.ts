@@ -25,6 +25,7 @@ vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManag
 import {
 	buildLexicon,
 	decipherStage,
+	milestoneLevels,
 	representativeTier,
 	xpForLevel
 } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
@@ -133,6 +134,53 @@ describe('xpForLevel', () => {
 		// 100 × 1.1^3 = 133.1 exactly; a curve that lands beyond 3 dp is rounded.
 		expect(xpForLevel(100, 1.1, 3)).toBe(133.1);
 		expect(xpForLevel(10, 1.337, 2)).toBe(Math.round(10 * 1.337 ** 2 * 1000) / 1000);
+	});
+});
+
+/* ── milestoneLevels ───────────────────────────────────────────────────────── */
+
+describe('milestoneLevels', () => {
+	it('is the distinct, ascending levels that grant a reward', () => {
+		const p = prof({
+			id: 0,
+			pathId: 0,
+			pathOrdinal: 0,
+			maxLevel: 10,
+			levelRewards: [
+				{ level: 10, rewardSkillId: 1 },
+				{ level: 5, rewardSkillId: 2 },
+				{ level: 5, rewardSkillId: 3 }
+			]
+		});
+		expect(milestoneLevels(p)).toEqual([5, 10]);
+	});
+
+	it('clamps rewards to the 1..maxLevel range', () => {
+		const p = prof({
+			id: 0,
+			pathId: 0,
+			pathOrdinal: 0,
+			maxLevel: 5,
+			levelRewards: [
+				{ level: 0, rewardSkillId: 1 },
+				{ level: 3, rewardSkillId: 2 },
+				{ level: 8, rewardSkillId: 3 }
+			]
+		});
+		expect(milestoneLevels(p)).toEqual([3]);
+	});
+
+	it('is empty when there are no rewards', () => {
+		expect(milestoneLevels(prof({ id: 0, pathId: 0, pathOrdinal: 0 }))).toEqual([]);
+	});
+
+	it('is surfaced on each tier of the built lexicon', () => {
+		const profs: IProficiency[] = [
+			prof({ id: 0, pathId: 0, pathOrdinal: 0, levelRewards: [{ level: 5, rewardSkillId: 9 }] })
+		];
+		const paths: IPath[] = [path({ id: 0 })];
+		const lexicon = buildLexicon(profs, paths, [row(0, 1)], []);
+		expect(lexicon[0].tiers[0].milestoneLevels).toEqual([5]);
 	});
 });
 
