@@ -25,7 +25,10 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 			attributes: [
 				{ attributeId: 0, amount: 50 },
 				{ attributeId: 1, amount: 30 }
-			]
+			],
+			// The class locked-base battle modifiers — a stable reference (the real manager memoises it) the
+			// battle engine compares by identity, so reassigning it simulates a class/level change.
+			battleLockedBaseModifiers: [] as unknown[]
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],

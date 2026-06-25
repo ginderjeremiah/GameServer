@@ -1,4 +1,6 @@
+using Game.Abstractions.Contracts;
 using Game.Abstractions.Contracts.Identity;
+using Game.Abstractions.DataAccess;
 using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
@@ -24,6 +26,7 @@ namespace Game.Api.Controllers
         SocketManagerService socketManager,
         PlayerService playerService,
         BattleService battleService,
+        IClasses classes,
         ILogger<LoginController> logger) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
@@ -33,7 +36,24 @@ namespace Game.Api.Controllers
         private readonly SocketManagerService _socketManager = socketManager;
         private readonly PlayerService _playerService = playerService;
         private readonly BattleService _battleService = battleService;
+        private readonly IClasses _classes = classes;
         private readonly ILogger<LoginController> _logger = logger;
+
+        // Projects the player to its wire DTO, resolving its class's attribute distributions (the locked-base
+        // fingerprint #1126 area D) so the client battler composes the same locked base the backend snapshot
+        // does. An unresolvable class yields an empty fingerprint rather than throwing — the player still loads.
+        private PlayerData BuildPlayerData(Player player)
+        {
+            var lockedBaseDistribution = (_classes.GetClass(player.ClassId)?.AttributeDistributions ?? [])
+                .Select(distribution => new AttributeDistribution
+                {
+                    AttributeId = distribution.AttributeId,
+                    BaseAmount = distribution.BaseAmount,
+                    AmountPerLevel = distribution.AmountPerLevel,
+                })
+                .ToList();
+            return PlayerData.FromPlayer(player, lockedBaseDistribution);
+        }
 
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
@@ -91,7 +111,7 @@ namespace Game.Api.Controllers
             return ApiResponse.Success(new SelectPlayerResult
             {
                 Tokens = ToAuthTokens(result.Tokens),
-                Player = PlayerData.FromPlayer(result.Player),
+                Player = BuildPlayerData(result.Player),
             });
         }
 
@@ -139,7 +159,7 @@ namespace Game.Api.Controllers
             return ApiResponse.Success(new SelectPlayerResult
             {
                 Tokens = ToAuthTokens(result.Tokens),
-                Player = PlayerData.FromPlayer(result.Player),
+                Player = BuildPlayerData(result.Player),
             });
         }
 
@@ -267,7 +287,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Player data not found", ApiErrorCategory.NotFound);
             }
 
-            return ApiResponse.Success(PlayerData.FromPlayer(player));
+            return ApiResponse.Success(BuildPlayerData(player));
         }
 
         /// <summary>

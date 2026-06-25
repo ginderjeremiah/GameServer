@@ -54,6 +54,7 @@ export interface PlayerBattleState {
 	attributes: IBattlerAttribute[];
 	selectedSkills: number[];
 	level: number;
+	lockedBaseModifiers: AttributeModifier[];
 	proficiencyModifiers: AttributeModifier[];
 }
 
@@ -105,6 +106,7 @@ export class BattleEngine {
 	private lastPlayerAttributes?: IBattlerAttribute[];
 	private lastSelectedSkills?: number[];
 	private lastPlayerLevel?: number;
+	private lastLockedBaseModifiers?: AttributeModifier[];
 	private lastProficiencyModifiers?: AttributeModifier[];
 
 	public start() {
@@ -173,23 +175,34 @@ export class BattleEngine {
 		// reference while unchanged (a `$derived`), so an idle farm whose proficiencies didn't change re-arms
 		// the existing battler instead of rebuilding it (#811).
 		const proficiencyModifiers = playerProficiencies.battleModifiers;
+		// The class locked base — the level-scaled attribute fingerprint (spike #1126 area D). A stable
+		// reference while the level and class distribution are unchanged (memoised on the manager), so an idle
+		// farm re-arms the existing battler instead of rebuilding it (#811).
+		const lockedBaseModifiers = playerManager.battleLockedBaseModifiers;
 		if (
 			equipmentStats === this.lastEquipmentStats &&
 			attributes === this.lastPlayerAttributes &&
 			selectedSkills === this.lastSelectedSkills &&
 			level === this.lastPlayerLevel &&
+			lockedBaseModifiers === this.lastLockedBaseModifiers &&
 			proficiencyModifiers === this.lastProficiencyModifiers
 		) {
 			this.player.reset();
 			return;
 		}
 		// Granted skills change only when equipment does, so gating the re-derive on equipmentStats (above)
-		// already covers them; read the slot-ordered ids here so the rebuilt battler fields them.
-		this.player.reset(playerManager, equipmentStats, inventoryManager.grantedSkillIds, proficiencyModifiers);
+		// already covers them; read the slot-ordered ids here so the rebuilt battler fields them. The locked
+		// base composes before the proficiency bonuses (the order the backend BattleSnapshot.GetModifiers uses)
+		// so the additive accumulation — and therefore the result down to the last bit — matches the replay.
+		this.player.reset(playerManager, equipmentStats, inventoryManager.grantedSkillIds, [
+			...lockedBaseModifiers,
+			...proficiencyModifiers
+		]);
 		this.lastEquipmentStats = equipmentStats;
 		this.lastPlayerAttributes = attributes;
 		this.lastSelectedSkills = selectedSkills;
 		this.lastPlayerLevel = level;
+		this.lastLockedBaseModifiers = lockedBaseModifiers;
 		this.lastProficiencyModifiers = proficiencyModifiers;
 	}
 
@@ -206,6 +219,7 @@ export class BattleEngine {
 			attributes: playerManager.attributes,
 			selectedSkills: playerManager.selectedSkills,
 			level: playerManager.level,
+			lockedBaseModifiers: playerManager.battleLockedBaseModifiers,
 			proficiencyModifiers: playerProficiencies.battleModifiers
 		};
 	}
@@ -220,6 +234,7 @@ export class BattleEngine {
 			state.attributes === playerManager.attributes &&
 			state.selectedSkills === playerManager.selectedSkills &&
 			state.level === playerManager.level &&
+			state.lockedBaseModifiers === playerManager.battleLockedBaseModifiers &&
 			state.proficiencyModifiers === playerProficiencies.battleModifiers
 		);
 	}

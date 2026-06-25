@@ -25,7 +25,7 @@ namespace Game.Api.Tests.Unit
                 skills: [skill5, skill6, skill7, skill8],
                 selectedSkills: [skill7, skill5]);
 
-            var data = PlayerDataModel.FromPlayer(player);
+            var data = PlayerDataModel.FromPlayer(player, []);
 
             Assert.Equal(4, data.UnlockedSkills.Count);
 
@@ -51,7 +51,7 @@ namespace Game.Api.Tests.Unit
         {
             var player = MakePlayer(skills: [], selectedSkills: []);
 
-            var data = PlayerDataModel.FromPlayer(player);
+            var data = PlayerDataModel.FromPlayer(player, []);
 
             Assert.Empty(data.UnlockedSkills);
         }
@@ -69,7 +69,7 @@ namespace Game.Api.Tests.Unit
 
             var player = MakePlayer(skills: [], selectedSkills: [], inventory: inventory);
 
-            var data = PlayerDataModel.FromPlayer(player);
+            var data = PlayerDataModel.FromPlayer(player, []);
 
             Assert.Equal(2, data.InventoryData.UnlockedItems.Count);
 
@@ -80,6 +80,25 @@ namespace Game.Api.Tests.Unit
             var unequippedHelm = data.InventoryData.UnlockedItems.Single(i => i.ItemId == helm.Id);
             Assert.False(unequippedHelm.Equipped);
             Assert.Null(unequippedHelm.EquipmentSlotId);
+        }
+
+        [Fact]
+        public void FromPlayer_ProjectsTheClassLockedBaseDistribution()
+        {
+            var player = MakePlayer(skills: [], selectedSkills: []);
+            var distribution = new Game.Abstractions.Contracts.AttributeDistribution
+            {
+                AttributeId = EAttribute.Strength,
+                BaseAmount = 8m,
+                AmountPerLevel = 2m,
+            };
+
+            var data = PlayerDataModel.FromPlayer(player, [distribution]);
+
+            var projected = Assert.Single(data.LockedBaseDistribution);
+            Assert.Equal(EAttribute.Strength, projected.AttributeId);
+            Assert.Equal(8m, projected.BaseAmount);
+            Assert.Equal(2m, projected.AmountPerLevel);
         }
 
         private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills, Inventory? inventory = null)
