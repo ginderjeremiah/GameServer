@@ -103,7 +103,7 @@ describe('Select page', () => {
 		await fireEvent.input(screen.getByTestId('new-name-input'), { target: { value: 'Mage' } });
 		await fireEvent.submit(screen.getByTestId('create-form'));
 
-		await waitFor(() => expect(postMock).toHaveBeenCalledWith('Login/CreatePlayer', { name: 'Mage' }));
+		await waitFor(() => expect(postMock).toHaveBeenCalledWith('Login/CreatePlayer', { name: 'Mage', classId: 0 }));
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(2));
 		expect(screen.getByText('Mage')).toBeTruthy();
 	});

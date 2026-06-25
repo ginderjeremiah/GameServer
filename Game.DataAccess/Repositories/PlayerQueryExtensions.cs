@@ -26,6 +26,7 @@ namespace Game.DataAccess.Repositories
             return players.Select(p => new PlayerCacheModel
             {
                 Id = p.Id,
+                ClassId = p.ClassId,
                 Name = p.Name,
                 Level = p.Level,
                 Exp = p.Exp,

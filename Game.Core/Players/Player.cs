@@ -17,6 +17,13 @@ namespace Game.Core.Players
     public class Player : AggregateRoot
     {
         public required int Id { get; set; }
+
+        /// <summary>
+        /// The class chosen at character creation. Permanent (never changed — a new archetype means a new
+        /// character) and the persisted seam the durable class effects build on: the level-scaled locked-base
+        /// attribute fingerprint (#1223) and the signature passive (#1224) are assembled from it at battle time.
+        /// </summary>
+        public required int ClassId { get; set; }
         public required string Name { get; set; }
         public required int Level { get; set; }
         public required int Exp { get; set; }

@@ -35,6 +35,32 @@ INSERT INTO "SkillDamageMultipliers" ("SkillId", "AttributeId", "Multiplier") VA
   (2, 2, 1.0)
 ON CONFLICT ("SkillId", "AttributeId") DO NOTHING;
 
+-- A starter class (id 0). Character creation now requires a class (#1221): both signup and
+-- add-character send a classId, which the API rejects unless it resolves to a live class, so the
+-- suite's signup flow needs class 0 to exist. Its kit is the starter skills 0/1/2 (the skills new
+-- players still receive) and a uniform base spread of 5 across the six core attributes (ids 0-5),
+-- mirroring the former flat starting allocation so a fresh e2e character is playable. The signature
+-- passive is a no-op (amount 0, Additive = 1 per EModifierType).
+INSERT INTO "Classes" ("Id", "Name", "Description", "Word", "PassiveAttributeId", "PassiveAmount", "PassiveScalingAttributeId", "PassiveScalingAmount", "PassiveModifierType", "RetiredAt") VALUES
+  (0, 'Adventurer', 'A versatile starting archetype.', 'aenkor', 0, 0, NULL, 0, 1, NULL)
+ON CONFLICT ("Id") DO NOTHING;
+
+INSERT INTO "ClassStarterSkills" ("ClassId", "SkillId") VALUES
+  (0, 0),
+  (0, 1),
+  (0, 2)
+ON CONFLICT ("ClassId", "SkillId") DO NOTHING;
+
+-- Base spread of 5 across the six core attributes (Strength=0 … Luck=5 per EAttribute), no per-level growth.
+INSERT INTO "ClassAttributeDistributions" ("ClassId", "AttributeId", "BaseAmount", "AmountPerLevel") VALUES
+  (0, 0, 5, 0),
+  (0, 1, 5, 0),
+  (0, 2, 5, 0),
+  (0, 3, 5, 0),
+  (0, 4, 5, 0),
+  (0, 5, 5, 0)
+ON CONFLICT ("ClassId", "AttributeId") DO NOTHING;
+
 -- A progression-gating challenge: "clear the starter zone" (ZonesCleared = 3 per EChallengeType,
 -- targeting zone 0, goal 1). The second zone below is gated behind it, so a brand-new player — who
 -- has not cleared anything — sees the forward zone-nav arrow locked. This exercises the locked path
@@ -96,6 +122,7 @@ ON CONFLICT ("ZoneId", "EnemyId") DO NOTHING;
 -- leaves their sequences untouched. Advance each past the highest seeded id so later DB-generated
 -- inserts (e.g. creating a record through the admin tools) don't collide with a seeded row.
 SELECT setval(pg_get_serial_sequence('"Skills"', 'Id'), (SELECT MAX("Id") FROM "Skills"));
+SELECT setval(pg_get_serial_sequence('"Classes"', 'Id'), (SELECT MAX("Id") FROM "Classes"));
 SELECT setval(pg_get_serial_sequence('"Enemies"', 'Id'), (SELECT MAX("Id") FROM "Enemies"));
 SELECT setval(pg_get_serial_sequence('"Zones"', 'Id'), (SELECT MAX("Id") FROM "Zones"));
 SELECT setval(pg_get_serial_sequence('"Challenges"', 'Id'), (SELECT MAX("Id") FROM "Challenges"));

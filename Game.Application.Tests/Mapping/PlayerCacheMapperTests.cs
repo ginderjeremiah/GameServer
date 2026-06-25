@@ -109,6 +109,7 @@ namespace Game.Application.Tests.Mapping
             var player = PlayerCacheMapper.ToCore(model, Catalog(), Catalog(), Catalog());
 
             Assert.Equal(1, player.Id);
+            Assert.Equal(2, player.ClassId);
             Assert.Equal("Hero", player.Name);
             Assert.Equal(3, player.Level);
             Assert.Equal(MappedLastActivity, player.LastActivity);
@@ -267,6 +268,7 @@ namespace Game.Application.Tests.Mapping
             var rehydrated = PlayerCacheMapper.ToCore(model, catalog, catalog, catalog);
 
             Assert.Equal(player.Id, rehydrated.Id);
+            Assert.Equal(player.ClassId, rehydrated.ClassId);
             Assert.Equal(player.Name, rehydrated.Name);
             Assert.Equal(player.Level, rehydrated.Level);
             Assert.Equal(player.Exp, rehydrated.Exp);
@@ -307,6 +309,7 @@ namespace Game.Application.Tests.Mapping
             bool autoChallengeBoss = false) => new()
             {
                 Id = 1,
+                ClassId = 2,
                 Name = "Hero",
                 Level = 3,
                 Exp = 0,
@@ -357,6 +360,7 @@ namespace Game.Application.Tests.Mapping
             return new Player
             {
                 Id = 1,
+                ClassId = 2,
                 Name = "Hero",
                 Level = 3,
                 Exp = 12,

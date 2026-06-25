@@ -197,7 +197,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
             }
 
-            var result = await _accountService.CreatePlayer(_sessionService.UserId, request.Name, HttpContext.RequestAborted);
+            var result = await _accountService.CreatePlayer(_sessionService.UserId, request.Name, request.ClassId, HttpContext.RequestAborted);
             if (!result.Success)
             {
                 return ApiResponse.Error(CreatePlayerErrorMessage(result.Status), CreatePlayerErrorCategory(result.Status));
@@ -220,15 +220,16 @@ namespace Game.Api.Controllers
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost]
-        public async Task<ApiResponse> CreateAccount([FromBody] LoginCredentials creds)
+        public async Task<ApiResponse> CreateAccount([FromBody] CreateAccountRequest request)
         {
-            var status = await _accountService.CreateAccount(creds.Username, creds.Password, HttpContext.RequestAborted);
+            var status = await _accountService.CreateAccount(request.Username, request.Password, request.ClassId, HttpContext.RequestAborted);
             // Exhaustive map (mirrors the login/role mappings) so a newly-added failure status is a build-time
             // gap to fill rather than a silent success reported to the client.
             return status switch
             {
                 CreateAccountStatus.Success => ApiResponse.Success(),
                 CreateAccountStatus.UsernameTaken => ApiResponse.Error("There is already an account with this username."),
+                CreateAccountStatus.InvalidClass => ApiResponse.Error("The selected class is not available.", ApiErrorCategory.BadRequest),
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }
@@ -376,6 +377,7 @@ namespace Game.Api.Controllers
             {
                 CreatePlayerStatus.InvalidName =>
                     $"Character names must be {PlayerName.MinLength}-{PlayerName.MaxLength} characters and contain no control characters.",
+                CreatePlayerStatus.InvalidClass => "The selected class is not available.",
                 CreatePlayerStatus.CapReached => "You have reached the maximum number of characters for this account.",
                 CreatePlayerStatus.UserNotFound => "Account not found",
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
@@ -386,8 +388,10 @@ namespace Game.Api.Controllers
         {
             return status switch
             {
-                // Both an invalid name and exceeding the cap are client-side validation/business failures.
+                // An invalid name, an unavailable class, and exceeding the cap are all client-side
+                // validation/business failures.
                 CreatePlayerStatus.InvalidName => ApiErrorCategory.BadRequest,
+                CreatePlayerStatus.InvalidClass => ApiErrorCategory.BadRequest,
                 CreatePlayerStatus.CapReached => ApiErrorCategory.BadRequest,
                 CreatePlayerStatus.UserNotFound => ApiErrorCategory.NotFound,
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),

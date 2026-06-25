@@ -45,9 +45,6 @@ namespace Game.Infrastructure.Entities
         public decimal BaseXp { get; set; }
         public decimal XpGrowth { get; set; }
 
-        /// <summary>True for a root proficiency that is open from character creation (class may override later).</summary>
-        public bool StartsUnlocked { get; set; }
-
         /// <summary>Optional skill granted when this proficiency opens via the tree (a node with no world
         /// skill source, e.g. a synthesized line). Null when the proficiency is seeded by an item/starter skill.</summary>
         public int? SeedSkillId { get; set; }

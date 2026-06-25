@@ -22,6 +22,9 @@ namespace Game.Infrastructure.Entities
         /// </summary>
         public int CurrentZoneId { get; set; }
 
+        /// <inheritdoc cref="Core.Players.Player.ClassId"/>
+        public int ClassId { get; set; }
+
         /// <inheritdoc cref="Core.Players.Player.Name"/>
         public required string Name { get; set; }
 

@@ -118,7 +118,6 @@ namespace Game.Application.Tests.DataAccess
                     MaxLevel = 10,
                     BaseXp = 100m,
                     XpGrowth = 2m,
-                    StartsUnlocked = true,
                     LevelModifiers = [],
                     LevelRewards = [],
                     Prerequisites = [],

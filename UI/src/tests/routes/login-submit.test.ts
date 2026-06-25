@@ -122,7 +122,11 @@ describe('Login page — submit flow', () => {
 		await submit();
 
 		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/select'));
-		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', { username: 'newhero', password: 'Test1234' });
+		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', {
+			username: 'newhero',
+			password: 'Test1234',
+			classId: 0
+		});
 		expect(postMock).toHaveBeenCalledWith('Login', { username: 'newhero', password: 'Test1234' });
 	});
 

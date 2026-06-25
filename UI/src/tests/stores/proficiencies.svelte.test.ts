@@ -39,7 +39,6 @@ const proficiency = (id: number, levelModifiers: IProficiency['levelModifiers'])
 	maxLevel: 10,
 	baseXp: 100,
 	xpGrowth: 1,
-	startsUnlocked: false,
 	levelModifiers,
 	levelRewards: [],
 	prerequisiteIds: []
