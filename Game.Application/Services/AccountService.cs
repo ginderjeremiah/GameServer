@@ -2,6 +2,7 @@ using Game.Abstractions.Auth;
 using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Application.Auth;
+using Game.Core.Classes;
 using Game.Core.Players;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,7 +22,7 @@ namespace Game.Application.Services
         IPasswordHasher passwordHasher,
         LoginBackoffGuard backoffGuard,
         NewPlayerFactory newPlayerFactory,
-        IProficiencies proficiencies,
+        IClasses classes,
         IOptions<PlayerCreationOptions> playerCreationOptions,
         ILogger<AccountService> logger)
     {
@@ -32,7 +33,7 @@ namespace Game.Application.Services
         private readonly IPasswordHasher _passwordHasher = passwordHasher;
         private readonly LoginBackoffGuard _backoffGuard = backoffGuard;
         private readonly NewPlayerFactory _newPlayerFactory = newPlayerFactory;
-        private readonly IProficiencies _proficiencies = proficiencies;
+        private readonly IClasses _classes = classes;
         private readonly PlayerCreationOptions _playerCreationOptions = playerCreationOptions.Value;
         private readonly ILogger<AccountService> _logger = logger;
 
@@ -44,8 +45,13 @@ namespace Game.Application.Services
         /// graphs. The up-front check is a fast path; the data tier's active-username uniqueness guard is
         /// the authority, so a username claimed concurrently (past the check) is still reported as taken.
         /// </summary>
-        public async Task<CreateAccountStatus> CreateAccount(string username, string password, CancellationToken cancellationToken = default)
+        public async Task<CreateAccountStatus> CreateAccount(string username, string password, int classId, CancellationToken cancellationToken = default)
         {
+            if (ResolveCreatableClass(classId) is not { } chosenClass)
+            {
+                return CreateAccountStatus.InvalidClass;
+            }
+
             if (await _users.CheckIfUsernameExists(username, cancellationToken))
             {
                 return CreateAccountStatus.UsernameTaken;
@@ -57,7 +63,7 @@ namespace Game.Application.Services
                 PassHash = _passwordHasher.Hash(password),
             };
 
-            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username, RootSeedSkillIds()), cancellationToken);
+            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username, chosenClass), cancellationToken);
 
             return created ? CreateAccountStatus.Success : CreateAccountStatus.UsernameTaken;
         }
@@ -200,14 +206,19 @@ namespace Game.Application.Services
         /// status so the caller can surface the right message; on success the new character's summary is
         /// returned so the client can add it to the select list.
         /// </summary>
-        public async Task<AccountCreatePlayerResult> CreatePlayer(int userId, string? name, CancellationToken cancellationToken = default)
+        public async Task<AccountCreatePlayerResult> CreatePlayer(int userId, string? name, int classId, CancellationToken cancellationToken = default)
         {
             if (!PlayerName.TryNormalize(name, out var normalized))
             {
                 return AccountCreatePlayerResult.Failed(CreatePlayerStatus.InvalidName);
             }
 
-            var blueprint = _newPlayerFactory.Create(normalized, RootSeedSkillIds());
+            if (ResolveCreatableClass(classId) is not { } chosenClass)
+            {
+                return AccountCreatePlayerResult.Failed(CreatePlayerStatus.InvalidClass);
+            }
+
+            var blueprint = _newPlayerFactory.Create(normalized, chosenClass);
             var result = await _users.CreatePlayer(userId, blueprint, _playerCreationOptions.MaxPlayersPerAccount, cancellationToken);
 
             return result.Outcome switch
@@ -221,17 +232,22 @@ namespace Game.Application.Services
         }
 
         /// <summary>
-        /// The seed skills granted to a brand-new character so its root proficiencies are trainable from
-        /// creation — the authored tree-seed skill of every live root (a <c>StartsUnlocked</c>, non-retired
-        /// proficiency that authors a <c>SeedSkillId</c>). Empty until roots are authored. The factory dedupes
-        /// these against the starter skills.
+        /// Resolves the class a new character is created as, or <see langword="null"/> when
+        /// <paramref name="classId"/> does not name a class that is in circulation. A retired class stays
+        /// resolvable by id (so existing characters keep working) but is out of circulation for new creations,
+        /// so it is rejected here. Returns the lean domain class the <see cref="NewPlayerFactory"/> reads.
         /// </summary>
-        private IReadOnlyList<int> RootSeedSkillIds()
+        private Class? ResolveCreatableClass(int classId)
         {
-            return [.. _proficiencies.AllProficiencies()
-                .Where(p => p.StartsUnlocked && p.RetiredAt is null && p.SeedSkillId is not null)
-                .Select(p => p.SeedSkillId!.Value)
-                .Distinct()];
+            if (_classes.All().FirstOrDefault(c => c.Id == classId) is not { RetiredAt: null })
+            {
+                return null;
+            }
+
+            // The contract resolved and is live, so the lean domain class must resolve too; a miss here is a
+            // corrupt cache, not a bad request.
+            return _classes.GetClass(classId)
+                ?? throw new InvalidOperationException($"Class {classId} resolved as a live contract but is missing from the gameplay cache.");
         }
 
         /// <summary>

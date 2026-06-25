@@ -179,7 +179,10 @@ const handleSubmit = async () => {
 	submitting = true;
 
 	if (mode === 'signup') {
-		const created = await new ApiRequest('Login/CreateAccount').post({ username, password });
+		// TODO(#1225): send the class chosen in the create-character class picker. Until it (and authored
+		// class content, #1226) ships, creation is wired but not usable end-to-end; this placeholder keeps
+		// the call type-correct.
+		const created = await new ApiRequest('Login/CreateAccount').post({ username, password, classId: 0 });
 		if (created.status !== 200) {
 			submitting = false;
 			serverError = created.error ?? 'Could not create account.';

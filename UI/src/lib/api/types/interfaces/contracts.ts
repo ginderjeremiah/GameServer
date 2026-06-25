@@ -134,7 +134,6 @@ export interface IProficiency {
 	maxLevel: number;
 	baseXp: number;
 	xpGrowth: number;
-	startsUnlocked: boolean;
 	seedSkillId?: number;
 	retiredAt?: string;
 	levelModifiers: IProficiencyLevelModifier[];

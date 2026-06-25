@@ -13,6 +13,7 @@ namespace Game.Core.TestInfrastructure.Builders
     public sealed class PlayerBuilder
     {
         private int _id = 1;
+        private int _classId = 0;
         private string _name = "Test";
         private int _level = 1;
         private int _exp = 0;
@@ -30,6 +31,12 @@ namespace Game.Core.TestInfrastructure.Builders
         public PlayerBuilder WithId(int id)
         {
             _id = id;
+            return this;
+        }
+
+        public PlayerBuilder WithClassId(int classId)
+        {
+            _classId = classId;
             return this;
         }
 
@@ -102,6 +109,7 @@ namespace Game.Core.TestInfrastructure.Builders
         public Player Build() => new()
         {
             Id = _id,
+            ClassId = _classId,
             Name = _name,
             Level = _level,
             Exp = _exp,

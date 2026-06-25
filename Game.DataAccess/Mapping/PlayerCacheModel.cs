@@ -20,6 +20,7 @@ namespace Game.DataAccess.Mapping
     internal sealed class PlayerCacheModel
     {
         public required int Id { get; init; }
+        public required int ClassId { get; init; }
         public required string Name { get; init; }
         public required int Level { get; init; }
         public required int Exp { get; init; }

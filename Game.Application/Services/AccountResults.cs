@@ -11,6 +11,9 @@ namespace Game.Application.Services
     {
         Success,
         UsernameTaken,
+
+        /// <summary>The chosen class id does not resolve to a live (non-retired) class.</summary>
+        InvalidClass,
     }
 
     /// <summary>
@@ -57,6 +60,9 @@ namespace Game.Application.Services
 
         /// <summary>The supplied name failed validation (blank, too long, or control characters).</summary>
         InvalidName,
+
+        /// <summary>The chosen class id does not resolve to a live (non-retired) class.</summary>
+        InvalidClass,
 
         /// <summary>The account already holds the maximum number of characters.</summary>
         CapReached,

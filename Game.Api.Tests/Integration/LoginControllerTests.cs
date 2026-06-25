@@ -465,14 +465,16 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreateAccount_ValidCredentials_Succeeds()
         {
-            // Arrange — CreateAccount inserts PlayerSkills with SkillId 0, 1, 2
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            // Arrange — the class kit backs the new player's PlayerSkills.
+            int classId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
 
-            var creds = new { Username = "newuser", Password = "newpass" };
+            var creds = new { Username = "newuser", Password = "newpass", ClassId = classId };
 
             var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
 
@@ -486,12 +488,17 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreateAccount_DuplicateUsername_ReturnsError()
         {
-            // Arrange — create user first
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            await TestDataSeeder.CreateUserAsync(context, "duplicate", "pass");
+            // Arrange — create user first; seed a class so creation reaches the duplicate-username check.
+            int classId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateUserAsync(context, "duplicate", "pass");
+                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
 
-            var creds = new { Username = "duplicate", Password = "anotherpass" };
+            var creds = new { Username = "duplicate", Password = "anotherpass", ClassId = classId };
 
             // Act
             var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
@@ -506,14 +513,16 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreateAccount_ConcurrentDuplicate_ReturnsCleanErrorNotServerError()
         {
-            // CreateAccount inserts PlayerSkills with SkillId 0, 1, 2.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            // The class kit backs each new player's PlayerSkills.
+            int classId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
 
-            var creds = new { Username = "raceuser", Password = "racepass" };
+            var creds = new { Username = "raceuser", Password = "racepass", ClassId = classId };
 
             // Two concurrent requests racing past the existence check both reach the commit. The
             // active-username unique index lets exactly one through; the loser must surface as a clean
@@ -530,19 +539,19 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreatePlayer_AuthenticatedValidName_CreatesCharacterAndReturnsSummary()
         {
-            // The new-player blueprint inserts PlayerSkills with SkillId 0, 1, 2.
+            // The class kit (its starter skills) backs the new-player blueprint's PlayerSkills.
+            int classId;
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
             var user = await TestDataSeeder.CreateUserAsync(context, "creatorctrl", "pass");
+            await ReloadReferenceCachesAsync();
 
             var client = Factory.CreateClient();
             // A pre-selection token (no player bound) — the realistic state on the character-select screen.
             TestAuthHelper.AddAuthHeader(client, user.Id);
 
-            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "Gandalf" }, CancellationToken);
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "Gandalf", ClassId = classId }, CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerSummary>>(CancellationToken);
@@ -556,6 +565,7 @@ namespace Game.Api.Tests.Integration
             var created = await verifyContext.Players.FirstOrDefaultAsync(p => p.Id == result.Data.Id, CancellationToken);
             Assert.NotNull(created);
             Assert.Equal(user.Id, created.UserId);
+            Assert.Equal(classId, created.ClassId);
             client.Dispose();
         }
 
@@ -577,9 +587,10 @@ namespace Game.Api.Tests.Integration
             var client = Factory.CreateClient();
             TestAuthHelper.AddAuthHeader(client, user.Id);
 
-            // A name past the 20-char limit is rejected with a structured error, not a 500.
+            // A name past the 20-char limit is rejected with a structured error, not a 500. The name is
+            // validated before the class, so the placeholder class id is never reached.
             var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer",
-                new { Name = "this-name-is-way-too-long-to-be-valid" }, CancellationToken);
+                new { Name = "this-name-is-way-too-long-to-be-valid", ClassId = 0 }, CancellationToken);
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<PlayerSummary>>(CancellationToken);
@@ -597,21 +608,21 @@ namespace Game.Api.Tests.Integration
         {
             // Verifies the configured default cap (6) is wired end-to-end: an account already holding the cap
             // is refused another character.
+            int classId;
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
             var user = await TestDataSeeder.CreateUserAsync(context, "cappedctrl", "pass");
             for (var i = 0; i < 6; i++)
             {
                 await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: $"Char{i}");
             }
+            await ReloadReferenceCachesAsync();
 
             var client = Factory.CreateClient();
             TestAuthHelper.AddAuthHeader(client, user.Id);
 
-            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "OneTooMany" }, CancellationToken);
+            var response = await client.PostAsJsonAsync("/api/Login/CreatePlayer", new { Name = "OneTooMany", ClassId = classId }, CancellationToken);
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             using var verifyScope = CreateScope();

@@ -69,6 +69,7 @@ namespace Game.DataAccess.Mapping
             return new PlayerCacheModel
             {
                 Id = player.Id,
+                ClassId = player.ClassId,
                 Name = player.Name,
                 Level = player.Level,
                 Exp = player.Exp,
@@ -161,6 +162,7 @@ namespace Game.DataAccess.Mapping
             return new Player
             {
                 Id = model.Id,
+                ClassId = model.ClassId,
                 Name = model.Name,
                 Level = model.Level,
                 Exp = model.Exp,

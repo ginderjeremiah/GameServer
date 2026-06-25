@@ -31,14 +31,14 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // The starter skills 0/1/2 must exist for the player-skill FK.
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            // The class kit (starter skills 0/1/2 + base-5 spread over the six core attributes) is the parameter
+            // that drives creation; its skills must exist for the player-skill FK. Reload caches so IClasses sees it.
+            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
+            await ReloadReferenceCachesAsync();
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var status = await accountService.CreateAccount("newaccount", "newpass");
+            var status = await accountService.CreateAccount("newaccount", "newpass", chosenClass.Id);
             Assert.Equal(CreateAccountStatus.Success, status);
 
             // CreateAccount commits its own insert (so the active-username guard can be honoured), so the
@@ -52,6 +52,7 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(createdUser);
             var createdPlayer = Assert.Single(createdUser.Players);
             Assert.Equal("newaccount", createdPlayer.Name);
+            Assert.Equal(chosenClass.Id, createdPlayer.ClassId);
             Assert.Equal(1, createdPlayer.Level);
             Assert.Equal(0, createdPlayer.Exp);
             Assert.Equal(0, createdPlayer.CurrentZoneId);
@@ -95,10 +96,12 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             await TestDataSeeder.CreateUserAsync(context, "existing", "pass");
+            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
+            await ReloadReferenceCachesAsync();
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var status = await accountService.CreateAccount("existing", "anotherpass");
+            var status = await accountService.CreateAccount("existing", "anotherpass", chosenClass.Id);
 
             Assert.Equal(CreateAccountStatus.UsernameTaken, status);
         }
@@ -106,14 +109,14 @@ namespace Game.Application.Tests.Services
         [Fact]
         public async Task CreateAccount_ConcurrentSameUsername_CreatesExactlyOneActiveAccount()
         {
-            // The starter skills 0/1/2 must exist for each new player's player-skill FK.
+            // The class kit (its starter skills) must exist for each new player's player-skill FK.
+            int classId;
             using (var seedScope = CreateScope())
             {
                 var seedContext = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill0");
-                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill1");
-                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill2");
+                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(seedContext)).Id;
             }
+            await ReloadReferenceCachesAsync();
 
             // Each attempt runs on its own scope/DbContext (a context is not thread-safe). Whether both race
             // past the existence check or one observes the other's row, the active-username unique index must
@@ -121,7 +124,7 @@ namespace Game.Application.Tests.Services
             async Task<CreateAccountStatus> Attempt()
             {
                 using var scope = CreateScope();
-                return await CreateAccountService(scope.ServiceProvider).CreateAccount("raceuser", "racepass");
+                return await CreateAccountService(scope.ServiceProvider).CreateAccount("raceuser", "racepass", classId);
             }
 
             var results = await Task.WhenAll(Attempt(), Attempt());
@@ -147,12 +150,11 @@ namespace Game.Application.Tests.Services
             archived.ArchivedAt = DateTime.UtcNow;
             await context.SaveChangesAsync(CancellationToken);
 
-            // The starter skills 0/1/2 must exist for the new player's player-skill FK.
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            // The class kit (its starter skills) must exist for the new player's player-skill FK.
+            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
+            await ReloadReferenceCachesAsync();
 
-            var status = await CreateAccountService(scope.ServiceProvider).CreateAccount("reusable", "newpass");
+            var status = await CreateAccountService(scope.ServiceProvider).CreateAccount("reusable", "newpass", chosenClass.Id);
             Assert.Equal(CreateAccountStatus.Success, status);
 
             using var verifyScope = CreateScope();
@@ -492,16 +494,15 @@ namespace Game.Application.Tests.Services
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            // The starter skills 0/1/2 must exist for the new player's player-skill FK.
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            // The class kit (its starter skills) must exist for the new player's player-skill FK.
+            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
+            await ReloadReferenceCachesAsync();
             var user = await TestDataSeeder.CreateUserAsync(context, "creator", "pass");
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
             // A surrounding-whitespace name is normalized (trimmed) before persistence.
-            var result = await accountService.CreatePlayer(user.Id, "  Aragorn  ");
+            var result = await accountService.CreatePlayer(user.Id, "  Aragorn  ", chosenClass.Id);
 
             Assert.True(result.Success);
             Assert.Equal("Aragorn", result.Player.Name);
@@ -515,6 +516,7 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(created);
             Assert.Equal(user.Id, created.UserId);
             Assert.Equal("Aragorn", created.Name);
+            Assert.Equal(chosenClass.Id, created.ClassId);
             Assert.Equal(1, created.Level);
 
             var skills = await verifyContext.Set<PlayerSkill>()
@@ -530,15 +532,14 @@ namespace Game.Application.Tests.Services
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            await TestDataSeeder.CreateSkillAsync(context, "Skill0");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill1");
-            await TestDataSeeder.CreateSkillAsync(context, "Skill2");
+            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
+            await ReloadReferenceCachesAsync();
             var user = await TestDataSeeder.CreateUserAsync(context, "secondchar", "pass");
             var existing = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "First");
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var result = await accountService.CreatePlayer(user.Id, "Second");
+            var result = await accountService.CreatePlayer(user.Id, "Second", chosenClass.Id);
 
             Assert.True(result.Success);
             using var verifyScope = CreateScope();
@@ -564,10 +565,66 @@ namespace Game.Application.Tests.Services
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var result = await accountService.CreatePlayer(user.Id, name);
+            // The name is validated before the class, so an invalid name is rejected regardless of class id.
+            var result = await accountService.CreatePlayer(user.Id, name, classId: 0);
 
             Assert.False(result.Success);
             Assert.Equal(CreatePlayerStatus.InvalidName, result.Status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(0, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
+        }
+
+        [Fact]
+        public async Task CreateAccount_UnknownClass_ReturnsInvalidClassAndCreatesNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            // A class id far beyond anything the shared integration catalogue holds is guaranteed unknown.
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var status = await accountService.CreateAccount("classless", "pass", classId: 999_999);
+
+            Assert.Equal(CreateAccountStatus.InvalidClass, status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.False(await verifyContext.Users.AnyAsync(u => u.Username == "classless", CancellationToken));
+        }
+
+        [Fact]
+        public async Task CreateAccount_RetiredClass_ReturnsInvalidClass()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            // A retired class stays resolvable by id but is out of circulation for new creations.
+            var retired = await TestDataSeeder.CreateClassWithKitAsync(
+                context, starterSkillIds: [], name: "Retired", retiredAt: DateTime.UtcNow);
+            await ReloadReferenceCachesAsync();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var status = await accountService.CreateAccount("wantsretired", "pass", retired.Id);
+
+            Assert.Equal(CreateAccountStatus.InvalidClass, status);
+        }
+
+        [Fact]
+        public async Task CreatePlayer_UnknownClass_ReturnsInvalidClassAndCreatesNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "classlesschar", "pass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            // A valid name with an unknown class id (far beyond the shared catalogue) is rejected as
+            // InvalidClass, creating nothing.
+            var result = await accountService.CreatePlayer(user.Id, "Nameless", classId: 999_999);
+
+            Assert.False(result.Success);
+            Assert.Equal(CreatePlayerStatus.InvalidClass, result.Status);
 
             using var verifyScope = CreateScope();
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
@@ -579,13 +636,15 @@ namespace Game.Application.Tests.Services
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
+            await ReloadReferenceCachesAsync();
             var user = await TestDataSeeder.CreateUserAsync(context, "capped", "pass");
             await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Only");
 
             // A cap of 1 with one existing character means the next creation is over the cap.
             var accountService = CreateAccountService(scope.ServiceProvider, maxPlayersPerAccount: 1);
 
-            var result = await accountService.CreatePlayer(user.Id, "TooMany");
+            var result = await accountService.CreatePlayer(user.Id, "TooMany", chosenClass.Id);
 
             Assert.False(result.Success);
             Assert.Equal(CreatePlayerStatus.CapReached, result.Status);
@@ -598,13 +657,13 @@ namespace Game.Application.Tests.Services
         [Fact]
         public async Task CreatePlayer_ConcurrentAtCapBoundary_NeverExceedsTheCap()
         {
+            int classId;
             using (var seedScope = CreateScope())
             {
                 var seedContext = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill0");
-                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill1");
-                await TestDataSeeder.CreateSkillAsync(seedContext, "Skill2");
+                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(seedContext)).Id;
             }
+            await ReloadReferenceCachesAsync();
 
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -616,7 +675,7 @@ namespace Game.Application.Tests.Services
             async Task<AccountCreatePlayerResult> Attempt(string name)
             {
                 using var attemptScope = CreateScope();
-                return await CreateAccountService(attemptScope.ServiceProvider, maxPlayersPerAccount: 2).CreatePlayer(user.Id, name);
+                return await CreateAccountService(attemptScope.ServiceProvider, maxPlayersPerAccount: 2).CreatePlayer(user.Id, name, classId);
             }
 
             var results = await Task.WhenAll(Attempt("RaceA"), Attempt("RaceB"));
@@ -828,7 +887,7 @@ namespace Game.Application.Tests.Services
                 hasher,
                 backoffGuard,
                 new NewPlayerFactory(),
-                provider.GetRequiredService<IProficiencies>(),
+                provider.GetRequiredService<IClasses>(),
                 Options.Create(new PlayerCreationOptions { MaxPlayersPerAccount = maxPlayersPerAccount }),
                 NullLogger<AccountService>.Instance);
         }

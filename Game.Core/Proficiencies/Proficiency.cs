@@ -27,9 +27,6 @@ namespace Game.Core.Proficiencies
         public required double BaseXp { get; init; }
         public required double XpGrowth { get; init; }
 
-        /// <summary>True for a root proficiency open from character creation.</summary>
-        public required bool StartsUnlocked { get; init; }
-
         /// <summary>Optional skill granted when this proficiency opens via the tree (a node with no world
         /// skill source); null when seeded by an item/starter skill.</summary>
         public required int? SeedSkillId { get; init; }

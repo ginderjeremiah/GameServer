@@ -51,7 +51,6 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
-                    StartsUnlocked = item.StartsUnlocked,
                     SeedSkillId = item.SeedSkillId,
                 }),
                 edit: item => _entityStore.Update(new Entities.Proficiency
@@ -68,7 +67,6 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
-                    StartsUnlocked = item.StartsUnlocked,
                     SeedSkillId = item.SeedSkillId,
                     RetiredAt = item.RetiredAt,
                 }),

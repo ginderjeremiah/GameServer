@@ -9,6 +9,7 @@ import type {
 	IChallenge,
 	IChange,
 	IClass,
+	ICreateAccountRequest,
 	ICreatePlayerRequest,
 	IDeadLetterInspection,
 	IDeadLetterReplayResult,
@@ -136,7 +137,7 @@ export type ApiRequestTypes = {
 	'AdminTools/SetUserRoles': ISetUserRolesData;
 	'AdminTools/SetZoneEnemies': ISetZoneEnemiesData;
 	'Login': ILoginCredentials;
-	'Login/CreateAccount': ILoginCredentials;
+	'Login/CreateAccount': ICreateAccountRequest;
 	'Login/CreatePlayer': ICreatePlayerRequest;
 	'Login/DeviceInfo': IDeviceInfoRequest;
 	'Login/Logout': IRefreshRequest;

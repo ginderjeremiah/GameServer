@@ -63,7 +63,6 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(10, core.MaxLevel);
             Assert.Equal(100d, core.BaseXp);
             Assert.Equal(1.5d, core.XpGrowth);
-            Assert.True(core.StartsUnlocked);
             Assert.Equal(4, core.SeedSkillId);
             Assert.Equal([2], core.PrerequisiteIds);
         }
@@ -149,7 +148,6 @@ namespace Game.Application.Tests.Mapping
                 MaxLevel = 10,
                 BaseXp = 100m,
                 XpGrowth = 1.5m,
-                StartsUnlocked = true,
                 SeedSkillId = seedSkillId,
                 LevelModifiers = modifiers ?? [],
                 LevelRewards = rewards ?? [],
