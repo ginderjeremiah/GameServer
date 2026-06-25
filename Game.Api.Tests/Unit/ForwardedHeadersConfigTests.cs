@@ -8,8 +8,9 @@ namespace Game.Api.Tests.Unit
 {
     /// <summary>
     /// Covers <see cref="ForwardedHeadersConfig.Apply"/>: the framework defaults (loopback) are cleared so
-    /// the trust set is entirely explicit, only X-Forwarded-For is honoured, and configured proxies/networks
-    /// are parsed onto the options while unparseable entries are skipped.
+    /// the trust set is entirely explicit, only X-Forwarded-For is honoured, the trust-chain depth
+    /// (ForwardLimit) is projected (defaulting to 1), and configured proxies/networks are parsed onto the
+    /// options while unparseable entries are skipped.
     /// </summary>
     public class ForwardedHeadersConfigTests
     {
@@ -57,6 +58,36 @@ namespace Game.Api.Tests.Unit
             Assert.Contains(options.KnownProxies, p => p.Equals(IPAddress.Parse("::1")));
             Assert.Single(options.KnownIPNetworks);
             Assert.Equal(System.Net.IPNetwork.Parse("172.16.0.0/12"), options.KnownIPNetworks[0]);
+        }
+
+        [Fact]
+        public void Apply_DefaultsForwardLimitToOne()
+        {
+            var options = new ForwardedHeadersOptions();
+
+            new ForwardedHeadersConfig().Apply(options);
+
+            Assert.Equal(1, options.ForwardLimit);
+        }
+
+        [Fact]
+        public void Apply_SetsConfiguredForwardLimit()
+        {
+            var options = new ForwardedHeadersOptions();
+
+            new ForwardedHeadersConfig { ForwardLimit = 2 }.Apply(options);
+
+            Assert.Equal(2, options.ForwardLimit);
+        }
+
+        [Fact]
+        public void Apply_WithNullForwardLimit_DisablesTheLimit()
+        {
+            var options = new ForwardedHeadersOptions();
+
+            new ForwardedHeadersConfig { ForwardLimit = null }.Apply(options);
+
+            Assert.Null(options.ForwardLimit);
         }
 
         [Fact]
