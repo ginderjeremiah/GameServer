@@ -24,9 +24,6 @@ A = gf.alphabet()
 def lab(size):
     return ImageFont.load_default(size=size * SS)
 
-def advance(ch):
-    return gf.WIDE.get(ch, gf.ADV)
-
 class Canvas:
     def __init__(self, draw):
         self.d = draw
@@ -45,16 +42,17 @@ def draw_glyph(c, contours, ox, baseline, color, scale):
             c.poly([(ox + x * scale, baseline - y * scale) for x, y in ct], color)
 
 def shape(text):
-    """Greedy digraph -> ligature shaper. Yields (contours|None, advance)."""
+    """Greedy digraph -> ligature shaper. Yields (shifted_contours|None, advance),
+    using the same ink-normalized metrics the font ships with."""
     out, i, t = [], 0, text.lower()
     while i < len(t):
         two = t[i:i + 2]
         if two in gf.LIGS:
-            out.append((gf.LIGS[two], advance(two[0]))); i += 2
+            out.append(gf.normalized(gf.LIGS[two])); i += 2
         elif t[i] == ' ':
-            out.append((None, gf.ADV * 0.5)); i += 1
+            out.append((None, gf.SPACE_ADV)); i += 1
         elif t[i] in A:
-            out.append((A[t[i]], advance(t[i]))); i += 1
+            out.append(gf.normalized(A[t[i]])); i += 1
         else:
             i += 1
     return out
@@ -63,7 +61,7 @@ def main():
     cols, cw, ch = 7, 168, 280
     rows_a = (26 + cols - 1) // cols
     rows_d = (10 + cols - 1) // cols
-    words = ['inferno', 'tempest', 'aether', 'frostbite', 'verdant grove']
+    words = ['inferno', 'frostbite', 'orbit', 'abyss', 'tempest', 'verdant grove']
     scale = 0.30
     w = 40 + cols * cw + 20
     h = 90 + rows_a * ch + 60 + rows_d * ch + 80 + len(words) * 250 + 40
@@ -73,9 +71,10 @@ def main():
 
     def cell(contours, label, gx, gy, color):
         base = gy + 200
+        shifted, adv = gf.normalized(contours)
         c.line([(gx, base), (gx + cw - 16, base)], GUIDE, 1)
         c.line([(gx, base + gf.DDEPTH * scale), (gx + cw - 16, base + gf.DDEPTH * scale)], GUIDE, 1)
-        draw_glyph(c, contours, gx + (cw - 16 - advance(label) * scale) / 2, base, color, scale)
+        draw_glyph(c, shifted, gx + (cw - 16 - adv * scale) / 2, base, color, scale)
         c.text((gx + 6, base + 36), label, 14, LABEL)
 
     y0 = 80

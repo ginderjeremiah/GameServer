@@ -25,7 +25,6 @@ UPM = 1000
 CAP = 700
 DESC = -200
 WIDTH = 46          # default stroke thickness (font units)
-ADV = 560           # default advance width
 
 # ---- primitives (unit coords, y-up, baseline 0) ----
 def ln(a, b):
@@ -169,16 +168,32 @@ PUNCT = {
 CMAP_PUNCT = {ord('.'): 'period', ord(','): 'comma', ord('!'): 'exclam',
               ord('?'): 'question', ord('-'): 'hyphen', ord(':'): 'colon', ord("'"): 'apostrophe'}
 
-# per-glyph advance overrides (narrower/wider than the ADV default)
-WIDE = {'i': 360, 'j': 460, 'l': 440, 'o': 460, 'x': 460, 'n': 460,
-        'h': 540, 'm': 540, 'w': 540, 'k': 520, 'f': 500,
-        'u': 540, 'q': 520, 'd': 540, 'v': 500, 'z': 540, 'y': 500}
-
 LIGATURE_PAIRS = (('t', 'h'), ('s', 'h'), ('c', 'h'), ('n', 'g'), ('p', 'h'), ('k', 'h'))
+
+# Spacing. Advance widths are derived from each glyph's actual ink bounds plus a
+# uniform side bearing on both sides — so every glyph carries the same left/right
+# gap and words space evenly. (A hand-tuned advance table previously left large
+# gaps wherever a glyph's ink sat far from its advance box, e.g. b's left-bulging
+# bow read as a near-space before the following letter.)
+SIDE_BEARING = 75
+SPACE_ADV = 280
+
+def _ink_bounds_x(contours):
+    xs = [p[0] for c in contours if len(c) >= 3 for p in c]
+    return (min(xs), max(xs)) if xs else None
+
+def normalized(contours, sb=SIDE_BEARING):
+    """Shift contours so their ink starts at the side bearing; return (contours, advance)."""
+    bounds = _ink_bounds_x(contours)
+    if bounds is None:
+        return contours, SPACE_ADV
+    minx, maxx = bounds
+    dx = sb - minx
+    shifted = [[(x + dx, y) for (x, y) in c] for c in contours]
+    return shifted, round((maxx - minx) + 2 * sb)
 
 def _pen(contours):
     pen = TTGlyphPen(None)
-    xs = []
     for c in contours:
         if len(c) < 3:
             continue
@@ -186,36 +201,36 @@ def _pen(contours):
         for pt in c[1:]:
             pen.lineTo((round(pt[0]), round(pt[1])))
         pen.closePath()
-        xs += [p[0] for p in c]
-    return pen.glyph(), (round(min(xs)) if xs else 0)
+    return pen.glyph()
 
 def _font():
     a = alphabet()
     glyphs, metrics, cmap, order = {}, {}, {}, ['.notdef']
 
-    def add(name, contours, codepoints=(), adv=ADV):
-        g, lsb = _pen(contours)
-        glyphs[name] = g
-        metrics[name] = (adv, lsb)
+    def add(name, contours, codepoints=()):
+        shifted, advance = normalized(contours)
+        glyphs[name] = _pen(shifted)
+        metrics[name] = (advance, SIDE_BEARING)
         order.append(name)
         for cp in codepoints:
             cmap[cp] = name
 
-    glyphs['.notdef'], _ = _pen([ring(300, 360, 180, 300)])
-    metrics['.notdef'] = (ADV, 0)
+    notdef_shifted, notdef_adv = normalized([ring(300, 360, 180, 300)])
+    glyphs['.notdef'] = _pen(notdef_shifted)
+    metrics['.notdef'] = (notdef_adv, SIDE_BEARING)
     glyphs['space'] = TTGlyphPen(None).glyph()
-    metrics['space'] = (ADV, 0)
+    metrics['space'] = (SPACE_ADV, 0)
     order.append('space')
     cmap[0x20] = 'space'
 
     for ch, contours in a.items():
-        add('cl_' + ch, contours, (ord(ch), ord(ch.upper())), WIDE.get(ch, ADV))
+        add('cl_' + ch, contours, (ord(ch), ord(ch.upper())))
     for ch, contours in DIGITS.items():
         add('cl_d' + ch, contours, (ord(ch),))
     for name, contours in PUNCT.items():
         add(name, contours, [cp for cp, n in CMAP_PUNCT.items() if n == name])
     for lg, contours in LIGS.items():
-        add('cl_' + lg, contours, (), WIDE.get(lg[0], ADV))
+        add('cl_' + lg, contours, ())
 
     fb = FontBuilder(UPM, isTTF=True)
     fb.setupGlyphOrder(order)
