@@ -7,7 +7,7 @@
 	data-testid="attr-row-{meta.id}"
 	aria-pressed={active}
 	onclick={() => onSelect(meta.id)}
-	use:attributeHover={{ controller: attrTip, id: meta.id }}
+	use:tooltipHover={{ controller: attrTip, payload: meta.id }}
 	use:describedByTooltip={attrTip?.describedById}
 >
 	<span class="info">
@@ -26,7 +26,7 @@ import { attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
-import { attributeHover } from '$components/tooltip/attribute-hover';
+import { tooltipHover } from '$components/tooltip/tooltip-hover';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import StackBar from './StackBar.svelte';
 import { fmtNum, type BreakdownAttrMeta, type LabeledModifier } from './attribute-breakdown-view.svelte';

@@ -23,7 +23,7 @@
 	<div
 		class="word-block"
 		tabindex="0"
-		use:wordHover={{ controller, tier }}
+		use:tooltipHover={{ controller, payload: tier }}
 		use:describedByTooltip={controller.describedById}
 	>
 		<WordOfPower
@@ -82,9 +82,9 @@
 import { Bar, WordOfPower } from '$components';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import { staticData } from '$stores';
-import type { PathView, TierView } from './proficiencies-lexicon';
+import { tooltipHover } from '$components/tooltip/tooltip-hover';
+import type { PathView, TierView, WordTooltipController } from './proficiencies-lexicon';
 import { buildLadder, decipherReveal, statePill, trainedBy, xpProgressText } from './word-detail';
-import { wordHover, type WordTooltipController } from './word-hover';
 
 interface Props {
 	/** The selected tier to detail. */

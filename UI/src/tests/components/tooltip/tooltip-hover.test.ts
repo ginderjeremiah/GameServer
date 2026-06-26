@@ -1,40 +1,18 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { wordHover } from '$routes/game/screens/proficiencies/word-hover';
-import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import { tooltipHover } from '$components/tooltip/tooltip-hover';
 
 const makeController = () => ({ describedById: 'tooltip-1', show: vi.fn(), move: vi.fn(), hide: vi.fn() });
 
-const tierView = (id: number): TierView => ({
-	id,
-	name: `Tier ${id}`,
-	pathOrdinal: 0,
-	level: 0,
-	maxLevel: 10,
-	xp: 0,
-	xpForNext: 100,
-	state: 'unlocked',
-	frontier: false,
-	milestoneLevels: [],
-	levelModifiers: [],
-	levelRewards: [],
-	decipher: 'undeciphered',
-	word: `word${id}`,
-	pronunciation: `pron${id}`,
-	translation: `means${id}`,
-	iconPath: ''
-});
-
-describe('wordHover action', () => {
+describe('tooltipHover action', () => {
 	it('shows anchored at the cursor on hover, repositions on move, hides on leave', () => {
 		const node = document.createElement('div');
 		const controller = makeController();
-		const tier = tierView(1);
-		const action = wordHover(node, { controller, tier });
+		const action = tooltipHover(node, { controller, payload: 'strength' });
 
 		const enter = new MouseEvent('mouseenter');
 		node.dispatchEvent(enter);
-		expect(controller.show).toHaveBeenCalledWith(tier, enter);
+		expect(controller.show).toHaveBeenCalledWith('strength', enter);
 
 		node.dispatchEvent(new MouseEvent('mousemove'));
 		expect(controller.move).toHaveBeenCalledTimes(1);
@@ -48,13 +26,12 @@ describe('wordHover action', () => {
 	it('shows anchored off the element on keyboard focus and hides on blur', () => {
 		const node = document.createElement('button');
 		const controller = makeController();
-		const tier = tierView(2);
-		const action = wordHover(node, { controller, tier });
+		const action = tooltipHover(node, { controller, payload: 'agility' });
 
 		// A preceding keydown marks the focus as keyboard-driven, so it anchors off the element's box.
 		document.dispatchEvent(new Event('keydown'));
 		node.dispatchEvent(new FocusEvent('focus'));
-		expect(controller.show).toHaveBeenCalledWith(tier, node);
+		expect(controller.show).toHaveBeenCalledWith('agility', node);
 
 		node.dispatchEvent(new FocusEvent('blur'));
 		expect(controller.hide).toHaveBeenCalledTimes(1);
@@ -65,12 +42,14 @@ describe('wordHover action', () => {
 	it('does not re-anchor on a mouse-click focus, leaving the tooltip tracking the cursor (#880)', () => {
 		const node = document.createElement('button');
 		const controller = makeController();
-		const tier = tierView(3);
-		const action = wordHover(node, { controller, tier });
+		const action = tooltipHover(node, { controller, payload: 'agility' });
 
+		// A mouse click hovers (tooltip shown at the cursor) and then focuses the element; the focus
+		// must not re-anchor the tooltip off the box, or it would jump away from the pointer.
 		const enter = new MouseEvent('mouseenter');
 		node.dispatchEvent(enter);
 		expect(controller.show).toHaveBeenCalledTimes(1);
+		expect(controller.show).toHaveBeenLastCalledWith('agility', enter);
 
 		document.dispatchEvent(new Event('pointerdown'));
 		node.dispatchEvent(new FocusEvent('focus'));
@@ -80,21 +59,27 @@ describe('wordHover action', () => {
 		action.destroy();
 	});
 
-	it('tracks the latest controller/tier after update and stops after destroy', () => {
+	it('tracks the latest controller/payload after update and stops after destroy', () => {
 		const node = document.createElement('div');
 		const first = makeController();
-		const action = wordHover(node, { controller: first, tier: tierView(1) });
+		const action = tooltipHover(node, { controller: first, payload: 'strength' });
 
 		const second = makeController();
-		const next = tierView(2);
-		action.update({ controller: second, tier: next });
+		action.update({ controller: second, payload: 'luck' });
 
 		node.dispatchEvent(new MouseEvent('mouseenter'));
 		expect(first.show).not.toHaveBeenCalled();
-		expect(second.show).toHaveBeenCalledWith(next, expect.anything());
+		expect(second.show).toHaveBeenCalledWith('luck', expect.anything());
 
 		action.destroy();
 		node.dispatchEvent(new MouseEvent('mouseenter'));
 		expect(second.show).toHaveBeenCalledTimes(1);
+	});
+
+	it('no-ops safely when no controller is provided', () => {
+		const node = document.createElement('div');
+		const action = tooltipHover(node, { controller: undefined, payload: 'strength' });
+		expect(() => node.dispatchEvent(new MouseEvent('mouseenter'))).not.toThrow();
+		action.destroy();
 	});
 });

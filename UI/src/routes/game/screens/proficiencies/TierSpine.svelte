@@ -30,8 +30,7 @@
 <script lang="ts">
 import { WordOfPower } from '$components';
 import TierCard from './TierCard.svelte';
-import type { PathView } from './proficiencies-lexicon';
-import type { WordTooltipController } from './word-hover';
+import type { PathView, WordTooltipController } from './proficiencies-lexicon';
 
 interface Props {
 	/** The selected path whose spine to render. */

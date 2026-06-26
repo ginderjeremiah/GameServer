@@ -17,7 +17,7 @@
 		aria-current={selected ? 'true' : undefined}
 		data-testid="tier-{tier.id}"
 		onclick={() => onSelect(tier.id)}
-		use:wordHover={{ controller, tier }}
+		use:tooltipHover={{ controller, payload: tier }}
 		use:describedByTooltip={controller.describedById}
 	>
 		<div class="card-inner">
@@ -56,9 +56,9 @@
 import { WordOfPower } from '$components';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import PipTrack from './PipTrack.svelte';
-import type { TierView } from './proficiencies-lexicon';
+import { tooltipHover } from '$components/tooltip/tooltip-hover';
+import type { TierView, WordTooltipController } from './proficiencies-lexicon';
 import { decipherReveal } from './word-detail';
-import { wordHover, type WordTooltipController } from './word-hover';
 
 interface Props {
 	/** The tier to render. */

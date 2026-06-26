@@ -13,6 +13,7 @@
    cross-path it also needs every `prerequisiteId` maxed. A tampered client reading ahead is an accepted
    non-goal. */
 
+import type { TooltipHoverController } from '$components/tooltip/tooltip-hover';
 import type {
 	IPath,
 	IPlayerProficiency,
@@ -75,6 +76,15 @@ export interface PathView {
 	contributions: ISkillPathContribution[];
 	/** Visible tiers in ascending `pathOrdinal` (root first); the spine reverses for display. */
 	tiers: TierView[];
+}
+
+/** The imperative controller for the screen's single shared word-of-power tooltip — driven by the
+ *  generic `tooltipHover` action with a {@link TierView} payload. The Proficiencies screen owns the panel
+ *  and builds this, then passes it down to the spine cards / inspector (mirroring the challenges reward
+ *  tooltip) so they don't thread hover handlers back up. */
+export interface WordTooltipController extends TooltipHoverController<TierView> {
+	/** Stable DOM id of the shared panel, for wiring a focusable card's `aria-describedby`. */
+	readonly describedById: string;
 }
 
 /** The decipher stage for a tier at `level` of `maxLevel`: `undeciphered` below `ceil(maxLevel / 2)`,

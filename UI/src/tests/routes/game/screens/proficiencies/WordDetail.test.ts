@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/svelte';
 import { EAttribute, EAttributeType, EModifierType } from '$lib/api';
-import type { PathView, TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
-import type { WordTooltipController } from '$routes/game/screens/proficiencies/word-hover';
+import type {
+	PathView,
+	TierView,
+	WordTooltipController
+} from '$routes/game/screens/proficiencies/proficiencies-lexicon';
 
 /* WordDetail reads the proficiency/skill/attribute reference data from staticData (skills are id-indexed,
    mirroring ItemTooltip); the rest of $stores stays real (the $components barrel transitively imports the
