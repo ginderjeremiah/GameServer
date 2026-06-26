@@ -20,4 +20,11 @@ describe('OutcomeBanner', () => {
 		expect(banner.classList.contains('lose')).toBe(true);
 		expect(banner.querySelector('h2')?.textContent).toBe('DOWNED');
 	});
+
+	it('announces the outcome as a polite live region', () => {
+		const { container } = render(OutcomeBanner, { props: { outcome: 'win', sub: 'The Warden unravels.' } });
+		const banner = container.querySelector('.banner') as HTMLElement;
+		expect(banner.getAttribute('role')).toBe('status');
+		expect(banner.getAttribute('aria-live')).toBe('polite');
+	});
 });

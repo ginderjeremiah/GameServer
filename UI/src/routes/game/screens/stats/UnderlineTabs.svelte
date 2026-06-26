@@ -10,6 +10,8 @@
 			class:on
 			role="tab"
 			aria-selected={on}
+			id={panelId ? `${panelId}-tab-${tab.key}` : undefined}
+			aria-controls={panelId}
 			data-testid="tab-{tab.key}"
 			style:--tab-color={tab.color}
 			onclick={() => onChange(tab.key)}
@@ -46,9 +48,12 @@ interface Props {
 	tabs: Tab[];
 	active: string;
 	onChange: (key: string) => void;
+	/** Id of the `role="tabpanel"` these tabs control; when set, each tab gets a stable id +
+	 *  `aria-controls` so the panel can point its `aria-labelledby` back at the active tab. */
+	panelId?: string;
 }
 
-let { tabs, active, onChange }: Props = $props();
+let { tabs, active, onChange, panelId }: Props = $props();
 </script>
 
 <style lang="scss">

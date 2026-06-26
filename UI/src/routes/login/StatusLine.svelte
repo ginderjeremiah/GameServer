@@ -1,4 +1,4 @@
-<div class="status-line" data-testid="status-line" style:color>
+<div {id} class="status-line" data-testid="status-line" role="status" aria-live="polite" style:color>
 	{#if type === 'ok' || type === 'err'}
 		<ValidationIcon {type} size={14} {color} />
 	{/if}
@@ -17,7 +17,8 @@ const COLORS: Record<StatusType, string> = {
 	idle: 'var(--text-tertiary)'
 };
 
-let { type, text }: { type: StatusType; text: string } = $props();
+// `id` lets fields associate their error with this live region via `aria-describedby`.
+let { type, text, id }: { type: StatusType; text: string; id?: string } = $props();
 
 const color = $derived(COLORS[type]);
 </script>

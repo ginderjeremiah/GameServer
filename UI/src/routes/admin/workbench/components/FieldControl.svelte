@@ -27,7 +27,7 @@
 			value={value as string}
 			oninput={(e) => set(e.currentTarget.value)}
 		></textarea>
-		{#if dirty}<span class="dirty-dot"></span>{/if}
+		{#if dirty}<DirtyDot />{/if}
 	</div>
 {:else if field.type === 'number'}
 	<div class="fld" style:width="{field.width ?? 150}px">
@@ -42,7 +42,7 @@
 			/>
 			{#if field.suffix}<span class="suffix">{field.suffix}</span>{/if}
 		</div>
-		{#if dirty}<span class="dirty-dot"></span>{/if}
+		{#if dirty}<DirtyDot />{/if}
 	</div>
 {:else if field.type === 'flags'}
 	<div class="fld" style:flex="1 1 100%" style:width="100%">
@@ -62,7 +62,7 @@
 					<span>{flag.label}</span>
 				</button>
 			{/each}
-			{#if dirty}<span class="dirty-dot"></span>{/if}
+			{#if dirty}<DirtyDot />{/if}
 		</div>
 	</div>
 {:else if field.type === 'select'}
@@ -82,7 +82,7 @@
 				{/each}
 			</select>
 			<SelectCaret />
-			{#if dirty}<span class="dirty-dot"></span>{/if}
+			{#if dirty}<DirtyDot />{/if}
 		</div>
 	</div>
 {:else}
@@ -97,7 +97,7 @@
 			value={value as string}
 			oninput={(e) => set(e.currentTarget.value)}
 		/>
-		{#if dirty}<span class="dirty-dot"></span>{/if}
+		{#if dirty}<DirtyDot />{/if}
 	</div>
 {/if}
 
@@ -117,6 +117,7 @@ import { fieldsOf, type FieldConfig, type Identified } from '../entities/types';
 import { fieldWarn } from '../validation';
 import SelectCaret from './SelectCaret.svelte';
 import NumInput from './NumInput.svelte';
+import DirtyDot from './DirtyDot.svelte';
 
 interface Props {
 	field: FieldConfig<Identified>;

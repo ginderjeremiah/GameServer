@@ -10,7 +10,7 @@
 
 	<CodexTabBar {view} />
 
-	<div class="content">
+	<div class="content" id="codex-panel" role="tabpanel" aria-labelledby="codex-tab-{view.tab}">
 		{#if view.tab === 'enemies'}
 			<EnemiesTab {view} />
 		{:else if view.tab === 'zones'}

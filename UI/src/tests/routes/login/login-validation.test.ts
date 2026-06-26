@@ -177,6 +177,20 @@ describe('deriveStatusLine', () => {
 		expect(deriveStatusLine({ ...base, formValid: true, username: 'hero' })).toEqual({ type: 'ok', text: 'Ready' });
 	});
 
+	it('yields strength to Ready when a signup form fully validates', () => {
+		// Signup always has a password here; strength must not pin the line off "Ready" once everything validates.
+		expect(
+			deriveStatusLine({
+				...base,
+				mode: 'signup',
+				password: 'Abcd1234',
+				strengthLabel: 'Strong',
+				formValid: true,
+				username: 'hero'
+			})
+		).toEqual({ type: 'ok', text: 'Ready' });
+	});
+
 	it('falls back to an idle placeholder when nothing applies', () => {
 		expect(deriveStatusLine(base)).toEqual({ type: 'idle', text: ' ' });
 	});

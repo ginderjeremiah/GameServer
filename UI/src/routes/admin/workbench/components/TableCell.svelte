@@ -9,7 +9,7 @@
 				{/each}
 			</select>
 			<SelectCaret />
-			{#if dirty}<span class="dirty-dot"></span>{/if}
+			{#if dirty}<DirtyDot />{/if}
 		</div>
 	</td>
 {:else if col.type === 'number'}
@@ -21,7 +21,7 @@
 				allowNegative={col.allowNegative}
 				onChange={(n) => onChange(n)}
 			/>
-			{#if dirty}<span class="dirty-dot"></span>{/if}
+			{#if dirty}<DirtyDot />{/if}
 		</div>
 	</td>
 {:else}
@@ -38,6 +38,7 @@ import type { ColumnConfig } from '../entities/types';
 import Bar from '$components/Bar.svelte';
 import NumInput from './NumInput.svelte';
 import SelectCaret from './SelectCaret.svelte';
+import DirtyDot from './DirtyDot.svelte';
 
 interface Props {
 	col: ColumnConfig;

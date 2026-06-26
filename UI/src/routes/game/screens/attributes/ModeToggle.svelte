@@ -2,8 +2,10 @@
 	{#each options as opt (opt.key)}
 		<button
 			type="button"
+			id="attr-mode-{opt.key}"
 			role="tab"
 			aria-selected={mode === opt.key}
+			aria-controls="attr-main-panel"
 			class="opt"
 			class:on={mode === opt.key}
 			onclick={() => onPick(opt.key)}
