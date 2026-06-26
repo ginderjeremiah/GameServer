@@ -1,9 +1,16 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { toastError } from '$stores';
 import { canonicalEqual, PersistFailedError } from './save-helpers';
+import { entityWarnings } from './validation';
 import type { EntityConfig, Identified, SaveDiff } from './entities/types';
 
 export type RecordStatus = 'clean' | 'added' | 'modified' | 'deleted';
+
+/** A record's change status plus its validation warnings — memoised together off the store. */
+export interface RecordState {
+	status: RecordStatus;
+	warnings: string[];
+}
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 export const recordsEqual = canonicalEqual;
@@ -54,12 +61,36 @@ export class EntityStore<T extends Identified> {
 		return recordsEqual(record, baseline) ? 'clean' : 'modified';
 	}
 
+	/**
+	 * Per-record status + validation warnings, keyed by id. Memoised here so the consumers (the list
+	 * rows, the page summary, the save-bar counts) read O(1) lookups instead of each re-running the
+	 * structural diff per record. Recomputes only when the records, baseline, or pending deletes
+	 * change — a search keystroke or a selection change (which touch neither) reuses the cached map.
+	 */
+	recordStates = $derived.by<Record<number, RecordState>>(() => {
+		const map: Record<number, RecordState> = {};
+		for (const record of this.items) {
+			map[record.id] = { status: this.status(record), warnings: entityWarnings(this.config, record) };
+		}
+		return map;
+	});
+
+	/** The memoised status + warnings for a record (recomputed on the fly for an unknown id). */
+	stateOf(record: T): RecordState {
+		return (
+			this.recordStates[record.id] ?? {
+				status: this.status(record),
+				warnings: entityWarnings(this.config, record)
+			}
+		);
+	}
+
 	counts = $derived.by(() => {
 		let added = 0;
 		let modified = 0;
 		let deleted = 0;
-		for (const record of this.items) {
-			switch (this.status(record)) {
+		for (const { status } of Object.values(this.recordStates)) {
+			switch (status) {
 				case 'added':
 					added++;
 					break;

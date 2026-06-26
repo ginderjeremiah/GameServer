@@ -313,4 +313,53 @@ describe('EntityStore', () => {
 			expect(store.status(record)).toBe('modified');
 		});
 	});
+
+	describe('recordStates memo', () => {
+		// A config with a required-name field so warnings are exercised alongside status.
+		const requiredNameConfig = (): EntityConfig<Row> => ({
+			...makeConfig(),
+			sections: [
+				{
+					kind: 'fields',
+					key: 'identity',
+					label: 'Identity',
+					glyph: 'box',
+					fields: [{ key: 'name', label: 'Name', type: 'text', required: true }]
+				}
+			]
+		});
+
+		it('exposes per-record status + validation warnings keyed by id', () => {
+			const store = new EntityStore(requiredNameConfig(), seed);
+			store.patch(1, (draft) => (draft.value = 99));
+
+			expect(store.recordStates[0].status).toBe('clean');
+			expect(store.recordStates[1].status).toBe('modified');
+			expect(store.recordStates[0].warnings).toEqual([]);
+		});
+
+		it('surfaces a validation warning for a record that violates a required field', () => {
+			const store = new EntityStore(requiredNameConfig(), seed);
+			const id = store.addItem(); // a fresh record has a blank (required) name
+
+			const state = store.stateOf(store.items.find((r) => r.id === id)!);
+			expect(state.status).toBe('added');
+			expect(state.warnings).toEqual(['Name required']);
+		});
+
+		it('stateOf recomputes for an id absent from the memo (defensive fallback)', () => {
+			const store = new EntityStore(requiredNameConfig(), seed);
+			// A record not in the store still resolves to a sensible state rather than throwing.
+			expect(store.stateOf({ id: 99, name: 'Ghost', value: 0 }).status).toBe('added');
+		});
+
+		it('counts derive from the memoised states', () => {
+			const store = new EntityStore(makeConfig(), seed);
+			store.addItem();
+			store.patch(0, (draft) => (draft.value = 7));
+			store.removeItem(1);
+
+			expect(store.counts).toMatchObject({ added: 1, modified: 1, deleted: 1, total: 3 });
+		});
+	});
 });

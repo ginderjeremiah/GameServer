@@ -548,10 +548,11 @@ describe('CodexView skill table', () => {
 		expect(rows.find((r) => r.id === 2)).toMatchObject({ name: 'Focus', cooldownLabel: '—', usedByCount: 0 });
 	});
 
-	it('marks the selected skill', () => {
+	it('tracks the selected skill (the row highlight reads selectedSkillId, kept out of the projection)', () => {
 		const view = new CodexView();
 		view.selectSkill(1);
-		expect(view.skillRows.find((r) => r.selected)?.id).toBe(1);
+		expect(view.selectedSkillId).toBe(1);
+		expect(view.selectedSkill?.id).toBe(1);
 	});
 
 	it('tints each row by its rarity tier and exposes the selected skill rarity for the dossier', () => {

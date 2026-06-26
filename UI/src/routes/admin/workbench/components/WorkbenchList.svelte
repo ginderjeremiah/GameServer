@@ -21,8 +21,9 @@
 
 	<div class="list-scroll">
 		{#each filtered as record (record.id)}
-			{@const status = store.status(record)}
-			{@const warns = entityWarnings(entity, record)}
+			{@const state = store.stateOf(record)}
+			{@const status = state.status}
+			{@const warns = state.warnings}
 			{@const badge = entity.listBadge?.(record)}
 			{@const edge =
 				status === 'added'
@@ -81,7 +82,6 @@
 <script lang="ts">
 import type { EntityConfig, Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
-import { entityWarnings } from '../validation';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import WarnTriangle from './WarnTriangle.svelte';
 
@@ -97,7 +97,7 @@ const { entity, store, selectedId, onSelect, onNew }: Props = $props();
 
 let q = $state('');
 const filtered = $derived(store.items.filter((it) => (it.name ?? '').toLowerCase().includes(q.toLowerCase())));
-const liveCount = $derived(store.items.filter((it) => store.status(it) !== 'deleted').length);
+const liveCount = $derived(store.items.filter((it) => store.stateOf(it).status !== 'deleted').length);
 </script>
 
 <style lang="scss">

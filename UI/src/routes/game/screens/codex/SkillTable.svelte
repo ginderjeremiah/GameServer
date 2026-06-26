@@ -13,7 +13,7 @@
 			<button
 				type="button"
 				class="row"
-				class:selected={row.selected}
+				class:selected={row.id === view.selectedSkillId}
 				data-testid="codex-skill-{row.id}"
 				onclick={() => view.selectSkill(row.id)}
 			>

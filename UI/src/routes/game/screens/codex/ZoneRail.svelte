@@ -9,7 +9,7 @@
 			<button
 				type="button"
 				class="row"
-				class:selected={row.selected}
+				class:selected={row.id === view.selectedZoneId}
 				style:--status-color={zoneStatusColor(row.status)}
 				data-testid="codex-zone-{row.id}"
 				onclick={() => view.selectZone(row.id)}

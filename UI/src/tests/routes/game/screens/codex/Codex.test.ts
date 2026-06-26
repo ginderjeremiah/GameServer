@@ -309,6 +309,16 @@ describe('Codex screen', () => {
 		expect(dossier.textContent).toContain('Strength');
 	});
 
+	it('marks the selected row and moves the highlight on click (selection applied in the component)', async () => {
+		render(Codex);
+		// The head enemy is selected by default; clicking another row moves the `selected` class.
+		expect(screen.getByTestId('codex-enemy-0').classList.contains('selected')).toBe(true);
+		expect(screen.getByTestId('codex-enemy-1').classList.contains('selected')).toBe(false);
+		await fireEvent.click(screen.getByTestId('codex-enemy-1'));
+		expect(screen.getByTestId('codex-enemy-0').classList.contains('selected')).toBe(false);
+		expect(screen.getByTestId('codex-enemy-1').classList.contains('selected')).toBe(true);
+	});
+
 	it('surfaces a load error in the statistics sub-tab', async () => {
 		mockFetchSocket.mockImplementation((cmd: string) =>
 			cmd === 'GetPlayerStatistics' ? Promise.reject(new Error('down')) : Promise.resolve([])
