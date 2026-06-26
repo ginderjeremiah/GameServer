@@ -262,6 +262,62 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetAttributeDistributions_DuplicateAttribute_ReturnsFailure()
+        {
+            int classId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateClassAsync(context, "Warrior")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminClasses>();
+
+            var result = admin.SetAttributeDistributions(new SetClassAttributeDistributionsData
+            {
+                ClassId = classId,
+                AttributeDistributions =
+                [
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.Strength, BaseAmount = 10m, AmountPerLevel = 2m },
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.Strength, BaseAmount = 5m, AmountPerLevel = 1m },
+                ],
+            });
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("more than one distribution", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetAttributeDistributions_NonCoreAttribute_ReturnsFailure()
+        {
+            int classId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                classId = (await TestDataSeeder.CreateClassAsync(context, "Warrior")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminClasses>();
+
+            // MaxHealth is a derived (non-core) attribute; only core attributes are seeded as the locked base.
+            var result = admin.SetAttributeDistributions(new SetClassAttributeDistributionsData
+            {
+                ClassId = classId,
+                AttributeDistributions =
+                [
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.MaxHealth, BaseAmount = 10m, AmountPerLevel = 2m },
+                ],
+            });
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("not a core attribute", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SetStarterSkills_MissingClass_ReturnsNotFound()
         {
             using var scope = CreateScope();
