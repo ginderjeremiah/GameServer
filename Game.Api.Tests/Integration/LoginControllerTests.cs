@@ -196,6 +196,60 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SelectPlayer_DeliversClassLockedBaseAndSignaturePassive()
+        {
+            // The logged-in player payload (LoginController.BuildPlayerData) projects the character's class
+            // into LockedBaseDistribution + SignaturePassive — the parity-sensitive class data the live
+            // frontend battler composes its attributes from (#1126 areas D/E). The end-to-end class-delivery
+            // assertions otherwise live only on CharacterCreationData, not the logged-in payload, so a
+            // regression in this projection would load fine while desyncing the FE/BE anti-cheat surface.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "classdelivery", "classpass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            // A distinctive locked-base fingerprint and an attribute-scaled signature passive, so every
+            // projected field (incl. the scaling fields and modifier type) is pinned, not just the defaults.
+            var @class = await TestDataSeeder.CreateClassWithKitAsync(
+                context,
+                starterSkillIds: [],
+                attributeDistributions:
+                [
+                    (EAttribute.Strength, 12m, 2m),
+                    (EAttribute.Endurance, 8m, 1m),
+                ],
+                passiveAttribute: EAttribute.Endurance,
+                passiveAmount: 7m,
+                passiveScalingAttribute: EAttribute.Strength,
+                passiveScalingAmount: 0.5m,
+                passiveModifierType: EModifierType.Additive);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, classId: @class.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("classdelivery", "classpass");
+            var summary = Assert.Single(login.PlayerSummaries);
+            var select = await SelectPlayerAsync(login.Tokens, summary.Id);
+
+            // The signature passive is delivered verbatim from the class.
+            var passive = select.Player.SignaturePassive;
+            Assert.Equal(EAttribute.Endurance, passive.AttributeId);
+            Assert.Equal(7m, passive.Amount);
+            Assert.Equal(EAttribute.Strength, passive.ScalingAttributeId);
+            Assert.Equal(0.5m, passive.ScalingAmount);
+            Assert.Equal(EModifierType.Additive, passive.ModifierType);
+
+            // The locked-base fingerprint is delivered as the authored distribution (base + per-level), so the
+            // client can rescale it on level-up. Asserted by attribute to stay independent of projection order.
+            Assert.Equal(2, select.Player.LockedBaseDistribution.Count);
+            var strength = Assert.Single(select.Player.LockedBaseDistribution, d => d.AttributeId == EAttribute.Strength);
+            Assert.Equal(12m, strength.BaseAmount);
+            Assert.Equal(2m, strength.AmountPerLevel);
+            var endurance = Assert.Single(select.Player.LockedBaseDistribution, d => d.AttributeId == EAttribute.Endurance);
+            Assert.Equal(8m, endurance.BaseAmount);
+            Assert.Equal(1m, endurance.AmountPerLevel);
+        }
+
+        [Fact]
         public async Task SelectPlayer_CharacterOfAnotherAccount_IsRejected()
         {
             using var scope = CreateScope();

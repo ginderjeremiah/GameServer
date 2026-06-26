@@ -456,9 +456,22 @@ namespace Game.TestInfrastructure.Helpers
             IReadOnlyList<(EAttribute Attribute, decimal BaseAmount, decimal AmountPerLevel)>? attributeDistributions = null,
             string name = "Test Class",
             DateTime? retiredAt = null,
-            IReadOnlyList<(int ItemId, EEquipmentSlot Slot)>? starterEquipment = null)
+            IReadOnlyList<(int ItemId, EEquipmentSlot Slot)>? starterEquipment = null,
+            EAttribute passiveAttribute = EAttribute.Strength,
+            decimal passiveAmount = 5m,
+            EAttribute? passiveScalingAttribute = null,
+            decimal passiveScalingAmount = 0m,
+            EModifierType passiveModifierType = EModifierType.Additive)
         {
-            var @class = await CreateClassAsync(context, name: name, retiredAt: retiredAt);
+            var @class = await CreateClassAsync(
+                context,
+                name: name,
+                retiredAt: retiredAt,
+                passiveAttribute: passiveAttribute,
+                passiveAmount: passiveAmount,
+                passiveScalingAttribute: passiveScalingAttribute,
+                passiveScalingAmount: passiveScalingAmount,
+                passiveModifierType: passiveModifierType);
 
             foreach (var skillId in starterSkillIds)
             {
