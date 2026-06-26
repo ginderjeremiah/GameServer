@@ -88,11 +88,15 @@ $attr-dexterity: #f0d28a;
 $attr-luck: #8fded0;
 
 // attribute-modifier-source accents (one hue per EAttributeModifierSource shown
-// in the breakdown: base / stat points / equipment / item mods / derived) —
-// consumed via the helpers in the attribute-breakdown screen's source-display.
-// Most reuse an existing palette hue; only the neutral base value is its own.
+// in the breakdown: base / class locked base / stat points / proficiency /
+// equipment / item mods / derived / class signature passive) — consumed via the
+// helpers in the attribute-breakdown screen's source-display. Each must stay
+// visually distinct so the stacked bar and legend disambiguate the sources.
 $source-base: #8b919e;
+$source-distribution: #8fded0;
 $source-points: $accent;
+$source-proficiency: #cf7a9e;
 $source-item: $success;
 $source-mod: $attr-intellect;
 $source-derived: $warning;
+$source-class: #d9a441;

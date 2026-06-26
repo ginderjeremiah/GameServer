@@ -16,18 +16,16 @@ const SOURCE_KEY: Record<EAttributeModifierSource, string> = {
 	[EAttributeModifierSource.Item]: 'item',
 	[EAttributeModifierSource.ItemMod]: 'mod',
 	[EAttributeModifierSource.Derived]: 'derived',
-	// AttributeDistribution is an enemy/NPC source that never appears in a
-	// player's breakdown; it falls back to the neutral base hue if ever shown.
-	[EAttributeModifierSource.AttributeDistribution]: 'base',
+	// The player's class locked base — the level-scaled, non-reallocatable attribute fingerprint (#1126
+	// area D). Shares the source enum with an enemy/NPC distribution but only ever appears as the player's
+	// own locked base in this breakdown.
+	[EAttributeModifierSource.AttributeDistribution]: 'distribution',
 	// SkillEffect is a timed battle modifier; it falls back to the derived hue.
 	[EAttributeModifierSource.SkillEffect]: 'derived',
-	// Proficiency is a permanent progression bonus; it is not yet surfaced in the player breakdown (that
-	// lands with the proficiency client work), so it falls back to the stat-points hue until then.
-	[EAttributeModifierSource.Proficiency]: 'points',
-	// Class is the signature-passive bonus composed at battler assembly (#1126 area E); like the locked base
-	// and proficiency bonuses it is not yet surfaced in the player breakdown, so it falls back to the
-	// stat-points hue (rather than minting a speculative token) until #1261 wires those modifiers in.
-	[EAttributeModifierSource.Class]: 'points'
+	// Permanent proficiency progression bonus (#982 area E).
+	[EAttributeModifierSource.Proficiency]: 'proficiency',
+	// The class signature passive composed at battler assembly (#1126 area E).
+	[EAttributeModifierSource.Class]: 'class'
 };
 
 const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
@@ -36,10 +34,10 @@ const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {
 	[EAttributeModifierSource.Item]: 'Equipment',
 	[EAttributeModifierSource.ItemMod]: 'Item mods',
 	[EAttributeModifierSource.Derived]: 'Derived',
-	[EAttributeModifierSource.AttributeDistribution]: 'Distribution',
+	[EAttributeModifierSource.AttributeDistribution]: 'Class base',
 	[EAttributeModifierSource.SkillEffect]: 'Skill effect',
 	[EAttributeModifierSource.Proficiency]: 'Proficiency',
-	[EAttributeModifierSource.Class]: 'Class'
+	[EAttributeModifierSource.Class]: 'Signature passive'
 };
 
 /** Themeable source accent hue, e.g. `var(--source-points)`. */
