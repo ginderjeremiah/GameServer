@@ -39,7 +39,6 @@ import { Loading } from '$components';
 import './workbench.scss';
 import type { EntityConfig, Identified } from './entities/types';
 import { EntityStore } from './entity-store.svelte';
-import { entityWarnings } from './validation';
 import WorkbenchIcon from './WorkbenchIcon.svelte';
 import WorkbenchList from './components/WorkbenchList.svelte';
 import WorkbenchDetail from './components/WorkbenchDetail.svelte';
@@ -70,9 +69,12 @@ const selected = $derived(store ? (store.items.find((it) => it.id === selId) ?? 
 const selectedBaseline = $derived(store && selected ? store.baselineOf(selected.id) : undefined);
 const liveItems = $derived.by(() => {
 	const s = store;
-	return s ? s.items.filter((it) => s.status(it) !== 'deleted') : [];
+	return s ? s.items.filter((it) => s.stateOf(it).status !== 'deleted') : [];
 });
-const flagged = $derived(liveItems.filter((it) => entityWarnings(entity, it).length > 0).length);
+const flagged = $derived.by(() => {
+	const s = store;
+	return s ? liveItems.filter((it) => s.stateOf(it).warnings.length > 0).length : 0;
+});
 
 // If the selected record was removed (e.g. deleted then saved), fall back to the first.
 $effect(() => {

@@ -99,7 +99,6 @@ export interface EnemyRowVM {
 	skillCount: number;
 	/** Pre-lowercased search haystack: name + kind + zone names (spawn zones, or a boss's encounter zone). */
 	searchText: string;
-	selected: boolean;
 }
 
 export interface SubTabVM {
@@ -144,7 +143,6 @@ export interface ZoneRowVM {
 	/** Enemies (excluding the boss) that spawn in this zone. */
 	spawnCount: number;
 	hasBoss: boolean;
-	selected: boolean;
 }
 
 export interface ZoneBossVM {
@@ -178,7 +176,6 @@ export interface SkillRowVM {
 	usedByCount: number;
 	/** Themeable rarity hue for the row's tier mark. */
 	rarityColor: string;
-	selected: boolean;
 }
 
 /** The selected skill's rarity tier (hue + label) for the dossier header. */
@@ -354,8 +351,7 @@ export class CodexView {
 					level: range.min,
 					zoneCount: e.isBoss ? 1 : e.spawns.length,
 					skillCount: e.skillPool.length,
-					searchText: [e.name, enemyKindLabel(e.isBoss), ...zoneNames].join(' ').toLowerCase(),
-					selected: e.id === this.selectedEnemyId
+					searchText: [e.name, enemyKindLabel(e.isBoss), ...zoneNames].join(' ').toLowerCase()
 				};
 			})
 			.filter((row) => matchesEnemySearch(row, this.search))
@@ -501,8 +497,7 @@ export class CodexView {
 			band: formatBand({ min: z.levelMin, max: z.levelMax, fixed: false }),
 			status: resolveZoneStatus(statistics.isZoneCleared(z.id), this.isZoneLocked(z)),
 			spawnCount: enemies.filter((e) => e.spawns.some((s) => s.zoneId === z.id)).length,
-			hasBoss: z.bossEnemyId != null,
-			selected: z.id === this.selectedZoneId
+			hasBoss: z.bossEnemyId != null
 		}));
 	});
 
@@ -593,8 +588,7 @@ export class CodexView {
 			baseDamageLabel: formatBaseDamage(sk.baseDamage),
 			cooldownLabel: formatCooldown(sk.cooldownMs),
 			usedByCount: enemies.filter((e) => e.skillPool.includes(sk.id)).length,
-			rarityColor: rarityColor(sk.rarityId),
-			selected: sk.id === this.selectedSkillId
+			rarityColor: rarityColor(sk.rarityId)
 		}));
 	});
 

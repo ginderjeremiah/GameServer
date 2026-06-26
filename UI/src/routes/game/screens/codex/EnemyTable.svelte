@@ -14,7 +14,7 @@
 			<button
 				type="button"
 				class="row"
-				class:selected={row.selected}
+				class:selected={row.id === view.selectedEnemyId}
 				class:boss={row.isBoss}
 				data-testid="codex-enemy-{row.id}"
 				onclick={() => view.selectEnemy(row.id)}
