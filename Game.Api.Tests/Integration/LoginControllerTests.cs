@@ -465,16 +465,8 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreateAccount_ValidCredentials_Succeeds()
         {
-            // Arrange — the class kit backs the new player's PlayerSkills.
-            int classId;
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            var creds = new { Username = "newuser", Password = "newpass", ClassId = classId };
+            // Signup creates the account only — no character, so no class is supplied (#1256).
+            var creds = new { Username = "newuser", Password = "newpass" };
 
             var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
 
@@ -488,17 +480,14 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreateAccount_DuplicateUsername_ReturnsError()
         {
-            // Arrange — create user first; seed a class so creation reaches the duplicate-username check.
-            int classId;
+            // Arrange — create the user first so the duplicate-username check rejects the second attempt.
             using (var scope = CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<GameContext>();
                 await TestDataSeeder.CreateUserAsync(context, "duplicate", "pass");
-                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
             }
-            await ReloadReferenceCachesAsync();
 
-            var creds = new { Username = "duplicate", Password = "anotherpass", ClassId = classId };
+            var creds = new { Username = "duplicate", Password = "anotherpass" };
 
             // Act
             var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
@@ -513,16 +502,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreateAccount_ConcurrentDuplicate_ReturnsCleanErrorNotServerError()
         {
-            // The class kit backs each new player's PlayerSkills.
-            int classId;
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            var creds = new { Username = "raceuser", Password = "racepass", ClassId = classId };
+            var creds = new { Username = "raceuser", Password = "racepass" };
 
             // Two concurrent requests racing past the existence check both reach the commit. The
             // active-username unique index lets exactly one through; the loser must surface as a clean

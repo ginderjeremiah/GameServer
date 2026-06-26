@@ -3,9 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace Game.Api.Models.Auth
 {
     /// <summary>
-    /// Creates a new account and its first character. Carries the credentials plus the chosen class; the
-    /// server validates the class and enforces username uniqueness (anti-cheat). Kept distinct from the
-    /// login credentials so the class only rides the creation request, not every login.
+    /// Creates a new account from a username and password. The account is created with <b>no</b> character —
+    /// the first character is created on the select screen through the class picker (issue #1256) — so this
+    /// request carries no class. The server enforces username uniqueness (anti-cheat).
     /// </summary>
     public class CreateAccountRequest : IModel
     {
@@ -14,8 +14,5 @@ namespace Game.Api.Models.Auth
 
         [Length(1, 256)]
         public required string Password { get; set; }
-
-        /// <summary>The id of the class the first character is created as (the archetype that seeds its kit).</summary>
-        public required int ClassId { get; set; }
     }
 }

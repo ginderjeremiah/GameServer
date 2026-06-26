@@ -87,6 +87,26 @@ describe('PlayerSelectView — select', () => {
 	});
 });
 
+describe('PlayerSelectView — open-create-when-empty', () => {
+	it('opens the create form when the list is empty and the option is set (first-character signup)', () => {
+		const view = new PlayerSelectView(makeDeps(), [], { openCreateWhenEmpty: true });
+
+		expect(view.showCreate).toBe(true);
+	});
+
+	it('leaves the create form closed when characters already exist', () => {
+		const view = new PlayerSelectView(makeDeps(), [summary(1)], { openCreateWhenEmpty: true });
+
+		expect(view.showCreate).toBe(false);
+	});
+
+	it('leaves the create form closed for an empty list when the option is off (the switcher)', () => {
+		const view = new PlayerSelectView(makeDeps(), []);
+
+		expect(view.showCreate).toBe(false);
+	});
+});
+
 describe('PlayerSelectView — class loading', () => {
 	it('loads the creatable classes and defaults the selection to the first', async () => {
 		const deps = makeDeps({ loadCreationData: vi.fn().mockResolvedValue([creatable(3), creatable(5)]) });

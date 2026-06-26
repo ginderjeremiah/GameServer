@@ -76,14 +76,13 @@ namespace Game.Abstractions.DataAccess
     public interface IUsers
     {
         /// <summary>
-        /// Persists a brand-new account: the user record described by <paramref name="account"/> together
-        /// with its initial player graph (built from the <paramref name="player"/> blueprint), linked via
-        /// the navigation property so EF resolves the foreign key without the user's store-generated id.
+        /// Persists a brand-new account (the user record described by <paramref name="account"/>) with no
+        /// characters — a freshly signed-up account creates its first character later, on the select screen.
         /// The insert is committed immediately (not deferred to the surrounding unit of work) so the
         /// active-username uniqueness guard can be honoured: returns <see langword="false"/> when the
         /// username was claimed by a concurrently-created active account, <see langword="true"/> otherwise.
         /// </summary>
-        Task<bool> CreateAccount(NewAccount account, NewPlayer player, CancellationToken cancellationToken = default);
+        Task<bool> CreateAccount(NewAccount account, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Creates an additional character on an existing account from the <paramref name="player"/>

@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { selectFirstCharacter, shortUsername, TEST_PASSWORD, waitForLoginReady } from './helpers';
+import { createFirstCharacter, selectFirstCharacter, shortUsername, TEST_PASSWORD, waitForLoginReady } from './helpers';
 
-// The character-select screen sits between login and the loading screen: signup lands here with the
-// account's starting character, the player can create additional ones (bounded server-side by the
-// per-account cap), and selecting one binds the session and proceeds into the game.
+// The character-select screen sits between login and the loading screen. Signup creates the account
+// only (#1256), so a freshly signed-up account lands here with no characters and creates its first one
+// through the class picker — the single class-selection surface — before entering the game.
 test.describe('Character select', () => {
-	test('signup lands on the select screen with the starting character', async ({ page }) => {
+	const signUp = async (page: import('@playwright/test').Page) => {
 		await page.goto('/');
 		await waitForLoginReady(page);
 
@@ -15,33 +15,24 @@ test.describe('Character select', () => {
 		await page.getByTestId('password-input').fill(TEST_PASSWORD);
 		await page.getByTestId('confirm-input').fill(TEST_PASSWORD);
 		await page.getByTestId('submit-button').click();
+	};
+
+	test('signup lands on the empty select screen with the create form open', async ({ page }) => {
+		await signUp(page);
 
 		await expect(page).toHaveURL('/select', { timeout: 10000 });
 		await expect(page.getByTestId('select-heading')).toBeVisible();
-		await expect(page.getByTestId('player-card')).toHaveCount(1);
+		// No characters yet, and the create form is opened automatically so the first one can be made.
+		await expect(page.getByTestId('player-card')).toHaveCount(0);
+		await expect(page.getByTestId('new-name-input')).toBeVisible();
 	});
 
-	test('can create an additional character and enter as it', async ({ page }) => {
-		await page.goto('/');
-		await waitForLoginReady(page);
+	test('creates the first character and enters as it', async ({ page }) => {
+		await signUp(page);
 
-		await page.getByTestId('mode-toggle').click();
-		const username = shortUsername('sel');
-		await page.getByTestId('username-input').fill(username);
-		await page.getByTestId('password-input').fill(TEST_PASSWORD);
-		await page.getByTestId('confirm-input').fill(TEST_PASSWORD);
-		await page.getByTestId('submit-button').click();
+		await createFirstCharacter(page);
 
-		await expect(page).toHaveURL('/select', { timeout: 10000 });
-
-		// Create a second character.
-		await page.getByTestId('show-create').click();
-		await page.getByTestId('new-name-input').fill('Second Hero');
-		await page.getByTestId('create-form').getByTestId('submit-button').click();
-
-		await expect(page.getByTestId('player-card')).toHaveCount(2, { timeout: 10000 });
-
-		// Selecting one proceeds into the game.
+		// Selecting it proceeds into the game.
 		await selectFirstCharacter(page);
 		await expect(page.getByTestId('enter-button')).toBeEnabled({ timeout: 10000 });
 	});

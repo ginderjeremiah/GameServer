@@ -1,6 +1,12 @@
 <div class="select-screen" data-testid="select-screen">
 	{#if view}
-		<PlayerSelectPanel {view} heading="Choose your character." subtitle="Pick who to play as, or forge a new hero.">
+		<PlayerSelectPanel
+			{view}
+			heading={view.players.length === 0 ? 'Create your character.' : 'Choose your character.'}
+			subtitle={view.players.length === 0
+				? 'Forge your first hero to begin your journey.'
+				: 'Pick who to play as, or forge a new hero.'}
+		>
 			{#snippet footer()}
 				<button type="button" class="sign-out" data-testid="sign-out" onclick={signOut}>
 					Use a different account
@@ -82,7 +88,10 @@ onMount(() => {
 
 	view = new PlayerSelectView(
 		{ selectPlayer, createPlayer, confirmTakeover: confirmSessionTakeover, enterWorld, loadCreationData },
-		summaries
+		summaries,
+		// A freshly signed-up account arrives here with no characters; open the create form so the first
+		// character creation (the only class-selection surface now — #1256) is front and centre.
+		{ openCreateWhenEmpty: true }
 	);
 });
 </script>

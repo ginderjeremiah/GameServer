@@ -59,9 +59,17 @@ export class PlayerSelectView {
 
 	constructor(
 		private readonly deps: PlayerSelectDeps,
-		initial: IPlayerSummary[]
+		initial: IPlayerSummary[],
+		options: { openCreateWhenEmpty?: boolean } = {}
 	) {
 		this.players = initial;
+		// A brand-new account lands here with no characters to create its first one (the signup flow no
+		// longer creates it — #1256), so open the create form immediately rather than making the player
+		// hunt for the "+ New character" affordance. Opt-in, so the in-game switcher (whose list can also
+		// be empty for a single-character account) isn't forced into create mode when it opens.
+		if (options.openCreateWhenEmpty && initial.length === 0) {
+			this.showCreate = true;
+		}
 		void this.loadClasses();
 	}
 

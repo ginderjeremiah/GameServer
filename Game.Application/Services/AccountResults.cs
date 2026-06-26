@@ -11,9 +11,6 @@ namespace Game.Application.Services
     {
         Success,
         UsernameTaken,
-
-        /// <summary>The chosen class id does not resolve to a live (non-retired) class.</summary>
-        InvalidClass,
     }
 
     /// <summary>

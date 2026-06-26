@@ -6,11 +6,13 @@
 -- admin tools and is deliberately NOT encoded in the application or its migrations (see
 -- docs/backend.md "Reference Data"). A freshly-migrated database therefore has none of it.
 --
--- Account creation, however, gives every new player the starter skills 0/1/2
--- (LoginController.CreateAccount), so without at least those Skill rows the very first signup fails
--- with an FK violation (FK_PlayerSkills_Skills_SkillId) and the whole e2e suite cannot log in. This
--- script seeds the minimal, coherent slice of static reference data the suite needs:
---   * Skills 0/1/2          – required by new-player creation
+-- Character creation, however, gives every new player the starter skills 0/1/2 (the class kit built by
+-- NewPlayerFactory, persisted by LoginController.CreatePlayer). Signup itself creates no character now
+-- (#1256) — the first one is created on the select screen — but the suite's signup flow then creates
+-- that first character there, so without at least those Skill rows it fails with an FK violation
+-- (FK_PlayerSkills_Skills_SkillId) and the whole e2e suite cannot reach the game. This script seeds the
+-- minimal, coherent slice of static reference data the suite needs:
+--   * Skills 0/1/2          – required by new-character creation
 --   * one Zone with enemies – so the Enemies admin catalogue has rows and the fight screen is playable
 --   * a dedicated zone boss – so the "Challenge Boss" flow can be exercised end-to-end (#220)
 --
@@ -21,7 +23,7 @@
 -- re-running is safe. It is intentionally separate from the app: production/local databases are
 -- never touched by it.
 
--- Starter skills (ids 0/1/2 are referenced directly by LoginController.CreateAccount).
+-- Starter skills (ids 0/1/2 are the class kit granted on character creation, LoginController.CreatePlayer).
 INSERT INTO "Skills" ("Id", "Name", "BaseDamage", "Description", "CooldownMs", "IconPath") VALUES
   (0, 'Strike', 10, 'A basic physical attack.', 1000, ''),
   (1, 'Cleave', 8, 'A sweeping blow that favours raw power.', 1500, ''),
@@ -35,10 +37,10 @@ INSERT INTO "SkillDamageMultipliers" ("SkillId", "AttributeId", "Multiplier") VA
   (2, 2, 1.0)
 ON CONFLICT ("SkillId", "AttributeId") DO NOTHING;
 
--- A starter class (id 0). Character creation now requires a class (#1221): both signup and
--- add-character send a classId, which the API rejects unless it resolves to a live class, so the
--- suite's signup flow needs class 0 to exist. Its kit is the starter skills 0/1/2 (the skills new
--- players still receive) and a uniform base spread of 5 across the six core attributes (ids 0-5),
+-- A starter class (id 0). Character creation requires a class (#1221): the select-screen create form
+-- sends a classId, which the API rejects unless it resolves to a live class, so the suite's
+-- first-character creation needs class 0 to exist. Its kit is the starter skills 0/1/2 (the skills new
+-- characters receive) and a uniform base spread of 5 across the six core attributes (ids 0-5),
 -- mirroring the former flat starting allocation so a fresh e2e character is playable. The signature
 -- passive is a no-op (amount 0, Additive = 1 per EModifierType).
 INSERT INTO "Classes" ("Id", "Name", "Description", "Word", "PassiveAttributeId", "PassiveAmount", "PassiveScalingAttributeId", "PassiveScalingAmount", "PassiveModifierType", "RetiredAt") VALUES

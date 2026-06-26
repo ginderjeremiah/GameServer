@@ -15,7 +15,6 @@ export interface IAuthTokens {
 export interface ICreateAccountRequest {
 	username: string;
 	password: string;
-	classId: number;
 }
 
 export interface ICreatePlayerRequest {

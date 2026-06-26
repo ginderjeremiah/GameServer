@@ -27,7 +27,31 @@ namespace Game.Application.Tests.Services
             : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task CreateAccount_NewUsername_InsertsUserAndInitialPlayerGraph()
+        public async Task CreateAccount_NewUsername_InsertsUserWithNoCharacter()
+        {
+            using var scope = CreateScope();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            // Signup creates the account only — the first character is created later, on the select screen
+            // (#1256), so no class is supplied and no player graph is built here.
+            var status = await accountService.CreateAccount("newaccount", "newpass");
+            Assert.Equal(CreateAccountStatus.Success, status);
+
+            // CreateAccount commits its own insert (so the active-username guard can be honoured), so the
+            // user is already persisted — no separate unit-of-work commit is needed.
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var createdUser = await verifyContext.Users
+                .Include(user => user.Players)
+                .FirstOrDefaultAsync(user => user.Username == "newaccount", CancellationToken);
+
+            Assert.NotNull(createdUser);
+            Assert.Empty(createdUser.Players);
+        }
+
+        [Fact]
+        public async Task CreatePlayer_NewCharacter_PersistsFullBlueprintGraph()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -36,23 +60,20 @@ namespace Game.Application.Tests.Services
             // that drives creation; its skills must exist for the player-skill FK. Reload caches so IClasses sees it.
             var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
             await ReloadReferenceCachesAsync();
+            var user = await TestDataSeeder.CreateUserAsync(context, "blueprinter", "pass");
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var status = await accountService.CreateAccount("newaccount", "newpass", chosenClass.Id);
-            Assert.Equal(CreateAccountStatus.Success, status);
+            var result = await accountService.CreatePlayer(user.Id, "Hero", chosenClass.Id);
+            Assert.True(result.Success);
 
-            // CreateAccount commits its own insert (so the active-username guard can be honoured), so the
-            // graph is already persisted — no separate unit-of-work commit is needed.
             using var verifyScope = CreateScope();
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
-            var createdUser = await verifyContext.Users
-                .Include(user => user.Players)
-                .FirstOrDefaultAsync(user => user.Username == "newaccount", CancellationToken);
+            var createdPlayer = await verifyContext.Players
+                .FirstOrDefaultAsync(player => player.Id == result.Player.Id, CancellationToken);
 
-            Assert.NotNull(createdUser);
-            var createdPlayer = Assert.Single(createdUser.Players);
-            Assert.Equal("newaccount", createdPlayer.Name);
+            Assert.NotNull(createdPlayer);
+            Assert.Equal("Hero", createdPlayer.Name);
             Assert.Equal(chosenClass.Id, createdPlayer.ClassId);
             Assert.Equal(1, createdPlayer.Level);
             Assert.Equal(0, createdPlayer.Exp);
@@ -94,7 +115,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task CreateAccount_ClassWithStarterEquipment_UnlocksAndEquipsItWithItsGrantedSkillActive()
+        public async Task CreatePlayer_ClassWithStarterEquipment_UnlocksAndEquipsItWithItsGrantedSkillActive()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -116,22 +137,17 @@ namespace Game.Application.Tests.Services
                 starterSkillIds: starterSkills,
                 starterEquipment: [(weapon.Id, EEquipmentSlot.WeaponSlot)]);
             await ReloadReferenceCachesAsync();
+            var user = await TestDataSeeder.CreateUserAsync(context, "equipper", "pass");
 
             var accountService = CreateAccountService(scope.ServiceProvider);
-            var status = await accountService.CreateAccount("equipped", "pass", chosenClass.Id);
-            Assert.Equal(CreateAccountStatus.Success, status);
+            var result = await accountService.CreatePlayer(user.Id, "Equipped", chosenClass.Id);
+            Assert.True(result.Success);
 
             // Re-read the persisted player through the canonical load path on a fresh scope (the cache-flush
             // equivalent), so the equipment graph is asserted as it round-trips, not just as it was written.
             using var verifyScope = CreateScope();
             var verifyProvider = verifyScope.ServiceProvider;
-            var verifyContext = verifyProvider.GetRequiredService<GameContext>();
-            var playerId = await verifyContext.Players
-                .Where(p => p.Name == "equipped")
-                .Select(p => p.Id)
-                .SingleAsync(CancellationToken);
-
-            var player = await verifyProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerId, CancellationToken);
+            var player = await verifyProvider.GetRequiredService<IPlayerRepository>().GetPlayer(result.Player.Id, CancellationToken);
             Assert.NotNull(player);
 
             // The weapon is unlocked and equipped in its slot.
@@ -152,12 +168,10 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             await TestDataSeeder.CreateUserAsync(context, "existing", "pass");
-            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
-            await ReloadReferenceCachesAsync();
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var status = await accountService.CreateAccount("existing", "anotherpass", chosenClass.Id);
+            var status = await accountService.CreateAccount("existing", "anotherpass");
 
             Assert.Equal(CreateAccountStatus.UsernameTaken, status);
         }
@@ -165,22 +179,13 @@ namespace Game.Application.Tests.Services
         [Fact]
         public async Task CreateAccount_ConcurrentSameUsername_CreatesExactlyOneActiveAccount()
         {
-            // The class kit (its starter skills) must exist for each new player's player-skill FK.
-            int classId;
-            using (var seedScope = CreateScope())
-            {
-                var seedContext = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(seedContext)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-
             // Each attempt runs on its own scope/DbContext (a context is not thread-safe). Whether both race
             // past the existence check or one observes the other's row, the active-username unique index must
             // ensure only one insert wins; the loser is reported as taken rather than failing.
             async Task<CreateAccountStatus> Attempt()
             {
                 using var scope = CreateScope();
-                return await CreateAccountService(scope.ServiceProvider).CreateAccount("raceuser", "racepass", classId);
+                return await CreateAccountService(scope.ServiceProvider).CreateAccount("raceuser", "racepass");
             }
 
             var results = await Task.WhenAll(Attempt(), Attempt());
@@ -206,11 +211,7 @@ namespace Game.Application.Tests.Services
             archived.ArchivedAt = DateTime.UtcNow;
             await context.SaveChangesAsync(CancellationToken);
 
-            // The class kit (its starter skills) must exist for the new player's player-skill FK.
-            var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
-            await ReloadReferenceCachesAsync();
-
-            var status = await CreateAccountService(scope.ServiceProvider).CreateAccount("reusable", "newpass", chosenClass.Id);
+            var status = await CreateAccountService(scope.ServiceProvider).CreateAccount("reusable", "newpass");
             Assert.Equal(CreateAccountStatus.Success, status);
 
             using var verifyScope = CreateScope();
@@ -630,40 +631,6 @@ namespace Game.Application.Tests.Services
             using var verifyScope = CreateScope();
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
             Assert.Equal(0, await verifyContext.Players.CountAsync(p => p.UserId == user.Id, CancellationToken));
-        }
-
-        [Fact]
-        public async Task CreateAccount_UnknownClass_ReturnsInvalidClassAndCreatesNothing()
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            // A class id far beyond anything the shared integration catalogue holds is guaranteed unknown.
-            var accountService = CreateAccountService(scope.ServiceProvider);
-
-            var status = await accountService.CreateAccount("classless", "pass", classId: 999_999);
-
-            Assert.Equal(CreateAccountStatus.InvalidClass, status);
-
-            using var verifyScope = CreateScope();
-            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
-            Assert.False(await verifyContext.Users.AnyAsync(u => u.Username == "classless", CancellationToken));
-        }
-
-        [Fact]
-        public async Task CreateAccount_RetiredClass_ReturnsInvalidClass()
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            // A retired class stays resolvable by id but is out of circulation for new creations.
-            var retired = await TestDataSeeder.CreateClassWithKitAsync(
-                context, starterSkillIds: [], name: "Retired", retiredAt: DateTime.UtcNow);
-            await ReloadReferenceCachesAsync();
-
-            var accountService = CreateAccountService(scope.ServiceProvider);
-
-            var status = await accountService.CreateAccount("wantsretired", "pass", retired.Id);
-
-            Assert.Equal(CreateAccountStatus.InvalidClass, status);
         }
 
         [Fact]
