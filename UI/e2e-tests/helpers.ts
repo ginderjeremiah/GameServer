@@ -53,6 +53,28 @@ export async function selectFirstCharacter(page: Page) {
 	await expect(page).toHaveURL('/loading', { timeout: 10000 });
 }
 
+/**
+ * From the (empty) select screen a freshly-signed-up account lands on, create the first character —
+ * signup no longer creates one (#1256). The create form is auto-opened for an account with no
+ * characters; fall back to the "+ New character" affordance if it isn't already open. Leaves exactly
+ * one player card on the screen.
+ */
+export async function createFirstCharacter(page: Page, name = 'Hero') {
+	await expect(page).toHaveURL('/select', { timeout: 10000 });
+
+	const nameInput = page.getByTestId('new-name-input');
+	if (!(await nameInput.isVisible())) {
+		await page.getByTestId('show-create').click();
+	}
+	// A class is required to create, so wait for the picker to load (it defaults to the first class)
+	// before submitting — the Create button stays disabled until a class is selected.
+	await expect(page.getByTestId('class-picker')).toBeVisible({ timeout: 10000 });
+	await nameInput.fill(name);
+	await page.getByTestId('create-form').getByTestId('submit-button').click();
+
+	await expect(page.getByTestId('player-card')).toHaveCount(1, { timeout: 10000 });
+}
+
 export async function createAccountAndLogin(page: Page, prefix = 'e') {
 	await page.goto('/');
 	await waitForLoginReady(page);
@@ -66,6 +88,8 @@ export async function createAccountAndLogin(page: Page, prefix = 'e') {
 	await page.getByTestId('confirm-input').fill(TEST_PASSWORD);
 	await page.getByTestId('submit-button').click();
 
+	// Signup lands on the select screen with no characters; create the first one, then enter as it.
+	await createFirstCharacter(page);
 	await selectFirstCharacter(page);
 	return username;
 }

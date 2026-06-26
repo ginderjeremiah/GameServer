@@ -2,8 +2,9 @@ namespace Game.Abstractions.Contracts.Identity
 {
     /// <summary>
     /// The credential material for a brand-new account, handed to the Identity / User Admin context to
-    /// persist a new user. The orchestration layer hashes the password and supplies the blueprint; the
-    /// data tier maps it to the entity graph (alongside the new player's <c>NewPlayer</c> blueprint).
+    /// persist a new user. The orchestration layer hashes the password and supplies this material; the
+    /// data tier maps it to the user entity. A new account has no characters — its first character is
+    /// created later, on the select screen (issue #1256).
     /// </summary>
     /// <remarks>
     /// Like <see cref="AccountCredentials"/> this is an internal write contract of the Identity context.

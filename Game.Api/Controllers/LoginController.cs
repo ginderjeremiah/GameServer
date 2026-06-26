@@ -258,14 +258,13 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse> CreateAccount([FromBody] CreateAccountRequest request)
         {
-            var status = await _accountService.CreateAccount(request.Username, request.Password, request.ClassId, HttpContext.RequestAborted);
+            var status = await _accountService.CreateAccount(request.Username, request.Password, HttpContext.RequestAborted);
             // Exhaustive map (mirrors the login/role mappings) so a newly-added failure status is a build-time
             // gap to fill rather than a silent success reported to the client.
             return status switch
             {
                 CreateAccountStatus.Success => ApiResponse.Success(),
                 CreateAccountStatus.UsernameTaken => ApiResponse.Error("There is already an account with this username."),
-                CreateAccountStatus.InvalidClass => ApiResponse.Error("The selected class is not available.", ApiErrorCategory.BadRequest),
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }

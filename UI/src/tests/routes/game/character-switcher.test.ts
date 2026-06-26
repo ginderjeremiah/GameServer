@@ -177,6 +177,8 @@ describe('CharacterSwitcher', () => {
 
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		await fireEvent.click(screen.getByTestId('show-create'));
+		// A class is required, so wait for the picker (the default class is selected once it loads).
+		await waitFor(() => expect(screen.getByTestId('class-picker')).toBeTruthy());
 		await fireEvent.input(screen.getByTestId('new-name-input'), { target: { value: 'Mage' } });
 		await fireEvent.submit(screen.getByTestId('create-form'));
 

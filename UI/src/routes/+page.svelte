@@ -185,10 +185,9 @@ const handleSubmit = async () => {
 	submitting = true;
 
 	if (mode === 'signup') {
-		// TODO(#1256): the signup path creates the account's first character but has no class picker yet,
-		// so it sends a placeholder classId. Closing that gap is a UX fork (pick-at-signup vs. defer
-		// first-character creation to the select screen) tracked in #1256.
-		const created = await new ApiRequest('Login/CreateAccount').post({ username, password, classId: 0 });
+		// Signup creates the account only — its first character is created on the select screen, through the
+		// same class picker as any additional one (#1256), so no class rides this request.
+		const created = await new ApiRequest('Login/CreateAccount').post({ username, password });
 		if (created.status !== 200) {
 			submitting = false;
 			serverError = created.error ?? 'Could not create account.';
@@ -200,19 +199,14 @@ const handleSubmit = async () => {
 	if (response.status === 200) {
 		setTokens(response.data.tokens);
 
-		// Login lists the account's characters; choosing one (which binds the session and rotates the
-		// token to carry the player) happens on the character-select screen. Hand the summaries off and
-		// proceed there — the refresh token needed to select is held in the token store.
-		const summaries = response.data.playerSummaries;
-		if (summaries.length === 0) {
-			submitting = false;
-			serverError = 'This account has no characters.';
-			return;
-		}
-		// Surface the brief "signing in" success status while the navigation to the character-select
-		// screen settles; `submitting` stays true so the form holds disabled through the transition.
+		// Login lists the account's characters; choosing one (which binds the session and rotates the token
+		// to carry the player) happens on the character-select screen, using the refresh token held in the
+		// token store. A freshly signed-up account has no characters yet and creates its first one there; an
+		// existing account lands there to pick one. Either way, hand the (possibly empty) summaries off and
+		// proceed. The brief "signing in" success status shows while the navigation settles; `submitting`
+		// stays true so the form holds disabled through the transition.
 		success = true;
-		playerSelectHandoff.set(summaries);
+		playerSelectHandoff.set(response.data.playerSummaries);
 		goto(resolve('/select'));
 	} else if (mode === 'signup') {
 		submitting = false;

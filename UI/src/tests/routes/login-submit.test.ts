@@ -82,7 +82,10 @@ describe('Login page — submit flow', () => {
 		expect(postMock).not.toHaveBeenCalledWith('Login/SelectPlayer', expect.anything());
 	});
 
-	it('surfaces a server error when login has no characters', async () => {
+	it('hands off an empty character list and navigates to select (a freshly signed-up account)', async () => {
+		// An account with no characters is now a valid state — signup creates the account only, and the
+		// first character is created on the select screen (#1256). The page hands off the empty list and
+		// proceeds rather than treating it as an error.
 		postMock.mockResolvedValue({
 			status: 200,
 			data: { tokens: { accessToken: 'a', refreshToken: 'r' }, playerSummaries: [] }
@@ -92,11 +95,8 @@ describe('Login page — submit flow', () => {
 
 		await submit();
 
-		await waitFor(() =>
-			expect(screen.getByTestId('status-line').textContent).toContain('This account has no characters.')
-		);
-		expect(gotoMock).not.toHaveBeenCalled();
-		expect(handoffSetMock).not.toHaveBeenCalled();
+		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/select'));
+		expect(handoffSetMock).toHaveBeenCalledWith([]);
 	});
 
 	it('surfaces a server error on a rejected login', async () => {
@@ -122,10 +122,10 @@ describe('Login page — submit flow', () => {
 		await submit();
 
 		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/select'));
+		// Signup creates the account only (no class) — the first character is created on the select screen.
 		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', {
 			username: 'newhero',
-			password: 'Test1234',
-			classId: 0
+			password: 'Test1234'
 		});
 		expect(postMock).toHaveBeenCalledWith('Login', { username: 'newhero', password: 'Test1234' });
 	});

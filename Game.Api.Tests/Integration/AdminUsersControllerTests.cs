@@ -52,20 +52,6 @@ namespace Game.Api.Tests.Integration
             return (CreateAuthenticatedClient(user.Id, player.Id, roles), user.Id);
         }
 
-        /// <summary>Seeds the class CreateAccount needs (its starter skills 0/1/2 + a base spread) and reloads
-        /// the reference caches so the endpoint resolves it. Returns the class id to create the account as.</summary>
-        private async Task<int> SeedCreatableClassAsync()
-        {
-            int classId;
-            using (var scope = CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-                classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-            return classId;
-        }
-
         private static async Task<AdminUserSearchResults> GetUsersAsync(HttpClient client, string query = "")
         {
             var response = await client.GetAsync($"/api/AdminTools/GetUsers{query}", CancellationToken);
@@ -345,7 +331,6 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task ArchiveUser_FreesUsernameForReuse()
         {
-            var classId = await SeedCreatableClassAsync();
             using var authClient = await SetupAdminClientAsync();
             int recyclerId;
             using (var scope = CreateScope())
@@ -368,7 +353,7 @@ namespace Game.Api.Tests.Integration
 
             // The freed username can now be claimed by a brand-new account.
             var createResponse = await Client.PostAsJsonAsync(
-                "/api/Login/CreateAccount", new { Username = "recycler", Password = "newpass", ClassId = classId }, CancellationToken);
+                "/api/Login/CreateAccount", new { Username = "recycler", Password = "newpass" }, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
             var createResult = await createResponse.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.Null(createResult?.ErrorMessage);
@@ -377,7 +362,6 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task BanUser_KeepsUsernameReserved()
         {
-            var classId = await SeedCreatableClassAsync();
             using var authClient = await SetupAdminClientAsync();
             int outlawId;
             using (var scope = CreateScope())
@@ -400,7 +384,7 @@ namespace Game.Api.Tests.Integration
 
             // A banned user keeps their username reserved, so it cannot be reused.
             var createResponse = await Client.PostAsJsonAsync(
-                "/api/Login/CreateAccount", new { Username = "outlaw", Password = "newpass", ClassId = classId }, CancellationToken);
+                "/api/Login/CreateAccount", new { Username = "outlaw", Password = "newpass" }, CancellationToken);
             Assert.Equal(HttpStatusCode.BadRequest, createResponse.StatusCode);
         }
 

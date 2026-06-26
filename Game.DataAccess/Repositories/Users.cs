@@ -52,11 +52,11 @@ namespace Game.DataAccess.Repositories
             _context = context;
         }
 
-        public async Task<bool> CreateAccount(NewAccount account, NewPlayer player, CancellationToken cancellationToken = default)
+        public async Task<bool> CreateAccount(NewAccount account, CancellationToken cancellationToken = default)
         {
-            // The account graph carries no cache write or domain events: a freshly created player is only
-            // loaded into the cache later, on login. The player links to the user via navigation, so EF
-            // resolves the FK without the store-generated user id.
+            // A new account is created with no characters — its first one is created later, on the select
+            // screen. The user carries no cache write or domain events either: nothing is loaded into the
+            // cache until login.
             var user = new UserEntity
             {
                 Username = account.Username,
@@ -65,7 +65,6 @@ namespace Game.DataAccess.Repositories
             };
 
             _context.Users.Add(user);
-            _context.Players.Add(PlayerMapper.ToEntity(player, user));
 
             try
             {
@@ -79,8 +78,8 @@ namespace Game.DataAccess.Repositories
             {
                 // The only unique constraint a new account can violate is the active-username index, so a
                 // unique violation means another request created the same active username concurrently.
-                // Clear the tracker (it holds only this account's rolled-back inserts) so the unit-of-work
-                // commit filter doesn't re-attempt them after the action returns.
+                // Clear the tracker (it holds only this account's rolled-back insert) so the unit-of-work
+                // commit filter doesn't re-attempt it after the action returns.
                 _context.ChangeTracker.Clear();
                 return false;
             }

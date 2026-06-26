@@ -31,8 +31,10 @@
 			error={view.createError}
 			creating={view.creating}
 			classes={view.classes}
+			classesLoading={view.classesLoading}
 			selectedClassId={view.selectedClassId}
 			onSelectClass={(id) => view.selectClass(id)}
+			onRetryClasses={() => view.retryLoadClasses()}
 			onSubmit={() => view.create()}
 			onCancel={() => view.toggleCreate()}
 		/>

@@ -11,8 +11,8 @@ using Contracts = Game.Abstractions.Contracts;
 namespace Game.Application.Services
 {
     /// <summary>
-    /// Orchestrates account and authentication use cases: creating accounts (and their initial player
-    /// graph), authenticating a login, and rotating/revoking refresh tokens. The API layer is a thin
+    /// Orchestrates account and authentication use cases: creating accounts, authenticating a login,
+    /// selecting/creating characters, and rotating/revoking refresh tokens. The API layer is a thin
     /// adapter over this service — it owns only request-scoped session wiring and HTTP mapping.
     /// </summary>
     public class AccountService(
@@ -44,19 +44,14 @@ namespace Game.Application.Services
 
         /// <summary>
         /// Creates a new account: validates the username is available, hashes the password, and hands the
-        /// credential material plus the new-player blueprint to the Identity context for persistence. The
-        /// new-player defaults (starter skills, attributes, and log preferences) are a domain concern
-        /// owned by <see cref="NewPlayerFactory"/>; this method only orchestrates — it builds no entity
-        /// graphs. The up-front check is a fast path; the data tier's active-username uniqueness guard is
+        /// credential material to the Identity context for persistence. The account is created with
+        /// <b>no</b> character — a freshly signed-up account creates its first character on the select
+        /// screen through the same class picker as any additional one (issue #1256), so signup needs no
+        /// class. The up-front check is a fast path; the data tier's active-username uniqueness guard is
         /// the authority, so a username claimed concurrently (past the check) is still reported as taken.
         /// </summary>
-        public async Task<CreateAccountStatus> CreateAccount(string username, string password, int classId, CancellationToken cancellationToken = default)
+        public async Task<CreateAccountStatus> CreateAccount(string username, string password, CancellationToken cancellationToken = default)
         {
-            if (ResolveCreatableClass(classId) is not { } chosenClass)
-            {
-                return CreateAccountStatus.InvalidClass;
-            }
-
             if (await _users.CheckIfUsernameExists(username, cancellationToken))
             {
                 return CreateAccountStatus.UsernameTaken;
@@ -68,7 +63,7 @@ namespace Game.Application.Services
                 PassHash = _passwordHasher.Hash(password),
             };
 
-            var created = await _users.CreateAccount(account, _newPlayerFactory.Create(username, chosenClass), cancellationToken);
+            var created = await _users.CreateAccount(account, cancellationToken);
 
             return created ? CreateAccountStatus.Success : CreateAccountStatus.UsernameTaken;
         }
