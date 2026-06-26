@@ -297,7 +297,7 @@ namespace Game.Api.Controllers
 
             // A still-valid token whose player can't be loaded (deleted/archived between requests) is a
             // graceful error, not a 500 — mirroring the structured ApiResponse.Error its sibling endpoints use.
-            var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId);
+            var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId, HttpContext.RequestAborted);
             if (player is null)
             {
                 return ApiResponse.Error("Player data not found", ApiErrorCategory.NotFound);

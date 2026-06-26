@@ -63,7 +63,7 @@ namespace Game.Api.Middleware
 
             using var scope = scopeFactory.CreateScope();
             var player = await scope.ServiceProvider.GetRequiredService<PlayerService>()
-                .LoadPlayer(sessionService.SelectedPlayerId);
+                .LoadPlayer(sessionService.SelectedPlayerId, cancellationToken);
             if (player is null)
             {
                 return false;
