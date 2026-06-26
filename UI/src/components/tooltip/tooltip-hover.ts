@@ -12,6 +12,16 @@ export interface TooltipHoverController<P> {
 	hide: () => void;
 }
 
+/**
+ * A {@link TooltipHoverController} for a single shared panel that also exposes that panel's stable DOM
+ * id, for wiring a focusable trigger's `aria-describedby` (via the `describedByTooltip` action). The
+ * common shape of the concrete per-surface controllers (attribute pills, words of power).
+ */
+export interface DescribedTooltipController<P> extends TooltipHoverController<P> {
+	/** Stable DOM id of the shared panel, for wiring a focusable trigger's `aria-describedby`. */
+	readonly describedById: string;
+}
+
 export interface TooltipHoverParams<P> {
 	/** The shared tooltip controller, or `undefined` to no-op (a screen may not provide one). */
 	controller: TooltipHoverController<P> | undefined;
