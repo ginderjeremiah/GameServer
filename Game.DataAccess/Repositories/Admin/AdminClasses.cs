@@ -129,6 +129,15 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Class");
             }
 
+            // Authoring guard: NewPlayerFactory reads these as the class's level-scaled locked base, keyed by
+            // attribute and seeded core-only. A duplicate attribute would throw at character creation (the
+            // downstream ToDictionary), and a non-core distribution would be silently dropped — so both are
+            // rejected here, at save time, rather than surfacing as a 500 or a silent no-op at creation.
+            if (FindAttributeDistributionViolation(data.AttributeDistributions) is { } rejection)
+            {
+                return rejection;
+            }
+
             return ChildCollectionReconciler.Reconcile(
                 existing: @class.AttributeDistributions,
                 desired: data.AttributeDistributions,
@@ -163,6 +172,29 @@ namespace Game.DataAccess.Repositories.Admin
                 BaseAmount = distribution.BaseAmount,
                 AmountPerLevel = distribution.AmountPerLevel,
             };
+        }
+
+        /// <summary>Returns a rejection for the first desired distribution that targets a non-core attribute or
+        /// repeats an attribute already in the set, or null when the desired set is well-formed.</summary>
+        private static AdminSaveResult? FindAttributeDistributionViolation(IEnumerable<Contracts.AttributeDistribution> distributions)
+        {
+            var seen = new HashSet<EAttribute>();
+            foreach (var distribution in distributions)
+            {
+                if (!Game.Core.Attributes.Attribute.IsCore(distribution.AttributeId))
+                {
+                    return AdminSaveResult.Failure(
+                        $"Attribute '{distribution.AttributeId}' is not a core attribute and cannot have a class distribution.");
+                }
+
+                if (!seen.Add(distribution.AttributeId))
+                {
+                    return AdminSaveResult.Failure(
+                        $"Attribute '{distribution.AttributeId}' has more than one distribution; each attribute may appear at most once.");
+                }
+            }
+
+            return null;
         }
 
         /// <summary>Returns a rejection for the first desired skill that does not exist or is not
