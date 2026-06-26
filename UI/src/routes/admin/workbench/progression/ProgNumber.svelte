@@ -1,6 +1,6 @@
 <div class="numfld" style:width={width ? `${width}px` : undefined}>
 	{#if label}<span class="lbl" class:warn>{label}</span>{/if}
-	<NumInput class="pnum{warn ? ' invalid' : ''}" ariaLabel={label} {value} {allowNegative} {onChange} />
+	<NumInput class="pnum{warn ? ' invalid' : ''}" ariaLabel={ariaLabel ?? label} {value} {allowNegative} {onChange} />
 </div>
 
 <script lang="ts">
@@ -13,9 +13,11 @@ interface Props {
 	width?: number;
 	allowNegative?: boolean;
 	warn?: boolean;
+	/** Accessible name when the control has no visible `label` (e.g. table-row inputs). */
+	ariaLabel?: string;
 }
 
-const { label, value, onChange, width, allowNegative = false, warn = false }: Props = $props();
+const { label, value, onChange, width, allowNegative = false, warn = false, ariaLabel }: Props = $props();
 </script>
 
 <style lang="scss">

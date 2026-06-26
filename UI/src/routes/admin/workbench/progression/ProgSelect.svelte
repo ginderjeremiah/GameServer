@@ -4,7 +4,7 @@
 		<select
 			class="sel"
 			class:invalid={warn}
-			aria-label={label}
+			aria-label={ariaLabel ?? label}
 			{value}
 			onchange={(e) => onChange(+e.currentTarget.value)}
 		>
@@ -27,9 +27,11 @@ interface Props {
 	onChange: (value: number) => void;
 	width?: number;
 	warn?: boolean;
+	/** Accessible name when the control has no visible `label` (e.g. table-row selects). */
+	ariaLabel?: string;
 }
 
-const { label, value, options, onChange, width, warn = false }: Props = $props();
+const { label, value, options, onChange, width, warn = false, ariaLabel }: Props = $props();
 </script>
 
 <style lang="scss">

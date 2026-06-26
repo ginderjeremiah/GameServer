@@ -35,6 +35,7 @@
 			<div class="mod-row">
 				<div class="m-attr">
 					<ProgSelect
+						ariaLabel="Attribute"
 						value={mr.modifier.attributeId}
 						options={attrOptionsFor(mr.modifier.attributeId)}
 						onChange={(v) => store.updateModifier(tier.id, mr.index, { attributeId: v })}
@@ -42,6 +43,7 @@
 				</div>
 				<div class="m-type">
 					<ProgSelect
+						ariaLabel="Modifier type"
 						value={mr.modifier.modifierTypeId}
 						options={modTypeOptions}
 						onChange={(v) => store.updateModifier(tier.id, mr.index, { modifierTypeId: v })}
@@ -49,6 +51,7 @@
 				</div>
 				<div class="m-val">
 					<ProgNumber
+						ariaLabel="Amount"
 						value={mr.modifier.amount}
 						allowNegative
 						onChange={(v) => store.updateModifier(tier.id, mr.index, { amount: v })}
@@ -69,6 +72,7 @@
 		</div>
 		<div class="reward">
 			<ProgSelect
+				ariaLabel="Reward skill"
 				value={reward?.rewardSkillId ?? NO_SEED_SKILL}
 				options={rewardOptions}
 				onChange={(v) => store.setReward(tier.id, sel, v)}

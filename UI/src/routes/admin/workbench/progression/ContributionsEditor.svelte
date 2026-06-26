@@ -20,10 +20,11 @@
 		<span class="c-rm"></span>
 	</div>
 
-	{#each path.contributions as row, index (index)}
+	{#each path.contributions as row, index (row.skillId)}
 		<div class="grid-row">
 			<div class="c-skill">
 				<ProgSelect
+					ariaLabel="Skill"
 					value={row.skillId}
 					options={skillOptionsFor(row.skillId)}
 					onChange={(v) => store.updateContribution(pathId, index, { skillId: v })}
@@ -31,13 +32,18 @@
 			</div>
 			<div class="c-home">
 				<ProgSelect
+					ariaLabel="Home tier"
 					value={row.homeTier}
 					options={homeTierOptions(tiers)}
 					onChange={(v) => store.updateContribution(pathId, index, { homeTier: v })}
 				/>
 			</div>
 			<div class="c-weight">
-				<ProgNumber value={row.weight} onChange={(v) => store.updateContribution(pathId, index, { weight: v })} />
+				<ProgNumber
+					ariaLabel="Weight"
+					value={row.weight}
+					onChange={(v) => store.updateContribution(pathId, index, { weight: v })}
+				/>
 			</div>
 			<button
 				type="button"
