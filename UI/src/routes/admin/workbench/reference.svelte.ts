@@ -43,24 +43,39 @@ class WorkbenchReference {
 		// post-save reads stay fresh because every admin write reloads these in-memory caches
 		// server-side (AdminCacheReloadFilter). Tags have no socket command yet, so they
 		// remain on HTTP.
-		const [enemies, skills, zones, items, itemMods, tags, tagCategories, challengeTypes, challenges] =
-			await Promise.all([
-				fetchSocketData('GetEnemies'),
-				fetchSocketData('GetSkills'),
-				fetchSocketData('GetZones'),
-				fetchSocketData('GetItems'),
-				fetchSocketData('GetItemMods'),
-				ApiRequest.get('Tags'),
-				ApiRequest.get('Tags/TagCategories'),
-				fetchSocketData('GetChallengeTypes'),
-				fetchSocketData('GetChallenges')
-			]);
+		const [
+			enemies,
+			skills,
+			zones,
+			items,
+			itemMods,
+			tags,
+			tagCategories,
+			challengeTypes,
+			challenges,
+			paths,
+			proficiencies
+		] = await Promise.all([
+			fetchSocketData('GetEnemies'),
+			fetchSocketData('GetSkills'),
+			fetchSocketData('GetZones'),
+			fetchSocketData('GetItems'),
+			fetchSocketData('GetItemMods'),
+			ApiRequest.get('Tags'),
+			ApiRequest.get('Tags/TagCategories'),
+			fetchSocketData('GetChallengeTypes'),
+			fetchSocketData('GetChallenges'),
+			fetchSocketData('GetPaths'),
+			fetchSocketData('GetProficiencies')
+		]);
 		staticData.enemies = enemies;
 		staticData.skills = skills;
 		staticData.zones = zones;
 		staticData.items = items;
 		staticData.itemMods = itemMods;
 		staticData.challenges = challenges;
+		staticData.paths = paths;
+		staticData.proficiencies = proficiencies;
 		this.tags = tags;
 		this.tagCategories = tagCategories;
 		this.challengeTypes = challengeTypes;
@@ -134,6 +149,26 @@ class WorkbenchReference {
 			acquisition: s.acquisition,
 			retired: !!s.retiredAt
 		}));
+
+	// ── Progression (paths & proficiencies) ──
+	/** Any active skill (plus the current value if retired) — the contribution skill picker. */
+	skillOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.skills ?? [], keep);
+	/**
+	 * Player-acquirable skills, with a "None" sentinel (-1). Backs the seed-skill and milestone-reward
+	 * pickers, which the backend restricts to `ESkillAcquisition.Player` skills. The current value stays
+	 * visible even if it lost the flag or was retired, so an existing grant isn't silently dropped.
+	 */
+	playerSkillOptions = (keep?: number): SelectOption[] => [
+		{ value: -1, text: 'None' },
+		...this.retireableOptions(
+			(staticData.skills ?? []).filter((s) => hasFlag(s.acquisition, ESkillAcquisition.Player) || s.id === keep),
+			keep
+		)
+	];
+	/** Active proficiencies (plus the current value if retired) — the cross-path prerequisite picker. */
+	proficiencyOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.proficiencies ?? [], keep);
+	pathName = (id: number) => staticData.paths?.[id]?.name;
+	proficiencyName = (id: number) => staticData.proficiencies?.[id]?.name;
 
 	// ── Challenges ──
 	challengeTypeOptions = (): SelectOption[] => this.challengeTypes.map((t) => ({ value: t.id, text: t.name }));
