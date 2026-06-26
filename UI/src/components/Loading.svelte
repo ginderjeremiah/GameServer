@@ -63,19 +63,6 @@ $outer-rotation-count: 3;
 	background: color-mix(in srgb, var(--black) 50%, transparent);
 }
 
-// Accessible label for screen readers without showing visible text.
-.sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	margin: -1px;
-	padding: 0;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
-}
-
 .loading-spinner-container {
 	position: absolute;
 	top: 50%;

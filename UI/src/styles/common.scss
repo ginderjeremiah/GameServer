@@ -132,6 +132,21 @@ h1 {
 	}
 }
 
+// Visually-hidden accessible label: removed from the visual layout but kept in the
+// accessibility tree so a state conveyed by colour/shape alone (e.g. a dirty dot) still
+// has text for screen readers. Promoted from ~5 byte-identical scoped copies.
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
 input::placeholder {
 	color: var(--text-tertiary);
 }
