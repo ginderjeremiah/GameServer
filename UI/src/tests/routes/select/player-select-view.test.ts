@@ -126,6 +126,32 @@ describe('PlayerSelectView — class loading', () => {
 		expect(view.classes).toEqual([]);
 		expect(view.selectedClassId).toBeNull();
 	});
+
+	it('clears the loading flag once the options resolve', async () => {
+		const view = new PlayerSelectView(makeDeps(), [summary(1)]);
+		expect(view.classesLoading).toBe(true);
+
+		await flush();
+
+		expect(view.classesLoading).toBe(false);
+	});
+
+	it('retries the class load after a failed (empty) load', async () => {
+		const loadCreationData = vi
+			.fn()
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce([creatable(4)]);
+		const view = new PlayerSelectView(makeDeps({ loadCreationData }), [summary(1)]);
+		await flush();
+		expect(view.classes).toEqual([]);
+
+		view.retryLoadClasses();
+		await flush();
+
+		expect(view.classes.map((c) => c.id)).toEqual([4]);
+		expect(view.selectedClassId).toBe(4);
+		expect(loadCreationData).toHaveBeenCalledTimes(2);
+	});
 });
 
 describe('PlayerSelectView — create', () => {
@@ -156,15 +182,17 @@ describe('PlayerSelectView — create', () => {
 		expect(view.createError).toBeTruthy();
 	});
 
-	it('creates with a null class when the picker is inactive (host coerces to its placeholder)', async () => {
+	it('blocks creation when no class is selected and surfaces an error', async () => {
 		const deps = makeDeps();
 		const view = new PlayerSelectView(deps, [summary(1)]);
 		view.newName = 'NewHero';
-		// selectedClassId stays null — e.g. the pre-selection select screen, where the picker is hidden.
+		// selectedClassId stays null — e.g. the class catalogue failed to load, so the picker is hidden.
+		// A class is mandatory now (no placeholder fallback), so creation is blocked client-side.
 
 		await view.create();
 
-		expect(deps.createPlayer).toHaveBeenCalledWith('NewHero', null);
+		expect(deps.createPlayer).not.toHaveBeenCalled();
+		expect(view.createError).toBeTruthy();
 	});
 
 	it('selectClass records the choice and clears a prior create error', () => {

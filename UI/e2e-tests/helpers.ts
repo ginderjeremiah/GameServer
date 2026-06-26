@@ -66,6 +66,9 @@ export async function createFirstCharacter(page: Page, name = 'Hero') {
 	if (!(await nameInput.isVisible())) {
 		await page.getByTestId('show-create').click();
 	}
+	// A class is required to create, so wait for the picker to load (it defaults to the first class)
+	// before submitting — the Create button stays disabled until a class is selected.
+	await expect(page.getByTestId('class-picker')).toBeVisible({ timeout: 10000 });
 	await nameInput.fill(name);
 	await page.getByTestId('create-form').getByTestId('submit-button').click();
 

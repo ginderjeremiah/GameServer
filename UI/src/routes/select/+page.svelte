@@ -48,9 +48,8 @@ const selectPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 };
 
 const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
-	// classId is the picker's choice; `?? 0` is a safety net for the (not-expected) case where the
-	// class options failed to load, leaving the picker hidden.
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId: classId ?? 0 });
+	// classId is the picker's choice; the view-model guarantees one is selected before calling here.
+	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}

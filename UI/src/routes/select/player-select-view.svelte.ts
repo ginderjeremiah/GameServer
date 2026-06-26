@@ -19,10 +19,10 @@ export interface PlayerSelectDeps {
 	/** Binds the session to the chosen character (rotating the token) and loads it; resolves the
 	 *  player on success or a surfaced error message on failure. */
 	selectPlayer: (playerId: number) => Promise<SelectResult>;
-	/** Creates a new character on the account, of the chosen class when the picker is active (the host
-	 *  coerces a null class to its placeholder where the catalogue isn't available — see the select
-	 *  screen). Resolves its summary or a surfaced error message. */
-	createPlayer: (name: string, classId: number | null) => Promise<CreateResult>;
+	/** Creates a new character on the account, of the chosen class. A class is always required — the
+	 *  view-model blocks creation until one is selected — so this never receives a null. Resolves its
+	 *  summary or a surfaced error message. */
+	createPlayer: (name: string, classId: number) => Promise<CreateResult>;
 	/** Confirms the active-session takeover after selection (a per-player presence check). Returns
 	 *  true to proceed into the game, false when the player declined. */
 	confirmTakeover: () => Promise<boolean>;
@@ -47,8 +47,12 @@ export class PlayerSelectView {
 	/** The in-progress new-character name. */
 	newName = $state('');
 	/** The creatable class options, loaded from the bespoke character-creation payload. Empty until they
-	 *  load (and on failure), which keeps the picker hidden and creation on its placeholder fallback. */
+	 *  load and if the load fails; the picker stays hidden either way and creation is blocked until a
+	 *  class is selected. */
 	classes = $state<ICreatableClass[]>([]);
+	/** Whether the class options are still being fetched — distinguishes the brief initial load (show a
+	 *  loading hint) from a finished-but-empty load (a failure, show the unavailable + retry state). */
+	classesLoading = $state(true);
 	/** The class chosen for the new character, or null before the options load / a choice is made.
 	 *  Defaulted to the first option once they load. */
 	selectedClassId = $state<number | null>(null);
@@ -76,11 +80,25 @@ export class PlayerSelectView {
 	/** Loads the creatable class options and defaults the selection to the first one, so the create form
 	 *  is submittable without an extra click. A failure leaves the list empty (picker hidden). */
 	private async loadClasses(): Promise<void> {
-		const classes = await this.deps.loadCreationData();
-		this.classes = classes;
-		if (this.selectedClassId == null && classes.length > 0) {
-			this.selectedClassId = classes[0].id;
+		this.classesLoading = true;
+		try {
+			const classes = await this.deps.loadCreationData();
+			this.classes = classes;
+			if (this.selectedClassId == null && classes.length > 0) {
+				this.selectedClassId = classes[0].id;
+			}
+		} finally {
+			this.classesLoading = false;
 		}
+	}
+
+	/** Re-fetches the class options after a failed load. The picker hides and creation is blocked when
+	 *  the options are missing, so the create form offers a retry rather than leaving the player stuck. */
+	retryLoadClasses(): void {
+		if (this.classesLoading) {
+			return;
+		}
+		void this.loadClasses();
 	}
 
 	/** Live validation of the new-character name, mirroring the backend rule. */
@@ -136,9 +154,9 @@ export class PlayerSelectView {
 	}
 
 	/**
-	 * Creates a new character and appends it to the list. Validates the name client-side first (the
-	 * backend re-validates and enforces the per-account cap as anti-cheat), then surfaces any backend
-	 * failure — name rejected or cap reached — as an inline error.
+	 * Creates a new character and appends it to the list. Validates the name and requires a chosen class
+	 * client-side first (the backend re-validates the name, the class, and the per-account cap as
+	 * anti-cheat), then surfaces any backend failure — name rejected or cap reached — as an inline error.
 	 */
 	async create(): Promise<void> {
 		if (this.busy) {
@@ -149,10 +167,18 @@ export class PlayerSelectView {
 			this.createError = validation.msg;
 			return;
 		}
+		// A class is mandatory — there is no placeholder fallback any more (#1256). If none is selected
+		// (the catalogue hasn't loaded, or failed to), block creation and surface why rather than silently
+		// defaulting to class 0.
+		const classId = this.selectedClassId;
+		if (classId == null) {
+			this.createError = 'Select a class to create your character.';
+			return;
+		}
 
 		this.creating = true;
 		this.createError = null;
-		const result = await this.deps.createPlayer(validation.name, this.selectedClassId);
+		const result = await this.deps.createPlayer(validation.name, classId);
 		this.creating = false;
 
 		if (!result.ok) {

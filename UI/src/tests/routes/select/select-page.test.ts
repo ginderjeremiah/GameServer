@@ -92,6 +92,23 @@ describe('Select page', () => {
 		expect(screen.queryByTestId('character-list')).toBeNull();
 	});
 
+	it('renders the auto-opened create form for an empty account, distinct from a missing handoff', async () => {
+		// An empty handoff ([]) is a valid post-signup state — a freshly signed-up account with no
+		// characters yet — and must NOT be treated as "no handoff" (null, which redirects to login). The
+		// distinction hinges on `if (!summaries)`, so this pins []→render against a later "simplification"
+		// to `!summaries?.length` that would silently send the whole new-account flow back to login.
+		takeMock.mockReturnValue([]);
+		render(SelectPage);
+
+		// The create form opens automatically (openCreateWhenEmpty) and the heading invites first-character
+		// creation rather than character selection.
+		await waitFor(() => expect(screen.getByTestId('new-name-input')).toBeTruthy());
+		expect(screen.getByTestId('select-heading').textContent).toContain('Create your character.');
+		// No characters yet, and crucially no redirect — an empty list is not a missing handoff.
+		expect(screen.queryByTestId('player-card')).toBeNull();
+		expect(gotoMock).not.toHaveBeenCalledWith('/');
+	});
+
 	it('renders a card per handed-off character', async () => {
 		takeMock.mockReturnValue(SUMMARIES);
 		render(SelectPage);
@@ -130,11 +147,33 @@ describe('Select page', () => {
 
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		await fireEvent.click(screen.getByTestId('show-create'));
+		// A class is required, so wait for the picker (the default class is selected once it loads).
+		await waitFor(() => expect(screen.getByTestId('class-picker')).toBeTruthy());
 		await fireEvent.input(screen.getByTestId('new-name-input'), { target: { value: 'Mage' } });
 		await fireEvent.submit(screen.getByTestId('create-form'));
 
 		await waitFor(() => expect(postMock).toHaveBeenCalledWith('Login/CreatePlayer', { name: 'Mage', classId: 0 }));
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(2));
 		expect(screen.getByText('Mage')).toBeTruthy();
+	});
+
+	it('shows an unavailable + retry state when class options fail, and recovers on retry', async () => {
+		// A freshly signed-up account opens the create form, but the class catalogue fetch fails first.
+		takeMock.mockReturnValue([]);
+		getMock.mockReset();
+		getMock
+			.mockResolvedValueOnce({ status: 500, error: 'boom' })
+			.mockResolvedValue({ status: 200, data: [CREATABLE_CLASS] });
+		render(SelectPage);
+
+		// The picker stays hidden and a retry affordance is offered rather than silently defaulting a class.
+		await waitFor(() => expect(screen.getByTestId('retry-classes')).toBeTruthy());
+		expect(screen.queryByTestId('class-picker')).toBeNull();
+
+		await fireEvent.click(screen.getByTestId('retry-classes'));
+
+		// The retry refetches and the picker appears, so creation can proceed with a real class.
+		await waitFor(() => expect(screen.getByTestId('class-picker')).toBeTruthy());
+		expect(screen.queryByTestId('retry-classes')).toBeNull();
 	});
 });
