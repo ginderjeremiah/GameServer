@@ -132,6 +132,134 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveProficiencies_ReorderSwapsExistingOrdinals_IsAccepted()
+        {
+            // The regression a naive per-change cache probe would break: two existing tiers swap ordinals in one
+            // batch. Each Edit transiently "collides" with the other's pre-edit state, but the prospective layout
+            // (both swapped) is collision-free, so the swap must be accepted.
+            int pathId, firstId, secondId;
+            using (var seedScope = CreateScope())
+            {
+                pathId = (await SeedPathAsync(seedScope)).Id;
+                firstId = (await SeedProficiencyAsync(seedScope, pathId, pathOrdinal: 0, name: "Tier A")).Id;
+                secondId = (await SeedProficiencyAsync(seedScope, pathId, pathOrdinal: 1, name: "Tier B")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: firstId, pathId: pathId, pathOrdinal: 1, name: "Tier A") },
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: secondId, pathId: pathId, pathOrdinal: 0, name: "Tier B") },
+            ]);
+
+            Assert.True(result.Succeeded);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_TwoAddsSameOrdinalSamePath_IsRejected()
+        {
+            int pathId;
+            using (var seedScope = CreateScope())
+            {
+                pathId = (await SeedPathAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: pathId, pathOrdinal: 0, name: "Tier A") },
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: pathId, pathOrdinal: 0, name: "Tier B") },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("two tiers at ordinal 0", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_AddCollidesWithExistingTier_IsRejected()
+        {
+            int pathId;
+            using (var seedScope = CreateScope())
+            {
+                pathId = (await SeedPathAsync(seedScope)).Id;
+                await SeedProficiencyAsync(seedScope, pathId, pathOrdinal: 0, name: "Existing");
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: pathId, pathOrdinal: 0, name: "Newcomer") },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("two tiers at ordinal 0", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_SameOrdinalDifferentPaths_IsAccepted()
+        {
+            // Uniqueness is per-path, so the same ordinal across two paths is a valid layout.
+            int firstPathId, secondPathId;
+            using (var seedScope = CreateScope())
+            {
+                firstPathId = (await SeedPathAsync(seedScope)).Id;
+                secondPathId = (await SeedPathAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: firstPathId, pathOrdinal: 0, name: "Tier A") },
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: secondPathId, pathOrdinal: 0, name: "Tier B") },
+            ]);
+
+            Assert.True(result.Succeeded);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_DeleteResolvesCollidingOrdinal_IsAccepted()
+        {
+            // Deleting one of two same-ordinal tiers removes it from the prospective layout, so an Add at that
+            // ordinal in the same batch no longer collides. (Delete is rejected for proficiencies elsewhere, so
+            // this asserts the collision check itself accepts the layout — it must precede that rejection only if
+            // the layout is valid; here the batch passes the collision check and is rejected later by the
+            // retire-only rule, proving the collision check did not false-reject.)
+            int pathId, existingId;
+            using (var seedScope = CreateScope())
+            {
+                pathId = (await SeedPathAsync(seedScope)).Id;
+                existingId = (await SeedProficiencyAsync(seedScope, pathId, pathOrdinal: 0, name: "Existing")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Delete, Item = NewProficiency(id: existingId, pathId: pathId, pathOrdinal: 0) },
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(pathId: pathId, pathOrdinal: 0, name: "Replacement") },
+            ]);
+
+            // The collision check accepts the layout (the delete frees the ordinal); the batch then fails the
+            // retire-only rule, not the collision check — proving the collision check did not false-reject.
+            Assert.False(result.Succeeded);
+            Assert.Contains("retired, not deleted", result.ErrorMessage);
+        }
+
+        [Fact]
         public void SetModifiers_UnknownProficiency_ReturnsNotFound()
         {
             using var scope = CreateScope();
@@ -405,18 +533,23 @@ namespace Game.Application.Tests.DataAccess
 
         private async Task<Entities.Proficiency> SeedProficiencyAsync(IServiceScope scope)
         {
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var path = await SeedPathAsync(scope);
+            return await SeedProficiencyAsync(scope, path.Id);
+        }
+
+        private async Task<Entities.Proficiency> SeedProficiencyAsync(IServiceScope scope, int pathId, int pathOrdinal = 0, string name = "Blades")
+        {
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var proficiency = new Entities.Proficiency
             {
-                Name = "Blades",
+                Name = name,
                 Description = "",
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",
                 Translation = "",
-                PathId = path.Id,
-                PathOrdinal = 0,
+                PathId = pathId,
+                PathOrdinal = pathOrdinal,
                 MaxLevel = 10,
                 BaseXp = 100m,
                 XpGrowth = 2m,
@@ -456,7 +589,7 @@ namespace Game.Application.Tests.DataAccess
             Amount = amount,
         };
 
-        private static Contracts.Proficiency NewProficiency(int id = 0, int? seedSkillId = null, string name = "Blades", int pathId = 0) => new()
+        private static Contracts.Proficiency NewProficiency(int id = 0, int? seedSkillId = null, string name = "Blades", int pathId = 0, int pathOrdinal = 0) => new()
         {
             Id = id,
             Name = name,
@@ -466,7 +599,7 @@ namespace Game.Application.Tests.DataAccess
             Pronunciation = "",
             Translation = "",
             PathId = pathId,
-            PathOrdinal = 0,
+            PathOrdinal = pathOrdinal,
             MaxLevel = 10,
             BaseXp = 100m,
             XpGrowth = 2m,

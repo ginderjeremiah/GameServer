@@ -37,6 +37,15 @@ namespace Game.DataAccess.Repositories.Admin
                 return pathRejection;
             }
 
+            // (PathId, PathOrdinal) is unique per path (a path's tiers form a contiguous frontier). The DB
+            // unique index is the backstop, but a raw violation surfaces as a 500; validate the full prospective
+            // per-path tier layout (not a per-change cache probe, which would false-reject a valid reorder/swap)
+            // and fail cleanly before anything is staged.
+            if (FindTierOrdinalCollision(changes) is { } collisionRejection)
+            {
+                return collisionRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Proficiency
                 {
@@ -238,6 +247,50 @@ namespace Game.DataAccess.Repositories.Admin
                 if (change.Item.PathOrdinal < 0)
                 {
                     return AdminSaveResult.Failure("A proficiency's path ordinal (tier) cannot be negative.");
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns a rejection if the prospective per-path tier layout would place two proficiencies at
+        /// the same <c>PathOrdinal</c> within one path, else null. The prospective set is the cached proficiencies
+        /// with each Edit replacing its record (by Id), each Add appended, and each Delete removed — so a clean
+        /// reorder/swap of existing ordinals is accepted while a true collision is named before anything stages.
+        /// The DB unique index remains the backstop.</summary>
+        private AdminSaveResult? FindTierOrdinalCollision(IReadOnlyList<Change<Contracts.Proficiency>> changes)
+        {
+            // Start from the current cached layout keyed by Id, then fold the batch in.
+            var prospective = _proficiencies.AllProficiencyEntities()
+                .ToDictionary(p => p.Id, p => (p.PathId, p.PathOrdinal));
+
+            foreach (var change in changes)
+            {
+                switch (change.ChangeType)
+                {
+                    case EChangeType.Delete:
+                        prospective.Remove(change.Item.Id);
+                        break;
+                    case EChangeType.Edit:
+                        prospective[change.Item.Id] = (change.Item.PathId, change.Item.PathOrdinal);
+                        break;
+                    case EChangeType.Add:
+                        // Adds carry an unassigned Id, so they can't key the dictionary; collect them separately.
+                        break;
+                }
+            }
+
+            var tiers = prospective.Values
+                .Concat(changes.Where(c => c.ChangeType == EChangeType.Add).Select(c => (c.Item.PathId, c.Item.PathOrdinal)));
+
+            var seen = new HashSet<(int PathId, int PathOrdinal)>();
+            foreach (var tier in tiers)
+            {
+                if (!seen.Add(tier))
+                {
+                    var pathName = _proficiencies.LookupPath(tier.PathId)?.Name;
+                    var pathLabel = pathName is null ? $"{tier.PathId}" : $"'{pathName}'";
+                    return AdminSaveResult.Failure($"Path {pathLabel} has two tiers at ordinal {tier.PathOrdinal}.");
                 }
             }
 

@@ -17,6 +17,13 @@ export interface AdminToolDef {
 export const OPS_GROUP_KEY = 'ops';
 export const DEAD_LETTERS_TOOL_KEY = 'dead-letters';
 
+/**
+ * Nav key for the bespoke Paths/Proficiencies progression editor. Like the Ops tools it renders its
+ * own view (a two-level path → tier drill-down) instead of an EntityConfig-driven Workbench panel,
+ * but it lives in the Progression group alongside the entity-authored surfaces.
+ */
+export const PROGRESSION_TOOL_KEY = 'paths';
+
 /** Workbench nav groups mirror the entity groups (Combat / Items / World / Progression). */
 const workbenchGroupDefs: AdminGroupDef[] = workbenchGroups.map((group) => ({ key: group.key, label: group.label }));
 
@@ -37,10 +44,15 @@ const workbenchToolDefs: AdminToolDef[] = workbenchGroups.flatMap((group) =>
  * Operations/diagnostics tools — a different kind of surface from the entity-authoring Workbench, so
  * they live in their own group and render their own views rather than an EntityConfig-driven panel.
  */
+/** Bespoke (non-entity) Workbench surfaces that still live inside a Workbench group. */
+const progressionToolDefs: AdminToolDef[] = [
+	{ key: PROGRESSION_TOOL_KEY, label: 'Paths', group: 'progression', glyph: 'rune' }
+];
+
 const opsGroupDefs: AdminGroupDef[] = [{ key: OPS_GROUP_KEY, label: 'Ops' }];
 const opsToolDefs: AdminToolDef[] = [
 	{ key: DEAD_LETTERS_TOOL_KEY, label: 'Dead Letters', group: OPS_GROUP_KEY, glyph: 'inbox' }
 ];
 
 export const adminGroups: AdminGroupDef[] = [...workbenchGroupDefs, ...opsGroupDefs];
-export const adminTools: AdminToolDef[] = [...workbenchToolDefs, ...opsToolDefs];
+export const adminTools: AdminToolDef[] = [...workbenchToolDefs, ...progressionToolDefs, ...opsToolDefs];
