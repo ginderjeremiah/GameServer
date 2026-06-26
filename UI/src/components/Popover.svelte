@@ -8,12 +8,18 @@
 	The layer is absolutely positioned, so it overlays its nearest positioned ancestor rather than
 	the whole viewport; mount it inside a `position: relative` container.
 -->
-<svelte:window onkeydown={onKeydown} />
-
 {#if open}
 	<div class="popover-layer">
 		<button class="popover-backdrop" type="button" tabindex="-1" aria-label={closeLabel} onclick={onClose}></button>
-		<div class="popover-shell" role="dialog" aria-modal="true" aria-label={label} tabindex="-1" bind:this={shell}>
+		<div
+			class="popover-shell"
+			role="dialog"
+			aria-modal="true"
+			aria-label={label}
+			tabindex="-1"
+			bind:this={shell}
+			use:focusTrap={{ onEscape: onClose, scrollLockClass: 'popover-open' }}
+		>
 			{@render children()}
 		</div>
 	</div>
@@ -21,6 +27,7 @@
 
 <script lang="ts">
 import type { Snippet } from 'svelte';
+import { focusTrap, FOCUSABLE_SELECTOR } from './focus-trap';
 
 interface Props {
 	/** Whether the popover is shown. */
@@ -38,71 +45,14 @@ interface Props {
 const { open, onClose, label, closeLabel = 'Close', children }: Props = $props();
 
 let shell = $state<HTMLElement | null>(null);
-// The element focus is returned to once the popover closes. A plain field (not reactive): only read
-// inside effects/handlers, never rendered.
-let restoreFocus: HTMLElement | null = null;
 
-const onKeydown = (event: KeyboardEvent) => {
-	if (!open) {
-		return;
-	}
-	if (event.key === 'Escape') {
-		event.preventDefault();
-		onClose();
-	} else if (event.key === 'Tab') {
-		trapTab(event);
-	}
-};
-
-// Keep Tab focus inside the popover while it is open.
-const trapTab = (event: KeyboardEvent) => {
-	if (!shell) {
-		return;
-	}
-	const focusables = [...shell.querySelectorAll<HTMLElement>('button:not([disabled])')];
-	if (focusables.length === 0) {
-		return;
-	}
-	const first = focusables[0];
-	const last = focusables[focusables.length - 1];
-	const focused = document.activeElement;
-	if (!shell.contains(focused)) {
-		event.preventDefault();
-		first.focus();
-	} else if (event.shiftKey && focused === first) {
-		event.preventDefault();
-		last.focus();
-	} else if (!event.shiftKey && focused === last) {
-		event.preventDefault();
-		first.focus();
-	}
-};
-
-// On open, capture the outgoing focus and move it onto the first focusable inside the popover (or
-// the shell itself if it has none) so the trap has somewhere to anchor.
+// On open, move focus onto the first focusable inside the popover (or the shell itself if it has
+// none) so the trap has somewhere to anchor. Trap/Escape/scroll-lock/restore are owned by focusTrap.
 $effect(() => {
 	if (open && shell) {
-		restoreFocus ??= document.activeElement as HTMLElement | null;
-		const target = shell.querySelector<HTMLElement>('button:not([disabled])');
+		const target = shell.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
 		(target ?? shell).focus();
 	}
-});
-
-// On close, return focus to wherever it was before the popover opened.
-$effect(() => {
-	if (!open && restoreFocus) {
-		restoreFocus.focus();
-		restoreFocus = null;
-	}
-});
-
-// Lock background scroll while open.
-$effect(() => {
-	if (!open) {
-		return;
-	}
-	document.body.classList.add('popover-open');
-	return () => document.body.classList.remove('popover-open');
 });
 </script>
 

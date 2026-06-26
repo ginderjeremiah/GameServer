@@ -10,11 +10,21 @@
 		<div class="caption">/ {limitText} limit</div>
 	{/if}
 	<div class="track">
-		<div class="track-fill" class:warning style:width="{fillPercent}%"></div>
+		<Bar
+			value={fillPercent}
+			presentational
+			--bar-height="2px"
+			--bar-radius="1px"
+			--bar-track-bg="color-mix(in srgb, var(--white) 9%, transparent)"
+			--bar-fill={warning ? 'var(--warning)' : 'var(--accent)'}
+			--bar-transition="width 0.12s linear, background 0.4s"
+		/>
 	</div>
 </div>
 
 <script lang="ts">
+import Bar from '$components/Bar.svelte';
+
 type Props = {
 	/** Elapsed battle time in milliseconds (the engine's `timeElapsed`). */
 	elapsedMs: number;
@@ -78,22 +88,6 @@ const limitText = $derived(formatClock(maxMs));
 
 .track {
 	width: 120px;
-	height: 2px;
 	margin-top: 3px;
-	border-radius: 1px;
-	background: color-mix(in srgb, var(--white) 9%, transparent);
-	overflow: hidden;
-}
-
-.track-fill {
-	height: 100%;
-	background: var(--accent);
-	transition:
-		width 0.12s linear,
-		background 0.4s;
-
-	&.warning {
-		background: var(--warning);
-	}
 }
 </style>

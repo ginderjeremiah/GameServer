@@ -18,7 +18,7 @@ describe('EnemyCooldown', () => {
 	it('fills the track by the elapsed fraction of the cooldown', () => {
 		const { container } = render(EnemyCooldown, { props: { remainingMs: 2000, totalMs: 5000 } });
 		// 3000ms of 5000ms elapsed = 60% filled.
-		expect((container.querySelector('.track-fill') as HTMLElement).getAttribute('style')).toContain('width: 60%');
+		expect((container.querySelector('.bar-fill') as HTMLElement).getAttribute('style')).toContain('width: 60%');
 	});
 
 	it('clamps a tiny overshoot to 0s rather than a negative count', () => {
@@ -28,6 +28,6 @@ describe('EnemyCooldown', () => {
 
 	it('guards a zero total against a divide-by-zero, showing an empty track', () => {
 		const { container } = render(EnemyCooldown, { props: { remainingMs: 0, totalMs: 0 } });
-		expect((container.querySelector('.track-fill') as HTMLElement).getAttribute('style')).toContain('width: 0%');
+		expect((container.querySelector('.bar-fill') as HTMLElement).getAttribute('style')).toContain('width: 0%');
 	});
 });

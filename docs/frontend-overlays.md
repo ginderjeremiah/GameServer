@@ -22,6 +22,7 @@ Blocking confirmation dialogs are the toast system's counterpart, from the same 
 - **A queue, not a single slot** — only the head is shown, but requests queue (each with its own resolve) so two callers each get an answer.
 - **Dismissal semantics depend on kind** — backdrop-click/Escape are a cancel for `confirm`/`destructive` but an acknowledgement for `acknowledge`.
 - **The host owns the interaction model so the card stays presentational** — backdrop/Escape dismissal, a focus trap, focus capture+restore, and a scroll lock; it focuses the safe action for a destructive dialog (so a stray Enter can't confirm) and the primary action otherwise. All motion is CSS so `prefers-reduced-motion` collapses it.
+- **Tab-trap, Escape, scroll-lock, and focus restore are the shared `focusTrap` action** (`components/focus-trap.ts`), used by both `ModalHost` and `Popover`; only the per-open initial focus is component-specific (kind-aware here, first-focusable in `Popover`). Reuse the action for any new overlay rather than re-implementing the trap.
 
 ## Popover (non-blocking overlays)
 
