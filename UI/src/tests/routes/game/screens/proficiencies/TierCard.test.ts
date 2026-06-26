@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/svelte';
 import TierCard from '$routes/game/screens/proficiencies/TierCard.svelte';
-import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
-import type { WordTooltipController } from '$routes/game/screens/proficiencies/word-hover';
+import type { TierView, WordTooltipController } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
 
 const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	name: `Tier ${o.id}`,

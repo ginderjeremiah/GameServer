@@ -7,13 +7,13 @@
 		role="img"
 		tabindex="0"
 		aria-label={name}
-		use:attributeHover={{ controller: attrTip, id }}
+		use:tooltipHover={{ controller: attrTip, payload: id }}
 		use:describedByTooltip={attrTip?.describedById}
 	>
 		<AttributeIcon {id} size={40} />
 	</span>
 	<div class="attr">
-		<div class="head" use:attributeHover={{ controller: attrTip, id }}>
+		<div class="head" use:tooltipHover={{ controller: attrTip, payload: id }}>
 			<span class="code" style="color: {color}">{code}</span>
 			<span class="name">{name}</span>
 		</div>
@@ -55,7 +55,7 @@ import { formatAttributeDelta, attributeColor, attributeCode, attributeName } fr
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
-import { attributeHover } from '$components/tooltip/attribute-hover';
+import { tooltipHover } from '$components/tooltip/tooltip-hover';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import Stepper from './Stepper.svelte';
 import { CORE_ATTRIBUTES, derivedShortLabel, perPointYields, type AttributesView } from './attributes-view.svelte';

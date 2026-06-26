@@ -9,7 +9,7 @@
 	tabindex="0"
 	aria-label={attributeName(attributeId, staticData.attributes)}
 	style:--ac={attributeColor(attributeId)}
-	use:attributeHover={{ controller: attrTip, id: attributeId }}
+	use:tooltipHover={{ controller: attrTip, payload: attributeId }}
 	use:describedByTooltip={attrTip?.describedById}
 >
 	<AttributeIcon id={attributeId} size={iconSize} />
@@ -22,7 +22,7 @@ import { attributeCode, attributeColor, attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
-import { attributeHover } from '$components/tooltip/attribute-hover';
+import { tooltipHover } from '$components/tooltip/tooltip-hover';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 
 interface Props {

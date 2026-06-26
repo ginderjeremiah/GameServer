@@ -68,9 +68,8 @@ import LexiconRail from './LexiconRail.svelte';
 import TierSpine from './TierSpine.svelte';
 import WordDetail from './WordDetail.svelte';
 import WordOfPowerTooltip from './WordOfPowerTooltip.svelte';
-import type { TierView } from './proficiencies-lexicon';
+import type { TierView, WordTooltipController } from './proficiencies-lexicon';
 import { ProficienciesView } from './proficiencies-view.svelte';
-import type { WordTooltipController } from './word-hover';
 
 const view = new ProficienciesView();
 
