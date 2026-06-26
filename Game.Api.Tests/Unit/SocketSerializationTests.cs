@@ -67,7 +67,7 @@ namespace Game.Api.Tests.Unit
             var sendGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var socket = new FakeWebSocket(sendGate.Task);
             var context = new SocketContext(socket, playerId: 1, session, NullLogger<SocketContext>.Instance);
-            var handler = new SocketHandler(context, commandFactory, countingScopeFactory, NullLogger<SocketHandler>.Instance, () => Task.CompletedTask);
+            var handler = new SocketHandler(context, commandFactory, countingScopeFactory, NullLogger<SocketHandler>.Instance, () => { });
 
             var first = handler.ExecuteCommand(new SocketCommandInfo("GetStatisticTypes") { Id = "first" });
             var second = handler.ExecuteCommand(new SocketCommandInfo("GetStatisticTypes") { Id = "second" });

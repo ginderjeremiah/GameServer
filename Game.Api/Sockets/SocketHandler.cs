@@ -15,7 +15,7 @@ namespace Game.Api.Sockets
         private readonly SocketCommandFactory _commandFactory;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<SocketHandler> _logger;
-        private readonly Func<Task> _onActivity;
+        private readonly Action _onActivity;
 
         // Serializes command execution across the two paths that reach ExecuteCommand — the client read
         // loop and the pub/sub processor (server-initiated commands) — so the documented "websocket
@@ -63,7 +63,7 @@ namespace Game.Api.Sockets
         /// <summary>Completes once both the read and inactivity loops have wound down.</summary>
         public Task Completion => _loops;
 
-        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Func<Task> onActivity, TimeSpan? commandTimeout = null)
+        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Action onActivity, TimeSpan? commandTimeout = null)
         {
             _context = context;
             _commandFactory = commandFactory;
@@ -289,8 +289,19 @@ namespace Game.Api.Sockets
                         _logger.LogDebug("Received socket data from playerId ({PlayerId}) on socket ({Id}): {Message}", PlayerId, Id, message);
                         Interlocked.Exchange(ref _lastResponseTicks, DateTime.UtcNow.Ticks);
                         // Any inbound message (heartbeat ping or command) marks the connection live — keep its
-                        // presence key from expiring on the same signal the inactivity check uses above.
-                        await _onActivity();
+                        // presence key from expiring on the same signal the inactivity check uses above. Presence
+                        // refresh is best-effort (the sliding TTL lapses harmlessly if a refresh is missed), so
+                        // isolate a fault here: it must never reach the terminal read-fault catch below and tear
+                        // down an otherwise-healthy connection.
+                        try
+                        {
+                            _onActivity();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to refresh socket presence for player ({PlayerId}) on socket ({Id}); the read loop continues.", PlayerId, Id);
+                        }
+
                         await HandleMessage(message);
                     }
                 }
