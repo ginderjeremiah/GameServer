@@ -411,6 +411,32 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.True(withFingerprint.Wins > 0);
         }
 
+        [Fact]
+        public void Simulate_AppliesClassSignaturePassive_FromTheFrozenSnapshot()
+        {
+            // The signature passive (#1126 area E) feeds the same attribute pipeline as the locked base, so a
+            // strong flat-core passive lets the player win idle battles it wins none of without one — proving
+            // the offline path composes the passive, not just the locked base. The class carries no locked-base
+            // distribution, so the wins are attributable to the passive alone.
+            var zone = MakeZone(levelMin: 1, levelMax: 1);
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+
+            OfflineProgressResult Run(ClassSignaturePassive passive)
+            {
+                var scenario = new Scenario { Zone = zone, Snapshot = snapshot, ResolveEnemy = level => WeakEnemy(level) };
+                return _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario) with
+                {
+                    ResolveClass = ClassResolver(2, passive),
+                });
+            }
+
+            var withoutPassive = Run(NoopPassive());
+            var withPassive = Run(FlatPassive(Strength, 100m));
+
+            Assert.Equal(0, withoutPassive.Wins);
+            Assert.True(withPassive.Wins > 0);
+        }
+
         // ── Scenario plumbing ────────────────────────────────────────────────
 
         private const int EnemyId = 1;
@@ -570,25 +596,41 @@ namespace Game.Core.Tests.Battle.Offline
         };
 
         private static Func<int, CoreClass> ClassResolver(int classId, params AttributeDistribution[] distributions) =>
+            ClassResolver(classId, NoopPassive(), distributions);
+
+        private static Func<int, CoreClass> ClassResolver(
+            int classId, ClassSignaturePassive passive, params AttributeDistribution[] distributions) =>
             id => id == classId
-                ? MakeClass(classId, distributions)
+                ? MakeClass(classId, passive, distributions)
                 : throw new InvalidOperationException($"Unexpected class resolve for {id}");
 
-        private static CoreClass MakeClass(int id, params AttributeDistribution[] distributions) => new()
-        {
-            Id = id,
-            Name = $"Class {id}",
-            StarterSkillIds = [],
-            StarterEquipment = [],
-            AttributeDistributions = distributions,
-            SignaturePassive = new ClassSignaturePassive
+        private static CoreClass MakeClass(
+            int id, ClassSignaturePassive passive, params AttributeDistribution[] distributions) => new()
             {
-                Attribute = Strength,
-                Amount = 0m,
-                ScalingAttribute = null,
-                ScalingAmount = 0m,
-                ModifierType = EModifierType.Additive,
-            },
+                Id = id,
+                Name = $"Class {id}",
+                StarterSkillIds = [],
+                StarterEquipment = [],
+                AttributeDistributions = distributions,
+                SignaturePassive = passive,
+            };
+
+        private static ClassSignaturePassive NoopPassive() => new()
+        {
+            Attribute = Strength,
+            Amount = 0m,
+            ScalingAttribute = null,
+            ScalingAmount = 0m,
+            ModifierType = EModifierType.Additive,
+        };
+
+        private static ClassSignaturePassive FlatPassive(EAttribute attribute, decimal amount) => new()
+        {
+            Attribute = attribute,
+            Amount = amount,
+            ScalingAttribute = null,
+            ScalingAmount = 0m,
+            ModifierType = EModifierType.Additive,
         };
 
         private static AttributeDistribution Distribution(EAttribute attribute, decimal baseAmount, decimal amountPerLevel = 0m) =>

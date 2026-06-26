@@ -345,6 +345,55 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task EndBattleVictory_RewardIncludesClassSignaturePassiveInPlayerPower()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The class signature passive (#1126 area E) is folded into the player's battle power via
+            // GetModifiersWithSignaturePassive, so a flat-core passive must count in the snapshot-measured
+            // difficulty ratio exactly like the locked base. A one-shot skill makes the victory certain.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            // Enemy power 200 (Strength 100 + Endurance 100, no per-level scaling).
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 100m, strengthPerLevel: 0m, enduranceBase: 100m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            // A class with no locked-base distribution but a flat Strength 100 signature passive. The seeded
+            // free pool is Strength 50 + Endurance 50 = 100, so the passive lifts the player's measured power
+            // to 200 — matching the enemy's 200 for a difficulty ratio of 1 (reward = enemy total = 200).
+            // Without the passive counting, the ratio would be 200/100 = 2, paying the capped 800.
+            var passiveClass = await TestDataSeeder.CreateClassAsync(context,
+                passiveAttribute: EAttribute.Strength, passiveAmount: 100m);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(
+                context, user.Id, zoneId: zone.Id, classId: passiveClass.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            var result = await battleService.EndBattleVictory(player, state);
+
+            Assert.NotNull(result);
+            Assert.Equal(200, result.ExpReward);
+        }
+
+        [Fact]
         public async Task EndBattleVictory_ClaimedBeforeBattleCouldFinish_ReturnsNull()
         {
             using var scope = CreateScope();
