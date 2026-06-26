@@ -1,11 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import type { EAttribute, EModifierType } from '$lib/api';
-import {
-	anchorPosition,
-	registerTooltipComponent,
-	type TooltipAnchor,
-	type TooltipComponent
-} from '$stores/tooltip.svelte';
+import { anchorPosition, registerTooltipComponent, type TooltipComponent } from '$stores/tooltip.svelte';
+import type { DescribedTooltipController } from './tooltip-hover';
 
 /** One contributing source skill within a stacked effect, for the tooltip's per-source breakdown.
  *  Applications are aggregated by source (not listed individually) so the breakdown stays bounded by the
@@ -54,16 +50,10 @@ export interface AttributeEffectContext {
  * directly (so the countdown pill stays live); the controller only governs which attribute is shown
  * and where.
  *
- * `show`/`move` accept a {@link TooltipAnchor} — a pointer event (positioned at the cursor) or a
- * focused element (positioned off its box) — so a trigger is reachable by mouse and keyboard alike.
+ * `show`/`move` accept a `TooltipAnchor` — a pointer event (positioned at the cursor) or a focused
+ * element (positioned off its box) — so a trigger is reachable by mouse and keyboard alike.
  */
-export interface AttributeTooltipController {
-	/** Stable DOM id of the shared panel, for wiring a focusable trigger's `aria-describedby`. */
-	readonly describedById: string;
-	show: (attributeId: EAttribute, anchor: TooltipAnchor) => void;
-	move: (anchor: TooltipAnchor) => void;
-	hide: () => void;
-}
+export type AttributeTooltipController = DescribedTooltipController<EAttribute>;
 
 /** The reactive render state of the tooltip plus its {@link AttributeTooltipController}. */
 export interface AttributeTooltipHandle {
