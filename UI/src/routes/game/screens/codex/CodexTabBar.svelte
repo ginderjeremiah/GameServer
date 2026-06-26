@@ -4,8 +4,10 @@
 	{#each view.tabs as tab (tab.key)}
 		<button
 			type="button"
+			id="codex-tab-{tab.key}"
 			role="tab"
 			aria-selected={tab.active}
+			aria-controls="codex-panel"
 			class="tab"
 			class:active={tab.active}
 			style:--tab-accent={tab.accent}

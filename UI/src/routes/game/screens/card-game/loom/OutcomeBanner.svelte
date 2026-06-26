@@ -1,4 +1,4 @@
-<div class="banner {outcome}">
+<div class="banner {outcome}" role="status" aria-live="polite">
 	<h2>{outcome === 'win' ? 'VICTORY' : 'DOWNED'}</h2>
 	<span class="bsub">{sub}</span>
 </div>

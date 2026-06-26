@@ -3,7 +3,20 @@
 		class="btn reflex"
 		class:on={view.game.slow}
 		title="Hold to slow time (Agility reserve)"
+		aria-pressed={view.game.slow}
 		onpointerdown={() => view.setReflex(true)}
+		onkeydown={(e) => {
+			// Make the focused button a press-and-hold control for keyboard users too (Space/Enter).
+			if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+				e.preventDefault();
+				view.setReflex(true);
+			}
+		}}
+		onkeyup={(e) => {
+			if (e.key === ' ' || e.key === 'Enter') {
+				view.setReflex(false);
+			}
+		}}
 	>
 		⏳ REFLEX
 	</button>

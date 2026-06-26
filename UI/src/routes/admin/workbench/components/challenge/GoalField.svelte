@@ -11,7 +11,7 @@
 		/>
 		<span class="suffix">{unit}</span>
 	</div>
-	{#if dirty}<span class="dirty-dot"></span>{/if}
+	{#if dirty}<DirtyDot />{/if}
 </div>
 
 <script lang="ts">
@@ -21,6 +21,7 @@ import type { EntityStore } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';
 import { goalComparisonOf, goalUnit } from '../../entities/challenge-helpers';
 import NumInput from '../NumInput.svelte';
+import DirtyDot from '../DirtyDot.svelte';
 
 interface Props {
 	challenge: IChallenge;

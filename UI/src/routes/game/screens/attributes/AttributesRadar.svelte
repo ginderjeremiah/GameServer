@@ -4,7 +4,7 @@
 	height={size}
 	viewBox="0 0 {size} {size}"
 	class="radar"
-	role="img"
+	role="group"
 	aria-label="Attribute build radar"
 >
 	{#each rings as f (f)}

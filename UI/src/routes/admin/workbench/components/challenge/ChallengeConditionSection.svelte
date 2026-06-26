@@ -22,7 +22,7 @@
 					{/each}
 				</select>
 				<SelectCaret />
-				{#if typeDirty}<span class="dirty-dot"></span>{/if}
+				{#if typeDirty}<DirtyDot />{/if}
 			</div>
 		</div>
 		<StatReadout {challenge} />
@@ -44,6 +44,7 @@ import type { EntityStore } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';
 import { deriveFromType } from '../../entities/challenge-helpers';
 import SelectCaret from '../SelectCaret.svelte';
+import DirtyDot from '../DirtyDot.svelte';
 import WorkbenchIcon from '../../WorkbenchIcon.svelte';
 import StatReadout from './StatReadout.svelte';
 import GoalField from './GoalField.svelte';

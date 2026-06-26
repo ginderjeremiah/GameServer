@@ -69,7 +69,7 @@
 						{section.label}
 						{#if count !== null}<span class="count-badge">{count}</span>{/if}
 						{#if incomplete}<WarnTriangle size={12} />{/if}
-						{#if dirty}<span class="tab-dot" title="Unsaved changes"></span>{/if}
+						{#if dirty}<span class="tab-dot" aria-hidden="true"></span><span class="sr-only">unsaved changes</span>{/if}
 					</button>
 				{/each}
 			</div>
@@ -265,5 +265,16 @@ const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): bo
 .pips {
 	display: inline-flex;
 	gap: 12px;
+}
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 </style>

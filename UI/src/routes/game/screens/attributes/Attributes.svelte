@@ -20,7 +20,13 @@
 	</div>
 
 	<!-- main -->
-	<div class="main" class:theory={view.mode === 'theory'}>
+	<div
+		class="main"
+		class:theory={view.mode === 'theory'}
+		id="attr-main-panel"
+		role="tabpanel"
+		aria-labelledby="attr-mode-{view.mode}"
+	>
 		{#if view.mode === 'theory'}
 			<div class="alloc-table">
 				<div class="table-head">

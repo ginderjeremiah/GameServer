@@ -14,8 +14,10 @@
 			{#each view.subTabs as tab (tab.key)}
 				<button
 					type="button"
+					id="codex-subtab-{tab.key}"
 					role="tab"
 					aria-selected={view.sub === tab.key}
+					aria-controls="codex-subpanel"
 					class="sub-tab"
 					class:active={view.sub === tab.key}
 					data-testid="codex-subtab-{tab.key}"
@@ -27,7 +29,7 @@
 			{/each}
 		</div>
 
-		<div class="body">
+		<div class="body" id="codex-subpanel" role="tabpanel" aria-labelledby="codex-subtab-{view.sub}">
 			{#if view.sub === 'attributes'}
 				<AttributesPanel {view} />
 			{:else if view.sub === 'statistics'}

@@ -1,8 +1,13 @@
 <!-- "By statistic" view: category tabs over a grid of stat cards. Clicking an
      entity row in a card pivots to that entity's dossier. -->
 <div class="by-stat">
-	<UnderlineTabs {tabs} active={view.statCat} onChange={(k) => view.setStatCat(k as StatCategory | 'all')} />
-	<div class="scroll">
+	<UnderlineTabs
+		{tabs}
+		active={view.statCat}
+		onChange={(k) => view.setStatCat(k as StatCategory | 'all')}
+		panelId="by-stat-panel"
+	/>
+	<div class="scroll" id="by-stat-panel" role="tabpanel" aria-labelledby="by-stat-panel-tab-{view.statCat}">
 		<div class="grid" data-testid="stat-card-grid">
 			{#each view.shownStats as stat (stat.id)}
 				<StatCard

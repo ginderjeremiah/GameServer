@@ -15,6 +15,7 @@
 				onblur={() => (touched.username = true)}
 				error={!!usernameError}
 				valid={!!username && usernameValid}
+				describedById={usernameError ? STATUS_LINE_ID : undefined}
 			>
 				{#snippet trailing()}
 					{#if username}
@@ -36,6 +37,7 @@
 				onkeyup={detectCapsLock}
 				error={!!passwordError}
 				valid={!!password && passwordValid}
+				describedById={passwordError ? STATUS_LINE_ID : undefined}
 			>
 				{#snippet trailing()}
 					<button
@@ -68,6 +70,7 @@
 					onblur={() => (touched.confirm = true)}
 					error={!!confirmError}
 					valid={!!confirm && confirmValid}
+					describedById={confirmError ? STATUS_LINE_ID : undefined}
 				>
 					{#snippet trailing()}
 						{#if confirm}
@@ -77,7 +80,7 @@
 				</UnderlineInput>
 			{/if}
 
-			<StatusLine type={statusLine.type} text={statusLine.text} />
+			<StatusLine id={STATUS_LINE_ID} type={statusLine.type} text={statusLine.text} />
 
 			<SubmitButton ready={formValid} {submitting} label={mode === 'login' ? 'Sign In' : 'Create'} />
 		</form>
@@ -109,6 +112,9 @@ import {
 	type LoginMode
 } from './login/login-validation';
 import { playerSelectHandoff } from './select/player-select-handoff';
+
+// The live status line doubles as each field's error description (aria-describedby).
+const STATUS_LINE_ID = 'login-status-line';
 
 let mode = $state<LoginMode>('login');
 let username = $state('');

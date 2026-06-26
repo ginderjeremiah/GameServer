@@ -9,6 +9,8 @@
 		{autocomplete}
 		bind:value
 		data-testid={testid}
+		aria-invalid={error || undefined}
+		aria-describedby={describedById}
 		{onblur}
 		{onkeydown}
 		{onkeyup}
@@ -42,10 +44,12 @@ interface Props {
 	label?: string;
 	/** Autofill hint for password managers (e.g. 'username', 'current-password', 'new-password'). */
 	autocomplete?: HTMLInputAttributes['autocomplete'];
-	/** Applies the error accent to the underline. */
+	/** Applies the error accent to the underline (and sets `aria-invalid`). */
 	error?: boolean;
 	/** Applies the valid accent to the underline. */
 	valid?: boolean;
+	/** Id of the live status element describing this field's current error, wired to `aria-describedby`. */
+	describedById?: string;
 	onblur?: (event: FocusEvent) => void;
 	onkeydown?: (event: KeyboardEvent) => void;
 	onkeyup?: (event: KeyboardEvent) => void;
@@ -65,6 +69,7 @@ let {
 	autocomplete,
 	error = false,
 	valid = false,
+	describedById,
 	onblur,
 	onkeydown,
 	onkeyup,

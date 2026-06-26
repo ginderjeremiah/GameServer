@@ -156,7 +156,9 @@ export const deriveStatusLine = (state: StatusLineState): { type: StatusType; te
 	if (state.capsLock) {
 		return { type: 'warn', text: 'Caps Lock is on' };
 	}
-	if (state.mode === 'signup' && state.password) {
+	// Strength is advisory while the form is still incomplete; once everything validates, yield to the
+	// "Ready" resting state below (otherwise signup, which always has a password here, never reaches it).
+	if (state.mode === 'signup' && state.password && !state.formValid) {
 		return { type: 'info', text: `Strength · ${state.strengthLabel.toLowerCase()}` };
 	}
 	if (state.formValid && state.username) {

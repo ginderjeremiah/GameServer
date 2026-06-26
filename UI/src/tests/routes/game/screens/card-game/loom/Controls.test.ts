@@ -15,6 +15,29 @@ describe('Controls', () => {
 		expect(setReflex).toHaveBeenCalledWith(true);
 	});
 
+	it('begins a held Reflex on keyboard activation of the focused reflex button (Space/Enter)', async () => {
+		const view = new CardGameView();
+		const setReflex = vi.spyOn(view, 'setReflex');
+		const { container } = render(Controls, { props: { view } });
+		const btn = container.querySelector('.btn.reflex') as HTMLElement;
+
+		await fireEvent.keyDown(btn, { key: ' ' });
+		expect(setReflex).toHaveBeenLastCalledWith(true);
+		await fireEvent.keyUp(btn, { key: ' ' });
+		expect(setReflex).toHaveBeenLastCalledWith(false);
+	});
+
+	it('reflects the slow-time state on the reflex button via aria-pressed', () => {
+		const idle = render(Controls, { props: { view: new CardGameView() } });
+		expect((idle.container.querySelector('.btn.reflex') as HTMLElement).getAttribute('aria-pressed')).toBe('false');
+		cleanup();
+
+		const held = new CardGameView();
+		held.setReflex(true); // reserve starts full, so this engages slow-time
+		const { container } = render(Controls, { props: { view: held } });
+		expect((container.querySelector('.btn.reflex') as HTMLElement).getAttribute('aria-pressed')).toBe('true');
+	});
+
 	it('exposes the reflex meter as a 0-100 progressbar of the agility reserve', () => {
 		const view = new CardGameView();
 		view.game.reflex = 60.7;
