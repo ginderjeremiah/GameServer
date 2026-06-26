@@ -319,3 +319,153 @@ describe('save orchestration', () => {
 		expect(store.paths[0].name).toBe('Inferno');
 	});
 });
+
+const reqPath = (store: ProgressionStore, id: number) => {
+	const path = store.paths.find((p) => p.id === id);
+	if (!path) {
+		throw new Error(`no path ${id}`);
+	}
+	return path;
+};
+const reqProf = (store: ProgressionStore, id: number) => {
+	const prof = store.profs.find((p) => p.id === id);
+	if (!prof) {
+		throw new Error(`no prof ${id}`);
+	}
+	return prof;
+};
+
+describe('navigation & detail mutations', () => {
+	const richServer = () => {
+		serverPaths = [
+			{
+				id: 0,
+				name: 'Fire',
+				description: 'd',
+				falloffBase: 0.6,
+				retiredAt: null,
+				contributions: [{ skillId: 1, homeTier: 0, weight: 1 }]
+			}
+		];
+		serverProfs = [
+			fullTier({
+				id: 0,
+				pathId: 0,
+				pathOrdinal: 0,
+				name: 'Fire T0',
+				levelModifiers: [{ level: 2, attributeId: 0, modifierTypeId: 0, amount: 5 }],
+				levelRewards: [{ level: 5, rewardSkillId: 9 }]
+			}),
+			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+		];
+	};
+
+	it('navigates selection, drill, tabs and level', async () => {
+		richServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.setPathTab('contrib');
+		expect(store.pathTab).toBe('contrib');
+
+		store.drillTier(0);
+		expect(store.drilledTier?.id).toBe(0);
+		expect(store.tierTab).toBe('milestones');
+		expect(store.selectedLevel).toBe(5); // first reward level
+
+		store.setTierTab('xp');
+		expect(store.tierTab).toBe('xp');
+		store.selectLevel(3);
+		expect(store.selectedLevel).toBe(3);
+
+		store.back();
+		expect(store.drilledTier).toBeUndefined();
+
+		store.selectPath(0);
+		expect(store.selectedPathId).toBe(0);
+		expect(store.pathTab).toBe('tiers');
+	});
+
+	it('edits and removes contributions', async () => {
+		richServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.updateContribution(0, 0, { weight: 0.5 });
+		expect(reqPath(store, 0).contributions[0].weight).toBe(0.5);
+		store.addContribution(0);
+		expect(reqPath(store, 0).contributions).toHaveLength(2);
+		store.removeContribution(0, 1);
+		expect(reqPath(store, 0).contributions).toHaveLength(1);
+	});
+
+	it('edits milestone modifiers, rewards and payouts', async () => {
+		richServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.updateModifier(0, 0, { amount: 12 });
+		expect(reqProf(store, 0).levelModifiers[0].amount).toBe(12);
+		store.addModifier(0, 2);
+		expect(reqProf(store, 0).levelModifiers.filter((m) => m.level === 2)).toHaveLength(2);
+		store.removeModifier(0, 0);
+		expect(reqProf(store, 0).levelModifiers.filter((m) => m.level === 2)).toHaveLength(1);
+
+		store.setReward(0, 5, 7);
+		expect(reqProf(store, 0).levelRewards.find((r) => r.level === 5)?.rewardSkillId).toBe(7);
+		store.setReward(0, 5, -1); // clear
+		expect(reqProf(store, 0).levelRewards.find((r) => r.level === 5)).toBeUndefined();
+
+		store.addPayout(0, 8);
+		expect(reqProf(store, 0).levelModifiers.some((m) => m.level === 8)).toBe(true);
+		store.removePayout(0, 2);
+		expect(reqProf(store, 0).levelModifiers.some((m) => m.level === 2)).toBe(false);
+	});
+
+	it('edits gateways: seed skill and prerequisites (deduped)', async () => {
+		richServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.setSeedSkill(0, 2);
+		expect(reqProf(store, 0).seedSkillId).toBe(2);
+		store.addPrerequisite(0, 1);
+		store.addPrerequisite(0, 1);
+		expect(reqProf(store, 0).prerequisiteIds).toEqual([1]);
+		store.removePrerequisite(0, 1);
+		expect(reqProf(store, 0).prerequisiteIds).toEqual([]);
+	});
+
+	it('retires/reinstates a tier, removes an unsaved tier, resets, discards and disposes', async () => {
+		richServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.retireProf(0, true);
+		expect(store.isRetired(reqProf(store, 0))).toBe(true);
+		store.retireProf(0, false);
+		expect(store.profStatus(reqProf(store, 0))).toBe('clean');
+
+		const newTier = store.addTier(0);
+		store.drillTier(newTier);
+		store.removeTier(newTier);
+		expect(store.profs.some((p) => p.id === newTier)).toBe(false);
+		expect(store.drilledTier).toBeUndefined();
+
+		store.patchPath(0, (d) => (d.name = 'Changed'));
+		store.resetPath(0);
+		expect(store.pathStatus(reqPath(store, 0))).toBe('clean');
+		store.patchProf(0, (d) => (d.name = 'Changed'));
+		store.resetProf(0);
+		expect(store.profStatus(reqProf(store, 0))).toBe('clean');
+
+		expect(store.pathBaseline(0)?.name).toBe('Fire');
+		expect(store.profBaseline(0)?.name).toBe('Fire T0');
+
+		store.patchPath(0, (d) => (d.name = 'X'));
+		store.discard();
+		expect(store.totalChanges).toBe(0);
+
+		store.dispose();
+	});
+});
