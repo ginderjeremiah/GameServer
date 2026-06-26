@@ -25,9 +25,9 @@ const SOURCE_KEY: Record<EAttributeModifierSource, string> = {
 	// lands with the proficiency client work), so it falls back to the stat-points hue until then.
 	[EAttributeModifierSource.Proficiency]: 'points',
 	// Class is the signature-passive bonus composed at battler assembly (#1126 area E); like the locked base
-	// and proficiency bonuses it is not yet surfaced in the player breakdown, so it gets its own hue ready for
-	// when those battle-assembly modifiers are wired in (follow-up).
-	[EAttributeModifierSource.Class]: 'class'
+	// and proficiency bonuses it is not yet surfaced in the player breakdown, so it falls back to the
+	// stat-points hue (rather than minting a speculative token) until #1261 wires those modifiers in.
+	[EAttributeModifierSource.Class]: 'points'
 };
 
 const SOURCE_LABEL: Record<EAttributeModifierSource, string> = {

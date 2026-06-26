@@ -664,7 +664,7 @@ namespace Game.Application.Services
             }
 
             var rewards = new DefeatRewards(
-                snapshot.GetModifiers(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
+                snapshot.GetModifiersWithSignaturePassive(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
 
             player.GrantExp(rewards.ExpReward);
             // Thread the difficulty multiplier onto the battle-completed event so the progress handler can

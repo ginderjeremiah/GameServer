@@ -331,6 +331,53 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void GetModifiersWithSignaturePassive_IncludesPassive_SoPowerCountsItLikeTheLockedBase()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                ClassId = 3,
+                StatAllocations = [Alloc(EAttribute.Strength, 6)],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            var passive = new ClassSignaturePassive
+            {
+                Attribute = EAttribute.Strength,
+                Amount = 4m,
+                ScalingAttribute = null,
+                ScalingAmount = 0m,
+                ModifierType = EModifierType.Additive,
+            };
+            var modifiers = snapshot
+                .GetModifiersWithSignaturePassive(ThrowItem, ThrowMod, resolveClass: ClassResolver(MakeClassWithPassive(3, passive)))
+                .ToList();
+
+            // The flat-core passive (a class-identity bonus) is present, so DefeatRewards' core-additive power
+            // sum counts it just like the locked base — not silently dropped from the reward heuristic.
+            var classModifier = Assert.Single(modifiers, m => m.Source == EAttributeModifierSource.Class);
+            Assert.Equal(EAttribute.Strength, classModifier.Attribute);
+            Assert.Equal(4d, classModifier.Amount);
+        }
+
+        [Fact]
+        public void GetModifiersWithSignaturePassive_NoClassCaptured_ReturnsBaseModifiersOnly()
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [Alloc(EAttribute.Strength, 6)],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            var modifiers = snapshot.GetModifiersWithSignaturePassive(ThrowItem, ThrowMod).ToList();
+
+            Assert.DoesNotContain(modifiers, m => m.Source == EAttributeModifierSource.Class);
+        }
+
+        [Fact]
         public void GetModifiers_ClassCapturedButNoResolver_Throws()
         {
             var snapshot = new BattleSnapshot
