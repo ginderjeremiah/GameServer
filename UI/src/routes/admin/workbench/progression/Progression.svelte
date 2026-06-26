@@ -9,11 +9,35 @@
 					<span class="unsaved">{store.totalChanges} unsaved</span>
 				{/if}
 			</div>
+			<div class="spacer"></div>
+			<div class="view-toggle" role="group" aria-label="Progression view">
+				<button
+					type="button"
+					class="seg"
+					class:active={view === 'list'}
+					aria-pressed={view === 'list'}
+					onclick={() => (view = 'list')}
+				>
+					List
+				</button>
+				<button
+					type="button"
+					class="seg"
+					class:active={view === 'map'}
+					aria-pressed={view === 'map'}
+					data-testid="progression-map-toggle"
+					onclick={() => (view = 'map')}
+				>
+					Map
+				</button>
+			</div>
 		</div>
 	</div>
 
 	{#if !store.loaded}
 		<div class="prog-loading"><Loading loading={true} delay={120} /></div>
+	{:else if view === 'map'}
+		<ProgressionMap {store} onNavigate={() => (view = 'list')} />
 	{:else}
 		<div class="prog-body">
 			<ProgressionList {store} />
@@ -82,10 +106,13 @@ import Loading from '$components/Loading.svelte';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import { ProgressionStore } from './progression-store.svelte';
 import ProgressionList from './ProgressionList.svelte';
+import ProgressionMap from './ProgressionMap.svelte';
 import PathDetail from './PathDetail.svelte';
 import TierDetail from './TierDetail.svelte';
 
 const store = new ProgressionStore();
+
+let view = $state<'list' | 'map'>('list');
 
 onMount(() => {
 	void store.load();
@@ -121,6 +148,36 @@ onDestroy(() => {
 	display: flex;
 	align-items: baseline;
 	gap: 14px;
+}
+.spacer {
+	flex: 1;
+}
+.view-toggle {
+	align-self: center;
+	display: flex;
+	border: 1px solid var(--border-light);
+	border-radius: 5px;
+	overflow: hidden;
+}
+.seg {
+	background: transparent;
+	border: none;
+	color: var(--text-tertiary);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+	padding: 5px 14px;
+	cursor: pointer;
+	transition: all 0.14s ease;
+
+	&:hover:not(.active) {
+		color: var(--text-secondary);
+	}
+	&.active {
+		background: var(--accent);
+		color: var(--text-on-accent);
+	}
 }
 .title {
 	margin: 0;
