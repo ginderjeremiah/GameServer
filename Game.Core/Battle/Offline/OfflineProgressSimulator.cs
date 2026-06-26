@@ -36,7 +36,7 @@ namespace Game.Core.Battle.Offline
             // The player's power is stationary offline, so the modifier set that measures each victory's exp
             // reward never changes — materialize it once and reuse it for every battle's DefeatRewards.
             var playerModifiers = parameters.Snapshot
-                .GetModifiers(parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveProficiency, parameters.ResolveClass)
+                .GetModifiersWithSignaturePassive(parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveProficiency, parameters.ResolveClass)
                 .ToList();
 
             // Tracks whether any battle has produced progress (a win or a loss). A run that is nothing but

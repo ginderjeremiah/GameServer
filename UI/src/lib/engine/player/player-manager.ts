@@ -5,11 +5,13 @@ import {
 	IInventoryData,
 	ILogPreference,
 	IPlayerData,
+	ISignaturePassive,
 	IUnlockedSkill
 } from '$lib/api';
+import { EAttribute, EModifierType } from '$lib/api';
 import { EXP_PER_LEVEL, STAT_POINTS_PER_LEVEL } from '$lib/api/types/game-constants';
 import { formatNum, statify } from '$lib/common';
-import { classLockedBaseModifiers } from '$lib/battle/class-modifiers';
+import { classLockedBaseModifiers, classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 import type { AttributeModifier } from '$lib/battle/attribute-modifier';
 import { logMessage } from '../log';
 
@@ -23,6 +25,15 @@ export class PlayerManager implements IPlayerData {
 	public statPointsUsed = 0;
 	public attributes: IBattlerAttribute[] = [];
 	public lockedBaseDistribution: IAttributeDistribution[] = [];
+	/** The player's class signature passive — composed into the live battler so its attributes match the
+	 *  backend snapshot (spike #1126 area E). Defaults to a flat no-op until {@link initialize} delivers the
+	 *  real class data. */
+	public signaturePassive: ISignaturePassive = {
+		attributeId: EAttribute.Strength,
+		amount: 0,
+		scalingAmount: 0,
+		modifierType: EModifierType.Additive
+	};
 	public unlockedSkills: IUnlockedSkill[] = [];
 	private logPreferenceList: ILogPreference[] = [];
 	public inventoryData: IInventoryData = {
@@ -70,6 +81,19 @@ export class PlayerManager implements IPlayerData {
 			this.#lockedBaseCacheSource = this.lockedBaseDistribution;
 		}
 		return this.#lockedBaseCache;
+	}
+
+	/**
+	 * The class signature passive's battle modifier, resolved against the player battler's already-assembled
+	 * attributes (spike #1126 area E). `resolveScalingValue` reads the final value of an attribute-scaled
+	 * passive's scaling attribute — so this is called by the battle engine **after** building the battler (free
+	 * pool + locked base + proficiency + static), and the produced modifier is added last, mirroring where the
+	 * backend `BattleSnapshot.ToBattler` composes it. Unlike the locked base it isn't memoised here: it is a
+	 * pure function of inputs the battle engine already change-detects (level, attributes, equipment, locked
+	 * base, proficiency), so it is recomputed only on the same rebuilds those trigger.
+	 */
+	public battleSignaturePassiveModifier(resolveScalingValue: (attribute: EAttribute) => number): AttributeModifier {
+		return classSignaturePassiveModifier(this.signaturePassive, resolveScalingValue);
 	}
 
 	/** Recomputes the memoised {@link selectedSkills} from the current unlocked set's selected/order. */
@@ -122,6 +146,7 @@ export class PlayerManager implements IPlayerData {
 		this.statPointsUsed = data.statPointsUsed;
 		this.attributes = data.attributes;
 		this.lockedBaseDistribution = data.lockedBaseDistribution;
+		this.signaturePassive = data.signaturePassive;
 		this.unlockedSkills = data.unlockedSkills;
 		this.logPreferences = data.logPreferences;
 		this.inventoryData = data.inventoryData;

@@ -27,7 +27,18 @@ namespace Game.Api.Models.Player
         /// </summary>
         public required List<AttributeDistribution> LockedBaseDistribution { get; set; }
 
-        public static PlayerData FromPlayer(CorePlayer player, IReadOnlyList<AttributeDistribution> lockedBaseDistribution)
+        /// <summary>
+        /// The player's class signature passive — the durable combat-identity bonus (flat or attribute-scaled)
+        /// the live frontend battler composes into its attributes so they match the backend snapshot
+        /// (<c>BattleSnapshot.ToBattler</c>) the anti-cheat replay measures against (spike #1126 area E).
+        /// Delivered with the player (its class is fixed) alongside the locked-base fingerprint.
+        /// </summary>
+        public required SignaturePassive SignaturePassive { get; set; }
+
+        public static PlayerData FromPlayer(
+            CorePlayer player,
+            IReadOnlyList<AttributeDistribution> lockedBaseDistribution,
+            SignaturePassive signaturePassive)
         {
             var inventory = player.Inventory;
 
@@ -106,6 +117,7 @@ namespace Game.Api.Models.Player
                     UnlockedMods = inventory.UnlockedMods.ToList(),
                 },
                 LockedBaseDistribution = lockedBaseDistribution.ToList(),
+                SignaturePassive = signaturePassive,
             };
         }
     }

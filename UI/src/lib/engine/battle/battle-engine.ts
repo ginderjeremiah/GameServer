@@ -198,6 +198,15 @@ export class BattleEngine {
 			...lockedBaseModifiers,
 			...proficiencyModifiers
 		]);
+		// Compose the class signature passive LAST — after the locked base, proficiency bonuses, and the static
+		// engine modifiers the rebuild just assembled — so an attribute-scaled passive reads the fully-resolved
+		// value of its scaling attribute (snapshot state, like a skill effect reads its caster) and lands in the
+		// same per-attribute apply order the backend's BattleSnapshot.ToBattler appends it in; float addition is
+		// not associative, so the anti-cheat replay depends on that order matching. The data-less re-arm above
+		// keeps this modifier (setData isn't re-run), so it is composed only here, on a full rebuild.
+		this.player.attributes.addModifier(
+			playerManager.battleSignaturePassiveModifier((attribute) => this.player.attributes.getValue(attribute))
+		);
 		this.lastEquipmentStats = equipmentStats;
 		this.lastPlayerAttributes = attributes;
 		this.lastSelectedSkills = selectedSkills;

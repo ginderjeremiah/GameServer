@@ -1,4 +1,4 @@
-import { EAttribute, EModifierType } from '$lib/api';
+import { EAttribute, EModifierType, type ISignaturePassive } from '$lib/api';
 import { EAttributeModifierSource, type AttributeModifier } from './attribute-modifier';
 
 /** One entry of a class's locked-base attribute fingerprint: a level-scaled distribution of a single
@@ -31,4 +31,33 @@ export function classLockedBaseModifiers(
 		type: EModifierType.Additive,
 		source: EAttributeModifierSource.AttributeDistribution
 	}));
+}
+
+/** The single battle attribute modifier a character's class signature passive contributes — the durable
+ *  combat-identity bonus (spike #1126 area E), the exact mirror of the backend's
+ *  `ClassSignaturePassive.GetModifier`. A purely flat passive (`scalingAttributeId` null) contributes
+ *  `amount`; an attribute-scaled one adds `scalingAmount × resolveScalingValue(scalingAttributeId)`, reading
+ *  the scaling attribute's already-assembled value (the snapshot state a V1 passive sees, like a skill effect
+ *  reading its caster), so it never depends on itself. The arithmetic is IEEE-754 double here **and on the
+ *  backend** (which casts each authored `decimal` operand to double before the add/multiply), so a fractional
+ *  `amount`/`scalingAmount` stays bit-exact across the boundary — the anti-cheat replay compares with no
+ *  tolerance. The produced modifier is added to the player battler **last** (after the locked base, proficiency
+ *  bonuses, and the static engine modifiers), matching where the backend appends it at assembly. */
+export function classSignaturePassiveModifier(
+	passive: ISignaturePassive,
+	resolveScalingValue: (attribute: EAttribute) => number
+): AttributeModifier {
+	// `!= null` catches both the omitted (`undefined`) and JSON-`null` forms a flat passive's optional scaling
+	// attribute can take, so only a genuinely-present scaling attribute pulls in the scaled term.
+	let amount = passive.amount;
+	if (passive.scalingAttributeId != null) {
+		amount += passive.scalingAmount * resolveScalingValue(passive.scalingAttributeId);
+	}
+
+	return {
+		attribute: passive.attributeId,
+		amount,
+		type: passive.modifierType,
+		source: EAttributeModifierSource.Class
+	};
 }

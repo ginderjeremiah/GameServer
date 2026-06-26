@@ -117,9 +117,62 @@ namespace Game.Core.Battle
             Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
         {
             var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass));
+            if (ResolveSignaturePassive(attributes, resolveClass) is { } passive)
+            {
+                attributes.AddModifier(passive);
+            }
             var skills = GetBattleSkillIds(resolveItem).Select(resolveSkill);
 
             return new Battler(attributes, skills, Level);
+        }
+
+        /// <summary>
+        /// Resolves the captured class's signature passive against the already-assembled
+        /// <paramref name="attributes"/> as the final contributor (spike #1126 area E), or <c>null</c> when the
+        /// snapshot carries no class state (a hand-built test snapshot). It is resolved against — and added
+        /// <b>last</b>, after — the free pool, gear, locked base, proficiency bonuses, and the static engine
+        /// modifiers, so an attribute-scaled passive reads the fully-resolved value of its scaling attribute (the
+        /// snapshot state a V1 passive sees, like a skill effect reading its caster), and so the frontend mirror
+        /// (which adds it after building the battler) lands it in the identical place in the per-attribute apply
+        /// order — floating-point addition is not associative, so the anti-cheat replay depends on that order
+        /// matching bit-for-bit. A captured <see cref="ClassId"/> requires a resolver, failing loudly rather than
+        /// silently dropping the passive (mirroring the locked-base guard in <see cref="GetModifiers"/>).
+        /// </summary>
+        private AttributeModifier? ResolveSignaturePassive(AttributeCollection attributes, Func<int, Class>? resolveClass)
+        {
+            if (ClassId is not int classId)
+            {
+                return null;
+            }
+
+            if (resolveClass is null)
+            {
+                throw new InvalidOperationException(
+                    "A battle snapshot with a captured class requires a class resolver to compose its signature passive.");
+            }
+
+            return resolveClass(classId).SignaturePassive.GetModifier(attributes.GetAttributeValue);
+        }
+
+        /// <summary>
+        /// The snapshot's battle modifiers (<see cref="GetModifiers"/>) <b>plus</b> the resolved signature passive
+        /// — the set the <see cref="DefeatRewards"/> power measurement reads. Including the passive here keeps a
+        /// flat (or core-additive-scaled) signature passive counted toward power exactly like the class locked
+        /// base, rather than silently dropping a class-identity bonus from the reward heuristic (so a class built
+        /// around a large flat-core passive can't under-report its power and inflate rewards). A transient
+        /// <see cref="AttributeCollection"/> resolves the passive's scaling against the same fully-assembled
+        /// attributes <see cref="ToBattler"/> uses, so power reads the identical passive value the battle simulated.
+        /// </summary>
+        public IEnumerable<AttributeModifier> GetModifiersWithSignaturePassive(
+            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod,
+            Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
+        {
+            var modifiers = GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass).ToList();
+            if (ResolveSignaturePassive(new AttributeCollection(modifiers), resolveClass) is { } passive)
+            {
+                modifiers.Add(passive);
+            }
+            return modifiers;
         }
 
         /// <summary>

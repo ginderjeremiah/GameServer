@@ -25,7 +25,7 @@ namespace Game.Api.Tests.Unit
                 skills: [skill5, skill6, skill7, skill8],
                 selectedSkills: [skill7, skill5]);
 
-            var data = PlayerDataModel.FromPlayer(player, []);
+            var data = PlayerDataModel.FromPlayer(player, [], MakePassive());
 
             Assert.Equal(4, data.UnlockedSkills.Count);
 
@@ -51,7 +51,7 @@ namespace Game.Api.Tests.Unit
         {
             var player = MakePlayer(skills: [], selectedSkills: []);
 
-            var data = PlayerDataModel.FromPlayer(player, []);
+            var data = PlayerDataModel.FromPlayer(player, [], MakePassive());
 
             Assert.Empty(data.UnlockedSkills);
         }
@@ -69,7 +69,7 @@ namespace Game.Api.Tests.Unit
 
             var player = MakePlayer(skills: [], selectedSkills: [], inventory: inventory);
 
-            var data = PlayerDataModel.FromPlayer(player, []);
+            var data = PlayerDataModel.FromPlayer(player, [], MakePassive());
 
             Assert.Equal(2, data.InventoryData.UnlockedItems.Count);
 
@@ -93,12 +93,34 @@ namespace Game.Api.Tests.Unit
                 AmountPerLevel = 2m,
             };
 
-            var data = PlayerDataModel.FromPlayer(player, [distribution]);
+            var data = PlayerDataModel.FromPlayer(player, [distribution], MakePassive());
 
             var projected = Assert.Single(data.LockedBaseDistribution);
             Assert.Equal(EAttribute.Strength, projected.AttributeId);
             Assert.Equal(8m, projected.BaseAmount);
             Assert.Equal(2m, projected.AmountPerLevel);
+        }
+
+        [Fact]
+        public void FromPlayer_ProjectsTheClassSignaturePassive()
+        {
+            var player = MakePlayer(skills: [], selectedSkills: []);
+            var passive = new Game.Abstractions.Contracts.SignaturePassive
+            {
+                AttributeId = EAttribute.Defense,
+                Amount = 2m,
+                ScalingAttributeId = EAttribute.Endurance,
+                ScalingAmount = 0.5m,
+                ModifierType = EModifierType.Additive,
+            };
+
+            var data = PlayerDataModel.FromPlayer(player, [], passive);
+
+            Assert.Equal(EAttribute.Defense, data.SignaturePassive.AttributeId);
+            Assert.Equal(2m, data.SignaturePassive.Amount);
+            Assert.Equal(EAttribute.Endurance, data.SignaturePassive.ScalingAttributeId);
+            Assert.Equal(0.5m, data.SignaturePassive.ScalingAmount);
+            Assert.Equal(EModifierType.Additive, data.SignaturePassive.ModifierType);
         }
 
         private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills, Inventory? inventory = null)
@@ -110,6 +132,16 @@ namespace Game.Api.Tests.Unit
             }
             return builder.Build();
         }
+
+        // A flat, do-nothing signature passive for the projections that don't assert on it.
+        private static Game.Abstractions.Contracts.SignaturePassive MakePassive() => new()
+        {
+            AttributeId = EAttribute.Strength,
+            Amount = 0m,
+            ScalingAttributeId = null,
+            ScalingAmount = 0m,
+            ModifierType = EModifierType.Additive,
+        };
 
         private static Skill MakeSkill(int id) => new()
         {

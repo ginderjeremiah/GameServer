@@ -28,7 +28,18 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 			],
 			// The class locked-base battle modifiers — a stable reference (the real manager memoises it) the
 			// battle engine compares by identity, so reassigning it simulates a class/level change.
-			battleLockedBaseModifiers: [] as unknown[]
+			battleLockedBaseModifiers: [] as unknown[],
+			// The class signature passive modifier, resolved against the assembled battler attributes and added
+			// last at the reset seam. A flat no-op (amount 0) here so it doesn't perturb the attribute assertions.
+			// Raw numeric enum values (hoisted mock runs before imports): type 1 = EModifierType.Additive,
+			// source 9 = EAttributeModifierSource.Class — a flat additive 0 leaves every attribute untouched.
+			// Ignores its scaling-resolver arg, so it's declared param-less (JS tolerates the extra call arg).
+			battleSignaturePassiveModifier: () => ({
+				attribute: 0,
+				amount: 0,
+				type: 1,
+				source: 9
+			})
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],
@@ -753,6 +764,7 @@ describe('BattleEngine', () => {
 		const defaultLevel = mockPlayerManager.level;
 		const defaultProficiencyModifiers = mockPlayerProficiencies.battleModifiers;
 		const defaultLockedBaseModifiers = mockPlayerManager.battleLockedBaseModifiers;
+		const defaultSignaturePassive = mockPlayerManager.battleSignaturePassiveModifier;
 
 		afterEach(() => {
 			mockPlayerManager.attributes = defaultAttributes;
@@ -760,6 +772,7 @@ describe('BattleEngine', () => {
 			mockPlayerManager.level = defaultLevel;
 			mockPlayerProficiencies.battleModifiers = defaultProficiencyModifiers;
 			mockPlayerManager.battleLockedBaseModifiers = defaultLockedBaseModifiers;
+			mockPlayerManager.battleSignaturePassiveModifier = defaultSignaturePassive;
 		});
 
 		it('re-arms the player without re-deriving when the inputs are unchanged between spawns', () => {
@@ -849,6 +862,29 @@ describe('BattleEngine', () => {
 				mockInventoryManager.grantedSkillIds,
 				newLockedBase
 			);
+		});
+
+		// The class signature passive (#1126 area E) is composed at this seam — added LAST, after the rebuild's
+		// setData. A full rebuild must compose it exactly once; a data-less re-arm (which skips setData) must
+		// preserve it rather than dropping or double-applying it. This pins the re-arm-preservation claim that
+		// the backend equivalent (BattleSnapshotTests.ToBattler_Composes...Passive) can't cover.
+		it('composes the signature passive onto the player battler and preserves it across a data-less re-arm', () => {
+			// A real (non-no-op) passive: +7 Strength, additive, source 9 = EAttributeModifierSource.Class.
+			mockPlayerManager.battleSignaturePassiveModifier = () => ({
+				attribute: EAttribute.Strength,
+				amount: 7,
+				type: EModifierType.Additive,
+				source: 9
+			});
+
+			// The full rebuild composes the passive last: Strength = 50 (alloc) + 7 (passive), added exactly once.
+			engine.start();
+			expect(engine.player.attributes.getValue(EAttribute.Strength)).toBe(57);
+
+			// A data-less re-arm (unchanged inputs) skips setData, so the already-composed passive persists — it is
+			// neither lost (→ 50) nor re-applied (→ 64).
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			expect(engine.player.attributes.getValue(EAttribute.Strength)).toBe(57);
 		});
 
 		// The additionalModifiers passed to reset must be [...lockedBase, ...proficiency] in that order — the

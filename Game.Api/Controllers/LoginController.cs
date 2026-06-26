@@ -58,7 +58,17 @@ namespace Game.Api.Controllers
                     AmountPerLevel = distribution.AmountPerLevel,
                 })
                 .ToList();
-            return PlayerData.FromPlayer(player, lockedBaseDistribution);
+
+            var passive = @class.SignaturePassive;
+            var signaturePassive = new SignaturePassive
+            {
+                AttributeId = passive.Attribute,
+                Amount = passive.Amount,
+                ScalingAttributeId = passive.ScalingAttribute,
+                ScalingAmount = passive.ScalingAmount,
+                ModifierType = passive.ModifierType,
+            };
+            return PlayerData.FromPlayer(player, lockedBaseDistribution, signaturePassive);
         }
 
         [AllowAnonymous]
