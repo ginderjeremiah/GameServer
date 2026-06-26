@@ -118,6 +118,11 @@ namespace Game.Core.Attributes
             if (modifier.Source is EAttributeModifierSource.Derived)
             {
                 var sourceNode = GetOrCreateNode((int)modifier.DerivedSource);
+                // Detects only a direct (length-2) cycle: the target already derives from this
+                // modifier's source. Longer derived chains (A→B→C→A) are not detected — acceptable
+                // only because derived modifiers come solely from the static, acyclic
+                // StaticAttributeModifiers. See AttributeCircularDerivedModifierException for the
+                // full rationale and the upgrade trigger if derived modifiers become authorable.
                 if (node.DerivedNodes?.Contains(sourceNode) == true)
                 {
                     throw new AttributeCircularDerivedModifierException(modifier);
