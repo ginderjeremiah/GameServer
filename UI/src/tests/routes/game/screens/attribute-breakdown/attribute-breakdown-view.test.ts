@@ -1,19 +1,46 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EAttributeType, EItemModType, type IAttribute, type IBattlerAttribute } from '$lib/api';
-import { EAttributeModifierSource, EModifierType, type AppliedModifier, type ComputedAttribute } from '$lib/battle';
+import {
+	EAttribute,
+	EAttributeType,
+	EItemModType,
+	type IAttribute,
+	type IBattlerAttribute,
+	type ISignaturePassive
+} from '$lib/api';
+import {
+	BattleAttributes,
+	EAttributeModifierSource,
+	EModifierType,
+	type AppliedModifier,
+	type AttributeModifier,
+	type ComputedAttribute
+} from '$lib/battle';
+import { classLockedBaseModifiers, classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
+import { proficiencyModifiers } from '$lib/battle/proficiency-modifiers';
 
-// Stand-ins for the player + inventory managers and the static reference data.
-// `buildPlayerModifiers` reads the player's allocations and equipped loadout
-// from these; the view aggregates them through the real attribute pipeline and
-// reads the display taxonomy / precision off `staticData.attributes`.
-const { mockPlayerManager, mockInventoryManager, staticData } = vi.hoisted(() => ({
-	mockPlayerManager: { attributes: [] as IBattlerAttribute[], name: 'Aelara', level: 12 },
+// Stand-ins for the player + inventory managers, proficiency store, and static reference data.
+// `buildPlayerModifiers` reads the player's allocations, equipped loadout, class locked base /
+// signature passive, and proficiency bonuses from these; the view aggregates them through the real
+// attribute pipeline and reads the display taxonomy / precision off `staticData.attributes`.
+const { mockPlayerManager, mockInventoryManager, staticData, playerProficiencies } = vi.hoisted(() => ({
+	mockPlayerManager: {
+		attributes: [] as IBattlerAttribute[],
+		name: 'Aelara',
+		level: 12,
+		battleLockedBaseModifiers: [] as AttributeModifier[],
+		// Reassigned per-test (and to a flat no-op in beforeEach); the placeholder keeps the property
+		// present so the hoisted factory needn't reference the not-yet-imported enums.
+		battleSignaturePassiveModifier: undefined as unknown as (
+			resolve: (attribute: EAttribute) => number
+		) => AttributeModifier
+	},
 	mockInventoryManager: { equippedSlots: [] as unknown[] },
-	staticData: { attributes: undefined as IAttribute[] | undefined }
+	staticData: { attributes: undefined as IAttribute[] | undefined },
+	playerProficiencies: { battleModifiers: [] as AttributeModifier[] }
 }));
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
-vi.mock('$stores', () => ({ staticData }));
+vi.mock('$stores', () => ({ staticData, playerProficiencies }));
 
 import { attributeName } from '$lib/common';
 import {
@@ -99,9 +126,22 @@ const computedWithSources = (
 	})) as AppliedModifier<LabeledModifier>[]
 });
 
+// A flat no-op signature passive — the default a player whose class has no passive carries. It
+// contributes nothing, so the breakdown must omit it (and not let it self-select Strength).
+const noOpPassive: ISignaturePassive = {
+	attributeId: EAttribute.Strength,
+	amount: 0,
+	scalingAmount: 0,
+	modifierType: EModifierType.Additive
+};
+
 beforeEach(() => {
 	mockPlayerManager.attributes = [];
+	mockPlayerManager.level = 12;
+	mockPlayerManager.battleLockedBaseModifiers = [];
+	mockPlayerManager.battleSignaturePassiveModifier = (resolve) => classSignaturePassiveModifier(noOpPassive, resolve);
 	mockInventoryManager.equippedSlots = [];
+	playerProficiencies.battleModifiers = [];
 	staticData.attributes = refAttributes;
 });
 
@@ -151,6 +191,59 @@ describe('buildPlayerModifiers', () => {
 		expect(
 			mods.some((m) => m.source === EAttributeModifierSource.Derived && m.derivedSource === EAttribute.Endurance)
 		).toBe(true);
+	});
+
+	it('composes the class locked base and proficiency bonuses after gear and before the static modifiers', () => {
+		mockInventoryManager.equippedSlots = [mockItem('Aegis', [{ attributeId: EAttribute.Defense, amount: 14 }])];
+		mockPlayerManager.battleLockedBaseModifiers = classLockedBaseModifiers(
+			[{ attributeId: EAttribute.Strength, baseAmount: 5, amountPerLevel: 1 }],
+			mockPlayerManager.level // 5 + 1×12 = 17
+		);
+		playerProficiencies.battleModifiers = proficiencyModifiers(
+			[{ level: 1, attributeId: EAttribute.Endurance, amount: 6, modifierTypeId: EModifierType.Additive }],
+			3
+		);
+		const sources = buildPlayerModifiers().map((m) => m.source);
+		const gear = sources.indexOf(EAttributeModifierSource.Item);
+		const locked = sources.indexOf(EAttributeModifierSource.AttributeDistribution);
+		const prof = sources.indexOf(EAttributeModifierSource.Proficiency);
+		const firstStatic = sources.findIndex(
+			(s) => s === EAttributeModifierSource.BaseValue || s === EAttributeModifierSource.Derived
+		);
+		// Apply order: gear → locked base → proficiency → statics.
+		expect(gear).toBeLessThan(locked);
+		expect(locked).toBeLessThan(prof);
+		expect(prof).toBeLessThan(firstStatic);
+		const mods = buildPlayerModifiers();
+		expect(mods[locked]).toMatchObject({ attribute: EAttribute.Strength, amount: 17 });
+		expect(mods[prof]).toMatchObject({ attribute: EAttribute.Endurance, amount: 6 });
+	});
+
+	it('composes the class signature passive last, resolved against the assembled scaling value', () => {
+		mockPlayerManager.attributes = [{ attributeId: EAttribute.Strength, amount: 20 }];
+		mockPlayerManager.battleSignaturePassiveModifier = (resolve) =>
+			classSignaturePassiveModifier(
+				{
+					attributeId: EAttribute.Defense,
+					amount: 0,
+					scalingAmount: 0.5,
+					scalingAttributeId: EAttribute.Strength,
+					modifierType: EModifierType.Additive
+				},
+				resolve
+			);
+		const mods = buildPlayerModifiers();
+		const last = mods[mods.length - 1];
+		// Strength resolves to 20 (allocation; no static base), so the passive adds 0.5 × 20 = 10 to Defense.
+		expect(last).toMatchObject({ source: EAttributeModifierSource.Class, attribute: EAttribute.Defense });
+		expect(last.amount).toBeCloseTo(10);
+	});
+
+	it('omits the class signature passive when it is a flat no-op (the default)', () => {
+		// The beforeEach default passive contributes nothing, so no Class line is emitted — otherwise it
+		// would spuriously self-select Strength into the inspector.
+		const mods = buildPlayerModifiers();
+		expect(mods.some((m) => m.source === EAttributeModifierSource.Class)).toBe(false);
 	});
 });
 
@@ -246,6 +339,86 @@ describe('AttributeBreakdownView', () => {
 	});
 });
 
+describe('battle-assembly parity', () => {
+	// A scenario exercising all three battle-assembly sources at once.
+	const distributions = [{ attributeId: EAttribute.Strength, baseAmount: 5, amountPerLevel: 1 }]; // STR +17 at lvl 12
+	const proficiency = [
+		{ level: 1, attributeId: EAttribute.Endurance, amount: 6, modifierTypeId: EModifierType.Additive }
+	]; // END +6
+	const scaledPassive: ISignaturePassive = {
+		attributeId: EAttribute.Defense,
+		amount: 0,
+		scalingAmount: 0.5,
+		scalingAttributeId: EAttribute.Strength,
+		modifierType: EModifierType.Additive
+	};
+
+	function arrangeScenario() {
+		mockPlayerManager.level = 12;
+		mockPlayerManager.attributes = [
+			{ attributeId: EAttribute.Strength, amount: 14 },
+			{ attributeId: EAttribute.Endurance, amount: 12 }
+		];
+		mockInventoryManager.equippedSlots = [
+			mockItem(
+				'Aegis Greathelm',
+				[{ attributeId: EAttribute.Defense, amount: 14 }],
+				[
+					{
+						name: 'Tempered',
+						itemModTypeId: EItemModType.Prefix,
+						attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }]
+					}
+				]
+			)
+		];
+		mockPlayerManager.battleLockedBaseModifiers = classLockedBaseModifiers(distributions, mockPlayerManager.level);
+		playerProficiencies.battleModifiers = proficiencyModifiers(proficiency, 3);
+		mockPlayerManager.battleSignaturePassiveModifier = (resolve) =>
+			classSignaturePassiveModifier(scaledPassive, resolve);
+	}
+
+	it('aggregates to the same totals the live battler (BattleAttributes) resolves', () => {
+		arrangeScenario();
+		const view = new AttributeBreakdownView();
+
+		// Oracle: assemble the identical inputs the way BattleEngine.resetPlayer builds the player battler —
+		// free pool + gear as the base data, locked base + proficiency as additional modifiers (before the
+		// statics setData appends), then the signature passive added last, resolved against the assembled set.
+		const atts: IBattlerAttribute[] = [
+			...mockPlayerManager.attributes,
+			{ attributeId: EAttribute.Defense, amount: 14 },
+			{ attributeId: EAttribute.Endurance, amount: 10 }
+		];
+		const battler = new BattleAttributes();
+		battler.setData(atts, true, [
+			...classLockedBaseModifiers(distributions, 12),
+			...proficiencyModifiers(proficiency, 3)
+		]);
+		battler.addModifier(classSignaturePassiveModifier(scaledPassive, (a) => battler.getValue(a)));
+
+		for (const attr of [EAttribute.Strength, EAttribute.Endurance, EAttribute.Defense, EAttribute.MaxHealth]) {
+			expect(view.computedFor(attr).total).toBeCloseTo(battler.getValue(attr), 10);
+		}
+		// Sanity-check the load-bearing numbers: STR = 14 + 17 locked base = 31; the passive then adds
+		// 0.5 × 31 = 15.5 to Defense (2 base + 1×END + 14 gear + 15.5 = 59.5, END = 12 + 10 + 6 = 28).
+		expect(view.computedFor(EAttribute.Strength).total).toBe(31);
+		expect(view.computedFor(EAttribute.Defense).total).toBeCloseTo(59.5);
+	});
+
+	it('surfaces the locked base, proficiency, and signature passive in the by-source grouping', () => {
+		arrangeScenario();
+		const view = new AttributeBreakdownView();
+		const sourcesFor = (attr: EAttribute) => {
+			view.select(attr);
+			return view.selectedGrouped.groups.map((g) => g.source);
+		};
+		expect(sourcesFor(EAttribute.Strength)).toContain(EAttributeModifierSource.AttributeDistribution);
+		expect(sourcesFor(EAttribute.Endurance)).toContain(EAttributeModifierSource.Proficiency);
+		expect(sourcesFor(EAttribute.Defense)).toContain(EAttributeModifierSource.Class);
+	});
+});
+
 describe('self-selecting membership', () => {
 	it('treats a combat-only (SkillEffect) contributor as not a real, non-combat modifier', () => {
 		const combatOnly = computedWithSources(EAttribute.DamageTakenPerSecond, [EAttributeModifierSource.SkillEffect]);
@@ -298,6 +471,9 @@ describe('formatting + labels', () => {
 		expect(
 			modifierLabel({ source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance } as never)
 		).toBe('Endurance');
+		expect(modifierLabel({ source: EAttributeModifierSource.AttributeDistribution } as never)).toBe('Class base');
+		expect(modifierLabel({ source: EAttributeModifierSource.Proficiency } as never)).toBe('Proficiency');
+		expect(modifierLabel({ source: EAttributeModifierSource.Class } as never)).toBe('Signature passive');
 	});
 });
 

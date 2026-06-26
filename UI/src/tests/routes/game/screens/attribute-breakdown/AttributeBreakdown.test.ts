@@ -1,15 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EAttribute, type IBattlerAttribute } from '$lib/api';
+import { EAttribute, EModifierType, type IBattlerAttribute } from '$lib/api';
+import { EAttributeModifierSource, type AttributeModifier } from '$lib/battle';
 
-const { mockPlayerManager, mockInventoryManager, staticData } = vi.hoisted(() => ({
-	mockPlayerManager: { attributes: [] as IBattlerAttribute[], name: 'Aelara', level: 12 },
+const { mockPlayerManager, mockInventoryManager, staticData, playerProficiencies } = vi.hoisted(() => ({
+	mockPlayerManager: {
+		attributes: [] as IBattlerAttribute[],
+		name: 'Aelara',
+		level: 12,
+		battleLockedBaseModifiers: [] as AttributeModifier[],
+		battleSignaturePassiveModifier: undefined as unknown as (
+			resolve: (attribute: EAttribute) => number
+		) => AttributeModifier
+	},
 	mockInventoryManager: { equippedSlots: [] as unknown[] },
-	staticData: { attributes: undefined as unknown }
+	staticData: { attributes: undefined as unknown },
+	playerProficiencies: { battleModifiers: [] as AttributeModifier[] }
 }));
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
-vi.mock('$stores', () => ({ staticData }));
+vi.mock('$stores', () => ({ staticData, playerProficiencies }));
 
 import AttributeBreakdown from '$routes/game/screens/attribute-breakdown/AttributeBreakdown.svelte';
 
@@ -18,7 +28,16 @@ beforeEach(() => {
 		{ attributeId: EAttribute.Strength, amount: 14 },
 		{ attributeId: EAttribute.Endurance, amount: 12 }
 	];
+	mockPlayerManager.battleLockedBaseModifiers = [];
+	// A flat no-op signature passive — contributes nothing, so the breakdown omits it.
+	mockPlayerManager.battleSignaturePassiveModifier = () => ({
+		attribute: EAttribute.Strength,
+		amount: 0,
+		type: EModifierType.Additive,
+		source: EAttributeModifierSource.Class
+	});
 	mockInventoryManager.equippedSlots = [];
+	playerProficiencies.battleModifiers = [];
 	staticData.attributes = undefined;
 });
 

@@ -31,7 +31,7 @@ import {
 } from '$lib/battle';
 import { attributeName } from '$lib/common';
 import { playerManager, inventoryManager } from '$lib/engine';
-import { staticData } from '$stores';
+import { staticData, playerProficiencies } from '$stores';
 
 /** An {@link AttributeModifier} carrying display-only provenance so the
  *  breakdown can label each contribution (which item/mod it came from). The core
@@ -150,7 +150,9 @@ export function fmtSigned(n: number, dec?: number, pct = false): string {
 
 /** Shared shape of a contribution-line label: both the full and the short variants resolve a derived
  *  line to its source attribute and any gear line to the item/mod name, differing only in the fixed
- *  phrasing used for the base-value and stat-point sources (`base`/`statPoints`). */
+ *  phrasing used for the base-value and stat-point sources (`base`/`statPoints`). The class
+ *  battle-assembly sources (locked base / proficiency / signature passive) have no per-line provenance
+ *  to surface, so each gets a fixed phrase shared by both variants. */
 function contributionLabel(line: AppliedModifier<LabeledModifier>, base: string, statPoints: string): string {
 	switch (line.source) {
 		case EAttributeModifierSource.Derived:
@@ -159,6 +161,12 @@ function contributionLabel(line: AppliedModifier<LabeledModifier>, base: string,
 			return statPoints;
 		case EAttributeModifierSource.BaseValue:
 			return base;
+		case EAttributeModifierSource.AttributeDistribution:
+			return 'Class base';
+		case EAttributeModifierSource.Proficiency:
+			return 'Proficiency';
+		case EAttributeModifierSource.Class:
+			return 'Signature passive';
 		default:
 			return line.label ?? '';
 	}
@@ -177,11 +185,22 @@ export function traceLabel(line: AppliedModifier<LabeledModifier>): string {
 	return contributionLabel(line, 'Base', 'Stat points');
 }
 
-/* ── modifier assembly (mirrors Player.GetAllModifiers + static modifiers) ──── */
+/* ── modifier assembly (mirrors the player battler's BattleSnapshot.ToBattler) ─ */
 
-/** Builds the player's full modifier list from their live allocations and
- *  equipped loadout, then appends the engine's static base/derived modifiers —
- *  the same composition the backend's `AttributeCollection` is built from. */
+/** Whether a modifier makes a real contribution to its attribute — a `+0` additive or a `×1`
+ *  multiplicative changes no total, so it is omitted from the breakdown. It would otherwise add an
+ *  empty row and, for the class signature passive's flat no-op default, spuriously self-select its
+ *  attribute into the inspector (any non-combat line marks an attribute as displayed). */
+function contributes(modifier: AttributeModifier): boolean {
+	return modifier.type === EModifierType.Multiplicative ? modifier.amount !== 1 : modifier.amount !== 0;
+}
+
+/** Builds the player's full modifier list the exact way the live player battler is assembled
+ *  (`BattleEngine.resetPlayer` → the backend's `BattleSnapshot.ToBattler`): allocated stat points →
+ *  equipped gear → class locked base → proficiency bonuses → engine static base/derived → the class
+ *  signature passive last. Keeping this order identical to the battler is what lets the inspector
+ *  aggregate (through `computeAttributes`) to the same totals the simulation uses — float addition is
+ *  not associative, so the apply order is load-bearing. */
 export function buildPlayerModifiers(): LabeledModifier[] {
 	const mods: LabeledModifier[] = [];
 
@@ -230,9 +249,36 @@ export function buildPlayerModifiers(): LabeledModifier[] {
 		}
 	}
 
+	// Class locked base (the level-scaled attribute fingerprint, source `AttributeDistribution`) then the
+	// proficiency bonuses (source `Proficiency`) — both composed before the static engine modifiers, the
+	// order the battler assembles them in.
+	for (const mod of playerManager.battleLockedBaseModifiers) {
+		if (contributes(mod)) {
+			mods.push({ ...mod });
+		}
+	}
+	for (const mod of playerProficiencies.battleModifiers) {
+		if (contributes(mod)) {
+			mods.push({ ...mod });
+		}
+	}
+
 	// Engine base values + derived formulas.
 	for (const stat of STATIC_ATTRIBUTE_MODIFIERS) {
 		mods.push({ ...stat });
+	}
+
+	// The class signature passive is composed LAST (after the locked base, proficiency, and statics),
+	// resolved against the already-assembled value of its scaling attribute — the same two-pass the
+	// battler does (build the set, then add the passive reading the resolved scaling value, like a skill
+	// effect reads its caster). The resolve pass is lazy so a flat (non-scaled) passive skips it.
+	let resolved: Map<EAttribute, ComputedAttribute<LabeledModifier>> | undefined;
+	const passive = playerManager.battleSignaturePassiveModifier((attribute) => {
+		resolved ??= computeAttributes(mods);
+		return resolved.get(attribute)?.total ?? 0;
+	});
+	if (contributes(passive)) {
+		mods.push({ ...passive });
 	}
 
 	return mods;

@@ -141,14 +141,19 @@ export interface SourceGroup<T extends AttributeModifier = AttributeModifier> {
 	lines: AppliedModifier<T>[];
 }
 
-/** The display order sources are grouped/stacked in (base → points → gear →
- *  mods → derived), matching the backend's `EAttributeModifierSource` intent. */
+/** The display order sources are grouped/stacked in (base → class locked base → points → proficiency →
+ *  gear → mods → derived → class signature passive), matching the backend's `EAttributeModifierSource`
+ *  intent. A source absent here is dropped from the by-source view, so every player-facing source must
+ *  be listed. */
 export const SOURCE_ORDER: readonly EAttributeModifierSource[] = [
 	EAttributeModifierSource.BaseValue,
+	EAttributeModifierSource.AttributeDistribution,
 	EAttributeModifierSource.PlayerStatPoints,
+	EAttributeModifierSource.Proficiency,
 	EAttributeModifierSource.Item,
 	EAttributeModifierSource.ItemMod,
-	EAttributeModifierSource.Derived
+	EAttributeModifierSource.Derived,
+	EAttributeModifierSource.Class
 ];
 
 /** A computed attribute's additive lines bucketed by source (in {@link SOURCE_ORDER}),

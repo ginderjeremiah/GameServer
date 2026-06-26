@@ -263,9 +263,12 @@ $effect(() => {
 	// the breakdown). Consumed via the helpers in the attribute-breakdown screen's
 	// source-display.
 	--source-base: #{colors.$source-base};
+	--source-distribution: #{colors.$source-distribution};
 	--source-points: #{colors.$source-points};
+	--source-proficiency: #{colors.$source-proficiency};
 	--source-item: #{colors.$source-item};
 	--source-mod: #{colors.$source-mod};
 	--source-derived: #{colors.$source-derived};
+	--source-class: #{colors.$source-class};
 }
 </style>
