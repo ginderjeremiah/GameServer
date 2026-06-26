@@ -129,10 +129,12 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Class");
             }
 
-            // Authoring guard: NewPlayerFactory reads these as the class's level-scaled locked base, keyed by
-            // attribute and seeded core-only. A duplicate attribute would throw at character creation (the
-            // downstream ToDictionary), and a non-core distribution would be silently dropped — so both are
-            // rejected here, at save time, rather than surfacing as a 500 or a silent no-op at creation.
+            // Authoring guard: these distributions become the class's level-scaled locked base, folded into the
+            // battler's AttributeCollection at assembly (BattleSnapshot.GetModifiers), which sums per-attribute
+            // modifiers. A duplicate attribute would silently double-count its locked-base modifier, and a
+            // non-core attribute's modifier would silently take effect (while being omitted from the
+            // reward-power heuristic, DefeatRewards.SumCoreAttributes) — neither is intended, so both are
+            // rejected here at save time.
             if (FindAttributeDistributionViolation(data.AttributeDistributions) is { } rejection)
             {
                 return rejection;
