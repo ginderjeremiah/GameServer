@@ -15,11 +15,12 @@ Each screen folder contains the HTML entry-point prototype(s), the JSX component
 
 ## Admin
 
-| Folder                                      | Screens                                      | Chat      |
-| ------------------------------------------- | -------------------------------------------- | --------- |
-| [admin-tools](./admin/admin-tools/)         | Admin Tools (sidebar layout, nav redesign)   | `chat.md` |
-| [enemy-admin](./admin/enemy-admin/)         | Enemy Admin Workbench, Workbench Interactive | `chat.md` |
-| [challenge-admin](./admin/challenge-admin/) | Challenge Admin editor                       | `chat.md` |
+| Folder                                          | Screens                                      | Chat      |
+| ----------------------------------------------- | -------------------------------------------- | --------- |
+| [admin-tools](./admin/admin-tools/)             | Admin Tools (sidebar layout, nav redesign)   | `chat.md` |
+| [enemy-admin](./admin/enemy-admin/)             | Enemy Admin Workbench, Workbench Interactive | `chat.md` |
+| [challenge-admin](./admin/challenge-admin/)     | Challenge Admin editor                       | `chat.md` |
+| [proficiency-admin](./admin/proficiency-admin/) | Proficiency/Path Admin editor                | —         |
 
 ---
 
@@ -43,4 +44,4 @@ Each screen folder contains the HTML entry-point prototype(s), the JSX component
 | [card-game](./game/card-game/)         | Card minigame (Loom) wireframes and themed passes          | `chat.md`                                                                                                                |
 | [shared](./game/shared/)               | Cross-screen prototype utilities (not screen-specific)     | —                                                                                                                        |
 | [codex](./game/codex/)                 | Codex page and relevant tab designs                        | —                                                                                                                        |
-| [proficiencies](./game/proficiencies/) | "Lexicon" proficiency system page                          | -                                                                                                                        |
+| [proficiencies](./game/proficiencies/) | "Lexicon" proficiency system page                          | —                                                                                                                        |

@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sans:'Geist',system-ui,sans-serif; --mono:'Geist Mono',ui-monospace,monospace;
+    --page:#0f1014; --surface:#14151b; --panel:#16171e; --panel2:#1b1c24;
+    --accent:#a1c2f7; --accent-light:#c0d8ff;
+    --tp:#f0f0f0; --ts:rgba(240,240,240,.78); --tt:rgba(240,240,240,.55); --tm:rgba(240,240,240,.40);
+    --bs:rgba(255,255,255,.08); --bl:rgba(255,255,255,.14); --bm:rgba(255,255,255,.18);
+    --warn:#f0d28a; --added:var(--accent); --removed:#e08778; --success:#bde0b4;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--page);font-family:var(--sans);color:var(--tp)}
+  ::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
+  input,select,button{font-family:inherit}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent) !important;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent),0 0 8px color-mix(in srgb,var(--accent) 35%,transparent);outline:none}
+  select{outline:none} select option{background:#1b1c24;color:#f0f0f0}
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="height:100vh;display:flex;flex-direction:column;overflow:hidden">
+
+  <!-- page head -->
+  <div style="padding:20px 32px 0;border-bottom:1px solid var(--bs);flex-shrink:0">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:color-mix(in srgb,var(--accent) 70%,transparent);margin-bottom:6px">Admin Console · Progression</div>
+    <div style="display:flex;align-items:baseline;gap:14px;padding-bottom:18px">
+      <h1 style="margin:0;font-size:22px;font-weight:500;letter-spacing:-.2px">Paths</h1>
+      <div style="display:inline-flex;align-items:center;gap:14px;font-family:var(--mono);font-size:11.5px;color:var(--tt)">
+        <span>{{ pathCount }} paths</span>
+        <span style="color:var(--warn);display:inline-flex;align-items:center;gap:6px">▲ 1 needs attention</span>
+        <span style="color:var(--ts)">{{ dirtyCount }} unsaved</span>
+      </div>
+      <div style="flex:1"></div>
+      <div style="align-self:center;display:flex;border:1px solid var(--bl);border-radius:5px;overflow:hidden">
+        <button onClick="{{ onListView }}" style="{{ listBtnStyle }}">List</button>
+        <button onClick="{{ onMapView }}" style="{{ mapBtnStyle }}">Map</button>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ listMode }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex:1;min-height:0">
+
+    <!-- LIST PANE -->
+    <div style="width:322px;flex-shrink:0;border-right:1px solid var(--bs);display:flex;flex-direction:column;background:var(--surface)">
+      <div style="padding:16px 16px 12px;border-bottom:1px solid var(--bs);flex-shrink:0">
+        <sc-if value="{{ showBack }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ onBack }}" style="display:inline-flex;align-items:center;gap:7px;background:transparent;border:none;color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:.6px;text-transform:uppercase;padding:0;cursor:pointer;margin-bottom:12px">‹ {{ backLabel }}</button>
+        </sc-if>
+        <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:12px">
+          <span style="font-size:14px;font-weight:500">{{ listTitle }}</span>
+          <span style="font-family:var(--mono);font-size:11.5px;color:var(--tt)">{{ listCount }}</span>
+          <div style="flex:1"></div>
+          <sc-if value="{{ showNew }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ onNew }}" style="display:inline-flex;align-items:center;gap:7px;background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid var(--accent);color:var(--accent-light);font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;padding:5px 11px;border-radius:3px;cursor:pointer" style-hover="background:color-mix(in srgb,var(--accent) 20%,transparent)">+ New</button>
+          </sc-if>
+        </div>
+        <div style="position:relative">
+          <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--tm);font-size:13px;pointer-events:none">⌕</span>
+          <input placeholder="Search…" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13px;padding:8px 11px 8px 31px">
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto">
+        <sc-for list="{{ listItems }}" as="item" hint-placeholder-count="6">
+          <div onClick="{{ item.onClick }}" style="{{ item.rowStyle }}" style-hover="background:color-mix(in srgb,#fff 4%,transparent)">
+            <div style="{{ item.edgeStyle }}"></div>
+            <sc-if value="{{ item.showOrdinal }}" hint-placeholder-val="{{ false }}">
+              <span style="{{ item.ordinalStyle }}">{{ item.ordinal }}</span>
+            </sc-if>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <span style="{{ item.nameStyle }}">{{ item.name }}</span>
+                <sc-if value="{{ item.hasSpill }}" hint-placeholder-val="{{ false }}">
+                  <span style="{{ item.spillStyle }}">{{ item.spill }}</span>
+                </sc-if>
+                <sc-if value="{{ item.warn }}" hint-placeholder-val="{{ false }}">
+                  <span style="flex:1"></span><span style="color:var(--warn);font-size:11px">▲</span>
+                </sc-if>
+              </div>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--tt)">{{ item.meta }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- DETAIL PANE -->
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+      <!-- detail head -->
+      <div style="padding:18px 32px 0;flex-shrink:0">
+        <sc-if value="{{ isTier }}" hint-placeholder-val="{{ false }}">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--tt);margin-bottom:10px"><span onClick="{{ onBack }}" style="color:var(--accent);cursor:pointer">{{ crumbPath }}</span> <span style="color:var(--tm)">›</span> Tier {{ crumbOrd }}</div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-family:var(--mono);font-size:11px;color:{{ recIdColor }}">{{ recId }}</span>
+          <h2 style="margin:0;font-size:22px;font-weight:500;color:var(--tp)">{{ recName }}</h2>
+          <sc-if value="{{ hasRecSpill }}" hint-placeholder-val="{{ false }}">
+            <span style="{{ recSpillStyle }}">{{ recSpill }}</span>
+          </sc-if>
+          <div style="flex:1"></div>
+          <button style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--bl);color:var(--tt);font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer" style-hover="border-color:var(--bm);color:var(--ts)">Reset</button>
+          <button style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--bl);color:var(--tt);font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;padding:6px 11px;border-radius:3px;cursor:pointer" style-hover="border-color:var(--removed);color:var(--removed)">{{ deleteLabel }}</button>
+        </div>
+        <div style="margin-top:8px;font-size:14px;color:var(--ts);letter-spacing:-.1px">{{ headline }}</div>
+        <div style="display:flex;gap:4px;margin-top:16px;border-bottom:1px solid var(--bs);flex-wrap:wrap">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">
+              {{ t.label }}
+              <sc-if value="{{ t.hasCount }}" hint-placeholder-val="{{ false }}">
+                <span style="font-family:var(--mono);font-size:10px;color:var(--tt);background:color-mix(in srgb,#fff 5%,transparent);border:1px solid var(--bs);border-radius:10px;padding:1px 8px;min-width:22px;text-align:center">{{ t.count }}</span>
+              </sc-if>
+              <sc-if value="{{ t.dirty }}" hint-placeholder-val="{{ false }}">
+                <span style="width:5px;height:5px;border-radius:50%;background:var(--warn);box-shadow:0 0 5px var(--warn)"></span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- detail body -->
+      <div style="flex:1;overflow-y:auto;padding:24px 32px">
+        <div style="max-width:1020px">
+          <div style="font-family:var(--mono);font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin:0 0 18px;display:flex;align-items:center;gap:10px">{{ secTitle }}<span style="text-transform:none;letter-spacing:0;font-family:var(--sans);font-size:12px;color:var(--tm);white-space:nowrap">{{ secSub }}</span><span style="flex:1;height:1px;background:var(--bs)"></span></div>
+
+          <!-- ░░ TIERS SPINE ░░ -->
+          <sc-if value="{{ isTiers }}" hint-placeholder-val="{{ true }}">
+            <div style="position:relative;padding-left:4px">
+              <div style="display:flex;flex-direction:column;gap:10px;position:relative">
+                <sc-for list="{{ spine }}" as="ti" hint-placeholder-count="3">
+                  <div draggable="true" onDragStart="{{ ti.onDragStart }}" onDragOver="{{ ti.onDragOver }}" onDrop="{{ ti.onDrop }}" onDragEnd="{{ ti.onDragEnd }}" style="{{ ti.rowStyle }}">
+                    <span style="color:var(--tm);font-size:15px;cursor:grab">⠿</span>
+                    <span style="{{ ti.nodeStyle }}">{{ ti.ord }}</span>
+                    <div onClick="{{ ti.onClick }}" style="{{ ti.cardStyle }}" style-hover="border-color:var(--accent);background:color-mix(in srgb,var(--accent) 5%,transparent)">
+                      <div>
+                        <div style="font-size:15px;font-weight:500;color:var(--tp);margin-bottom:3px">{{ ti.name }}</div>
+                        <div style="font-family:var(--mono);font-size:11px;color:var(--tt)">{{ ti.meta }}</div>
+                      </div>
+                      <div style="flex:1"></div>
+                      <sc-if value="{{ ti.edited }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-family:var(--mono);font-size:8.5px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:3px;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)">edited</span>
+                      </sc-if>
+                      <sc-if value="{{ ti.showWord }}" hint-placeholder-val="{{ true }}">
+                        <span style="font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:3px;padding:3px 8px">word · {{ ti.word }}</span>
+                      </sc-if>
+                      <span style="color:var(--tm);font-size:18px">›</span>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="display:flex;align-items:center;gap:12px;margin-top:2px">
+                  <span style="width:15px"></span>
+                  <span style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:1px dashed var(--bl);color:var(--tm);display:flex;align-items:center;justify-content:center;font-size:14px">+</span>
+                  <button onClick="{{ onAddTier }}" style="background:transparent;border:1px dashed var(--bl);border-radius:4px;color:var(--tt);font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:10px 16px;cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent)">Add tier — pick or create a proficiency</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ░░ PATH IDENTITY ░░ -->
+          <sc-if value="{{ isPathIdentity }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:16px;margin-bottom:18px">
+              <div style="flex:1">
+                <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Path name</div>
+                <input value="{{ pathName }}" onChange="{{ onPathName }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:8px 11px">
+              </div>
+              <div style="width:160px">
+                <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Falloff base</div>
+                <input value="{{ pathFalloff }}" onChange="{{ onPathFalloff }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-family:var(--mono);text-align:right;font-size:13.5px;padding:8px 11px">
+              </div>
+            </div>
+            <div>
+              <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Description</div>
+              <textarea onChange="{{ onPathDesc }}" style="width:100%;min-height:84px;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:9px 11px;line-height:1.5;resize:vertical">{{ pathDesc }}</textarea>
+            </div>
+          </sc-if>
+
+          <!-- ░░ PATH CONTRIBUTIONS ░░ -->
+          <sc-if value="{{ isContrib }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--bs);border-radius:5px;padding:11px 14px;margin-bottom:16px">
+              <div><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--tm);margin-bottom:4px">Falloff base</div><div style="font-family:var(--mono);font-size:14px;color:var(--tp)">{{ pathFalloff }}</div></div>
+              <span style="color:var(--accent)">→</span>
+              <div style="display:flex;gap:6px">
+                <sc-for list="{{ falloffSteps }}" as="f" hint-placeholder-count="3">
+                  <span style="{{ f.style }}">{{ f.label }}</span>
+                </sc-for>
+              </div>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--tm);margin-left:auto">pull decays per tier above a skill's home</span>
+            </div>
+            <div style="display:flex;gap:10px;font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--tm);padding:0 4px 8px;border-bottom:1px solid var(--bl)">
+              <span style="flex:1">Skill</span><span style="width:190px">Home tier</span><span style="width:84px;text-align:right">Weight</span><span style="width:24px"></span>
+            </div>
+            <sc-for list="{{ contribRows }}" as="c" hint-placeholder-count="4">
+              <div style="display:flex;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--bs)">
+                <div style="flex:1;position:relative">
+                  <select value="{{ c.skill }}" onChange="{{ c.onSkill }}" style="width:100%;appearance:none;-webkit-appearance:none;background:transparent;border:1px solid transparent;border-radius:3px;color:var(--tp);font-size:13.5px;padding:6px 26px 6px 8px;cursor:pointer" style-hover="border-color:color-mix(in srgb,#fff 10%,transparent);background:color-mix(in srgb,#fff 3%,transparent)">
+                    <sc-for list="{{ c.skillOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for>
+                  </select>
+                  <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--tt);font-size:10px;pointer-events:none">▾</span>
+                </div>
+                <div style="width:190px;position:relative">
+                  <select value="{{ c.homeTier }}" onChange="{{ c.onHome }}" style="width:100%;appearance:none;-webkit-appearance:none;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--ts);font-family:var(--mono);font-size:12px;padding:6px 26px 6px 10px;cursor:pointer">
+                    <sc-for list="{{ c.tierOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for>
+                  </select>
+                  <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--tt);font-size:10px;pointer-events:none">▾</span>
+                </div>
+                <input value="{{ c.weight }}" onChange="{{ c.onWeight }}" style="width:84px;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-family:var(--mono);font-size:12px;text-align:right;padding:6px 10px">
+                <button onClick="{{ c.onRemove }}" style="width:24px;background:transparent;border:none;color:var(--tm);font-size:13px;cursor:pointer" style-hover="color:var(--removed)">✕</button>
+              </div>
+            </sc-for>
+            <button onClick="{{ onAddContrib }}" style="background:transparent;border:none;color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:12px 4px 0;cursor:pointer">+ Add contributing skill</button>
+          </sc-if>
+
+          <!-- ░░ TIER IDENTITY · CONLANG ░░ -->
+          <sc-if value="{{ isTierIdentity }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:16px;margin-bottom:16px">
+              <div style="flex:1"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Name</div><input value="{{ tierName }}" onChange="{{ onTierName }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:8px 11px"></div>
+              <div style="width:160px"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Path</div><div style="position:relative"><div style="background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--ts);font-size:13.5px;padding:8px 26px 8px 11px">{{ crumbPath }}</div><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--tt);font-size:10px">▾</span></div></div>
+              <div style="width:70px"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Tier</div><div style="background:color-mix(in srgb,#fff 2%,transparent);border:1px solid var(--bs);border-radius:3px;color:var(--tt);font-family:var(--mono);text-align:center;font-size:13.5px;padding:8px 11px">{{ crumbOrd }}</div></div>
+            </div>
+            <div style="border:1px solid var(--bl);border-radius:6px;padding:16px 18px;background:var(--panel)">
+              <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px"><span style="font-family:var(--mono);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--tp)">Words of Power</span><span style="font-size:12px;color:var(--tm)">— the conlang glyphs deciphered as the tier levels (shared with Classes)</span></div>
+              <div style="display:flex;gap:12px;margin-bottom:16px">
+                <div style="flex:1"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Romanized word</div><input value="{{ tierWord }}" onChange="{{ onTierWord }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-family:var(--mono);font-size:13.5px;padding:8px 11px"></div>
+                <div style="flex:1"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Pronunciation</div><input value="{{ tierPron }}" onChange="{{ onTierPron }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:8px 11px"></div>
+                <div style="flex:1"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Translation</div><input value="{{ tierTrans }}" onChange="{{ onTierTrans }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:8px 11px"></div>
+              </div>
+              <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:9px">Decipher preview <span style="text-transform:none;letter-spacing:0;color:var(--tm)">— how the player sees it as they level</span></div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="flex:1;border:1px solid var(--bl);border-radius:4px;padding:10px;text-align:center;background:var(--page)"><div style="font-family:var(--mono);color:var(--tm);letter-spacing:3px">▯▯▯</div><div style="font-family:var(--mono);font-size:9px;color:var(--tt);margin-top:4px">lv 0 · undeciphered</div></div>
+                <span style="color:var(--accent)">→</span>
+                <div style="flex:1;border:1px solid var(--bl);border-radius:4px;padding:10px;text-align:center;background:var(--page)"><div style="font-size:13px;color:var(--ts)">{{ tierPron }}</div><div style="font-family:var(--mono);font-size:9px;color:var(--tt);margin-top:4px">lv {{ halfLevel }} · pronunciation</div></div>
+                <span style="color:var(--accent)">→</span>
+                <div style="flex:1;border:1px solid var(--accent);border-radius:4px;padding:10px;text-align:center;background:color-mix(in srgb,var(--accent) 6%,transparent)"><div style="font-size:13px;font-weight:500;color:var(--tp)">{{ tierTrans }}</div><div style="font-family:var(--mono);font-size:9px;color:var(--tt);margin-top:4px">lv {{ tierMax }} · translated</div></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ░░ XP CURVE ░░ -->
+          <sc-if value="{{ isXp }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:14px;margin-bottom:20px">
+              <div style="flex:1"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Max level</div><input value="{{ tierMax }}" onChange="{{ onTierMax }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-family:var(--mono);text-align:right;font-size:13.5px;padding:8px 11px"></div>
+              <div style="flex:1"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Base XP</div><input value="{{ tierBase }}" onChange="{{ onTierBase }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-family:var(--mono);text-align:right;font-size:13.5px;padding:8px 11px"></div>
+              <div style="flex:1"><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">XP growth ×</div><input value="{{ tierGrowth }}" onChange="{{ onTierGrowth }}" style="width:100%;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-family:var(--mono);text-align:right;font-size:13.5px;padding:8px 11px"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:12px">Derived per-level cost <span style="text-transform:none;letter-spacing:0;color:var(--tm)">— baseXp × growth^(n−1), not stored</span></div>
+            <div style="background:var(--panel);border:1px solid var(--bs);border-radius:5px;padding:20px">
+              <div style="display:flex;align-items:flex-end;gap:8px;height:150px;border-bottom:1px solid var(--bl);padding:0 2px">
+                <sc-for list="{{ xpBars }}" as="b" hint-placeholder-count="9">
+                  <div style="{{ b.style }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:8px;padding:8px 2px 0">
+                <sc-for list="{{ xpBars }}" as="b" hint-placeholder-count="9">
+                  <div style="flex:1;text-align:center;font-family:var(--mono);font-size:9px;color:var(--tt)">{{ b.cost }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ░░ MILESTONES ░░ -->
+          <sc-if value="{{ isMilestones }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--panel);border:1px solid var(--bs);border-radius:5px;padding:22px 22px 16px;margin-bottom:18px">
+              <div style="position:relative;padding:0 6px">
+                <div style="position:absolute;left:20px;right:20px;top:11px;height:2px;background:var(--bs)"></div>
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative">
+                  <sc-for list="{{ levelNodes }}" as="n" hint-placeholder-count="10">
+                    <div onClick="{{ n.onClick }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer">
+                      <div style="height:24px;display:flex;align-items:center;justify-content:center"><span style="{{ n.dotStyle }}"></span></div>
+                      <span style="{{ n.numStyle }}">{{ n.num }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;gap:18px;margin-top:14px;font-family:var(--mono);font-size:10.5px;color:var(--tt)">
+                <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:11px;border-radius:50%;border:1px solid var(--bl)"></span>empty</span>
+                <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:13px;height:13px;border-radius:50%;background:color-mix(in srgb,#fff 30%,transparent)"></span>per-level bonus</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;color:var(--accent-light)"><span style="width:13px;height:13px;border-radius:50%;background:var(--accent)"></span>milestone (grants a skill)</span>
+              </div>
+            </div>
+
+            <div style="background:var(--panel);border:1px solid var(--accent);border-radius:5px;padding:18px 20px;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 18%,transparent)">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+                <span style="font-size:15px;font-weight:500;color:var(--tp)">Level {{ edLevel }}</span>
+                <sc-if value="{{ edIsMilestone }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 10%,transparent);border-radius:3px;padding:2px 8px">Milestone</span>
+                </sc-if>
+                <div style="flex:1"></div>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--tm)">threshold ~ {{ edThreshold }} xp</span>
+              </div>
+
+              <sc-if value="{{ edHasPayout }}" hint-placeholder-val="{{ true }}">
+                <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:9px">Attribute modifiers</div>
+                <sc-for list="{{ edMods }}" as="m" hint-placeholder-count="2">
+                  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                    <div style="flex:1;position:relative">
+                      <select value="{{ m.attr }}" onChange="{{ m.onAttr }}" style="width:100%;appearance:none;-webkit-appearance:none;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:8px 28px 8px 11px;cursor:pointer">
+                        <sc-for list="{{ attrOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for>
+                      </select>
+                      <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--tt);font-size:10px;pointer-events:none">▾</span>
+                    </div>
+                    <div style="width:148px;position:relative">
+                      <select value="{{ m.type }}" onChange="{{ m.onType }}" style="width:100%;appearance:none;-webkit-appearance:none;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--ts);font-size:13.5px;padding:8px 28px 8px 11px;cursor:pointer">
+                        <sc-for list="{{ modTypeOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for>
+                      </select>
+                      <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--tt);font-size:10px;pointer-events:none">▾</span>
+                    </div>
+                    <input value="{{ m.val }}" onChange="{{ m.onVal }}" style="width:90px;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-family:var(--mono);text-align:right;font-size:13.5px;padding:8px 11px">
+                    <button onClick="{{ m.onRemove }}" style="background:transparent;border:none;color:var(--tm);font-size:14px;cursor:pointer;padding:6px" style-hover="color:var(--removed)">✕</button>
+                  </div>
+                </sc-for>
+                <button onClick="{{ onAddMod }}" style="background:transparent;border:none;color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:2px 0;cursor:pointer;margin-bottom:18px">+ Add modifier</button>
+
+                <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:9px">Reward skill <span style="text-transform:none;letter-spacing:0;color:var(--tm)">(optional — granted on reaching this level)</span></div>
+                <div style="max-width:340px;position:relative">
+                  <select value="{{ edReward }}" onChange="{{ onReward }}" style="width:100%;appearance:none;-webkit-appearance:none;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:8px 28px 8px 11px;cursor:pointer">
+                    <sc-for list="{{ rewardOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for>
+                  </select>
+                  <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--tt);font-size:10px;pointer-events:none">▾</span>
+                </div>
+                <div style="margin-top:14px;border-top:1px solid var(--bs);padding-top:12px"><button onClick="{{ onRemovePayout }}" style="background:transparent;border:none;color:var(--tm);font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;padding:0" style-hover="color:var(--removed)">✕ Remove this payout level</button></div>
+              </sc-if>
+              <sc-if value="{{ edEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="text-align:center;padding:14px 0 6px">
+                  <div style="font-size:13px;color:var(--tt);margin-bottom:12px">No payout at level {{ edLevel }} — players just gain the level.</div>
+                  <button onClick="{{ onAddPayout }}" style="background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid var(--accent);color:var(--accent-light);font-family:var(--mono);font-size:11px;letter-spacing:.6px;text-transform:uppercase;padding:8px 16px;border-radius:3px;cursor:pointer">+ Add a payout here</button>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <!-- ░░ GATEWAYS ░░ -->
+          <sc-if value="{{ isGateways }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-bottom:18px">
+              <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:7px">Seed skill <span style="text-transform:none;letter-spacing:0;color:var(--tm)">— granted when this tier opens</span></div>
+              <div style="max-width:340px;position:relative">
+                <select value="{{ gwSeed }}" onChange="{{ onSeed }}" style="width:100%;appearance:none;-webkit-appearance:none;background:color-mix(in srgb,#fff 3%,transparent);border:1px solid color-mix(in srgb,#fff 10%,transparent);border-radius:3px;color:var(--tp);font-size:13.5px;padding:8px 28px 8px 11px;cursor:pointer">
+                  <sc-for list="{{ skillOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for>
+                </select>
+                <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--tt);font-size:10px;pointer-events:none">▾</span>
+              </div>
+            </div>
+            <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--tm);margin-bottom:10px">Prerequisite proficiencies <span style="text-transform:none;letter-spacing:0;color:var(--tm)">— must be maxed to open this path</span></div>
+            <sc-if value="{{ gwIsStarter }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--panel);border:1px dashed var(--bl);border-radius:5px;padding:16px;text-align:center;font-size:13px;color:var(--tt)">Starter path — opens from the world, no prerequisites. <span onClick="{{ onAddPrereq }}" style="color:var(--accent);cursor:pointer">+ Add a gateway</span> to gate it behind other paths.</div>
+            </sc-if>
+            <sc-if value="{{ gwGated }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:24px;align-items:center;background:var(--panel);border:1px solid var(--bs);border-radius:5px;padding:18px">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ gwPrereqs }}" as="p" hint-placeholder-count="2">
+                    <span style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:14px;padding:5px 12px;font-size:12.5px;color:var(--ts)">{{ p.label }} <span style="color:var(--accent)">✦</span> <span onClick="{{ p.onRemove }}" style="color:var(--tm);cursor:pointer" style-hover="color:var(--removed)">✕</span></span>
+                  </sc-for>
+                  <button onClick="{{ onAddPrereq }}" style="background:transparent;border:none;color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:2px 0;cursor:pointer;text-align:left">+ Add prerequisite</button>
+                </div>
+                <span style="font-family:var(--mono);font-size:18px;color:var(--accent)">┄►</span>
+                <div style="border:1px dashed var(--accent);border-radius:6px;padding:12px 16px;text-align:center;background:color-mix(in srgb,var(--accent) 6%,transparent)">
+                  <div style="font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)">opens</div>
+                  <div style="font-size:14px;font-weight:500;color:var(--tp)">{{ recName }} · Tier 0</div>
+                </div>
+              </div>
+            </sc-if>
+          </sc-if>
+        </div>
+      </div>
+
+      <!-- save bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 24px;border-top:1px solid var(--bs);background:var(--surface);flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:11.5px;color:var(--tt)">
+          <span style="color:var(--ts)">{{ dirtyCount }} unsaved changes</span>
+          <span style="display:inline-flex;gap:12px">
+            <span style="display:inline-flex;align-items:center;gap:6px;color:var(--added)"><span style="width:6px;height:6px;border-radius:50%;background:var(--added)"></span>1 added</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;color:var(--warn)"><span style="width:6px;height:6px;border-radius:50%;background:var(--warn)"></span>{{ editedCount }} edited</span>
+          </span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button style="background:transparent;border:1px solid var(--bl);color:var(--ts);font-family:var(--mono);font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;padding:8px 15px;border-radius:3px;cursor:pointer" style-hover="border-color:var(--bm)">Discard</button>
+          <button style="background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid var(--accent);color:var(--accent-light);font-family:var(--mono);font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;padding:8px 15px;border-radius:3px;cursor:pointer" style-hover="background:color-mix(in srgb,var(--accent) 20%,transparent)">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ mapMode }}" hint-placeholder-val="{{ false }}">
+  <div ref="{{ mapRef }}" style="flex:1;overflow:auto;position:relative;padding:30px 40px;background:var(--page)">
+    <svg style="position:absolute;top:0;left:0;width:{{ svgW }}px;height:{{ svgH }}px;pointer-events:none;overflow:visible">
+      <defs><marker id="gw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--accent)"></path></marker></defs>
+      <sc-for list="{{ edgePaths }}" as="d" hint-placeholder-count="0">
+        <path d="{{ d }}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#gw-arrow)" opacity="0.85"></path>
+      </sc-for>
+    </svg>
+    <div style="position:relative;display:flex;gap:52px;align-items:flex-start;min-width:max-content;padding-bottom:10px">
+      <sc-for list="{{ mapColumns }}" as="col" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div onClick="{{ col.onOpen }}" style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:{{ col.headColor }};margin-bottom:16px;cursor:pointer;white-space:nowrap" style-hover="color:var(--accent-light)">{{ col.name }}</div>
+          <sc-for list="{{ col.nodes }}" as="n" hint-placeholder-count="3">
+            <sc-if value="{{ n.showConnector }}" hint-placeholder-val="{{ false }}"><div style="width:2px;height:18px;background:var(--bl)"></div></sc-if>
+            <div data-node="{{ n.nodeId }}" onClick="{{ n.onClick }}" style="{{ n.cardStyle }}" style-hover="border-color:var(--accent)">
+              <div style="font-family:var(--mono);font-size:8.5px;color:var(--tt);margin-bottom:2px">T{{ n.ord }}{{ n.gatedMark }}</div>
+              <div style="font-size:12.5px;font-weight:500;color:var(--tp)">{{ n.name }}</div>
+              <div style="font-family:var(--mono);font-size:8.5px;color:var(--tm);margin-top:2px">cap {{ n.cap }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+    <div style="position:relative;margin-top:26px;font-family:var(--mono);font-size:11px;color:var(--tm)">solid = within-path order · ┄► dashed = gateway prerequisite (maxed) opens a gated path</div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:820},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#a1c2f7&quot;,&quot;options&quot;:[&quot;#a1c2f7&quot;,&quot;#e0b0f0&quot;,&quot;#9be0c0&quot;,&quot;#f0c89a&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;showWords&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  constructor(...args) {
+    super(...args);
+    this.rootRef = React.createRef();
+    this.mapRef = React.createRef();
+
+    this.ATTRS = ['Strength','Endurance','Intellect','Agility','Dexterity','Luck','Max Health','Defense','Cooldown Recovery','Critical Chance','Critical Damage','Dodge Chance','Block Chance','Block Reduction','Spell Power','Vitality'];
+    this.MOD_TYPES = ['Additive','Multiplicative'];
+    this.SKILLS = ['Ember Bolt','Flame Lash','Cinder Veil','Magma Spear','Inferno Wave','Pyroclasm','Heat Death','Ember Nova','Firestorm','Meteor','Apocalypse','Molten Touch','Eruption','Volcano','Stone Throw','Slash','Arcane Thread','Aimed Shot'];
+
+    const fireTiers = [
+      { id: 30, ord: 0, name: 'Fire Magic', word: 'fyr', pron: 'fyoor', trans: 'Fire', max: '10', base: '100', growth: '1.40',
+        levels: [
+          { level: 2, mods: [{ attr: 'Strength', type: 'Additive', val: '5' }], reward: '' },
+          { level: 5, milestone: true, mods: [{ attr: 'Strength', type: 'Additive', val: '15' }], reward: 'Ember Nova' },
+          { level: 10, milestone: true, mods: [{ attr: 'Strength', type: 'Additive', val: '40' }], reward: 'Firestorm' }
+        ] },
+      { id: 31, ord: 1, name: 'Inferno Magic', word: 'inferno', pron: 'in-fer-no', trans: 'Inferno', max: '10', base: '100', growth: '1.45', edited: true,
+        levels: [
+          { level: 2, mods: [{ attr: 'Strength', type: 'Additive', val: '5' }], reward: '' },
+          { level: 5, milestone: true, mods: [{ attr: 'Strength', type: 'Additive', val: '15' }, { attr: 'Critical Chance', type: 'Multiplicative', val: '1.02' }], reward: 'Firestorm' },
+          { level: 10, milestone: true, mods: [{ attr: 'Strength', type: 'Additive', val: '40' }], reward: 'Meteor' }
+        ] },
+      { id: 32, ord: 2, name: 'Cataclysm', word: 'ragnarok', pron: 'rag-na-rok', trans: 'Cataclysm', max: '8', base: '140', growth: '1.50',
+        levels: [
+          { level: 4, mods: [{ attr: 'Spell Power', type: 'Additive', val: '20' }], reward: '' },
+          { level: 8, milestone: true, mods: [{ attr: 'Spell Power', type: 'Additive', val: '60' }], reward: 'Apocalypse' }
+        ] }
+    ];
+
+    const gen = (idBase, names, words) => names.map((nm, i) => {
+      const max = i === names.length - 1 ? 8 : 10;
+      return { id: idBase + i, ord: i, name: nm, word: words[i], pron: words[i], trans: nm, max: '' + max, base: '' + (100 + i * 20), growth: (1.4 + i * 0.05).toFixed(2),
+        levels: [
+          { level: Math.ceil(max / 2), milestone: true, mods: [{ attr: 'Vitality', type: 'Additive', val: '12' }], reward: nm + ' Focus' },
+          { level: max, milestone: true, mods: [{ attr: 'Vitality', type: 'Additive', val: '35' }], reward: 'Grand ' + nm }
+        ] };
+    });
+
+    const fireContrib = [
+      { skill: 'Ember Bolt', homeTier: 'T0 · Fire Magic', weight: '1.0' },
+      { skill: 'Flame Lash', homeTier: 'T0 · Fire Magic', weight: '0.7' },
+      { skill: 'Cinder Veil', homeTier: 'T0 · Fire Magic', weight: '0.5' },
+      { skill: 'Magma Spear', homeTier: 'T1 · Inferno Magic', weight: '1.0' },
+      { skill: 'Inferno Wave', homeTier: 'T1 · Inferno Magic', weight: '0.8' },
+      { skill: 'Pyroclasm', homeTier: 'T2 · Cataclysm', weight: '1.0' },
+      { skill: 'Heat Death', homeTier: 'T2 · Cataclysm', weight: '0.6' }
+    ];
+
+    this.paths = [
+      { id: 3, name: 'Fire Magic', falloff: '0.60', status: 'modified', desc: 'Elemental fire school — XP from any contributing skill routes up the spine, decaying by the falloff each tier above its home.', tiers: fireTiers, contrib: fireContrib },
+      { id: 5, name: 'Earthshaping', falloff: '0.50', desc: 'Stone, soil and tremor — a slow, durable progression.', tiers: gen(50, ['Earth', 'Magma', 'Quake'], ['erde', 'magma', 'temblor']), contrib: [{ skill: 'Stone Throw', homeTier: 'T0 · Earth', weight: '1.0' }, { skill: 'Magma Spear', homeTier: 'T1 · Magma', weight: '0.4' }] },
+      { id: 8, name: 'Bladework', falloff: '0.70', desc: 'Martial sword discipline.', tiers: gen(80, ['Bladework', 'Mastery'], ['klinge', 'meister']), contrib: [{ skill: 'Slash', homeTier: 'T0 · Bladework', weight: '1.0' }] },
+      { id: -1, name: 'Spellweaving', falloff: '0.55', status: 'added', desc: 'Arcane pattern-magic (new).', tiers: gen(90, ['Weave', 'Pattern'], ['weben', 'muster']), contrib: [{ skill: 'Arcane Thread', homeTier: 'T0 · Weave', weight: '1.0' }] },
+      { id: 11, name: 'Marksmanship', falloff: '0.65', desc: 'Ranged precision.', tiers: gen(110, ['Aim', 'Snipe', 'Deadeye'], ['ziel', 'schuss', 'auge']), contrib: [{ skill: 'Aimed Shot', homeTier: 'T0 · Aim', weight: '1.0' }] },
+      { id: 14, name: 'Shadow Arts', falloff: '0.70', status: 'warn', desc: 'Stealth and subterfuge.', tiers: gen(140, ['Shadow'], ['schatten']), contrib: [] },
+      { id: 17, name: 'Lava', falloff: '0.60', desc: 'A gated convergence school — opens only when its prerequisite paths are mastered.', tiers: [
+        { id: 170, ord: 0, name: 'Lava', word: 'lava', pron: 'lah-va', trans: 'Lava', max: '10', base: '130', growth: '1.50',
+          gateway: { seed: 'Molten Touch', prereqs: ['Cataclysm (Fire ✦)', 'Quake (Earth ✦)'], prereqRefs: [32, 52] },
+          levels: [
+            { level: 5, milestone: true, mods: [{ attr: 'Spell Power', type: 'Additive', val: '25' }], reward: 'Eruption' },
+            { level: 10, milestone: true, mods: [{ attr: 'Vitality', type: 'Additive', val: '30' }], reward: 'Volcano' }
+          ] }
+      ], contrib: [{ skill: 'Molten Touch', homeTier: 'T0 · Lava', weight: '1.0' }] }
+    ];
+
+    this.state = { selPath: 3, drill: null, pathTab: 'tiers', tierTab: 'milestones', selLevel: 5, dragOver: null, view: 'list', edgePaths: [], edgePathStr: '', svgW: 0, svgH: 0 };
+    this.dragIndex = null;
+  }
+
+  componentDidMount() { this.applyAccent(); this.measureEdges(); }
+  componentDidUpdate() { this.applyAccent(); this.measureEdges(); }
+  applyAccent() {
+    const el = this.rootRef.current; if (!el) return;
+    const a = this.props.accentColor;
+    if (a) el.style.setProperty('--accent', a);
+  }
+  openPathFromMap(id) { this.setState({ view: 'list', selPath: id, drill: null, pathTab: 'tiers' }); }
+  openTierFromMap(pid, tid) {
+    const p = this.paths.find(x => x.id === pid);
+    const t = p && p.tiers.find(x => x.id === tid);
+    const ms = t && t.levels.find(l => l.milestone);
+    this.setState({ view: 'list', selPath: pid, drill: tid, tierTab: 'milestones', selLevel: ms ? ms.level : (t ? parseInt(t.max) : 1) });
+  }
+  mapEdgeDefs() {
+    const defs = [];
+    this.paths.forEach(p => p.tiers.forEach(t => {
+      if (t.gateway && t.gateway.prereqRefs) t.gateway.prereqRefs.forEach(ref => defs.push({ from: 't' + ref, to: 't' + t.id }));
+    }));
+    return defs;
+  }
+  measureEdges() {
+    if (this.state.view !== 'map') return;
+    const cont = this.mapRef && this.mapRef.current;
+    if (!cont) return;
+    const crect = cont.getBoundingClientRect();
+    const paths = [];
+    this.mapEdgeDefs().forEach(e => {
+      const a = cont.querySelector(`[data-node="${e.from}"]`);
+      const b = cont.querySelector(`[data-node="${e.to}"]`);
+      if (!a || !b) return;
+      const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
+      const x1 = ar.right - crect.left + cont.scrollLeft, y1 = ar.top + ar.height / 2 - crect.top + cont.scrollTop;
+      const x2 = br.left - crect.left + cont.scrollLeft, y2 = br.top + br.height / 2 - crect.top + cont.scrollTop;
+      const mx = (x1 + x2) / 2;
+      paths.push(`M ${x1} ${y1} C ${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`);
+    });
+    const str = paths.join('|');
+    const w = cont.scrollWidth, h = cont.scrollHeight;
+    if (str !== this.state.edgePathStr || w !== this.state.svgW || h !== this.state.svgH) {
+      this.setState({ edgePaths: paths, edgePathStr: str, svgW: w, svgH: h });
+    }
+  }
+
+  get path() { return this.paths.find(p => p.id === this.state.selPath) || this.paths[0]; }
+  get tier() { if (this.state.drill == null) return null; return this.path.tiers.find(t => t.id === this.state.drill) || null; }
+
+  mut(fn) { fn(); this.markDirty(); this.forceUpdate(); }
+  markDirty() {
+    const p = this.path; if (!p.status) p.status = 'modified';
+    const t = this.tier; if (t) t.edited = true;
+  }
+
+  selectPath(id) { this.setState({ selPath: id, drill: null, pathTab: 'tiers' }); }
+  drillTier(id) {
+    const t = this.path.tiers.find(x => x.id === id);
+    const firstMs = t && t.levels.find(l => l.milestone);
+    this.setState({ drill: id, tierTab: 'milestones', selLevel: firstMs ? firstMs.level : (t ? parseInt(t.max) : 1) });
+  }
+  back() { this.setState({ drill: null }); }
+  setPathTab(k) { this.setState({ pathTab: k }); }
+  setTierTab(k, disabled) { if (disabled) return; this.setState({ tierTab: k }); }
+  selectLevel(n) { this.setState({ selLevel: n }); }
+  reorderTier(from, to) {
+    const arr = this.path.tiers;
+    const [m] = arr.splice(from, 1);
+    arr.splice(to, 0, m);
+    arr.forEach((t, idx) => t.ord = idx);
+    if (!this.path.status) this.path.status = 'modified';
+    this.forceUpdate();
+  }
+  addTier() {
+    const arr = this.path.tiers;
+    arr.push({ id: Date.now(), ord: arr.length, name: 'New Proficiency', word: '', pron: '', trans: 'New Proficiency', max: '10', base: '100', growth: '1.40', edited: true, levels: [] });
+    if (!this.path.status) this.path.status = 'modified';
+    this.forceUpdate();
+  }
+  addPath() {
+    const id = -Date.now();
+    this.paths.push({ id, name: 'New Path', falloff: '0.60', status: 'added', desc: '', tiers: [{ id: Date.now(), ord: 0, name: 'New Proficiency', word: '', pron: '', trans: 'New Proficiency', max: '10', base: '100', growth: '1.40', levels: [] }], contrib: [] });
+    this.setState({ selPath: id, drill: null, pathTab: 'identity' });
+  }
+
+  spillStyleFor(kind) {
+    const c = kind === 'added' ? 'var(--added)' : 'var(--warn)';
+    return `font-family:var(--mono);font-size:8.5px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:3px;color:${c};border:1px solid color-mix(in srgb,${c} 40%,transparent);background:color-mix(in srgb,${c} 10%,transparent)`;
+  }
+  spillLabelFor(kind) { return kind === 'added' ? 'new' : 'edited'; }
+
+  tierOptsFor(path) { return path.tiers.map(t => `T${t.ord} · ${t.name}`); }
+
+  cumXp(tier, level) {
+    const base = parseFloat(tier.base) || 0, growth = parseFloat(tier.growth) || 1;
+    let total = 0;
+    for (let i = 1; i < level; i++) total += Math.round(base * Math.pow(growth, i - 1));
+    return total.toLocaleString();
+  }
+
+  renderVals() {
+    const showWords = this.props.showWords !== false;
+    const path = this.path;
+    const tier = this.tier;
+    const mode = tier ? 'tier' : 'path';
+
+    const editedCount = this.paths.filter(p => p.status === 'modified').length
+      || this.paths.reduce((a, p) => a + p.tiers.filter(t => t.edited).length, 0) || 2;
+    const addedCount = this.paths.filter(p => p.status === 'added').length;
+
+    // ── list ──
+    let listItems, listTitle, listCount, showBack = false, backLabel = '', showNew = true;
+    if (mode === 'path') {
+      listTitle = 'Paths'; listCount = this.paths.length;
+      listItems = this.paths.map(p => {
+        const sel = p.id === this.state.selPath;
+        const edge = p.status === 'added' ? 'var(--added)' : p.status === 'modified' ? 'var(--warn)' : 'transparent';
+        return {
+          key: p.id, name: p.name,
+          meta: `${p.tiers.length} ${p.tiers.length === 1 ? 'tier' : 'tiers'} · falloff ${p.falloff}`,
+          rowStyle: `width:100%;text-align:left;background:${sel ? 'color-mix(in srgb,var(--accent) 8%,transparent)' : 'transparent'};border:none;border-bottom:1px solid var(--bs);padding:10px 14px 10px 0;cursor:pointer;display:flex;align-items:center;gap:10px`,
+          edgeStyle: `width:3px;height:34px;flex-shrink:0;background:${edge};${edge !== 'transparent' ? 'box-shadow:0 0 7px ' + edge : ''}`,
+          showOrdinal: false,
+          nameStyle: `font-size:13.5px;color:${sel ? 'var(--tp)' : 'var(--ts)'};font-weight:${sel ? '500' : '400'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`,
+          hasSpill: p.status === 'added' || p.status === 'modified',
+          spill: this.spillLabelFor(p.status), spillStyle: this.spillStyleFor(p.status),
+          warn: p.status === 'warn',
+          onClick: () => this.selectPath(p.id)
+        };
+      });
+    } else {
+      listTitle = 'Tiers'; listCount = path.tiers.length; showBack = true; backLabel = path.name; showNew = false;
+      listItems = path.tiers.map(t => {
+        const sel = t.id === this.state.drill;
+        const ms = t.levels.filter(l => l.milestone).length;
+        return {
+          key: t.id, name: t.name,
+          meta: `cap ${t.max} · ${ms} ${ms === 1 ? 'milestone' : 'milestones'}`,
+          rowStyle: `width:100%;text-align:left;background:${sel ? 'color-mix(in srgb,var(--accent) 8%,transparent)' : 'transparent'};border:none;border-bottom:1px solid var(--bs);padding:11px 14px 11px 0;cursor:pointer;display:flex;align-items:center;gap:10px`,
+          edgeStyle: `width:3px;height:34px;flex-shrink:0;background:${t.edited ? 'var(--warn)' : 'transparent'};${t.edited ? 'box-shadow:0 0 7px var(--warn)' : ''}`,
+          showOrdinal: true, ordinal: t.ord,
+          ordinalStyle: `width:24px;height:24px;flex-shrink:0;border-radius:50%;background:${sel ? 'color-mix(in srgb,var(--accent) 22%,transparent)' : 'var(--panel2)'};border:1px solid ${sel ? 'var(--accent)' : 'var(--bl)'};color:${sel ? 'var(--accent-light)' : 'var(--tt)'};font-family:var(--mono);font-size:10px;display:flex;align-items:center;justify-content:center`,
+          nameStyle: `font-size:13.5px;color:${sel ? 'var(--tp)' : 'var(--ts)'};font-weight:${sel ? '500' : '400'}`,
+          hasSpill: !!t.edited, spill: 'edited', spillStyle: this.spillStyleFor('modified'),
+          warn: false,
+          onClick: () => this.drillTier(t.id)
+        };
+      });
+    }
+
+    // ── header + tabs ──
+    const mkTab = (label, active, onClick, opts = {}) => ({
+      label, hasCount: opts.count != null, count: opts.count, dirty: !!opts.dirty, onClick,
+      style: `background:transparent;border:none;border-bottom:2px solid ${active ? 'var(--accent)' : 'transparent'};color:${opts.disabled ? 'var(--tm)' : active ? 'var(--tp)' : 'var(--tt)'};font-family:var(--sans);font-size:13px;padding:8px 14px 12px;cursor:${opts.disabled ? 'not-allowed' : 'pointer'};display:flex;align-items:center;gap:8px`
+    });
+
+    let recId, recIdColor, recName, hasRecSpill, recSpill, recSpillStyle, headline, deleteLabel, tabs;
+    if (mode === 'path') {
+      recId = path.id < 0 ? 'new' : '#' + path.id;
+      recIdColor = path.id < 0 ? 'var(--accent)' : 'var(--tm)';
+      recName = path.name;
+      hasRecSpill = path.status === 'added' || path.status === 'modified';
+      recSpill = this.spillLabelFor(path.status); recSpillStyle = this.spillStyleFor(path.status);
+      headline = path.desc; deleteLabel = '⌗ Retire';
+      const anyEdited = path.tiers.some(t => t.edited);
+      tabs = [
+        mkTab('Identity', this.state.pathTab === 'identity', () => this.setPathTab('identity')),
+        mkTab('Tiers', this.state.pathTab === 'tiers', () => this.setPathTab('tiers'), { count: path.tiers.length, dirty: anyEdited }),
+        mkTab('Contributions', this.state.pathTab === 'contrib', () => this.setPathTab('contrib'), { count: path.contrib.length })
+      ];
+    } else {
+      recId = '#' + tier.id; recIdColor = 'var(--tm)'; recName = tier.name;
+      hasRecSpill = !!tier.edited; recSpill = 'edited'; recSpillStyle = this.spillStyleFor('modified');
+      headline = `${path.name} · Tier ${tier.ord} · max level ${tier.max} — payouts compound with everything earned at lower levels.`;
+      deleteLabel = '✕ Delete';
+      const isT0 = tier.ord === 0;
+      const tt = this.state.tierTab;
+      tabs = [
+        mkTab('Identity · Conlang', tt === 'identity', () => this.setTierTab('identity')),
+        mkTab('XP Curve', tt === 'xp', () => this.setTierTab('xp')),
+        mkTab('Milestones', tt === 'milestones', () => this.setTierTab('milestones'), { count: tier.levels.filter(l => l.milestone).length, dirty: tier.edited }),
+        mkTab('Gateways', tt === 'gateways', () => this.setTierTab('gateways', !isT0), { disabled: !isT0 })
+      ];
+    }
+
+    // ── section flags ──
+    const pTab = this.state.pathTab, tTab = this.state.tierTab;
+    const isTiers = mode === 'path' && pTab === 'tiers';
+    const isPathIdentity = mode === 'path' && pTab === 'identity';
+    const isContrib = mode === 'path' && pTab === 'contrib';
+    const isTierIdentity = mode === 'tier' && tTab === 'identity';
+    const isXp = mode === 'tier' && tTab === 'xp';
+    const isMilestones = mode === 'tier' && tTab === 'milestones';
+    const isGateways = mode === 'tier' && tTab === 'gateways';
+
+    let secTitle = '', secSub = '';
+    if (isTiers) { secTitle = 'Tiers'; secSub = '— ordered proficiencies · drag ⠿ to reorder · open ›'; }
+    else if (isPathIdentity) { secTitle = 'Identity'; secSub = '— the path-level record'; }
+    else if (isContrib) { secTitle = 'Contributions'; secSub = '— skills that feed this path, with their home tier'; }
+    else if (isTierIdentity) { secTitle = 'Identity · Conlang'; secSub = '— name and words of power'; }
+    else if (isXp) { secTitle = 'XP Curve'; secSub = '— max level and the cost curve'; }
+    else if (isMilestones) { secTitle = 'Milestones'; secSub = '— click a level to author its payout · only levels with a payout are stored'; }
+    else if (isGateways) { secTitle = 'Gateways'; secSub = '— how this path is unlocked'; }
+
+    const out = {
+      rootRef: this.rootRef, pathCount: this.paths.length,
+      dirtyCount: addedCount + editedCount, editedCount,
+      listItems, listTitle, listCount, showBack, backLabel, showNew,
+      onBack: () => this.back(),
+      isTier: mode === 'tier', crumbPath: path.name, crumbOrd: tier ? tier.ord : 0,
+      recId, recIdColor, recName, hasRecSpill, recSpill, recSpillStyle, headline, deleteLabel,
+      tabs, secTitle, secSub,
+      isTiers, isPathIdentity, isContrib, isTierIdentity, isXp, isMilestones, isGateways,
+      pathName: path.name, pathFalloff: path.falloff, pathDesc: path.desc,
+      attrOpts: this.ATTRS, modTypeOpts: this.MOD_TYPES, skillOpts: this.SKILLS,
+      rewardOpts: ['— none —', ...this.SKILLS],
+      onAddTier: () => this.addTier(),
+      onNew: () => this.addPath(),
+      onPathName: e => this.mut(() => path.name = e.target.value),
+      onPathFalloff: e => this.mut(() => path.falloff = e.target.value),
+      onPathDesc: e => this.mut(() => path.desc = e.target.value)
+    };
+
+    // ── tiers spine ──
+    if (isTiers) {
+      out.spine = path.tiers.map((t, i) => {
+        const ms = t.levels.filter(l => l.milestone).length;
+        const skills = path.contrib.filter(c => c.homeTier.startsWith('T' + t.ord + ' ')).length;
+        let meta = `cap ${t.max} · ${ms} ${ms === 1 ? 'milestone' : 'milestones'} · ${skills} ${skills === 1 ? 'skill' : 'skills'}`;
+        if (t.gateway) meta = `cap ${t.max} · gated ✦ · ${ms} milestones`;
+        const isTarget = this.state.dragOver === i && this.dragIndex != null && this.dragIndex !== i;
+        return {
+          ord: t.ord, name: t.name, word: t.word, showWord: showWords && !!t.word, edited: !!t.edited, meta,
+          rowStyle: `display:flex;align-items:center;gap:12px;border-radius:6px;${isTarget ? 'box-shadow:inset 0 2px 0 var(--accent)' : ''}`,
+          nodeStyle: `width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--panel2);border:1px solid var(--bl);color:var(--tt);font-family:var(--mono);font-size:11px;display:flex;align-items:center;justify-content:center;z-index:1`,
+          cardStyle: `flex:1;background:var(--panel);border:1px solid var(--bl);${t.edited ? 'border-left:2px solid var(--warn);' : ''}border-radius:4px;padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer`,
+          onClick: () => this.drillTier(t.id),
+          onDragStart: e => { this.dragIndex = i; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); } catch (_) {} },
+          onDragOver: e => { e.preventDefault(); if (this.state.dragOver !== i) this.setState({ dragOver: i }); },
+          onDrop: e => { e.preventDefault(); const from = this.dragIndex; if (from != null && from !== i) this.reorderTier(from, i); this.dragIndex = null; this.setState({ dragOver: null }); },
+          onDragEnd: () => { this.dragIndex = null; if (this.state.dragOver != null) this.setState({ dragOver: null }); }
+        };
+      });
+    }
+
+    // ── contributions (path only) ──
+    if (isContrib) {
+      const tierOpts = this.tierOptsFor(path);
+      const usedSkills = new Set(path.contrib.map(c => c.skill));
+      out.contribRows = path.contrib.map((c, i) => ({
+        skill: c.skill, homeTier: c.homeTier, weight: c.weight, tierOpts,
+        skillOpts: this.SKILLS.filter(s => s === c.skill || !usedSkills.has(s)),
+        onSkill: e => this.mut(() => c.skill = e.target.value),
+        onHome: e => this.mut(() => c.homeTier = e.target.value),
+        onWeight: e => this.mut(() => c.weight = e.target.value),
+        onRemove: () => this.mut(() => path.contrib.splice(i, 1))
+      }));
+      const firstFree = this.SKILLS.find(s => !usedSkills.has(s));
+      out.onAddContrib = firstFree ? () => this.mut(() => path.contrib.push({ skill: firstFree, homeTier: tierOpts[0], weight: '1.0' })) : () => {};
+      const f = parseFloat(path.falloff) || 0;
+      out.falloffSteps = [0, 1, 2].map(d => ({
+        label: `d${d} · ${d === 0 ? '1.0' : Math.pow(f, d).toFixed(2)}`,
+        style: `font-family:var(--mono);font-size:10px;color:${d === 0 ? 'var(--ts)' : 'var(--tt)'};border:1px solid var(--bl);border-radius:3px;padding:3px 8px`
+      }));
+    }
+
+    // ── tier identity ──
+    if (isTierIdentity) {
+      out.tierName = tier.name; out.tierWord = tier.word; out.tierPron = tier.pron; out.tierTrans = tier.trans;
+      out.tierMax = tier.max; out.halfLevel = Math.ceil((parseInt(tier.max) || 1) / 2);
+      out.onTierName = e => this.mut(() => tier.name = e.target.value);
+      out.onTierWord = e => this.mut(() => tier.word = e.target.value);
+      out.onTierPron = e => this.mut(() => tier.pron = e.target.value);
+      out.onTierTrans = e => this.mut(() => tier.trans = e.target.value);
+    }
+
+    // ── xp curve ──
+    if (isXp) {
+      out.tierMax = tier.max; out.tierBase = tier.base; out.tierGrowth = tier.growth;
+      out.onTierMax = e => this.mut(() => tier.max = e.target.value);
+      out.onTierBase = e => this.mut(() => tier.base = e.target.value);
+      out.onTierGrowth = e => this.mut(() => tier.growth = e.target.value);
+      const max = Math.max(1, Math.min(40, parseInt(tier.max) || 1));
+      const base = parseFloat(tier.base) || 0, growth = parseFloat(tier.growth) || 1;
+      const costs = [];
+      for (let l = 1; l <= max; l++) costs.push(Math.round(base * Math.pow(growth, l - 1)));
+      const maxCost = Math.max(...costs, 1);
+      out.xpBars = costs.map((c, i) => ({
+        cost: c >= 1000 ? (c / 1000).toFixed(1) + 'k' : '' + c,
+        style: `flex:1;border-radius:2px 2px 0 0;height:${Math.max(8, Math.round((c / maxCost) * 100))}%;background:${i === costs.length - 1 ? 'var(--accent)' : i >= costs.length - 3 ? 'color-mix(in srgb,#fff 38%,transparent)' : 'color-mix(in srgb,#fff 22%,transparent)'}`
+      }));
+    }
+
+    // ── milestones ──
+    if (isMilestones) {
+      const max = Math.max(1, parseInt(tier.max) || 1);
+      const sel = Math.min(this.state.selLevel, max);
+      out.levelNodes = [];
+      for (let l = 1; l <= max; l++) {
+        const lvl = tier.levels.find(x => x.level === l);
+        const kind = lvl ? (lvl.milestone ? 'milestone' : 'bonus') : 'empty';
+        const isSel = l === sel;
+        const isMax = l === max;
+        let dot;
+        if (kind === 'empty') dot = `width:13px;height:13px;border-radius:50%;border:1px solid var(--bl);background:var(--page)`;
+        else if (kind === 'bonus') dot = `width:17px;height:17px;border-radius:50%;background:color-mix(in srgb,#fff 30%,transparent)`;
+        else dot = `width:${isMax ? 20 : 22}px;height:${isMax ? 20 : 22}px;border-radius:50%;background:var(--accent)${isMax ? ';border:2px solid var(--accent-light)' : ''}`;
+        if (isSel) dot += `;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 28%,transparent)`;
+        out.levelNodes.push({ num: l, dotStyle: dot, numStyle: `font-family:var(--mono);font-size:10px;color:${isSel ? 'var(--accent-light)' : 'var(--tt)'}`, onClick: () => this.selectLevel(l) });
+      }
+      const cur = tier.levels.find(x => x.level === sel);
+      out.edLevel = sel;
+      out.edThreshold = this.cumXp(tier, sel);
+      out.edIsMilestone = !!(cur && cur.milestone);
+      out.edHasPayout = !!cur; out.edEmpty = !cur;
+      out.edMods = cur ? cur.mods.map((m, i) => ({
+        attr: m.attr, type: m.type, val: m.val,
+        onAttr: e => this.mut(() => m.attr = e.target.value),
+        onType: e => this.mut(() => m.type = e.target.value),
+        onVal: e => this.mut(() => m.val = e.target.value),
+        onRemove: () => this.mut(() => cur.mods.splice(i, 1))
+      })) : [];
+      out.edReward = cur && cur.reward ? cur.reward : '— none —';
+      out.onAddMod = () => this.mut(() => cur && cur.mods.push({ attr: this.ATTRS[0], type: 'Additive', val: '0' }));
+      out.onReward = e => this.mut(() => {
+        const v = e.target.value;
+        cur.reward = v === '— none —' ? '' : v;
+        cur.milestone = !!cur.reward;
+      });
+      out.onRemovePayout = () => this.mut(() => { const idx = tier.levels.indexOf(cur); if (idx >= 0) tier.levels.splice(idx, 1); });
+      out.onAddPayout = () => this.mut(() => { tier.levels.push({ level: sel, mods: [{ attr: this.ATTRS[0], type: 'Additive', val: '0' }], reward: '' }); });
+    }
+
+    // ── gateways ──
+    if (isGateways) {
+      const gw = tier.gateway;
+      out.gwSeed = gw ? gw.seed : (this.SKILLS[0]);
+      out.gwIsStarter = !gw; out.gwGated = !!gw;
+      out.gwPrereqs = gw ? gw.prereqs.map((p, i) => ({ label: p, onRemove: () => this.mut(() => gw.prereqs.splice(i, 1)) })) : [];
+      out.onSeed = e => this.mut(() => { if (tier.gateway) tier.gateway.seed = e.target.value; });
+      out.onAddPrereq = () => this.mut(() => {
+        if (!tier.gateway) tier.gateway = { seed: this.SKILLS[0], prereqs: [] };
+        tier.gateway.prereqs.push('New prerequisite ✦');
+      });
+    }
+
+    // ── view toggle + cross-path map (H3) ──
+    const listMode = this.state.view !== 'map';
+    const mapMode = this.state.view === 'map';
+    out.listMode = listMode; out.mapMode = mapMode;
+    out.mapRef = this.mapRef;
+    const seg = a => `background:${a ? 'var(--accent)' : 'transparent'};border:none;color:${a ? '#0f1014' : 'var(--tt)'};font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;padding:5px 14px;cursor:pointer`;
+    out.listBtnStyle = seg(listMode); out.mapBtnStyle = seg(mapMode);
+    out.onListView = () => this.setState({ view: 'list' });
+    out.onMapView = () => this.setState({ view: 'map' });
+    out.svgW = this.state.svgW || 0; out.svgH = this.state.svgH || 0;
+    out.edgePaths = this.state.edgePaths || [];
+    out.mapColumns = this.paths.map(p => ({
+      id: p.id, name: p.name,
+      headColor: p.tiers.some(t => t.gateway) ? 'var(--accent)' : 'var(--tt)',
+      onOpen: () => this.openPathFromMap(p.id),
+      nodes: p.tiers.map(t => ({
+        nodeId: 't' + t.id, ord: t.ord, name: t.name, cap: t.max,
+        gatedMark: t.gateway ? ' · gated ✦' : '',
+        showConnector: t.ord > 0,
+        cardStyle: t.gateway
+          ? `width:132px;border:1.5px dashed var(--accent);border-radius:6px;padding:8px 10px;background:color-mix(in srgb,var(--accent) 7%,transparent);text-align:center;cursor:pointer`
+          : `width:132px;border:1px solid var(--bl);border-radius:6px;padding:8px 10px;background:var(--panel);text-align:center;cursor:pointer`,
+        onClick: () => this.openTierFromMap(p.id, t.id)
+      }))
+    }));
+
+    return out;
+  }
+}
+</script>
+</body>
+</html>
