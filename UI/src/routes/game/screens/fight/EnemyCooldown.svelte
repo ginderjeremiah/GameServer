@@ -6,11 +6,21 @@
 	<div class="readout">{secondsText}</div>
 	<div class="caption">next enemy</div>
 	<div class="track">
-		<div class="track-fill" style:width="{fillPercent}%"></div>
+		<Bar
+			value={fillPercent}
+			presentational
+			--bar-height="2px"
+			--bar-radius="1px"
+			--bar-track-bg="color-mix(in srgb, var(--white) 9%, transparent)"
+			--bar-fill="var(--enemy-accent)"
+			--bar-transition="width 0.12s linear"
+		/>
 	</div>
 </div>
 
 <script lang="ts">
+import Bar from '$components/Bar.svelte';
+
 type Props = {
 	/** Remaining cooldown in milliseconds (the engine's `loadingTime`). */
 	remainingMs: number;
@@ -58,16 +68,6 @@ const fillPercent = $derived(totalMs > 0 ? Math.min(100, Math.max(0, ((totalMs -
 
 .track {
 	width: 120px;
-	height: 2px;
 	margin-top: 3px;
-	border-radius: 1px;
-	background: color-mix(in srgb, var(--white) 9%, transparent);
-	overflow: hidden;
-}
-
-.track-fill {
-	height: 100%;
-	background: var(--enemy-accent);
-	transition: width 0.12s linear;
 }
 </style>

@@ -5,12 +5,21 @@
 			{remaining}<span class="budget-total">&nbsp;/&nbsp;{budget}</span>
 		</span>
 	</div>
-	<div class="track">
-		<div class="fill" style="width: {pct}%"></div>
-	</div>
+	<Bar
+		value={pct}
+		presentational
+		--bar-height="4px"
+		--bar-radius="2px"
+		--bar-track-bg="color-mix(in srgb, var(--white) 7%, transparent)"
+		--bar-fill="var(--accent)"
+		--bar-fill-shadow="0 0 8px var(--accent)"
+		--bar-transition="width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
+	/>
 </div>
 
 <script lang="ts">
+import Bar from '$components/Bar.svelte';
+
 interface Props {
 	remaining: number;
 	budget: number;
@@ -66,19 +75,5 @@ const pct = $derived(budget > 0 ? Math.max(0, Math.min(100, (remaining / budget)
 	font-size: 11px;
 	font-weight: 400;
 	color: var(--text-muted);
-}
-
-.track {
-	height: 4px;
-	border-radius: 2px;
-	background: color-mix(in srgb, var(--white) 7%, transparent);
-	overflow: hidden;
-}
-
-.fill {
-	height: 100%;
-	background: var(--accent);
-	box-shadow: 0 0 8px var(--accent);
-	transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 </style>

@@ -21,17 +21,19 @@ describe('BattleTimer', () => {
 	it('sizes the progress track to the elapsed fraction', () => {
 		const { container } = render(BattleTimer, { props: { elapsedMs: 60000, maxMs: DEFAULT_MAX_BATTLE_MS } });
 		// 60s / 120s = 50%.
-		expect((container.querySelector('.track-fill') as HTMLElement).getAttribute('style')).toContain('width: 50%');
+		expect((container.querySelector('.bar-fill') as HTMLElement).getAttribute('style')).toContain('width: 50%');
 	});
 
 	it('uses the accent fill before the final seconds and the warning hue within them', () => {
 		const early = render(BattleTimer, { props: { elapsedMs: 60000, maxMs: DEFAULT_MAX_BATTLE_MS } });
-		expect((early.container.querySelector('.track-fill') as HTMLElement).classList.contains('warning')).toBe(false);
+		// The fill colour rides the Bar's --bar-fill token: accent before the warning window.
+		expect(early.container.innerHTML).toContain('--bar-fill: var(--accent)');
+		expect(early.container.innerHTML).not.toContain('--bar-fill: var(--warning)');
 		cleanup();
 
 		// Final 20 seconds (>= 100000ms of the 120000ms cap) flips to the warning hue.
 		const late = render(BattleTimer, { props: { elapsedMs: 105000, maxMs: DEFAULT_MAX_BATTLE_MS } });
-		expect((late.container.querySelector('.track-fill') as HTMLElement).classList.contains('warning')).toBe(true);
+		expect(late.container.innerHTML).toContain('--bar-fill: var(--warning)');
 	});
 
 	it('caps the readout at the limit instead of overshooting', () => {
