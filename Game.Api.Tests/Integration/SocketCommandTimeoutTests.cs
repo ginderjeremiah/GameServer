@@ -137,7 +137,7 @@ namespace Game.Api.Tests.Integration
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var context = new SocketContext(socket, playerId: 1, session, contextLogger);
             var handler = new SocketHandler(context, commandFactory, scopeFactory, handlerLogger,
-                () => Task.CompletedTask, commandTimeout);
+                () => { }, commandTimeout);
 
             return (socket, handler, scopeFactory);
         }

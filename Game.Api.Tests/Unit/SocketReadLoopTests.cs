@@ -8,6 +8,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
+using System.Text;
 using Xunit;
 
 namespace Game.Api.Tests.Unit
@@ -86,13 +87,43 @@ namespace Game.Api.Tests.Unit
             Assert.DoesNotContain(_logs.Entries, e => e.Level == LogLevel.Error);
         }
 
-        private (SocketContext Context, SocketHandler Handler) CreateHandler(WebSocket socket)
+        [Fact]
+        public async Task ReadLoop_OnActivityThrows_DoesNotTerminateTheReadLoop()
+        {
+            // Presence refresh (the on-activity callback) is best-effort: a transient Redis fault while
+            // refreshing the presence TTL must NOT be mistaken for a read fault and tear down a healthy socket.
+            // Here the callback throws on every inbound frame; the loop must log-and-continue, process the
+            // message, and keep reading rather than closing.
+            var socket = new ScriptedReadWebSocket();
+            socket.QueueMessage("ping");
+            var (_, handler) = CreateHandler(socket,
+                onActivity: () => throw new InvalidOperationException("transient Redis failure on presence refresh"));
+
+            using var drain = new CancellationTokenSource();
+            using var inactivityStop = new CancellationTokenSource();
+            handler.Listen(hostStopping: inactivityStop.Token, drainDeadline: drain.Token);
+
+            // The loop read the message, hit the throwing refresh, and still looped back to read again.
+            await socket.IdleReadReached.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
+
+            Assert.Equal(WebSocketState.Open, socket.State);
+            Assert.Equal(2, socket.ReceiveAttempts);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("presence"));
+            Assert.DoesNotContain(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("closing the socket"));
+
+            // Tear down: abort the blocked idle receive so the read loop completes.
+            drain.Cancel();
+            inactivityStop.Cancel();
+            await handler.Completion.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
+        }
+
+        private (SocketContext Context, SocketHandler Handler) CreateHandler(WebSocket socket, Action? onActivity = null)
         {
             var session = new SessionService(new NoOpSessionStore());
             session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(), _scopeFactory,
-                _loggerFactory.CreateLogger<SocketHandler>(), () => Task.CompletedTask);
+                _loggerFactory.CreateLogger<SocketHandler>(), onActivity ?? (() => { }));
             return (context, handler);
         }
 
@@ -112,14 +143,20 @@ namespace Game.Api.Tests.Unit
         {
             private Exception? _throwOnReceive;
             private bool _closeFrameQueued;
+            private byte[]? _messageQueued;
             private WebSocketState _state = WebSocketState.Open;
+            private readonly TaskCompletionSource _idleReadReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             public int ReceiveAttempts { get; private set; }
             public bool CloseAsyncCalled { get; private set; }
             public WebSocketCloseStatus? CloseStatusUsed { get; private set; }
 
+            /// <summary>Completes when the loop calls receive with no scripted input left — i.e. it looped back to read again.</summary>
+            public Task IdleReadReached => _idleReadReached.Task;
+
             public void QueueThrow(Exception toThrow) => _throwOnReceive = toThrow;
             public void QueueClose() => _closeFrameQueued = true;
+            public void QueueMessage(string message) => _messageQueued = Encoding.UTF8.GetBytes(message);
 
             public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
             {
@@ -131,6 +168,14 @@ namespace Game.Api.Tests.Unit
                     return Task.FromException<WebSocketReceiveResult>(_throwOnReceive);
                 }
 
+                if (_messageQueued is not null)
+                {
+                    var payload = _messageQueued;
+                    _messageQueued = null;
+                    payload.CopyTo(buffer.Array.AsSpan(buffer.Offset));
+                    return Task.FromResult(new WebSocketReceiveResult(payload.Length, WebSocketMessageType.Text, endOfMessage: true));
+                }
+
                 if (_closeFrameQueued)
                 {
                     _closeFrameQueued = false;
@@ -138,9 +183,13 @@ namespace Game.Api.Tests.Unit
                     return Task.FromResult(new WebSocketReceiveResult(0, WebSocketMessageType.Close, endOfMessage: true));
                 }
 
-                // No further scripted input: block so a (buggy) spinning loop would be observable as repeated
-                // receive attempts rather than a completed read.
-                return new TaskCompletionSource<WebSocketReceiveResult>().Task;
+                // No further scripted input: signal that the loop looped back to read, then block (cancellable by
+                // the read token so a test can tear down) so a (buggy) spinning loop would instead be observable
+                // as repeated receive attempts.
+                _idleReadReached.TrySetResult();
+                var idle = new TaskCompletionSource<WebSocketReceiveResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+                cancellationToken.Register(() => idle.TrySetCanceled(cancellationToken));
+                return idle.Task;
             }
 
             public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)

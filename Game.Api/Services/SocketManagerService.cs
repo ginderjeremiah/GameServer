@@ -131,11 +131,14 @@ namespace Game.Api.Services
         /// Extends the player's socket-presence TTL on connection activity, so a live socket keeps its
         /// presence key from expiring (see <see cref="SocketPresenceTtl"/>). Uses an expire (not a
         /// re-set) so it only ever prolongs the currently-registered socket's key and never resurrects a
-        /// key a newer connection has since taken over.
+        /// key a newer connection has since taken over. Fire-and-forget: presence refresh is best-effort
+        /// (a missed refresh simply lets the sliding TTL lapse), so it must neither throw on a transient
+        /// Redis fault — which would tear down the live read loop — nor add a serial round-trip to the
+        /// front of every inbound command.
         /// </summary>
-        private async Task RefreshSocketPresence(int playerId)
+        private void RefreshSocketPresence(int playerId)
         {
-            await _cache.Expire(CurrentSocketKey(playerId), SocketPresenceTtl);
+            _cache.ExpireAndForget(CurrentSocketKey(playerId), SocketPresenceTtl);
         }
 
         public Task UnRegisterSocket(SocketContext context)

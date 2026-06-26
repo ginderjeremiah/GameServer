@@ -170,7 +170,7 @@ namespace Game.Api.Tests.Integration
 
             var socket = new DrainableWebSocket(echoServerClose);
             var context = new SocketContext(socket, playerId: 1, session, contextLogger);
-            var handler = new SocketHandler(context, commandFactory, scopeFactory, handlerLogger, () => Task.CompletedTask);
+            var handler = new SocketHandler(context, commandFactory, scopeFactory, handlerLogger, () => { });
             return (socket, handler);
         }
 
