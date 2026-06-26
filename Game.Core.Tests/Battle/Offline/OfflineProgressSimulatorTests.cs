@@ -606,14 +606,14 @@ namespace Game.Core.Tests.Battle.Offline
 
         private static CoreClass MakeClass(
             int id, ClassSignaturePassive passive, params AttributeDistribution[] distributions) => new()
-        {
-            Id = id,
-            Name = $"Class {id}",
-            StarterSkillIds = [],
-            StarterEquipment = [],
-            AttributeDistributions = distributions,
-            SignaturePassive = passive,
-        };
+            {
+                Id = id,
+                Name = $"Class {id}",
+                StarterSkillIds = [],
+                StarterEquipment = [],
+                AttributeDistributions = distributions,
+                SignaturePassive = passive,
+            };
 
         private static ClassSignaturePassive NoopPassive() => new()
         {
