@@ -121,7 +121,7 @@ onMount(() => {
 	background: linear-gradient(
 		180deg,
 		color-mix(in srgb, var(--white) 4%, var(--surface)),
-		color-mix(in srgb, var(--surface) 85%, black)
+		color-mix(in srgb, var(--surface) 85%, var(--black))
 	);
 	box-shadow:
 		0 0 0 1px color-mix(in srgb, var(--black) 40%, transparent),

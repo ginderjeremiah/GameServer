@@ -96,7 +96,7 @@ const drawPerc = $derived((game.drawAcc / game.drawIntervalSec) * 100);
 }
 
 .combatant.enemy {
-	--bar-fill: linear-gradient(90deg, color-mix(in srgb, var(--enemy-accent) 70%, black), var(--enemy-accent));
+	--bar-fill: linear-gradient(90deg, color-mix(in srgb, var(--enemy-accent) 70%, var(--black)), var(--enemy-accent));
 	--bar-fill-shadow: 0 0 10px color-mix(in srgb, var(--enemy-accent) 50%, transparent);
 
 	.name {
