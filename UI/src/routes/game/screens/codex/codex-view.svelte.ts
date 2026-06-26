@@ -135,14 +135,18 @@ export interface EnemyChallengeVM {
 	completed: boolean;
 }
 
-export interface ZoneRowVM {
+/** The immutable per-zone fields (everything the rail row needs except the live progression status). */
+export interface ZoneProjectionVM {
 	id: number;
 	name: string;
 	band: string;
-	status: ZoneStatus;
 	/** Enemies (excluding the boss) that spawn in this zone. */
 	spawnCount: number;
 	hasBoss: boolean;
+}
+
+export interface ZoneRowVM extends ZoneProjectionVM {
+	status: ZoneStatus;
 }
 
 export interface ZoneBossVM {
@@ -311,10 +315,6 @@ export class CodexView {
 
 	readonly enemies = $derived(liveEnemies(staticData.enemies));
 
-	readonly filteredEnemies = $derived(
-		this.enemies.filter((e) => this.filter === 'all' || (this.filter === 'boss' ? e.isBoss : !e.isBoss))
-	);
-
 	/** Top-level tabs with live counts + section accents. */
 	readonly tabs = $derived.by<CodexTabVM[]>(() => {
 		const counts: Record<CodexTab, number> = {
@@ -331,32 +331,40 @@ export class CodexView {
 		}));
 	});
 
-	/** Enemy table rows for the active filter, narrowed by the search query and ordered by the
-	 *  active sort. The search/sort maths are the pure helpers in `codex-display`. */
-	readonly enemyRows = $derived.by<EnemyRowVM[]>(() => {
+	/** Immutable per-enemy view-models — depends only on reference data (enemies + zones), so the heavy
+	 *  projection (level band, the zone-name search haystack incl. the per-boss `zones.find`) is built
+	 *  once and reused, rather than rebuilt on every search keystroke / sort / filter change. */
+	readonly enemyProjections = $derived.by<EnemyRowVM[]>(() => {
 		const zones = staticData.zones ?? [];
-		return this.filteredEnemies
-			.map((e) => {
-				const range = levelRange(e, zones);
-				// Bosses don't populate `spawns`; resolve their encounter zone the same way the dossier
-				// does so a boss is findable by that zone name. Normal enemies use their spawn zones.
-				const zoneNames = e.isBoss
-					? [zones.find((z) => z?.bossEnemyId === e.id)?.name ?? '']
-					: e.spawns.map((sp) => zones[sp.zoneId]?.name ?? '');
-				return {
-					id: e.id,
-					name: e.name,
-					isBoss: e.isBoss,
-					band: formatBand(range),
-					level: range.min,
-					zoneCount: e.isBoss ? 1 : e.spawns.length,
-					skillCount: e.skillPool.length,
-					searchText: [e.name, enemyKindLabel(e.isBoss), ...zoneNames].join(' ').toLowerCase()
-				};
-			})
-			.filter((row) => matchesEnemySearch(row, this.search))
-			.sort(sortEnemyRows(this.sort));
+		return this.enemies.map((e) => {
+			const range = levelRange(e, zones);
+			// Bosses don't populate `spawns`; resolve their encounter zone the same way the dossier
+			// does so a boss is findable by that zone name. Normal enemies use their spawn zones.
+			const zoneNames = e.isBoss
+				? [zones.find((z) => z?.bossEnemyId === e.id)?.name ?? '']
+				: e.spawns.map((sp) => zones[sp.zoneId]?.name ?? '');
+			return {
+				id: e.id,
+				name: e.name,
+				isBoss: e.isBoss,
+				band: formatBand(range),
+				level: range.min,
+				zoneCount: e.isBoss ? 1 : e.spawns.length,
+				skillCount: e.skillPool.length,
+				searchText: [e.name, enemyKindLabel(e.isBoss), ...zoneNames].join(' ').toLowerCase()
+			};
+		});
 	});
+
+	/** Enemy table rows: the immutable projections narrowed by the active filter + search query and
+	 *  ordered by the active sort — the only work that reruns as the player types or re-sorts. The
+	 *  filter/search/sort maths are the pure helpers in `codex-display`. */
+	readonly enemyRows = $derived.by<EnemyRowVM[]>(() =>
+		this.enemyProjections
+			.filter((row) => this.filter === 'all' || (this.filter === 'boss' ? row.isBoss : !row.isBoss))
+			.filter((row) => matchesEnemySearch(row, this.search))
+			.sort(sortEnemyRows(this.sort))
+	);
 
 	/** Number of enemies shown under the active filter + search (the "N shown" readout). */
 	readonly shownCount = $derived(this.enemyRows.length);
@@ -487,19 +495,29 @@ export class CodexView {
 
 	readonly zones = $derived(liveZones(staticData.zones));
 
-	/** Zone rail rows: a status dot (cleared / unlocked / locked), the level band, the spawn-pool size
-	 *  and whether the zone has a dedicated boss. */
-	readonly zoneRows = $derived.by<ZoneRowVM[]>(() => {
+	/** Immutable per-zone view-models — depends only on reference data (zones + enemies). The spawn-pool
+	 *  count is O(zones×enemies), so it's built once here rather than rebuilt every time a zone's
+	 *  cleared/locked status changes (which happens continuously during idle play). */
+	readonly zoneProjections = $derived.by<ZoneProjectionVM[]>(() => {
 		const enemies = this.enemies;
 		return this.zones.map((z) => ({
 			id: z.id,
 			name: z.name,
 			band: formatBand({ min: z.levelMin, max: z.levelMax, fixed: false }),
-			status: resolveZoneStatus(statistics.isZoneCleared(z.id), this.isZoneLocked(z)),
 			spawnCount: enemies.filter((e) => e.spawns.some((s) => s.zoneId === z.id)).length,
 			hasBoss: z.bossEnemyId != null
 		}));
 	});
+
+	/** Zone rail rows: the immutable projections overlaid with each zone's live progression status
+	 *  (cleared / unlocked / locked) — the only part that reruns as zones clear or gates open. Zipped
+	 *  by index since `zoneProjections` and `zones` share the same authored order and length. */
+	readonly zoneRows = $derived.by<ZoneRowVM[]>(() =>
+		this.zones.map((z, i) => ({
+			...this.zoneProjections[i],
+			status: resolveZoneStatus(statistics.isZoneCleared(z.id), this.isZoneLocked(z))
+		}))
+	);
 
 	/* ── selected zone + dossier ────────────────────────────────────────────────── */
 

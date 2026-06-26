@@ -240,6 +240,25 @@ describe('CodexView enemy rows', () => {
 	});
 });
 
+describe('CodexView enemy projections', () => {
+	it('projects every enemy independent of the active filter, search and sort', () => {
+		const view = new CodexView();
+		// The immutable projection ignores the interaction state the thin `enemyRows` layers on top.
+		view.setFilter('boss');
+		view.search = 'griffin';
+		view.sort = 'name';
+		expect(view.enemyProjections.map((p) => p.id)).toEqual([0, 1, 2]);
+		expect(view.enemyProjections.find((p) => p.id === 2)).toMatchObject({
+			band: 'L10',
+			level: 10,
+			isBoss: true,
+			zoneCount: 1,
+			skillCount: 2
+		});
+		expect(view.enemyProjections.find((p) => p.id === 0)?.searchText).toContain('emberreach');
+	});
+});
+
 describe('CodexView enemy search', () => {
 	it('matches by name, case-insensitively', () => {
 		const view = new CodexView();
@@ -441,6 +460,29 @@ describe('CodexView zone rail', () => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		staticData.zones = staticData.zones.map((z: any) => ({ ...z, order: 3 - z.order }));
 		expect(new CodexView().zoneRows.map((r) => r.id)).toEqual([2, 1, 0]);
+	});
+});
+
+describe('CodexView zone projections', () => {
+	it('projects the immutable per-zone fields without the live status, in authored order', () => {
+		const rows = new CodexView().zoneProjections;
+		expect(rows.map((r) => r.id)).toEqual([0, 1, 2]);
+		expect(rows.find((r) => r.id === 1)).toEqual({
+			id: 1,
+			name: 'Ashfen Marsh',
+			band: '11–22',
+			spawnCount: 2,
+			hasBoss: false
+		});
+		// Status is the rail's reactive overlay, not part of the immutable projection.
+		expect(rows[0]).not.toHaveProperty('status');
+	});
+
+	it('stays stable when a zone is cleared or its gate opens (only the status overlay reacts)', () => {
+		const before = new CodexView().zoneProjections;
+		statistics.isZoneCleared.mockImplementation(() => true);
+		playerChallenges.all = [{ challengeId: 0, progress: 100, completed: true }];
+		expect(new CodexView().zoneProjections).toEqual(before);
 	});
 });
 
