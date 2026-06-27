@@ -11,14 +11,22 @@ interface Row extends Identified {
 	skillPool: number[];
 }
 
-const CATALOGUE: { id: number; name: string; baseDamage: number; retired?: boolean }[] = [
+interface SkillEntry {
+	id: number;
+	name: string;
+	baseDamage: number;
+	retired?: boolean;
+}
+
+const CATALOGUE: SkillEntry[] = [
 	{ id: 1, name: 'Cleave', baseDamage: 12 },
 	{ id: 2, name: 'Fireball', baseDamage: 25 },
 	{ id: 3, name: 'Heal', baseDamage: 0 },
 	{ id: 4, name: 'Smite', baseDamage: 18, retired: true }
 ];
 
-const section: ChipsSectionConfig<Row> = {
+// Declaring the catalogue entry type lets `metaOf` read `baseDamage` directly — no cast back in.
+const section: ChipsSectionConfig<Row, SkillEntry> = {
 	key: 'skills',
 	label: 'Skills',
 	glyph: 'rune',
@@ -26,7 +34,7 @@ const section: ChipsSectionConfig<Row> = {
 	itemsKey: 'skillPool',
 	catalogue: () => CATALOGUE,
 	labelOf: (e) => e.name,
-	metaOf: (e) => `${(e as unknown as { baseDamage: number }).baseDamage} dmg`,
+	metaOf: (e) => `${e.baseDamage} dmg`,
 	emptyIcon: 'rune',
 	emptyTitle: 'No skills in pool',
 	emptySub: "Enemies with no skills can't act.",

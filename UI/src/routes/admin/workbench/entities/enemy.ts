@@ -4,7 +4,7 @@ import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
-import type { EntityConfig } from './types';
+import { chipsSection, type EntityConfig } from './types';
 
 /** An enemy plus the zones it is the dedicated boss of, derived from the zones' boss FK. */
 export interface WorkbenchEnemy extends IEnemy {
@@ -112,7 +112,7 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 				{ key: 'amountPerLevel', label: 'Per Level', type: 'number', align: 'r', width: 110, allowNegative: true }
 			]
 		},
-		{
+		chipsSection<WorkbenchEnemy>()({
 			key: 'skills',
 			label: 'Skills',
 			glyph: 'rune',
@@ -126,12 +126,12 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 			catalogue: () =>
 				reference.skillCatalogue().map((s) => ({ ...s, addable: hasFlag(s.acquisition, ESkillAcquisition.Enemy) })),
 			labelOf: (s) => s.name,
-			metaOf: (s) => `${(s as unknown as { baseDamage: number }).baseDamage} dmg`,
+			metaOf: (s) => `${s.baseDamage} dmg`,
 			emptyIcon: 'rune',
 			emptyTitle: 'No skills in pool',
 			emptySub: "Enemies with no skills can't act in battle.",
 			addLabel: 'Add skill from pool…'
-		},
+		}),
 		{
 			key: 'spawns',
 			label: 'Spawns',
