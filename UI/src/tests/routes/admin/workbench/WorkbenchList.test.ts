@@ -125,4 +125,41 @@ describe('WorkbenchList', () => {
 		});
 		expect(container.querySelector('.spill.retired')).toBeNull();
 	});
+
+	// A nameless entity (e.g. a skill-synthesis recipe) carries no `name`; its row title and the search
+	// filter come from the `title(rec)` hook (driving `displayName`) instead.
+	const namelessConfig = (): EntityConfig<Identified> => ({
+		...makeConfig(),
+		// Derive the row title from a non-name field, the way the recipe editor derives it from its result
+		// skill (an empty derivation falls back to blankName, mirroring `title: (r) => resultName(r)`).
+		title: (rec) => (rec as { result?: string }).result ?? ''
+	});
+	const namelessSeed: Identified[] = [
+		{ id: 1, result: 'Lava' } as Identified,
+		{ id: 2, result: 'Steam' } as Identified
+	];
+
+	it('renders a nameless entity row from its title hook and falls back to blankName when empty', () => {
+		const store = new EntityStore(namelessConfig(), [...namelessSeed, { id: 3 } as Identified]);
+		render(WorkbenchList, {
+			props: { entity: namelessConfig(), store, selectedId: 1, onSelect: vi.fn(), onNew: vi.fn() }
+		});
+		const rows = screen.getAllByTestId('workbench-row');
+		expect(rows[0].textContent).toContain('Lava');
+		// The title hook returns '' (no result), so the row shows the blank-name placeholder instead.
+		expect(rows[2].querySelector('.blank')?.textContent).toBe('Unnamed');
+	});
+
+	it('filters a nameless entity by its derived title, not by name', async () => {
+		const store = new EntityStore(namelessConfig(), namelessSeed);
+		const { container } = render(WorkbenchList, {
+			props: { entity: namelessConfig(), store, selectedId: 1, onSelect: vi.fn(), onNew: vi.fn() }
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'steam' } });
+		flushSync();
+		const rows = screen.getAllByTestId('workbench-row');
+		expect(rows.length).toBe(1);
+		expect(rows[0].textContent).toContain('Steam');
+	});
 });

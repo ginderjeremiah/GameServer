@@ -18,7 +18,12 @@ export function fieldWarn<T>(field: FieldConfig<T>, rec: T): string | null {
 
 export function sectionWarnings<T>(section: SectionConfig<T>, rec: T): string[] {
 	if (section.kind === 'fields') {
-		return section.fields.map((f) => fieldWarn(f, rec)).filter((w): w is string => !!w);
+		// A fields section warns on each failing required field, plus an optional section-level `warn`
+		// for a cross-field rule the per-field `required` check can't express (e.g. a recipe result that
+		// resolves to a non-Synthesis or retired skill).
+		const fieldWarnings = section.fields.map((f) => fieldWarn(f, rec)).filter((w): w is string => !!w);
+		const sectionWarn = section.warn?.(rec);
+		return sectionWarn ? [...fieldWarnings, sectionWarn] : fieldWarnings;
 	}
 	if (section.warn) {
 		const message = section.warn(rec);
