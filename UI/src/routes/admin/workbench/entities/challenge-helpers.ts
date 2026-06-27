@@ -74,7 +74,13 @@ const STAT_UNIT: Record<EStatisticType, string> = {
 	[EStatisticType.PlayerDeaths]: 'deaths',
 	[EStatisticType.TotalBattleTime]: 'ms',
 	[EStatisticType.FastestVictory]: 'ms',
-	[EStatisticType.SkillsUsed]: 'skills'
+	[EStatisticType.SkillsUsed]: 'skills',
+	[EStatisticType.CriticalHits]: 'crits',
+	[EStatisticType.CriticalDamageDealt]: 'damage',
+	[EStatisticType.AttacksDodged]: 'dodges',
+	[EStatisticType.DamageDodged]: 'damage',
+	[EStatisticType.AttacksBlocked]: 'blocks',
+	[EStatisticType.DamageBlocked]: 'damage'
 };
 
 export const goalUnit = (c: IChallenge): string => {
