@@ -288,6 +288,67 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void GetImportTexts_Class_ReturnsSingleImport()
+        {
+            var descriptor = GetPropertyDescriptor<NestedModel>("Child");
+            Assert.Equal(["ISimpleModel"], CodeGenTypeFormatter.GetImportTexts(descriptor));
+        }
+
+        [Fact]
+        public void GetImportTexts_Primitive_ReturnsEmpty()
+        {
+            var descriptor = GetPropertyDescriptor<SimpleModel>("Name");
+            Assert.Empty(CodeGenTypeFormatter.GetImportTexts(descriptor));
+        }
+
+        [Fact]
+        public void GetImportTexts_ListOfClass_ReturnsElementImport()
+        {
+            var descriptor = GetPropertyDescriptor<ModelWithList>("Items");
+            Assert.Equal(["ISimpleModel"], CodeGenTypeFormatter.GetImportTexts(descriptor));
+        }
+
+        [Fact]
+        public void GetImportTexts_DictionaryWithPrimitiveKeyAndValue_ReturnsEmpty()
+        {
+            var descriptor = GetPropertyDescriptor<ModelWithDictionary>("StringToInt");
+            Assert.Empty(CodeGenTypeFormatter.GetImportTexts(descriptor));
+        }
+
+        [Fact]
+        public void GetImportTexts_DictionaryWithClassValue_ReturnsValueImport()
+        {
+            var descriptor = GetPropertyDescriptor<ModelWithDictionary>("StringToClass");
+            Assert.Equal(["ISimpleModel"], CodeGenTypeFormatter.GetImportTexts(descriptor));
+        }
+
+        [Fact]
+        public void GetImportTexts_DictionaryWithEnumKey_IncludesKeyImport()
+        {
+            // The key type is an enum that needs importing; the value is a primitive. The old value-only
+            // collection dropped the key, emitting a Record<TestEnum, number> with no TestEnum import.
+            var descriptor = GetPropertyDescriptor<ModelWithDictionary>("EnumToInt");
+            Assert.Equal(["TestEnum"], CodeGenTypeFormatter.GetImportTexts(descriptor));
+        }
+
+        [Fact]
+        public void GetImportTexts_DictionaryWithEnumKeyAndClassValue_IncludesBothImports()
+        {
+            var descriptor = GetPropertyDescriptor<ModelWithDictionary>("EnumToClass");
+            Assert.Equal(["TestEnum", "ISimpleModel"], CodeGenTypeFormatter.GetImportTexts(descriptor));
+        }
+
+        [Fact]
+        public void GetImportText_Multiple_DictionaryWithEnumKey_ImportsKeyType()
+        {
+            // End-to-end through the import-statement formatter: the enum key must appear in the emitted
+            // import list so the generated Record<TestEnum, number> reference resolves.
+            var descriptors = new[] { GetPropertyDescriptor<ModelWithDictionary>("EnumToInt") };
+            var result = CodeGenTypeFormatter.GetImportText(descriptors);
+            Assert.Contains("TestEnum", result);
+        }
+
+        [Fact]
         public void GetTypeText_UnmappedByte_Throws()
         {
             // byte has no TypeScript mapping and is rejected by NeedsInterface (it is a primitive), so the
