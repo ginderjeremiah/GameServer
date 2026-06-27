@@ -46,25 +46,31 @@
 		/>
 	</div>
 
-	{#if open === 'item'}
-		<RewardPicker
-			kind="item"
-			records={itemPickRecords}
-			currentId={challenge.rewardItemId}
-			claimed={claimedItems}
-			onPick={setItem}
-			onClose={() => (open = null)}
-		/>
-	{:else if open === 'mod'}
-		<RewardPicker
-			kind="mod"
-			records={modPickRecords}
-			currentId={challenge.rewardItemModId}
-			claimed={claimedMods}
-			onPick={setMod}
-			onClose={() => (open = null)}
-		/>
-	{/if}
+	<Popover
+		open={open !== null}
+		onClose={() => (open = null)}
+		label={open === 'mod' ? 'Select item mod reward' : 'Select item reward'}
+	>
+		{#if open === 'item'}
+			<RewardPicker
+				kind="item"
+				records={itemPickRecords}
+				currentId={challenge.rewardItemId}
+				claimed={claimedItems}
+				onPick={setItem}
+				onClose={() => (open = null)}
+			/>
+		{:else if open === 'mod'}
+			<RewardPicker
+				kind="mod"
+				records={modPickRecords}
+				currentId={challenge.rewardItemModId}
+				claimed={claimedMods}
+				onPick={setMod}
+				onClose={() => (open = null)}
+			/>
+		{/if}
+	</Popover>
 
 	{#if none}
 		<div class="ch-reward-warn">
@@ -76,6 +82,7 @@
 
 <script lang="ts">
 import { ERarity, type IChallenge } from '$lib/api';
+import { Popover } from '$components';
 import { reference } from '../../reference.svelte';
 import type { EntityStore } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';

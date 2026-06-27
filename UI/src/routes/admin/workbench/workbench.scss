@@ -1085,12 +1085,14 @@
 		margin-top: 5px;
 		font-style: italic;
 	}
+	// Centered overlay card (mounted in a Popover), so it owns a fixed width rather
+	// than the in-flow spacing it previously needed below the reward slots.
 	.ch-picker {
-		margin-top: 16px;
+		width: 720px;
+		max-width: 100%;
 		border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 		border-radius: 8px;
 		overflow: hidden;
-		max-width: 760px;
 		box-shadow: 0 12px 36px color-mix(in srgb, var(--black) 35%, transparent);
 	}
 	.ch-picker-bar {
