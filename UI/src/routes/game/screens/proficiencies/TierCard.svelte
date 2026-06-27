@@ -79,7 +79,7 @@ const reveal = $derived(decipherReveal(tier));
 </script>
 
 <style lang="scss">
-@use '../../../../styles/decipher-stage' as decipher;
+@use '$styles/decipher-stage' as decipher;
 
 .tier-row {
 	display: flex;

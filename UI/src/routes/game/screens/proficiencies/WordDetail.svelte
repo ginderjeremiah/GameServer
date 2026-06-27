@@ -114,7 +114,7 @@ const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.see
 </script>
 
 <style lang="scss">
-@use '../../../../styles/decipher-stage' as decipher;
+@use '$styles/decipher-stage' as decipher;
 
 .inspector {
 	flex: none;
