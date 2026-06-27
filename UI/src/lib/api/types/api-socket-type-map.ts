@@ -35,6 +35,7 @@ import type {
 	ISkill,
 	ISkillRecipe,
 	IStatisticType,
+	ISynthesisResult,
 	IZone
 } from './';
 
@@ -72,6 +73,7 @@ export type ApiSocketResponseTypes = {
 	'SetItemFavorite': undefined;
 	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;
+	'SynthesizeSkill': ISynthesisResult;
 	'UnequipItem': undefined;
 	'UpdatePlayerStats': IBattlerAttribute[];
 };
@@ -87,6 +89,7 @@ export type ApiSocketRequestTypes = {
 	'SetAutoChallengeBoss': boolean;
 	'SetItemFavorite': ISetItemFavoriteRequest;
 	'SetSelectedSkills': number[];
+	'SynthesizeSkill': number;
 	'UnequipItem': IEquipRequest;
 	'UpdatePlayerStats': IAttributeUpdate[];
 };

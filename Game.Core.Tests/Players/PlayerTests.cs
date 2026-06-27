@@ -912,7 +912,160 @@ namespace Game.Core.Tests.Players
             Assert.Empty(player.DomainEvents);
         }
 
+        // ── TrySynthesizeSkill ───────────────────────────────────────────────
+
+        [Fact]
+        public void TrySynthesizeSkill_AllInputsOwnedAndConditionsMet_UnlocksResultAndReturnsTrue()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2]);
+            player.ClearEvents();
+
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+
+            Assert.True(result);
+            Assert.Contains(player.Skills, s => s.Id == 7);
+            var evt = Assert.Single(player.DomainEvents.OfType<SkillUnlockedEvent>());
+            Assert.Equal(7, evt.SkillId);
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_IsNonConsumptive_InputsRemainUnlocked()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2]);
+
+            player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+
+            // Synthesis never consumes its inputs (spike #1125 decision 3): the inputs stay owned alongside the result.
+            Assert.Contains(player.Skills, s => s.Id == 1);
+            Assert.Contains(player.Skills, s => s.Id == 2);
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_RetiredRecipe_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2], isRetired: true);
+            player.ClearEvents();
+
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+
+            Assert.False(result);
+            Assert.DoesNotContain(player.Skills, s => s.Id == 7);
+            Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_MissingInput_ReturnsFalseAndRaisesNoEvent()
+        {
+            // The player owns only one of the two required inputs.
+            var player = MakePlayerWithUnlockedSkills(1);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2]);
+            player.ClearEvents();
+
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+
+            Assert.False(result);
+            Assert.DoesNotContain(player.Skills, s => s.Id == 7);
+            Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_InnateItemGrantedInputNotInUnlockedSet_IsRejected()
+        {
+            // Innate item-granted skills are derived at battle assembly and never live in Player.Skills, so an
+            // input the player holds only via an equipped item is absent from the unlocked set and rejected —
+            // this is exactly the missing-input path, which is what enforces "no equip-to-synthesize-then-unequip"
+            // (spike #1125 decision 6). Here input id 2 is not unlocked, standing in for such a grant.
+            var player = MakePlayerWithUnlockedSkills(1);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2]);
+            player.ClearEvents();
+
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_UnmetProficiencyCondition_ReturnsFalseAndRaisesNoEvent()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2],
+                conditions: [new RecipeCondition(ProficiencyId: 3, MinLevel: 5)]);
+            // The player is level 2 in proficiency 3 — below the required 5.
+            var levels = new Dictionary<int, int> { [3] = 2 };
+            player.ClearEvents();
+
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), levels);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_MissingProficiencyCountsAsLevelZero_RejectsAGatedRecipe()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2],
+                conditions: [new RecipeCondition(ProficiencyId: 3, MinLevel: 1)]);
+            player.ClearEvents();
+
+            // No row for proficiency 3 means level 0 — below the required 1, so the recipe is gated.
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_MetProficiencyCondition_Synthesizes()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2],
+                conditions: [new RecipeCondition(ProficiencyId: 3, MinLevel: 5)]);
+            // Level 5 meets the threshold exactly.
+            var levels = new Dictionary<int, int> { [3] = 5 };
+
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), levels);
+
+            Assert.True(result);
+            Assert.Contains(player.Skills, s => s.Id == 7);
+        }
+
+        [Fact]
+        public void TrySynthesizeSkill_RepeatSynthesize_IsIdempotentNoOp()
+        {
+            var player = MakePlayerWithUnlockedSkills(1, 2);
+            var recipe = MakeRecipe(resultSkillId: 7, inputSkillIds: [1, 2]);
+            player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+            player.ClearEvents();
+
+            // Re-synthesizing an already-owned result still validates, but the unlock is a no-op.
+            var result = player.TrySynthesizeSkill(recipe, MakeSkill(7), NoProficiencies);
+
+            Assert.True(result);
+            Assert.Single(player.Skills, s => s.Id == 7);
+            Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
+
+        private static readonly Dictionary<int, int> NoProficiencies = [];
+
+        private static SkillRecipe MakeRecipe(
+            int resultSkillId,
+            IReadOnlyList<int> inputSkillIds,
+            IReadOnlyList<RecipeCondition>? conditions = null,
+            bool isRetired = false) => new()
+            {
+                Id = 0,
+                ResultSkillId = resultSkillId,
+                InputSkillIds = inputSkillIds,
+                Conditions = conditions ?? [],
+                IsRetired = isRetired,
+            };
 
         private static Player MakePlayer(int level = 1, int exp = 0) =>
             new PlayerBuilder().WithLevel(level).WithExp(exp).Build();

@@ -35,7 +35,8 @@ namespace Game.Application.DependencyInjection
                 .AddScoped<ChallengeRewardService>()
                 .AddScoped<ProficiencyRewardService>()
                 .AddScoped<LoginTrackingService>()
-                .AddScoped<PlayerService>();
+                .AddScoped<PlayerService>()
+                .AddScoped<SynthesisService>();
         }
 
         public static void RegisterDomainEventHandlers()
