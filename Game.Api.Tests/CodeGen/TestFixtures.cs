@@ -115,6 +115,8 @@ namespace Game.Api.Tests.CodeGen
         public Dictionary<string, SimpleModel> StringToClass { get; set; } = [];
         public Dictionary<int, string> IntToString { get; set; } = [];
         public Dictionary<string, SimpleModel?> StringToNullableClass { get; set; } = [];
+        public Dictionary<TestEnum, int> EnumToInt { get; set; } = [];
+        public Dictionary<TestEnum, SimpleModel> EnumToClass { get; set; } = [];
     }
 
     [Route("/api/[controller]/[action]")]

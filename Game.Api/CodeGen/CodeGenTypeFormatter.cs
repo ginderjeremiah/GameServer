@@ -7,12 +7,40 @@ namespace Game.Api.CodeGen
     {
         public static string GetImportText(IEnumerable<CodeGenTypeDescriptor> typeDescriptors, string importPath = "./")
         {
-            var typeStrings = typeDescriptors.SelectNotNull(GetImportText).Distinct().OrderBy(t => t).ToList();
+            var typeStrings = typeDescriptors.SelectMany(GetImportTexts).Distinct().OrderBy(t => t).ToList();
             return typeStrings.Count > 3
                 ? $"import type {{{Environment.NewLine}\t{string.Join($",{Environment.NewLine}\t", typeStrings)}{Environment.NewLine}}} from '{importPath}';{Environment.NewLine}"
                 : $"import type {{ {string.Join(", ", typeStrings)} }} from '{importPath}';{Environment.NewLine}";
         }
 
+        /// <summary>
+        /// Every interface/enum import a descriptor's rendered TypeScript type requires, walking through
+        /// enumerable elements and <b>both</b> dictionary type arguments. A <c>Record&lt;K, V&gt;</c> names
+        /// both K and V, so an enum (or otherwise importable) key needs its import collected just like the
+        /// value — collecting only the value would emit an unimported reference and break the frontend build.
+        /// </summary>
+        public static IEnumerable<string> GetImportTexts(CodeGenTypeDescriptor descriptor)
+        {
+            if (descriptor.UnderlyingType.IsEnumerable())
+            {
+                if (descriptor.UnderlyingType.IsDictionary())
+                {
+                    return GetImportTexts(descriptor.GenericArgumentDescriptors[0])
+                        .Concat(GetImportTexts(descriptor.GenericArgumentDescriptors[1]));
+                }
+
+                return GetImportTexts(descriptor.GenericArgumentDescriptors[0]);
+            }
+
+            var leaf = GetLeafImportText(descriptor);
+            return leaf is null ? [] : [leaf];
+        }
+
+        /// <summary>
+        /// A single descriptor's own import name, used as a stable identity key by the interface writer's
+        /// de-duplication. Unlike <see cref="GetImportTexts"/> this collapses a dictionary to its value
+        /// import only, so it must not be used to collect the full import set (see <see cref="GetImportTexts"/>).
+        /// </summary>
         public static string? GetImportText(CodeGenTypeDescriptor descriptor)
         {
             if (descriptor.UnderlyingType.IsEnumerable())
@@ -24,7 +52,15 @@ namespace Game.Api.CodeGen
 
                 return GetImportText(descriptor.GenericArgumentDescriptors[0]);
             }
-            else if (descriptor.IsEnum)
+
+            return GetLeafImportText(descriptor);
+        }
+
+        // The import name for a single non-enumerable descriptor: its enum name, its I-prefixed interface
+        // name, or null when it maps to a primitive that needs no import.
+        private static string? GetLeafImportText(CodeGenTypeDescriptor descriptor)
+        {
+            if (descriptor.IsEnum)
             {
                 return descriptor.TypeName;
             }
