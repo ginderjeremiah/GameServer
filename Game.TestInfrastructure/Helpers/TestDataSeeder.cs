@@ -581,7 +581,6 @@ namespace Game.TestInfrastructure.Helpers
             decimal xpGrowth = 2m,
             int? pathId = null,
             int pathOrdinal = 0,
-            int? seedSkillId = null,
             string word = "",
             string pronunciation = "",
             string translation = "")
@@ -601,10 +600,8 @@ namespace Game.TestInfrastructure.Helpers
                 MaxLevel = maxLevel,
                 BaseXp = baseXp,
                 XpGrowth = xpGrowth,
-                SeedSkillId = seedSkillId,
                 LevelModifiers = [],
                 LevelRewards = [],
-                Prerequisites = [],
             };
 
             context.Proficiencies.Add(proficiency);
@@ -621,18 +618,6 @@ namespace Game.TestInfrastructure.Helpers
                 ProficiencyId = proficiencyId,
                 Level = level,
                 RewardSkillId = rewardSkillId,
-            });
-            await context.SaveChangesAsync();
-        }
-
-        // Adds a cross-path gateway edge: the proficiency opens once prerequisiteId is maxed.
-        public static async Task AddProficiencyPrerequisiteAsync(
-            GameContext context, int proficiencyId, int prerequisiteId)
-        {
-            context.Set<ProficiencyPrerequisite>().Add(new ProficiencyPrerequisite
-            {
-                ProficiencyId = proficiencyId,
-                PrerequisiteProficiencyId = prerequisiteId,
             });
             await context.SaveChangesAsync();
         }

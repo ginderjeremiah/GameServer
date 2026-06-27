@@ -38,7 +38,6 @@ const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdin
 	xpGrowth: 1,
 	levelModifiers: [],
 	levelRewards: [],
-	prerequisiteIds: [],
 	...o
 });
 

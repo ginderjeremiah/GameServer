@@ -437,16 +437,13 @@ describe('handleProficiencyXpGained', () => {
 		expect(addUnlockedSkill).toHaveBeenCalledWith(12);
 	});
 
-	it('toasts a newly-opened proficiency and unlocks its seed skill', () => {
+	it('toasts a newly-opened proficiency', () => {
 		staticDataStub.proficiencies = [];
 		staticDataStub.proficiencies[3] = { id: 3, name: 'Inferno Magic', levelRewards: [] };
-		staticDataStub.skills = [];
-		staticDataStub.skills[7] = { id: 7, name: 'Ember' };
 
-		handleProficiencyXpGained(proficiencyXpGainedResponse([], [{ proficiencyId: 3, seedSkillId: 7 }]));
+		handleProficiencyXpGained(proficiencyXpGainedResponse([], [{ proficiencyId: 3 }]));
 
-		expect(toastSuccess).toHaveBeenCalledWith('New proficiency unlocked: Inferno Magic — granted Ember');
-		expect(addUnlockedSkill).toHaveBeenCalledWith(7);
+		expect(toastSuccess).toHaveBeenCalledWith('New proficiency unlocked: Inferno Magic');
 	});
 
 	it('does nothing when the push carries no data', () => {

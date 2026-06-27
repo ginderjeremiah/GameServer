@@ -2,9 +2,8 @@ namespace Game.DataAccess.Repositories.Caching
 {
     /// <summary>
     /// Generic cycle detection over a directed graph expressed as an adjacency map (node → the nodes it points
-    /// to). Shared by the reference-data graphs that must be acyclic — the proficiency prerequisite graph
-    /// (<see cref="ProficiencyPrerequisiteGraph"/>) and the skill-recipe dependency graph
-    /// (<see cref="SkillRecipeGraph"/>) — both as an admin-authoring guard and as a build-time cache invariant.
+    /// to). Shared by the reference-data graphs that must be acyclic — currently the skill-recipe dependency
+    /// graph (<see cref="SkillRecipeGraph"/>) — both as an admin-authoring guard and as a build-time cache invariant.
     /// </summary>
     internal static class DirectedGraphCycleDetector
     {

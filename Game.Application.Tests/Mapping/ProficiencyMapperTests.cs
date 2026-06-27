@@ -49,10 +49,9 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
-        public void ToCore_MapsScalarFieldsAndPrerequisites()
+        public void ToCore_MapsScalarFields()
         {
-            var entity = NewProficiency(seedSkillId: 4);
-            entity.Prerequisites = [new() { ProficiencyId = 0, PrerequisiteProficiencyId = 2 }];
+            var entity = NewProficiency();
 
             var core = ProficiencyMapper.ToCore(entity);
 
@@ -63,8 +62,6 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(10, core.MaxLevel);
             Assert.Equal(100d, core.BaseXp);
             Assert.Equal(1.5d, core.XpGrowth);
-            Assert.Equal(4, core.SeedSkillId);
-            Assert.Equal([2], core.PrerequisiteIds);
         }
 
         [Fact]
@@ -132,7 +129,6 @@ namespace Game.Application.Tests.Mapping
         };
 
         private static Entities.Proficiency NewProficiency(
-            int? seedSkillId = null,
             List<Entities.ProficiencyLevelModifier>? modifiers = null,
             List<Entities.ProficiencyLevelReward>? rewards = null) => new()
             {
@@ -148,10 +144,8 @@ namespace Game.Application.Tests.Mapping
                 MaxLevel = 10,
                 BaseXp = 100m,
                 XpGrowth = 1.5m,
-                SeedSkillId = seedSkillId,
                 LevelModifiers = modifiers ?? [],
                 LevelRewards = rewards ?? [],
-                Prerequisites = [],
             };
     }
 }

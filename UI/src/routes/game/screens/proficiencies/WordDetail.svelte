@@ -1,7 +1,7 @@
 <!-- The word-detail inspector pane (#1218): the right column detailing the selected tier — a compact
      header (name + school + state pill), the tier's word of power illuminated by its decipher stage (the
      hover target driving the shared decipher tooltip), an XP progress bar, the per-level breakdown ladder
-     (each level's attribute payout + milestone reward skills), the seed skill, and the "Trained by" chips.
+     (each level's attribute payout + milestone reward skills), and the "Trained by" chips.
      All formatting/derivation lives in the pure `word-detail` module; this only resolves reference-data
      names from the live stores and renders. -->
 <aside class="inspector" data-testid="word-detail">
@@ -63,9 +63,6 @@
 		{/each}
 	</div>
 
-	<div class="section-head">Seed skill<span class="rule"></span></div>
-	<div class="seed" data-testid="seed-skill">{seedName ?? '—'}</div>
-
 	<div class="section-head">Trained by<span class="rule"></span></div>
 	<div class="chips" data-testid="trained-by">
 		{#if chips.length > 0}
@@ -110,7 +107,6 @@ const xpText = $derived(xpProgressText(tier));
 const reveal = $derived(decipherReveal(tier));
 const ladder = $derived(buildLadder(tier, staticData.attributes, resolveSkill));
 const chips = $derived(trainedBy(path.contributions, resolveSkill));
-const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.seedSkillId) : undefined);
 </script>
 
 <style lang="scss">
@@ -366,12 +362,6 @@ const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.see
 
 .rung.reached .ms-tag {
 	color: var(--gold);
-}
-
-.seed {
-	margin-top: 8px;
-	font-size: 15px;
-	color: var(--text-primary);
 }
 
 .chips {

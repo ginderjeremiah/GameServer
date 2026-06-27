@@ -4,8 +4,8 @@ namespace Game.Core.Proficiencies
     /// A proficiency definition — immutable, cached reference-data instance (init-only properties, read-only
     /// collections, mirroring <see cref="Skills.Skill"/>) so the shared cached instance can't be corrupted.
     /// Leveling, bonuses, and unlocks are wired up in later sub-issues; this model carries the authored
-    /// definition the gameplay layers read: the level cap, the XP-curve params, the per-level payouts
-    /// (<see cref="Levels"/>), the prerequisite tree edges, and the optional tree-seed skill.
+    /// definition the gameplay layers read: the level cap, the XP-curve params, and the per-level payouts
+    /// (<see cref="Levels"/>).
     /// </summary>
     public class Proficiency
     {
@@ -26,13 +26,6 @@ namespace Game.Core.Proficiencies
         /// sub-issue.</summary>
         public required double BaseXp { get; init; }
         public required double XpGrowth { get; init; }
-
-        /// <summary>Optional skill granted when this proficiency opens via the tree (a node with no world
-        /// skill source); null when seeded by an item/starter skill.</summary>
-        public required int? SeedSkillId { get; init; }
-
-        /// <summary>The proficiencies that must be maxed before this one opens.</summary>
-        public required IReadOnlyList<int> PrerequisiteIds { get; init; }
 
         /// <summary>The authored levels that carry a payout (a bonus and/or a reward skill), ascending by
         /// level. Sparse — a level with no authored payout is absent.</summary>

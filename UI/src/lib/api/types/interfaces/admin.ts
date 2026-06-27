@@ -89,11 +89,6 @@ export interface ISetProficiencyModifiersData {
 	modifiers: IProficiencyLevelModifier[];
 }
 
-export interface ISetProficiencyPrerequisitesData {
-	id: number;
-	prerequisiteIds: number[];
-}
-
 export interface ISetProficiencyRewardsData {
 	id: number;
 	rewards: IProficiencyLevelReward[];

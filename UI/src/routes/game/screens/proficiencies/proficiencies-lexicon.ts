@@ -2,16 +2,14 @@
 
    Reference data (`staticData.proficiencies` + `staticData.paths`) and the player's progress
    (`playerProficiencies`) are composed into per-path **spine** view-models: each path is a linear chain of
-   tiers (proficiencies) ordered by `pathOrdinal`, the tree's cross-path **gateways** being the
-   `prerequisiteIds` edges between spines. This module is framework-free so the whole state machine is
+   tiers (proficiencies) ordered by `pathOrdinal`. This module is framework-free so the whole state machine is
    unit-testable without rendering; the reactive `ProficienciesView` (proficiencies-view.svelte.ts) only
    wires these functions to the live stores and owns selection.
 
    Visibility is a client-side render choice (spike #982 decision 14): locked tiers are simply not drawn
-   (no teasers). The unlocked set is derived from player levels + the path/gateway structure the client
-   already holds — within a path a tier reveals once the tier before it (by `pathOrdinal`) is maxed;
-   cross-path it also needs every `prerequisiteId` maxed. A tampered client reading ahead is an accepted
-   non-goal. */
+   (no teasers). The unlocked set is derived from player levels + the path structure the client already
+   holds — within a path a tier reveals once the tier before it (by `pathOrdinal`) is maxed. A tampered
+   client reading ahead is an accepted non-goal. */
 
 import type { DescribedTooltipController } from '$components/tooltip/tooltip-hover';
 import type {
@@ -61,7 +59,6 @@ export interface TierView {
 	pronunciation: string;
 	translation: string;
 	iconPath: string;
-	seedSkillId?: number;
 }
 
 /** A discovered path, rendered as a rail entry and an ordered spine of visible tiers. */
@@ -154,8 +151,8 @@ export function buildLexicon(
 		openedIds.add(row.proficiencyId);
 	}
 
-	// The maxed set is global because gateways are cross-path; a tier is maxed once its level reaches the
-	// authored cap (only an opened tier can have a non-zero level, so no `opened` check is needed).
+	// A tier is maxed once its level reaches the authored cap (only an opened tier can have a non-zero
+	// level, so no `opened` check is needed).
 	const maxedIds = new Set<number>();
 	for (const prof of proficiencies) {
 		if ((levelById.get(prof.id) ?? 0) >= prof.maxLevel) {
@@ -223,19 +220,13 @@ function derivePathSpine(
 	firingSkills: ReadonlySet<number>
 ): TierView[] {
 	// Reachability builds a contiguous prefix from the root — a tier whose predecessor is un-maxed (so
-	// hidden) keeps every deeper tier hidden too. The root reveals when the path is discovered: a pure root
-	// has no structural gate (it opens by acquiring a contributing skill), so it needs a player row; a
-	// cross-path gateway root (with `prerequisiteIds`) also reveals once every prerequisite is maxed, the
-	// unlock moment, even before its seed row lands. A deeper tier reveals once the tier before it (by
-	// `pathOrdinal`) is maxed and any cross-path prerequisites are maxed.
+	// hidden) keeps every deeper tier hidden too. The root reveals when the path is discovered (it opens by
+	// acquiring a contributing skill, so it needs a player row); a deeper tier reveals once the tier before
+	// it (by `pathOrdinal`) is maxed.
 	const visible: IProficiency[] = [];
 	for (let i = 0; i < ordered.length; i++) {
 		const prof = ordered[i];
-		const prereqsMaxed = prof.prerequisiteIds.every((id) => maxedIds.has(id));
-		const reachable =
-			i === 0
-				? openedIds.has(prof.id) || (prof.prerequisiteIds.length > 0 && prereqsMaxed)
-				: maxedIds.has(ordered[i - 1].id) && prereqsMaxed;
+		const reachable = i === 0 ? openedIds.has(prof.id) : maxedIds.has(ordered[i - 1].id);
 		if (!reachable) {
 			break;
 		}
@@ -274,8 +265,7 @@ function derivePathSpine(
 			word: prof.word,
 			pronunciation: prof.pronunciation,
 			translation: prof.translation,
-			iconPath: prof.iconPath,
-			seedSkillId: prof.seedSkillId
+			iconPath: prof.iconPath
 		};
 	});
 }

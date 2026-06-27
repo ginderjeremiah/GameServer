@@ -60,8 +60,7 @@ const tiers = $derived(tiersOfPath(store.profs, pathId));
 const metaFor = (tier: WorkbenchProficiency): string => {
 	const milestones = tier.levelRewards.length;
 	const skills = (store.selectedPath?.contributions ?? []).filter((c) => c.homeTier === tier.pathOrdinal).length;
-	const gated = tier.prerequisiteIds.length > 0 ? ' · gated ✦' : '';
-	return `cap ${tier.maxLevel} · ${milestones} ${milestones === 1 ? 'milestone' : 'milestones'} · ${skills} ${skills === 1 ? 'skill' : 'skills'}${gated}`;
+	return `cap ${tier.maxLevel} · ${milestones} ${milestones === 1 ? 'milestone' : 'milestones'} · ${skills} ${skills === 1 ? 'skill' : 'skills'}`;
 };
 </script>
 

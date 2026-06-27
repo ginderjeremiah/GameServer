@@ -8,8 +8,8 @@ namespace Game.DataAccess.Mapping
 {
     internal static class ProficiencyMapper
     {
-        /// <summary>Maps an entity <see cref="EntityProficiency"/> (with its level modifiers, level rewards,
-        /// prerequisites, and skill contributions loaded) to the read/authoring contract.</summary>
+        /// <summary>Maps an entity <see cref="EntityProficiency"/> (with its level modifiers and level rewards
+        /// loaded) to the read/authoring contract.</summary>
         public static Contracts.Proficiency ToContract(EntityProficiency entity)
         {
             return new Contracts.Proficiency
@@ -26,7 +26,6 @@ namespace Game.DataAccess.Mapping
                 MaxLevel = entity.MaxLevel,
                 BaseXp = entity.BaseXp,
                 XpGrowth = entity.XpGrowth,
-                SeedSkillId = entity.SeedSkillId,
                 RetiredAt = entity.RetiredAt,
                 LevelModifiers = entity.LevelModifiers
                     .Select(m => new Contracts.ProficiencyLevelModifier
@@ -42,8 +41,6 @@ namespace Game.DataAccess.Mapping
                         Level = r.Level,
                         RewardSkillId = r.RewardSkillId,
                     }).ToList(),
-                PrerequisiteIds = entity.Prerequisites
-                    .Select(p => p.PrerequisiteProficiencyId).ToList(),
             };
         }
 
@@ -86,8 +83,6 @@ namespace Game.DataAccess.Mapping
                 MaxLevel = entity.MaxLevel,
                 BaseXp = (double)entity.BaseXp,
                 XpGrowth = (double)entity.XpGrowth,
-                SeedSkillId = entity.SeedSkillId,
-                PrerequisiteIds = entity.Prerequisites.Select(p => p.PrerequisiteProficiencyId).ToList(),
                 Levels = levels,
             };
         }

@@ -852,8 +852,7 @@ namespace Game.Application.Services
         /// skills granted (spike #982 decision 9 — the offline accrual's notification rides this summary).</summary>
         public required IReadOnlyList<ProficiencyXpResult> ProficiencyGains { get; init; }
 
-        /// <summary>The proficiency nodes opened over the window (a maxed tier's next tier or a newly-satisfied
-        /// gateway), each with the seed skill it granted (if any).</summary>
+        /// <summary>The proficiency nodes opened over the window (each a maxed tier's next tier within its path).</summary>
         public required IReadOnlyList<ProficiencyOpened> OpenedProficiencies { get; init; }
 
         /// <summary>

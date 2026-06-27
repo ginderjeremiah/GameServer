@@ -181,7 +181,7 @@ class WorkbenchReference {
 			keep
 		)
 	];
-	/** Active proficiencies (plus the current value if retired) — the cross-path prerequisite picker. */
+	/** Active proficiencies (plus the current value if retired) — the recipe condition picker. */
 	proficiencyOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.proficiencies ?? [], keep);
 	/**
 	 * Item equip-gate picker options: a "None" sentinel (-1) plus active proficiencies (the current value
@@ -193,7 +193,6 @@ class WorkbenchReference {
 		...this.retireableOptions(staticData.proficiencies ?? [], keep)
 	];
 	pathName = (id: number) => staticData.paths?.[id]?.name;
-	proficiencyName = (id: number) => staticData.proficiencies?.[id]?.name;
 
 	// ── Challenges ──
 	challengeTypeOptions = (): SelectOption[] => this.challengeTypes.map((t) => ({ value: t.id, text: t.name }));

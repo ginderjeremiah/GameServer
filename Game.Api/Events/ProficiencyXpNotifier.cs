@@ -37,7 +37,6 @@ namespace Game.Api.Events
                     .Select(opened => new ProficiencyOpenedModel
                     {
                         ProficiencyId = opened.ProficiencyId,
-                        SeedSkillId = opened.SeedSkillId,
                     })
                     .ToList(),
             };

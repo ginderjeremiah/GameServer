@@ -5,8 +5,8 @@ namespace Game.Infrastructure.Entities
     /// <c>docs/spikes/982-proficiency-system.md</c>). Static, authored reference data with a zero-based
     /// identity. Leveling and bonus/skill payouts are implemented in later sub-issues; this entity carries
     /// only the authored definition: its position in a <see cref="Path"/>, the level cap, the XP curve
-    /// params, the per-level bonus/skill payouts, and the cross-path prerequisite edges. Skill contributions
-    /// now hang off the owning <see cref="Path"/> (<see cref="Path.SkillContributions"/>), not the proficiency.
+    /// params, and the per-level bonus/skill payouts. Skill contributions now hang off the owning
+    /// <see cref="Path"/> (<see cref="Path.SkillContributions"/>), not the proficiency.
     /// </summary>
     public class Proficiency : IZeroBasedIdentityEntity
     {
@@ -45,18 +45,12 @@ namespace Game.Infrastructure.Entities
         public decimal BaseXp { get; set; }
         public decimal XpGrowth { get; set; }
 
-        /// <summary>Optional skill granted when this proficiency opens via the tree (a node with no world
-        /// skill source, e.g. a synthesized line). Null when the proficiency is seeded by an item/starter skill.</summary>
-        public int? SeedSkillId { get; set; }
-
         /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
         public DateTime? RetiredAt { get; set; }
 
-        public virtual Skill? SeedSkill { get; set; }
         public virtual Path Path { get => field ?? throw new NotLoadedException(nameof(Path)); set; }
 
         public virtual List<ProficiencyLevelModifier> LevelModifiers { get => field ?? throw new NotLoadedException(nameof(LevelModifiers)); set; }
         public virtual List<ProficiencyLevelReward> LevelRewards { get => field ?? throw new NotLoadedException(nameof(LevelRewards)); set; }
-        public virtual List<ProficiencyPrerequisite> Prerequisites { get => field ?? throw new NotLoadedException(nameof(Prerequisites)); set; }
     }
 }

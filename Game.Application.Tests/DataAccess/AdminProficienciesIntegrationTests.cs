@@ -109,29 +109,6 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task SaveProficiencies_SeedSkillNotPlayerAcquirable_ReturnsFailure()
-        {
-            int skillId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                skillId = (await SeedSkillAsync(context, ESkillAcquisition.Enemy)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
-
-            var result = admin.SaveProficiencies(
-            [
-                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Add, Item = NewProficiency(seedSkillId: skillId) },
-            ]);
-
-            Assert.False(result.Succeeded);
-            Assert.Contains("not flagged as Player-acquirable", result.ErrorMessage);
-        }
-
-        [Fact]
         public async Task SaveProficiencies_ReorderSwapsExistingOrdinals_IsAccepted()
         {
             // The regression a naive per-change cache probe would break: two existing tiers swap ordinals in one
@@ -417,8 +394,8 @@ namespace Game.Application.Tests.DataAccess
         public async Task SetRewards_LevelZero_ReturnsFailure()
         {
             // Unlike modifiers, a level-0 reward is rejected: a reward fires only by crossing a milestone
-            // (RewardSkillsCrossed uses l.Level > fromLevel), which a level-0 reward never does — the on-open
-            // grant is the proficiency's SeedSkillId. The level check fires before the skill id is resolved.
+            // (RewardSkillsCrossed uses l.Level > fromLevel), which a level-0 reward never does. The level
+            // check fires before the skill id is resolved.
             int proficiencyId;
             using (var seedScope = CreateScope())
             {
@@ -464,64 +441,6 @@ namespace Game.Application.Tests.DataAccess
             Assert.Contains("not flagged as Player-acquirable", result.ErrorMessage);
         }
 
-        [Fact]
-        public async Task SetPrerequisites_SelfReference_ReturnsFailure()
-        {
-            int proficiencyId;
-            using (var seedScope = CreateScope())
-            {
-                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
-
-            var result = admin.SetPrerequisites(new SetProficiencyPrerequisitesData
-            {
-                Id = proficiencyId,
-                PrerequisiteIds = [proficiencyId],
-            });
-
-            Assert.False(result.Succeeded);
-            Assert.Contains("cannot be its own prerequisite", result.ErrorMessage);
-        }
-
-        [Fact]
-        public async Task SetPrerequisites_WouldFormACycle_ReturnsFailure()
-        {
-            int gatedId, prerequisiteId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                var gated = await SeedProficiencyAsync(seedScope);
-                var prerequisite = await SeedProficiencyAsync(seedScope);
-                gatedId = gated.Id;
-                prerequisiteId = prerequisite.Id;
-
-                // gated already depends on prerequisite; making prerequisite depend on gated closes a cycle.
-                context.Set<Entities.ProficiencyPrerequisite>().Add(new Entities.ProficiencyPrerequisite
-                {
-                    ProficiencyId = gatedId,
-                    PrerequisiteProficiencyId = prerequisiteId,
-                });
-                await context.SaveChangesAsync(CancellationToken);
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
-
-            var result = admin.SetPrerequisites(new SetProficiencyPrerequisitesData
-            {
-                Id = prerequisiteId,
-                PrerequisiteIds = [gatedId],
-            });
-
-            Assert.False(result.Succeeded);
-            Assert.Contains("cycle", result.ErrorMessage);
-        }
-
         private async Task<Entities.Path> SeedPathAsync(IServiceScope scope)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -555,7 +474,6 @@ namespace Game.Application.Tests.DataAccess
                 XpGrowth = 2m,
                 LevelModifiers = [],
                 LevelRewards = [],
-                Prerequisites = [],
             };
             context.Proficiencies.Add(proficiency);
             await context.SaveChangesAsync(CancellationToken);
@@ -589,7 +507,7 @@ namespace Game.Application.Tests.DataAccess
             Amount = amount,
         };
 
-        private static Contracts.Proficiency NewProficiency(int id = 0, int? seedSkillId = null, string name = "Blades", int pathId = 0, int pathOrdinal = 0) => new()
+        private static Contracts.Proficiency NewProficiency(int id = 0, string name = "Blades", int pathId = 0, int pathOrdinal = 0) => new()
         {
             Id = id,
             Name = name,
@@ -603,10 +521,8 @@ namespace Game.Application.Tests.DataAccess
             MaxLevel = 10,
             BaseXp = 100m,
             XpGrowth = 2m,
-            SeedSkillId = seedSkillId,
             LevelModifiers = [],
             LevelRewards = [],
-            PrerequisiteIds = [],
         };
     }
 }

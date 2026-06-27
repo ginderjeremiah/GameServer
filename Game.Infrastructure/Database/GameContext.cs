@@ -62,7 +62,6 @@ namespace Game.Infrastructure.Database
         public DbSet<Proficiency> Proficiencies { get; set; }
         public DbSet<ProficiencyLevelModifier> ProficiencyLevelModifiers { get; set; }
         public DbSet<ProficiencyLevelReward> ProficiencyLevelRewards { get; set; }
-        public DbSet<ProficiencyPrerequisite> ProficiencyPrerequisites { get; set; }
         public DbSet<SkillPathContribution> SkillPathContributions { get; set; }
         public DbSet<StatisticType> StatisticTypes { get; set; }
         public DbSet<ItemModType> ItemModTypes { get; set; }
@@ -580,13 +579,6 @@ namespace Game.Infrastructure.Database
                 // schema and makes the home-tier → tier resolution unambiguous.
                 entity.HasIndex(p => new { p.PathId, p.PathOrdinal })
                     .IsUnique();
-
-                // Optional tree-seed skill. Clear the FK if the skill is ever removed (skills are retired,
-                // not deleted, so this never fires in practice).
-                entity.HasOne(p => p.SeedSkill)
-                    .WithMany()
-                    .HasForeignKey(p => p.SeedSkillId)
-                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ProficiencyLevelModifier>(entity =>
@@ -616,23 +608,6 @@ namespace Game.Infrastructure.Database
                 entity.HasOne(r => r.RewardSkill)
                     .WithMany()
                     .HasForeignKey(r => r.RewardSkillId)
-                    .OnDelete(DeleteBehavior.Restrict);
-            });
-
-            modelBuilder.Entity<ProficiencyPrerequisite>(entity =>
-            {
-                entity.HasKey(p => new { p.ProficiencyId, p.PrerequisiteProficiencyId });
-
-                entity.HasOne(p => p.Proficiency)
-                    .WithMany(prof => prof.Prerequisites)
-                    .HasForeignKey(p => p.ProficiencyId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                // The prerequisite side is a second FK to Proficiency; Restrict so the two FKs don't form a
-                // multiple-cascade-path ambiguity (a proficiency is retired, never deleted, regardless).
-                entity.HasOne(p => p.Prerequisite)
-                    .WithMany()
-                    .HasForeignKey(p => p.PrerequisiteProficiencyId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
 

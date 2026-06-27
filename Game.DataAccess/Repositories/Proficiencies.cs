@@ -66,12 +66,5 @@ namespace Game.DataAccess.Repositories
                 ? contributions
                 : [];
         }
-
-        public IReadOnlyList<int> DependentsOf(int proficiencyId)
-        {
-            return Snapshot.DependentsByProficiency.TryGetValue(proficiencyId, out var dependents)
-                ? dependents
-                : [];
-        }
     }
 }

@@ -202,19 +202,9 @@ describe('WordDetail — per-level ladder', () => {
 	});
 });
 
-/* ── seed skill + trained-by chips ─────────────────────────────────────────── */
+/* ── trained-by chips ──────────────────────────────────────────────────────── */
 
-describe('WordDetail — seed skill & trained-by chips', () => {
-	it('resolves the seed skill name', () => {
-		renderInspector(tierView({ id: 1, seedSkillId: 1 }));
-		expect(screen.getByTestId('seed-skill').textContent).toBe('Spark');
-	});
-
-	it('shows an em-dash when the tier has no seed skill', () => {
-		renderInspector(tierView({ id: 1, seedSkillId: undefined }));
-		expect(screen.getByTestId('seed-skill').textContent).toBe('—');
-	});
-
+describe('WordDetail — trained-by chips', () => {
 	it('renders a chip per distinct contributing skill name', () => {
 		const path = pathView({
 			contributions: [

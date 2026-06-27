@@ -49,7 +49,7 @@ namespace Game.Core.Proficiencies
         /// <summary>
         /// The tier immediately after <paramref name="ordinal"/> within the path (its
         /// <see cref="PathTier.Ordinal"/> + 1), or <c>null</c> when <paramref name="ordinal"/> is the last
-        /// tier. The within-path open trigger uses this: maxing a tier reveals and seeds the next one.
+        /// tier. The within-path open trigger uses this: maxing a tier reveals the next one.
         /// </summary>
         public PathTier? NextTier(int ordinal)
         {

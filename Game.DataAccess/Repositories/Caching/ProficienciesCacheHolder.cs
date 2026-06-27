@@ -28,8 +28,7 @@ namespace Game.DataAccess.Repositories.Caching
         IReadOnlyList<Path> Paths,
         IReadOnlyList<CoreProficiency> CoreProficiencies,
         IReadOnlyList<CorePath> CorePaths,
-        IReadOnlyDictionary<int, IReadOnlyList<SkillContribution>> ContributionsBySkill,
-        IReadOnlyDictionary<int, IReadOnlyList<int>> DependentsByProficiency);
+        IReadOnlyDictionary<int, IReadOnlyList<SkillContribution>> ContributionsBySkill);
 
     /// <summary>Singleton snapshot holder for the cached proficiency/path entity lists and their derived structures.</summary>
     internal sealed class ProficienciesCacheHolder(IServiceScopeFactory scopeFactory)
@@ -41,7 +40,6 @@ namespace Game.DataAccess.Repositories.Caching
                 .AsNoTracking()
                 .Include(p => p.LevelModifiers)
                 .Include(p => p.LevelRewards)
-                .Include(p => p.Prerequisites)
                 .AsSplitQuery()
                 .OrderBy(p => p.Id)
                 .ToListAsync(cancellationToken);
@@ -60,32 +58,6 @@ namespace Game.DataAccess.Repositories.Caching
                 .Where(path => path.RetiredAt is not null)
                 .Select(path => path.Id)
                 .ToHashSet();
-
-            // Build-time invariant: the authored prerequisite graph must be acyclic, since a cycle would
-            // soft-lock every node on it under the "open once prerequisites are maxed" rule. The admin save
-            // rejects a cycle before it commits; this is the backstop against a seed/migration mistake (it
-            // fails the build-then-swap, keeping the prior good snapshot or surfacing as a boot failure).
-            var prerequisiteGraph = entities.ToDictionary(
-                p => p.Id,
-                p => (IReadOnlyList<int>)p.Prerequisites.Select(pr => pr.PrerequisiteProficiencyId).ToList());
-            if (ProficiencyPrerequisiteGraph.TryFindCycle(prerequisiteGraph, out var cycle))
-            {
-                throw new InvalidOperationException(
-                    $"Proficiency prerequisite graph contains a cycle: {string.Join(" -> ", cycle)}.");
-            }
-
-            // The reverse prerequisite index the open logic consumes: each proficiency → the proficiencies that
-            // gate on it, so maxing a node can resolve the gateways it might open without rescanning the set.
-            // Proficiencies on a retired path are excluded from the gated side: a retired track is frozen (see
-            // contributionsBySkill below), so it must never be opened as a cross-path gateway and granted its
-            // seed skill when its live prerequisites max — mirroring the accrual freeze at the open choke point.
-            var dependentsByProficiency = entities
-                .Where(p => !retiredPathIds.Contains(p.PathId))
-                .SelectMany(p => p.Prerequisites.Select(pr => (Gated: p.Id, Prerequisite: pr.PrerequisiteProficiencyId)))
-                .GroupBy(x => x.Prerequisite)
-                .ToDictionary(
-                    g => g.Key,
-                    g => (IReadOnlyList<int>)g.Select(x => x.Gated).OrderBy(id => id).ToList());
 
             // The routing models: each path's falloff base plus its tiers ordered by ordinal (the proficiencies
             // carrying its id), so the accrual can resolve a contribution's frontier tier off the player's
@@ -131,8 +103,7 @@ namespace Game.DataAccess.Repositories.Caching
                 paths,
                 entities.Select(ProficiencyMapper.ToCore).ToList(),
                 corePaths,
-                contributionsBySkill,
-                dependentsByProficiency);
+                contributionsBySkill);
         }
     }
 }

@@ -40,8 +40,7 @@ const proficiency = (id: number, levelModifiers: IProficiency['levelModifiers'])
 	baseXp: 100,
 	xpGrowth: 1,
 	levelModifiers,
-	levelRewards: [],
-	prerequisiteIds: []
+	levelRewards: []
 });
 
 const additive = (level: number, attributeId: EAttribute, amount: number) => ({
@@ -158,7 +157,7 @@ describe('proficiencies store', () => {
 
 			playerProficiencies.applyXpGained({
 				proficiencies: [],
-				opened: [{ proficiencyId: 5, seedSkillId: 12 }]
+				opened: [{ proficiencyId: 5 }]
 			});
 
 			expect(playerProficiencies.all).toEqual([playerProficiency(5, 0, 0)]);

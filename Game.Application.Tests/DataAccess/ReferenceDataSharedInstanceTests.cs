@@ -120,7 +120,6 @@ namespace Game.Application.Tests.DataAccess
                     XpGrowth = 2m,
                     LevelModifiers = [],
                     LevelRewards = [],
-                    Prerequisites = [],
                 };
                 context.Proficiencies.Add(proficiency);
                 await context.SaveChangesAsync(CancellationToken);

@@ -22,11 +22,6 @@ namespace Game.Abstractions.DataAccess
         /// none — the reverse index the battle XP path consumes.</summary>
         public IReadOnlyList<SkillContribution> ContributionsForSkill(int skillId);
 
-        /// <summary>The proficiencies that name <paramref name="proficiencyId"/> as a prerequisite (the
-        /// cross-path gateways it gates), or empty if none — the reverse index the open logic consumes when a
-        /// proficiency is maxed to resolve which gateways might now open.</summary>
-        public IReadOnlyList<int> DependentsOf(int proficiencyId);
-
         /// <inheritdoc cref="IItems.VersionKey"/>
         public object VersionKey { get; }
     }

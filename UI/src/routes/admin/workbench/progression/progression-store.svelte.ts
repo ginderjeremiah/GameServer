@@ -15,13 +15,13 @@ import {
 	resolveNewIds,
 	tiersOfPath
 } from './progression-helpers';
-import { NO_SEED_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types';
+import { NO_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 export type RecordStatus = 'clean' | 'added' | 'modified';
 export type PathTab = 'identity' | 'tiers' | 'contrib';
-export type TierTab = 'identity' | 'xp' | 'milestones' | 'gateways';
+export type TierTab = 'identity' | 'xp' | 'milestones';
 
 /** Format a one-shot retire timestamp. Not reactive state — just an ISO string. */
 const nowIso = () => new Date().toISOString();
@@ -67,13 +67,12 @@ export class ProgressionStore {
 		}
 	}
 
-	/** Replace the working + baseline data from server truth, normalising the seed-skill sentinel. */
+	/** Replace the working + baseline data from server truth. */
 	private setData(paths: IPath[], profs: IProficiency[]) {
-		const normProfs: WorkbenchProficiency[] = profs.map((p) => ({ ...p, seedSkillId: p.seedSkillId ?? NO_SEED_SKILL }));
 		this.paths = paths.map(clone);
 		this.basePaths = paths.map(clone);
-		this.profs = normProfs.map(clone);
-		this.baseProfs = normProfs.map(clone);
+		this.profs = profs.map(clone);
+		this.baseProfs = profs.map(clone);
 		staticData.paths = paths;
 		staticData.proficiencies = profs;
 	}
@@ -355,11 +354,11 @@ export class ProgressionStore {
 		});
 	}
 
-	/** Upsert (skillId ≥ 0) or clear (NO_SEED_SKILL) the milestone reward skill at a level. */
+	/** Upsert (skillId ≥ 0) or clear (NO_SKILL) the milestone reward skill at a level. */
 	setReward(profId: number, level: number, skillId: number) {
 		this.patchProf(profId, (draft) => {
 			const others = draft.levelRewards.filter((r) => r.level !== level);
-			draft.levelRewards = skillId === NO_SEED_SKILL ? others : [...others, { level, rewardSkillId: skillId }];
+			draft.levelRewards = skillId === NO_SKILL ? others : [...others, { level, rewardSkillId: skillId }];
 		});
 	}
 
@@ -373,28 +372,6 @@ export class ProgressionStore {
 		this.patchProf(profId, (draft) => {
 			draft.levelModifiers = draft.levelModifiers.filter((m) => m.level !== level);
 			draft.levelRewards = draft.levelRewards.filter((r) => r.level !== level);
-		});
-	}
-
-	// ── Gateways (seed skill + cross-path prerequisites) ──
-
-	setSeedSkill(profId: number, skillId: number) {
-		this.patchProf(profId, (draft) => {
-			draft.seedSkillId = skillId;
-		});
-	}
-
-	addPrerequisite(profId: number, prerequisiteId: number) {
-		this.patchProf(profId, (draft) => {
-			if (!draft.prerequisiteIds.includes(prerequisiteId)) {
-				draft.prerequisiteIds = [...draft.prerequisiteIds, prerequisiteId];
-			}
-		});
-	}
-
-	removePrerequisite(profId: number, prerequisiteId: number) {
-		this.patchProf(profId, (draft) => {
-			draft.prerequisiteIds = draft.prerequisiteIds.filter((id) => id !== prerequisiteId);
 		});
 	}
 
@@ -448,7 +425,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 4. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
+			// 4. Resolve the persisted ids of newly-added proficiencies (for the child savers).
 			const freshProfs = await fetchSocketData('GetProficiencies');
 			const profIdMap = resolveNewIds(
 				freshProfs,
@@ -468,7 +445,7 @@ export class ProgressionStore {
 				}
 			}
 
-			// 6. Proficiency child collections — modifiers, rewards, and cross-path prerequisites.
+			// 6. Proficiency child collections — modifiers and rewards.
 			for (const prof of [...profDiff.added, ...profDiff.modified.map((m) => m.record)]) {
 				const baseline = baseProfMap[prof.id];
 				const id = resolveId(prof.id, profIdMap);
@@ -478,11 +455,6 @@ export class ProgressionStore {
 				}
 				if (childChanged(prof.levelRewards, baseline?.levelRewards)) {
 					await ApiRequest.post('AdminTools/SetProficiencyRewards', { id, rewards: prof.levelRewards });
-					committed = true;
-				}
-				if (childChanged(prof.prerequisiteIds, baseline?.prerequisiteIds)) {
-					const prerequisiteIds = prof.prerequisiteIds.map((pid) => resolveId(pid, profIdMap));
-					await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', { id, prerequisiteIds });
 					committed = true;
 				}
 			}

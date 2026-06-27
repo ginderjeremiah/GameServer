@@ -42,9 +42,9 @@ namespace Game.Core.Tests.Proficiencies
         }
 
         [Fact]
-        public void Split_FreshTierOnItsNativeSeed_TrainsAtFullPace()
+        public void Split_FreshTierOnItsNativeSkill_TrainsAtFullPace()
         {
-            // A freshly-opened tier trained on its native seed skill (home tier = the tier, falloff 1) trains at
+            // A freshly-opened tier trained on a native skill (home tier = the tier, falloff 1) trains at
             // full pace — never walled by being deep, the pull to fill the loadout with the new tier's natives.
             var slice = Assert.Single(Split(Pie, 1.0, [OnTier(3)]));
             Assert.Equal(3, slice.ProficiencyId);

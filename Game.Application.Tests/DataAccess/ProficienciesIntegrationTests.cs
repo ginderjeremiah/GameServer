@@ -48,7 +48,6 @@ namespace Game.Application.Tests.DataAccess
                     XpGrowth = 2m,
                     LevelModifiers = [],
                     LevelRewards = [],
-                    Prerequisites = [],
                 };
                 context.Proficiencies.Add(proficiency);
                 await context.SaveChangesAsync(CancellationToken);
@@ -258,7 +257,6 @@ namespace Game.Application.Tests.DataAccess
             XpGrowth = 2m,
             LevelModifiers = [],
             LevelRewards = [],
-            Prerequisites = [],
         };
 
         private async Task<Entities.Skill> SeedSkillAsync(GameContext context, ESkillAcquisition acquisition)

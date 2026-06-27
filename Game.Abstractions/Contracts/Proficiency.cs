@@ -23,15 +23,11 @@ namespace Game.Abstractions.Contracts
         public int MaxLevel { get; set; }
         public decimal BaseXp { get; set; }
         public decimal XpGrowth { get; set; }
-        public int? SeedSkillId { get; set; }
 
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).</summary>
         public DateTime? RetiredAt { get; set; }
 
         public required IEnumerable<ProficiencyLevelModifier> LevelModifiers { get; set; }
         public required IEnumerable<ProficiencyLevelReward> LevelRewards { get; set; }
-
-        /// <summary>Cross-path gateway prerequisites (within-path order is implicit in <see cref="PathOrdinal"/>).</summary>
-        public required IEnumerable<int> PrerequisiteIds { get; set; }
     }
 }

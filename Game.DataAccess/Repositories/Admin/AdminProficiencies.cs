@@ -1,7 +1,6 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
-using Game.DataAccess.Repositories.Caching;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -23,13 +22,6 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveProficiencies(IReadOnlyList<Change<Contracts.Proficiency>> changes)
         {
-            // Anti-tamper: a tree-seed skill is a permanent grant, so it must declare itself Player-acquirable
-            // (the flag is intent; this reference is reality). Rejected up front before anything is staged.
-            if (FindSeedSkillFlagViolation(changes) is { } rejection)
-            {
-                return rejection;
-            }
-
             // A proficiency is a tier of a path; the path it names must exist (the FK would also reject it,
             // but a named check fails the whole set cleanly before anything is staged).
             if (FindPathViolation(changes) is { } pathRejection)
@@ -60,7 +52,6 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
-                    SeedSkillId = item.SeedSkillId,
                 }),
                 edit: item => _entityStore.Update(new Entities.Proficiency
                 {
@@ -76,7 +67,6 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
-                    SeedSkillId = item.SeedSkillId,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
@@ -128,8 +118,7 @@ namespace Game.DataAccess.Repositories.Admin
             // A milestone reward only pays out at a reachable, crossable level, so reject one authored outside
             // 1..MaxLevel before the anti-tamper skill check. Unlike modifiers, level 0 is not allowed: a reward
             // is granted by crossing a milestone (Proficiency.RewardSkillsCrossed uses l.Level > fromLevel, and
-            // fromLevel is never below 0), so a level-0 reward could never fire — the on-open grant is the
-            // proficiency's SeedSkillId.
+            // fromLevel is never below 0), so a level-0 reward could never fire.
             if (FindLevelOutOfRange(proficiency, data.Rewards.Select(r => r.Level), "level reward", minLevel: 1) is { } levelRejection)
             {
                 return levelRejection;
@@ -157,53 +146,6 @@ namespace Game.DataAccess.Repositories.Admin
                 insert: r => _entityStore.Insert(ToRewardEntity(proficiency.Id, r)),
                 resourceName: "proficiency level reward",
                 update: r => _entityStore.Update(ToRewardEntity(proficiency.Id, r)));
-        }
-
-        public AdminSaveResult SetPrerequisites(SetProficiencyPrerequisitesData data)
-        {
-            var proficiency = _proficiencies.LookupProficiency(data.Id);
-            if (proficiency is null)
-            {
-                return AdminSaveResult.NotFound("Proficiency");
-            }
-
-            foreach (var prerequisiteId in data.PrerequisiteIds)
-            {
-                if (prerequisiteId == proficiency.Id)
-                {
-                    return AdminSaveResult.Failure("A proficiency cannot be its own prerequisite.");
-                }
-
-                if (_proficiencies.LookupProficiency(prerequisiteId) is null)
-                {
-                    return AdminSaveResult.Failure($"Prerequisite proficiency {prerequisiteId} does not exist.");
-                }
-            }
-
-            // Reject a prerequisite that would cycle (A needs B needs A), which would soft-lock both nodes.
-            // Build the prospective graph — every other proficiency's existing edges plus this one's desired
-            // set — and run full cycle detection before anything commits.
-            if (FindPrerequisiteCycle(proficiency.Id, data.PrerequisiteIds) is { } cycleRejection)
-            {
-                return cycleRejection;
-            }
-
-            return ChildCollectionReconciler.Reconcile(
-                existing: proficiency.Prerequisites,
-                desired: data.PrerequisiteIds,
-                existingKey: p => p.PrerequisiteProficiencyId,
-                desiredKey: id => id,
-                delete: p => _entityStore.Delete(new Entities.ProficiencyPrerequisite
-                {
-                    ProficiencyId = proficiency.Id,
-                    PrerequisiteProficiencyId = p.PrerequisiteProficiencyId,
-                }),
-                insert: id => _entityStore.Insert(new Entities.ProficiencyPrerequisite
-                {
-                    ProficiencyId = proficiency.Id,
-                    PrerequisiteProficiencyId = id,
-                }),
-                resourceName: "proficiency prerequisite");
         }
 
         private static Entities.ProficiencyLevelModifier ToModifierEntity(int proficiencyId, Contracts.ProficiencyLevelModifier modifier)
@@ -309,44 +251,6 @@ namespace Game.DataAccess.Repositories.Admin
                 {
                     return AdminSaveResult.Failure(
                         $"Proficiency {role} level {level} is out of range (must be between {minLevel} and the cap of {proficiency.MaxLevel}).");
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>Returns a rejection if setting <paramref name="proficiencyId"/>'s prerequisites to
-        /// <paramref name="desiredPrerequisiteIds"/> would introduce a cycle in the prerequisite graph, else
-        /// null. The prospective graph keeps every other proficiency's existing edges and overrides only this
-        /// node's.</summary>
-        private AdminSaveResult? FindPrerequisiteCycle(int proficiencyId, IReadOnlyList<int> desiredPrerequisiteIds)
-        {
-            var graph = _proficiencies.AllProficiencyEntities().ToDictionary(
-                p => p.Id,
-                p => (IReadOnlyList<int>)p.Prerequisites.Select(pr => pr.PrerequisiteProficiencyId).ToList());
-            graph[proficiencyId] = desiredPrerequisiteIds;
-
-            if (ProficiencyPrerequisiteGraph.TryFindCycle(graph, out var cycle))
-            {
-                return AdminSaveResult.Failure(
-                    $"These prerequisites would create a cycle: {string.Join(" -> ", cycle)}.");
-            }
-
-            return null;
-        }
-
-        private AdminSaveResult? FindSeedSkillFlagViolation(IReadOnlyList<Change<Contracts.Proficiency>> changes)
-        {
-            foreach (var change in changes)
-            {
-                if (change.ChangeType == EChangeType.Delete || change.Item.SeedSkillId is not { } skillId)
-                {
-                    continue;
-                }
-
-                if (CheckPlayerSkill(skillId, "seed skill") is { } rejection)
-                {
-                    return rejection;
                 }
             }
 

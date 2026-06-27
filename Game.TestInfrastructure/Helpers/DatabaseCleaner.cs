@@ -43,7 +43,6 @@ namespace Game.TestInfrastructure.Helpers
                     "Proficiencies",
                     "ProficiencyLevelModifiers",
                     "ProficiencyLevelRewards",
-                    "ProficiencyPrerequisites",
                     "SkillPathContributions"
                 RESTART IDENTITY CASCADE
                 """);

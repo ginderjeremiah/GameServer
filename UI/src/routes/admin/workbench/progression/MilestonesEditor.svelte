@@ -73,7 +73,7 @@
 		<div class="reward">
 			<ProgSelect
 				ariaLabel="Reward skill"
-				value={reward?.rewardSkillId ?? NO_SEED_SKILL}
+				value={reward?.rewardSkillId ?? NO_SKILL}
 				options={rewardOptions}
 				onChange={(v) => store.setReward(tier.id, sel, v)}
 			/>
@@ -102,7 +102,7 @@ import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import { reference } from '../reference.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
 import { cumulativeXp, modifiersAtLevel, rewardAtLevel } from './progression-helpers';
-import { NO_SEED_SKILL, type WorkbenchProficiency } from './types';
+import { NO_SKILL, type WorkbenchProficiency } from './types';
 import ProgSelect from './ProgSelect.svelte';
 import ProgNumber from './ProgNumber.svelte';
 

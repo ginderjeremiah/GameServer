@@ -10,8 +10,7 @@
 		tabs={[
 			{ key: 'identity', label: 'Identity · Conlang', warn: identityWarn },
 			{ key: 'xp', label: 'XP Curve', warn: xpWarn },
-			{ key: 'milestones', label: 'Milestones', count: payoutCount, dirty: milestonesDirty, warn: milestoneWarn },
-			{ key: 'gateways', label: 'Gateways', count: tier.prerequisiteIds.length, disabled: !isRoot }
+			{ key: 'milestones', label: 'Milestones', count: payoutCount, dirty: milestonesDirty, warn: milestoneWarn }
 		]}
 		activeTab={store.tierTab}
 		onTab={(k) => store.setTierTab(k as TierTab)}
@@ -49,11 +48,6 @@
 					></span>
 				</div>
 				<MilestonesEditor {store} {tier} />
-			{:else if store.tierTab === 'gateways'}
-				<div class="sec-title">
-					Gateways<span class="sub">— how this path is unlocked</span><span class="ln"></span>
-				</div>
-				<GatewaysEditor {store} {tier} />
 			{/if}
 		</div>
 	</div>
@@ -67,7 +61,6 @@ import DetailHeader from './DetailHeader.svelte';
 import ConlangIdentity from './ConlangIdentity.svelte';
 import XpCurve from './XpCurve.svelte';
 import MilestonesEditor from './MilestonesEditor.svelte';
-import GatewaysEditor from './GatewaysEditor.svelte';
 
 interface Props {
 	store: ProgressionStore;
@@ -77,7 +70,6 @@ const { store }: Props = $props();
 
 const tier = $derived(store.drilledTier);
 const baseline = $derived(tier ? store.profBaseline(tier.id) : undefined);
-const isRoot = $derived(tier?.pathOrdinal === 0);
 const payoutCount = $derived(tier ? payoutLevels(tier).length : 0);
 
 const identityWarn = $derived(

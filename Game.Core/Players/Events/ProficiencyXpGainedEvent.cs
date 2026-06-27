@@ -6,7 +6,7 @@ namespace Game.Core.Players.Events
     /// <summary>
     /// Raised when a won battle accrues proficiency XP (live path only — the offline batch suppresses it in
     /// favour of the welcome-back summary). Carries every proficiency the battle trained plus any nodes it
-    /// opened (a maxed tier's next tier or a newly-satisfied gateway), so the API layer can push one update to
+    /// opened (a maxed tier's next tier within its path), so the API layer can push one update to
     /// the connected client and a level-up, milestone, or unlock becomes visible immediately rather than only
     /// after a refresh — mirroring <see cref="ChallengeCompletedEvent"/>.
     /// </summary>

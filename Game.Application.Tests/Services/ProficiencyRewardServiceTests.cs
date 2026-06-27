@@ -15,10 +15,10 @@ namespace Game.Application.Tests.Services
 {
     /// <summary>
     /// The milestone-effect and proficiency-open triggers (spike #982 area D) layered on the XP accrual: a
-    /// crossed milestone grants its reward skill, maxing a tier opens (and seeds) the next tier in its path,
-    /// and a cross-path gateway opens once all its prerequisites are maxed. "Opened" itself is derived from
-    /// levels + structure, so the only persisted effects are the idempotent skill grants — verified here
-    /// against live DB-backed reference data, exactly as the battle-completion path runs.
+    /// crossed milestone grants its reward skill, and maxing a tier reveals the next tier in its path
+    /// (notification-only — no skill is granted on open). "Opened" itself is derived from levels + structure,
+    /// so the only persisted effect is the idempotent milestone skill grant — verified here against live
+    /// DB-backed reference data, exactly as the battle-completion path runs.
     /// </summary>
     [Collection("Integration")]
     public class ProficiencyRewardServiceTests : ApplicationIntegrationTestBase
@@ -68,26 +68,28 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task MaxingATier_OpensAndSeedsTheNextTierInItsPath()
+        public async Task MaxingATier_OpensTheNextTierInItsPath_GrantingNoSkill()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var path = await TestDataSeeder.CreatePathAsync(context);
-            // Tier 0 maxes on a single victory (cap 1, cost 1); tier 1 carries the seed skill granted on open.
+            // Tier 0 maxes on a single victory (cap 1, cost 1); maxing it reveals tier 1 (notification-only —
+            // no skill is granted on open now that synthesis provides the cross-path bootstrap).
             var tier0 = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
-            var seedSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Inferno Seed");
-            await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Inferno", maxLevel: 10, baseXp: 100m, pathId: path.Id, pathOrdinal: 1,
-                seedSkillId: seedSkill.Id);
+            var tier1 = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Inferno", maxLevel: 10, baseXp: 100m, pathId: path.Id, pathOrdinal: 1);
 
             var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, tier0.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
-            var (player, _) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
+            var (player, _) = await AccrueAsync(scope, playerId, firedSkillId, notify: true);
 
-            Assert.Contains(player.Skills, s => s.Id == seedSkill.Id);
+            var raised = Assert.Single(player.DomainEvents.OfType<ProficiencyXpGainedEvent>());
+            Assert.Equal(tier1.Id, Assert.Single(raised.Opened).ProficiencyId);
+            // Opening grants no skill: the player owns only the starter skill they fired.
+            Assert.Single(player.Skills);
         }
 
         [Fact]
@@ -113,86 +115,6 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task MaxingTheLastPrerequisite_OpensAndSeedsTheGatewayTier()
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-
-            // Two single-tier prerequisite proficiencies and a gated tier that opens once both are maxed.
-            var prereqA = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
-            var prereqB = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Earth", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
-            var gatewaySeed = await TestDataSeeder.CreateSkillAsync(context, name: "Lava Seed");
-            var gateway = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Lava", maxLevel: 10, baseXp: 100m, seedSkillId: gatewaySeed.Id);
-            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqA.Id);
-            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqB.Id);
-
-            // Prereq A is already maxed; this battle maxes prereq B, satisfying the gateway.
-            var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, prereqB.Id);
-            await TestDataSeeder.AddPlayerProficiencyAsync(context, playerId, prereqA.Id, level: 1);
-            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
-
-            var (player, _) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
-
-            Assert.Contains(player.Skills, s => s.Id == gatewaySeed.Id);
-        }
-
-        [Fact]
-        public async Task MaxingOnePrerequisite_DoesNotOpenAGatewayStillMissingAnother()
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-
-            var prereqA = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
-            var prereqB = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Earth", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
-            var gatewaySeed = await TestDataSeeder.CreateSkillAsync(context, name: "Lava Seed");
-            var gateway = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Lava", maxLevel: 10, baseXp: 100m, seedSkillId: gatewaySeed.Id);
-            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqA.Id);
-            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqB.Id);
-
-            // Prereq A is left un-maxed, so maxing B alone must not open the gateway.
-            var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, prereqB.Id);
-            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
-
-            var (player, _) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
-
-            Assert.DoesNotContain(player.Skills, s => s.Id == gatewaySeed.Id);
-        }
-
-        [Fact]
-        public async Task MaxingThePrerequisitesOfARetiredGateway_DoesNotOpenOrSeedIt()
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-
-            // The gateway tier lives on a retired (frozen) path; its prerequisites are on live paths. Maxing
-            // both prerequisites here would open and seed the gateway if it were live, but a retired track must
-            // never be granted via the open logic — so its seed skill is not granted.
-            var prereqA = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
-            var prereqB = await TestDataSeeder.CreateProficiencyAsync(context, name: "Adv Earth", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
-            var retiredPath = await TestDataSeeder.CreatePathAsync(context, name: "Retired Lava", retiredAt: DateTime.UtcNow);
-            var gatewaySeed = await TestDataSeeder.CreateSkillAsync(context, name: "Lava Seed");
-            var gateway = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Lava", maxLevel: 10, baseXp: 100m, pathId: retiredPath.Id, pathOrdinal: 0,
-                seedSkillId: gatewaySeed.Id);
-            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqA.Id);
-            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, gateway.Id, prereqB.Id);
-
-            // Prereq A is already maxed; this battle maxes prereq B, which would otherwise satisfy the gateway.
-            var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, prereqB.Id);
-            await TestDataSeeder.AddPlayerProficiencyAsync(context, playerId, prereqA.Id, level: 1);
-            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
-
-            var (player, results) = await AccrueAsync(scope, playerId, firedSkillId, notify: false);
-
-            // Prereq B genuinely maxed (so the gateway's prerequisites are all satisfied) — what's suppressed is
-            // the gateway open, not a dead accrual.
-            Assert.Equal(1, Assert.Single(results).NewLevel);
-            Assert.DoesNotContain(player.Skills, s => s.Id == gatewaySeed.Id);
-        }
-
-        [Fact]
         public async Task LivePath_RaisesTheEventCarryingGrantedSkillsAndOpenedTiers()
         {
             using var scope = CreateScope();
@@ -201,13 +123,11 @@ namespace Game.Application.Tests.Services
             var path = await TestDataSeeder.CreatePathAsync(context);
             var tier0 = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
-            // A milestone at the cap grants a reward skill, and maxing opens the seeded next tier.
+            // A milestone at the cap grants a reward skill, and maxing opens the next tier (notification-only).
             var rewardSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Reward");
             await TestDataSeeder.AddProficiencyLevelRewardAsync(context, tier0.Id, level: 1, rewardSkill.Id);
-            var seedSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Inferno Seed");
             var tier1 = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Inferno", maxLevel: 10, baseXp: 100m, pathId: path.Id, pathOrdinal: 1,
-                seedSkillId: seedSkill.Id);
+                context, name: "Inferno", maxLevel: 10, baseXp: 100m, pathId: path.Id, pathOrdinal: 1);
 
             var (playerId, firedSkillId) = await SeedPlayerWithFiringSkillAsync(context, tier0.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
@@ -216,9 +136,7 @@ namespace Game.Application.Tests.Services
 
             var raised = Assert.Single(player.DomainEvents.OfType<ProficiencyXpGainedEvent>());
             Assert.Equal([rewardSkill.Id], Assert.Single(raised.Results).GrantedSkillIds);
-            var opened = Assert.Single(raised.Opened);
-            Assert.Equal(tier1.Id, opened.ProficiencyId);
-            Assert.Equal(seedSkill.Id, opened.SeedSkillId);
+            Assert.Equal(tier1.Id, Assert.Single(raised.Opened).ProficiencyId);
         }
 
         [Fact]

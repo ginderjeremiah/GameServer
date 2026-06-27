@@ -58,7 +58,6 @@ export interface IPlayerStatistic {
 
 export interface IProficiencyOpenedModel {
 	proficiencyId: number;
-	seedSkillId?: number;
 }
 
 export interface IProficiencyXpGainedModel {

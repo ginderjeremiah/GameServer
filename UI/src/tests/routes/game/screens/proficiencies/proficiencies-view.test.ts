@@ -45,7 +45,6 @@ const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdin
 	xpGrowth: 1,
 	levelModifiers: [],
 	levelRewards: [],
-	prerequisiteIds: [],
 	...o
 });
 
@@ -62,14 +61,14 @@ const contrib = (skillId: number, homeTier = 0, weight = 1): ISkillPathContribut
 
 /* A multi-path scenario reused across the state-derivation tests:
      · path 0 "Pyromancy"  — Fire(maxed) → Inferno(lvl6, frontier) → Pyroclasm(hidden), fed by skill 100
-     · path 1 "Lava"       — a gateway root gated on Inferno (id 1) being maxed
+     · path 1 "Lava"       — an undiscovered root (no player row in the base progress)
      · path 2 "Blade"      — Sword(maxLevel 5, maxed) → Blade(revealed at lvl 0), fed by skill 200
      · path 3 "Retired"    — a retired path, excluded entirely */
 const PROFICIENCIES: IProficiency[] = [
 	prof({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire' }),
 	prof({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Inferno' }),
 	prof({ id: 2, pathId: 0, pathOrdinal: 2, name: 'Pyroclasm' }),
-	prof({ id: 3, pathId: 1, pathOrdinal: 0, name: 'Lava', prerequisiteIds: [1] }),
+	prof({ id: 3, pathId: 1, pathOrdinal: 0, name: 'Lava' }),
 	prof({ id: 4, pathId: 2, pathOrdinal: 0, name: 'Sword', maxLevel: 5 }),
 	prof({ id: 5, pathId: 2, pathOrdinal: 1, name: 'Blade' }),
 	prof({ id: 6, pathId: 3, pathOrdinal: 0, name: 'Retired tier' })
@@ -194,7 +193,7 @@ describe('buildLexicon — grouping & discovery', () => {
 	});
 
 	it('returns only discovered paths, ordered by id', () => {
-		// Pyromancy + Blade are discovered; Lava is undiscovered (gateway not met) and Retired is filtered.
+		// Pyromancy + Blade are discovered; Lava is undiscovered (no player row) and Retired is filtered.
 		expect(build().map((p) => p.id)).toEqual([0, 2]);
 	});
 
@@ -321,27 +320,21 @@ describe('buildLexicon — decipher stage & progress', () => {
 	});
 });
 
-/* ── buildLexicon: gateway reachability ────────────────────────────────────── */
+/* ── buildLexicon: root discovery ──────────────────────────────────────────── */
 
-describe('buildLexicon — gateway reachability', () => {
-	it('hides a gateway root until every prerequisite is maxed', () => {
-		// Base: Inferno is level 6, so the Lava gateway (prereq id 1) is unmet → Lava undiscovered.
+describe('buildLexicon — root discovery', () => {
+	it('hides a root path with no player row', () => {
+		// Lava has no contributing skill and no player row → undiscovered.
 		expect(byId(build(), 1)).toBeUndefined();
 	});
 
-	it('reveals a gateway root once its prerequisites are maxed, even without a player row', () => {
-		const lexicon = build({ player: [row(0, 10), row(1, 10), row(4, 5)] });
+	it('reveals a root path once it has a player row, carrying its progress', () => {
+		const lexicon = build({ player: [...PROGRESS, row(3, 2, 10)] });
 		const lava = byId(lexicon, 1);
 		expect(lava).toBeDefined();
 		expect(lava?.tiers.map((t) => t.id)).toEqual([3]);
-		expect(tier(lexicon, 1, 3)?.level).toBe(0);
-		expect(tier(lexicon, 1, 3)?.frontier).toBe(true);
-	});
-
-	it('keeps an already-opened gateway root visible to preserve its progress', () => {
-		// Lava opened (row present) even though its prerequisite (Inferno) is not yet maxed.
-		const lexicon = build({ player: [...PROGRESS, row(3, 2, 10)] });
 		expect(tier(lexicon, 1, 3)?.level).toBe(2);
+		expect(tier(lexicon, 1, 3)?.frontier).toBe(true);
 	});
 });
 

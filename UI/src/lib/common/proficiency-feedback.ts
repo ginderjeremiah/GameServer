@@ -23,9 +23,8 @@ export function proficiencyMilestoneMessage(proficiencyName: string, level: numb
 	return skillName ? `${base} — unlocked ${skillName}` : base;
 }
 
-/** Announces a newly-opened proficiency, naming the seed skill granted with it when present (a node
- *  opened via a world skill carries no seed skill). Used for both the toast and the log. */
-export function proficiencyOpenedMessage(proficiencyName: string, seedSkillName?: string): string {
-	const base = `New proficiency unlocked: ${proficiencyName}`;
-	return seedSkillName ? `${base} — granted ${seedSkillName}` : base;
+/** Announces a newly-opened proficiency (a maxed tier's next tier within its path). Used for both the
+ *  toast and the log. */
+export function proficiencyOpenedMessage(proficiencyName: string): string {
+	return `New proficiency unlocked: ${proficiencyName}`;
 }
