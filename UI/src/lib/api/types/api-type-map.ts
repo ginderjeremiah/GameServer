@@ -41,10 +41,13 @@ import type {
 	ISetProficiencyPrerequisitesData,
 	ISetProficiencyRewardsData,
 	ISetSkillEffectsData,
+	ISetSkillRecipeConditionsData,
+	ISetSkillRecipeInputsData,
 	ISetTagsData,
 	ISetUserRolesData,
 	ISetZoneEnemiesData,
 	ISkill,
+	ISkillRecipe,
 	ITag,
 	ITagCategory,
 	IUserActionData,
@@ -62,6 +65,7 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditItems': undefined;
 	'AdminTools/AddEditPaths': undefined;
 	'AdminTools/AddEditProficiencies': undefined;
+	'AdminTools/AddEditSkillRecipes': undefined;
 	'AdminTools/AddEditSkills': undefined;
 	'AdminTools/AddEditTags': undefined;
 	'AdminTools/AddEditZones': undefined;
@@ -83,6 +87,8 @@ export type ApiResponseTypes = {
 	'AdminTools/SetProficiencyRewards': undefined;
 	'AdminTools/SetSkillEffects': undefined;
 	'AdminTools/SetSkillMultipliers': undefined;
+	'AdminTools/SetSkillRecipeConditions': undefined;
+	'AdminTools/SetSkillRecipeInputs': undefined;
 	'AdminTools/SetTagsForItem': undefined;
 	'AdminTools/SetTagsForItemMod': undefined;
 	'AdminTools/SetUserRoles': undefined;
@@ -114,6 +120,7 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditItems': IChange<IItem>[];
 	'AdminTools/AddEditPaths': IChange<IPath>[];
 	'AdminTools/AddEditProficiencies': IChange<IProficiency>[];
+	'AdminTools/AddEditSkillRecipes': IChange<ISkillRecipe>[];
 	'AdminTools/AddEditSkills': IChange<ISkill>[];
 	'AdminTools/AddEditTags': IChange<ITag>[];
 	'AdminTools/AddEditZones': IChange<IZone>[];
@@ -134,6 +141,8 @@ export type ApiRequestTypes = {
 	'AdminTools/SetProficiencyRewards': ISetProficiencyRewardsData;
 	'AdminTools/SetSkillEffects': ISetSkillEffectsData;
 	'AdminTools/SetSkillMultipliers': IAddEditAttributesData;
+	'AdminTools/SetSkillRecipeConditions': ISetSkillRecipeConditionsData;
+	'AdminTools/SetSkillRecipeInputs': ISetSkillRecipeInputsData;
 	'AdminTools/SetTagsForItem': ISetTagsData;
 	'AdminTools/SetTagsForItemMod': ISetTagsData;
 	'AdminTools/SetUserRoles': ISetUserRolesData;
