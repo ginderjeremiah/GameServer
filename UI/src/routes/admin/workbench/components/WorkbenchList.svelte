@@ -24,6 +24,7 @@
 			{@const state = store.stateOf(record)}
 			{@const status = state.status}
 			{@const warns = state.warnings}
+			{@const title = displayName(record)}
 			{@const badge = entity.listBadge?.(record)}
 			{@const edge =
 				status === 'added'
@@ -53,7 +54,7 @@
 				<div class="row-body">
 					<div class="row-top">
 						<span class="row-name" class:selected={record.id === selectedId} class:struck={status === 'deleted'}>
-							{#if record.name}{record.name}{:else}<span class="blank">{entity.blankName}</span>{/if}
+							{#if title}{title}{:else}<span class="blank">{entity.blankName}</span>{/if}
 						</span>
 						{#if badge}
 							<span class="rare-tag" style:color={entity.badgeColor?.(record) ?? 'var(--text-secondary)'}>{badge}</span>
@@ -95,8 +96,11 @@ interface Props {
 
 const { entity, store, selectedId, onSelect, onNew }: Props = $props();
 
+/** The row label: the entity's live `title` hook (for a nameless entity) falling back to the stored name. */
+const displayName = (record: Identified): string => entity.title?.(record) || record.name || '';
+
 let q = $state('');
-const filtered = $derived(store.items.filter((it) => (it.name ?? '').toLowerCase().includes(q.toLowerCase())));
+const filtered = $derived(store.items.filter((it) => displayName(it).toLowerCase().includes(q.toLowerCase())));
 const liveCount = $derived(store.items.filter((it) => store.stateOf(it).status !== 'deleted').length);
 </script>
 

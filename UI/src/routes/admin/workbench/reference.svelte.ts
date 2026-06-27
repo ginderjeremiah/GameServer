@@ -149,6 +149,22 @@ class WorkbenchReference {
 			acquisition: s.acquisition,
 			retired: !!s.retiredAt
 		}));
+	/**
+	 * Synthesis recipe result-skill picker: active skills flagged {@link ESkillAcquisition.Synthesis}
+	 * (a hard block on a non-Synthesis result, mirroring the backend authoring guard). The current value
+	 * stays visible even if it lost the flag or was retired, so an already-authored result isn't silently
+	 * dropped — the recipe editor surfaces that stale value as a warning instead.
+	 */
+	synthesisResultSkillOptions = (keep?: number): SelectOption[] =>
+		this.retireableOptions(
+			(staticData.skills ?? []).filter((s) => hasFlag(s.acquisition, ESkillAcquisition.Synthesis) || s.id === keep),
+			keep
+		);
+	/** Whether a skill id resolves to a live (non-retired) Synthesis-flagged skill — a valid recipe result. */
+	isSynthesisResult = (id: number): boolean => {
+		const skill = staticData.skills?.[id];
+		return !!skill && !skill.retiredAt && hasFlag(skill.acquisition, ESkillAcquisition.Synthesis);
+	};
 
 	// ── Progression (paths & proficiencies) ──
 	/** Any active skill (plus the current value if retired) — the contribution skill picker. */

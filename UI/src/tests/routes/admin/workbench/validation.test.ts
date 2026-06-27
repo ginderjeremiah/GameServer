@@ -58,6 +58,23 @@ describe('sectionWarnings', () => {
 		expect(sectionWarnings(entity.sections[1], { id: 1, name: 'x', icon: 'x', rows: [] })).toEqual(['No rows']);
 		expect(sectionWarnings(entity.sections[1], { id: 1, name: 'x', icon: 'x', rows: [1] })).toEqual([]);
 	});
+
+	it('also surfaces a fields section warn (a cross-field rule), after its field warns', () => {
+		const section = {
+			key: 'identity',
+			label: 'Identity',
+			glyph: 'tag',
+			kind: 'fields',
+			fields: [nameField],
+			warn: (t: Thing) => (t.icon ? null : 'No icon set')
+		} as unknown as EntityConfig<Thing>['sections'][number];
+		// Both the failing required field and the section warn surface, field warns first.
+		expect(sectionWarnings(section, { id: 1, name: '', icon: '', rows: [] })).toEqual(['Missing name', 'No icon set']);
+		// Section warn alone when the required field passes.
+		expect(sectionWarnings(section, { id: 1, name: 'Ok', icon: '', rows: [] })).toEqual(['No icon set']);
+		// Neither when both pass.
+		expect(sectionWarnings(section, { id: 1, name: 'Ok', icon: 'x', rows: [] })).toEqual([]);
+	});
 });
 
 describe('entityWarnings', () => {
