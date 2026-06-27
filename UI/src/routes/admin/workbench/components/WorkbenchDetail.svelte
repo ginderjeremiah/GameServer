@@ -12,11 +12,12 @@
 	{@const status = store.status(record)}
 	{@const badge = entity.listBadge?.(record)}
 	{@const curSection = entity.sections.find((s) => s.key === tab) ?? entity.sections[0]}
+	{@const title = entity.title?.(record) || record.name}
 	<div class="detail-pane">
 		<div class="detail-head">
 			<div class="head-row">
 				<span class="rec-id" class:is-new={record.id < 0}>{record.id < 0 ? 'new' : `#${record.id}`}</span>
-				<h2 class="rec-name" class:blank={!record.name}>{record.name || entity.blankName}</h2>
+				<h2 class="rec-name" class:blank={!title}>{title || entity.blankName}</h2>
 				{#if badge}
 					<span class="rare-tag" style:color={entity.badgeColor?.(record) ?? 'var(--text-secondary)'}>{badge}</span>
 				{/if}
@@ -166,7 +167,7 @@ const onRetire = async (rec: Identified) => {
 	if (groups.length > 0) {
 		const confirmed = await dangerModal({
 			title: `Retire ${entity.singular}?`,
-			body: formatReferenceBody(entity.key, rec.name || entity.blankName, groups),
+			body: formatReferenceBody(entity.key, entity.title?.(rec) || rec.name || entity.blankName, groups),
 			confirmLabel: 'Retire anyway'
 		});
 		if (!confirmed) {

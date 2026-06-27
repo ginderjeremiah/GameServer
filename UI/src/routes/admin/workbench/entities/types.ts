@@ -194,6 +194,13 @@ export interface EntityConfig<T extends Identified> {
 	newItem: (id: number) => T;
 	listBadge?: (rec: T) => string | null;
 	badgeColor?: (rec: T) => string;
+	/**
+	 * Derives the list/detail title for an entity that has no editable `name` of its own — a recipe is
+	 * identified by its result skill, not a stored name. Resolved live (so it tracks an in-flight edit of
+	 * the field it derives from) and also drives list search. Falls back to `name` / {@link blankName}
+	 * when omitted or when it returns an empty string.
+	 */
+	title?: (rec: T) => string;
 	/** Optional one-line preview rendered under the detail title (e.g. a challenge's objective). */
 	headline?: (rec: T) => string;
 	/** Compact stat line for the list row: [label, value][] (blank label = bare value). */
