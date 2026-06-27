@@ -5,7 +5,7 @@
 				<path d="M0,0 L6,3 L0,6 Z" fill="var(--accent)" />
 			</marker>
 		</defs>
-		{#each edges as d (d)}
+		{#each edges as d, i (i)}
 			<path
 				class="edge"
 				{d}
