@@ -224,6 +224,26 @@ namespace Game.Api.Tests.CodeGen
             Assert.False(typeof(Dictionary<string, int>).NeedsInterface());
         }
 
+        [Fact]
+        public void NeedsInterface_DictionaryWithEnumKey_ReturnsTrue()
+        {
+            // The key needs an import even though the value does not; checking only the value would
+            // under-report this (the asymmetry that mirrored the dropped-key-import trap).
+            Assert.True(typeof(Dictionary<TestEnum, int>).NeedsInterface());
+        }
+
+        [Fact]
+        public void NeedsInterface_DictionaryWithClassKey_ReturnsTrue()
+        {
+            Assert.True(typeof(Dictionary<SimpleModel, int>).NeedsInterface());
+        }
+
+        [Fact]
+        public void NeedsInterface_DictionaryWithEnumKeyAndClassValue_ReturnsTrue()
+        {
+            Assert.True(typeof(Dictionary<TestEnum, SimpleModel>).NeedsInterface());
+        }
+
         [Theory]
         [InlineData("HelloWorld", "helloWorld")]
         [InlineData("A", "a")]

@@ -175,6 +175,31 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void WriteApiInterfaces_DictionaryWireModel_GeneratesLeafTypesNotContainerInterface()
+        {
+            var writer = new ApiInterfaceWriter(_options);
+            var descriptor = GetDescriptorForClass<ModelWithDictionary>();
+
+            writer.WriteApiInterfaces([descriptor], "// Auto-generated");
+
+            var interfaceFiles = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
+            var interfaceContent = string.Join(Environment.NewLine, interfaceFiles.Select(File.ReadAllText));
+            var enumContent = File.ReadAllText(Path.Combine(_options.TargetDirectory, "enums.ts"));
+            var allContent = interfaceContent + Environment.NewLine + enumContent;
+
+            // The leaf type arguments become real types...
+            Assert.Contains("export interface ISimpleModel {", interfaceContent);
+            Assert.Contains("export enum TestEnum {", enumContent);
+            // ...the owning model renders the dictionaries as Records referencing those leaves...
+            Assert.Contains("export interface IModelWithDictionary {", interfaceContent);
+            Assert.Contains("Record<TestEnum, number>", interfaceContent);
+            Assert.Contains("Record<TestEnum, ISimpleModel>", interfaceContent);
+            // ...but the Dictionary<,> container itself is never emitted as an interface or its own file.
+            Assert.DoesNotContain("IDictionary", allContent);
+            Assert.False(File.Exists(Path.Combine(_options.TargetDirectory, "interfaces", "dictionary.ts")));
+        }
+
+        [Fact]
         public void WriteApiInterfaces_RemovesStaleFiles()
         {
             var interfacesDir = Path.Combine(_options.TargetDirectory, "interfaces");

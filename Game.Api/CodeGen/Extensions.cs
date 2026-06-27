@@ -60,7 +60,11 @@ namespace Game.Api.CodeGen
             {
                 if (type.IsDictionary())
                 {
-                    return type.GetGenericArguments()[1].NeedsInterface();
+                    // Both the key and value can need an import (e.g. an enum key), so consider both —
+                    // matching GetImportTexts, which collects both type arguments. Checking only the value
+                    // would under-report a dictionary keyed by a type that NeedsInterface.
+                    var arguments = type.GetGenericArguments();
+                    return arguments[0].NeedsInterface() || arguments[1].NeedsInterface();
                 }
 
                 return type.GetGenericArguments()[0].NeedsInterface();
