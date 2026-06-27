@@ -37,6 +37,18 @@
 		</TooltipSection>
 	{/if}
 
+	<!-- Requires — the proficiency level needed to equip, flagged red when unmet -->
+	{#if !masked && requirement}
+		<TooltipSection label="Requires">
+			<span class="requirement" class:unmet={!requirement.met}>
+				{proficiencyName} · Level {requirement.requiredLevel}
+				{#if !requirement.met}
+					<span class="current-level">(you have {requirement.currentLevel})</span>
+				{/if}
+			</span>
+		</TooltipSection>
+	{/if}
+
 	<!-- Description — masked teaser shows even when the real item has none -->
 	{#if masked || item?.description}
 		<TooltipSection label="Description" last>
@@ -47,8 +59,14 @@
 
 <script lang="ts">
 import type { Item } from '$lib/battle';
-import { composeItemName, itemCategoryColor, itemCategoryName, rarityColor } from '$lib/common';
-import { staticData } from '$stores';
+import {
+	composeItemName,
+	itemCategoryColor,
+	itemCategoryName,
+	itemProficiencyRequirement,
+	rarityColor
+} from '$lib/common';
+import { playerProficiencies, staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
@@ -88,6 +106,14 @@ const grantedSkillName = $derived(
 	item?.grantedSkillId != null ? staticData.skills?.[item.grantedSkillId]?.name : undefined
 );
 
+// The item's proficiency equip gate, resolved against the player's current level (undefined when ungated).
+const requirement = $derived(
+	item ? itemProficiencyRequirement(item, (id) => playerProficiencies.levelOf(id)) : undefined
+);
+const proficiencyName = $derived(
+	requirement != null ? (staticData.proficiencies?.[requirement.proficiencyId]?.name ?? 'a proficiency') : ''
+);
+
 // The tooltip's main accent (left border) reflects the item's rarity, while the
 // category row (diamond + label) stays category-coloured — mirroring how
 // ModTooltip accents its border by rarity and its diamond/label by mod type.
@@ -107,5 +133,20 @@ const DESC_LINE_WIDTHS = [236, 188];
 	font-size: 12px;
 	font-weight: 500;
 	color: var(--text-primary);
+}
+
+.requirement {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--text-primary);
+
+	&.unmet {
+		color: var(--error);
+	}
+
+	.current-level {
+		color: var(--text-tertiary);
+		font-weight: 400;
+	}
 }
 </style>

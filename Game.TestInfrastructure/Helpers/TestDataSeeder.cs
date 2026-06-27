@@ -113,7 +113,9 @@ namespace Game.TestInfrastructure.Helpers
             EAttribute attributeId = EAttribute.Strength,
             decimal attributeAmount = 5m,
             EItemCategory category = EItemCategory.Weapon,
-            int? grantedSkillId = null)
+            int? grantedSkillId = null,
+            int? requiredProficiencyId = null,
+            int requiredProficiencyLevel = 0)
         {
             var item = new Item
             {
@@ -123,6 +125,8 @@ namespace Game.TestInfrastructure.Helpers
                 RarityId = (int)ERarity.Common,
                 IconPath = "",
                 GrantedSkillId = grantedSkillId,
+                RequiredProficiencyId = requiredProficiencyId,
+                RequiredProficiencyLevel = requiredProficiencyLevel,
             };
 
             context.Items.Add(item);

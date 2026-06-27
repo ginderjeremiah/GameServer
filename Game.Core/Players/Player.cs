@@ -298,9 +298,9 @@ namespace Game.Core.Players
             return false;
         }
 
-        public bool TryEquipItem(int itemId, EEquipmentSlot slot)
+        public bool TryEquipItem(int itemId, EEquipmentSlot slot, IReadOnlyDictionary<int, int> proficiencyLevels)
         {
-            if (!Inventory.TryEquipItem(itemId, slot))
+            if (!Inventory.TryEquipItem(itemId, slot, proficiencyLevels))
             {
                 return false;
             }

@@ -62,6 +62,7 @@ const item = (id: number, name: string, rarity: ERarity, cat: EItemCategory, ext
 	itemCategoryId: cat,
 	rarityId: rarity,
 	iconPath: '',
+	requiredProficiencyLevel: 0,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
 	modSlots: [{ id: id * 10, itemId: id, itemModSlotTypeId: EItemModType.Prefix }],
 	tags: [],

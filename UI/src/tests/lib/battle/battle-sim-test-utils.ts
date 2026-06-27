@@ -179,6 +179,7 @@ export function equipmentFactory(itemRegistry: IItem[], itemModRegistry: IItemMo
 			itemCategoryId: EItemCategory.Accessory,
 			rarityId: ERarity.Common,
 			iconPath: '',
+			requiredProficiencyLevel: 0,
 			attributes: spec.attributes,
 			modSlots: [],
 			tags: []

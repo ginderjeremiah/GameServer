@@ -31,7 +31,13 @@
 </div>
 
 <div class="drawer-footer">
-	<button type="button" class="equip-button" class:equipped onclick={() => view.toggleEquip(item)}>
+	{#if requirement && !requirement.met}
+		<p class="requirement-note">
+			Requires {proficiencyName} level {requirement.requiredLevel}
+			<span class="current-level">(you have {requirement.currentLevel})</span>
+		</p>
+	{/if}
+	<button type="button" class="equip-button" class:equipped disabled={gated} onclick={() => view.toggleEquip(item)}>
 		{equipped ? 'Unequip' : 'Equip'}
 		<span class="equip-hint">{equipped ? '⌘·click' : 'or drag'}</span>
 	</button>
@@ -45,13 +51,23 @@ import TooltipStatsGrid from '$components/tooltip/TooltipStatsGrid.svelte';
 import TooltipDescription from '$components/tooltip/TooltipDescription.svelte';
 import RarityTag from '$components/RarityTag.svelte';
 import { type Item } from '$lib/battle';
-import { itemCategoryColor, itemCategoryName } from '$lib/common';
+import { itemCategoryColor, itemCategoryName, itemProficiencyRequirement } from '$lib/common';
+import { playerProficiencies, staticData } from '$stores';
 import { type InventoryView } from './inventory-view.svelte';
 
 const { item, view }: { item: Item; view: InventoryView } = $props();
 
 const accent = $derived(itemCategoryColor(item.itemCategoryId));
 const equipped = $derived(item.equipmentSlotId != null);
+
+// The item's proficiency gate resolved against the player's current level (undefined when ungated).
+// A gated item the player hasn't qualified for disables the Equip affordance (the backend rejects it
+// too); unequipping is never gated.
+const requirement = $derived(itemProficiencyRequirement(item, (id) => playerProficiencies.levelOf(id)));
+const gated = $derived(!equipped && requirement != null && !requirement.met);
+const proficiencyName = $derived(
+	requirement != null ? (staticData.proficiencies?.[requirement.proficiencyId]?.name ?? 'a proficiency') : ''
+);
 
 // Merged item + applied-mod attributes, from the item's own source-of-truth
 // projection (the same one ItemTooltip reads) so the drawer and tooltip can't
@@ -117,6 +133,27 @@ const attributeMap = $derived(item.totalAttributes?.getAttributeMap());
 		&:hover {
 			background: color-mix(in srgb, var(--error) 16%, transparent);
 		}
+	}
+
+	&:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
+
+		&:hover {
+			background: color-mix(in srgb, var(--accent) 8%, transparent);
+		}
+	}
+}
+
+.requirement-note {
+	margin: 0 0 10px;
+	font-size: 11px;
+	color: var(--error);
+	text-align: center;
+
+	.current-level {
+		color: var(--text-tertiary);
 	}
 }
 

@@ -19,6 +19,8 @@ namespace Game.DataAccess.Mapping
                 Category = (EItemCategory)entity.ItemCategoryId,
                 Rarity = (ERarity)entity.RarityId,
                 GrantedSkillId = entity.GrantedSkillId,
+                RequiredProficiencyId = entity.RequiredProficiencyId,
+                RequiredProficiencyLevel = entity.RequiredProficiencyLevel,
                 Attributes = entity.ItemAttributes
                     .Select(ia => new AttributeModifier
                     {
@@ -69,6 +71,8 @@ namespace Game.DataAccess.Mapping
                 RarityId = (ERarity)entity.RarityId,
                 IconPath = entity.IconPath,
                 GrantedSkillId = entity.GrantedSkillId,
+                RequiredProficiencyId = entity.RequiredProficiencyId,
+                RequiredProficiencyLevel = entity.RequiredProficiencyLevel,
                 Attributes = entity.ItemAttributes
                     .Select(ia => new Contracts.BattlerAttribute
                     {

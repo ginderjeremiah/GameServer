@@ -4,10 +4,12 @@ using Game.Core.Players;
 
 namespace Game.Application.Services
 {
-    public class PlayerService(IPlayerRepository playerRepo, IItemMods itemMods)
+    public class PlayerService(
+        IPlayerRepository playerRepo, IItemMods itemMods, IPlayerProgressRepository playerProgress)
     {
         private readonly IPlayerRepository _playerRepo = playerRepo;
         private readonly IItemMods _itemMods = itemMods;
+        private readonly IPlayerProgressRepository _playerProgress = playerProgress;
 
         public async Task<Player?> LoadPlayer(int playerId, CancellationToken cancellationToken = default)
         {
@@ -21,7 +23,11 @@ namespace Game.Application.Services
 
         public async Task<bool> EquipItem(Player player, int itemId, EEquipmentSlot slot, CancellationToken cancellationToken = default)
         {
-            return await SaveIf(player, player.TryEquipItem(itemId, slot), cancellationToken);
+            // The proficiency gate is evaluated against the player's current levels, which live on the
+            // separate PlayerProgress aggregate; the domain rule itself stays in Inventory.TryEquipItem.
+            var proficiencyLevels = await _playerProgress.GetProficiencies(player.Id, cancellationToken);
+            var levelsByProficiency = proficiencyLevels.ToDictionary(p => p.ProficiencyId, p => p.Level);
+            return await SaveIf(player, player.TryEquipItem(itemId, slot, levelsByProficiency), cancellationToken);
         }
 
         public async Task<bool> UnequipItem(Player player, EEquipmentSlot slot, CancellationToken cancellationToken = default)

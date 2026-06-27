@@ -27,6 +27,7 @@ mockItems[1] = {
 	itemCategoryId: EItemCategory.Weapon,
 	rarityId: ERarity.Epic,
 	iconPath: '',
+	requiredProficiencyLevel: 0,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
 	modSlots: [],
 	tags: []

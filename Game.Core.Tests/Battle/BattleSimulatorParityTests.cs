@@ -952,7 +952,7 @@ namespace Game.Core.Tests.Battle
 
             var player = MakePlayer(strength, endurance, skills: skills);
             player.UnlockItem(item);
-            player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot);
+            player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
             for (var index = 0; index < mods.Count; index++)
             {
                 player.UnlockMod(mods[index].Id);

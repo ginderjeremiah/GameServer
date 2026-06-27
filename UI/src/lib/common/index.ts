@@ -9,6 +9,7 @@ export * from './enemy-attributes';
 export * from './attribute-display';
 export * from './skill-effect-display';
 export * from './item-display';
+export * from './item-requirements';
 export * from './types';
 export * from './hooks';
 export * from './event-measuring';

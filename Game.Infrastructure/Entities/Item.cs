@@ -13,6 +13,15 @@
         /// persisted link (an optional FK).</summary>
         public int? GrantedSkillId { get; set; }
 
+        /// <summary>The proficiency that gates equipping this item, or null when the item is ungated. A
+        /// navigation-less optional FK, like the zone unlock challenge. The player must have reached
+        /// <see cref="RequiredProficiencyLevel"/> in this proficiency to equip the item.</summary>
+        public int? RequiredProficiencyId { get; set; }
+
+        /// <summary>The minimum level the player must have reached in <see cref="RequiredProficiencyId"/> to
+        /// equip this item. Only meaningful when <see cref="RequiredProficiencyId"/> is set.</summary>
+        public int RequiredProficiencyLevel { get; set; }
+
         /// <summary>When set, the record is <em>retired</em>: out of circulation for new acquisition but
         /// kept at its slot and resolvable by id so existing references stay valid. Null while active.</summary>
         public DateTime? RetiredAt { get; set; }

@@ -261,7 +261,7 @@ namespace Game.Core.Tests.Battle
                 ModSlots = [],
             };
             player.Inventory.UnlockItem(item);
-            player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot);
+            player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
         }
 
         private static AttributeModifier Modifier(EAttribute attribute, double amount, EModifierType type) => new()

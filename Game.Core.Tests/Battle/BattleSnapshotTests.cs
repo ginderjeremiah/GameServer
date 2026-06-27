@@ -664,13 +664,13 @@ namespace Game.Core.Tests.Battle
         private static void Equip(Player player, Item item)
         {
             player.UnlockItem(item);
-            player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot);
+            player.TryEquipItem(item.Id, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
         }
 
         private static void EquipInSlot(Player player, Item item, EEquipmentSlot slot)
         {
             player.UnlockItem(item);
-            player.TryEquipItem(item.Id, slot);
+            player.TryEquipItem(item.Id, slot, new Dictionary<int, int>());
         }
 
         private static void EquipWithMod(Player player, Item item, ItemMod mod, int modSlotIndex)

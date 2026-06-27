@@ -38,6 +38,19 @@ namespace Game.Core.Items
         public int? GrantedSkillId { get; init; }
 
         /// <summary>
+        /// The id of the proficiency that gates equipping this item, or null when the item is ungated.
+        /// Stored as an id only (not the resolved proficiency) so the item cache stays independent of the
+        /// proficiency reference data; the equip gate is evaluated against the player's proficiency levels.
+        /// </summary>
+        public int? RequiredProficiencyId { get; init; }
+
+        /// <summary>
+        /// The minimum level the player must have reached in <see cref="RequiredProficiencyId"/> to equip
+        /// this item. Only meaningful when <see cref="RequiredProficiencyId"/> is set.
+        /// </summary>
+        public int RequiredProficiencyLevel { get; init; }
+
+        /// <summary>
         /// The attribute modifiers that the item applies.
         /// </summary>
         public required IReadOnlyList<AttributeModifier> Attributes { get; init; }
@@ -57,6 +70,19 @@ namespace Game.Core.Items
         public IEnumerable<AttributeModifier> GetAttributeModifiers(IEnumerable<ItemMod> appliedMods)
         {
             return Attributes.Concat(appliedMods.SelectMany(mod => mod.Attributes));
+        }
+
+        /// <summary>
+        /// Whether a player meets this item's proficiency gate given their current per-proficiency levels
+        /// (a missing entry is level 0 — the "never trained" state). An ungated item
+        /// (<see cref="RequiredProficiencyId"/> is null) is always equippable; a gated item requires the
+        /// player's level in <see cref="RequiredProficiencyId"/> to be at least
+        /// <see cref="RequiredProficiencyLevel"/>. Mirrors <see cref="Game.Core.Zones.Zone.IsUnlocked"/>.
+        /// </summary>
+        public bool MeetsProficiencyRequirement(IReadOnlyDictionary<int, int> proficiencyLevels)
+        {
+            return RequiredProficiencyId is not int proficiencyId
+                || (proficiencyLevels.TryGetValue(proficiencyId, out var level) && level >= RequiredProficiencyLevel);
         }
     }
 }

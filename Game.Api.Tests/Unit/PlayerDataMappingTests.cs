@@ -65,7 +65,7 @@ namespace Game.Api.Tests.Unit
             var inventory = new Inventory();
             inventory.UnlockItem(weapon);
             inventory.UnlockItem(helm);
-            inventory.TryEquipItem(weapon.Id, EEquipmentSlot.WeaponSlot);
+            inventory.TryEquipItem(weapon.Id, EEquipmentSlot.WeaponSlot, new Dictionary<int, int>());
 
             var player = MakePlayer(skills: [], selectedSkills: [], inventory: inventory);
 

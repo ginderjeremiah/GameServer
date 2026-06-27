@@ -118,6 +118,8 @@ export interface IItem {
 	modSlots: IItemModSlot[];
 	tags: number[];
 	grantedSkillId?: number;
+	requiredProficiencyId?: number;
+	requiredProficiencyLevel: number;
 	retiredAt?: string;
 }
 

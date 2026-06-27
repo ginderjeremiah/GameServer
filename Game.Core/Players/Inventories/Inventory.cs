@@ -77,7 +77,7 @@ namespace Game.Core.Players.Inventories
             return unlocked.AppliedMods.Select(applied => applied.ItemMod);
         }
 
-        public bool TryEquipItem(int itemId, EEquipmentSlot slot)
+        public bool TryEquipItem(int itemId, EEquipmentSlot slot, IReadOnlyDictionary<int, int> proficiencyLevels)
         {
             var unlocked = GetUnlockedItem(itemId);
             if (unlocked is null)
@@ -92,6 +92,13 @@ namespace Game.Core.Players.Inventories
             }
 
             if (equipSlot.ItemCategory != unlocked.Item.Category)
+            {
+                return false;
+            }
+
+            // Anti-cheat: gear gated behind a proficiency can only be equipped once the player has reached the
+            // required level (a tampered client cannot bypass the frontend gate).
+            if (!unlocked.Item.MeetsProficiencyRequirement(proficiencyLevels))
             {
                 return false;
             }

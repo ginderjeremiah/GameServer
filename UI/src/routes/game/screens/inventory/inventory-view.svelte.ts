@@ -1,7 +1,8 @@
 import { EItemCategory } from '$lib/api';
 import { EEquipmentSlot, getEquipmentSlotForCategory, inventoryManager } from '$lib/engine';
 import { BattleAttributes, type AttributeEntry, type Item, type ItemMod } from '$lib/battle';
-import { staticData, toastError } from '$stores';
+import { meetsItemProficiencyRequirement } from '$lib/common';
+import { playerProficiencies, staticData, toastError } from '$stores';
 
 /* ─── Static config ─────────────────────────────────────────────────────
    Equipment slots are declared here (extensible): adding a second weapon
@@ -147,9 +148,22 @@ export class InventoryView {
 		this.selectedId = itemId;
 	}
 
+	/** Whether the player meets an item's proficiency gate (always true for ungated gear). Mirrors the
+	    backend equip anti-cheat; used to disable the equip affordance and block the action. */
+	canEquip(item: Item): boolean {
+		return meetsItemProficiencyRequirement(item, (id) => playerProficiencies.levelOf(id));
+	}
+
 	// Inventory mutations apply optimistically and roll back on a persist error; await the manager's
 	// boolean and surface a toast on failure so the silent revert is reported, not swallowed.
 	async equip(itemId: number, slotId: EEquipmentSlot) {
+		// UI-side proficiency gate: refuse before the optimistic apply so a gated item never flickers
+		// equipped (the backend would reject it anyway). The drawer also disables the affordance.
+		const item = inventoryManager.unlockedItems.get(itemId);
+		if (item && !this.canEquip(item)) {
+			toastError('You have not met the proficiency requirement to equip this item.');
+			return;
+		}
 		if (!(await inventoryManager.equipItem(itemId, slotId))) {
 			toastError('Your equipment change could not be saved. Please try again.');
 		}

@@ -167,6 +167,15 @@ class WorkbenchReference {
 	];
 	/** Active proficiencies (plus the current value if retired) — the cross-path prerequisite picker. */
 	proficiencyOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.proficiencies ?? [], keep);
+	/**
+	 * Item equip-gate picker options: a "None" sentinel (-1) plus active proficiencies (the current value
+	 * stays visible even if retired). Backs the item `RequiredProficiency` gate; the backend rejects a
+	 * retired or out-of-range gate on save.
+	 */
+	requiredProficiencyOptions = (keep?: number): SelectOption[] => [
+		{ value: -1, text: 'None (ungated)' },
+		...this.retireableOptions(staticData.proficiencies ?? [], keep)
+	];
 	pathName = (id: number) => staticData.paths?.[id]?.name;
 	proficiencyName = (id: number) => staticData.proficiencies?.[id]?.name;
 

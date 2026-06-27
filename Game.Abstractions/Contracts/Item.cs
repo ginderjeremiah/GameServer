@@ -19,6 +19,15 @@ namespace Game.Abstractions.Contracts
         /// <see cref="ESkillAcquisition.Item"/>-flagged, enforced on save), or null for none.</summary>
         public int? GrantedSkillId { get; set; }
 
+        /// <summary>The id of the proficiency that gates equipping this item, or null when the item is
+        /// ungated. Equipping requires the player to have reached <see cref="RequiredProficiencyLevel"/>
+        /// in this proficiency (enforced server-side at equip time as anti-cheat).</summary>
+        public int? RequiredProficiencyId { get; set; }
+
+        /// <summary>The minimum level required in <see cref="RequiredProficiencyId"/> to equip this item.
+        /// Only meaningful when <see cref="RequiredProficiencyId"/> is set.</summary>
+        public int RequiredProficiencyLevel { get; set; }
+
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
         /// Null while active.</summary>
         public DateTime? RetiredAt { get; set; }

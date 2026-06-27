@@ -582,7 +582,7 @@ namespace Game.Core.Tests.Players
         {
             var player = MakePlayer();
             player.UnlockItem(MakeItem(id: 10));
-            player.TryEquipItem(10, EEquipmentSlot.AccessorySlot);
+            player.TryEquipItem(10, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
             player.ClearEvents();
 
             var result = player.TryUnequipItem(EEquipmentSlot.AccessorySlot);

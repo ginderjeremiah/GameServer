@@ -64,6 +64,7 @@ const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon, gr
 	rarityId: ERarity.Common,
 	iconPath: `/icons/${id}.png`,
 	grantedSkillId,
+	requiredProficiencyLevel: 0,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
 	modSlots: [],
 	tags: []
