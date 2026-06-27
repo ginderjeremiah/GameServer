@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { IItem } from '$lib/api';
+import { EItemCategory, ERarity, type IItem } from '$lib/api';
 import { itemProficiencyRequirement, meetsItemProficiencyRequirement } from '$lib/common';
 
 const item = (requiredProficiencyId?: number, requiredProficiencyLevel = 0): IItem =>
@@ -7,8 +7,8 @@ const item = (requiredProficiencyId?: number, requiredProficiencyLevel = 0): IIt
 		id: 1,
 		name: 'Item',
 		description: '',
-		itemCategoryId: 0,
-		rarityId: 0,
+		itemCategoryId: EItemCategory.Accessory,
+		rarityId: ERarity.Common,
 		iconPath: '',
 		requiredProficiencyId,
 		requiredProficiencyLevel,
