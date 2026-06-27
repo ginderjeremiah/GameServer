@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { flushSync } from 'svelte';
 import {
 	EAttribute,
 	EChallengeType,
@@ -31,7 +32,7 @@ const { staticData, playerChallenges, navigation, statistics } = vi.hoisted(() =
 }));
 vi.mock('$stores', () => ({ staticData, playerChallenges, navigation, statistics }));
 
-import { CodexView } from '$routes/game/screens/codex/codex-view.svelte';
+import { CodexView, type EnemyRowVM, type ZoneProjectionVM } from '$routes/game/screens/codex/codex-view.svelte';
 
 const dist = () => [
 	{ attributeId: EAttribute.Strength, baseAmount: 10, amountPerLevel: 1 },
@@ -257,6 +258,43 @@ describe('CodexView enemy projections', () => {
 		});
 		expect(view.enemyProjections.find((p) => p.id === 0)?.searchText).toContain('emberreach');
 	});
+
+	it('memoizes the projection on a single instance: the same reference survives search / sort / filter changes', () => {
+		// The cross-instance value test above proves the projection's *value* ignores interaction state.
+		// This asserts the actual perf guarantee the projection/row split exists for: on one live instance,
+		// the heavy projection is not rebuilt when the cheap interaction state the rows layer reads moves —
+		// it returns the *same reference*. Run inside an effect root so the deriveds stay live and memoized.
+		const view = new CodexView();
+		let projection: EnemyRowVM[] | undefined;
+		let rows: EnemyRowVM[] | undefined;
+		const cleanup = $effect.root(() => {
+			$effect(() => {
+				projection = view.enemyProjections;
+			});
+			$effect(() => {
+				rows = view.enemyRows;
+			});
+		});
+
+		flushSync();
+		const projectionBefore = projection;
+		const rowsBefore = rows;
+
+		// Mutate the reactive interaction state (`filter`/`search`/`sort` are `$state`) the row layer reads.
+		view.setFilter('boss');
+		view.search = 'griffin';
+		view.sort = 'name';
+		flushSync();
+
+		// The interaction change genuinely moved the reactive graph — the thin row layer recomputed…
+		expect(rows).not.toBe(rowsBefore);
+		expect(rows).toEqual([]); // boss filter + a query that matches nothing
+		// …yet the projection was memoized: the same array reference, never rebuilt.
+		expect(projection).toBe(projectionBefore);
+		expect(view.enemyProjections).toBe(projectionBefore);
+
+		cleanup();
+	});
 });
 
 describe('CodexView enemy search', () => {
@@ -478,11 +516,30 @@ describe('CodexView zone projections', () => {
 		expect(rows[0]).not.toHaveProperty('status');
 	});
 
-	it('stays stable when a zone is cleared or its gate opens (only the status overlay reacts)', () => {
-		const before = new CodexView().zoneProjections;
+	it('memoizes the projection on a single instance: the same reference survives a zone clear / gate open', () => {
+		// Asserts the perf guarantee the projection/row split exists for — not just that two fresh instances
+		// agree by value. On one live instance the heavy O(zones×enemies) projection must return the *same
+		// reference* when the live status the rail overlays moves; only `zoneRows` reacts. Run inside an
+		// effect root so the derived stays live and its memoization (referential identity) holds.
+		const view = new CodexView();
+		let projection: ZoneProjectionVM[] | undefined;
+		const cleanup = $effect.root(() => {
+			$effect(() => {
+				projection = view.zoneProjections;
+			});
+		});
+
+		flushSync();
+		const before = projection;
+
+		// Move only the live status inputs the rail overlays (zone cleared + gate opened) — the projection
+		// reads neither, so it must not be rebuilt.
 		statistics.isZoneCleared.mockImplementation(() => true);
 		playerChallenges.all = [{ challengeId: 0, progress: 100, completed: true }];
-		expect(new CodexView().zoneProjections).toEqual(before);
+		flushSync();
+
+		expect(view.zoneProjections).toBe(before);
+		cleanup();
 	});
 });
 
