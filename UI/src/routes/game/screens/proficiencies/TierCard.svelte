@@ -79,6 +79,8 @@ const reveal = $derived(decipherReveal(tier));
 </script>
 
 <style lang="scss">
+@use '../../../../styles/decipher-stage' as decipher;
+
 .tier-row {
 	display: flex;
 	gap: 16px;
@@ -183,46 +185,14 @@ const reveal = $derived(decipherReveal(tier));
 .card-body {
 	flex: 1;
 	min-width: 0;
-}
 
-// Word-of-power illumination by decipher stage. The glyph is the child WordOfPower element, so its
-// classes are reached through `:global()` (anchored under `.card-body` so the rule isn't global-leaky).
-// WordOfPower inherits its colour, so the stage hue drives both the glyph and (via currentColor) its glow.
-.card-body :global(.glyph) {
-	display: block;
-	line-height: 1.05;
-}
-
-.card-body :global(.glyph.stage-undeciphered) {
-	color: var(--text-tertiary);
-}
-
-.card-body :global(.glyph.stage-pronunciation) {
-	color: var(--accent-light);
-}
-
-.card-body :global(.glyph.stage-translated) {
-	color: var(--gold);
+	// Word-of-power illumination by decipher stage (shared with the WordDetail inspector). Anchored
+	// here so the `:global()` glyph rules stay scoped to the card and don't leak global.
+	@include decipher.glyph-illumination;
 }
 
 .reveal {
-	margin-top: 6px;
-	font-family: var(--mono);
-	font-size: 12px;
-	letter-spacing: 0.4px;
-
-	&.stage-undeciphered {
-		color: var(--text-muted);
-		font-style: italic;
-	}
-
-	&.stage-pronunciation {
-		color: var(--accent-light);
-	}
-
-	&.stage-translated {
-		color: var(--gold);
-	}
+	@include decipher.reveal-line;
 }
 
 .meta {

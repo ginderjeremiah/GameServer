@@ -1,0 +1,49 @@
+// Decipher-stage illumination shared by the Lexicon surfaces — the spine `TierCard` and the
+// `WordDetail` inspector. Both render a `WordOfPower` glyph that lights dim → accent → gold by
+// decipher stage over a reveal line, so these mixins keep the stage → colour mapping in one place.
+// Mixins rather than a `%placeholder`: the glyph rules must live under a per-surface parent anchor,
+// and `@extend` can't reach a placeholder across the `@use` module boundary.
+
+// Word-of-power illumination by decipher stage. The glyph is a child `WordOfPower` element, reached
+// through `:global()`; `@include` this inside the surface's anchoring parent (`.card-body` /
+// `.word-block`) so the rule stays scoped there rather than leaking global. `WordOfPower` inherits
+// its colour, so the stage hue drives both the glyph and (via currentColor) its glow.
+@mixin glyph-illumination {
+	:global(.glyph) {
+		display: block;
+		line-height: 1.05;
+	}
+
+	:global(.glyph.stage-undeciphered) {
+		color: var(--text-tertiary);
+	}
+
+	:global(.glyph.stage-pronunciation) {
+		color: var(--accent-light);
+	}
+
+	:global(.glyph.stage-translated) {
+		color: var(--gold);
+	}
+}
+
+// The reveal line beneath the glyph; `@include` on the `.reveal` element.
+@mixin reveal-line {
+	margin-top: 6px;
+	font-family: var(--mono);
+	font-size: 12px;
+	letter-spacing: 0.4px;
+
+	&.stage-undeciphered {
+		color: var(--text-muted);
+		font-style: italic;
+	}
+
+	&.stage-pronunciation {
+		color: var(--accent-light);
+	}
+
+	&.stage-translated {
+		color: var(--gold);
+	}
+}
