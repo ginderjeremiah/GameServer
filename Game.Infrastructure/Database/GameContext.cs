@@ -55,6 +55,9 @@ namespace Game.Infrastructure.Database
         public DbSet<Skill> Skills { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
         public DbSet<SkillEffect> SkillEffects { get; set; }
+        public DbSet<SkillRecipe> SkillRecipes { get; set; }
+        public DbSet<SkillRecipeInput> SkillRecipeInputs { get; set; }
+        public DbSet<SkillRecipeCondition> SkillRecipeConditions { get; set; }
         public DbSet<Path> Paths { get; set; }
         public DbSet<Proficiency> Proficiencies { get; set; }
         public DbSet<ProficiencyLevelModifier> ProficiencyLevelModifiers { get; set; }
@@ -471,6 +474,50 @@ namespace Game.Infrastructure.Database
                 entity.HasOne(se => se.ScalingAttribute)
                     .WithMany()
                     .HasForeignKey(se => se.ScalingAttributeId);
+            });
+
+            modelBuilder.Entity<SkillRecipe>(entity =>
+            {
+                entity.Property(r => r.Id)
+                    .HasIdentityOptions(0, 1, 0);
+
+                // The result skill is retired, never deleted, so Restrict (it is also referenced by the recipe's
+                // own input rows). The recipe is itself retired, never deleted.
+                entity.HasOne(r => r.ResultSkill)
+                    .WithMany()
+                    .HasForeignKey(r => r.ResultSkillId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<SkillRecipeInput>(entity =>
+            {
+                entity.HasKey(i => new { i.RecipeId, i.SkillId });
+
+                entity.HasOne(i => i.Recipe)
+                    .WithMany(r => r.Inputs)
+                    .HasForeignKey(i => i.RecipeId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // The input skill is retired, never deleted; Restrict avoids a multiple-cascade-path ambiguity.
+                entity.HasOne(i => i.Skill)
+                    .WithMany()
+                    .HasForeignKey(i => i.SkillId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<SkillRecipeCondition>(entity =>
+            {
+                entity.HasKey(c => new { c.RecipeId, c.ProficiencyId });
+
+                entity.HasOne(c => c.Recipe)
+                    .WithMany(r => r.Conditions)
+                    .HasForeignKey(c => c.RecipeId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(c => c.Proficiency)
+                    .WithMany()
+                    .HasForeignKey(c => c.ProficiencyId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Path>(entity =>
