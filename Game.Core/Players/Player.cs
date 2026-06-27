@@ -191,6 +191,55 @@ namespace Game.Core.Players
         }
 
         /// <summary>
+        /// Executes a skill-synthesis recipe (spike #1125): validates the player may forge it and, on success,
+        /// unlocks the result skill. All validation is authoritative anti-cheat — a tampered client controls
+        /// only the recipe id, so every fact is re-checked against the live recipe and player state:
+        /// <list type="bullet">
+        /// <item>the recipe must be live (a retired recipe is no longer offered);</item>
+        /// <item>the player must own every input as an <em>unlocked</em> skill — innate item-granted skills are
+        /// derived at battle assembly and never live in <see cref="Skills"/>, so they are excluded by
+        /// construction (no equip-to-synthesize-then-unequip; spike #1125 decision 6);</item>
+        /// <item>every proficiency-level condition must be met, a missing proficiency counting as level 0
+        /// (mirroring the gear proficiency gate).</item>
+        /// </list>
+        /// Synthesis is non-consumptive: inputs are never removed. The result-skill grant is idempotent via
+        /// <see cref="UnlockSkill"/>, so re-synthesizing an already-owned result raises no second event.
+        /// Returns whether the synthesis was permitted; a rejection mutates nothing and raises no event.
+        /// <para>
+        /// The recipe's result is guaranteed to be <see cref="ESkillAcquisition.Synthesis"/>-flagged by
+        /// admin-authoring validation (the flag is authoring intent, not a player-tamperable surface), so it is
+        /// not re-checked here — and the lean battle <see cref="Skill"/> deliberately carries no acquisition
+        /// flag (docs/backend.md → skill acquisition flags).
+        /// </para>
+        /// </summary>
+        public bool TrySynthesizeSkill(
+            SkillRecipe recipe, Skill resultSkill, IReadOnlyDictionary<int, int> proficiencyLevels)
+        {
+            if (recipe.IsRetired)
+            {
+                return false;
+            }
+
+            var unlockedSkillIds = Skills.Select(s => s.Id).ToHashSet();
+            if (!recipe.InputSkillIds.All(unlockedSkillIds.Contains))
+            {
+                return false;
+            }
+
+            foreach (var condition in recipe.Conditions)
+            {
+                var level = proficiencyLevels.TryGetValue(condition.ProficiencyId, out var l) ? l : 0;
+                if (level < condition.MinLevel)
+                {
+                    return false;
+                }
+            }
+
+            UnlockSkill(resultSkill);
+            return true;
+        }
+
+        /// <summary>
         /// Completes a challenge for the player: unlocks each reward the challenge carries (item and/or
         /// mod — either of which may be absent) and, when <paramref name="notify"/> is <c>true</c>,
         /// raises a single <see cref="ChallengeCompletedEvent"/> describing the completion and what it

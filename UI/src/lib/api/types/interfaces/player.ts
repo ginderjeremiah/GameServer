@@ -35,6 +35,10 @@ export interface IPlayerData {
 	signaturePassive: ISignaturePassive;
 }
 
+export interface ISynthesisResult {
+	resultSkillId?: number;
+}
+
 export interface IUnlockedSkill {
 	skillId: number;
 	selected: boolean;

@@ -21,6 +21,11 @@ namespace Game.DataAccess.Repositories
             return [.. Snapshot.Entities.Select(SkillRecipeMapper.ToContract)];
         }
 
+        public bool ValidateRecipeId(int recipeId)
+        {
+            return recipeId >= 0 && recipeId < Snapshot.Entities.Count;
+        }
+
         public CoreSkillRecipe GetSkillRecipe(int recipeId)
         {
             // Returns the snapshot's shared, pre-materialized immutable instance rather than re-mapping.
