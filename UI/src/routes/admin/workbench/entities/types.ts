@@ -121,22 +121,48 @@ export interface TableSectionConfig<T> extends BaseSection<T> {
 	columns: ColumnConfig[];
 }
 
-export interface ChipsSectionConfig<T> extends BaseSection<T> {
+/**
+ * The minimum a `chips` catalogue entry carries — what the renderer itself needs (id to key/match a
+ * chip, name to fall back on, retired/addable to style and gate the add-list). A section may supply a
+ * wider entry (see {@link ChipsSectionConfig}'s `E`) so `labelOf`/`metaOf` can read extra meta fields.
+ */
+export interface ChipCatalogueEntry {
+	id: number;
+	name: string;
+	retired?: boolean;
+	addable?: boolean;
+}
+
+export interface ChipsSectionConfig<T, E extends ChipCatalogueEntry = ChipCatalogueEntry> extends BaseSection<T> {
 	kind: 'chips';
 	itemsKey: keyof T & string;
 	/**
 	 * Catalogue of addable entries. A `retired` entry, or one with `addable: false` (e.g. a skill not
 	 * flagged for this channel), stays available for display of an already-assigned chip but can't be
-	 * newly added.
+	 * newly added. `E` lets a section declare a richer entry shape that its `labelOf`/`metaOf` read.
 	 */
-	catalogue: () => { id: number; name: string; retired?: boolean; addable?: boolean }[];
-	labelOf: (entry: { id: number; name: string }) => string;
-	metaOf: (entry: { id: number; name: string }) => string;
+	catalogue: () => E[];
+	// Method shorthand (not arrow properties) so the entry parameter is compared bivariantly: a section
+	// built on a wider `E` stays assignable to the base `ChipsSectionConfig<T>` the renderer consumes.
+	labelOf(entry: E): string;
+	metaOf(entry: E): string;
 	emptyIcon: WorkbenchIconKind;
 	emptyTitle: string;
 	emptySub: string;
 	addLabel: string;
 }
+
+/**
+ * Builds a {@link ChipsSectionConfig} whose catalogue carries entity-specific meta (e.g. a skill's
+ * `baseDamage`), inferring the entry type `E` from `catalogue` so `labelOf`/`metaOf` read those fields
+ * type-safely — no casting back through `as unknown as`. Curried so the record type `T` is given
+ * explicitly while `E` is inferred. The result erases `E` to the base entry for storage in the record's
+ * section list; the renderer only needs the base contract.
+ */
+export const chipsSection =
+	<T>() =>
+	<E extends ChipCatalogueEntry>(section: ChipsSectionConfig<T, E>): ChipsSectionConfig<T> =>
+		section;
 
 export interface TagsSectionConfig<T> extends BaseSection<T> {
 	kind: 'tags';
