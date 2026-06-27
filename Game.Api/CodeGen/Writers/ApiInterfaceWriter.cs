@@ -34,9 +34,14 @@ namespace Game.Api.CodeGen.Writers
                 Directory.CreateDirectory(interfacesDir);
             }
 
+            // Enumerable/dictionary descriptors are containers, not named types: only their leaf type
+            // arguments (collected separately by GetAllUsedDescriptors) become files. Excluding them here
+            // stops a Dictionary<,>/List<> descriptor — whose NeedsInterface tracks its element/value —
+            // from emitting a bogus IDictionary/IList interface and colliding with the real leaf in the
+            // DistinctBy identity. Relying on enumeration order to drop the container was always fragile.
             var allDescriptors = descriptors
                 .SelectMany(GetAllUsedDescriptors)
-                .Where(d => d.NeedsInterface)
+                .Where(d => d.NeedsInterface && !d.UnderlyingType.IsEnumerable())
                 .DistinctBy(CodeGenTypeFormatter.GetImportText);
 
             // Materialized once: the grouping is enumerated by the foreach below and again by
