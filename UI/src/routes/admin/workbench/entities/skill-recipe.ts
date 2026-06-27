@@ -2,7 +2,7 @@ import { ApiRequest, fetchSocketData, type ISkillRecipe } from '$lib/api';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
-import type { EntityConfig } from './types';
+import { chipsSection, type EntityConfig } from './types';
 
 /**
  * The admin Workbench editor for skill-synthesis recipes (spike #1125, area A). A recipe is nameless
@@ -66,7 +66,7 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 				}
 			]
 		},
-		{
+		chipsSection<ISkillRecipe>()({
 			key: 'inputs',
 			label: 'Inputs',
 			glyph: 'box',
@@ -84,12 +84,12 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			// can't be newly added (the backend rejects a retired input too).
 			catalogue: () => reference.skillCatalogue().map((s) => ({ ...s, addable: !s.retired })),
 			labelOf: (s) => s.name,
-			metaOf: (s) => `${(s as unknown as { baseDamage: number }).baseDamage} dmg`,
+			metaOf: (s) => `${s.baseDamage} dmg`,
 			emptyIcon: 'box',
 			emptyTitle: 'No input skills',
 			emptySub: 'A recipe combines at least one owned skill.',
 			addLabel: 'Add input skill…'
-		},
+		}),
 		{
 			key: 'conditions',
 			label: 'Conditions',

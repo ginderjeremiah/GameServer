@@ -3,7 +3,7 @@ import { hasFlag } from '$lib/common';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
-import type { EntityConfig } from './types';
+import { chipsSection, type EntityConfig } from './types';
 
 /**
  * A class with its optional signature-passive scaling attribute widened to a plain number so the select can
@@ -117,7 +117,7 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 				{ key: 'passiveScalingAmount', label: 'Scaling Amount', type: 'number', width: 150, allowNegative: true }
 			]
 		},
-		{
+		chipsSection<WorkbenchClass>()({
 			key: 'starterSkills',
 			label: 'Starter Skills',
 			glyph: 'rune',
@@ -131,12 +131,12 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			catalogue: () =>
 				reference.skillCatalogue().map((s) => ({ ...s, addable: hasFlag(s.acquisition, ESkillAcquisition.Player) })),
 			labelOf: (s) => s.name,
-			metaOf: (s) => `${(s as unknown as { baseDamage: number }).baseDamage} dmg`,
+			metaOf: (s) => `${s.baseDamage} dmg`,
 			emptyIcon: 'rune',
 			emptyTitle: 'No starter skills',
 			emptySub: 'This class grants no skills at creation.',
 			addLabel: 'Add starter skill…'
-		},
+		}),
 		{
 			key: 'starterEquipment',
 			label: 'Starter Equipment',
