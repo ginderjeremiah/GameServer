@@ -82,7 +82,7 @@ namespace Game.Core.Items
         public bool MeetsProficiencyRequirement(IReadOnlyDictionary<int, int> proficiencyLevels)
         {
             return RequiredProficiencyId is not int proficiencyId
-                || (proficiencyLevels.TryGetValue(proficiencyId, out var level) && level >= RequiredProficiencyLevel);
+                || proficiencyLevels.GetValueOrDefault(proficiencyId) >= RequiredProficiencyLevel;
         }
     }
 }
