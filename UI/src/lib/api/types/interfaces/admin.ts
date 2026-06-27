@@ -12,6 +12,7 @@ import type {
 	IProficiencyLevelReward,
 	ISkillEffect,
 	ISkillPathContribution,
+	ISkillRecipeCondition,
 	IZoneEnemy
 } from '../';
 
@@ -101,6 +102,16 @@ export interface ISetProficiencyRewardsData {
 export interface ISetSkillEffectsData {
 	id: number;
 	changes: IChange<ISkillEffect>[];
+}
+
+export interface ISetSkillRecipeConditionsData {
+	id: number;
+	conditions: ISkillRecipeCondition[];
+}
+
+export interface ISetSkillRecipeInputsData {
+	id: number;
+	skillIds: number[];
 }
 
 export interface ISetTagsData {

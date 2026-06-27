@@ -218,6 +218,19 @@ export interface ISkillPathContribution {
 	weight: number;
 }
 
+export interface ISkillRecipe {
+	id: number;
+	resultSkillId: number;
+	retiredAt?: string;
+	inputSkillIds: number[];
+	conditions: ISkillRecipeCondition[];
+}
+
+export interface ISkillRecipeCondition {
+	proficiencyId: number;
+	minLevel: number;
+}
+
 export interface ITag {
 	id: number;
 	name: string;

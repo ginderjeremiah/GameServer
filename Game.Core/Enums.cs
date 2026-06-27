@@ -522,6 +522,11 @@ namespace Game.Core
 
         /// <summary>Assignable to an enemy's skill pool.</summary>
         Enemy = 4,
+
+        /// <summary>Allowed to be the result of a skill-synthesis recipe (authoring intent; spike #1125). Once
+        /// synthesized the skill is a permanent player grant like any other, but this flag gates which skills an
+        /// authored <c>SkillRecipe</c> may produce.</summary>
+        Synthesis = 8,
     }
 
     /// <summary>

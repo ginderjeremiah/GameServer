@@ -129,6 +129,7 @@ export enum ESkillAcquisition {
 	Player = 1,
 	Item = 2,
 	Enemy = 4,
+	Synthesis = 8,
 }
 
 export enum ESkillEffectTarget {
