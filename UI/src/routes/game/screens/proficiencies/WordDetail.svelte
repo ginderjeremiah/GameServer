@@ -114,6 +114,8 @@ const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.see
 </script>
 
 <style lang="scss">
+@use '../../../../styles/decipher-stage' as decipher;
+
 .inspector {
 	flex: none;
 	width: 312px;
@@ -201,45 +203,14 @@ const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.see
 		outline-offset: 3px;
 		border-radius: var(--border-radius);
 	}
-}
 
-// The glyph is the child WordOfPower element, reached through `:global()` anchored under `.word-block`
-// so the rule stays scoped here. Its colour drives both the glyph and (via currentColor) the glow.
-.word-block :global(.glyph) {
-	display: block;
-	line-height: 1.05;
-}
-
-.word-block :global(.glyph.stage-undeciphered) {
-	color: var(--text-tertiary);
-}
-
-.word-block :global(.glyph.stage-pronunciation) {
-	color: var(--accent-light);
-}
-
-.word-block :global(.glyph.stage-translated) {
-	color: var(--gold);
+	// Word-of-power illumination by decipher stage (shared with the spine TierCard). Anchored here so
+	// the `:global()` glyph rules stay scoped to the inspector and don't leak global.
+	@include decipher.glyph-illumination;
 }
 
 .reveal {
-	margin-top: 6px;
-	font-family: var(--mono);
-	font-size: 12px;
-	letter-spacing: 0.4px;
-
-	&.stage-undeciphered {
-		color: var(--text-muted);
-		font-style: italic;
-	}
-
-	&.stage-pronunciation {
-		color: var(--accent-light);
-	}
-
-	&.stage-translated {
-		color: var(--gold);
-	}
+	@include decipher.reveal-line;
 }
 
 .xp {
