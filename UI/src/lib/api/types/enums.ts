@@ -152,4 +152,10 @@ export enum EStatisticType {
 	FastestVictory = 13,
 	SkillsUsed = 14,
 	BattlesAbandoned = 15,
+	CriticalHits = 16,
+	CriticalDamageDealt = 17,
+	AttacksDodged = 18,
+	DamageDodged = 19,
+	AttacksBlocked = 20,
+	DamageBlocked = 21,
 }

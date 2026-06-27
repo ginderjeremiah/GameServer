@@ -154,6 +154,97 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(before - 18, player.CurrentHealth, 0.001);
         }
 
+        // ── DamageTarget: crit/dodge/block statistics ────────────────────────
+
+        [Fact]
+        public void DamageTarget_PlayerCrit_RecordsCritHitAndPostDefenseDamage()
+        {
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20); // 20×2 = 40, −2 Defense = 38 dealt
+
+            Assert.Equal(1, context.Stats.CriticalHits);
+            Assert.Equal(38, context.Stats.CriticalDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerNoCrit_RecordsNoCritStatistics()
+        {
+            var player = MakeBattlerWith((CriticalChance, 0), (CriticalDamage, 2));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20);
+
+            Assert.Equal(0, context.Stats.CriticalHits);
+            Assert.Equal(0, context.Stats.CriticalDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerDodge_RecordsDodgeAndPostDefenseDamageAvoided()
+        {
+            var player = MakeBattlerWith((DodgeChance, 1)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20); // would deal 20 − 2 Defense = 18, fully avoided
+
+            Assert.Equal(1, context.Stats.AttacksDodged);
+            Assert.Equal(18, context.Stats.DamageDodged, 0.001);
+            Assert.Equal(0, context.Stats.AttacksBlocked);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerBlock_RecordsBlockAndReductionPrevented()
+        {
+            // BlockReduction base 2 + 8 = 10; Defense 2.
+            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20); // after Defense 18, blocked to 8 ⇒ reduction prevented = 10
+
+            Assert.Equal(1, context.Stats.AttacksBlocked);
+            Assert.Equal(10, context.Stats.DamageBlocked, 0.001);
+            Assert.Equal(0, context.Stats.AttacksDodged);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerBlock_ReductionNeverExceedsTheWouldBeDamage()
+        {
+            // The block over-absorbs: after Defense only 3 damage remained, so the reduction prevented is 3,
+            // not the full BlockReduction (the blocked amount can never exceed the would-be hit).
+            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8)); // BlockReduction 10
+            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(5); // after Defense 3, blocked to 0 ⇒ reduction prevented = 3
+
+            Assert.Equal(1, context.Stats.AttacksBlocked);
+            Assert.Equal(3, context.Stats.DamageBlocked, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_NormalEnemyHit_RecordsNoDodgeOrBlock()
+        {
+            var player = MakeBattlerWith((Endurance, 0)); // no dodge/block chance
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20);
+
+            Assert.Equal(0, context.Stats.AttacksDodged);
+            Assert.Equal(0, context.Stats.DamageDodged, 0.001);
+            Assert.Equal(0, context.Stats.AttacksBlocked);
+            Assert.Equal(0, context.Stats.DamageBlocked, 0.001);
+        }
+
         // ── DamageTarget: RNG draw order ─────────────────────────────────────
 
         [Fact]

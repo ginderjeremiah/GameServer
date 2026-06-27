@@ -115,6 +115,12 @@ namespace Game.Core.Battle
                 actualDamage = _targetBattler.TakeDamage(damage);
 
                 Stats.PlayerDamageDealt += actualDamage;
+                if (isCrit)
+                {
+                    Stats.CriticalHits++;
+                    Stats.CriticalDamageDealt += actualDamage;
+                }
+
                 if (actualDamage > Stats.HighestPlayerAttack)
                 {
                     Stats.HighestPlayerAttack = actualDamage;
@@ -127,13 +133,22 @@ namespace Game.Core.Battle
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
                 var isBlock = _rng.Next() < _targetBattler.GetAttributeValue(BlockChance);
 
+                // The post-Defense damage the hit would deal if it landed normally — the basis for how much a
+                // dodge avoided or a block prevented (the same Defense clamp Battler.TakeDamage applies).
+                var afterDefense = rawDamage - _targetBattler.GetAttributeValue(Defense);
+                afterDefense = afterDefense > 0 ? afterDefense : 0;
+
                 if (isDodge)
                 {
                     actualDamage = 0;
+                    Stats.AttacksDodged++;
+                    Stats.DamageDodged += afterDefense;
                 }
                 else if (isBlock)
                 {
                     actualDamage = _targetBattler.TakeDamage(rawDamage, _targetBattler.GetAttributeValue(BlockReduction));
+                    Stats.AttacksBlocked++;
+                    Stats.DamageBlocked += afterDefense - actualDamage;
                 }
                 else
                 {

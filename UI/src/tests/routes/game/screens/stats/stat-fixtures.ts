@@ -30,5 +30,16 @@ export const SERVER_STAT_TYPES: IStatisticType[] = [
 	{ id: EStatisticType.PlayerDeaths, entityType: EEntityType.None, bossOnly: false, name: 'Player Deaths' },
 	{ id: EStatisticType.TotalBattleTime, entityType: EEntityType.None, bossOnly: false, name: 'Total Battle Time' },
 	{ id: EStatisticType.FastestVictory, entityType: EEntityType.Enemy, bossOnly: false, name: 'Fastest Victory' },
-	{ id: EStatisticType.SkillsUsed, entityType: EEntityType.Skill, bossOnly: false, name: 'Skills Used' }
+	{ id: EStatisticType.SkillsUsed, entityType: EEntityType.Skill, bossOnly: false, name: 'Skills Used' },
+	{ id: EStatisticType.CriticalHits, entityType: EEntityType.None, bossOnly: false, name: 'Critical Hits' },
+	{
+		id: EStatisticType.CriticalDamageDealt,
+		entityType: EEntityType.None,
+		bossOnly: false,
+		name: 'Critical Damage Dealt'
+	},
+	{ id: EStatisticType.AttacksDodged, entityType: EEntityType.None, bossOnly: false, name: 'Attacks Dodged' },
+	{ id: EStatisticType.DamageDodged, entityType: EEntityType.None, bossOnly: false, name: 'Damage Dodged' },
+	{ id: EStatisticType.AttacksBlocked, entityType: EEntityType.None, bossOnly: false, name: 'Attacks Blocked' },
+	{ id: EStatisticType.DamageBlocked, entityType: EEntityType.None, bossOnly: false, name: 'Damage Blocked' }
 ];
