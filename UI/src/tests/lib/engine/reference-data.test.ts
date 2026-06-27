@@ -42,7 +42,8 @@ const SETS = [
 	'statisticTypes',
 	'proficiencies',
 	'paths',
-	'classes'
+	'classes',
+	'skillRecipes'
 ];
 
 const COMMANDS = [
@@ -57,7 +58,8 @@ const COMMANDS = [
 	'GetStatisticTypes',
 	'GetProficiencies',
 	'GetPaths',
-	'GetClasses'
+	'GetClasses',
+	'GetSkillRecipes'
 ];
 
 /** Builds the GetReferenceDataVersions payload, defaulting every set to "v1". */

@@ -135,6 +135,13 @@ export const REFERENCE_DATA: RefDataSource[] = [
 		'GetClasses',
 		() => staticData.classes,
 		(d) => (staticData.classes = d)
+	),
+	refSource(
+		'skillRecipes',
+		'Skill Recipes',
+		'GetSkillRecipes',
+		() => staticData.skillRecipes,
+		(d) => (staticData.skillRecipes = d)
 	)
 ];
 

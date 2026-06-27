@@ -107,6 +107,43 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetSkillRecipes_ReturnsSeededSkillRecipesWithInputsAndConditions()
+        {
+            int userId, recipeId, resultSkillId, inputSkillId, proficiencyId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                resultSkillId = (await TestDataSeeder.CreateSkillAsync(context, "RefSynthResult",
+                    acquisition: ESkillAcquisition.Synthesis)).Id;
+                inputSkillId = (await TestDataSeeder.CreateSkillAsync(context, "RefSynthInput")).Id;
+                proficiencyId = (await TestDataSeeder.CreateProficiencyAsync(context, "RefSynthGate")).Id;
+                recipeId = (await TestDataSeeder.CreateSkillRecipeAsync(context, resultSkillId, [inputSkillId],
+                    [(proficiencyId, 3)])).Id;
+
+                var user = await TestDataSeeder.CreateUserAsync(context, "recipesocketuser", "recipesocketpass");
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                userId = user.Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+            await LoginAsync("recipesocketuser", "recipesocketpass");
+
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<SkillRecipe>>("GetSkillRecipes");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            var recipe = Assert.Single(response.Data, r => r.Id == recipeId);
+            Assert.Equal(resultSkillId, recipe.ResultSkillId);
+            Assert.Equal([inputSkillId], recipe.InputSkillIds);
+            var condition = Assert.Single(recipe.Conditions);
+            Assert.Equal(proficiencyId, condition.ProficiencyId);
+            Assert.Equal(3, condition.MinLevel);
+            Assert.Null(recipe.RetiredAt);
+        }
+
+        [Fact]
         public async Task GetItems_ReturnsSeededItems()
         {
             var userId = await SeedReferenceDataAndLoginAsync();
@@ -322,7 +359,7 @@ namespace Game.Api.Tests.Integration
             // One entry per Get* reference-data command the loading screen pulls.
             Assert.Equal(
                 ["GetAttributes", "GetChallengeTypes", "GetChallenges", "GetClasses", "GetEnemies", "GetItemMods",
-                 "GetItems", "GetPaths", "GetProficiencies", "GetSkills", "GetStatisticTypes", "GetZones"],
+                 "GetItems", "GetPaths", "GetProficiencies", "GetSkillRecipes", "GetSkills", "GetStatisticTypes", "GetZones"],
                 response.Data.Select(v => v.Command).OrderBy(c => c, StringComparer.Ordinal));
             Assert.All(response.Data, v => Assert.False(string.IsNullOrEmpty(v.Version)));
         }
