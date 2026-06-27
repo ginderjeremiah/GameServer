@@ -33,6 +33,7 @@ import type {
 	IServerCommandFailedModel,
 	ISetItemFavoriteRequest,
 	ISkill,
+	ISkillRecipe,
 	IStatisticType,
 	IZone
 } from './';
@@ -58,6 +59,7 @@ export type ApiSocketResponseTypes = {
 	'GetPlayerStatistics': IPlayerStatistic[];
 	'GetProficiencies': IProficiency[];
 	'GetReferenceDataVersions': IReferenceDataVersion[];
+	'GetSkillRecipes': ISkillRecipe[];
 	'GetSkills': ISkill[];
 	'GetStatisticTypes': IStatisticType[];
 	'GetZones': IZone[];

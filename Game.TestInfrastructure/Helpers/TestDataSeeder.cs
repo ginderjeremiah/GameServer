@@ -107,6 +107,29 @@ namespace Game.TestInfrastructure.Helpers
             return skill;
         }
 
+        /// <summary>
+        /// Seeds a skill-synthesis recipe producing <paramref name="resultSkillId"/> from the given
+        /// <paramref name="inputSkillIds"/>, with optional proficiency-level conditions.
+        /// </summary>
+        public static async Task<SkillRecipe> CreateSkillRecipeAsync(
+            GameContext context,
+            int resultSkillId,
+            IEnumerable<int> inputSkillIds,
+            IEnumerable<(int ProficiencyId, int MinLevel)>? conditions = null)
+        {
+            var recipe = new SkillRecipe { ResultSkillId = resultSkillId };
+            context.SkillRecipes.Add(recipe);
+            await context.SaveChangesAsync();
+
+            context.SkillRecipeInputs.AddRange(inputSkillIds.Select(skillId =>
+                new SkillRecipeInput { RecipeId = recipe.Id, SkillId = skillId }));
+            context.SkillRecipeConditions.AddRange((conditions ?? []).Select(c =>
+                new SkillRecipeCondition { RecipeId = recipe.Id, ProficiencyId = c.ProficiencyId, MinLevel = c.MinLevel }));
+            await context.SaveChangesAsync();
+
+            return recipe;
+        }
+
         public static async Task<Item> CreateItemAsync(
             GameContext context,
             string name = "Test Item",

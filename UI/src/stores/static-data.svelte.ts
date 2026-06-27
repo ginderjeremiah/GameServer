@@ -9,6 +9,7 @@ import {
 	IPath,
 	IProficiency,
 	ISkill,
+	ISkillRecipe,
 	IStatisticType,
 	IZone
 } from '$lib/api';
@@ -25,6 +26,7 @@ let statisticTypes = $state<IStatisticType[]>();
 let proficiencies = $state<IProficiency[]>();
 let paths = $state<IPath[]>();
 let classes = $state<IClass[]>();
+let skillRecipes = $state<ISkillRecipe[]>();
 
 /* The backing `$state` slots are genuinely `undefined` until the loading screen (or the silent
    session-resume path) populates them, so the getters honestly expose `T[] | undefined` rather than
@@ -104,6 +106,12 @@ export const staticData = {
 	set classes(value: IClass[] | undefined) {
 		classes = value;
 	},
+	get skillRecipes(): ISkillRecipe[] | undefined {
+		return skillRecipes;
+	},
+	set skillRecipes(value: ISkillRecipe[] | undefined) {
+		skillRecipes = value;
+	},
 	get loaded(): boolean {
 		return [
 			zones,
@@ -117,7 +125,8 @@ export const staticData = {
 			statisticTypes,
 			proficiencies,
 			paths,
-			classes
+			classes,
+			skillRecipes
 		].every((set) => set != null);
 	}
 };
