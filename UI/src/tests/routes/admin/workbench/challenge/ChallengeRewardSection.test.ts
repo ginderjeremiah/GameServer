@@ -148,6 +148,27 @@ describe('ChallengeRewardSection', () => {
 		expect(container.querySelector('.ch-picker')).toBeNull();
 	});
 
+	it('dismisses the picker on Escape without changing the reward (Popover-owned)', async () => {
+		const { store, record, baseline } = setup();
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		await fireEvent.click(screen.getByText('Choose item…'));
+		expect(container.querySelector('.ch-picker')).toBeTruthy();
+
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		expect(container.querySelector('.ch-picker')).toBeNull();
+		expect((store.items[0] as unknown as IChallenge).rewardItemId).toBeUndefined();
+	});
+
+	it('dismisses the picker on a backdrop click (Popover-owned)', async () => {
+		const { store, record, baseline } = setup();
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		await fireEvent.click(screen.getByText('Choose item…'));
+		expect(container.querySelector('.ch-picker')).toBeTruthy();
+
+		await fireEvent.click(container.querySelector('.popover-backdrop') as HTMLElement);
+		expect(container.querySelector('.ch-picker')).toBeNull();
+	});
+
 	it('collapses an open picker when the rendered record switches to a different challenge', async () => {
 		// Two sibling challenges in the same store; the section is reused as the detail
 		// pane switches between them, and its $effect must reset the open picker on switch.
