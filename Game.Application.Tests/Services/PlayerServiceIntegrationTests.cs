@@ -22,6 +22,58 @@ namespace Game.Application.Tests.Services
         public PlayerServiceIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
         [Fact]
+        public async Task EquipItem_ProficiencyGateNotMet_RejectsWithoutEquipping()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, "Fire Magic", maxLevel: 10);
+            // The item requires Fire Magic level 5; the player has only reached level 4.
+            var item = await TestDataSeeder.CreateItemAsync(
+                context, requiredProficiencyId: proficiency.Id, requiredProficiencyLevel: 5);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id);
+            await TestDataSeeder.AddPlayerProficiencyAsync(context, playerEntity.Id, proficiency.Id, level: 4);
+            await ReloadReferenceCachesAsync();
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var equipped = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+
+            Assert.False(equipped);
+            Assert.DoesNotContain(player.Inventory.EquipmentSlots, s => s.ItemId == item.Id);
+        }
+
+        [Fact]
+        public async Task EquipItem_ProficiencyGateMet_Equips()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, "Fire Magic", maxLevel: 10);
+            var item = await TestDataSeeder.CreateItemAsync(
+                context, requiredProficiencyId: proficiency.Id, requiredProficiencyLevel: 5);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id);
+            // The player has reached exactly the required level, so the gate is satisfied.
+            await TestDataSeeder.AddPlayerProficiencyAsync(context, playerEntity.Id, proficiency.Id, level: 5);
+            await ReloadReferenceCachesAsync();
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var equipped = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+
+            Assert.True(equipped);
+            Assert.Contains(player.Inventory.EquipmentSlots, s => s.ItemId == item.Id);
+        }
+
+        [Fact]
         public async Task TryUpdateAttributes_ValidUpdate_ReturnsTrue()
         {
             using var scope = CreateScope();

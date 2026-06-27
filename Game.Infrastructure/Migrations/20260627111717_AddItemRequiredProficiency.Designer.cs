@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260627111717_AddItemRequiredProficiency")]
+    partial class AddItemRequiredProficiency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1453,61 +1456,6 @@ namespace Game.Infrastructure.Migrations
                     b.ToTable("SkillPathContributions");
                 });
 
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipe", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
-
-                    b.Property<int>("ResultSkillId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("RetiredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ResultSkillId");
-
-                    b.ToTable("SkillRecipes");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipeCondition", b =>
-                {
-                    b.Property<int>("RecipeId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ProficiencyId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("MinLevel")
-                        .HasColumnType("integer");
-
-                    b.HasKey("RecipeId", "ProficiencyId");
-
-                    b.HasIndex("ProficiencyId");
-
-                    b.ToTable("SkillRecipeConditions");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipeInput", b =>
-                {
-                    b.Property<int>("RecipeId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SkillId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("RecipeId", "SkillId");
-
-                    b.HasIndex("SkillId");
-
-                    b.ToTable("SkillRecipeInputs");
-                });
-
             modelBuilder.Entity("Game.Infrastructure.Entities.StatisticType", b =>
                 {
                     b.Property<int>("Id")
@@ -2516,55 +2464,6 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipe", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Skill", "ResultSkill")
-                        .WithMany()
-                        .HasForeignKey("ResultSkillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ResultSkill");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipeCondition", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.Proficiency", "Proficiency")
-                        .WithMany()
-                        .HasForeignKey("ProficiencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Game.Infrastructure.Entities.SkillRecipe", "Recipe")
-                        .WithMany("Conditions")
-                        .HasForeignKey("RecipeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Proficiency");
-
-                    b.Navigation("Recipe");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipeInput", b =>
-                {
-                    b.HasOne("Game.Infrastructure.Entities.SkillRecipe", "Recipe")
-                        .WithMany("Inputs")
-                        .HasForeignKey("RecipeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Game.Infrastructure.Entities.Skill", "Skill")
-                        .WithMany()
-                        .HasForeignKey("SkillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Recipe");
-
-                    b.Navigation("Skill");
-                });
-
             modelBuilder.Entity("Game.Infrastructure.Entities.Tag", b =>
                 {
                     b.HasOne("Game.Infrastructure.Entities.TagCategory", "TagCategory")
@@ -2809,13 +2708,6 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("SkillDamageMultipliers");
 
                     b.Navigation("SkillEffects");
-                });
-
-            modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipe", b =>
-                {
-                    b.Navigation("Conditions");
-
-                    b.Navigation("Inputs");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.StatisticType", b =>

@@ -39,18 +39,49 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(grantedSkillId, core.GrantedSkillId);
         }
 
-        private static EntityItem NewItem(int? grantedSkillId) => new()
+        [Theory]
+        [InlineData(null, 0)]
+        [InlineData(0, 1)]
+        [InlineData(4, 7)]
+        public void ToContract_RoundTripsRequiredProficiency(int? requiredProficiencyId, int requiredProficiencyLevel)
         {
-            Id = 0,
-            Name = "Test",
-            Description = "",
-            IconPath = "",
-            ItemCategoryId = (int)EItemCategory.Weapon,
-            RarityId = (int)ERarity.Common,
-            GrantedSkillId = grantedSkillId,
-            ItemAttributes = [],
-            ItemModSlots = [],
-            Tags = [],
-        };
+            var entity = NewItem(requiredProficiencyId: requiredProficiencyId, requiredProficiencyLevel: requiredProficiencyLevel);
+
+            var contract = ItemMapper.ToContract(entity);
+
+            Assert.Equal(requiredProficiencyId, contract.RequiredProficiencyId);
+            Assert.Equal(requiredProficiencyLevel, contract.RequiredProficiencyLevel);
+        }
+
+        [Theory]
+        [InlineData(null, 0)]
+        [InlineData(0, 1)]
+        [InlineData(4, 7)]
+        public void ToCore_RoundTripsRequiredProficiency(int? requiredProficiencyId, int requiredProficiencyLevel)
+        {
+            var entity = NewItem(requiredProficiencyId: requiredProficiencyId, requiredProficiencyLevel: requiredProficiencyLevel);
+
+            var core = ItemMapper.ToCore(entity);
+
+            Assert.Equal(requiredProficiencyId, core.RequiredProficiencyId);
+            Assert.Equal(requiredProficiencyLevel, core.RequiredProficiencyLevel);
+        }
+
+        private static EntityItem NewItem(int? grantedSkillId = null, int? requiredProficiencyId = null,
+            int requiredProficiencyLevel = 0) => new()
+            {
+                Id = 0,
+                Name = "Test",
+                Description = "",
+                IconPath = "",
+                ItemCategoryId = (int)EItemCategory.Weapon,
+                RarityId = (int)ERarity.Common,
+                GrantedSkillId = grantedSkillId,
+                RequiredProficiencyId = requiredProficiencyId,
+                RequiredProficiencyLevel = requiredProficiencyLevel,
+                ItemAttributes = [],
+                ItemModSlots = [],
+                Tags = [],
+            };
     }
 }

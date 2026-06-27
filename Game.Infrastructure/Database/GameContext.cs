@@ -255,6 +255,14 @@ namespace Game.Infrastructure.Database
                 entity.Property(i => i.Name)
                     .HasMaxLength(50);
 
+                // The proficiency gate is an optional reference to a proficiency. Navigation-less FK (like the
+                // zone unlock challenge): deleting the referenced proficiency clears the gate (SetNull),
+                // leaving the item ungated, rather than blocking the delete.
+                entity.HasOne<Proficiency>()
+                    .WithMany()
+                    .HasForeignKey(i => i.RequiredProficiencyId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
                 // Explicit join entity (ItemTag) backs the Item.Tags skip navigation so the admin tag-setting
                 // path can add/remove a single assignment without loading a tag's full membership. Cascade is
                 // load-bearing: hard-deleting an in-use tag (#297) relies on its join rows cascading away.

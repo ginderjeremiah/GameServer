@@ -46,6 +46,39 @@ namespace Game.Core.Tests.Items
             Assert.Contains(modifiers, m => m.Attribute == EAttribute.Agility && m.Amount == 4);
         }
 
+        // ── MeetsProficiencyRequirement ─────────────────────────────────────
+
+        [Fact]
+        public void MeetsProficiencyRequirement_UngatedItem_AlwaysMet()
+        {
+            var item = MakeItem(1, []);
+
+            Assert.True(item.MeetsProficiencyRequirement(new Dictionary<int, int>()));
+            Assert.True(item.MeetsProficiencyRequirement(new Dictionary<int, int> { [3] = 0 }));
+        }
+
+        [Theory]
+        [InlineData(5, true)]   // exactly the required level meets the gate
+        [InlineData(6, true)]   // above the required level meets the gate
+        [InlineData(4, false)]  // below the required level fails the gate
+        public void MeetsProficiencyRequirement_GatedItem_ComparesAgainstPlayerLevel(int playerLevel, bool expected)
+        {
+            var item = MakeGatedItem(requiredProficiencyId: 3, requiredProficiencyLevel: 5);
+
+            var met = item.MeetsProficiencyRequirement(new Dictionary<int, int> { [3] = playerLevel });
+
+            Assert.Equal(expected, met);
+        }
+
+        [Fact]
+        public void MeetsProficiencyRequirement_GatedItem_MissingProficiencyTreatedAsLevelZero()
+        {
+            var item = MakeGatedItem(requiredProficiencyId: 3, requiredProficiencyLevel: 1);
+
+            // The player has never trained proficiency 3 (no entry), so they are below any positive gate.
+            Assert.False(item.MeetsProficiencyRequirement(new Dictionary<int, int> { [9] = 99 }));
+        }
+
         private static Item MakeItem(int id, List<AttributeModifier> attributes) => new()
         {
             Id = id,
@@ -54,6 +87,19 @@ namespace Game.Core.Tests.Items
             Category = EItemCategory.Accessory,
             Rarity = ERarity.Common,
             Attributes = attributes,
+            ModSlots = [],
+        };
+
+        private static Item MakeGatedItem(int requiredProficiencyId, int requiredProficiencyLevel) => new()
+        {
+            Id = 1,
+            Name = "Gated",
+            Description = string.Empty,
+            Category = EItemCategory.Accessory,
+            Rarity = ERarity.Common,
+            RequiredProficiencyId = requiredProficiencyId,
+            RequiredProficiencyLevel = requiredProficiencyLevel,
+            Attributes = [],
             ModSlots = [],
         };
 

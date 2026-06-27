@@ -96,7 +96,7 @@ namespace Game.Core.Tests.Players
             var item = MakeItem(1, EItemCategory.Accessory);
             AddUnlockedItem(inventory, item);
 
-            var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
             Assert.True(result);
             var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
@@ -109,7 +109,7 @@ namespace Game.Core.Tests.Players
         {
             var inventory = new Inventory();
 
-            var result = inventory.TryEquipItem(999, EEquipmentSlot.AccessorySlot);
+            var result = inventory.TryEquipItem(999, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
             Assert.False(result);
         }
@@ -122,7 +122,7 @@ namespace Game.Core.Tests.Players
             AddUnlockedItem(inventory, item);
 
             // Weapon into Accessory slot should fail
-            var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
             Assert.False(result);
         }
@@ -134,7 +134,7 @@ namespace Game.Core.Tests.Players
             var item = MakeItem(1, EItemCategory.Accessory);
             AddUnlockedItem(inventory, item);
 
-            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
             // Find another accessory slot if one exists, or just verify the old slot is cleared
             var oldSlot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
@@ -149,9 +149,9 @@ namespace Game.Core.Tests.Players
             var itemB = MakeItem(2, EItemCategory.Accessory);
             AddUnlockedItem(inventory, itemA);
             AddUnlockedItem(inventory, itemB);
-            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
-            var result = inventory.TryEquipItem(2, EEquipmentSlot.AccessorySlot);
+            var result = inventory.TryEquipItem(2, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
             Assert.True(result);
             var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
@@ -159,6 +159,46 @@ namespace Game.Core.Tests.Players
             Assert.Equal(itemB, slot.Item);
             // The previously equipped item must no longer occupy any slot.
             Assert.DoesNotContain(inventory.EquipmentSlots, s => s.ItemId == 1);
+        }
+
+        [Fact]
+        public void TryEquipItem_ProficiencyGateMet_EquipsSuccessfully()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory, requiredProficiencyId: 3, requiredProficiencyLevel: 5);
+            AddUnlockedItem(inventory, item);
+
+            var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int> { [3] = 5 });
+
+            Assert.True(result);
+            var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
+            Assert.Equal(1, slot.ItemId);
+        }
+
+        [Fact]
+        public void TryEquipItem_ProficiencyGateNotMet_ReturnsFalseAndDoesNotEquip()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory, requiredProficiencyId: 3, requiredProficiencyLevel: 5);
+            AddUnlockedItem(inventory, item);
+
+            var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int> { [3] = 4 });
+
+            Assert.False(result);
+            var slot = inventory.EquipmentSlots.First(s => s.Value == EEquipmentSlot.AccessorySlot);
+            Assert.Null(slot.ItemId);
+        }
+
+        [Fact]
+        public void TryEquipItem_UngatedItem_EquipsRegardlessOfProficiencies()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, EItemCategory.Accessory);
+            AddUnlockedItem(inventory, item);
+
+            var result = inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
+
+            Assert.True(result);
         }
 
         // ── TryUnequipItem ──────────────────────────────────────────────────
@@ -169,7 +209,7 @@ namespace Game.Core.Tests.Players
             var inventory = new Inventory();
             var item = MakeItem(1, EItemCategory.Accessory);
             AddUnlockedItem(inventory, item);
-            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
             var result = inventory.TryUnequipItem(EEquipmentSlot.AccessorySlot);
 
@@ -469,7 +509,7 @@ namespace Game.Core.Tests.Players
                 },
             ]);
             AddUnlockedItem(inventory, item);
-            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
 
             var modifiers = inventory.GetEquippedAttributeModifiers().ToList();
 
@@ -497,7 +537,7 @@ namespace Game.Core.Tests.Players
                 new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
             ]);
             AddUnlockedItem(inventory, item);
-            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
             inventory.UnlockMod(10);
             inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix, attributes:
             [
@@ -523,7 +563,7 @@ namespace Game.Core.Tests.Players
                     new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
                 ]);
             AddUnlockedItem(inventory, item);
-            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
             inventory.UnlockMod(10);
             inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix, attributes:
             [
@@ -568,7 +608,7 @@ namespace Game.Core.Tests.Players
                 new ItemModSlot { Id = 1, Type = EItemModType.Suffix },
             ]);
             AddUnlockedItem(inventory, item);
-            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot);
+            inventory.TryEquipItem(1, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>());
             inventory.UnlockMod(10);
             inventory.UnlockMod(11);
             inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix, attributes:
@@ -634,7 +674,7 @@ namespace Game.Core.Tests.Players
             Assert.True(slot.Favorite);
             Assert.Equal(10, Assert.Single(slot.AppliedMods).ItemModId);
             // The rebuilt index is live, so a lookup-driven operation against the restored item resolves it.
-            Assert.True(restored.TryEquipItem(3, EEquipmentSlot.AccessorySlot));
+            Assert.True(restored.TryEquipItem(3, EEquipmentSlot.AccessorySlot, new Dictionary<int, int>()));
         }
 
         // ── Slot ItemId is derived from Item (single source of truth) ────────
@@ -664,13 +704,16 @@ namespace Game.Core.Tests.Players
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory, ERarity rarity = ERarity.Common,
-            List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null) => new()
+            List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null,
+            int? requiredProficiencyId = null, int requiredProficiencyLevel = 0) => new()
             {
                 Id = id,
                 Name = $"Item {id}",
                 Description = string.Empty,
                 Category = category,
                 Rarity = rarity,
+                RequiredProficiencyId = requiredProficiencyId,
+                RequiredProficiencyLevel = requiredProficiencyLevel,
                 Attributes = attributes ?? [],
                 ModSlots = modSlots ?? [],
             };

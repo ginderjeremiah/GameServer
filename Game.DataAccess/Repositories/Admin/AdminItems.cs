@@ -13,11 +13,13 @@ namespace Game.DataAccess.Repositories.Admin
     /// the unit of work; the per-action commit filter persists them.
     /// </summary>
     internal class AdminItems(
-        IItemEntityCache items, ISkillEntityCache skills, ITagAssignmentQueries tags, IEntityStore entityStore)
+        IItemEntityCache items, ISkillEntityCache skills, IProficiencyEntityCache proficiencies,
+        ITagAssignmentQueries tags, IEntityStore entityStore)
         : IAdminItems
     {
         private readonly IItemEntityCache _items = items;
         private readonly ISkillEntityCache _skills = skills;
+        private readonly IProficiencyEntityCache _proficiencies = proficiencies;
         private readonly ITagAssignmentQueries _tags = tags;
         private readonly IEntityStore _entityStore = entityStore;
 
@@ -43,6 +45,14 @@ namespace Game.DataAccess.Repositories.Admin
                 return rejection;
             }
 
+            // A proficiency gate must reference an existing, non-retired proficiency and name a level within
+            // that proficiency's range — a bad FK would otherwise FK-fault at commit, and an out-of-range
+            // level would author an unsatisfiable (or no-op) gate.
+            if (FindProficiencyGateViolation(changes) is { } gateRejection)
+            {
+                return gateRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Item
                 {
@@ -52,6 +62,8 @@ namespace Game.DataAccess.Repositories.Admin
                     RarityId = (int)item.RarityId,
                     IconPath = item.IconPath,
                     GrantedSkillId = item.GrantedSkillId,
+                    RequiredProficiencyId = item.RequiredProficiencyId,
+                    RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
                 }),
                 // Build a fresh, navigation-free entity rather than mutating the cached one, whose loaded
                 // graph would otherwise be dragged into the change tracker.
@@ -64,6 +76,8 @@ namespace Game.DataAccess.Repositories.Admin
                     RarityId = (int)item.RarityId,
                     IconPath = item.IconPath,
                     GrantedSkillId = item.GrantedSkillId,
+                    RequiredProficiencyId = item.RequiredProficiencyId,
+                    RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
@@ -97,6 +111,44 @@ namespace Game.DataAccess.Repositories.Admin
                 {
                     return AdminSaveResult.Failure(
                         $"Skill '{skill.Name}' is not flagged as Item-acquirable and cannot be granted by an item.");
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Returns a rejection for the first added/edited item whose <c>RequiredProficiencyId</c> targets a
+        /// proficiency that does not exist or is retired, or whose <c>RequiredProficiencyLevel</c> is outside
+        /// the proficiency's <c>[1, MaxLevel]</c> range, or null when every gate is valid. Ungated items and
+        /// deletes are skipped.
+        /// </summary>
+        private AdminSaveResult? FindProficiencyGateViolation(IReadOnlyList<Change<Contracts.Item>> changes)
+        {
+            foreach (var change in changes)
+            {
+                if (change.ChangeType == EChangeType.Delete || change.Item.RequiredProficiencyId is not { } proficiencyId)
+                {
+                    continue;
+                }
+
+                var proficiency = _proficiencies.LookupProficiency(proficiencyId);
+                if (proficiency is null)
+                {
+                    return AdminSaveResult.Failure($"Required proficiency {proficiencyId} does not exist.");
+                }
+
+                if (proficiency.RetiredAt is not null)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Proficiency '{proficiency.Name}' is retired and cannot gate an item.");
+                }
+
+                var level = change.Item.RequiredProficiencyLevel;
+                if (level < 1 || level > proficiency.MaxLevel)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Required proficiency level {level} is outside the valid range for '{proficiency.Name}' (1 to {proficiency.MaxLevel}).");
                 }
             }
 

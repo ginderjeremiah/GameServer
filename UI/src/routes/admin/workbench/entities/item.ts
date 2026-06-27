@@ -9,9 +9,13 @@ import type { EntityConfig } from './types';
 const refresh = async (): Promise<IItem[]> => {
 	const items = await fetchSocketData('GetItems');
 	staticData.items = items;
-	// Normalise the optional granted-skill FK to the select's "None" sentinel (-1) for the editable copy;
+	// Normalise the optional FK fields to the select's "None" sentinel (-1) for the editable copy;
 	// staticData.items stays raw (null = none) for the game/other screens.
-	return items.map((item) => ({ ...item, grantedSkillId: item.grantedSkillId ?? -1 }));
+	return items.map((item) => ({
+		...item,
+		grantedSkillId: item.grantedSkillId ?? -1,
+		requiredProficiencyId: item.requiredProficiencyId ?? -1
+	}));
 };
 
 export const itemEntity: EntityConfig<IItem> = {
@@ -29,6 +33,8 @@ export const itemEntity: EntityConfig<IItem> = {
 		rarityId: ERarity.Common,
 		iconPath: '',
 		grantedSkillId: -1,
+		requiredProficiencyId: -1,
+		requiredProficiencyLevel: 1,
 		attributes: [],
 		modSlots: [],
 		tags: []
@@ -81,6 +87,14 @@ export const itemEntity: EntityConfig<IItem> = {
 					options: reference.grantedSkillOptions,
 					width: 240
 				},
+				{
+					key: 'requiredProficiencyId',
+					label: 'Required Proficiency',
+					type: 'select',
+					options: reference.requiredProficiencyOptions,
+					width: 240
+				},
+				{ key: 'requiredProficiencyLevel', label: 'Required Level', type: 'number', width: 150 },
 				{ key: 'description', label: 'Description', type: 'textarea', placeholder: 'Flavor text…', grow: true }
 			]
 		},
@@ -146,6 +160,8 @@ export const itemEntity: EntityConfig<IItem> = {
 			toPrimaryDto: (it) => ({
 				...it,
 				grantedSkillId: it.grantedSkillId === -1 ? undefined : it.grantedSkillId,
+				// Map the "None" sentinel (-1) back to no gate; the backend ignores the level when ungated.
+				requiredProficiencyId: it.requiredProficiencyId === -1 ? undefined : it.requiredProficiencyId,
 				attributes: [],
 				modSlots: [],
 				tags: []

@@ -20,7 +20,8 @@ const {
 	sampleItems,
 	sampleSlots,
 	sampleStats,
-	staticData
+	staticData,
+	proficiencyLevels
 } = vi.hoisted(() => ({
 	equipItem: vi.fn(),
 	unequipItem: vi.fn(),
@@ -29,6 +30,8 @@ const {
 	removeMod: vi.fn(),
 	toastError: vi.fn(),
 	unlockedMods: new Set<number>(),
+	// The player's per-proficiency levels the equip gate is evaluated against (kept simple: a plain map).
+	proficiencyLevels: new Map<number, number>(),
 	// The manager's itemId-keyed Map that selection/drag now resolve through (kept in sync with
 	// sampleItems in beforeEach), mirroring InventoryManager.unlockedItems.
 	unlockedItems: new Map<number, Item>(),
@@ -69,7 +72,11 @@ vi.mock('$lib/engine', () => ({
 	}
 }));
 
-vi.mock('$stores', () => ({ staticData, toastError }));
+vi.mock('$stores', () => ({
+	staticData,
+	toastError,
+	playerProficiencies: { levelOf: (id: number) => proficiencyLevels.get(id) ?? 0 }
+}));
 
 import { itemCategoryColor, itemCategoryName } from '$lib/common';
 import { InventoryView, SORTS, EQUIP_SLOTS } from '$routes/game/screens/inventory/inventory-view.svelte';
@@ -102,6 +109,7 @@ beforeEach(() => {
 	toastError.mockClear();
 	unlockedMods.clear();
 	unlockedItems.clear();
+	proficiencyLevels.clear();
 	staticData.itemMods = [];
 	sampleSlots.fill(undefined);
 	sampleStats.length = 0;
@@ -363,6 +371,53 @@ describe('InventoryView persist-failure feedback', () => {
 		await new InventoryView().applyMod(2, 0, 7);
 		await new InventoryView().removeMod(2, 0);
 		expect(toastError).not.toHaveBeenCalled();
+	});
+});
+
+describe('InventoryView proficiency equip gate', () => {
+	it('canEquip is true for an ungated item regardless of proficiencies', () => {
+		expect(new InventoryView().canEquip(sampleItems[1])).toBe(true);
+	});
+
+	it('canEquip reflects whether the player meets a gated item requirement', () => {
+		const gated = makeItem(5, 'Gated Blade', EItemCategory.Weapon, ERarity.Epic, {
+			requiredProficiencyId: 3,
+			requiredProficiencyLevel: 5
+		});
+		unlockedItems.set(5, gated);
+
+		proficiencyLevels.set(3, 4);
+		expect(new InventoryView().canEquip(gated)).toBe(false);
+
+		proficiencyLevels.set(3, 5);
+		expect(new InventoryView().canEquip(gated)).toBe(true);
+	});
+
+	it('equip refuses a gated item the player has not qualified for, without calling the manager', async () => {
+		const gated = makeItem(5, 'Gated Blade', EItemCategory.Weapon, ERarity.Epic, {
+			requiredProficiencyId: 3,
+			requiredProficiencyLevel: 5
+		});
+		unlockedItems.set(5, gated);
+		proficiencyLevels.set(3, 2);
+
+		await new InventoryView().equip(5, 4);
+
+		expect(equipItem).not.toHaveBeenCalled();
+		expect(toastError).toHaveBeenCalledWith('You have not met the proficiency requirement to equip this item.');
+	});
+
+	it('equip proceeds once the gate is met', async () => {
+		const gated = makeItem(5, 'Gated Blade', EItemCategory.Weapon, ERarity.Epic, {
+			requiredProficiencyId: 3,
+			requiredProficiencyLevel: 5
+		});
+		unlockedItems.set(5, gated);
+		proficiencyLevels.set(3, 5);
+
+		await new InventoryView().equip(5, 4);
+
+		expect(equipItem).toHaveBeenCalledWith(5, 4);
 	});
 });
 
