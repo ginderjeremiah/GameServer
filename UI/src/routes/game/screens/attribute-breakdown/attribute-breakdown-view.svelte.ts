@@ -61,7 +61,11 @@ export interface BreakdownAttrMeta {
 export const ATTRIBUTE_TYPE_GROUPS: { type: EAttributeType; label: string }[] = [
 	{ type: EAttributeType.Primary, label: 'Primary' },
 	{ type: EAttributeType.Secondary, label: 'Secondary' },
-	{ type: EAttributeType.Status, label: 'Status' }
+	{ type: EAttributeType.Status, label: 'Status' },
+	// The damage-type amplification/resistance family (spike #1320). Stays empty until an amp/resist
+	// attribute gains a non-combat contributor, so it is invisible in V1; Area F (#1328) refines this
+	// flat group into per-damage-type sub-groups via each attribute's `damageTypeKey`.
+	{ type: EAttributeType.Affinity, label: 'Affinity' }
 ];
 
 /** Reference-data description for an attribute (empty when not yet loaded). */

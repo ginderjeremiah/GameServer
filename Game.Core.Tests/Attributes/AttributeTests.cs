@@ -85,12 +85,35 @@ namespace Game.Core.Tests.Attributes
         [InlineData(EAttribute.CooldownRecovery, EAttributeType.Secondary, "CDR")]
         [InlineData(EAttribute.DamageTakenPerSecond, EAttributeType.Status, "DOT")]
         [InlineData(EAttribute.HealthRegenPerSecond, EAttributeType.Status, "REG")]
+        [InlineData(EAttribute.FireAmplification, EAttributeType.Affinity, "FIR AMP")]
+        [InlineData(EAttribute.ElementalResistance, EAttributeType.Affinity, "ELE RES")]
+        [InlineData(EAttribute.DotResistance, EAttributeType.Affinity, "DOT RES")]
         public void Constructor_AssignsTypeAndCode(EAttribute id, EAttributeType expectedType, string expectedCode)
         {
             var attribute = new Attribute(id);
 
             Assert.Equal(expectedType, attribute.AttributeType);
             Assert.Equal(expectedCode, attribute.Code);
+        }
+
+        [Theory]
+        [InlineData(EAttribute.FireAmplification, EDamageTypeKey.Fire)]
+        [InlineData(EAttribute.FireResistance, EDamageTypeKey.Fire)]
+        [InlineData(EAttribute.DotAmplification, EDamageTypeKey.Dot)]
+        public void Constructor_TagsAmpResistAttributesWithTheirDamageTypeKey(EAttribute id, EDamageTypeKey expectedKey)
+        {
+            var attribute = new Attribute(id);
+
+            Assert.Equal(expectedKey, attribute.DamageTypeKey);
+            Assert.True(attribute.IsPercentage);
+        }
+
+        [Theory]
+        [InlineData(EAttribute.Strength)]
+        [InlineData(EAttribute.Defense)]
+        public void Constructor_LeavesDamageTypeKeyNullForNonAmpResistAttributes(EAttribute id)
+        {
+            Assert.Null(new Attribute(id).DamageTypeKey);
         }
 
         [Theory]
