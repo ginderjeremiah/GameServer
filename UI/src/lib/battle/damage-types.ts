@@ -45,13 +45,20 @@ export function resistanceAttributes(type: EDamageType): EAttribute[] {
 	return applies(type).map((key) => DAMAGE_TYPE_KEY_ATTRIBUTES[key].resistance);
 }
 
+// The attribute → key inverse, precomputed once (mirrors the backend's `DamageTypes.KeyByAttribute`)
+// so the lookup is an O(1) map read rather than a per-call scan.
+const KEY_BY_ATTRIBUTE: ReadonlyMap<EAttribute, EDamageTypeKey> = new Map(
+	Object.entries(DAMAGE_TYPE_KEY_ATTRIBUTES).flatMap(([key, attrs]) => {
+		const damageTypeKey = Number(key) as EDamageTypeKey;
+		return [
+			[attrs.amplification, damageTypeKey],
+			[attrs.resistance, damageTypeKey]
+		] as [EAttribute, EDamageTypeKey][];
+	})
+);
+
 /** Inverse of {@link attributesForKey}: the damage-type key an amplification/resistance attribute
  *  belongs to, or `undefined` for any other attribute. Drives the breakdown's by-type grouping. */
 export function keyForAttribute(attribute: EAttribute): EDamageTypeKey | undefined {
-	for (const [key, attrs] of Object.entries(DAMAGE_TYPE_KEY_ATTRIBUTES)) {
-		if (attrs.amplification === attribute || attrs.resistance === attribute) {
-			return Number(key) as EDamageTypeKey;
-		}
-	}
-	return undefined;
+	return KEY_BY_ATTRIBUTE.get(attribute);
 }
