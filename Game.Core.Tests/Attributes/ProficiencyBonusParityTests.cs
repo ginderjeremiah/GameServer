@@ -148,7 +148,6 @@ namespace Game.Core.Tests.Attributes
             MaxLevel = 10,
             BaseXp = 100,
             XpGrowth = 2,
-            SeedSkillId = null,
             PrerequisiteIds = [],
             Levels = levels.Select(l => new ProficiencyLevel
             {

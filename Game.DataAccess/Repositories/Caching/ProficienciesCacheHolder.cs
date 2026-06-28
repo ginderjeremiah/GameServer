@@ -77,8 +77,8 @@ namespace Game.DataAccess.Repositories.Caching
             // The reverse prerequisite index the open logic consumes: each proficiency → the proficiencies that
             // gate on it, so maxing a node can resolve the gateways it might open without rescanning the set.
             // Proficiencies on a retired path are excluded from the gated side: a retired track is frozen (see
-            // contributionsBySkill below), so it must never be opened as a cross-path gateway and granted its
-            // seed skill when its live prerequisites max — mirroring the accrual freeze at the open choke point.
+            // contributionsBySkill below), so it must never be opened as a cross-path gateway when its live
+            // prerequisites max — mirroring the accrual freeze at the open choke point.
             var dependentsByProficiency = entities
                 .Where(p => !retiredPathIds.Contains(p.PathId))
                 .SelectMany(p => p.Prerequisites.Select(pr => (Gated: p.Id, Prerequisite: pr.PrerequisiteProficiencyId)))

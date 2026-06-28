@@ -70,7 +70,6 @@ const applyPost = (endpoint: string, body: Rec) => {
 					...change.item,
 					id: id++,
 					retiredAt: change.item.retiredAt ?? null,
-					seedSkillId: change.item.seedSkillId ?? null,
 					levelModifiers: [],
 					levelRewards: [],
 					prerequisiteIds: []
@@ -81,7 +80,6 @@ const applyPost = (endpoint: string, body: Rec) => {
 					Object.assign(existing, {
 						...change.item,
 						retiredAt: change.item.retiredAt ?? null,
-						seedSkillId: change.item.seedSkillId ?? null,
 						levelModifiers: existing.levelModifiers,
 						levelRewards: existing.levelRewards,
 						prerequisiteIds: existing.prerequisiteIds
@@ -124,7 +122,6 @@ const fullTier = (over: Rec): Rec => ({
 	maxLevel: 10,
 	baseXp: 100,
 	xpGrowth: 1.4,
-	seedSkillId: null,
 	levelModifiers: [],
 	levelRewards: [],
 	prerequisiteIds: [],
@@ -160,8 +157,6 @@ describe('load & normalization', () => {
 		expect(store.loaded).toBe(true);
 		expect(store.paths).toHaveLength(1);
 		expect(store.selectedPathId).toBe(0);
-		// Server null seed skill normalises to the -1 sentinel without registering a diff.
-		expect(store.profs[0].seedSkillId).toBe(-1);
 		expect(store.totalChanges).toBe(0);
 	});
 });
@@ -422,13 +417,11 @@ describe('navigation & detail mutations', () => {
 		expect(reqProf(store, 0).levelModifiers.some((m) => m.level === 2)).toBe(false);
 	});
 
-	it('edits gateways: seed skill and prerequisites (deduped)', async () => {
+	it('edits gateways: cross-path prerequisites (deduped)', async () => {
 		richServer();
 		const store = new ProgressionStore();
 		await store.load();
 
-		store.setSeedSkill(0, 2);
-		expect(reqProf(store, 0).seedSkillId).toBe(2);
 		store.addPrerequisite(0, 1);
 		store.addPrerequisite(0, 1);
 		expect(reqProf(store, 0).prerequisiteIds).toEqual([1]);

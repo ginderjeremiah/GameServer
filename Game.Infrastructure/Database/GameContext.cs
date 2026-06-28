@@ -580,13 +580,6 @@ namespace Game.Infrastructure.Database
                 // schema and makes the home-tier → tier resolution unambiguous.
                 entity.HasIndex(p => new { p.PathId, p.PathOrdinal })
                     .IsUnique();
-
-                // Optional tree-seed skill. Clear the FK if the skill is ever removed (skills are retired,
-                // not deleted, so this never fires in practice).
-                entity.HasOne(p => p.SeedSkill)
-                    .WithMany()
-                    .HasForeignKey(p => p.SeedSkillId)
-                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ProficiencyLevelModifier>(entity =>

@@ -15,7 +15,7 @@ import {
 	resolveNewIds,
 	tiersOfPath
 } from './progression-helpers';
-import { NO_SEED_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types';
+import { NO_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -67,13 +67,12 @@ export class ProgressionStore {
 		}
 	}
 
-	/** Replace the working + baseline data from server truth, normalising the seed-skill sentinel. */
+	/** Replace the working + baseline data from server truth. */
 	private setData(paths: IPath[], profs: IProficiency[]) {
-		const normProfs: WorkbenchProficiency[] = profs.map((p) => ({ ...p, seedSkillId: p.seedSkillId ?? NO_SEED_SKILL }));
 		this.paths = paths.map(clone);
 		this.basePaths = paths.map(clone);
-		this.profs = normProfs.map(clone);
-		this.baseProfs = normProfs.map(clone);
+		this.profs = profs.map(clone);
+		this.baseProfs = profs.map(clone);
 		staticData.paths = paths;
 		staticData.proficiencies = profs;
 	}
@@ -355,11 +354,11 @@ export class ProgressionStore {
 		});
 	}
 
-	/** Upsert (skillId ≥ 0) or clear (NO_SEED_SKILL) the milestone reward skill at a level. */
+	/** Upsert (skillId ≥ 0) or clear (NO_SKILL) the milestone reward skill at a level. */
 	setReward(profId: number, level: number, skillId: number) {
 		this.patchProf(profId, (draft) => {
 			const others = draft.levelRewards.filter((r) => r.level !== level);
-			draft.levelRewards = skillId === NO_SEED_SKILL ? others : [...others, { level, rewardSkillId: skillId }];
+			draft.levelRewards = skillId === NO_SKILL ? others : [...others, { level, rewardSkillId: skillId }];
 		});
 	}
 
@@ -376,13 +375,7 @@ export class ProgressionStore {
 		});
 	}
 
-	// ── Gateways (seed skill + cross-path prerequisites) ──
-
-	setSeedSkill(profId: number, skillId: number) {
-		this.patchProf(profId, (draft) => {
-			draft.seedSkillId = skillId;
-		});
-	}
+	// ── Gateways (cross-path prerequisites) ──
 
 	addPrerequisite(profId: number, prerequisiteId: number) {
 		this.patchProf(profId, (draft) => {

@@ -29,7 +29,7 @@ namespace Game.Api.Tests.Unit
                         GrantedSkillIds = [9],
                     },
                 ],
-                Opened = [new ProficiencyOpenedModel { ProficiencyId = 4, SeedSkillId = 11 }],
+                Opened = [new ProficiencyOpenedModel { ProficiencyId = 4 }],
             };
 
             var command = new ProficiencyXpGained();
@@ -48,7 +48,6 @@ namespace Game.Api.Tests.Unit
             Assert.Equal([9], echoed.GrantedSkillIds);
             var opened = Assert.Single(response.Data.Opened);
             Assert.Equal(4, opened.ProficiencyId);
-            Assert.Equal(11, opened.SeedSkillId);
         }
 
         [Fact]

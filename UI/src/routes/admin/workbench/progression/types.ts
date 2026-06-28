@@ -8,16 +8,14 @@ import type { IPath, IProficiency } from '$lib/api';
 export type WorkbenchPath = IPath;
 
 /**
- * A proficiency (a path tier) as edited in the workbench. The optional seed-skill FK is widened to a
- * plain number so the select can use a "None" sentinel (-1), mirroring how items/classes handle their
- * optional granted/scaling FKs; it maps back to `undefined` in the persisted DTO.
+ * A proficiency (a path tier) as edited in the workbench. Identical to the {@link IProficiency} contract —
+ * its level modifiers/rewards and prerequisites ride along and are persisted through their dedicated
+ * relationship endpoints.
  */
-export interface WorkbenchProficiency extends Omit<IProficiency, 'seedSkillId'> {
-	seedSkillId: number;
-}
+export type WorkbenchProficiency = IProficiency;
 
-/** The "no seed skill" sentinel for the seed-skill select. */
-export const NO_SEED_SKILL = -1;
+/** The "no skill" sentinel for the milestone reward-skill select (-1 ⇒ no skill chosen / cleared). */
+export const NO_SKILL = -1;
 
 /** The two record kinds the progression editor authors. */
 export type ProgressionKind = 'path' | 'tier';

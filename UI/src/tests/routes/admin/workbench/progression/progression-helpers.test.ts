@@ -23,7 +23,7 @@ import {
 	tiersOfPath,
 	xpCostCurve
 } from '$routes/admin/workbench/progression/progression-helpers';
-import { NO_SEED_SKILL, type WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
 
 const tier = (overrides: Partial<WorkbenchProficiency> & Pick<WorkbenchProficiency, 'id'>): WorkbenchProficiency => ({
 	...newProficiency(overrides.id, overrides.pathId ?? 1, overrides.pathOrdinal ?? 0),
@@ -198,27 +198,22 @@ describe('DTO builders', () => {
 		expect(dto.name).toBe('Fire');
 	});
 
-	it('profIdentityDto maps the seed-skill sentinel to undefined and clears child sets', () => {
-		const noSeed = profIdentityDto(tier({ id: 1, seedSkillId: NO_SEED_SKILL }));
-		expect(noSeed.seedSkillId).toBeUndefined();
-		expect(noSeed.levelModifiers).toEqual([]);
-		expect(noSeed.prerequisiteIds).toEqual([]);
-
-		const withSeed = profIdentityDto(tier({ id: 2, seedSkillId: 4 }));
-		expect(withSeed.seedSkillId).toBe(4);
+	it('profIdentityDto clears the child sets (persisted via dedicated relationship endpoints)', () => {
+		const dto = profIdentityDto(tier({ id: 1 }));
+		expect(dto.levelModifiers).toEqual([]);
+		expect(dto.prerequisiteIds).toEqual([]);
 	});
 });
 
 describe('factories', () => {
-	it('newProficiency carries strawman cap/curve defaults and the no-seed sentinel', () => {
+	it('newProficiency carries strawman cap/curve defaults', () => {
 		const p = newProficiency(-1, 3, 2);
 		expect(p).toMatchObject({
 			pathId: 3,
 			pathOrdinal: 2,
 			maxLevel: 10,
 			baseXp: 100,
-			xpGrowth: 1.4,
-			seedSkillId: NO_SEED_SKILL
+			xpGrowth: 1.4
 		});
 	});
 });
