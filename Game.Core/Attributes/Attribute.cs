@@ -58,6 +58,13 @@ namespace Game.Core.Attributes
         public int Decimals { get; }
 
         /// <summary>
+        /// The damage-type key this is an amplification/resistance attribute for (spike #1320), or
+        /// <c>null</c> for every other attribute. Lets the breakdown screen group the amp/resist family
+        /// by damage type. A display tag only; never used in battle math, so it is parity-safe.
+        /// </summary>
+        public EDamageTypeKey? DamageTypeKey { get; }
+
+        /// <summary>
         /// Creates a new attribute based on the given enum value.
         /// </summary>
         /// <param name="id"></param>
@@ -73,10 +80,21 @@ namespace Game.Core.Attributes
             Code = metadata.Code;
             DisplayOrder = metadata.DisplayOrder;
             Decimals = metadata.Decimals;
+            DamageTypeKey = DamageTypes.KeyForAttribute(id);
         }
 
         private static string GetDescription(EAttribute value)
         {
+            // The 20 damage-type amplification/resistance attributes (spike #1320) are templated from their
+            // key's foundation facts rather than hand-listed, so the family scales as damage types are added.
+            if (DamageTypes.KeyForAttribute(value) is EDamageTypeKey ampResistKey)
+            {
+                var info = DamageTypes.Info(ampResistKey);
+                return info.Resistance == value
+                    ? $"Reduces the damage you take from {info.Label} attacks."
+                    : $"Increases the damage your {info.Label} attacks deal.";
+            }
+
 #pragma warning disable CS0618 // DropBonus is obsolete but still seeded for data integrity.
             return value switch
             {
@@ -108,6 +126,16 @@ namespace Game.Core.Attributes
         /// </summary>
         private static AttributeDisplayMetadata GetDisplayMetadata(EAttribute value)
         {
+            // Damage-type amplification/resistance attributes (spike #1320): templated from the key's facts —
+            // the Affinity display group, decimal-percentage, harmless, code "<KEY> AMP"/"<KEY> RES", and a
+            // display order tracking the enum value so the amp/resist family sorts after the existing set.
+            if (DamageTypes.KeyForAttribute(value) is EDamageTypeKey ampResistKey)
+            {
+                var info = DamageTypes.Info(ampResistKey);
+                var code = $"{info.Code} {(info.Resistance == value ? "RES" : "AMP")}";
+                return new(EAttributeType.Affinity, IsPercentage: true, IsHarmful: false, code, (int)value, 0);
+            }
+
 #pragma warning disable CS0618 // DropBonus is obsolete but still seeded for data integrity.
             // The two adjacent bools are named at every call site so a future arm cannot silently
             // transpose IsPercentage/IsHarmful (the enum/string/int columns are type-distinct).

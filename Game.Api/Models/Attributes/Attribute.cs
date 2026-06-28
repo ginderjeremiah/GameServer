@@ -14,6 +14,7 @@ namespace Game.Api.Models.Attributes
         public required string Code { get; set; }
         public int DisplayOrder { get; set; }
         public int Decimals { get; set; }
+        public EDamageTypeKey? DamageTypeKey { get; set; }
 
         public static Attribute FromSource(CoreAttribute attribute)
         {
@@ -28,6 +29,7 @@ namespace Game.Api.Models.Attributes
                 Code = attribute.Code,
                 DisplayOrder = attribute.DisplayOrder,
                 Decimals = attribute.Decimals,
+                DamageTypeKey = attribute.DamageTypeKey,
             };
         }
     }

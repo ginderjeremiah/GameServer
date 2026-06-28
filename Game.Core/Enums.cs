@@ -98,7 +98,148 @@ namespace Game.Core
         /// A per-second attribute representing the amount of health restored each second from heal-over-time
         /// effects. Consumed by the end-of-tick DoT/HoT simulator phase (capped at MaxHealth).
         /// </summary>
-        HealthRegenPerSecond = 16
+        HealthRegenPerSecond = 16,
+
+        // Damage-type amplification / resistance attributes (spike #1320). One amplification + one resistance
+        // per damage-type key (the eight leaf types plus the Elemental / DoT cross-cutting categories), in the
+        // canonical key order used by the applies() map. Decimal-percentage convention (0.30 = 30%), base 0, so
+        // an untyped or unmodified battler reads 0 everywhere. Inert in V1: nothing reads them until the damage
+        // pipeline (Area B/C) does — the #178 foundation pattern. See <see cref="Attributes.DamageTypes"/>.
+
+        /// <summary>Amplifies physical damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        PhysicalAmplification = 17,
+
+        /// <summary>Resists physical damage taken by the defender. Decimal-percentage, base 0.</summary>
+        PhysicalResistance = 18,
+
+        /// <summary>Amplifies fire damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        FireAmplification = 19,
+
+        /// <summary>Resists fire damage taken by the defender. Decimal-percentage, base 0.</summary>
+        FireResistance = 20,
+
+        /// <summary>Amplifies water damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        WaterAmplification = 21,
+
+        /// <summary>Resists water damage taken by the defender. Decimal-percentage, base 0.</summary>
+        WaterResistance = 22,
+
+        /// <summary>Amplifies earth damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        EarthAmplification = 23,
+
+        /// <summary>Resists earth damage taken by the defender. Decimal-percentage, base 0.</summary>
+        EarthResistance = 24,
+
+        /// <summary>Amplifies wind damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        WindAmplification = 25,
+
+        /// <summary>Resists wind damage taken by the defender. Decimal-percentage, base 0.</summary>
+        WindResistance = 26,
+
+        /// <summary>Amplifies bleed damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        BleedAmplification = 27,
+
+        /// <summary>Resists bleed damage taken by the defender. Decimal-percentage, base 0.</summary>
+        BleedResistance = 28,
+
+        /// <summary>Amplifies poison damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        PoisonAmplification = 29,
+
+        /// <summary>Resists poison damage taken by the defender. Decimal-percentage, base 0.</summary>
+        PoisonResistance = 30,
+
+        /// <summary>Amplifies burn damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        BurnAmplification = 31,
+
+        /// <summary>Resists burn damage taken by the defender. Decimal-percentage, base 0.</summary>
+        BurnResistance = 32,
+
+        /// <summary>Amplifies all elemental (fire/water/earth/wind) damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        ElementalAmplification = 33,
+
+        /// <summary>Resists all elemental (fire/water/earth/wind) damage taken by the defender. Decimal-percentage, base 0.</summary>
+        ElementalResistance = 34,
+
+        /// <summary>Amplifies all damage-over-time (bleed/poison/burn) damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        DotAmplification = 35,
+
+        /// <summary>Resists all damage-over-time (bleed/poison/burn) damage taken by the defender. Decimal-percentage, base 0.</summary>
+        DotResistance = 36
+    }
+
+    /// <summary>
+    /// A leaf damage type carried by a single damage instance (skill hit or DoT tick). Exactly one leaf type
+    /// per instance; the cross-cutting categories an instance also belongs to (Elemental / DoT) are resolved
+    /// through the static <see cref="Attributes.DamageTypes.Applies(EDamageType)"/> map rather than stored.
+    /// Spike #1320.
+    /// </summary>
+    [ClientMirrored]
+    public enum EDamageType
+    {
+        /// <summary>Physical damage. Belongs to no cross-cutting category.</summary>
+        Physical = 0,
+
+        /// <summary>Fire damage. Elemental.</summary>
+        Fire = 1,
+
+        /// <summary>Water damage. Elemental.</summary>
+        Water = 2,
+
+        /// <summary>Earth damage. Elemental.</summary>
+        Earth = 3,
+
+        /// <summary>Wind damage. Elemental.</summary>
+        Wind = 4,
+
+        /// <summary>Bleed damage-over-time. DoT.</summary>
+        Bleed = 5,
+
+        /// <summary>Poison damage-over-time. DoT.</summary>
+        Poison = 6,
+
+        /// <summary>Burn damage-over-time. Fire + Elemental + DoT (a burning ember is still fire).</summary>
+        Burn = 7,
+    }
+
+    /// <summary>
+    /// A key that an amplification / resistance attribute is bucketed under (spike #1320). The superset of the
+    /// eight leaf <see cref="EDamageType"/> values plus the two cross-cutting categories (<see cref="Elemental"/>,
+    /// <see cref="Dot"/>). Each key backs one <c>…Amplification</c> and one <c>…Resistance</c>
+    /// <see cref="EAttribute"/>; the static <see cref="Attributes.DamageTypes.Applies(EDamageType)"/> map resolves
+    /// a leaf type to the keys whose amp/resist apply to it, in the fixed iteration order parity depends on.
+    /// </summary>
+    [ClientMirrored]
+    public enum EDamageTypeKey
+    {
+        /// <summary>The physical leaf type.</summary>
+        Physical = 0,
+
+        /// <summary>The fire leaf type.</summary>
+        Fire = 1,
+
+        /// <summary>The water leaf type.</summary>
+        Water = 2,
+
+        /// <summary>The earth leaf type.</summary>
+        Earth = 3,
+
+        /// <summary>The wind leaf type.</summary>
+        Wind = 4,
+
+        /// <summary>The bleed leaf type.</summary>
+        Bleed = 5,
+
+        /// <summary>The poison leaf type.</summary>
+        Poison = 6,
+
+        /// <summary>The burn leaf type.</summary>
+        Burn = 7,
+
+        /// <summary>The elemental category (fire / water / earth / wind, not physical).</summary>
+        Elemental = 8,
+
+        /// <summary>The damage-over-time category (bleed / poison / burn).</summary>
+        Dot = 9,
     }
 
     /// <summary>
@@ -125,6 +266,13 @@ namespace Game.Core
         /// HealthRegenPerSecond).
         /// </summary>
         Status = 3,
+
+        /// <summary>
+        /// A damage-type amplification or resistance attribute (spike #1320) — authored-only, base 0, grouped by
+        /// damage-type key for the breakdown screen. Kept distinct from <see cref="Secondary"/> (derived
+        /// aggregates) so the large amp/resist family does not crowd that bucket.
+        /// </summary>
+        Affinity = 4,
     }
 
     /// <summary>

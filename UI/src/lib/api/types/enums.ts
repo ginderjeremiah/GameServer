@@ -20,6 +20,26 @@ export enum EAttribute {
 	BlockReduction = 14,
 	DamageTakenPerSecond = 15,
 	HealthRegenPerSecond = 16,
+	PhysicalAmplification = 17,
+	PhysicalResistance = 18,
+	FireAmplification = 19,
+	FireResistance = 20,
+	WaterAmplification = 21,
+	WaterResistance = 22,
+	EarthAmplification = 23,
+	EarthResistance = 24,
+	WindAmplification = 25,
+	WindResistance = 26,
+	BleedAmplification = 27,
+	BleedResistance = 28,
+	PoisonAmplification = 29,
+	PoisonResistance = 30,
+	BurnAmplification = 31,
+	BurnResistance = 32,
+	ElementalAmplification = 33,
+	ElementalResistance = 34,
+	DotAmplification = 35,
+	DotResistance = 36,
 }
 
 export enum EAttributeModifierSource {
@@ -38,6 +58,7 @@ export enum EAttributeType {
 	Primary = 1,
 	Secondary = 2,
 	Status = 3,
+	Affinity = 4,
 }
 
 export enum EChallengeGoalComparison {
@@ -60,6 +81,30 @@ export enum EChangeType {
 	Add = 0,
 	Edit = 1,
 	Delete = 2,
+}
+
+export enum EDamageType {
+	Physical = 0,
+	Fire = 1,
+	Water = 2,
+	Earth = 3,
+	Wind = 4,
+	Bleed = 5,
+	Poison = 6,
+	Burn = 7,
+}
+
+export enum EDamageTypeKey {
+	Physical = 0,
+	Fire = 1,
+	Water = 2,
+	Earth = 3,
+	Wind = 4,
+	Bleed = 5,
+	Poison = 6,
+	Burn = 7,
+	Elemental = 8,
+	Dot = 9,
 }
 
 export enum EDeadLetterReason {
