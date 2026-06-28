@@ -61,7 +61,6 @@ export interface TierView {
 	pronunciation: string;
 	translation: string;
 	iconPath: string;
-	seedSkillId?: number;
 }
 
 /** A discovered path, rendered as a rail entry and an ordered spine of visible tiers. */
@@ -274,8 +273,7 @@ function derivePathSpine(
 			word: prof.word,
 			pronunciation: prof.pronunciation,
 			translation: prof.translation,
-			iconPath: prof.iconPath,
-			seedSkillId: prof.seedSkillId
+			iconPath: prof.iconPath
 		};
 	});
 }

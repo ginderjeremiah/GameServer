@@ -1,14 +1,3 @@
-<div class="seed">
-	<div class="field-label">Seed skill <span class="muted">— granted when this tier opens</span></div>
-	<div class="seed-pick">
-		<ProgSelect
-			value={tier.seedSkillId}
-			options={reference.playerSkillOptions(tier.seedSkillId)}
-			onChange={(v) => store.setSeedSkill(tier.id, v)}
-		/>
-	</div>
-</div>
-
 <div class="field-label">
 	Prerequisite proficiencies <span class="muted">— must be maxed to open this path (cross-path gateways)</span>
 </div>
@@ -79,9 +68,6 @@ const onAddPrereq = (value: number) => {
 </script>
 
 <style lang="scss">
-.seed {
-	margin-bottom: 18px;
-}
 .field-label {
 	font-family: var(--mono);
 	font-size: 9.5px;
@@ -94,9 +80,6 @@ const onAddPrereq = (value: number) => {
 		text-transform: none;
 		letter-spacing: 0;
 	}
-}
-.seed-pick {
-	max-width: 340px;
 }
 .starter {
 	background: var(--panel);

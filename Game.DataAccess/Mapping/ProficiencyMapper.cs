@@ -26,7 +26,6 @@ namespace Game.DataAccess.Mapping
                 MaxLevel = entity.MaxLevel,
                 BaseXp = entity.BaseXp,
                 XpGrowth = entity.XpGrowth,
-                SeedSkillId = entity.SeedSkillId,
                 RetiredAt = entity.RetiredAt,
                 LevelModifiers = entity.LevelModifiers
                     .Select(m => new Contracts.ProficiencyLevelModifier
@@ -86,7 +85,6 @@ namespace Game.DataAccess.Mapping
                 MaxLevel = entity.MaxLevel,
                 BaseXp = (double)entity.BaseXp,
                 XpGrowth = (double)entity.XpGrowth,
-                SeedSkillId = entity.SeedSkillId,
                 PrerequisiteIds = entity.Prerequisites.Select(p => p.PrerequisiteProficiencyId).ToList(),
                 Levels = levels,
             };

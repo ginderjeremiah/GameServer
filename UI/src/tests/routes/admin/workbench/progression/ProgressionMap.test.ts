@@ -42,7 +42,6 @@ const tier = (
 	maxLevel: 10,
 	baseXp: 100,
 	xpGrowth: 1.4,
-	seedSkillId: -1,
 	levelModifiers: [],
 	levelRewards: [],
 	prerequisiteIds: [],

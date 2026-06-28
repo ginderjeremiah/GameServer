@@ -11,8 +11,8 @@ namespace Game.Api.Models.Progress
     {
         public required List<ProficiencyXpResultModel> Proficiencies { get; set; }
 
-        /// <summary>The nodes this battle opened (a maxed tier's next tier, or a newly-satisfied gateway), each
-        /// with the seed skill it granted (if any), so the client surfaces the unlock and adds the seed skill.</summary>
+        /// <summary>The nodes this battle opened (a maxed tier's next tier, or a newly-satisfied gateway), so
+        /// the client surfaces the unlock. Notification-only — opening grants no skill.</summary>
         public required List<ProficiencyOpenedModel> Opened { get; set; }
     }
 
@@ -29,10 +29,9 @@ namespace Game.Api.Models.Progress
         public required List<int> GrantedSkillIds { get; set; }
     }
 
-    /// <summary>A node the battle opened and the seed skill granted with it (null when seeded by a world skill).</summary>
+    /// <summary>A node the battle opened (notification-only — opening grants no skill).</summary>
     public class ProficiencyOpenedModel : IModel
     {
         public int ProficiencyId { get; set; }
-        public int? SeedSkillId { get; set; }
     }
 }

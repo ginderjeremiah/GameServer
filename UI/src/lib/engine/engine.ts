@@ -147,7 +147,7 @@ const notifyChallengeCompleted = (challengeId: number) => {
 
 /**
  * Applies a proficiency-XP push from a won battle (spike #982 area H): surfaces the per-proficiency XP,
- * level-ups, milestones, and newly-opened proficiencies, makes any milestone/seed skill usable
+ * level-ups, milestones, and newly-opened proficiencies, makes any milestone reward skill usable
  * immediately (mirroring the challenge-reward unlock), then updates the proficiency store so the tree and
  * the live battler's bonuses reflect the gain without a refetch. Prior levels are read off the store
  * before it is updated, since the push carries only the new level — the level-up is detected by comparison.
@@ -166,9 +166,6 @@ export const handleProficiencyXpGained = (response: IApiSocketResponse<'Proficie
 	}
 	for (const opened of data.opened) {
 		notifyProficiencyOpened(opened);
-		if (opened.seedSkillId != null) {
-			playerManager.addUnlockedSkill(opened.seedSkillId);
-		}
 	}
 
 	playerProficiencies.applyXpGained(data);
@@ -211,16 +208,15 @@ const notifyProficiencyResult = (result: IProficiencyXpResultModel, previousLeve
 	}
 };
 
-/** Surfaces a newly-opened proficiency (a maxed tier's next tier, or a newly-satisfied gateway), naming
- *  the seed skill granted with it when present. Both a combat-log line and a toast, since an unlock is a
+/** Surfaces a newly-opened proficiency (a maxed tier's next tier, or a newly-satisfied gateway).
+ *  Notification-only — opening grants no skill. Both a combat-log line and a toast, since an unlock is a
  *  notable, infrequent event. Unknown reference ids are skipped. */
 const notifyProficiencyOpened = (opened: IProficiencyOpenedModel) => {
 	const proficiency = staticData.proficiencies?.[opened.proficiencyId];
 	if (!proficiency) {
 		return;
 	}
-	const seedSkillName = opened.seedSkillId != null ? staticData.skills?.[opened.seedSkillId]?.name : undefined;
-	const message = proficiencyOpenedMessage(proficiency.name, seedSkillName);
+	const message = proficiencyOpenedMessage(proficiency.name);
 	logMessage(ELogType.Proficiency, message);
 	toastSuccess(message);
 };

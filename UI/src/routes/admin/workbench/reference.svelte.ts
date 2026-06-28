@@ -170,9 +170,9 @@ class WorkbenchReference {
 	/** Any active skill (plus the current value if retired) — the contribution skill picker. */
 	skillOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.skills ?? [], keep);
 	/**
-	 * Player-acquirable skills, with a "None" sentinel (-1). Backs the seed-skill and milestone-reward
-	 * pickers, which the backend restricts to `ESkillAcquisition.Player` skills. The current value stays
-	 * visible even if it lost the flag or was retired, so an existing grant isn't silently dropped.
+	 * Player-acquirable skills, with a "None" sentinel (-1). Backs the milestone-reward picker, which the
+	 * backend restricts to `ESkillAcquisition.Player` skills. The current value stays visible even if it
+	 * lost the flag or was retired, so an existing grant isn't silently dropped.
 	 */
 	playerSkillOptions = (keep?: number): SelectOption[] => [
 		{ value: -1, text: 'None' },
