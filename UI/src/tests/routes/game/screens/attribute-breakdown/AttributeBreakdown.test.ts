@@ -79,4 +79,20 @@ describe('Attribute Breakdown screen', () => {
 		const row = screen.getByTestId(`attr-row-${EAttribute.Strength}`);
 		expect(row.getAttribute('aria-describedby')).toMatch(/^tooltip-\d+$/);
 	});
+
+	it('surfaces the derived Toughness and the authored-only DamageReflection (#1330)', () => {
+		// Toughness derives from Endurance, so it self-selects from the allocation alone. DamageReflection has
+		// no core-attribute derivation — it appears only where authored, here via an equipped item — confirming
+		// the breakdown surfaces the reworked mitigation stats.
+		mockInventoryManager.equippedSlots = [
+			{
+				name: 'Spiked Shield',
+				attributes: [{ attributeId: EAttribute.DamageReflection, amount: 0.25 }],
+				appliedMods: []
+			}
+		];
+		render(AttributeBreakdown);
+		expect(screen.getByTestId(`attr-row-${EAttribute.Toughness}`)).toBeTruthy();
+		expect(screen.getByTestId(`attr-row-${EAttribute.DamageReflection}`)).toBeTruthy();
+	});
 });

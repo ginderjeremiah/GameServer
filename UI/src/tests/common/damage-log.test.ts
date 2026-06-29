@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EDamageType } from '$lib/api';
-import { classifyResist, damageLogMessage } from '../../lib/common/damage-log';
+import { classifyResist, damageLogMessage, reflectLogMessage } from '../../lib/common/damage-log';
 
 describe('classifyResist', () => {
 	it('is normal with no typed resistance in play', () => {
@@ -79,5 +79,20 @@ describe('damageLogMessage', () => {
 		expect(damageLogMessage('Ember', -6, 'enemy-hit', EDamageType.Fire, 'absorbed', 'Goblin')).toBe(
 			"You absorbed Goblin's Ember, recovering 6 health!"
 		);
+	});
+});
+
+describe('reflectLogMessage (#1330)', () => {
+	it('phrases the player reflecting damage back to the enemy', () => {
+		expect(reflectLogMessage('player-reflect', 20, 'Goblin')).toBe('You reflected 20 damage back to Goblin!');
+	});
+
+	it('phrases the enemy reflecting damage back at the player', () => {
+		expect(reflectLogMessage('enemy-reflect', 12, 'Goblin')).toBe('Goblin reflected 12 damage back at you!');
+	});
+
+	it('formats the reflected amount like the hit lines', () => {
+		// Shares formatNum with damageLogMessage — 2-decimal rounding with trailing zeroes trimmed.
+		expect(reflectLogMessage('player-reflect', 7.456, 'Goblin')).toBe('You reflected 7.46 damage back to Goblin!');
 	});
 });

@@ -292,6 +292,7 @@ describe('battleStep', () => {
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
 			expect(activations[0].damage).toBe(40);
+			expect(activations[0].reflected).toBe(20); // surfaced for the combat log
 			expect(player.currentHealth).toBe(playerBefore - 20); // 40 × 0.5, unmitigated
 		});
 
@@ -312,6 +313,7 @@ describe('battleStep', () => {
 
 			expect(activations[0].byPlayer).toBe(false);
 			expect(activations[0].damage).toBe(50);
+			expect(activations[0].reflected).toBe(20); // 50 × 0.4, surfaced for the combat log
 			expect(enemy.currentHealth).toBe(enemyBefore - 20); // 50 × 0.4 reflected onto the enemy
 		});
 
@@ -326,8 +328,9 @@ describe('battleStep', () => {
 			const enemy = makeBattler(baseStats, [makeSkill(50, 40)]);
 			const enemyBefore = enemy.currentHealth;
 
-			battleStep(player, enemy, 40, new Mulberry32(0));
+			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
+			expect(activations[0].reflected).toBe(0); // a dodge zeroes the hit, so nothing reflects
 			expect(enemy.currentHealth).toBe(enemyBefore); // a dodge zeroes the hit, so nothing reflects
 		});
 

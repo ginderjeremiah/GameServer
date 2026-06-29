@@ -13,9 +13,10 @@
    are read from the real combat model (`BattleAttributes`), the same one the
    battle simulation uses, so the page always reflects what the game actually
    computes. Only the derived stats the game produces today are surfaced; the
-   deprecated DropBonus and the not-yet-implemented crit/dodge/block attributes
-   are intentionally omitted and will appear automatically once they gain real
-   formulas.
+   deprecated DropBonus, the authored-only DamageReflection (no core-attribute
+   yield, so it has nothing to preview here), and the crit/dodge set are
+   intentionally omitted and appear automatically once listed here with a real
+   per-point formula.
 
    The backend (`PlayerStatPoints.TryUpdateAttributes`) allows points to be moved
    freely — any attribute can be decremented back to 0, refunding its points to

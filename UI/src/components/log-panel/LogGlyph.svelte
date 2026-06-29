@@ -33,6 +33,9 @@
 	{:else if glyph === 'absorbed'}
 		<!-- A shield with a plus: the hit was absorbed into a heal. -->
 		<path d="M7 1.8l4.3 1.7v3.4c0 3-1.9 4.6-4.3 5.8C4.6 11.5 2.7 9.9 2.7 6.9V3.5z M7 5v3M5.5 6.5h3" />
+	{:else if glyph === 'reflect'}
+		<!-- A return arrow: damage sent down/right then bounced back to its sender. -->
+		<path d="M9 11V6H2M5 3L2 6l3 3" />
 	{:else}
 		<circle cx="7" cy="7" r="4.5" />
 		<path d="M7 5v3M7 9.5v0.01" />

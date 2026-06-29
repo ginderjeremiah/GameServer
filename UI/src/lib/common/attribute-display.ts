@@ -31,8 +31,8 @@ export const attributeColor = (id: EAttribute): string => {
 /** Icon filename (in `static/img`) per attribute. Frontend-owned, like `attributeColor`/
  *  `attributeCode`: the art lives in `UI/static/img` and the backend never references these
  *  paths. The core/derived/HoT set has art; the obsolete `DropBonus`, the #1320 amp/resist family,
- *  the typed DoT accumulators, and the authored-only `DamageReflection` (its art is owned by the
- *  #1334 UX pass) have none yet and degrade to an empty icon. The crit/dodge set follows a shared
+ *  the typed DoT accumulators, and the authored-only `DamageReflection` (dedicated art tracked in
+ *  #1378) have none yet and degrade to an empty icon. The crit/dodge set follows a shared
  *  visual language: the magnitude attribute (`CriticalDamage`) uses the clean base symbol, and the
  *  chance attributes reuse that symbol with a `%` badge. */
 const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
@@ -43,7 +43,7 @@ const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Dexterity]: 'Dexterity',
 	[EAttribute.Luck]: 'Luck',
 	[EAttribute.MaxHealth]: 'Max Health',
-	// Reuses the former Defense art until dedicated Toughness art lands (#1334 owns the UX/art pass).
+	// Reuses the former Defense art until dedicated Toughness art lands (#1378).
 	[EAttribute.Toughness]: 'Defense',
 	[EAttribute.CooldownRecovery]: 'Cooldown Recovery',
 	[EAttribute.CriticalChance]: 'Critical Chance',

@@ -79,12 +79,13 @@ describe('deriveStats', () => {
 	});
 
 	it('only surfaces the derived stats the game actually computes', () => {
-		// The deprecated DropBonus and the unimplemented crit/dodge/block stats are
+		// The deprecated DropBonus, the authored-only DamageReflection, and the crit/dodge set are
 		// intentionally excluded.
 		const ids = DERIVED_STATS.map((d) => d.id);
 		expect(ids).toEqual([EAttribute.MaxHealth, EAttribute.Toughness, EAttribute.CooldownRecovery]);
 		expect(ids).not.toContain(EAttribute.DropBonus);
 		expect(ids).not.toContain(EAttribute.CriticalChance);
+		expect(ids).not.toContain(EAttribute.DamageReflection);
 	});
 });
 
