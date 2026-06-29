@@ -133,6 +133,37 @@ export function computeAttributes<T extends AttributeModifier>(
 	return cache;
 }
 
+/** Folds a single attribute's modifiers into its final value, the value-only counterpart of
+ *  {@link computeAttributes}'s per-attribute reduction (which additionally records the breakdown
+ *  lines). Additive modifiers are applied first (running += amount), then multiplicative ones
+ *  (running *= factor); a `Derived` modifier scales its amount by `valueOf(derivedSource)` — the
+ *  same recursive resolution {@link computeAttributes} performs. The running total starts at 0.
+ *
+ *  This is the kernel `BattleAttributes` uses for its incremental, single-attribute recompute, so it
+ *  is deliberately kept in lockstep with the loop above — an equivalence test asserts the two agree. */
+export function foldAttributeValue<T extends AttributeModifier>(
+	modifiers: readonly T[],
+	valueOf: (attribute: EAttribute) => number
+): number {
+	let running = 0;
+	for (const mod of modifiers) {
+		if (mod.type !== EModifierType.Additive) {
+			continue;
+		}
+		running += mod.source === EAttributeModifierSource.Derived ? mod.amount * valueOf(mod.derivedSource) : mod.amount;
+	}
+	for (const mod of modifiers) {
+		if (mod.type === EModifierType.Additive) {
+			continue;
+		}
+		if (mod.type !== EModifierType.Multiplicative) {
+			throw new Error(`Unsupported EModifierType: ${mod.type}`);
+		}
+		running *= mod.source === EAttributeModifierSource.Derived ? mod.amount * valueOf(mod.derivedSource) : mod.amount;
+	}
+	return running;
+}
+
 /** A per-source bucket of a computed attribute's additive lines, with the
  *  source subtotal. */
 export interface SourceGroup<T extends AttributeModifier = AttributeModifier> {

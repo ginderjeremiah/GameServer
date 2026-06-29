@@ -29,6 +29,14 @@ const additive = (attribute: EAttribute, amount: number): AttributeModifier => (
 	source: EAttributeModifierSource.PlayerStatPoints
 });
 
+const derived = (attribute: EAttribute, amount: number, derivedSource: EAttribute): AttributeModifier => ({
+	attribute,
+	amount,
+	type: EModifierType.Additive,
+	source: EAttributeModifierSource.Derived,
+	derivedSource
+});
+
 describe('BattleAttributes', () => {
 	describe('constructor', () => {
 		it('initializes with zero values when no attributes provided', () => {
@@ -354,6 +362,53 @@ describe('BattleAttributes', () => {
 
 			expect(ba.removeModifier(additive(EAttribute.Strength, 10))).toBe(false);
 			expect(ba.getValue(EAttribute.Strength)).toBe(10);
+		});
+
+		it('returns false when removing from an attribute that has no modifiers at all', () => {
+			const ba = new BattleAttributes([]);
+			// Intellect was never touched, so its bucket is absent — removal must be a safe no-op.
+			expect(ba.removeModifier(additive(EAttribute.Intellect, 5))).toBe(false);
+		});
+
+		// A runtime-added Derived modifier registers a new cascade link, and removing it must unhook that
+		// link only once the last modifier deriving from the source is gone (mirroring the backend's
+		// AttributeCollection.UnhookDerivedLink so the source's invalidation cascade stays correct).
+		it('hooks and unhooks a derived cascade link across add/remove', () => {
+			const ba = new BattleAttributes([]);
+			ba.addModifier(additive(EAttribute.Luck, 10)); // Luck = 10
+
+			// Two Derived modifiers make Strength scale with Luck: Strength = (2 + 1) * Luck.
+			const first = derived(EAttribute.Strength, 2, EAttribute.Luck);
+			const second = derived(EAttribute.Strength, 1, EAttribute.Luck);
+			ba.addModifier(first);
+			ba.addModifier(second);
+			expect(ba.getValue(EAttribute.Strength)).toBe(30);
+			// The new Luck → Strength link also cascades into MaxHealth (+5*Strength).
+			expect(ba.getValue(EAttribute.MaxHealth)).toBe(50 + 5 * 30);
+
+			// Removing one leaves the other still deriving from Luck, so the link is kept and Luck cascades.
+			expect(ba.removeModifier(first)).toBe(true);
+			expect(ba.getValue(EAttribute.Strength)).toBe(10);
+			ba.addModifier(additive(EAttribute.Luck, 10)); // Luck = 20
+			expect(ba.getValue(EAttribute.Strength)).toBe(20);
+
+			// Removing the last derived-from-Luck modifier unhooks the link: Luck no longer moves Strength.
+			expect(ba.removeModifier(second)).toBe(true);
+			expect(ba.getValue(EAttribute.Strength)).toBe(0);
+			ba.addModifier(additive(EAttribute.Luck, 100));
+			expect(ba.getValue(EAttribute.Strength)).toBe(0);
+		});
+
+		it('breaks a circular derived chain instead of recursing forever', () => {
+			// Intellect ← Luck and Luck ← Intellect: the in-progress guard treats a re-entered attribute
+			// as 0, so the incremental recompute terminates with both at 0 rather than overflowing.
+			const ba = new BattleAttributes([]);
+			ba.setData([], true, [
+				derived(EAttribute.Intellect, 2, EAttribute.Luck),
+				derived(EAttribute.Luck, 3, EAttribute.Intellect)
+			]);
+			expect(ba.getValue(EAttribute.Intellect)).toBe(0);
+			expect(ba.getValue(EAttribute.Luck)).toBe(0);
 		});
 	});
 });
