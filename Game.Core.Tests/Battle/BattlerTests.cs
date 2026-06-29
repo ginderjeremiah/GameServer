@@ -178,14 +178,28 @@ namespace Game.Core.Tests.Battle
         public void TakeDamage_ResistanceAboveOne_HealsAndNeverAppliesFlatDefense()
         {
             // FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with flat Defense NOT subtracted (a heal of
-            // 20, not 22). The defender's health rises by the absorbed amount.
+            // 20, not 22). Bring the battler below MaxHealth first so the whole heal lands.
             var battler = MakeBattler((EAttribute.Endurance, 0), (EAttribute.FireResistance, 2.0)); // Defense 2, MaxHealth 50
-            var initialHealth = battler.CurrentHealth;
+            battler.TakeDamage(27, EDamageType.Physical); // 27 − 2 Defense = 25 damage → CurrentHealth 25
 
             var net = battler.TakeDamage(20, EDamageType.Fire);
 
             Assert.Equal(-20, net, 0.001);
-            Assert.Equal(initialHealth + 20, battler.CurrentHealth, 0.001);
+            Assert.Equal(45, battler.CurrentHealth, 0.001);
+        }
+
+        [Fact]
+        public void TakeDamage_AbsorptionHeal_IsCappedAtMaxHealth()
+        {
+            // The absorption heal never overheals past MaxHealth (consistent with ApplyHealOverTime). Only 5 of
+            // room remains, so a −20 absorption restores 5 and the net reported is the capped −5, not −20.
+            var battler = MakeBattler((EAttribute.Endurance, 0), (EAttribute.FireResistance, 2.0)); // Defense 2, MaxHealth 50
+            battler.TakeDamage(7, EDamageType.Physical); // 7 − 2 Defense = 5 damage → CurrentHealth 45
+
+            var net = battler.TakeDamage(20, EDamageType.Fire);
+
+            Assert.Equal(-5, net, 0.001);
+            Assert.Equal(50, battler.CurrentHealth, 0.001);
         }
 
         [Fact]

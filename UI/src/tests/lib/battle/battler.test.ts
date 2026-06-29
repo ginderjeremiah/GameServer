@@ -350,7 +350,8 @@ describe('Battler', () => {
 		});
 
 		it('heals on absorption (resistance > 1) and never applies flat defense', () => {
-			// FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with flat Defense NOT subtracted.
+			// FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with flat Defense NOT subtracted. Bring the
+			// battler below MaxHealth first so the whole heal lands.
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [
@@ -359,12 +360,31 @@ describe('Battler', () => {
 					]
 				})
 			);
-			const initialHealth = battler.currentHealth;
+			battler.takeDamage(27, EDamageType.Physical); // 27 − 2 Defense = 25 → currentHealth 25
 
 			const net = battler.takeDamage(20, EDamageType.Fire);
 
 			expect(net).toBeCloseTo(-20, 10);
-			expect(battler.currentHealth).toBeCloseTo(initialHealth + 20, 10);
+			expect(battler.currentHealth).toBeCloseTo(45, 10);
+		});
+
+		it('caps the absorption heal at MaxHealth (no overheal)', () => {
+			// Consistent with applyHealOverTime: only 5 of room remains, so a −20 absorption restores 5 and the
+			// net reported is the capped −5, not −20.
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.Endurance, amount: 0 },
+						{ attributeId: EAttribute.FireResistance, amount: 2.0 }
+					]
+				})
+			);
+			battler.takeDamage(7, EDamageType.Physical); // 7 − 2 Defense = 5 → currentHealth 45
+
+			const net = battler.takeDamage(20, EDamageType.Fire);
+
+			expect(net).toBeCloseTo(-5, 10);
+			expect(battler.currentHealth).toBeCloseTo(50, 10);
 		});
 
 		it('is identical to the old flat step for a typed hit with no resistance', () => {

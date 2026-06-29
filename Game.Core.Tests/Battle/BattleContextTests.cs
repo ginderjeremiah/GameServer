@@ -306,16 +306,18 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_ResistanceAboveOne_HealsTheTargetAndIgnoresFlatDefense()
         {
             // Absorption: FireResistance 2.0 drives the post-resistance hit negative (20 × (1 − 2) = −20), a net
-            // heal — and flat Defense is NOT subtracted from an absorbed hit (a heal of 20, not 18).
+            // heal — and flat Defense is NOT subtracted from an absorbed hit (a heal of 20, not 18). A physical
+            // hit first brings the enemy below MaxHealth so the heal lands (the heal is capped at MaxHealth).
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Defense 2, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.DamageTarget(27, EDamageType.Physical); // 27 − 2 Defense = 25 → CurrentHealth 25
 
             context.DamageTarget(20, EDamageType.Fire);
 
-            // Started at MaxHealth 50, healed 20 (uncapped) → 70; the booked damage is the −20 net.
-            Assert.Equal(70, enemy.CurrentHealth, 0.001);
-            Assert.Equal(-20, context.Stats.PlayerDamageDealt, 0.001);
+            // Healed 20 (flat ignored) → 45; the booked damage is 25 (physical) + (−20) (absorption) = 5.
+            Assert.Equal(45, enemy.CurrentHealth, 0.001);
+            Assert.Equal(5, context.Stats.PlayerDamageDealt, 0.001);
         }
 
         [Fact]

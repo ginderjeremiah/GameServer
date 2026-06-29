@@ -122,11 +122,24 @@ namespace Game.Core.Battle
         /// given <paramref name="damageType"/> via <see cref="ComputeNetDamage"/> — percentage resistance then
         /// flat <see cref="Defense"/> and the optional <paramref name="blockReduction"/> (a second flat
         /// reduction supplied only when the hit is blocked). Returns the net damage dealt; a negative result
-        /// (absorption) heals this battler.
+        /// (absorption) heals this battler, <b>capped at <see cref="MaxHealth"/></b> — the game has no
+        /// overheal/shield concept, so this matches <see cref="ApplyHealOverTime"/> rather than letting the
+        /// reactive absorption channel bank health above the cap.
         /// </summary>
         public double TakeDamage(double dealt, EDamageType damageType, double blockReduction = 0)
         {
             var net = ComputeNetDamage(dealt, damageType, blockReduction);
+            if (net < 0)
+            {
+                // Absorption: cap the heal at the remaining room to MaxHealth (consistent with ApplyHealOverTime),
+                // and report the actual healed amount so the per-skill / global stats stay reconciled.
+                var room = _attributes[MaxHealth] - CurrentHealth;
+                var heal = -net < room ? -net : room;
+                heal = heal > 0 ? heal : 0;
+                CurrentHealth += heal;
+                return -heal;
+            }
+
             CurrentHealth -= net;
             return net;
         }

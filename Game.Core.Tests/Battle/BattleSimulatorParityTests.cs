@@ -784,9 +784,10 @@ namespace Game.Core.Tests.Battle
                     ExpectedTotalMs: 1200),
 
                 // Absorption (res > 1): a +2.0 FireResistance drives the post-resistance hit negative (20 × (1 −
-                // 2) = −20), which heals the enemy — and flat Defense never applies to an absorbed hit. The enemy
-                // is healed every fire and never dies; dealing no damage back, the battle runs to the timeout.
-                // (At res 0 the player's 18/hit would win by 2400ms.)
+                // 2) = −20), so an absorbed hit deals no damage — flat Defense never applies, and the heal is
+                // capped at MaxHealth (the enemy is already full, so it stays at 100). The enemy never loses
+                // health and never dies; dealing no damage back, the battle runs to the timeout. (At res 0 the
+                // player's 18/hit would win by 2400ms.)
                 ["fireAbsorption"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,

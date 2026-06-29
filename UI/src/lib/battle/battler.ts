@@ -155,9 +155,17 @@ export class Battler {
 	/** Applies an incoming `dealt` hit (already amplified and crit-multiplied) of `damageType` via
 	 *  {@link mitigateDamage} — percentage resistance then flat Defense and the optional `blockReduction` (a
 	 *  second flat reduction supplied only when the hit is blocked). Returns the net damage dealt; a negative
-	 *  result (absorption) heals this battler. */
+	 *  result (absorption) heals this battler, CAPPED at MaxHealth (no overheal — matching
+	 *  {@link applyHealOverTime}). */
 	public takeDamage(dealt: number, damageType: EDamageType, blockReduction = 0) {
 		const net = mitigateDamage(dealt, damageType, this.attributes, blockReduction);
+		if (net < 0) {
+			// Absorption: cap the heal at the remaining room to MaxHealth, and report the actual healed amount.
+			const room = this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth;
+			const heal = Math.max(Math.min(-net, room), 0);
+			this.currentHealth += heal;
+			return -heal;
+		}
 		this.currentHealth -= net;
 		return net;
 	}
