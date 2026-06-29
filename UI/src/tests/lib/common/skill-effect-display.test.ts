@@ -43,7 +43,7 @@ describe('effectDirection', () => {
 		expect(effectDirection(false, EModifierType.Multiplicative, 0.5)).toBe('debuff');
 	});
 
-	it('inverts for a harmful-when-raised attribute (e.g. DamageTakenPerSecond)', () => {
+	it('inverts for a harmful-when-raised attribute (e.g. BleedDamagePerSecond)', () => {
 		// Raising incoming damage is a debuff; lowering it is a buff — the opposite of a normal attribute.
 		expect(effectDirection(true, EModifierType.Additive, 12)).toBe('debuff');
 		expect(effectDirection(true, EModifierType.Additive, -12)).toBe('buff');
@@ -159,27 +159,27 @@ describe('effectLogMessage', () => {
 	});
 
 	it('classifies the direction by what the effect does to its target, not the magnitude sign', () => {
-		// A positive DamageTakenPerSecond is detrimental (isHarmful), so applying it to the enemy is a weakening debuff.
+		// A positive BleedDamagePerSecond is detrimental (isHarmful), so applying it to the enemy is a weakening debuff.
 		const message = effectLogMessage(
-			effect({ attributeId: EAttribute.DamageTakenPerSecond, amount: 12, durationMs: 3000 }),
-			'Damage Taken Per Second',
+			effect({ attributeId: EAttribute.BleedDamagePerSecond, amount: 12, durationMs: 3000 }),
+			'Bleed Damage Per Second',
 			true,
 			false,
 			'Goblin'
 		);
-		expect(message).toBe('Goblin is weakened: +12 Damage Taken Per Second for 3s');
+		expect(message).toBe('Goblin is weakened: +12 Bleed Damage Per Second for 3s');
 	});
 
 	it('reports the caster-scaled amount when one is supplied', () => {
 		// Authored base 12, but the resolved (scaled) magnitude of 20 is what the log should announce.
 		const message = effectLogMessage(
-			effect({ attributeId: EAttribute.DamageTakenPerSecond, amount: 12, durationMs: 3000 }),
-			'Damage Taken Per Second',
+			effect({ attributeId: EAttribute.BleedDamagePerSecond, amount: 12, durationMs: 3000 }),
+			'Bleed Damage Per Second',
 			true,
 			false,
 			'Goblin',
 			20
 		);
-		expect(message).toBe('Goblin is weakened: +20 Damage Taken Per Second for 3s');
+		expect(message).toBe('Goblin is weakened: +20 Bleed Damage Per Second for 3s');
 	});
 });

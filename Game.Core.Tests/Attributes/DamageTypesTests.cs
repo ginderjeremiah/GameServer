@@ -122,7 +122,7 @@ namespace Game.Core.Tests.Attributes
         [Theory]
         [InlineData(EAttribute.Strength)]
         [InlineData(EAttribute.Defense)]
-        [InlineData(EAttribute.DamageTakenPerSecond)]
+        [InlineData(EAttribute.BleedDamagePerSecond)]
         public void KeyForAttribute_ReturnsNullForNonAmpResistAttributes(EAttribute attribute)
         {
             Assert.Null(DamageTypes.KeyForAttribute(attribute));
@@ -135,6 +135,50 @@ namespace Game.Core.Tests.Attributes
             // enum and the taxonomy from drifting apart.
             var keyed = Enum.GetValues<EAttribute>().Count(a => DamageTypes.KeyForAttribute(a) is not null);
             Assert.Equal(DamageTypes.Keys.Count * 2, keyed);
+        }
+
+        [Fact]
+        public void DotAccumulators_AreTheThreeDotTypesInFixedOrder()
+        {
+            // The fixed iteration order the end-of-tick DoT phase folds the types in (a parity contract).
+            Assert.Equal(
+                new[]
+                {
+                    (EDamageType.Bleed, EAttribute.BleedDamagePerSecond),
+                    (EDamageType.Poison, EAttribute.PoisonDamagePerSecond),
+                    (EDamageType.Burn, EAttribute.BurnDamagePerSecond),
+                },
+                DamageTypes.DotAccumulators.Select(info => (info.Type, info.Accumulator)));
+        }
+
+        [Fact]
+        public void DotTypeForAccumulator_RoundTripsEveryDotAccumulator()
+        {
+            foreach (var info in DamageTypes.DotAccumulators)
+            {
+                Assert.Equal(info.Type, DamageTypes.DotTypeForAccumulator(info.Accumulator));
+            }
+        }
+
+        [Theory]
+        [InlineData(EAttribute.Strength)]
+        [InlineData(EAttribute.HealthRegenPerSecond)]
+        [InlineData(EAttribute.FireResistance)]
+        public void DotTypeForAccumulator_ReturnsNullForNonDotAccumulators(EAttribute attribute)
+        {
+            Assert.Null(DamageTypes.DotTypeForAccumulator(attribute));
+        }
+
+        [Fact]
+        public void DotAccumulators_AreTheOnlyDotLeafTypes()
+        {
+            // Every DoT-category leaf type (Bleed/Poison/Burn) has exactly one accumulator; no direct type does.
+            var accumulatorTypes = DamageTypes.DotAccumulators.Select(info => info.Type).ToHashSet();
+            foreach (var type in Enum.GetValues<EDamageType>())
+            {
+                var isDot = DamageTypes.Applies(type).Contains(EDamageTypeKey.Dot);
+                Assert.Equal(isDot, accumulatorTypes.Contains(type));
+            }
         }
     }
 }

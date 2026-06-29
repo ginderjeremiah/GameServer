@@ -26,3 +26,9 @@ export const DAMAGE_TYPE_KEY_ATTRIBUTES = {
 	[EDamageTypeKey.Elemental]: { amplification: EAttribute.ElementalAmplification, resistance: EAttribute.ElementalResistance },
 	[EDamageTypeKey.Dot]: { amplification: EAttribute.DotAmplification, resistance: EAttribute.DotResistance },
 } as const;
+
+export const DAMAGE_TYPE_DOT_ACCUMULATORS = [
+	{ type: EDamageType.Bleed, accumulator: EAttribute.BleedDamagePerSecond },
+	{ type: EDamageType.Poison, accumulator: EAttribute.PoisonDamagePerSecond },
+	{ type: EDamageType.Burn, accumulator: EAttribute.BurnDamagePerSecond },
+] as const;

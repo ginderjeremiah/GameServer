@@ -2,24 +2,33 @@
    (spike #1320, Area A).
 
    The enum *values* (`EDamageType` / `EDamageTypeKey`) and the taxonomy *tables*
-   (`DAMAGE_TYPE_APPLIES`, `DAMAGE_TYPE_KEY_ATTRIBUTES`) are generated from the C# domain by
-   `Game.Api.CodeGen` — the enums into `$lib/api`'s `enums.ts`, the tables into
+   (`DAMAGE_TYPE_APPLIES`, `DAMAGE_TYPE_KEY_ATTRIBUTES`, `DAMAGE_TYPE_DOT_ACCUMULATORS`) are generated
+   from the C# domain by `Game.Api.CodeGen` — the enums into `$lib/api`'s `enums.ts`, the tables into
    `$lib/api/types/damage-types.ts` (from `DamageTypes`). So a backend retune of the damage-type
    taxonomy can no longer silently desync the two simulators: the CI codegen-drift check fails on a
    stale committed table, and this module only wraps the generated tables in lookup helpers.
 
-   These helpers are inert in V1 — the amp/resist attributes they resolve stay unread until the damage
-   pipeline (Area B/C) consumes them. Iteration order is preserved from the generated tables because
-   the damage math folds the amp/resist sums in that order and float addition is not associative (a
-   parity contract). */
+   The damage pipeline reads these: the direct-hit amp/resist (Area B) and the typed DoT phase (Area C).
+   Iteration order is preserved from the generated tables because the damage math folds the amp/resist
+   sums — and the DoT types — in that order, and float addition is not associative (a parity contract). */
 
 import { EAttribute, EDamageType, EDamageTypeKey } from '$lib/api';
-import { DAMAGE_TYPE_APPLIES, DAMAGE_TYPE_KEY_ATTRIBUTES } from '$lib/api/types/damage-types';
+import {
+	DAMAGE_TYPE_APPLIES,
+	DAMAGE_TYPE_KEY_ATTRIBUTES,
+	DAMAGE_TYPE_DOT_ACCUMULATORS
+} from '$lib/api/types/damage-types';
 
 /** The amplification / resistance attribute pair a damage-type key backs. */
 export interface DamageTypeKeyAttributes {
 	readonly amplification: EAttribute;
 	readonly resistance: EAttribute;
+}
+
+/** A DoT leaf type paired with the per-second accumulator attribute that encodes it. */
+export interface DotAccumulator {
+	readonly type: EDamageType;
+	readonly accumulator: EAttribute;
 }
 
 /** The set of keys whose amplification/resistance apply to a hit of the given leaf `type` — the leaf
@@ -61,4 +70,22 @@ const KEY_BY_ATTRIBUTE: ReadonlyMap<EAttribute, EDamageTypeKey> = new Map(
  *  belongs to, or `undefined` for any other attribute. Drives the breakdown's by-type grouping. */
 export function keyForAttribute(attribute: EAttribute): EDamageTypeKey | undefined {
 	return KEY_BY_ATTRIBUTE.get(attribute);
+}
+
+/** The three DoT (type, per-second accumulator) pairings in the fixed order the end-of-tick DoT phase
+ *  iterates them — the single source linking a DoT leaf type to the accumulator that encodes it. */
+export function dotAccumulators(): readonly DotAccumulator[] {
+	return DAMAGE_TYPE_DOT_ACCUMULATORS;
+}
+
+// The accumulator → DoT type inverse, precomputed once (mirrors the backend's `DotTypeByAccumulator`).
+const DOT_TYPE_BY_ACCUMULATOR: ReadonlyMap<EAttribute, EDamageType> = new Map(
+	DAMAGE_TYPE_DOT_ACCUMULATORS.map((entry) => [entry.accumulator, entry.type])
+);
+
+/** The DoT leaf type a per-second `attribute` accumulates, or `undefined` when it is not a DoT
+ *  accumulator. Lets the effect-apply path detect a DoT effect and freeze the caster's typed
+ *  amplification into the accumulated magnitude (spike #1320, Area C). */
+export function dotTypeForAccumulator(attribute: EAttribute): EDamageType | undefined {
+	return DOT_TYPE_BY_ACCUMULATOR.get(attribute);
 }

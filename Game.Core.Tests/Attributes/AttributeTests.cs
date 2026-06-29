@@ -83,7 +83,9 @@ namespace Game.Core.Tests.Attributes
         [InlineData(EAttribute.Luck, EAttributeType.Primary, "LUK")]
         [InlineData(EAttribute.MaxHealth, EAttributeType.Secondary, "HP")]
         [InlineData(EAttribute.CooldownRecovery, EAttributeType.Secondary, "CDR")]
-        [InlineData(EAttribute.DamageTakenPerSecond, EAttributeType.Status, "DOT")]
+        [InlineData(EAttribute.BleedDamagePerSecond, EAttributeType.Status, "BLD DOT")]
+        [InlineData(EAttribute.PoisonDamagePerSecond, EAttributeType.Status, "PSN DOT")]
+        [InlineData(EAttribute.BurnDamagePerSecond, EAttributeType.Status, "BRN DOT")]
         [InlineData(EAttribute.HealthRegenPerSecond, EAttributeType.Status, "REG")]
         [InlineData(EAttribute.FireAmplification, EAttributeType.Affinity, "FIR AMP")]
         [InlineData(EAttribute.ElementalResistance, EAttributeType.Affinity, "ELE RES")]
@@ -117,7 +119,9 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Theory]
-        [InlineData(EAttribute.DamageTakenPerSecond, true)]
+        [InlineData(EAttribute.BleedDamagePerSecond, true)]
+        [InlineData(EAttribute.PoisonDamagePerSecond, true)]
+        [InlineData(EAttribute.BurnDamagePerSecond, true)]
         [InlineData(EAttribute.HealthRegenPerSecond, false)]
         [InlineData(EAttribute.Strength, false)]
         [InlineData(EAttribute.MaxHealth, false)]

@@ -193,9 +193,14 @@ namespace Game.Api.Tests.Integration
             Assert.True(cooldownRecovery.IsPercentage);
             Assert.Equal(0, cooldownRecovery.Decimals);
 
-            var damageTaken = Assert.Single(response.Data, a => a.Id == EAttribute.DamageTakenPerSecond);
-            Assert.Equal(EAttributeType.Status, damageTaken.AttributeType);
-            Assert.True(damageTaken.IsHarmful);
+            var bleedDot = Assert.Single(response.Data, a => a.Id == EAttribute.BleedDamagePerSecond);
+            Assert.Equal(EAttributeType.Status, bleedDot.AttributeType);
+            Assert.True(bleedDot.IsHarmful);
+
+            // The poison/burn accumulators append after the amp/resist block (#1320 Area C).
+            var burnDot = Assert.Single(response.Data, a => a.Id == EAttribute.BurnDamagePerSecond);
+            Assert.Equal(EAttributeType.Status, burnDot.AttributeType);
+            Assert.True(burnDot.IsHarmful);
         }
 
         [Fact]

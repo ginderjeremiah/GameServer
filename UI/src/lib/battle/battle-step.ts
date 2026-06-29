@@ -129,7 +129,7 @@ export function battleStep(
 	}
 
 	// End-of-tick damage/heal-over-time, reached only while both battlers still live (mirroring the
-	// backend's both-alive guard). For each battler DamageTakenPerSecond (bypassing Defense) then
+	// backend's both-alive guard). For each battler the typed DoT accumulators (bypassing Defense) then
 	// HealthRegenPerSecond (capped at MaxHealth) apply before its death check — so a heal-over-time can
 	// save a battler from an otherwise-lethal DoT tick. The enemy resolves first: an enemy a same-tick
 	// regen cannot save dies before the player's DoT applies, so a same-tick mutual DoT kill leaves the

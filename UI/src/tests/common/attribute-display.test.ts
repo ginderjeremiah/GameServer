@@ -82,17 +82,17 @@ describe('attributeCode', () => {
 
 describe('attributeIsHarmful', () => {
 	const mockAttributes: IAttribute[] = [
-		makeAttribute(EAttribute.DamageTakenPerSecond, 'Damage Taken Per Second', { isHarmful: true }),
+		makeAttribute(EAttribute.BleedDamagePerSecond, 'Bleed Damage Per Second', { isHarmful: true }),
 		makeAttribute(EAttribute.Strength, 'Strength', { isHarmful: false })
 	];
 
 	it('reads the harmful flag from the reference set', () => {
-		expect(attributeIsHarmful(EAttribute.DamageTakenPerSecond, mockAttributes)).toBe(true);
+		expect(attributeIsHarmful(EAttribute.BleedDamagePerSecond, mockAttributes)).toBe(true);
 		expect(attributeIsHarmful(EAttribute.Strength, mockAttributes)).toBe(false);
 	});
 
 	it('defaults to false when attributes are absent or the id is unknown', () => {
-		expect(attributeIsHarmful(EAttribute.DamageTakenPerSecond)).toBe(false);
+		expect(attributeIsHarmful(EAttribute.BleedDamagePerSecond)).toBe(false);
 		expect(attributeIsHarmful(EAttribute.Luck, mockAttributes)).toBe(false);
 	});
 });
@@ -116,7 +116,7 @@ describe('attributeIcon', () => {
 		expect(attributeIcon(EAttribute.Strength)).toBe('/img/Strength.png');
 		expect(attributeIcon(EAttribute.MaxHealth)).toBe('/img/Max Health.png');
 		expect(attributeIcon(EAttribute.CooldownRecovery)).toBe('/img/Cooldown Recovery.png');
-		expect(attributeIcon(EAttribute.DamageTakenPerSecond)).toBe('/img/Damage Taken Per Second.png');
+		expect(attributeIcon(EAttribute.HealthRegenPerSecond)).toBe('/img/Health Regen Per Second.png');
 		expect(attributeIcon(EAttribute.CriticalChance)).toBe('/img/Critical Chance.png');
 		expect(attributeIcon(EAttribute.BlockReduction)).toBe('/img/Block Reduction.png');
 	});
@@ -137,7 +137,6 @@ describe('attributeIcon', () => {
 			EAttribute.DodgeChance,
 			EAttribute.BlockChance,
 			EAttribute.BlockReduction,
-			EAttribute.DamageTakenPerSecond,
 			EAttribute.HealthRegenPerSecond
 		];
 		for (const id of withArt) {
@@ -145,10 +144,13 @@ describe('attributeIcon', () => {
 		}
 	});
 
-	it('returns "" for the obsolete DropBonus and for unknown ids', () => {
-		// DropBonus is obsolete and has no art; an out-of-range id resolves the same way so the
-		// AttributeIcon component renders nothing rather than a broken image.
+	it('returns "" for attributes with no art and for unknown ids', () => {
+		// DropBonus is obsolete and the typed DoT accumulators have no art yet (#1320 Area F); an
+		// out-of-range id resolves the same way so the AttributeIcon component renders nothing.
 		expect(attributeIcon(EAttribute.DropBonus)).toBe('');
+		expect(attributeIcon(EAttribute.BleedDamagePerSecond)).toBe('');
+		expect(attributeIcon(EAttribute.PoisonDamagePerSecond)).toBe('');
+		expect(attributeIcon(EAttribute.BurnDamagePerSecond)).toBe('');
 		expect(attributeIcon(999 as EAttribute)).toBe('');
 	});
 });

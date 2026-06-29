@@ -343,24 +343,24 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 320),
 
-                // DoT kill timing: a constant poison on the enemy (a base DamageTakenPerSecond debuff, no direct
+                // DoT kill timing: a constant poison on the enemy (a base PoisonDamagePerSecond debuff, no direct
                 // damage) ticks it down. DTPS 50 → 50*40/1000 = 2 damage at the END of each tick, bypassing
                 // Defense. 2/tick over 25 ticks brings the 50-HP enemy to 0 → victory at tick 1000.
                 ["poisonKillTiming"] = new ParityScenario(
                     Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
-                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 50)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.PoisonDamagePerSecond, 50)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 1000),
 
-                // Same-tick mutual DoT tie favours the player: both battlers carry a constant DamageTakenPerSecond
+                // Same-tick mutual DoT tie favours the player: both battlers carry a constant PoisonDamagePerSecond
                 // (base poison) for 2/tick and reach 0 HP on the same tick (1000). The end-of-tick phase resolves
                 // the ENEMY first, so its death is awarded as a victory before the player's identical DoT is
                 // applied — the player never takes the lethal tick. (Applying the player's DoT first would flip
                 // this to a loss.)
                 ["poisonMutualDotTieFavoursPlayer"] = new ParityScenario(
-                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 50)]),
-                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 50)]),
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.PoisonDamagePerSecond, 50)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: [], extra: [(EAttribute.PoisonDamagePerSecond, 50)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 1000),
@@ -379,9 +379,9 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
 
-                // Ordering within the end-of-tick phase: for each battler DamageTakenPerSecond then
+                // Ordering within the end-of-tick phase: for each battler PoisonDamagePerSecond then
                 // HealthRegenPerSecond apply BEFORE its death check, so the heal can offset a lethal DoT tick
-                // (#1090). The player carries a constant 250 DamageTakenPerSecond (10/tick) and 150
+                // (#1090). The player carries a constant 250 PoisonDamagePerSecond (10/tick) and 150
                 // HealthRegenPerSecond (6/tick) — a net −4 grinding its 50 HP down. Each tick the 6 heal applies
                 // after the 10 DoT and is checked together, so the player only dies once the net drain crosses 0:
                 // 50/4 = 12.5 → death at tick 13 → 520ms. (Checking death before the heal would have killed it at
@@ -389,14 +389,14 @@ namespace Game.Core.Tests.Battle
                 ["dotRegenNetNegativeKillsAfterHeal"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0, skills: [],
-                        extra: [(EAttribute.DamageTakenPerSecond, 250), (EAttribute.HealthRegenPerSecond, 150)]),
+                        extra: [(EAttribute.PoisonDamagePerSecond, 250), (EAttribute.HealthRegenPerSecond, 150)]),
                     Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
                     ExpectedVictory: false,
                     ExpectedPlayerDied: true,
                     ExpectedTotalMs: 520),
 
                 // Heal-over-time saves the battler from an otherwise-lethal DoT tick (#1090). The player carries
-                // a constant 1500 DamageTakenPerSecond (60/tick) — more than its whole 50 HP — and an equal 1500
+                // a constant 1500 PoisonDamagePerSecond (60/tick) — more than its whole 50 HP — and an equal 1500
                 // HealthRegenPerSecond (60/tick). Each tick the 60 DoT drives HP to −10 but the same-tick 60 heal
                 // (applied before the death check, capped at MaxHealth) restores it to 50, so the player never
                 // dies; dealing no damage back, the battle runs to the timeout. (Checking death before the heal
@@ -404,21 +404,21 @@ namespace Game.Core.Tests.Battle
                 ["regenSavesFromLethalDot"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0, skills: [],
-                        extra: [(EAttribute.DamageTakenPerSecond, 1500), (EAttribute.HealthRegenPerSecond, 1500)]),
+                        extra: [(EAttribute.PoisonDamagePerSecond, 1500), (EAttribute.HealthRegenPerSecond, 1500)]),
                     Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
                     ExpectedVictory: false,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
 
                 // DoT bypasses Defense. The enemy's high Defense (12) clamps the player's direct 10-damage hit to
-                // 0, but its constant 250 DamageTakenPerSecond (base poison) → 10/tick ignores Defense and grinds
+                // 0, but its constant 250 PoisonDamagePerSecond (base poison) → 10/tick ignores Defense and grinds
                 // the enemy's 250 HP down: victory at tick 1000. If DoT respected Defense (10−12 clamped to 0) the
                 // enemy would never die.
                 ["dotBypassesDefense"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,
                         skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 40)]),
-                    Enemy: () => MakeEnemy(strength: 0, endurance: 10, skills: [], extra: [(EAttribute.DamageTakenPerSecond, 250)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 10, skills: [], extra: [(EAttribute.PoisonDamagePerSecond, 250)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 1000),
@@ -433,7 +433,7 @@ namespace Game.Core.Tests.Battle
                         skills:
                         [
                             MakeSkill(1, baseDamage: 0, cooldownMs: 2000,
-                                effects: [MakeEffect(207, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 50, 400)]),
+                                effects: [MakeEffect(207, ESkillEffectTarget.Opponent, EAttribute.PoisonDamagePerSecond, EModifierType.Additive, 50, 400)]),
                         ]),
                     Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
                     ExpectedVictory: false,
@@ -446,7 +446,7 @@ namespace Game.Core.Tests.Battle
                 // tick before the skill fires again and re-applies — the cycle where the backend's absolute
                 // ExpiresAtMs clock and the frontend's decrementing remainingMs are most likely to drift by a
                 // tick. (Distinct from the refresh-while-active stacking and single-shot expiry rows.)
-                //   Player: skill baseDamage 0, cooldown 120, Opponent +250 DamageTakenPerSecond for 80ms → 10/tick.
+                //   Player: skill baseDamage 0, cooldown 120, Opponent +250 PoisonDamagePerSecond for 80ms → 10/tick.
                 //     Fires at ticks 120,240,360; each application deals DoT on its 2 active ticks, then lapses one.
                 //   Enemy:  MaxHealth 50, no skills.
                 //   Active ticks 120,160 (50→30), lapse 200, re-apply 240,280 (30→10), lapse 320, re-apply 360
@@ -457,7 +457,7 @@ namespace Game.Core.Tests.Battle
                         skills:
                         [
                             MakeSkill(1, baseDamage: 0, cooldownMs: 120,
-                                effects: [MakeEffect(210, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, 80)]),
+                                effects: [MakeEffect(210, ESkillEffectTarget.Opponent, EAttribute.PoisonDamagePerSecond, EModifierType.Additive, 250, 80)]),
                         ]),
                     Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
                     ExpectedVictory: true,
@@ -465,8 +465,8 @@ namespace Game.Core.Tests.Battle
                     ExpectedTotalMs: 360),
 
                 // DoT stacking: a poison re-applied every tick STACKS (each application adds another
-                // DamageTakenPerSecond debuff) instead of refreshing, so the per-tick damage ramps. The skill
-                // (cooldown 40) applies Opponent +25 DamageTakenPerSecond each tick; at tick n the enemy
+                // PoisonDamagePerSecond debuff) instead of refreshing, so the per-tick damage ramps. The skill
+                // (cooldown 40) applies Opponent +25 PoisonDamagePerSecond each tick; at tick n the enemy
                 // carries n stacks = 25n DTPS → 25n×40/1000 = n damage that tick (bypassing Defense).
                 // Cumulative n(n+1)/2 reaches the 50-HP enemy's total on tick 10 (45 after tick 9, +10 = 55)
                 // → victory at 400ms. (Refresh-only would hold 25 DTPS = 1/tick → 2000ms.)
@@ -476,7 +476,7 @@ namespace Game.Core.Tests.Battle
                         skills:
                         [
                             MakeSkill(1, baseDamage: 0, cooldownMs: 40,
-                                effects: [MakeEffect(208, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 25, Permanent)]),
+                                effects: [MakeEffect(208, ESkillEffectTarget.Opponent, EAttribute.PoisonDamagePerSecond, EModifierType.Additive, 25, Permanent)]),
                         ]),
                     Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
                     ExpectedVictory: true,
@@ -485,10 +485,10 @@ namespace Game.Core.Tests.Battle
 
                 // Shared per-attribute expiry (#992 / #740): a poison whose duration (120ms = 3 ticks) outlasts
                 // its skill's cooldown (80ms = 2 ticks), so each fire re-applies WHILE the previous applications
-                // are still active — resetting the whole DamageTakenPerSecond stack's single shared expiry to the
+                // are still active — resetting the whole PoisonDamagePerSecond stack's single shared expiry to the
                 // new duration. The reset always lands before the 3-tick duration would lapse, so nothing ever
                 // expires and the stacks accumulate, the damage ramping like a permanent poison.
-                //   Player: skill baseDamage 0, cooldown 80 → fires ticks 2,4,6; Opponent +250 DamageTakenPerSecond, 120ms.
+                //   Player: skill baseDamage 0, cooldown 80 → fires ticks 2,4,6; Opponent +250 PoisonDamagePerSecond, 120ms.
                 //   Enemy:  Str=14 → MaxHealth=120, Def=2, no skills. Each stack = 250 DTPS → 10/tick (bypassing Defense).
                 //   Stacks 1 (ticks 2-3), 2 (4-5), 3 (6-7); DoT/tick = 10×stacks. Cum 10,20,40,60,90,120 → the
                 //   120-HP enemy dies on tick 7 → 280ms. (Independent per-application expiry — the bug this fixes —
@@ -499,7 +499,7 @@ namespace Game.Core.Tests.Battle
                         skills:
                         [
                             MakeSkill(1, baseDamage: 0, cooldownMs: 80,
-                                effects: [MakeEffect(211, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 250, 120)]),
+                                effects: [MakeEffect(211, ESkillEffectTarget.Opponent, EAttribute.PoisonDamagePerSecond, EModifierType.Additive, 250, 120)]),
                         ]),
                     Enemy: () => MakeEnemy(strength: 14, endurance: 0, skills: []),
                     ExpectedVictory: true,
@@ -510,7 +510,7 @@ namespace Game.Core.Tests.Battle
                 // 0 but scales with the caster's Intellect at 1.0/point. Intellect feeds no derived attribute,
                 // so it perturbs nothing but this scaling — keeping the timing hand-computable.
                 //   Player: Intellect=50; skill baseDamage 0, cooldown 2000 → fires once at tick 50 (cdMult=1).
-                //     Effect: Opponent +DamageTakenPerSecond, base 0 + Intellect(50)×1.0 = 50 DTPS, permanent.
+                //     Effect: Opponent +PoisonDamagePerSecond, base 0 + Intellect(50)×1.0 = 50 DTPS, permanent.
                 //   Enemy:  Str=0, End=0 → MaxHealth=50, no skills. DoT (bypassing Defense) = 50×40/1000 = 2/tick.
                 //   From tick 50 the enemy loses 2/tick; 50 HP / 2 = 25 ticks → dies on tick 74 → 2960ms.
                 //   (Without scaling the authored 0 would deal nothing and the battle would never resolve.)
@@ -520,7 +520,7 @@ namespace Game.Core.Tests.Battle
                         skills:
                         [
                             MakeSkill(1, baseDamage: 0, cooldownMs: 2000,
-                                effects: [MakeEffect(209, ESkillEffectTarget.Opponent, EAttribute.DamageTakenPerSecond, EModifierType.Additive, 0, Permanent,
+                                effects: [MakeEffect(209, ESkillEffectTarget.Opponent, EAttribute.PoisonDamagePerSecond, EModifierType.Additive, 0, Permanent,
                                     scalingAttribute: EAttribute.Intellect, scalingAmount: 1.0)]),
                         ],
                         extra: [(EAttribute.Intellect, 50)]),
@@ -843,6 +843,128 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: false,
                     ExpectedPlayerDied: true,
                     ExpectedTotalMs: 2400),
+
+                // ── Typed damage-over-time: per-type accumulators + live resistance (#1320 Area C) ─────────
+                // DoT is encoded by which per-second accumulator an effect targets; the end-of-tick phase loops
+                // the DoT types in fixed order, applying each type's resistance SAMPLED LIVE off the bearer and
+                // bypassing Defense. A bearer is the defender of its own DoT, so an enemy's own resistance
+                // mitigates its own poison. All hand-computable. Mirrored in the frontend suite.
+
+                // DoT resistance slows the kill: the enemy's +0.5 PoisonResistance halves its constant 50
+                // PoisonDamagePerSecond (2/tick → 1/tick), so the 50-HP enemy dies on tick 50 → 2000ms (vs the
+                // un-resisted 1000ms of poisonKillTiming).
+                ["poisonResistanceSlowsKill"] = new ParityScenario(
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.PoisonDamagePerSecond, 50), (EAttribute.PoisonResistance, 0.5)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
+                // DoT vulnerability (res < 0) hastens the kill: a −1.0 PoisonResistance doubles the constant 50
+                // PoisonDamagePerSecond (2/tick → 4/tick), so the 50-HP enemy dies on tick 13 → 520ms.
+                // Resistance is deliberately left unclamped.
+                ["poisonVulnerabilityHastensKill"] = new ParityScenario(
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.PoisonDamagePerSecond, 50), (EAttribute.PoisonResistance, -1.0)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 520),
+
+                // DoT absorption (res > 1): a +2.0 PoisonResistance drives the tick negative (2 × (1 − 2) = −2),
+                // so the enemy's own poison heals it instead of hurting — it never dies, and dealing no damage
+                // back the battle runs to the timeout. (At res 0 it would die by 1000ms.)
+                ["poisonAbsorptionPreventsDeath"] = new ParityScenario(
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.PoisonDamagePerSecond, 50), (EAttribute.PoisonResistance, 2.0)]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
+
+                // Multi-type DoT sums every accumulator in fixed order: Bleed 50 (2/tick) + Poison 100 (4/tick)
+                // + Burn 25 (1/tick) = 7/tick, no resistance authored. The 350-HP enemy (Str 60) dies on tick
+                // 50 → 2000ms.
+                ["multiTypeDotSum"] = new ParityScenario(
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
+                    Enemy: () => MakeEnemy(
+                        strength: 60, endurance: 0, skills: [],
+                        extra:
+                        [
+                            (EAttribute.BleedDamagePerSecond, 50),
+                            (EAttribute.PoisonDamagePerSecond, 100),
+                            (EAttribute.BurnDamagePerSecond, 25),
+                        ]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
+                // Reduce-to-today identity: a single typed DoT with no resistance behaves exactly like the
+                // former single accumulator. A constant 50 BurnDamagePerSecond → 2/tick kills the 50-HP enemy on
+                // tick 25 → 1000ms, byte-identical to poisonKillTiming's old DamageTakenPerSecond outcome.
+                ["typedBurnNoResistanceUnchanged"] = new ParityScenario(
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.BurnDamagePerSecond, 50)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1000),
+
+                // Cross-cutting resistance: burn resists as burn + fire + elemental + dot, so the enemy's +0.5
+                // FireResistance halves its constant 250 BurnDamagePerSecond (10/tick → 5/tick) for free — the
+                // 50-HP enemy dies on tick 10 → 400ms (vs 200ms with no fire resistance).
+                ["burnResistedByFireResistance"] = new ParityScenario(
+                    Player: () => MakeBattler(strength: 0, endurance: 0, skills: []),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.BurnDamagePerSecond, 250), (EAttribute.FireResistance, 0.5)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 400),
+
+                // Caster amplification is FROZEN into the accumulator at apply time: the player's +1.0
+                // PoisonAmplification doubles the poison its skill applies (base 25 → 50 PoisonDamagePerSecond →
+                // 2/tick). Fired once at tick 50 (cooldown 2000), the 50-HP enemy then loses 2/tick and dies on
+                // tick 74 → 2960ms. (Without the amplification, 25 → 1/tick would not kill within one application.)
+                ["poisonCasterAmplificationFreezes"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 2000,
+                                effects: [MakeEffect(212, ESkillEffectTarget.Opponent, EAttribute.PoisonDamagePerSecond, EModifierType.Additive, 25, Permanent)]),
+                        ],
+                        extra: [(EAttribute.PoisonAmplification, 1.0)]),
+                    Enemy: () => MakeEnemy(strength: 0, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2960),
+
+                // Resistance is sampled LIVE, not frozen: the enemy carries a constant 50 PoisonDamagePerSecond
+                // (2/tick) and the player applies a permanent −4.0 PoisonResistance vulnerability debuff once at
+                // tick 5 (cooldown 200). The first four ticks deal 2 (50→42); from tick 5 the live-sampled
+                // resistance (factor 1 − (−4) = 5) makes the same poison deal 10/tick, killing the enemy on tick
+                // 9 → 360ms — before the skill's tick-10 re-fire, so a single debuff application suffices. (A
+                // frozen resistance would leave the poison at 2/tick → 1000ms.)
+                ["poisonVulnerabilityDebuffSampledLive"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 0, cooldownMs: 200,
+                                effects: [MakeEffect(213, ESkillEffectTarget.Opponent, EAttribute.PoisonResistance, EModifierType.Additive, -4.0, Permanent)]),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.PoisonDamagePerSecond, 50)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 360),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>

@@ -51,6 +51,28 @@ namespace Game.Core.Attributes
             new(Dot, "damage-over-time", "DOT", DotAmplification, DotResistance),
         ];
 
+        /// <summary>
+        /// The per-second accumulator attribute backing one DoT leaf type (spike #1320, Area C). The DoT type
+        /// is encoded by <em>which accumulator an effect targets</em> — there is no type field on a skill
+        /// effect — so this pairing is the single source linking the two.
+        /// </summary>
+        /// <param name="Type">The DoT leaf damage type.</param>
+        /// <param name="Accumulator">The per-second <see cref="EAttribute"/> the type accumulates into.</param>
+        public readonly record struct DotAccumulatorInfo(EDamageType Type, EAttribute Accumulator);
+
+        // The three DoT accumulators in the fixed iteration order the end-of-tick DoT phase folds them in
+        // (float addition is not associative, so the order is a parity contract). Bleed reuses the slot of the
+        // former single DamageTakenPerSecond channel; poison/burn append after the amp/resist block.
+        private static readonly IReadOnlyList<DotAccumulatorInfo> DotAccumulatorList =
+        [
+            new(EDamageType.Bleed, BleedDamagePerSecond),
+            new(EDamageType.Poison, PoisonDamagePerSecond),
+            new(EDamageType.Burn, BurnDamagePerSecond),
+        ];
+
+        private static readonly IReadOnlyDictionary<EAttribute, EDamageType> DotTypeByAccumulator =
+            DotAccumulatorList.ToDictionary(info => info.Accumulator, info => info.Type);
+
         // Leaf type → applicable keys (the spike's taxonomy table). A leaf type's own key comes first, then any
         // cross-cutting categories it belongs to; the order is fixed for float parity.
         private static readonly IReadOnlyDictionary<EDamageType, IReadOnlyList<EDamageTypeKey>> AppliesMap =
@@ -87,6 +109,12 @@ namespace Game.Core.Attributes
 
         /// <summary>The ten keys, in canonical iteration order.</summary>
         public static IReadOnlyList<KeyInfo> Keys => KeyInfos;
+
+        /// <summary>
+        /// The three DoT (type, per-second accumulator) pairings in the fixed order the end-of-tick DoT phase
+        /// iterates them — the single source linking a DoT leaf type to the accumulator that encodes it.
+        /// </summary>
+        public static IReadOnlyList<DotAccumulatorInfo> DotAccumulators => DotAccumulatorList;
 
         /// <summary>
         /// The set of keys whose amplification/resistance apply to a hit of the given leaf <paramref name="type"/> —
@@ -128,6 +156,16 @@ namespace Game.Core.Attributes
         public static EDamageTypeKey? KeyForAttribute(EAttribute attribute)
         {
             return KeyByAttribute.TryGetValue(attribute, out var key) ? key : null;
+        }
+
+        /// <summary>
+        /// The DoT leaf type a per-second <paramref name="attribute"/> accumulates, or <c>null</c> when it is
+        /// not a DoT accumulator. Lets the effect-apply path detect a DoT effect and freeze the caster's typed
+        /// amplification into the accumulated magnitude (spike #1320, Area C).
+        /// </summary>
+        public static EDamageType? DotTypeForAccumulator(EAttribute attribute)
+        {
+            return DotTypeByAccumulator.TryGetValue(attribute, out var type) ? type : null;
         }
 
         /// <summary>The per-key foundation facts for <paramref name="key"/>.</summary>

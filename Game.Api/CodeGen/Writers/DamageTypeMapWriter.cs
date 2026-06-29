@@ -49,7 +49,19 @@ namespace Game.Api.CodeGen.Writers
                     $"\t[EDamageTypeKey.{EnumName(info.Key)}]: {{ amplification: EAttribute.{EnumName(info.Amplification)}, resistance: EAttribute.{EnumName(info.Resistance)} }},");
             }
 
-            builder.Append("} as const;");
+            builder.AppendLine("} as const;");
+            builder.AppendLine();
+
+            // DoT leaf type → its per-second accumulator attribute, in the fixed order the end-of-tick DoT
+            // phase folds them (a parity contract — float addition is not associative).
+            builder.AppendLine("export const DAMAGE_TYPE_DOT_ACCUMULATORS = [");
+            foreach (var info in DamageTypes.DotAccumulators)
+            {
+                builder.AppendLine(
+                    $"\t{{ type: EDamageType.{EnumName(info.Type)}, accumulator: EAttribute.{EnumName(info.Accumulator)} }},");
+            }
+
+            builder.Append("] as const;");
 
             Directory.CreateDirectory(_options.TargetDirectory);
             var filePath = Path.Combine(_options.TargetDirectory, FileName);

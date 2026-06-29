@@ -1,6 +1,7 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
 import { mitigateDamage, cooldownMultiplier } from './battle-formulas';
+import { dotAccumulators, resistanceAttributes } from './damage-types';
 import { IBattlerAttribute, ISkillEffect, EAttribute, EDamageType, EModifierType } from '$lib/api';
 import { EAttributeModifierSource, type AttributeModifier } from './attribute-modifier';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
@@ -170,18 +171,34 @@ export class Battler {
 		return net;
 	}
 
-	/** Applies one tick of damage-over-time from DamageTakenPerSecond (authored per second, scaled to
-	 *  `timeDelta`). Unlike {@link takeDamage} it BYPASSES Defense; returns the damage dealt.
+	/** Applies one tick of typed damage-over-time (#1320, Area C). Loops the DoT types in the fixed
+	 *  {@link dotAccumulators} order, scaling each type's per-second accumulator to `timeDelta` and applying
+	 *  this (defending) battler's resistance for that type SAMPLED LIVE —
+	 *  `perSec * timeDelta/1000 * (1 - Σ applies(type).resistance)` — so a vulnerability debuff makes existing
+	 *  DoTs hurt immediately. The caster's amplification was frozen into the accumulator at apply time
+	 *  ({@link Skill.applyEffects}). Unlike {@link takeDamage} it BYPASSES Defense (resistance is its only
+	 *  mitigation); returns the total damage dealt. With no DoT authored every accumulator is 0, so the return
+	 *  is an exact 0. Mirrors the backend `Battler.ApplyDamageOverTime`.
 	 *
-	 *  Intentionally NOT floored at zero, unlike {@link takeDamage}: that floor exists only so Defense
-	 *  mitigation can't drive net damage below zero and turn a hit into a heal. DoT has no mitigation step, so a
-	 *  tick is negative only if a negative DamageTakenPerSecond is deliberately authored — and a floor wouldn't
-	 *  prevent that, just silently rewrite it. Authored healing belongs in the capped {@link applyHealOverTime}
-	 *  channel instead. */
+	 *  Intentionally NOT floored at zero, unlike {@link takeDamage}: that floor exists only so flat Defense
+	 *  can't turn a hit into a heal. DoT bypasses Defense, so a tick goes negative only through a deliberately
+	 *  authored negative accumulator or a resistance above 1 (absorption) — a floor wouldn't prevent that, just
+	 *  silently rewrite it. Authored healing belongs in the capped {@link applyHealOverTime} channel instead. */
 	public applyDamageOverTime(timeDelta: number) {
-		const damage = (this.attributes.getValue(EAttribute.DamageTakenPerSecond) * timeDelta) / 1000;
-		this.currentHealth -= damage;
-		return damage;
+		let dot = 0;
+		for (const { type, accumulator } of dotAccumulators()) {
+			const perSecond = this.attributes.getValue(accumulator);
+			if (perSecond === 0) {
+				continue;
+			}
+			let resistance = 0;
+			for (const attribute of resistanceAttributes(type)) {
+				resistance += this.attributes.getValue(attribute);
+			}
+			dot += ((perSecond * timeDelta) / 1000) * (1 - resistance);
+		}
+		this.currentHealth -= dot;
+		return dot;
 	}
 
 	/** Applies one tick of heal-over-time from HealthRegenPerSecond (authored per second, scaled to

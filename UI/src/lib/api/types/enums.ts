@@ -18,7 +18,7 @@ export enum EAttribute {
 	DodgeChance = 12,
 	BlockChance = 13,
 	BlockReduction = 14,
-	DamageTakenPerSecond = 15,
+	BleedDamagePerSecond = 15,
 	HealthRegenPerSecond = 16,
 	PhysicalAmplification = 17,
 	PhysicalResistance = 18,
@@ -40,6 +40,8 @@ export enum EAttribute {
 	ElementalResistance = 34,
 	DotAmplification = 35,
 	DotResistance = 36,
+	PoisonDamagePerSecond = 37,
+	BurnDamagePerSecond = 38,
 }
 
 export enum EAttributeModifierSource {

@@ -191,15 +191,15 @@ namespace Game.Core.Tests.Battle
         public void BattleContext_ApplySkillEffect_ScalesAmountWithCasterAttribute()
         {
             // The issue's example: a poison applied to the enemy whose magnitude scales with the caster's
-            // Dexterity. Base 10 + Dexterity(20) × 0.5 = 20 DamageTakenPerSecond on the enemy.
+            // Dexterity. Base 10 + Dexterity(20) × 0.5 = 20 BleedDamagePerSecond on the enemy.
             var player = MakeBattler(Stat(Dexterity, 20));
             var enemy = MakeBattler(Stat(Dexterity, 0));
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
-            context.ApplySkillEffect(Effect(1, DamageTakenPerSecond, Additive, 10,
+            context.ApplySkillEffect(Effect(1, BleedDamagePerSecond, Additive, 10,
                 target: ESkillEffectTarget.Opponent, scalingAttribute: Dexterity, scalingAmount: 0.5));
 
-            Assert.Equal(20, enemy.GetAttributeValue(DamageTakenPerSecond));
+            Assert.Equal(20, enemy.GetAttributeValue(BleedDamagePerSecond));
         }
 
         [Fact]
@@ -211,11 +211,11 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattler(Stat(Dexterity, 100));  // target
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
-            context.ApplySkillEffect(Effect(1, DamageTakenPerSecond, Additive, 0,
+            context.ApplySkillEffect(Effect(1, BleedDamagePerSecond, Additive, 0,
                 target: ESkillEffectTarget.Opponent, scalingAttribute: Dexterity, scalingAmount: 1.0));
 
-            // 0 + caster Dexterity(4) × 1.0 = 4, not the target's 100 (DamageTakenPerSecond has base 0).
-            Assert.Equal(4, enemy.GetAttributeValue(DamageTakenPerSecond));
+            // 0 + caster Dexterity(4) × 1.0 = 4, not the target's 100 (BleedDamagePerSecond has base 0).
+            Assert.Equal(4, enemy.GetAttributeValue(BleedDamagePerSecond));
         }
 
         [Fact]
@@ -226,10 +226,81 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
             // ScalingAmount 0 ⇒ the authored amount is used verbatim regardless of the caster's attribute.
-            context.ApplySkillEffect(Effect(1, DamageTakenPerSecond, Additive, 7,
+            context.ApplySkillEffect(Effect(1, BleedDamagePerSecond, Additive, 7,
                 target: ESkillEffectTarget.Opponent, scalingAttribute: Dexterity, scalingAmount: 0));
 
-            Assert.Equal(7, enemy.GetAttributeValue(DamageTakenPerSecond));
+            Assert.Equal(7, enemy.GetAttributeValue(BleedDamagePerSecond));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_FreezesCasterAmplificationIntoDotAccumulator()
+        {
+            // A DoT effect targets a typed accumulator, so the caster's amplification is frozen into the
+            // accumulated magnitude at apply time: base 10 × (1 + 0.5 BleedAmplification) = 15.
+            var player = MakeBattler(Stat(BleedAmplification, 0.5));
+            var enemy = MakeBattler(Stat(Strength, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ApplySkillEffect(Effect(1, BleedDamagePerSecond, Additive, 10, target: ESkillEffectTarget.Opponent));
+
+            Assert.Equal(15, enemy.GetAttributeValue(BleedDamagePerSecond));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_AmplificationAppliesAfterCasterScaling()
+        {
+            // Scaling first, then the amplification freeze: base 0 + Intellect(20) × 0.5 = 10, × (1 + 0.5
+            // DotAmplification) = 15. DotAmplification amplifies every DoT type through the applies() map.
+            var player = MakeBattler(Stat(Intellect, 20), Stat(DotAmplification, 0.5));
+            var enemy = MakeBattler(Stat(Strength, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ApplySkillEffect(Effect(1, PoisonDamagePerSecond, Additive, 0,
+                target: ESkillEffectTarget.Opponent, scalingAttribute: Intellect, scalingAmount: 0.5));
+
+            Assert.Equal(15, enemy.GetAttributeValue(PoisonDamagePerSecond));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_BurnAmplifiedByFireAmplification_ThroughCrossCuttingKeys()
+        {
+            // Burn amplifies as burn + fire + elemental + dot, so a fire-amplifying caster strengthens burns
+            // for free: base 10 × (1 + 1.0 FireAmplification) = 20.
+            var player = MakeBattler(Stat(FireAmplification, 1.0));
+            var enemy = MakeBattler(Stat(Strength, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ApplySkillEffect(Effect(1, BurnDamagePerSecond, Additive, 10, target: ESkillEffectTarget.Opponent));
+
+            Assert.Equal(20, enemy.GetAttributeValue(BurnDamagePerSecond));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_AmplificationReadsCasterNotTarget()
+        {
+            // The freeze reads the CASTER's amplification, not the target's: a high-amplification target does
+            // not inflate a low-amplification caster's DoT. Caster +0 amp → base 10 stays 10 on the enemy.
+            var player = MakeBattler(Stat(Strength, 0));                 // caster, no amplification
+            var enemy = MakeBattler(Stat(BleedAmplification, 5.0));      // target's amplification is irrelevant
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ApplySkillEffect(Effect(1, BleedDamagePerSecond, Additive, 10, target: ESkillEffectTarget.Opponent));
+
+            Assert.Equal(10, enemy.GetAttributeValue(BleedDamagePerSecond));
+        }
+
+        [Fact]
+        public void BattleContext_ApplySkillEffect_HotStaysTypeless_NotAmplified()
+        {
+            // HealthRegenPerSecond is the typeless HoT channel, so the caster's DoT amplification never touches
+            // it: base 12 applied verbatim even with DotAmplification authored on the caster.
+            var player = MakeBattler(Stat(DotAmplification, 1.0));
+            var enemy = MakeBattler(Stat(Strength, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ApplySkillEffect(Effect(1, HealthRegenPerSecond, Additive, 12, target: ESkillEffectTarget.Self));
+
+            Assert.Equal(12, player.GetAttributeValue(HealthRegenPerSecond));
         }
 
         [Fact]

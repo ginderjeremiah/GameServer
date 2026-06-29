@@ -88,7 +88,7 @@ const refAttributes: IAttribute[] = [
 		decimals: 0,
 		isPercentage: true
 	}),
-	makeAttribute(EAttribute.DamageTakenPerSecond, 'Damage Taken Per Second', {
+	makeAttribute(EAttribute.BleedDamagePerSecond, 'Bleed Damage Per Second', {
 		attributeType: EAttributeType.Status,
 		displayOrder: 14,
 		isHarmful: true
@@ -327,7 +327,7 @@ describe('AttributeBreakdownView', () => {
 		]);
 		expect(view.groups.some((g) => g.type === EAttributeType.Primary)).toBe(false);
 		expect(ids).not.toContain(EAttribute.DropBonus);
-		expect(ids).not.toContain(EAttribute.DamageTakenPerSecond);
+		expect(ids).not.toContain(EAttribute.BleedDamagePerSecond);
 	});
 
 	it('defaults the selection to MaxHealth and can change it', () => {
@@ -421,7 +421,7 @@ describe('battle-assembly parity', () => {
 
 describe('self-selecting membership', () => {
 	it('treats a combat-only (SkillEffect) contributor as not a real, non-combat modifier', () => {
-		const combatOnly = computedWithSources(EAttribute.DamageTakenPerSecond, [EAttributeModifierSource.SkillEffect]);
+		const combatOnly = computedWithSources(EAttribute.BleedDamagePerSecond, [EAttributeModifierSource.SkillEffect]);
 		expect(hasNonCombatModifier(combatOnly)).toBe(false);
 	});
 
@@ -433,14 +433,14 @@ describe('self-selecting membership', () => {
 	it('omits an attribute with only a combat modifier from the groups, but lists one with a non-combat modifier', () => {
 		const computed = new Map<EAttribute, ComputedAttribute<LabeledModifier>>([
 			[
-				EAttribute.DamageTakenPerSecond,
-				computedWithSources(EAttribute.DamageTakenPerSecond, [EAttributeModifierSource.SkillEffect])
+				EAttribute.BleedDamagePerSecond,
+				computedWithSources(EAttribute.BleedDamagePerSecond, [EAttributeModifierSource.SkillEffect])
 			],
 			[EAttribute.Strength, computedWithSources(EAttribute.Strength, [EAttributeModifierSource.PlayerStatPoints])]
 		]);
 		const ids = buildGroups(computed, refAttributes).flatMap((g) => g.attrs.map((a) => a.meta.id));
 		expect(ids).toContain(EAttribute.Strength);
-		expect(ids).not.toContain(EAttribute.DamageTakenPerSecond);
+		expect(ids).not.toContain(EAttribute.BleedDamagePerSecond);
 	});
 });
 

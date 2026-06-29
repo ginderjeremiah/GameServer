@@ -23,13 +23,114 @@ namespace Game.Core.Tests.Battle
         public void ApplyDamageOverTime_ScalesPerSecondAttributeByTick_BypassingDefense()
         {
             // Endurance 50 → Defense 52, but damage-over-time ignores Defense entirely.
-            var battler = MakeBattler(Stat(Endurance, 50), Stat(DamageTakenPerSecond, 50));
+            var battler = MakeBattler(Stat(Endurance, 50), Stat(BleedDamagePerSecond, 50));
             var startHealth = battler.CurrentHealth;
 
             var dealt = battler.ApplyDamageOverTime(40); // 50 * 40 / 1000 = 2
 
             Assert.Equal(2, dealt);
             Assert.Equal(startHealth - 2, battler.CurrentHealth);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_NoDotAuthored_DealsZero()
+        {
+            var battler = MakeBattler(Stat(Strength, 10));
+            var startHealth = battler.CurrentHealth;
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(0, dealt);
+            Assert.Equal(startHealth, battler.CurrentHealth);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_AppliesTypeResistanceSampledLive()
+        {
+            // 50 BleedDamagePerSecond → 2/tick, halved by 0.5 BleedResistance (sampled live each tick) → 1.
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 0.5));
+            var startHealth = battler.CurrentHealth;
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(1, dealt);
+            Assert.Equal(startHealth - 1, battler.CurrentHealth);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_NegativeResistance_AmplifiesAsVulnerability()
+        {
+            // A −1.0 BleedResistance doubles the incoming bleed tick (factor 1 − (−1) = 2): 2 → 4. Unclamped.
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, -1.0));
+            var startHealth = battler.CurrentHealth;
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(4, dealt);
+            Assert.Equal(startHealth - 4, battler.CurrentHealth);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_ResistanceAboveOne_HealsAsAbsorption()
+        {
+            // A +2.0 BleedResistance drives the tick negative (2 × (1 − 2) = −2): absorption heals. DoT bypasses
+            // Defense and is not floored, so the negative tick restores health (here the battler is below max).
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 2.0));
+            battler.TakeDamage(52, EDamageType.Physical); // Defense 2 → 50 damage → CurrentHealth 50
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(-2, dealt);
+            Assert.Equal(52, battler.CurrentHealth); // 50 − (−2)
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_BurnResistedByFireResistance_ThroughCrossCuttingKeys()
+        {
+            // Burn resists as burn + fire + elemental + dot, so a fire-resistant battler mitigates burns for
+            // free: 250 BurnDamagePerSecond → 10/tick, halved by 0.5 FireResistance → 5.
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BurnDamagePerSecond, 250), Stat(FireResistance, 0.5));
+            var startHealth = battler.CurrentHealth;
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(5, dealt);
+            Assert.Equal(startHealth - 5, battler.CurrentHealth);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_SumsEveryDotTypeInFixedOrder()
+        {
+            // All three accumulators tick together: Bleed 50→2, Poison 100→4, Burn 25→1 = 7 total, each typed
+            // resistance sampled independently (none authored here). DotResistance 0.5 would resist all three.
+            var battler = MakeBattler(
+                Stat(Strength, 10),
+                Stat(BleedDamagePerSecond, 50),
+                Stat(PoisonDamagePerSecond, 100),
+                Stat(BurnDamagePerSecond, 25));
+            var startHealth = battler.CurrentHealth;
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(7, dealt);
+            Assert.Equal(startHealth - 7, battler.CurrentHealth);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_DotResistanceMitigatesEveryDotType()
+        {
+            // The DoT cross-cutting category resists all three types at once: Bleed 2, Poison 4, Burn 1 each ×
+            // (1 − 0.5) → 1 + 2 + 0.5 = 3.5.
+            var battler = MakeBattler(
+                Stat(Strength, 10),
+                Stat(BleedDamagePerSecond, 50),
+                Stat(PoisonDamagePerSecond, 100),
+                Stat(BurnDamagePerSecond, 25),
+                Stat(DotResistance, 0.5));
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(3.5, dealt);
         }
 
         [Fact]
@@ -84,11 +185,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DotOnEnemy_CountsTowardPlayerDamageDealt_NotHighestAttackOrSkillStats()
         {
-            // A constant poison on the enemy (a base DamageTakenPerSecond) ticks it for 2/tick; the 50-HP
+            // A constant poison on the enemy (a base BleedDamagePerSecond) ticks it for 2/tick; the 50-HP
             // enemy dies after exactly 50 DoT damage (25 ticks). The player fires a 0-damage skill so a
             // SkillStats row exists to assert the DoT is NOT attributed to it.
             var player = MakeBattler([Stat(Strength, 0)], [DamageSkill(1, baseDamage: 0)]);
-            var enemy = MakeBattler(Stat(Strength, 0), Stat(DamageTakenPerSecond, 50)); // MaxHealth 50, no skills
+            var enemy = MakeBattler(Stat(Strength, 0), Stat(BleedDamagePerSecond, 50)); // MaxHealth 50, no skills
 
             var result = new BattleSimulator(player, enemy, seed: 0).Simulate();
 
@@ -103,9 +204,9 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DotOnPlayer_CountsTowardPlayerDamageTaken()
         {
-            // A constant poison on the player (a base DamageTakenPerSecond) ticks for 2/tick; the 50-HP
+            // A constant poison on the player (a base BleedDamagePerSecond) ticks for 2/tick; the 50-HP
             // player (no damage skill) dies after 50 DoT.
-            var player = MakeBattler(Stat(Strength, 0), Stat(DamageTakenPerSecond, 50));
+            var player = MakeBattler(Stat(Strength, 0), Stat(BleedDamagePerSecond, 50));
             var enemy = MakeBattler(Stat(Strength, 0));
 
             var result = new BattleSimulator(player, enemy, seed: 0).Simulate();
@@ -139,7 +240,7 @@ namespace Game.Core.Tests.Battle
             // A 50-HP player takes 60 DoT this tick (more than its whole health) but an equal 60 heal applies
             // before the death check, restoring it to MaxHealth — so it survives a DoT that would otherwise kill.
             var player = MakeBattler(
-                Stat(Strength, 0), Stat(DamageTakenPerSecond, 1500), Stat(HealthRegenPerSecond, 1500));
+                Stat(Strength, 0), Stat(BleedDamagePerSecond, 1500), Stat(HealthRegenPerSecond, 1500));
             var enemy = MakeBattler(Stat(Strength, 0));
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
@@ -156,7 +257,7 @@ namespace Game.Core.Tests.Battle
             // otherwise-lethal DoT tick exactly as it does for the player.
             var player = MakeBattler(Stat(Strength, 0));
             var enemy = MakeBattler(
-                Stat(Strength, 0), Stat(DamageTakenPerSecond, 1500), Stat(HealthRegenPerSecond, 1500));
+                Stat(Strength, 0), Stat(BleedDamagePerSecond, 1500), Stat(HealthRegenPerSecond, 1500));
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
             context.ResolveDamageOverTime();
@@ -171,7 +272,7 @@ namespace Game.Core.Tests.Battle
             // The heal applies before the death check but cannot offset the whole tick: a 5-HP player takes 10
             // DoT and heals 4, dying at −1. The applied heal is still recorded toward PlayerDamageHealed.
             var player = MakeBattler(
-                Stat(Strength, 0), Stat(DamageTakenPerSecond, 250), Stat(HealthRegenPerSecond, 100));
+                Stat(Strength, 0), Stat(BleedDamagePerSecond, 250), Stat(HealthRegenPerSecond, 100));
             player.TakeDamage(47, EDamageType.Physical); // Defense 2 → 45 damage → MaxHealth 50 → CurrentHealth 5
             var enemy = MakeBattler(Stat(Strength, 0));
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
