@@ -261,7 +261,7 @@ export class BattleEngine {
 	}
 
 	public startLoading(loadingTime: number) {
-		// Cancel any countdown still in flight so re-invoking can't leak the previous render hook.
+		// Cancel any countdown still in flight so re-invoking can't leak the previous logical hook.
 		this.finishLoading?.();
 		this.loadingTime = loadingTime;
 		this.loadingTotal = loadingTime;
