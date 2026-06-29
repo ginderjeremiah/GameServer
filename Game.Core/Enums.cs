@@ -305,21 +305,20 @@ namespace Game.Core
         /// <summary>All damage-over-time (bleed / poison / burn) damage dealt. Mirrors <see cref="EDamageTypeKey.Dot"/>.</summary>
         Dot = 9,
 
-        // The four combat-event keys — not damage types, so absent from EDamageTypeKey. Defined here so the
-        // decided activity-key set (spike #1318) is stable on the contract/column, but deliberately inert:
-        // nothing routes to them until the proc / heal / reflect bindings wire them (#1339; Retribution also
-        // depends on the reflection rework #1330). A path keyed on one simply accrues nothing until then.
+        // The four combat-event keys — not damage types, so absent from EDamageTypeKey. The proc / heal bindings
+        // (#1339) wire crit / dodge / heal; Reflect stays inert until the reflection rework (#1330) produces a
+        // reflected-damage signal. A path keyed on an unwired key simply accrues nothing until its binding lands.
 
-        /// <summary>Critical damage dealt (the Precision mastery). Inert until #1339.</summary>
+        /// <summary>Critical damage dealt (the Precision mastery).</summary>
         Crit = 10,
 
-        /// <summary>Damage dodged (the Evasion mastery). Inert until #1339.</summary>
+        /// <summary>Damage dodged (the Evasion mastery).</summary>
         Dodge = 11,
 
-        /// <summary>Healing done (the Restoration mastery). Inert until #1339.</summary>
+        /// <summary>Healing done (the Restoration mastery).</summary>
         Heal = 12,
 
-        /// <summary>Reflected damage (the Retribution mastery). Inert until #1339 / #1330.</summary>
+        /// <summary>Reflected damage (the Retribution mastery). Inert until the reflection rework #1330.</summary>
         Reflect = 13,
     }
 
