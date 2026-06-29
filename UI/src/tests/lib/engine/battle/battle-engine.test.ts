@@ -607,9 +607,10 @@ describe('BattleEngine', () => {
 			expect(effectCalls).toContainEqual([ELogType.SkillEffect, 'Goblin recovered 5 health.']);
 		});
 
-		// The player-only crit/dodge/block outcomes (#178) surface through the combat log. Forcing a
-		// chance of 1 makes every [0,1) RNG draw succeed, so the outcome is deterministic without a seed.
-		describe('crit / dodge / block lines (#178)', () => {
+		// The player-only crit/dodge outcomes (#178) and deterministic reflection (#1330) surface through the
+		// combat log. Forcing a chance of 1 makes every [0,1) RNG draw succeed, so the outcome is deterministic
+		// without a seed; reflection is deterministic and needs no forced roll.
+		describe('crit / dodge / reflection lines', () => {
 			const defaultAttributes = mockPlayerManager.attributes;
 			afterEach(() => {
 				mockPlayerManager.attributes = defaultAttributes;
@@ -655,6 +656,50 @@ describe('BattleEngine', () => {
 					"You dodged Goblin's Slash!",
 					'player-dodge',
 					undefined
+				);
+			});
+
+			it('logs an enemy-reflect line when the enemy reflects the player’s hit back (#1330)', () => {
+				engine.start();
+				// The enemy carries 0.5 DamageReflection and enough Endurance to survive the opening hit, so a
+				// positive share of the player's damage is returned to the player.
+				enemyLoadedCallbacks[0]({
+					id: 1,
+					level: 1,
+					seed: 0,
+					selectedSkills: [0],
+					attributes: [
+						{ attributeId: EAttribute.Endurance, amount: 200 },
+						{ attributeId: EAttribute.DamageReflection, amount: 0.5 }
+					]
+				});
+
+				logicalUpdateCallbacks[0](500); // the player's 500ms skill fires and is partly reflected
+
+				expect(logMessage).toHaveBeenCalledWith(
+					ELogType.Damage,
+					expect.stringContaining('Goblin reflected'),
+					'enemy-reflect'
+				);
+			});
+
+			it('logs a player-reflect line when the player reflects an incoming enemy hit back (#1330)', () => {
+				// The player carries 0.5 DamageReflection (plus enough bulk to survive); a tanky enemy survives the
+				// opening hit and swings back, so the player returns a share to the enemy.
+				mockPlayerManager.attributes = [
+					{ attributeId: EAttribute.DamageReflection, amount: 0.5 },
+					{ attributeId: EAttribute.Endurance, amount: 30 },
+					{ attributeId: EAttribute.Strength, amount: 50 }
+				];
+				engine.start();
+				enemyLoadedCallbacks[0](tankyEnemy);
+
+				logicalUpdateCallbacks[0](500);
+
+				expect(logMessage).toHaveBeenCalledWith(
+					ELogType.Damage,
+					expect.stringContaining('You reflected'),
+					'player-reflect'
 				);
 			});
 		});

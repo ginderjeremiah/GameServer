@@ -3,7 +3,7 @@ import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData, playerProficiencies } from '$stores';
 import { ELogType, EDamageType, IBattlerAttribute, IEnemyInstance } from '$lib/api';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
-import { logMessage, type LogOutcome } from '../log';
+import { logMessage } from '../log';
 import {
 	formatNum,
 	createHook,
@@ -12,7 +12,10 @@ import {
 	attributeIsHarmful,
 	attributeName,
 	damageLogMessage,
-	classifyResist
+	reflectLogMessage,
+	classifyResist,
+	type DirectHitOutcome,
+	type ReflectOutcome
 } from '$lib/common';
 import { onLogicalUpdate } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
@@ -288,7 +291,7 @@ export class BattleEngine {
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
 		this.timeElapsed += timeDelta;
 		if (this.stage === Active) {
-			for (const { skill, damage, byPlayer, crit, dodged } of battleStep(
+			for (const { skill, damage, byPlayer, crit, dodged, reflected } of battleStep(
 				this.player,
 				this.enemy,
 				timeDelta,
@@ -310,6 +313,13 @@ export class BattleEngine {
 					resist === 'normal' ? undefined : resist
 				);
 				notifyCombatFloat(combatFloatEvent(outcome, damage, damageType));
+				// Deterministic reflection (#1330): the defender returned part of this hit to the attacker. The
+				// reflector is the opposite side of the activation — a player hit is reflected by the enemy, and an
+				// enemy hit by the player — and it deals raw, untyped damage, so the line carries no resist note.
+				if (reflected > 0) {
+					const reflectOutcome: ReflectOutcome = byPlayer ? 'enemy-reflect' : 'player-reflect';
+					logMessage(ELogType.Damage, reflectLogMessage(reflectOutcome, reflected, this.enemy.name), reflectOutcome);
+				}
 			}
 			this.logEffectApplications();
 			this.accumulateEffectDamage(timeDelta);
@@ -402,7 +412,7 @@ export class BattleEngine {
  *  The crit/dodge flags are only ever set on the player's side (crit on the player's own hit; dodge
  *  on an incoming enemy hit), so the mapping is unambiguous. Drives both the log prose and the glyph,
  *  keeping them in lockstep. */
-function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): LogOutcome {
+function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): DirectHitOutcome {
 	if (byPlayer) {
 		return crit ? 'player-crit' : 'player-hit';
 	}
@@ -417,7 +427,7 @@ function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): Lo
  *  parallel copy of the flag branching. A player hit/crit floats over the enemy; an incoming enemy hit
  *  floats over the player as a dodge (no number) or a plain hit. `damageType` rides every damaging
  *  kind (not a dodge) so the floater can tint by type (#1320, Area F). */
-function combatFloatEvent(outcome: LogOutcome, damage: number, damageType: EDamageType): CombatFloatEvent {
+function combatFloatEvent(outcome: DirectHitOutcome, damage: number, damageType: EDamageType): CombatFloatEvent {
 	switch (outcome) {
 		case 'player-crit':
 			return { target: 'enemy', kind: 'crit', amount: damage, damageType };

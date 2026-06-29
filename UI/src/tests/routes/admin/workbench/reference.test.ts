@@ -89,6 +89,14 @@ describe('enum-backed select options', () => {
 		expect(byValue(EAttribute.DodgeChance)).toBe('Dodge Chance');
 	});
 
+	it('exposes the authored-only DamageReflection for gear/mod/proficiency/class authoring (#1330)', () => {
+		// DamageReflection has no core-attribute derivation, so authoring is the ONLY way to grant it. Every
+		// attribute picker (gear / item-mod / proficiency / class) reads this enum-backed set, so it must offer
+		// DamageReflection despite the retired Block gap in the enum.
+		const opts = reference.attributeOptions();
+		expect(opts.find((o) => o.value === EAttribute.DamageReflection)?.text).toBe('Damage Reflection');
+	});
+
 	it('builds item-category, rarity and mod-type options', () => {
 		expect(reference.itemCategoryOptions().find((o) => o.value === EItemCategory.Weapon)?.text).toBe('Weapon');
 		expect(reference.rarityOptions().find((o) => o.value === ERarity.Legendary)?.text).toBe('Legendary');

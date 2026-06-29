@@ -17,7 +17,8 @@ const ALL_GLYPHS: GlyphKind[] = [
 	'effect',
 	'resisted',
 	'vulnerable',
-	'absorbed'
+	'absorbed',
+	'reflect'
 ];
 
 describe('LogGlyph', () => {

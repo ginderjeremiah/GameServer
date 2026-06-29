@@ -6,16 +6,20 @@ import { amplifiedDamage } from './battle-formulas';
 
 /** Deterministic damage reflection (#1330): the `defender` returns its DamageReflection share of a direct
  *  hit's `netDamage` to the `attacker`, BYPASSING the attacker's mitigation. Only a positive net reflects (a
- *  dodged or absorbed hit returns nothing), and DoT is never routed here, so DoT is never reflected. Mirrors
- *  the backend `BattleContext.ReflectDamage`. */
-function reflectDamage(attacker: Battler, defender: Battler, netDamage: number): void {
+ *  dodged or absorbed hit returns nothing), and DoT is never routed here, so DoT is never reflected. Returns
+ *  the amount reflected (0 when nothing was) so the live engine can log a reflected-damage line; the headless
+ *  simulator ignores the return. Mirrors the backend `BattleContext.ReflectDamage`. */
+function reflectDamage(attacker: Battler, defender: Battler, netDamage: number): number {
 	if (netDamage <= 0) {
-		return;
+		return 0;
 	}
 	const reflection = defender.attributes.getValue(EAttribute.DamageReflection);
 	if (reflection > 0) {
-		attacker.takeReflectedDamage(netDamage * reflection);
+		const reflected = netDamage * reflection;
+		attacker.takeReflectedDamage(reflected);
+		return reflected;
 	}
+	return 0;
 }
 
 /**
@@ -23,8 +27,10 @@ function reflectDamage(attacker: Battler, defender: Battler, netDamage: number):
  * final damage it dealt after the defender's mitigation, and whether the
  * player (true) or the enemy (false) was the attacker. The crit/dodged flags
  * carry the player-only roll outcomes for the combat log: `crit` on a player
- * attack, `dodged` on an incoming enemy attack. The live BattleEngine turns these
- * into combat-log messages; the headless BattleSimulator ignores them.
+ * attack, `dodged` on an incoming enemy attack. `reflected` is the deterministic
+ * damage (#1330) the defender returned to the attacker for this hit (0 when none),
+ * so the live engine can log a reflected-damage line. The live BattleEngine turns
+ * these into combat-log messages; the headless BattleSimulator ignores them.
  */
 export interface SkillActivation {
 	skill: Skill;
@@ -32,6 +38,7 @@ export interface SkillActivation {
 	byPlayer: boolean;
 	crit: boolean;
 	dodged: boolean;
+	reflected: number;
 }
 
 /** A skill effect application that landed during a tick (each application stacks), with the side it
@@ -119,8 +126,8 @@ export function battleStep(
 			player.level
 		);
 		// Direct-hit reflection: the enemy (defender) returns its share to the player (attacker).
-		reflectDamage(player, enemy, damage);
-		activations.push({ skill, damage, byPlayer: true, crit, dodged: false });
+		const reflected = reflectDamage(player, enemy, damage);
+		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, reflected });
 		skill.applyEffects(enemy, onApplied);
 	});
 
@@ -139,8 +146,8 @@ export function battleStep(
 			const dealt = amplifiedDamage(raw, skill.damageType, enemy.attributes);
 			const damage = dodged ? 0 : player.takeDamage(dealt, skill.damageType, enemy.level);
 			// Direct-hit reflection: the player (defender) returns its share to the enemy (attacker).
-			reflectDamage(enemy, player, damage);
-			activations.push({ skill, damage, byPlayer: false, crit: false, dodged });
+			const reflected = reflectDamage(enemy, player, damage);
+			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, reflected });
 			skill.applyEffects(player, onApplied);
 		});
 	}

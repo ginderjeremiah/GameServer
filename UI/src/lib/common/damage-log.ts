@@ -14,11 +14,27 @@ import { damageTypeName } from './damage-type-display';
 
 /**
  * Structured combat-outcome discriminator carried alongside a `Damage`-channel entry. The battle
- * engine knows each hit's outcome explicitly (player vs enemy, crit/dodge) at the log site, so it
- * sets this rather than encoding the outcome only in the prose — letting `logKind` pick the glyph
- * from a typed value instead of sniffing the message text, which would silently drift on a reword.
+ * engine knows each hit's outcome explicitly (player vs enemy, crit/dodge, and the #1330 reflection
+ * lines) at the log site, so it sets this rather than encoding the outcome only in the prose —
+ * letting `logKind` pick the glyph from a typed value instead of sniffing the message text, which
+ * would silently drift on a reword.
  */
-export type LogOutcome = 'player-hit' | 'player-crit' | 'player-dodge' | 'enemy-hit';
+export type LogOutcome =
+	| 'player-hit'
+	| 'player-crit'
+	| 'player-dodge'
+	| 'enemy-hit'
+	| 'player-reflect'
+	| 'enemy-reflect';
+
+/** The two deterministic-reflection outcomes (#1330): `player-reflect` when the player returned a share
+ *  of an incoming hit to the enemy, `enemy-reflect` when the enemy reflected onto the player. They carry
+ *  their own prose ({@link reflectLogMessage}) and a distinct glyph, separate from the direct-hit lines. */
+export type ReflectOutcome = Extract<LogOutcome, 'player-reflect' | 'enemy-reflect'>;
+
+/** The direct-hit subset of {@link LogOutcome} (everything but reflection) — the only outcomes
+ *  {@link damageLogMessage} phrases. Reflection lines use {@link reflectLogMessage} instead. */
+export type DirectHitOutcome = Exclude<LogOutcome, ReflectOutcome>;
 
 /**
  * How a hit's damage-type resistance resolved, for the combat-log feedback (#1320, Area F):
@@ -68,7 +84,7 @@ const resistSuffix = (resist: ResistOutcome): string => {
 export const damageLogMessage = (
 	skillName: string,
 	damage: number,
-	outcome: LogOutcome,
+	outcome: DirectHitOutcome,
 	damageType: EDamageType,
 	resist: ResistOutcome,
 	enemyName: string
@@ -96,4 +112,16 @@ export const damageLogMessage = (
 		case 'enemy-hit':
 			return `${enemyName} used ${skillName} and dealt ${amount} ${word}damage${suffix}`;
 	}
+};
+
+/** The combat-log line for a deterministic damage-reflection event (#1330): the defender returned `amount`
+ *  of a direct hit's net damage to the attacker, bypassing the attacker's mitigation. `player-reflect` is
+ *  the player returning damage to the enemy; `enemy-reflect` is the enemy reflecting onto the player. Reflected
+ *  damage is raw and untyped, so the line carries no damage-type/resist note. Store-free (the enemy name is
+ *  supplied), mirroring {@link damageLogMessage}. */
+export const reflectLogMessage = (outcome: ReflectOutcome, amount: number, enemyName: string): string => {
+	const reflected = formatNum(amount);
+	return outcome === 'player-reflect'
+		? `You reflected ${reflected} damage back to ${enemyName}!`
+		: `${enemyName} reflected ${reflected} damage back at you!`;
 };

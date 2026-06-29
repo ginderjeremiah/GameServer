@@ -48,6 +48,20 @@ describe('logKind', () => {
 			expect(result.label).toBe('Dodge');
 		});
 
+		it('returns the reflect treatment in the player hue for the "player-reflect" outcome (#1330)', () => {
+			const result = logKind(makeLog(ELogType.Damage, '', 'player-reflect'));
+			expect(result.color).toBe(logColors.player);
+			expect(result.glyph).toBe('reflect');
+			expect(result.label).toBe('Reflect');
+		});
+
+		it('returns the reflect treatment in the enemy hue for the "enemy-reflect" outcome (#1330)', () => {
+			const result = logKind(makeLog(ELogType.Damage, '', 'enemy-reflect'));
+			expect(result.color).toBe(logColors.enemy);
+			expect(result.glyph).toBe('reflect');
+			expect(result.label).toBe('Reflect');
+		});
+
 		it('keys the glyph off the outcome even when the message reads like a different outcome', () => {
 			// A reworded/misleading message must not flip the glyph: the outcome wins.
 			const result = logKind(makeLog(ELogType.Damage, 'You landed a critical hit!', 'player-hit'));

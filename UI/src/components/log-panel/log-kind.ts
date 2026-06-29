@@ -12,7 +12,8 @@ export type GlyphKind =
 	| 'effect'
 	| 'resisted'
 	| 'vulnerable'
-	| 'absorbed';
+	| 'absorbed'
+	| 'reflect';
 
 export interface LogKind {
 	/** Accent color for the chip, message, and left bar. */
@@ -47,15 +48,19 @@ const SYSTEM = logColors.system;
 const EFFECT = logColors.effect;
 
 /**
- * Visual treatment per structured combat outcome. The `Damage` channel carries player-vs-enemy and
- * the player-only crit/dodge outcomes (#178) on one `ELogType`; keying the glyph off the typed
- * {@link LogOutcome} the engine sets keeps it stable when a message is reworded.
+ * Visual treatment per structured combat outcome. The `Damage` channel carries player-vs-enemy, the
+ * player-only crit/dodge outcomes (#178), and the deterministic-reflection lines (#1330) on one
+ * `ELogType`; keying the glyph off the typed {@link LogOutcome} the engine sets keeps it stable when a
+ * message is reworded. A reflection keeps the player/enemy hue of the side it lands on (player-reflect
+ * deals to the enemy, enemy-reflect to the player) under a shared `reflect` glyph.
  */
 const damageKinds: Record<LogOutcome, LogKind> = {
 	'player-hit': { color: PLAYER, glyph: 'hit', label: 'Hit' },
 	'player-crit': { color: PLAYER, glyph: 'crit', label: 'Crit' },
 	'player-dodge': { color: ENEMY, glyph: 'dodge', label: 'Dodge' },
-	'enemy-hit': { color: ENEMY, glyph: 'enemy', label: 'Hurt' }
+	'enemy-hit': { color: ENEMY, glyph: 'enemy', label: 'Hurt' },
+	'player-reflect': { color: PLAYER, glyph: 'reflect', label: 'Reflect' },
+	'enemy-reflect': { color: ENEMY, glyph: 'reflect', label: 'Reflect' }
 };
 
 /**
