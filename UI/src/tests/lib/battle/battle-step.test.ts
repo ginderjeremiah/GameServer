@@ -16,8 +16,8 @@ import { Mulberry32 } from '$lib/engine/mulberry32';
 import { battlerFactory, makeSkill, makeEffect } from './battle-sim-test-utils';
 
 const makeBattler = battlerFactory(mockSkills);
-// A throwaway RNG for the steps that exercise no crit/dodge/block (their chances are 0, so the draws
-// never change an outcome). The dedicated rolls + draw-order are covered by the crit/dodge/block block.
+// A throwaway RNG for the steps that exercise no crit/dodge (their chances are 0, so the draws never
+// change an outcome). The dedicated rolls + draw-order are covered by the crit/dodge block.
 const noRng = () => new Mulberry32(0);
 
 const newLog = (): BattleStepLog => ({
@@ -237,9 +237,10 @@ describe('battleStep', () => {
 		});
 	});
 
-	// Player-only crit/dodge/block, mirroring the backend BattleContextTests. Chances are forced to 1/0
-	// so the outcome is deterministic regardless of the seed; the draw-order test pins the per-fire counts.
-	describe('crit / dodge / block (player-only, seeded)', () => {
+	// Player-only crit/dodge + deterministic reflection, mirroring the backend BattleContextTests. Chances
+	// are forced to 1/0 so the outcome is deterministic regardless of the seed; the draw-order test pins the
+	// per-fire counts.
+	describe('crit / dodge / reflection (player-only, seeded)', () => {
 		it('multiplies a player crit by CriticalDamage before mitigation', () => {
 			// CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, read directly as the multiplier.
 			const player = makeBattler(
@@ -281,24 +282,76 @@ describe('battleStep', () => {
 			expect(player.currentHealth).toBe(before);
 		});
 
-		it('subtracts BlockReduction on a blocked hit', () => {
-			// BlockReduction is the base 2 (sourced by #799) + 8 = 10. The player has no Toughness, so the
-			// curve passes the hit through unchanged and BlockReduction subtracts flatly after it.
-			const player = makeBattler(
-				[
-					{ id: EAttribute.BlockChance, amount: 1 },
-					{ id: EAttribute.BlockReduction, amount: 8 }
-				],
-				[]
-			);
-			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
-			const before = player.currentHealth;
+		it('reflects a share of a direct hit back to the attacker, bypassing its mitigation', () => {
+			// The enemy carries 0.5 DamageReflection; the player's 40-damage hit lands in full (enemy Toughness
+			// 0) and 40 × 0.5 = 20 is returned to the player, IGNORING the player's Toughness 100.
+			const player = makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(40, 40)]); // Toughness 100
+			const enemy = makeBattler([{ id: EAttribute.DamageReflection, amount: 0.5 }], []);
+			const playerBefore = player.currentHealth;
 
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
-			expect(activations[0].blocked).toBe(true);
-			expect(activations[0].damage).toBe(10); // 20 (player Toughness 0) − 10 block
-			expect(player.currentHealth).toBe(before - 10);
+			expect(activations[0].damage).toBe(40);
+			expect(player.currentHealth).toBe(playerBefore - 20); // 40 × 0.5, unmitigated
+		});
+
+		it('reflects an incoming hit back to the enemy', () => {
+			// The player carries 0.4 DamageReflection; the enemy's 50-damage hit lands in full (player Toughness
+			// 0) and 50 × 0.4 = 20 is dealt back to the enemy. The player (MaxHealth 150 from Strength) survives.
+			const player = makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 20 },
+					{ id: EAttribute.DamageReflection, amount: 0.4 }
+				],
+				[]
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(50, 40)]);
+			const enemyBefore = enemy.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+			expect(activations[0].byPlayer).toBe(false);
+			expect(activations[0].damage).toBe(50);
+			expect(enemy.currentHealth).toBe(enemyBefore - 20); // 50 × 0.4 reflected onto the enemy
+		});
+
+		it('reflects nothing when the incoming hit is dodged', () => {
+			const player = makeBattler(
+				[
+					{ id: EAttribute.DodgeChance, amount: 1 },
+					{ id: EAttribute.DamageReflection, amount: 1 }
+				],
+				[]
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(50, 40)]);
+			const enemyBefore = enemy.currentHealth;
+
+			battleStep(player, enemy, 40, new Mulberry32(0));
+
+			expect(enemy.currentHealth).toBe(enemyBefore); // a dodge zeroes the hit, so nothing reflects
+		});
+
+		it('reflects nothing when the incoming hit is absorbed', () => {
+			// The enemy both reflects and absorbs Fire (resistance > 1 → net heal). The player's physical hit lands
+			// and is reflected back (player 50 → 20), dropping the enemy to 20; the player's Fire hit is then
+			// absorbed (net −20 heal), and the reflection guard returns on the non-positive net — so the player
+			// takes no further damage. Mirrors the backend DamageTarget_AbsorbedHit_ReflectsNothing.
+			const player = makeBattler(baseStats, [
+				makeSkill(30, 40, [], [], EDamageType.Physical),
+				makeSkill(20, 40, [], [], EDamageType.Fire)
+			]);
+			const enemy = makeBattler(
+				[
+					{ id: EAttribute.FireResistance, amount: 2 },
+					{ id: EAttribute.DamageReflection, amount: 1 }
+				],
+				[]
+			);
+
+			battleStep(player, enemy, 40, new Mulberry32(0));
+
+			// Player took only the reflected physical 30 (50 → 20); the absorbed Fire hit reflected nothing.
+			expect(player.currentHealth).toBe(20);
 		});
 
 		it('never crits on the enemy’s attack, even with a forced crit chance', () => {
@@ -317,8 +370,9 @@ describe('battleStep', () => {
 			expect(activations[0].damage).toBe(20); // 20 (no crit), NOT 40
 		});
 
-		it('draws once per player fire and twice per enemy fire, in order', () => {
-			// One crit draw for the player's hit, then dodge + block for the enemy's — three draws total.
+		it('draws once per player fire and once per enemy fire, in order', () => {
+			// One crit draw for the player's hit, then one dodge draw for the enemy's — two draws total (Block's
+			// second draw was retired, #1330).
 			const seed = 12345;
 			const rng = new Mulberry32(seed);
 			const player = makeBattler(baseStats, [makeSkill(10, 40)]);
@@ -327,7 +381,6 @@ describe('battleStep', () => {
 			battleStep(player, enemy, 40, rng);
 
 			const reference = new Mulberry32(seed);
-			reference.next();
 			reference.next();
 			reference.next();
 			expect(rng.next()).toBe(reference.next());

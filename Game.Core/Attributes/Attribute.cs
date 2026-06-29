@@ -111,8 +111,7 @@ namespace Game.Core.Attributes
                 CriticalChance => "The percentage chance for an attack to deal increased damage.",
                 CriticalDamage => "The additional percentage of damage dealt when a critical hit occurs.",
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
-                BlockChance => "The percentage chance to block part of the damage from an incoming attack.",
-                BlockReduction => "A flat reduction applied to damage received when an attack is blocked.",
+                DamageReflection => "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
                 BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
                 PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
                 BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
@@ -155,8 +154,9 @@ namespace Game.Core.Attributes
                 CriticalChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT", 9, 0),
                 CriticalDamage => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT DMG", 10, 0),
                 DodgeChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "DOD", 11, 0),
-                BlockChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "BLK", 12, 0),
-                BlockReduction => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "BLK RED", 13, 0),
+                // DamageReflection (spike #1330) takes the defensive-secondary slot Block vacated, so it groups
+                // with the other combat-secondary stats on the breakdown screen. Authored-only, decimal-percentage.
+                DamageReflection => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "REF", 12, 0),
                 BleedDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "BLD DOT", 14, 0),
                 HealthRegenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: false, "REG", 15, 0),
                 // Obsolete: never displayed, so it gets neutral display metadata and sorts last.

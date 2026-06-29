@@ -67,13 +67,13 @@ beforeEach(() => {
 
 describe('buildStatTypes', () => {
 	it('builds one entry per presented statistic with names from the server', () => {
-		expect(statTypes).toHaveLength(21);
+		expect(statTypes).toHaveLength(19);
 		expect(statTypes.find((s) => s.id === EStatisticType.HighestSingleAttackDamage)!.name).toBe(
 			'Highest Single Attack Damage'
 		);
 	});
 
-	it('presents the crit/dodge/block statistics as total-only with their categories', () => {
+	it('presents the crit/dodge statistics as total-only with their categories', () => {
 		const crit = statTypes.find((s) => s.id === EStatisticType.CriticalHits)!;
 		expect(crit.kind).toBe('none');
 		expect(crit.cat).toBe('combat');
@@ -82,7 +82,7 @@ describe('buildStatTypes', () => {
 		const dodged = statTypes.find((s) => s.id === EStatisticType.AttacksDodged)!;
 		expect(dodged.kind).toBe('none');
 		expect(dodged.cat).toBe('survival');
-		expect(statTypes.find((s) => s.id === EStatisticType.DamageBlocked)!.cat).toBe('survival');
+		expect(statTypes.find((s) => s.id === EStatisticType.DamageDodged)!.cat).toBe('survival');
 	});
 
 	it('sources the entity-kind breakdown from the server entityType', () => {
@@ -124,7 +124,7 @@ describe('buildStatTypes', () => {
 	it('skips statistics the server does not return', () => {
 		const partial = SERVER_STAT_TYPES.filter((s) => s.id !== EStatisticType.SkillsUsed);
 		const built = buildStatTypes(partial);
-		expect(built).toHaveLength(20);
+		expect(built).toHaveLength(18);
 		expect(built.find((s) => s.id === EStatisticType.SkillsUsed)).toBeUndefined();
 	});
 });
@@ -258,7 +258,7 @@ describe('StatisticsView data wiring', () => {
 
 	it('builds the catalogue + entities from staticData once stats arrive', () => {
 		const view = seededView();
-		expect(view.data.statTypes).toHaveLength(21);
+		expect(view.data.statTypes).toHaveLength(19);
 		expect(view.data.entityList('enemy').map((e) => e.name)).toEqual(['Cave Bat', 'Goblin']);
 		// isBoss / order are resolved from the raw reference data.
 		expect(view.data.entity('enemy', 1)?.boss).toBe(true);

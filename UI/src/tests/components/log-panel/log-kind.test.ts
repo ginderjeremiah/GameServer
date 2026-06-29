@@ -48,13 +48,6 @@ describe('logKind', () => {
 			expect(result.label).toBe('Dodge');
 		});
 
-		it('returns the block treatment for the "player-block" outcome', () => {
-			const result = logKind(makeLog(ELogType.Damage, '', 'player-block'));
-			expect(result.color).toBe(logColors.enemy);
-			expect(result.glyph).toBe('block');
-			expect(result.label).toBe('Block');
-		});
-
 		it('keys the glyph off the outcome even when the message reads like a different outcome', () => {
 			// A reworded/misleading message must not flip the glyph: the outcome wins.
 			const result = logKind(makeLog(ELogType.Damage, 'You landed a critical hit!', 'player-hit'));

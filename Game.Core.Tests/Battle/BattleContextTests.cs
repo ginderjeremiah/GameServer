@@ -105,7 +105,7 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(50 - 20, enemy.CurrentHealth, 0.001);
         }
 
-        // ── DamageTarget: enemy attacking the player (dodge / block) ──────────
+        // ── DamageTarget: enemy attacking the player (dodge) ──────────────────
 
         [Fact]
         public void DamageTarget_PlayerDodgesEnemyHit_DealsZero()
@@ -120,23 +120,6 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(before, player.CurrentHealth, 0.001);
             Assert.Equal(0, context.Stats.PlayerDamageTaken, 0.001);
-        }
-
-        [Fact]
-        public void DamageTarget_PlayerBlocksEnemyHit_AppliesBlockReductionAfterToughness()
-        {
-            // BlockReduction is the base 2 + 8 = 10. The player has no Endurance (Toughness 0), so the flat
-            // block reduction is all that applies.
-            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
-            var enemy = MakeBattlerWith((Endurance, 0));
-            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.SwapActiveAndTargetBattlers();
-            var before = player.CurrentHealth;
-
-            context.DamageTarget(20, EDamageType.Physical); // blocked ⇒ 20 (no Toughness) − 10 BlockReduction = 10
-
-            Assert.Equal(before - 10, player.CurrentHealth, 0.001);
-            Assert.Equal(10, context.Stats.PlayerDamageTaken, 0.001);
         }
 
         [Fact]
@@ -195,46 +178,12 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(1, context.Stats.AttacksDodged);
             Assert.Equal(20, context.Stats.DamageDodged, 0.001);
-            Assert.Equal(0, context.Stats.AttacksBlocked);
         }
 
         [Fact]
-        public void DamageTarget_PlayerBlock_RecordsBlockAndReductionPrevented()
+        public void DamageTarget_NormalEnemyHit_RecordsNoDodge()
         {
-            // BlockReduction base 2 + 8 = 10. The player has no Toughness, so the would-be hit is 20 and the
-            // block reduces it to 10 ⇒ reduction prevented = 10.
-            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
-            var enemy = MakeBattlerWith((Endurance, 0));
-            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.SwapActiveAndTargetBattlers();
-
-            context.DamageTarget(20, EDamageType.Physical); // 20 unmitigated, blocked to 10 ⇒ reduction prevented = 10
-
-            Assert.Equal(1, context.Stats.AttacksBlocked);
-            Assert.Equal(10, context.Stats.DamageBlocked, 0.001);
-            Assert.Equal(0, context.Stats.AttacksDodged);
-        }
-
-        [Fact]
-        public void DamageTarget_PlayerBlock_ReductionNeverExceedsTheWouldBeDamage()
-        {
-            // The block over-absorbs: only 5 damage was coming in, so the reduction prevented is 5, not the full
-            // BlockReduction (the blocked amount can never exceed the would-be hit).
-            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8)); // BlockReduction 10
-            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
-            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.SwapActiveAndTargetBattlers();
-
-            context.DamageTarget(5, EDamageType.Physical); // 5 unmitigated, blocked to 0 ⇒ reduction prevented = 5
-
-            Assert.Equal(1, context.Stats.AttacksBlocked);
-            Assert.Equal(5, context.Stats.DamageBlocked, 0.001);
-        }
-
-        [Fact]
-        public void DamageTarget_NormalEnemyHit_RecordsNoDodgeOrBlock()
-        {
-            var player = MakeBattlerWith((Endurance, 0)); // no dodge/block chance
+            var player = MakeBattlerWith((Endurance, 0)); // no dodge chance
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
@@ -243,18 +192,17 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(0, context.Stats.AttacksDodged);
             Assert.Equal(0, context.Stats.DamageDodged, 0.001);
-            Assert.Equal(0, context.Stats.AttacksBlocked);
-            Assert.Equal(0, context.Stats.DamageBlocked, 0.001);
         }
 
         // ── DamageTarget: RNG draw order ─────────────────────────────────────
 
         [Fact]
-        public void DamageTarget_DrawsOncePerPlayerHit_TwicePerEnemyHit()
+        public void DamageTarget_DrawsOncePerPlayerHit_OncePerEnemyHit()
         {
             // The draw count is a pure function of the fire sequence: one crit draw when the player attacks,
-            // then two (dodge, block) when the enemy attacks. Verified by comparing the shared stream's
-            // position against a reference advanced by exactly three draws — independent of the seed.
+            // then one dodge draw when the enemy attacks (Block's second draw was retired, spike #1330).
+            // Verified by comparing the shared stream's position against a reference advanced by exactly two
+            // draws — independent of the seed.
             const uint seed = 12345u;
             var rng = new Mulberry32(seed);
             var player = MakeBattlerWith((Endurance, 0));
@@ -263,13 +211,87 @@ namespace Game.Core.Tests.Battle
 
             context.DamageTarget(5, EDamageType.Physical);               // player attacking → 1 draw
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(5, EDamageType.Physical);               // enemy attacking → 2 draws
+            context.DamageTarget(5, EDamageType.Physical);               // enemy attacking → 1 draw
 
             var reference = new Mulberry32(seed);
             reference.Next();
             reference.Next();
-            reference.Next();
             Assert.Equal(reference.Next(), rng.Next());
+        }
+
+        // ── DamageTarget: deterministic damage reflection (spike #1330) ───────
+
+        [Fact]
+        public void DamageTarget_EnemyReflectsPlayerHit_DealsNetShareBackToPlayerBypassingMitigation()
+        {
+            // The enemy (defender) carries 0.5 DamageReflection. The player's 40-damage hit lands in full (the
+            // enemy has no Toughness), and 40 × 0.5 = 20 is returned to the player — ignoring the player's own
+            // Toughness, which would otherwise have reduced it.
+            var player = MakeBattlerWith((Endurance, 50)); // Toughness 100 — must NOT mitigate the reflected hit
+            var enemy = MakeBattlerWith((Endurance, 0), (DamageReflection, 0.5));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            var playerBefore = player.CurrentHealth;
+
+            var dealt = context.DamageTarget(40, EDamageType.Physical); // 40 to the enemy
+
+            Assert.Equal(40, dealt, 0.001);
+            Assert.Equal(playerBefore - 20, player.CurrentHealth, 0.001); // 40 × 0.5, unmitigated
+            Assert.Equal(40, context.Stats.PlayerDamageDealt, 0.001);     // just the hit; reflection is not the player's damage dealt here
+            Assert.Equal(20, context.Stats.PlayerDamageTaken, 0.001);     // the enemy reflected 20 onto the player
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerReflectsEnemyHit_DealsNetShareBackToEnemyAsPlayerDamageDealt()
+        {
+            // The player (defender of the enemy's attack) carries 0.4 DamageReflection. The enemy's 50-damage
+            // hit lands in full (the player has no Toughness), and 50 × 0.4 = 20 is dealt back to the enemy —
+            // booked as the player's damage dealt (the tank's offence-through-defence).
+            var player = MakeBattlerWith((Endurance, 0), (DamageReflection, 0.4));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers(); // enemy attacks the player
+            var enemyBefore = enemy.CurrentHealth;
+
+            context.DamageTarget(50, EDamageType.Physical);
+
+            Assert.Equal(enemyBefore - 20, enemy.CurrentHealth, 0.001); // 50 × 0.4 reflected onto the enemy
+            Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(50, context.Stats.PlayerDamageTaken, 0.001); // the player still took the full hit
+        }
+
+        [Fact]
+        public void DamageTarget_DodgedHit_ReflectsNothing()
+        {
+            // A dodge zeroes the hit, so there is no net damage to reflect even though the player has reflection.
+            var player = MakeBattlerWith((DodgeChance, 1), (DamageReflection, 1.0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            var enemyBefore = enemy.CurrentHealth;
+
+            context.DamageTarget(50, EDamageType.Physical);
+
+            Assert.Equal(enemyBefore, enemy.CurrentHealth, 0.001);
+            Assert.Equal(0, context.Stats.PlayerDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_AbsorbedHit_ReflectsNothing()
+        {
+            // The enemy both reflects AND absorbs Fire (resistance > 1 → net heal). Reflection guards on a
+            // POSITIVE net, so an absorbed hit returns nothing — without the guard the negative net would reflect
+            // as a heal to the attacker. A prior physical hit (itself reflected) drops the enemy below MaxHealth
+            // so the absorption actually heals it (a genuinely negative net); the player's health is captured
+            // AFTER that hit, so only the absorbed Fire hit is measured.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0), (DamageReflection, 1.0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.DamageTarget(30, EDamageType.Physical); // enemy 50 → 20; the enemy reflects this 30 onto the player
+            var playerBefore = player.CurrentHealth;
+
+            context.DamageTarget(20, EDamageType.Fire); // 20 × (1 − 2) = −20, absorbed (enemy 20 → 40) — no reflection
+
+            Assert.Equal(playerBefore, player.CurrentHealth, 0.001); // the absorbed hit reflected nothing onto the attacker
         }
 
         // ── DamageTarget: damage typing (amplification / resistance, #1320) ──
@@ -426,21 +448,6 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(40, EDamageType.Fire);
 
             Assert.Equal(60, Exposure(context, EDamageType.Fire), 0.001);
-        }
-
-        [Fact]
-        public void DamageTarget_PlayerBlock_RecordsFullPreMitigationExposure()
-        {
-            // A block is mitigation, so the player was still exposed to the full pre-mitigation hit (20),
-            // even though the block reduces the damage actually taken.
-            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
-            var enemy = MakeBattlerWith((Endurance, 0));
-            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.SwapActiveAndTargetBattlers();
-
-            context.DamageTarget(20, EDamageType.Physical);
-
-            Assert.Equal(20, Exposure(context, EDamageType.Physical), 0.001);
         }
 
         [Fact]

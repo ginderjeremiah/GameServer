@@ -79,17 +79,6 @@ describe('CombatFloaters', () => {
 		expect(floater.textContent?.trim()).toBe('DODGE');
 	});
 
-	it('shows a block with its icon, number, and label', () => {
-		const { getByTestId } = render(CombatFloaters, { props: { side: 'player', testId: 'player-floaters' } });
-		emit({ target: 'player', kind: 'block', amount: 12 });
-
-		const floater = getByTestId('player-floaters').querySelector('.floater') as HTMLElement;
-		expect(floater.querySelector('img.floater-icon')?.getAttribute('src')).toContain('Block Reduction.png');
-		expect(floater.querySelector('.floater-label')?.textContent).toBe('BLOCK');
-		expect(floater.textContent).toContain('12');
-		expect(floater.getAttribute('style')).toContain('var(--block-color)');
-	});
-
 	it('colours an incoming hit on the player with the enemy hue', () => {
 		const { getByTestId } = render(CombatFloaters, { props: { side: 'player', testId: 'player-floaters' } });
 		emit({ target: 'player', kind: 'hit', amount: 182 });

@@ -38,8 +38,8 @@ import {
 const PERMANENT = 1_000_000;
 
 /** The shared battle-RNG seed both simulators construct their Mulberry32 from — mirrors the backend's
- *  ParitySeed. Immaterial to these scenarios (their crit/dodge/block chances are forced to 1/0, so the
- *  outcome never depends on a draw) but both suites must seed identically. */
+ *  ParitySeed. Most scenarios force their crit/dodge chances to 1/0 (outcome independent of a draw), but
+ *  the fractional-crit rows DO depend on the exact stream, so both suites must seed identically. */
 const PARITY_SEED = 0x9e3779b9;
 
 /**
@@ -750,11 +750,11 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 2960 }
 	},
 
-	// ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
+	// ── Seeded crit/dodge (player-only) ──────────────────────────────────────────
 	// Each chance is forced to 1 or 0 so the outcome is deterministic regardless of the seed (a chance ≥ 1
 	// always succeeds against a [0,1) draw, a chance ≤ 0 never does). The draws are still taken in lockstep
-	// on both sides. Mirrors the backend `forcedCrit` / `forcedDodge` / `forcedBlock` / `drawOrderMultiSkill`
-	// / `enemyForcedChanceIgnored` scenarios.
+	// on both sides. Mirrors the backend `forcedCrit` / `forcedDodge` / `drawOrderMultiSkill` /
+	// `enemyForcedChanceIgnored` scenarios.
 
 	// Forced crit: CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, so 20 raw × 2 = 40/hit (the
 	// enemy has no Toughness), and the 100-HP enemy dies on hit 3 at 1200ms.
@@ -789,30 +789,12 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
-	// Forced block: BlockReduction is the base 2 (sourced by #799) + 18 = 20, so with no Toughness the 25 hit
-	// becomes 25 − 20 block = 5/hit instead of 25/hit, and the player survives the enemy's every-5-tick assault
-	// long enough to kill the 200-HP enemy (50/hit) on hit 4 at 1600ms. Block flips the loss (player would die
-	// at tick 25) into a win.
-	{
-		name: 'forcedBlock',
-		player: () =>
-			makeBattler(
-				[
-					{ id: EAttribute.Strength, amount: 10 },
-					{ id: EAttribute.BlockChance, amount: 1 },
-					{ id: EAttribute.BlockReduction, amount: 18 }
-				],
-				[makeSkill(50, 400)]
-			),
-		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 30 }], [makeSkill(25, 200)]),
-		expected: { victory: true, playerDied: false, totalMs: 1600 }
-	},
-
 	// Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two enemy
-	// skills (two dodge+block draw pairs) fire on the same ticks. CriticalDamage and BlockReduction each fold
-	// in the #799 base (1.5 + 0.5 = 2 multiplier; 2 + 8 = 10 reduction). Neither side has Toughness. Player
-	// crits both hits (20 + 30 = 50/tick) and blocks both enemy hits (2 + 4 = 6/tick); the 100-HP enemy dies on
-	// the player's tick-20 volley → 800ms.
+	// skills (two dodge draws, one each now that Block's second draw is gone) fire on the same ticks.
+	// CriticalDamage folds in the #799 base (1.5 + 0.5 = 2 multiplier). Neither side has Toughness. The player
+	// crits both hits (10×2=20, 15×2=30 → 50/tick); the enemy's two hits land in full (12 + 14 = 26/tick — no
+	// Block). The 100-HP enemy dies on the player's tick-20 volley → 800ms (before its own tick-20 attack), so
+	// the player only takes the tick-10 volley and ends at 74 HP.
 	{
 		name: 'drawOrderMultiSkill',
 		player: () =>
@@ -820,9 +802,7 @@ const scenarios: ParityScenario[] = [
 				[
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 },
-					{ id: EAttribute.BlockChance, amount: 1 },
-					{ id: EAttribute.BlockReduction, amount: 8 }
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
 				],
 				[makeSkill(10, 400), makeSkill(15, 400)]
 			),
@@ -830,9 +810,9 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 800 }
 	},
 
-	// Enemies never crit/dodge/block: with every chance forced to 1 on the enemy, its hit still lands
-	// un-critted (20, not 40) and the player's hits still land in full (not zeroed by its 50 BlockReduction),
-	// so the player wins on hit 5 at 2000ms — proving the rolls are gated on the player alone.
+	// Enemies never crit/dodge: with every chance forced to 1 on the enemy, its hit still lands un-critted (20,
+	// not 40) and its dodge is irrelevant on offence, so the player's hits land in full and win on hit 5 at
+	// 2000ms — proving the rolls are gated on the player alone.
 	{
 		name: 'enemyForcedChanceIgnored',
 		player: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(20, 400)]),
@@ -842,13 +822,76 @@ const scenarios: ParityScenario[] = [
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.CriticalChance, amount: 1 },
 					{ id: EAttribute.CriticalDamage, amount: 2 },
-					{ id: EAttribute.DodgeChance, amount: 1 },
-					{ id: EAttribute.BlockChance, amount: 1 },
-					{ id: EAttribute.BlockReduction, amount: 50 }
+					{ id: EAttribute.DodgeChance, amount: 1 }
 				],
 				[makeSkill(20, 400)]
 			),
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
+	},
+
+	// ── Deterministic damage reflection (#1330) ──────────────────────────────────
+	// Reflection returns the defender's DamageReflection share of a direct hit's net damage to the attacker,
+	// bypassing the attacker's mitigation. Authored-only, deterministic (no draw), scoped to direct hits.
+	// Mirrors the backend `reflectionKillsAttacker` / `reflectionIgnoresDot` / `drawOrderDodgeOnlyAlignsCrit`.
+
+	// Reflection as a kill condition: a pure tank (no skills, no Toughness — MaxHealth 550 from Strength)
+	// returns 100% of every 25 it takes, so the 100-HP enemy dies to its own reflected damage on its 4th attack
+	// (tick 40 → 1600ms) while the 550-HP player (down to 450) easily survives.
+	{
+		name: 'reflectionKillsAttacker',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 100 },
+					{ id: EAttribute.DamageReflection, amount: 1.0 }
+				],
+				[]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(25, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
+	// Reflection ignores DoT: the player bears a constant 50 PoisonDamagePerSecond (2/tick, self-inflicted) and
+	// 100% DamageReflection but no skills, against a 100-HP enemy with no skills. DoT applies through the
+	// end-of-tick phase, not a direct hit, so it is never reflected — the enemy takes nothing back and never
+	// dies, and the player's own poison grinds its 200 HP (Str 30) down, killing it on tick 100 → 4000ms. (Were
+	// DoT reflected, the enemy would die at tick 50 / 2000ms.)
+	{
+		name: 'reflectionIgnoresDot',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 30 },
+					{ id: EAttribute.PoisonDamagePerSecond, amount: 50 },
+					{ id: EAttribute.DamageReflection, amount: 1.0 }
+				],
+				[]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: false, playerDied: true, totalMs: 4000 }
+	},
+
+	// Simplified draw order — an enemy attack now draws ONE dodge value (not dodge + block), so the player's
+	// fractional crit draws interleave at EVEN stream positions (the enemy's single dodge draw sits between
+	// consecutive player crit draws). With a real CriticalChance 0.5 against PARITY_SEED the crit draws at
+	// stream indices 0, 2, 4, 6 are crit, no, crit, crit; CriticalDamage base 1.5 + 0.5 = 2.0, so the player
+	// deals 24, 12, 24, 24 (no Toughness) for a cumulative 24, 36, 60, 84. The 80-HP enemy (Str 6) dies on the
+	// tick-40 fire → 1600ms. Had the enemy still drawn TWICE (the old dodge + block), the crit draws would land
+	// at indices 0, 3, 6, 9 — crit, no, crit, no → 24, 12, 24, 12 — pushing the kill to tick 50 (2000ms). So this
+	// row pins the one-draw enemy attack. The enemy chips 5/tick (DodgeChance 0), leaving the 100-HP player at 85.
+	{
+		name: 'drawOrderDodgeOnlyAlignsCrit',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.CriticalChance, amount: 0.5 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
+				],
+				[makeSkill(12, 400)]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(5, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
 	},
 
 	// Fractional crit chance against a fixed seed (#941): unlike the forced-1/0 crit rows, CriticalChance is a

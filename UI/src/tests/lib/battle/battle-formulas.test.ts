@@ -173,11 +173,6 @@ describe('battle-formulas', () => {
 			// Toughness 20: vs level 3 → 20/(20+60) = 0.25 reduction → 40 × 0.75 = 30.
 			expect(toughnessMitigatedDamage(40, 20, 3)).toBeCloseTo(30, 10);
 		});
-
-		it('subtracts block reduction after the curve, clamped at zero', () => {
-			expect(toughnessMitigatedDamage(40, 20, 1, 5)).toBeCloseTo(15, 10); // 20 − 5
-			expect(toughnessMitigatedDamage(40, 20, 1, 25)).toBe(0); // clamps when block exceeds the post-curve hit
-		});
 	});
 
 	// Damage typing (#1320): mirrors the backend `Battler.AmplifyDamage` / `Battler.ComputeNetDamage` math.

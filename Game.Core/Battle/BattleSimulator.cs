@@ -18,7 +18,7 @@ namespace Game.Core.Battle
             var msPerTick = GameConstants.MsPerTick;
             var limit = maxMs ?? GameConstants.DefaultMaxBattleMs;
             // One Mulberry32 seeded once from the battle seed and advanced in lockstep with the frontend, so
-            // both simulators draw the crit/dodge/block rolls from the identical stream (battle parity).
+            // both simulators draw the crit/dodge rolls from the identical stream (battle parity).
             var context = new BattleContext(PlayerBattler, EnemyBattler, msPerTick, new Mulberry32(_seed));
 
             int totalMs;
@@ -31,14 +31,30 @@ namespace Game.Core.Battle
 
                 PlayerBattler.Update(context);
 
+                // Enemy death is checked first so a kill wins the tie, then the player's own death — which
+                // damage reflection (spike #1330) can now inflict during the player's attack (the enemy reflects
+                // back). The frontend mirrors this by gating the enemy's fire on both battlers being alive.
                 if (EnemyBattler.IsDead)
                 {
                     return new BattleResult(true, false, totalMs, context.Stats);
                 }
 
+                if (PlayerBattler.IsDead)
+                {
+                    return new BattleResult(false, true, totalMs, context.Stats);
+                }
+
                 context.SwapActiveAndTargetBattlers();
 
                 EnemyBattler.Update(context);
+
+                // After the enemy attacks, the enemy may have died to the player's reflection (the tank kill
+                // condition) — checked first so the player wins the tie — and only then the player's death from
+                // the enemy's hit.
+                if (EnemyBattler.IsDead)
+                {
+                    return new BattleResult(true, false, totalMs, context.Stats);
+                }
 
                 if (PlayerBattler.IsDead)
                 {

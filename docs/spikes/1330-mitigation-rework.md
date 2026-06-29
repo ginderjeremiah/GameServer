@@ -1,7 +1,7 @@
 # Spike #1330 — Flat-mitigation rework (Defense armor curve + Block → reflection)
 
 - **Spike issue:** [#1330](https://github.com/ginderjeremiah/GameServer/issues/1330)
-- **Status:** Design decided; implementation underway. **Area A (#1332) is implemented** — `Defense` is renamed to `Toughness` and applied as the diminishing curve `Toughness / (Toughness + K·attackerLevel)` (Endurance-only derivation, `K` = `GameConstants.ToughnessMitigationConstant`); the attacker's level is threaded into the mitigation call on both sides. Block (Area B/#1333) and the UI/reflection surface (Area C/#1334) are still to follow.
+- **Status:** Design decided; implementation underway. **Areas A (#1332) and B (#1333) are implemented** — `Defense` is renamed to `Toughness` and applied as the diminishing curve `Toughness / (Toughness + K·attackerLevel)` (Endurance-only derivation, `K` = `GameConstants.ToughnessMitigationConstant`), and **Block has been retired and replaced by deterministic, authored-only `DamageReflection`** (the enemy attack now draws dodge only; the direct-hit stack is fully multiplicative with the flat floor and its absorption-safe branch gone). The UI/reflection authoring surface (Area C/#1334) is still to follow.
 - **Related:** surfaced during the damage-types spike ([#1320](https://github.com/ginderjeremiah/GameServer/issues/1320)) — this reworks the **final mitigation step** of that spike's damage-resolution pipeline. Deferred defensive mechanics live in [#1331](https://github.com/ginderjeremiah/GameServer/issues/1331); ramping "fortify" as a class passive is noted in [#1219](https://github.com/ginderjeremiah/GameServer/issues/1219).
 
 ## Goal

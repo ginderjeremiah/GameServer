@@ -154,12 +154,11 @@ export class Battler {
 	}
 
 	/** Applies an incoming `dealt` hit (already amplified and crit-multiplied) of `damageType` via
-	 *  {@link mitigateDamage} — percentage resistance, the Toughness mitigation curve (scaled by `attackerLevel`),
-	 *  then the optional `blockReduction` (supplied only when the hit is blocked). Returns the net damage dealt; a
-	 *  negative result (absorption) heals this battler, CAPPED at MaxHealth (no overheal — matching
-	 *  {@link applyHealOverTime}). */
-	public takeDamage(dealt: number, damageType: EDamageType, attackerLevel: number, blockReduction = 0) {
-		const net = mitigateDamage(dealt, damageType, this.attributes, attackerLevel, blockReduction);
+	 *  {@link mitigateDamage} — percentage resistance then the Toughness mitigation curve (scaled by
+	 *  `attackerLevel`). Returns the net damage dealt; a negative result (absorption) heals this battler, CAPPED
+	 *  at MaxHealth (no overheal — matching {@link applyHealOverTime}). */
+	public takeDamage(dealt: number, damageType: EDamageType, attackerLevel: number) {
+		const net = mitigateDamage(dealt, damageType, this.attributes, attackerLevel);
 		if (net < 0) {
 			// Absorption: cap the heal at the remaining room to MaxHealth, and report the actual healed amount.
 			const room = this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth;
@@ -171,19 +170,27 @@ export class Battler {
 		return net;
 	}
 
+	/** Subtracts `amount` of reflected damage directly from this (attacking) battler's health, BYPASSING all of
+	 *  its own mitigation (resistance and the Toughness curve) — the deterministic damage-reflection channel
+	 *  (#1330). The caller resolves the amount (defender net × the defender's DamageReflection) and reflects only
+	 *  a positive hit, so this is a raw health subtraction. Mirrors the backend `Battler.TakeReflectedDamage`. */
+	public takeReflectedDamage(amount: number) {
+		this.currentHealth -= amount;
+	}
+
 	/** Applies one tick of typed damage-over-time (#1320, Area C). Loops the DoT types in the fixed
 	 *  {@link dotAccumulators} order, scaling each type's per-second accumulator to `timeDelta` and applying
 	 *  this (defending) battler's resistance for that type SAMPLED LIVE —
 	 *  `perSec * timeDelta/1000 * (1 - Σ applies(type).resistance)` — so a vulnerability debuff makes existing
 	 *  DoTs hurt immediately. The caster's amplification was frozen into the accumulator at apply time
-	 *  ({@link Skill.applyEffects}). Unlike {@link takeDamage} it BYPASSES the Toughness curve and flat block
-	 *  (resistance is its only mitigation); returns the total damage dealt. With no DoT authored every accumulator
-	 *  is 0, so the return is an exact 0. Mirrors the backend `Battler.ApplyDamageOverTime`.
+	 *  ({@link Skill.applyEffects}). Unlike {@link takeDamage} it BYPASSES the Toughness curve (resistance is its
+	 *  only mitigation) and is never reflected (reflection is scoped to direct hits, #1330); returns the total
+	 *  damage dealt. With no DoT authored every accumulator is 0, so the return is an exact 0. Mirrors the backend
+	 *  `Battler.ApplyDamageOverTime`.
 	 *
-	 *  Intentionally NOT floored at zero, unlike {@link takeDamage}: that floor exists only so the flat block
-	 *  reduction can't turn a hit into a heal. DoT bypasses mitigation, so a tick goes negative only through a deliberately
-	 *  authored negative accumulator or a resistance above 1 (absorption) — a floor wouldn't prevent that, just
-	 *  silently rewrite it. Authored healing belongs in the capped {@link applyHealOverTime} channel instead. */
+	 *  Intentionally NOT floored at zero. DoT bypasses mitigation, so a tick goes negative only through a
+	 *  deliberately authored negative accumulator or a resistance above 1 (absorption) — a floor wouldn't prevent
+	 *  that, just silently rewrite it. Authored healing belongs in the capped {@link applyHealOverTime} channel instead. */
 	public applyDamageOverTime(timeDelta: number) {
 		let dot = 0;
 		for (const { type, accumulator } of dotAccumulators()) {

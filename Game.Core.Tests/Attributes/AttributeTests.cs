@@ -135,8 +135,7 @@ namespace Game.Core.Tests.Attributes
         [InlineData(EAttribute.CooldownRecovery, true, 0)]
         [InlineData(EAttribute.CriticalChance, true, 0)]
         [InlineData(EAttribute.DodgeChance, true, 0)]
-        [InlineData(EAttribute.BlockChance, true, 0)]
-        [InlineData(EAttribute.BlockReduction, false, 0)]
+        [InlineData(EAttribute.DamageReflection, true, 0)]
         [InlineData(EAttribute.Strength, false, 0)]
         [InlineData(EAttribute.MaxHealth, false, 0)]
         public void Constructor_AssignsPercentageAndDecimals(EAttribute id, bool expectedPercentage, int expectedDecimals)

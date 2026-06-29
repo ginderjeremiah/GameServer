@@ -4,14 +4,27 @@ import type { Mulberry32 } from '$lib/engine/mulberry32';
 import { EAttribute, type ISkillEffect } from '$lib/api';
 import { amplifiedDamage } from './battle-formulas';
 
+/** Deterministic damage reflection (#1330): the `defender` returns its DamageReflection share of a direct
+ *  hit's `netDamage` to the `attacker`, BYPASSING the attacker's mitigation. Only a positive net reflects (a
+ *  dodged or absorbed hit returns nothing), and DoT is never routed here, so DoT is never reflected. Mirrors
+ *  the backend `BattleContext.ReflectDamage`. */
+function reflectDamage(attacker: Battler, defender: Battler, netDamage: number): void {
+	if (netDamage <= 0) {
+		return;
+	}
+	const reflection = defender.attributes.getValue(EAttribute.DamageReflection);
+	if (reflection > 0) {
+		attacker.takeReflectedDamage(netDamage * reflection);
+	}
+}
+
 /**
  * A single skill activation produced by one battle tick: which skill fired, the
  * final damage it dealt after the defender's mitigation, and whether the
- * player (true) or the enemy (false) was the attacker. The crit/dodged/blocked
- * flags carry the player-only roll outcomes for the combat log: `crit` on a player
- * attack, `dodged`/`blocked` on an incoming enemy attack (a dodged hit is never
- * also blocked). The live BattleEngine turns these into combat-log messages; the
- * headless BattleSimulator ignores them.
+ * player (true) or the enemy (false) was the attacker. The crit/dodged flags
+ * carry the player-only roll outcomes for the combat log: `crit` on a player
+ * attack, `dodged` on an incoming enemy attack. The live BattleEngine turns these
+ * into combat-log messages; the headless BattleSimulator ignores them.
  */
 export interface SkillActivation {
 	skill: Skill;
@@ -19,7 +32,6 @@ export interface SkillActivation {
 	byPlayer: boolean;
 	crit: boolean;
 	dodged: boolean;
-	blocked: boolean;
 }
 
 /** A skill effect application that landed during a tick (each application stacks), with the side it
@@ -93,7 +105,7 @@ export function battleStep(
 	// next slot accrues, so an earlier slot's effect (e.g. a self CooldownRecovery buff) influences a
 	// later slot on the same tick, exactly as the backend's per-slot BattleSkill.Update does. Each fire
 	// draws from the shared seeded RNG in a fixed, outcome-independent order (1 crit draw per player fire,
-	// then 2 — dodge, block — per enemy fire) so both simulators stay in lockstep.
+	// 1 dodge draw per enemy fire — Block's second draw was retired, #1330) so both simulators stay in lockstep.
 	player.advanceCooldowns(timeDelta, (skill) => {
 		// Player crit: one draw (always), the raw damage multiplied by CriticalDamage BEFORE mitigation.
 		const crit = rng.next() < player.attributes.getValue(EAttribute.CriticalChance);
@@ -106,33 +118,29 @@ export function battleStep(
 			skill.damageType,
 			player.level
 		);
-		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, blocked: false });
+		// Direct-hit reflection: the enemy (defender) returns its share to the player (attacker).
+		reflectDamage(player, enemy, damage);
+		activations.push({ skill, damage, byPlayer: true, crit, dodged: false });
 		skill.applyEffects(enemy, onApplied);
 	});
 
-	if (!enemy.isDead) {
+	// The enemy fires only while BOTH battlers live: a dead enemy never retaliates (mirroring the backend's
+	// victory return after the player's turn), and a player killed by the enemy's reflection during its own
+	// attack ends the tick as a loss before the enemy can swing (the backend's player-death check after the
+	// player's turn).
+	if (!enemy.isDead && !player.isDead) {
 		enemy.advanceCooldowns(timeDelta, (skill) => {
-			// Dodge then block, both drawn unconditionally (even on a dodge) so the stream never branches on a
-			// roll result. A dodge zeroes the hit; a non-dodged block flatly subtracts BlockReduction after the
-			// Toughness curve.
+			// A single dodge draw — the only player-only roll left on an enemy attack now that Block is gone
+			// (#1330). A dodge zeroes the hit. The draw is taken unconditionally so the stream stays in lockstep.
 			const dodged = rng.next() < player.attributes.getValue(EAttribute.DodgeChance);
-			const blocked = rng.next() < player.attributes.getValue(EAttribute.BlockChance);
 			const raw = skill.calculateDamage();
 			// Attacker-side amplification reads the enemy (the attacker here); resistance + the Toughness curve
 			// (scaled by the enemy's level) read the player.
 			const dealt = amplifiedDamage(raw, skill.damageType, enemy.attributes);
-			let damage = 0;
-			if (!dodged) {
-				damage = blocked
-					? player.takeDamage(
-							dealt,
-							skill.damageType,
-							enemy.level,
-							player.attributes.getValue(EAttribute.BlockReduction)
-						)
-					: player.takeDamage(dealt, skill.damageType, enemy.level);
-			}
-			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, blocked });
+			const damage = dodged ? 0 : player.takeDamage(dealt, skill.damageType, enemy.level);
+			// Direct-hit reflection: the player (defender) returns its share to the enemy (attacker).
+			reflectDamage(enemy, player, damage);
+			activations.push({ skill, damage, byPlayer: false, crit: false, dodged });
 			skill.applyEffects(player, onApplied);
 		});
 	}

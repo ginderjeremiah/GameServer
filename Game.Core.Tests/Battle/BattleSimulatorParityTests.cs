@@ -535,11 +535,11 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2960),
 
-                // ── Seeded crit/dodge/block (player-only) ────────────────────────────────────
+                // ── Seeded crit/dodge (player-only) ──────────────────────────────────────────
                 // Each chance is forced to 1 or 0 so the outcome is deterministic regardless of the seed (a
                 // chance ≥ 1 always succeeds against a [0,1) draw, a chance ≤ 0 never does). The draws are still
-                // taken in lockstep on both sides, so these pin the player-only crit/dodge/block math and draw
-                // order while staying hand-computable.
+                // taken in lockstep on both sides, so these pin the player-only crit/dodge math and draw order
+                // while staying hand-computable.
 
                 // A forced crit (CriticalChance 1) multiplies the raw damage by CriticalDamage BEFORE mitigation.
                 // CriticalDamage is the base 1.5 (sourced by #799) plus a 0.5 allocation = 2.0 total: 20 raw × 2
@@ -570,31 +570,12 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2000),
 
-                // A forced block (BlockChance 1) applies a flat BlockReduction after the Toughness curve.
-                // BlockReduction is the base 2 (sourced by #799) plus an 18 allocation = 20 total: with no
-                // Toughness the 25-damage hit becomes 25 − 20 = 5/hit instead of 25. At 25/hit the enemy (firing
-                // every 5 ticks) kills the 100-HP player on its 5th hit at tick 25; at 5/hit the player survives
-                // to kill the 200-HP enemy (50/hit every 10 ticks) on hit 4 at tick 40 → 1600ms. Block flips the
-                // loss into a win.
-                ["forcedBlock"] = new ParityScenario(
-                    Player: () => MakeBattler(
-                        strength: 10, endurance: 0,
-                        skills: [MakeSkill(1, baseDamage: 50, cooldownMs: 400)],
-                        extra: [(EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 18.0)]),
-                    Enemy: () => MakeEnemy(
-                        strength: 30, endurance: 0,
-                        skills: [MakeSkill(2, baseDamage: 25, cooldownMs: 200)]),
-                    ExpectedVictory: true,
-                    ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 1600),
-
                 // Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two
-                // enemy skills (two dodge+block draw pairs) fire on the same ticks, so a mis-ordered or
-                // mis-counted draw stream would diverge between the two simulators. CriticalDamage and
-                // BlockReduction each fold in the #799 base (1.5 + 0.5 = 2 multiplier; 2 + 8 = 10 reduction).
-                // Neither side has Toughness. The player crits both hits (10×2=20, 15×2=30 → 50/tick) and blocks
-                // both enemy hits (12−10=2, 14−10=4 → 6/tick). The 100-HP enemy dies on the player's tick-20
-                // volley → 800ms; the player ends at 88 HP.
+                // enemy skills (two dodge draws, one each now that Block's second draw is gone) fire on the same
+                // ticks. CriticalDamage folds in the #799 base (1.5 + 0.5 = 2 multiplier). Neither side has
+                // Toughness. The player crits both hits (10×2=20, 15×2=30 → 50/tick); the enemy's two hits land
+                // in full (12 + 14 = 26/tick — no Block). The 100-HP enemy dies on the player's tick-20 volley →
+                // 800ms (before its own tick-20 attack), so the player only takes the tick-10 volley and ends at 74 HP.
                 ["drawOrderMultiSkill"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
@@ -603,11 +584,7 @@ namespace Game.Core.Tests.Battle
                             MakeSkill(1, baseDamage: 10, cooldownMs: 400),
                             MakeSkill(2, baseDamage: 15, cooldownMs: 400),
                         ],
-                        extra:
-                        [
-                            (EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5),
-                            (EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 8.0),
-                        ]),
+                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(
                         strength: 10, endurance: 0,
                         skills:
@@ -619,10 +596,10 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 800),
 
-                // Enemies never crit/dodge/block — even with every chance forced to 1, the gating reads the rolls
-                // only on the player's side. The enemy's forced crit is ignored (it deals 20, not 40, so the
-                // player survives to win) and its forced dodge/block is ignored (the player's 20-damage hits land
-                // in full and kill it, rather than being zeroed by a 50 BlockReduction). Win on hit 5 → 2000ms.
+                // Enemies never crit/dodge — even with every chance forced to 1, the gating reads the rolls only
+                // on the player's side. The enemy's forced crit is ignored (it deals 20, not 40, so the player
+                // survives to win) and its forced dodge is ignored (irrelevant on offence). The player's
+                // 20-damage hits land in full and kill it on hit 5 → 2000ms.
                 ["enemyForcedChanceIgnored"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
@@ -633,11 +610,68 @@ namespace Game.Core.Tests.Battle
                         extra:
                         [
                             (EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 2.0),
-                            (EAttribute.DodgeChance, 1.0), (EAttribute.BlockChance, 1.0), (EAttribute.BlockReduction, 50.0),
+                            (EAttribute.DodgeChance, 1.0),
                         ]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2000),
+
+                // ── Deterministic damage reflection (spike #1330) ────────────────────────────
+                // Reflection returns the defender's DamageReflection share of a direct hit's net damage to the
+                // attacker, bypassing the attacker's mitigation. Authored-only (granted here as a raw attribute),
+                // deterministic (no draw), and scoped to direct hits. Hand-computable; mirrored in the frontend suite.
+
+                // Reflection as a kill condition: a pure tank (no skills) returns 100% of every hit it takes.
+                // The player has no Toughness (MaxHealth 550 from Strength, Endurance 0), so it takes the enemy's
+                // full 25 and reflects 25 back each hit. The 100-HP enemy dies to its own reflected damage on its
+                // 4th attack (tick 40 → 1600ms) — exercising the attacker-death-from-reflection check after the
+                // enemy's turn — while the 550-HP player (down to 450) easily survives.
+                ["reflectionKillsAttacker"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 100, endurance: 0, skills: [],
+                        extra: [(EAttribute.DamageReflection, 1.0)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 25, cooldownMs: 400)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
+                // Reflection ignores DoT: the player bears a constant 50 PoisonDamagePerSecond (2/tick, self-
+                // inflicted) and 100% DamageReflection but no skills, against a 100-HP enemy with no skills. DoT
+                // is applied through the end-of-tick phase, not a direct hit, so it is never reflected — the enemy
+                // takes nothing back and never dies, and the player's own poison grinds its 200 HP (Str 30) down,
+                // killing it on tick 100 → 4000ms. (Were DoT reflected, the enemy would die at tick 50 / 2000ms.)
+                ["reflectionIgnoresDot"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 30, endurance: 0, skills: [],
+                        extra: [(EAttribute.PoisonDamagePerSecond, 50), (EAttribute.DamageReflection, 1.0)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: true,
+                    ExpectedTotalMs: 4000),
+
+                // Simplified draw order — an enemy attack now draws ONE dodge value (not dodge + block), so the
+                // player's fractional crit draws interleave at EVEN stream positions (the enemy's single dodge
+                // draw sits between consecutive player crit draws). With a real CriticalChance 0.5 against
+                // ParitySeed the crit draws at stream indices 0, 2, 4, 6 are crit, no, crit, crit; CriticalDamage
+                // base 1.5 + 0.5 = 2.0, so the player deals 24, 12, 24, 24 (no Toughness) for a cumulative
+                // 24, 36, 60, 84. The 80-HP enemy (Str 6) dies on the tick-40 fire → 1600ms. Had the enemy still
+                // drawn TWICE (the old dodge + block), the crit draws would land at indices 0, 3, 6, 9 —
+                // crit, no, crit, no → 24, 12, 24, 12 (cumulative 24, 36, 60, 72) — pushing the kill to tick 50
+                // (2000ms). So this row pins the one-draw enemy attack. The enemy chips 5/tick (DodgeChance 0, so
+                // its dodge draw is taken but never succeeds), leaving the 100-HP player at 85.
+                ["drawOrderDodgeOnlyAlignsCrit"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400)],
+                        extra: [(EAttribute.CriticalChance, 0.5), (EAttribute.CriticalDamage, 0.5)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 6, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 400)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
 
                 // Fractional crit chance against a fixed seed (#941): unlike the forced-1/0 crit rows, CriticalChance
                 // is a real 0.5 fraction, so whether each player fire crits depends on the actual Mulberry32 [0,1)
@@ -1136,9 +1170,10 @@ namespace Game.Core.Tests.Battle
                 new() { Attribute = EAttribute.Luck,      Amount = 0 },
             };
 
-            // Extra non-core attributes (e.g. forced crit/dodge/block chances) ride in as additive allocations
-            // layered on top of the static derivations that now source them (#799) — so injected CriticalDamage
-            // and BlockReduction amounts here are deltas over their derived bases (1.5 and 2).
+            // Extra non-core attributes (e.g. forced crit/dodge chances, DamageReflection) ride in as additive
+            // allocations layered on top of the static derivations that source them (#799) — so an injected
+            // CriticalDamage amount here is a delta over its derived base (1.5), while authored-only attributes
+            // like DamageReflection (no derivation) are the value itself.
             if (extra is not null)
             {
                 foreach (var (attribute, amount) in extra)
@@ -1318,8 +1353,8 @@ namespace Game.Core.Tests.Battle
                 new() { AttributeId = EAttribute.Endurance, BaseAmount = (decimal)endurance, AmountPerLevel = 0 },
             };
 
-            // Forced crit/dodge/block chances used by the "enemies never crit/dodge/block" scenario — they must
-            // be present on the enemy yet never consulted, proving the rolls are gated on the player alone.
+            // Forced crit/dodge chances used by the "enemies never crit/dodge" scenario — they must be present
+            // on the enemy yet never consulted, proving the rolls are gated on the player alone.
             if (extra is not null)
             {
                 foreach (var (attribute, amount) in extra)

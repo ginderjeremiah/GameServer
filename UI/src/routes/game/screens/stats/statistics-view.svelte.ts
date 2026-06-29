@@ -79,8 +79,6 @@ const STAT_PRESENTATION: StatPresentation[] = [
 	{ id: EStatisticType.DamageHealed, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.AttacksDodged, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.DamageDodged, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
-	{ id: EStatisticType.AttacksBlocked, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
-	{ id: EStatisticType.DamageBlocked, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.PlayerDeaths, unit: 'count', agg: 'sum', comp: 'AtMost', cat: 'survival' },
 	// Exploration
 	{ id: EStatisticType.ZonesCleared, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'exploration' },

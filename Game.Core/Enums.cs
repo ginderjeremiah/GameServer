@@ -80,17 +80,9 @@ namespace Game.Core
         /// </summary>
         DodgeChance = 12,
 
-        /// <summary>
-        /// A derived game attribute. A decimal probability (0.05 = 5%) to block part of an incoming attack,
-        /// compared directly against the battle RNG draw. Sourced from Endurance (player-only).
-        /// </summary>
-        BlockChance = 13,
-
-        /// <summary>
-        /// A derived game attribute. A flat reduction (base 2) applied after <see cref="Toughness"/> mitigation
-        /// when an incoming attack is blocked.
-        /// </summary>
-        BlockReduction = 14,
+        // 13 and 14 are retired (the former BlockChance / BlockReduction, removed with the Block mechanic in
+        // spike #1330). The enum is intrinsic, DB-backed reference data, so the ordinals are left as a gap
+        // rather than reused; the deterministic damage-reflection that replaced Block is DamageReflection below.
 
         /// <summary>
         /// A per-second accumulator for bleed damage-over-time (spike #1320). Consumed by the end-of-tick
@@ -214,6 +206,16 @@ namespace Game.Core
 
         /// <summary>Amplifies unarmed damage dealt by the attacker. Decimal-percentage, base 0.</summary>
         UnarmedAmplification = 44,
+
+        /// <summary>
+        /// A derived game attribute. The percentage of a direct hit's post-mitigation damage returned to the
+        /// attacker, bypassing the attacker's own mitigation (spike #1330). Decimal-percentage (0.30 = 30%),
+        /// base 0 and <b>authored-only</b> — granted by gear/mods/proficiency/class, never derived from a core
+        /// attribute — so it is a deliberate build identity (the tank's deterministic kill condition) rather
+        /// than a stat tax. Deterministic (no proc) and scoped to direct hits; DoT is never reflected. See
+        /// <see cref="Battle.BattleContext.DamageTarget"/>.
+        /// </summary>
+        DamageReflection = 45,
     }
 
     /// <summary>
@@ -474,7 +476,7 @@ namespace Game.Core
 
         /// <summary>
         /// An aggregate stat computed from a base/derived formula (MaxHealth, Toughness, CooldownRecovery,
-        /// and the crit/dodge/block set).
+        /// the crit/dodge set), plus the authored-only DamageReflection (base 0, no derivation).
         /// </summary>
         Secondary = 2,
 
@@ -777,8 +779,8 @@ namespace Game.Core
         CriticalDamageDealt = 17,
         AttacksDodged = 18,
         DamageDodged = 19,
-        AttacksBlocked = 20,
-        DamageBlocked = 21,
+        // 20 and 21 are retired (the former AttacksBlocked / DamageBlocked, removed with the Block mechanic in
+        // spike #1330). The enum is intrinsic, DB-backed reference data, so the ordinals are left as a gap.
     }
 
     /// <summary>

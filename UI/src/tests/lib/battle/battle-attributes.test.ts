@@ -119,20 +119,9 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.DodgeChance]
 			},
 
-			// BlockChance = 0.002*Endurance (no base)
-			blockChance: {
-				allocations: [[EAttribute.Endurance, 20]],
-				derivedAttributes: [EAttribute.BlockChance]
-			},
-
-			// BlockReduction = 2 (base) + 0.5*Endurance
-			blockReduction: {
-				allocations: [[EAttribute.Endurance, 20]],
-				derivedAttributes: [EAttribute.BlockReduction]
-			},
-
-			// With no allocations every derived stat collapses to just its base: the three with a base carry
-			// it (MaxHealth 50, CriticalDamage 1.5, BlockReduction 2), the pure-derived stats are 0/base.
+			// With no allocations every derived stat collapses to just its base: the two with a base carry
+			// it (MaxHealth 50, CriticalDamage 1.5), the pure-derived stats are 0. DamageReflection is
+			// authored-only (no static modifier), so it composes to 0 without any allocation.
 			zeroBaseStats: {
 				allocations: [],
 				derivedAttributes: [
@@ -140,10 +129,9 @@ describe('BattleAttributes', () => {
 					EAttribute.Toughness,
 					EAttribute.CooldownRecovery,
 					EAttribute.CriticalDamage,
-					EAttribute.BlockReduction,
 					EAttribute.CriticalChance,
 					EAttribute.DodgeChance,
-					EAttribute.BlockChance
+					EAttribute.DamageReflection
 				]
 			}
 		};

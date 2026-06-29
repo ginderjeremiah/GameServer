@@ -62,12 +62,6 @@ describe('damageLogMessage', () => {
 		);
 	});
 
-	it('phrases a block, carrying the type and a resist note', () => {
-		expect(damageLogMessage('Ember', 4, 'player-block', EDamageType.Fire, 'resisted', 'Goblin')).toBe(
-			"You blocked Goblin's Ember, taking only 4 fire damage — resisted."
-		);
-	});
-
 	it('phrases a dodge with no number, type, or resist note', () => {
 		expect(damageLogMessage('Ember', 0, 'player-dodge', EDamageType.Fire, 'normal', 'Goblin')).toBe(
 			"You dodged Goblin's Ember!"

@@ -49,8 +49,6 @@ export enum EAttribute {
 	CriticalChance = 10,
 	CriticalDamage = 11,
 	DodgeChance = 12,
-	BlockChance = 13,
-	BlockReduction = 14,
 	BleedDamagePerSecond = 15,
 	HealthRegenPerSecond = 16,
 	PhysicalAmplification = 17,
@@ -81,6 +79,7 @@ export enum EAttribute {
 	ClubAmplification = 42,
 	DaggerAmplification = 43,
 	UnarmedAmplification = 44,
+	DamageReflection = 45,
 }
 
 export enum EAttributeModifierSource {
@@ -255,6 +254,4 @@ export enum EStatisticType {
 	CriticalDamageDealt = 17,
 	AttacksDodged = 18,
 	DamageDodged = 19,
-	AttacksBlocked = 20,
-	DamageBlocked = 21,
 }
