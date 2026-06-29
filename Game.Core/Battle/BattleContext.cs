@@ -173,18 +173,18 @@ namespace Game.Core.Battle
                 else
                 {
                     // The hit landed (blocked or not), so the player was exposed to its full pre-mitigation
-                    // typed damage — recorded for the incoming book before resistance/Defense. A dodge above
+                    // typed damage — recorded for the incoming book before resistance/mitigation. A dodge above
                     // evaded the hit entirely, so it is excluded (its avoided damage trains evasion instead).
                     Stats.AddTypedDamageExposure(damageType, dealt);
                     if (isBlock)
                     {
                         actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level, _targetBattler.GetAttributeValue(BlockReduction));
                         Stats.AttacksBlocked++;
-                        Stats.DamageBlocked += afterDefense - actualDamage;
+                        Stats.DamageBlocked += afterMitigation - actualDamage;
                     }
                     else
                     {
-                        actualDamage = _targetBattler.TakeDamage(dealt, damageType);
+                        actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level);
                     }
                 }
 

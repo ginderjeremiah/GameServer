@@ -344,14 +344,14 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_PlayerHit_RecordsTypedDamageDealtMatchingPlayerDamageDealt()
         {
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Fire); // 20 − 2 Defense = 18 dealt
+            context.DamageTarget(20, EDamageType.Fire); // no Toughness ⇒ 20 dealt
 
             // The typed offense book sums the same post-mitigation figure each hit booked into PlayerDamageDealt.
-            Assert.Equal(18, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(18, TypedDealt(context, EDamageType.Fire), 0.001);
+            Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(20, TypedDealt(context, EDamageType.Fire), 0.001);
         }
 
         [Fact]
@@ -361,24 +361,24 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Fire);     // 18
-            context.DamageTarget(10, EDamageType.Fire);     // 8
-            context.DamageTarget(30, EDamageType.Physical); // 28
+            context.DamageTarget(20, EDamageType.Fire);     // 20
+            context.DamageTarget(10, EDamageType.Fire);     // 10
+            context.DamageTarget(30, EDamageType.Physical); // 30
 
-            Assert.Equal(26, TypedDealt(context, EDamageType.Fire), 0.001); // 18 + 8
-            Assert.Equal(28, TypedDealt(context, EDamageType.Physical), 0.001);
+            Assert.Equal(30, TypedDealt(context, EDamageType.Fire), 0.001); // 20 + 10
+            Assert.Equal(30, TypedDealt(context, EDamageType.Physical), 0.001);
         }
 
         [Fact]
         public void DamageTarget_PlayerCrit_TypedDamageDealtUsesPostMitigationActual()
         {
             var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
-            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, − 2 Defense = 38
+            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, no Toughness ⇒ 40
 
-            Assert.Equal(38, TypedDealt(context, EDamageType.Physical), 0.001);
+            Assert.Equal(40, TypedDealt(context, EDamageType.Physical), 0.001);
         }
 
         [Fact]
@@ -398,18 +398,18 @@ namespace Game.Core.Tests.Battle
         // ── DamageTarget: pre-mitigation typed exposure (incoming book, #1337) ─
 
         [Fact]
-        public void DamageTarget_EnemyHit_RecordsExposureBeforeResistanceAndDefense()
+        public void DamageTarget_EnemyHit_RecordsExposureBeforeResistanceAndMitigation()
         {
-            // Exposure is the pre-mitigation hit (40 Fire), captured before the player's FireResistance and
-            // Defense reduce the damage actually taken (40 × 0.5 − 2 = 18).
-            var player = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Defense 2
+            // Exposure is the pre-mitigation hit (40 Fire), captured before the player's FireResistance reduces
+            // the damage actually taken (40 × 0.5 = 20; the player has no Toughness, so the curve passes it through).
+            var player = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Toughness 0
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
             context.DamageTarget(40, EDamageType.Fire);
 
-            Assert.Equal(18, context.Stats.PlayerDamageTaken, 0.001);
+            Assert.Equal(20, context.Stats.PlayerDamageTaken, 0.001);
             Assert.Equal(40, Exposure(context, EDamageType.Fire), 0.001);
         }
 
