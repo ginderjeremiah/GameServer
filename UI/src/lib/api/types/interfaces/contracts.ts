@@ -2,6 +2,7 @@
 // Do not modify this file directly. Instead, modify the source C# code and regenerate the TypeScript files.
 
 import type {
+	EActivityKey,
 	EAttribute,
 	EChallengeType,
 	EDamageType,
@@ -145,9 +146,8 @@ export interface IPath {
 	id: number;
 	name: string;
 	description: string;
-	falloffBase: number;
+	activityKey: EActivityKey;
 	retiredAt?: string;
-	contributions: ISkillPathContribution[];
 }
 
 export interface IProficiency {
@@ -216,12 +216,6 @@ export interface ISkillEffect {
 	durationMs: number;
 	scalingAttributeId: EAttribute;
 	scalingAmount: number;
-}
-
-export interface ISkillPathContribution {
-	skillId: number;
-	homeTier: number;
-	weight: number;
 }
 
 export interface ISkillRecipe {

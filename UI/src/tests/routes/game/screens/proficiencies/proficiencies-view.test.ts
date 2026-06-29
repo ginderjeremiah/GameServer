@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { IPath, IPlayerProficiency, IProficiency, ISkillPathContribution } from '$lib/api';
+import { EActivityKey, EDamageType } from '$lib/api';
+import type { IPath, IPlayerProficiency, IProficiency } from '$lib/api';
 
 /* The pure derivation (buildLexicon and friends) takes explicit args and needs no mocks; the
    ProficienciesView reads the live stores, so those are stubbed with mutable stand-ins the view-class
@@ -7,7 +8,11 @@ import type { IPath, IPlayerProficiency, IProficiency, ISkillPathContribution } 
    uses them as erased types). */
 const { mockStaticData, mockPlayerProficiencies, mockPlayerManager, mockInventoryManager, toastError } = vi.hoisted(
 	() => ({
-		mockStaticData: { proficiencies: undefined as IProficiency[] | undefined, paths: undefined as IPath[] | undefined },
+		mockStaticData: {
+			proficiencies: undefined as IProficiency[] | undefined,
+			paths: undefined as IPath[] | undefined,
+			skills: undefined as Record<number, { damageType: EDamageType }> | undefined
+		},
 		mockPlayerProficiencies: { all: [] as IPlayerProficiency[], error: false, load: vi.fn() },
 		mockPlayerManager: { selectedSkills: [] as number[] },
 		mockInventoryManager: { grantedSkillIds: [] as number[] },
@@ -52,13 +57,11 @@ const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdin
 const path = (o: Partial<IPath> & { id: number }): IPath => ({
 	name: `Path ${o.id}`,
 	description: '',
-	falloffBase: 0.5,
-	contributions: [],
+	activityKey: EActivityKey.Physical,
 	...o
 });
 
 const row = (proficiencyId: number, level: number, xp = 0): IPlayerProficiency => ({ proficiencyId, level, xp });
-const contrib = (skillId: number, homeTier = 0, weight = 1): ISkillPathContribution => ({ skillId, homeTier, weight });
 
 /* A multi-path scenario reused across the state-derivation tests:
      · path 0 "Pyromancy"  — Fire(maxed) → Inferno(lvl6, frontier) → Pyroclasm(hidden), fed by skill 100
@@ -76,9 +79,9 @@ const PROFICIENCIES: IProficiency[] = [
 ];
 
 const PATHS: IPath[] = [
-	path({ id: 0, name: 'Pyromancy', contributions: [contrib(100, 0)] }),
+	path({ id: 0, name: 'Pyromancy', activityKey: EActivityKey.Fire }),
 	path({ id: 1, name: 'Lava' }),
-	path({ id: 2, name: 'Blade', contributions: [contrib(200, 0)] }),
+	path({ id: 2, name: 'Blade', activityKey: EActivityKey.Earth }),
 	path({ id: 3, name: 'Retired', retiredAt: '2026-01-01T00:00:00Z' })
 ];
 
@@ -86,7 +89,7 @@ const PATHS: IPath[] = [
 const PROGRESS: IPlayerProficiency[] = [row(0, 10), row(1, 6, 40), row(4, 5)];
 
 const build = (over?: { player?: IPlayerProficiency[]; firing?: number[] }) =>
-	buildLexicon(PROFICIENCIES, PATHS, over?.player ?? PROGRESS, over?.firing ?? [100]);
+	buildLexicon(PROFICIENCIES, PATHS, over?.player ?? PROGRESS, over?.firing ?? [EActivityKey.Fire]);
 
 const byId = (lexicon: ReturnType<typeof build>, id: number) => lexicon.find((p) => p.id === id);
 const tier = (lexicon: ReturnType<typeof build>, pathId: number, tierId: number) =>
@@ -252,28 +255,20 @@ describe('buildLexicon — tier state', () => {
 	});
 
 	it('marks the frontier training when an equipped skill feeds the path', () => {
-		expect(tier(build({ firing: [100] }), 0, 1)?.state).toBe('training');
+		expect(tier(build({ firing: [EActivityKey.Fire] }), 0, 1)?.state).toBe('training');
 	});
 
 	it('marks the frontier unlocked (not training) without an equipped contributing skill', () => {
 		expect(tier(build({ firing: [] }), 0, 1)?.state).toBe('unlocked');
-		// Blade's path is fed by skill 200, which is not equipped here.
-		expect(tier(build({ firing: [100] }), 2, 5)?.state).toBe('unlocked');
+		// Blade's path trains on Earth, which is not firing here.
+		expect(tier(build({ firing: [EActivityKey.Fire] }), 2, 5)?.state).toBe('unlocked');
 	});
 
 	it('only the frontier can be training — a maxed tier stays maxed even when fed', () => {
-		// Equip Sword's feeder (200): Blade (frontier) trains, Sword (maxed) does not.
-		const lexicon = build({ firing: [200] });
+		// Fire Earth damage (Blade's key): Blade (frontier) trains, Sword (maxed) does not.
+		const lexicon = build({ firing: [EActivityKey.Earth] });
 		expect(tier(lexicon, 2, 5)?.state).toBe('training');
 		expect(tier(lexicon, 2, 4)?.state).toBe('maxed');
-	});
-
-	it('does not train the frontier from a skill homed at a deeper tier', () => {
-		// A skill homed at tier 1 must not train a frontier at ordinal 0.
-		const paths = [path({ id: 0, name: 'Pyromancy', contributions: [contrib(100, 1)] })];
-		const fresh = buildLexicon(PROFICIENCIES.slice(0, 3), paths, [row(0, 3)], [100]);
-		// Fire (ordinal 0) is the frontier; the skill's home tier (1) is above it → not training.
-		expect(tier(fresh, 0, 0)?.state).toBe('unlocked');
 	});
 
 	it('flags exactly the lowest un-maxed visible tier as the frontier', () => {
@@ -370,6 +365,7 @@ describe('ProficienciesView', () => {
 	beforeEach(() => {
 		mockStaticData.proficiencies = PROFICIENCIES;
 		mockStaticData.paths = PATHS;
+		mockStaticData.skills = { 100: { damageType: EDamageType.Fire }, 200: { damageType: EDamageType.Earth } };
 		mockPlayerProficiencies.all = PROGRESS;
 		mockPlayerProficiencies.error = false;
 		mockPlayerManager.selectedSkills = [100];

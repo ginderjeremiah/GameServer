@@ -1,4 +1,3 @@
-using Game.Abstractions.Contracts;
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Api.Filters;
@@ -10,9 +9,9 @@ using Path = Game.Abstractions.Contracts.Path;
 namespace Game.Api.Controllers.Admin
 {
     /// <summary>
-    /// Admin Workbench endpoints for persisting paths (the proficiency sequences) and the skills that
-    /// contribute to them. A thin HTTP adapter over <see cref="IAdminPaths"/>. The route prefix is shared
-    /// across every admin controller so the existing <c>/api/AdminTools/*</c> contract is preserved.
+    /// Admin Workbench endpoints for persisting paths (the proficiency sequences, each declaring the activity
+    /// key it trains on). A thin HTTP adapter over <see cref="IAdminPaths"/>. The route prefix is shared across
+    /// every admin controller so the existing <c>/api/AdminTools/*</c> contract is preserved.
     /// </summary>
     [Route("/api/AdminTools/[action]")]
     [ApiController]
@@ -26,12 +25,6 @@ namespace Game.Api.Controllers.Admin
         public ApiResponse AddEditPaths([FromBody] List<Change<Path>> changes)
         {
             return _adminPaths.SavePaths(changes);
-        }
-
-        [HttpPost]
-        public ApiResponse SetPathContributions([FromBody] SetPathContributionsData changeData)
-        {
-            return _adminPaths.SetContributions(changeData);
         }
     }
 }

@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Core;
 using Game.DataAccess.Mapping;
 using Game.DataAccess.Repositories.Caching;
 using Game.Infrastructure.Entities;
@@ -6,7 +7,6 @@ using Contracts = Game.Abstractions.Contracts;
 using CorePath = Game.Core.Proficiencies.Path;
 using CoreProficiency = Game.Core.Proficiencies.Proficiency;
 using Path = Game.Infrastructure.Entities.Path;
-using SkillContribution = Game.Core.Proficiencies.SkillContribution;
 
 namespace Game.DataAccess.Repositories
 {
@@ -39,11 +39,6 @@ namespace Game.DataAccess.Repositories
             return Snapshot.Paths.Lookup(pathId);
         }
 
-        public Proficiency? LookupProficiencyByTier(int pathId, int ordinal)
-        {
-            return Snapshot.Entities.FirstOrDefault(p => p.PathId == pathId && p.PathOrdinal == ordinal);
-        }
-
         public IReadOnlyList<Proficiency> AllProficiencyEntities()
         {
             return Snapshot.Entities;
@@ -60,10 +55,10 @@ namespace Game.DataAccess.Repositories
             return Snapshot.CorePaths.GetById(pathId, "path");
         }
 
-        public IReadOnlyList<SkillContribution> ContributionsForSkill(int skillId)
+        public IReadOnlyList<CorePath> PathsForActivityKey(EActivityKey activityKey)
         {
-            return Snapshot.ContributionsBySkill.TryGetValue(skillId, out var contributions)
-                ? contributions
+            return Snapshot.PathsByActivityKey.TryGetValue(activityKey, out var paths)
+                ? paths
                 : [];
         }
 

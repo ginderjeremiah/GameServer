@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
+	EActivityKey,
 	EAttribute,
 	EAttributeType,
 	EModifierType,
 	type IAttribute,
 	type IProficiencyLevelModifier,
-	type IProficiencyLevelReward,
-	type ISkillPathContribution
+	type IProficiencyLevelReward
 } from '$lib/api';
 import {
 	buildLadder,
@@ -47,11 +47,6 @@ const modifier = (o: Partial<IProficiencyLevelModifier> & { level: number }): IP
 });
 
 const reward = (level: number, rewardSkillId: number): IProficiencyLevelReward => ({ level, rewardSkillId });
-const contribution = (skillId: number, homeTier = 0, weight = 1): ISkillPathContribution => ({
-	skillId,
-	homeTier,
-	weight
-});
 
 const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	name: `Tier ${o.id}`,
@@ -227,22 +222,8 @@ describe('buildLadder', () => {
 /* ── trainedBy ─────────────────────────────────────────────────────────────── */
 
 describe('trainedBy', () => {
-	it('resolves contribution skill ids to distinct names in order', () => {
-		const contributions = [contribution(100), contribution(200)];
-		expect(trainedBy(contributions, resolveSkill)).toEqual(['Fireball', 'Ember Strike']);
-	});
-
-	it('dedupes a skill that contributes at several home tiers', () => {
-		const contributions = [contribution(100, 0), contribution(100, 1), contribution(200, 0)];
-		expect(trainedBy(contributions, resolveSkill)).toEqual(['Fireball', 'Ember Strike']);
-	});
-
-	it('drops a contribution whose skill cannot be resolved rather than showing a blank chip', () => {
-		const contributions = [contribution(100), contribution(999)];
-		expect(trainedBy(contributions, resolveSkill)).toEqual(['Fireball']);
-	});
-
-	it('is empty when there are no contributions', () => {
-		expect(trainedBy([], resolveSkill)).toEqual([]);
+	it('labels the path by the activity key it trains on', () => {
+		expect(trainedBy(EActivityKey.Fire)).toEqual(['Fire']);
+		expect(trainedBy(EActivityKey.Physical)).toEqual(['Physical']);
 	});
 });

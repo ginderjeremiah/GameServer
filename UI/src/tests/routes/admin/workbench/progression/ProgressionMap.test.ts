@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
+import { EActivityKey } from '$lib/api';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import ProgressionMap from '$routes/admin/workbench/progression/ProgressionMap.svelte';
 import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
@@ -19,8 +20,7 @@ const path = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath => (
 	id,
 	name: `Path ${id}`,
 	description: '',
-	falloffBase: 0.6,
-	contributions: [],
+	activityKey: EActivityKey.Physical,
 	...over
 });
 

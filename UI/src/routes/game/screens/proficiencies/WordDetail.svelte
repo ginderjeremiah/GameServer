@@ -106,7 +106,7 @@ const pill = $derived(statePill(tier.state));
 const xpText = $derived(xpProgressText(tier));
 const reveal = $derived(decipherReveal(tier));
 const ladder = $derived(buildLadder(tier, staticData.attributes, resolveSkill));
-const chips = $derived(trainedBy(path.contributions, resolveSkill));
+const chips = $derived(trainedBy(path.activityKey));
 </script>
 
 <style lang="scss">

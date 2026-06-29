@@ -6,6 +6,7 @@
    arrive. The pure derivation lives in the framework-free module so it stays unit-testable without
    rendering. */
 
+import { applies } from '$lib/battle/damage-types';
 import { inventoryManager, playerManager } from '$lib/engine';
 import { playerProficiencies, staticData } from '$stores';
 import { buildLexicon, representativeTier, type TierView } from './proficiencies-lexicon';
@@ -23,12 +24,21 @@ export class ProficienciesView {
 	/** The discovered paths, each an ordered spine — recomputed as progress / reference data change. The
 	 *  firing skills (which decide the `training` state) are the union the battler actually fires: the
 	 *  selected loadout plus the innate item-granted skills (see `battle-engine` → `player.reset`). */
-	readonly paths = $derived(
-		buildLexicon(staticData.proficiencies ?? [], staticData.paths ?? [], playerProficiencies.all, [
-			...playerManager.selectedSkills,
-			...inventoryManager.grantedSkillIds
-		])
-	);
+	readonly paths = $derived.by(() => {
+		// The activity keys the player's firing skills (selected loadout + innate item grants) cover: a path
+		// shows as 'training' when a firing skill's damage type routes to its key (#1318). Damage-type keys
+		// share numeric values with the activity keys, so they are compared directly against path.activityKey.
+		const firingActivityKeys = [...playerManager.selectedSkills, ...inventoryManager.grantedSkillIds].flatMap((id) => {
+			const skill = staticData.skills?.[id];
+			return skill ? applies(skill.damageType) : [];
+		});
+		return buildLexicon(
+			staticData.proficiencies ?? [],
+			staticData.paths ?? [],
+			playerProficiencies.all,
+			firingActivityKeys
+		);
+	});
 
 	/** True when the player has not discovered any path yet (the new-player empty state). */
 	readonly isEmpty = $derived(this.paths.length === 0);
