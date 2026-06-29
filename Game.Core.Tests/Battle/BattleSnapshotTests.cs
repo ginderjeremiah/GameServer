@@ -805,6 +805,7 @@ namespace Game.Core.Tests.Battle
             BaseDamage = 1,
             Description = string.Empty,
             Rarity = ERarity.Common,
+            DamageType = EDamageType.Physical,
             CooldownMs = 1000,
             DamageMultipliers = [],
             Effects = [],

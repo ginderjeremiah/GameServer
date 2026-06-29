@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
 import {
 	buildSynthesis,
 	recipeStateAccent,
@@ -23,6 +23,7 @@ const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
+	damageType: EDamageType.Physical,
 	acquisition: ESkillAcquisition.Synthesis,
 	...over
 });

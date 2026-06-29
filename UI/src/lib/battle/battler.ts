@@ -1,7 +1,7 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
-import { applyDefense, cooldownMultiplier } from './battle-formulas';
-import { IBattlerAttribute, ISkillEffect, EAttribute, EModifierType } from '$lib/api';
+import { mitigateDamage, cooldownMultiplier } from './battle-formulas';
+import { IBattlerAttribute, ISkillEffect, EAttribute, EDamageType, EModifierType } from '$lib/api';
 import { EAttributeModifierSource, type AttributeModifier } from './attribute-modifier';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import { staticData } from '$stores';
@@ -152,12 +152,14 @@ export class Battler {
 		}
 	}
 
-	/** Applies `rawDamage` after subtracting flat Defense and the optional `blockReduction` (a second flat
-	 *  reduction in the same clamp, passed only when an incoming hit is blocked), never below zero. */
-	public takeDamage(rawDamage: number, blockReduction = 0) {
-		const damage = applyDefense(rawDamage, this.attributes.getValue(EAttribute.Defense), blockReduction);
-		this.currentHealth -= damage;
-		return damage;
+	/** Applies an incoming `dealt` hit (already amplified and crit-multiplied) of `damageType` via
+	 *  {@link mitigateDamage} — percentage resistance then flat Defense and the optional `blockReduction` (a
+	 *  second flat reduction supplied only when the hit is blocked). Returns the net damage dealt; a negative
+	 *  result (absorption) heals this battler. */
+	public takeDamage(dealt: number, damageType: EDamageType, blockReduction = 0) {
+		const net = mitigateDamage(dealt, damageType, this.attributes, blockReduction);
+		this.currentHealth -= net;
+		return net;
 	}
 
 	/** Applies one tick of damage-over-time from DamageTakenPerSecond (authored per second, scaled to

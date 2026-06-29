@@ -1,4 +1,12 @@
-﻿import { ERarity, IAttributeMultiplier, ISkill, ISkillEffect, ESkillEffectTarget, ESkillAcquisition } from '$lib/api';
+﻿import {
+	ERarity,
+	IAttributeMultiplier,
+	ISkill,
+	ISkillEffect,
+	ESkillEffectTarget,
+	ESkillAcquisition,
+	EDamageType
+} from '$lib/api';
 import { Battler } from './battler';
 import { calculateSkillDamage, scaledEffectAmount } from './battle-formulas';
 
@@ -10,6 +18,9 @@ export class Skill implements ISkill {
 	effects: ISkillEffect[];
 	description: string;
 	cooldownMs: number;
+	// The leaf damage type this skill's direct hits deal (#1320); the battle pipeline resolves it to the
+	// attacker's amplification and defender's resistance attributes via the `applies` map.
+	damageType: EDamageType;
 	iconPath: string;
 	// Carried to satisfy the ISkill contract this display-and-battle model implements; battle logic
 	// never reads provenance (the acquisition flag is authoring intent, not a combat input).
@@ -35,6 +46,7 @@ export class Skill implements ISkill {
 		this.effects = data.effects;
 		this.description = data.description;
 		this.cooldownMs = data.cooldownMs;
+		this.damageType = data.damageType;
 		this.iconPath = data.iconPath;
 		this.acquisition = data.acquisition;
 		this.rarityId = data.rarityId;

@@ -30,7 +30,7 @@ namespace Game.Core.Battle
                 // Record the actual post-crit/post-defense/block damage DamageTarget returns, so per-skill
                 // stats reconcile with the global stats (which DamageTarget also books) rather than the raw
                 // pre-mitigation value. Recording therefore has to follow the hit, not precede it.
-                var actualDamage = context.DamageTarget(damage);
+                var actualDamage = context.DamageTarget(damage, Skill.DamageType);
                 context.RecordSkillUse(Skill.Id, actualDamage);
                 ApplyEffects(context);
             }

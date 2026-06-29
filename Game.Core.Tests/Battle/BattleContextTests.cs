@@ -87,7 +87,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Defense 2
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20); // crit ⇒ 20×2 = 40, then −2 Defense = 38
+            context.DamageTarget(20, EDamageType.Physical); // crit ⇒ 20×2 = 40, then −2 Defense = 38
 
             Assert.Equal(50 - 38, enemy.CurrentHealth, 0.001);
             Assert.Equal(38, context.Stats.PlayerDamageDealt, 0.001);
@@ -100,7 +100,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20); // no crit ⇒ 20 − 2 Defense = 18
+            context.DamageTarget(20, EDamageType.Physical); // no crit ⇒ 20 − 2 Defense = 18
 
             Assert.Equal(50 - 18, enemy.CurrentHealth, 0.001);
         }
@@ -116,7 +116,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers(); // enemy attacks the player
             var before = player.CurrentHealth;
 
-            context.DamageTarget(20); // dodged ⇒ 0
+            context.DamageTarget(20, EDamageType.Physical); // dodged ⇒ 0
 
             Assert.Equal(before, player.CurrentHealth, 0.001);
             Assert.Equal(0, context.Stats.PlayerDamageTaken, 0.001);
@@ -132,7 +132,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers();
             var before = player.CurrentHealth;
 
-            context.DamageTarget(20); // blocked ⇒ 20 − 2 Defense − 10 BlockReduction = 8
+            context.DamageTarget(20, EDamageType.Physical); // blocked ⇒ 20 − 2 Defense − 10 BlockReduction = 8
 
             Assert.Equal(before - 8, player.CurrentHealth, 0.001);
             Assert.Equal(8, context.Stats.PlayerDamageTaken, 0.001);
@@ -149,7 +149,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers();
             var before = player.CurrentHealth;
 
-            context.DamageTarget(20);
+            context.DamageTarget(20, EDamageType.Physical);
 
             Assert.Equal(before - 18, player.CurrentHealth, 0.001);
         }
@@ -163,7 +163,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20); // 20×2 = 40, −2 Defense = 38 dealt
+            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, −2 Defense = 38 dealt
 
             Assert.Equal(1, context.Stats.CriticalHits);
             Assert.Equal(38, context.Stats.CriticalDamageDealt, 0.001);
@@ -176,7 +176,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20);
+            context.DamageTarget(20, EDamageType.Physical);
 
             Assert.Equal(0, context.Stats.CriticalHits);
             Assert.Equal(0, context.Stats.CriticalDamageDealt, 0.001);
@@ -190,7 +190,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20); // would deal 20 − 2 Defense = 18, fully avoided
+            context.DamageTarget(20, EDamageType.Physical); // would deal 20 − 2 Defense = 18, fully avoided
 
             Assert.Equal(1, context.Stats.AttacksDodged);
             Assert.Equal(18, context.Stats.DamageDodged, 0.001);
@@ -206,7 +206,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20); // after Defense 18, blocked to 8 ⇒ reduction prevented = 10
+            context.DamageTarget(20, EDamageType.Physical); // after Defense 18, blocked to 8 ⇒ reduction prevented = 10
 
             Assert.Equal(1, context.Stats.AttacksBlocked);
             Assert.Equal(10, context.Stats.DamageBlocked, 0.001);
@@ -223,7 +223,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(5); // after Defense 3, blocked to 0 ⇒ reduction prevented = 3
+            context.DamageTarget(5, EDamageType.Physical); // after Defense 3, blocked to 0 ⇒ reduction prevented = 3
 
             Assert.Equal(1, context.Stats.AttacksBlocked);
             Assert.Equal(3, context.Stats.DamageBlocked, 0.001);
@@ -237,7 +237,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20);
+            context.DamageTarget(20, EDamageType.Physical);
 
             Assert.Equal(0, context.Stats.AttacksDodged);
             Assert.Equal(0, context.Stats.DamageDodged, 0.001);
@@ -259,15 +259,77 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, rng);
 
-            context.DamageTarget(5);               // player attacking → 1 draw
+            context.DamageTarget(5, EDamageType.Physical);               // player attacking → 1 draw
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(5);               // enemy attacking → 2 draws
+            context.DamageTarget(5, EDamageType.Physical);               // enemy attacking → 2 draws
 
             var reference = new Mulberry32(seed);
             reference.Next();
             reference.Next();
             reference.Next();
             Assert.Equal(reference.Next(), rng.Next());
+        }
+
+        // ── DamageTarget: damage typing (amplification / resistance, #1320) ──
+
+        [Fact]
+        public void DamageTarget_AmplificationAndResistance_ApplyAsSeparateMultipliers()
+        {
+            // The attacker's amplification and the defender's resistance are SEPARATE budgets — × (1 + amp)
+            // then × (1 − res) — not a single (1 + amp − res). With FireAmp 0.5 and FireResist 0.5 on a 40-damage
+            // Fire hit: 40 × 1.5 = 60, × 0.5 = 30, − 2 Defense = 28. A combined budget would cancel to 40 − 2 = 38.
+            var player = MakeBattlerWith((FireAmplification, 0.5));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Defense 2, MaxHealth 50
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(40, EDamageType.Fire);
+
+            Assert.Equal(50 - 28, enemy.CurrentHealth, 0.001);
+            Assert.Equal(28, context.Stats.PlayerDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_FireAmplification_AlsoSummedFromElementalAmplification()
+        {
+            // applies(Fire) = { Fire, Elemental }, so a hit is amplified by the additive SUM of both keys.
+            // FireAmp 0.3 + ElementalAmp 0.2 = 0.5 → 40 × 1.5 = 60, − 2 Defense = 58.
+            var player = MakeBattlerWith((FireAmplification, 0.3), (ElementalAmplification, 0.2));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(40, EDamageType.Fire);
+
+            Assert.Equal(50 - 58, enemy.CurrentHealth, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_ResistanceAboveOne_HealsTheTargetAndIgnoresFlatDefense()
+        {
+            // Absorption: FireResistance 2.0 drives the post-resistance hit negative (20 × (1 − 2) = −20), a net
+            // heal — and flat Defense is NOT subtracted from an absorbed hit (a heal of 20, not 18).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Defense 2, MaxHealth 50
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, EDamageType.Fire);
+
+            // Started at MaxHealth 50, healed 20 (uncapped) → 70; the booked damage is the −20 net.
+            Assert.Equal(70, enemy.CurrentHealth, 0.001);
+            Assert.Equal(-20, context.Stats.PlayerDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_CritAmplifiesBeforeResistanceAndDefense()
+        {
+            // Order: amp (none) → crit (× 2) → resist (× 0.5) → flat Defense. A normal hit (20 × 0.5 = 10, − 10
+            // Defense) clamps to 0, but the crit (20 × 2 = 40, × 0.5 = 20, − 10 = 10) punches through.
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2.0
+            var enemy = MakeBattlerWith((Endurance, 0), (Defense, 8), (FireResistance, 0.5)); // Defense 10, MaxHealth 50
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, EDamageType.Fire);
+
+            Assert.Equal(50 - 10, enemy.CurrentHealth, 0.001);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

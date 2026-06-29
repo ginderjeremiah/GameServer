@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ERarity, EAttribute, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
+import { ERarity, EAttribute, EDamageType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { EModifierType, EAttributeModifierSource } from '$lib/battle/attribute-modifier';
 import { makeEffect } from './battle-sim-test-utils';
@@ -25,6 +25,7 @@ const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISki
 	effects: [],
 	description: '',
 	cooldownMs,
+	damageType: EDamageType.Physical,
 	iconPath: '',
 	rarityId: ERarity.Common,
 	word: '',
@@ -267,7 +268,7 @@ describe('Battler', () => {
 			const initialHealth = battler.currentHealth;
 			const rawDamage = 50;
 
-			const finalDmg = battler.takeDamage(rawDamage);
+			const finalDmg = battler.takeDamage(rawDamage, EDamageType.Physical);
 
 			expect(finalDmg).toBe(rawDamage - defense);
 			expect(battler.currentHealth).toBe(initialHealth - finalDmg);
@@ -280,7 +281,7 @@ describe('Battler', () => {
 				})
 			);
 
-			const finalDmg = battler.takeDamage(5);
+			const finalDmg = battler.takeDamage(5, EDamageType.Physical);
 			expect(finalDmg).toBe(0);
 			expect(battler.currentHealth).toBe(battler.attributes.getValue(EAttribute.MaxHealth));
 		});
@@ -292,7 +293,7 @@ describe('Battler', () => {
 				})
 			);
 
-			battler.takeDamage(battler.currentHealth + battler.attributes.getValue(EAttribute.Defense));
+			battler.takeDamage(battler.currentHealth + battler.attributes.getValue(EAttribute.Defense), EDamageType.Physical);
 			expect(battler.isDead).toBe(true);
 		});
 
@@ -303,9 +304,74 @@ describe('Battler', () => {
 				})
 			);
 
-			battler.takeDamage(99999);
+			battler.takeDamage(99999, EDamageType.Physical);
 			expect(battler.isDead).toBe(true);
 			expect(battler.currentHealth).toBeLessThan(0);
+		});
+
+		// ── Damage typing: percentage resistance then flat Defense (#1320) ──
+		// Mirrors the backend `BattlerTests` resistance cases with the same scenarios and expected results.
+
+		it('applies percentage resistance before flat defense', () => {
+			// FireResistance 0.5 halves the 40-damage hit to 20, then flat Defense 12 → 8 net.
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.Endurance, amount: 10 },
+						{ attributeId: EAttribute.FireResistance, amount: 0.5 }
+					]
+				})
+			);
+
+			expect(battler.takeDamage(40, EDamageType.Fire)).toBeCloseTo(8, 10);
+		});
+
+		it('sums resistance across the applicable keys (fire + elemental)', () => {
+			// applies(Fire) = { Fire, Elemental }: 0.25 + 0.25 = 0.5 → 40 × 0.5 = 20, − 2 Defense = 18.
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.FireResistance, amount: 0.25 },
+						{ attributeId: EAttribute.ElementalResistance, amount: 0.25 }
+					]
+				})
+			);
+
+			expect(battler.takeDamage(40, EDamageType.Fire)).toBeCloseTo(18, 10);
+		});
+
+		it('treats negative resistance as vulnerability (unclamped)', () => {
+			// −0.5 FireResistance makes the target take 1.5× (20 × 1.5 = 30, − 2 Defense = 28).
+			const battler = new Battler(
+				makeBattlerData({ attributes: [{ attributeId: EAttribute.FireResistance, amount: -0.5 }] })
+			);
+
+			expect(battler.takeDamage(20, EDamageType.Fire)).toBeCloseTo(28, 10);
+		});
+
+		it('heals on absorption (resistance > 1) and never applies flat defense', () => {
+			// FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with flat Defense NOT subtracted.
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.Endurance, amount: 0 },
+						{ attributeId: EAttribute.FireResistance, amount: 2.0 }
+					]
+				})
+			);
+			const initialHealth = battler.currentHealth;
+
+			const net = battler.takeDamage(20, EDamageType.Fire);
+
+			expect(net).toBeCloseTo(-20, 10);
+			expect(battler.currentHealth).toBeCloseTo(initialHealth + 20, 10);
+		});
+
+		it('is identical to the old flat step for a typed hit with no resistance', () => {
+			// The reduce-to-today identity at the unit level: 50 − 12 Defense = 38, unchanged by typing.
+			const battler = new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }] }));
+
+			expect(battler.takeDamage(50, EDamageType.Fire)).toBeCloseTo(38, 10);
 		});
 	});
 

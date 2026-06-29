@@ -22,6 +22,7 @@ namespace Game.DataAccess.Mapping
                 CooldownMs = entity.CooldownMs,
                 IconPath = entity.IconPath,
                 RarityId = (ERarity)entity.RarityId,
+                DamageType = (EDamageType)entity.DamageType,
                 Word = entity.Word,
                 Pronunciation = entity.Pronunciation,
                 Translation = entity.Translation,
@@ -62,6 +63,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
                 Rarity = (ERarity)entity.RarityId,
+                DamageType = (EDamageType)entity.DamageType,
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new DamageMultiplier
                     {

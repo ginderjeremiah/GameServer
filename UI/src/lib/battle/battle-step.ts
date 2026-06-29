@@ -2,6 +2,7 @@ import type { Battler } from './battler';
 import type { Skill } from './skill';
 import type { Mulberry32 } from '$lib/engine/mulberry32';
 import { EAttribute, type ISkillEffect } from '$lib/api';
+import { amplifiedDamage } from './battle-formulas';
 
 /**
  * A single skill activation produced by one battle tick: which skill fired, the
@@ -97,7 +98,12 @@ export function battleStep(
 		// Player crit: one draw (always), the raw damage multiplied by CriticalDamage BEFORE Defense.
 		const crit = rng.next() < player.attributes.getValue(EAttribute.CriticalChance);
 		const raw = skill.calculateDamage();
-		const damage = enemy.takeDamage(crit ? raw * player.attributes.getValue(EAttribute.CriticalDamage) : raw);
+		// Attacker-side amplification, then crit, then the typed mitigation pipeline (resistance, Defense).
+		const dealt = amplifiedDamage(raw, skill.damageType, player.attributes);
+		const damage = enemy.takeDamage(
+			crit ? dealt * player.attributes.getValue(EAttribute.CriticalDamage) : dealt,
+			skill.damageType
+		);
 		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, blocked: false });
 		skill.applyEffects(enemy, onApplied);
 	});
@@ -109,11 +115,13 @@ export function battleStep(
 			const dodged = rng.next() < player.attributes.getValue(EAttribute.DodgeChance);
 			const blocked = rng.next() < player.attributes.getValue(EAttribute.BlockChance);
 			const raw = skill.calculateDamage();
+			// Attacker-side amplification reads the enemy (the attacker here); resistance reads the player.
+			const dealt = amplifiedDamage(raw, skill.damageType, enemy.attributes);
 			let damage = 0;
 			if (!dodged) {
 				damage = blocked
-					? player.takeDamage(raw, player.attributes.getValue(EAttribute.BlockReduction))
-					: player.takeDamage(raw);
+					? player.takeDamage(dealt, skill.damageType, player.attributes.getValue(EAttribute.BlockReduction))
+					: player.takeDamage(dealt, skill.damageType);
 			}
 			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, blocked });
 			skill.applyEffects(player, onApplied);

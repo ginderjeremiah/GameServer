@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EItemModType, EModifierType, ESkillEffectTarget } from '$lib/api';
+import { EAttribute, EDamageType, EItemModType, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IItem, IItemMod } from '$lib/api';
 
 // Drive the REAL production simulation. The mocked `staticData.skills` is the
@@ -946,6 +946,142 @@ const scenarios: ParityScenario[] = [
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 20 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// ── Direct-hit damage typing: amplification / resistance (#1320 Area B) ──────
+	// Skills carry a leaf damage type; the attacker's amplification and defender's resistance for that type's
+	// applies() keys multiply the hit as separate budgets — × (1 + amp), × (1 − res), res unclamped — with
+	// crit attacker-side (pre-mitigation) and flat Defense last. All chances are 0, so outcomes are
+	// hand-computable. Mirrors the backend `fireAmplification` … `enemyAmplifiesPlayerResists` scenarios.
+
+	// Attacker amplification: a Fire skill with +0.5 FireAmplification deals 20 × 1.5 = 30, −2 Def = 28/hit, so
+	// the 100-HP enemy dies on hit 4 at tick 40 → 1600ms (vs hit 6 / 2400ms un-amplified).
+	{
+		name: 'fireAmplification',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireAmplification, amount: 0.5 }
+				],
+				[makeSkill(20, 400, [], [], EDamageType.Fire)]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
+	// Defender resistance: the enemy's +0.5 FireResistance halves a 40-damage Fire hit to 20, −2 Def = 18/hit,
+	// so the 100-HP enemy dies on hit 6 at tick 60 → 2400ms (vs hit 3 / 1200ms un-resisted).
+	{
+		name: 'fireResistance',
+		player: () =>
+			makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(40, 400, [], [], EDamageType.Fire)]),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireResistance, amount: 0.5 }
+				],
+				[]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// Vulnerability (res < 0): a −1.0 FireResistance doubles the incoming Fire hit (factor 1 − (−1) = 2). A
+	// 20-damage hit becomes 40, −2 Def = 38/hit, so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs hit
+	// 6 / 2400ms at res 0). Resistance is deliberately left unclamped.
+	{
+		name: 'fireVulnerability',
+		player: () =>
+			makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(20, 400, [], [], EDamageType.Fire)]),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireResistance, amount: -1.0 }
+				],
+				[]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
+	// Absorption (res > 1): a +2.0 FireResistance drives the post-resistance hit negative (20 × (1 − 2) = −20),
+	// which heals the enemy — and flat Defense never applies to an absorbed hit. The enemy is healed every fire
+	// and never dies; dealing no damage back, the battle runs to the timeout. (At res 0 the player's 18/hit
+	// would win by 2400ms.)
+	{
+		name: 'fireAbsorption',
+		player: () => makeBattler([], [makeSkill(20, 400, [], [], EDamageType.Fire)]),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireResistance, amount: 2.0 }
+				],
+				[]
+			),
+		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
+	},
+
+	// Crit punches through resistance AND Defense: a forced crit (CriticalDamage base 1.5 + 0.5 = 2.0)
+	// multiplies the Fire hit pre-mitigation. A normal hit (20 × (1 − 0.5 res) = 10, −10 Def) clamps to 0 — the
+	// enemy is unkillable without crit — but the crit (20 × 2 × 0.5 = 20, −10 Def = 10/hit) punches through,
+	// dropping the 50-HP enemy on hit 5 at tick 50 → 2000ms.
+	{
+		name: 'critPunchesThroughTyped',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.CriticalChance, amount: 1 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
+				],
+				[makeSkill(20, 400, [], [], EDamageType.Fire)]
+			),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Defense, amount: 8 },
+					{ id: EAttribute.FireResistance, amount: 0.5 }
+				],
+				[]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
+	},
+
+	// Reduce-to-today identity: a Fire-typed skill with no amplification or resistance authored anywhere behaves
+	// exactly like the untyped/physical hit it used to be — × (1 + 0) and × (1 − 0) are exact 1.0 factors. 20
+	// raw − 2 Def = 18/hit, so the 100-HP enemy dies on hit 6 → 2400ms, identical to a baseDamage-20 physical skill.
+	{
+		name: 'typedFireNoModifiersUnchanged',
+		player: () =>
+			makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(20, 400, [], [], EDamageType.Fire)]),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// Bidirectional: the ENEMY amplifies and the PLAYER resists. The enemy's +1.0 FireAmplification doubles its
+	// 20-damage Fire skill to 40; the player's +0.5 FireResistance halves that to 20, −2 Def = 18/hit. The
+	// player (no skills) dies on the enemy's hit 6 at tick 60 → 2400ms. (Without the enemy amp it would be
+	// 8/hit → 5200ms; without the player resist, 38/hit → 1200ms.)
+	{
+		name: 'enemyAmplifiesPlayerResists',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireResistance, amount: 0.5 }
+				],
+				[]
+			),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireAmplification, amount: 1.0 }
+				],
+				[makeSkill(20, 400, [], [], EDamageType.Fire)]
+			),
+		expected: { victory: false, playerDied: true, totalMs: 2400 }
 	}
 ];
 

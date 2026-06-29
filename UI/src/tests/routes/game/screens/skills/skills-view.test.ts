@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+	EDamageType,
 	ERarity,
 	EAttribute,
 	ESkillAcquisition,
@@ -87,6 +88,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
+	damageType: EDamageType.Physical,
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

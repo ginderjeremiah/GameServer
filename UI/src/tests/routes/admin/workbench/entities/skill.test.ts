@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+	EDamageType,
 	ERarity,
 	EAttribute,
 	EChangeType,
@@ -78,6 +79,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
+			damageType: EDamageType.Physical,
 			acquisition: ESkillAcquisition.Player,
 			description: '',
 			damageMultipliers: [],
@@ -166,6 +168,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
+			damageType: EDamageType.Physical,
 			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
@@ -196,6 +199,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
+			damageType: EDamageType.Physical,
 			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
@@ -228,6 +232,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
+			damageType: EDamageType.Physical,
 			acquisition: ESkillAcquisition.Player,
 			description: 'Poisons the foe',
 			damageMultipliers: [],

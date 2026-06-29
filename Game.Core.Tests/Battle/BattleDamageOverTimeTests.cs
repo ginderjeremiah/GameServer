@@ -36,7 +36,7 @@ namespace Game.Core.Tests.Battle
         public void ApplyHealOverTime_ScalesPerSecondAttributeByTick()
         {
             var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
-            battler.TakeDamage(52); // Defense 2 → 50 damage → CurrentHealth 50
+            battler.TakeDamage(52, EDamageType.Physical); // Defense 2 → 50 damage → CurrentHealth 50
 
             var healed = battler.ApplyHealOverTime(40); // 75 * 40 / 1000 = 3
 
@@ -59,7 +59,7 @@ namespace Game.Core.Tests.Battle
         public void ApplyHealOverTime_NearMax_HealsOnlyUpToTheCap()
         {
             var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
-            battler.TakeDamage(4); // Defense 2 → 2 damage → CurrentHealth 98
+            battler.TakeDamage(4, EDamageType.Physical); // Defense 2 → 2 damage → CurrentHealth 98
 
             var healed = battler.ApplyHealOverTime(40); // would heal 3, but only 2 of room remains
 
@@ -71,7 +71,7 @@ namespace Game.Core.Tests.Battle
         public void ApplyHealOverTime_KeepsIsDeadInSync()
         {
             var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
-            battler.TakeDamage(52); // CurrentHealth 50
+            battler.TakeDamage(52, EDamageType.Physical); // CurrentHealth 50
 
             battler.ApplyHealOverTime(40); // heals 3 → CurrentHealth 53
 
@@ -172,7 +172,7 @@ namespace Game.Core.Tests.Battle
             // DoT and heals 4, dying at −1. The applied heal is still recorded toward PlayerDamageHealed.
             var player = MakeBattler(
                 Stat(Strength, 0), Stat(DamageTakenPerSecond, 250), Stat(HealthRegenPerSecond, 100));
-            player.TakeDamage(47); // Defense 2 → 45 damage → MaxHealth 50 → CurrentHealth 5
+            player.TakeDamage(47, EDamageType.Physical); // Defense 2 → 45 damage → MaxHealth 50 → CurrentHealth 5
             var enemy = MakeBattler(Stat(Strength, 0));
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
@@ -205,6 +205,7 @@ namespace Game.Core.Tests.Battle
             Name = $"Skill {id}",
             Description = "",
             Rarity = ERarity.Common,
+            DamageType = EDamageType.Physical,
             CooldownMs = 40,
             BaseDamage = baseDamage,
             DamageMultipliers = [],

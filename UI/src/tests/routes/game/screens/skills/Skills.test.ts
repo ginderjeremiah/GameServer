@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import {
+	EDamageType,
 	ERarity,
 	EAttribute,
 	EModifierType,
@@ -98,6 +99,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
+	damageType: EDamageType.Physical,
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

@@ -1,6 +1,7 @@
 import {
 	ApiRequest,
 	EAttribute,
+	EDamageType,
 	EModifierType,
 	ERarity,
 	ESkillAcquisition,
@@ -34,6 +35,8 @@ export const skillEntity: EntityConfig<ISkill> = {
 		cooldownMs: 2000,
 		iconPath: '',
 		rarityId: ERarity.Common,
+		// New skills default to Physical; re-type as needed (#1320).
+		damageType: EDamageType.Physical,
 		word: '',
 		pronunciation: '',
 		translation: '',
@@ -71,6 +74,7 @@ export const skillEntity: EntityConfig<ISkill> = {
 				{ key: 'baseDamage', label: 'Base Damage', type: 'number', suffix: 'dmg', width: 150 },
 				{ key: 'cooldownMs', label: 'Cooldown', type: 'number', suffix: 'ms', width: 150 },
 				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },
+				{ key: 'damageType', label: 'Damage Type', type: 'select', options: reference.damageTypeOptions, width: 170 },
 				{ key: 'iconPath', label: 'Icon Path', type: 'text', placeholder: 'skills/icon.png', grow: true },
 				{ key: 'word', label: 'Word of Power', type: 'text', placeholder: 'sijren', width: 200 },
 				{ key: 'pronunciation', label: 'Pronunciation', type: 'text', placeholder: 'sij·ren', width: 200 },

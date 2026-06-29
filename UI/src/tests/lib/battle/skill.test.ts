@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ERarity, EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
+import { EDamageType, ERarity, EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IAttributeMultiplier } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import { Skill } from '$lib/battle/skill';
@@ -18,6 +18,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
+	damageType: EDamageType.Physical,
 	acquisition: ESkillAcquisition.Player,
 	...overrides
 });
