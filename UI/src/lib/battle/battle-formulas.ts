@@ -59,7 +59,12 @@ export function toughnessMitigatedDamage(
 ): number {
 	const scaled = TOUGHNESS_MITIGATION_CONSTANT * attackerLevel;
 	const toughnessReduction = toughness / (toughness + scaled);
-	return Math.max(rawDamage * (1 - toughnessReduction) - blockReduction, 0);
+	// Clamp with the backend's exact `net > 0 ? net : 0` rather than Math.max: the two agree for every reachable
+	// input, but only the ternary floors a NaN to 0. NaN arises solely from a 0/0 reduction (toughness AND
+	// attackerLevel both 0 — unreachable since battler Level ≥ 1); mirroring the operator keeps this bit-for-bit
+	// with `Battler.ComputeNetDamage` even there, where Math.max(NaN, 0) would leak NaN.
+	const net = rawDamage * (1 - toughnessReduction) - blockReduction;
+	return net > 0 ? net : 0;
 }
 
 /** Amplifies an outgoing `rawDamage` hit of `damageType` by the ATTACKER's amplification:
