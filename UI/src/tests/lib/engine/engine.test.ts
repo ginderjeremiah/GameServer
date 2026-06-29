@@ -27,6 +27,7 @@ const {
 		items?: ({ id: number; name: string; rarityId: number; itemCategoryId: number } | undefined)[];
 		itemMods?: unknown[];
 		skills?: ({ id: number; name: string } | undefined)[];
+		skillRecipes?: ISkillRecipe[];
 		proficiencies?: (
 			| { id: number; name: string; levelRewards: { level: number; rewardSkillId: number }[] }
 			| undefined
@@ -34,7 +35,13 @@ const {
 	},
 	statisticsStub: { load: vi.fn(), reset: vi.fn() },
 	playerChallengesStub: { load: vi.fn(), reset: vi.fn(), markCompleted: vi.fn() },
-	playerProficienciesStub: { load: vi.fn(), reset: vi.fn(), levelOf: vi.fn(() => 0), applyXpGained: vi.fn() },
+	playerProficienciesStub: {
+		load: vi.fn(),
+		reset: vi.fn(),
+		levelOf: vi.fn(() => 0),
+		applyXpGained: vi.fn(),
+		all: [] as { proficiencyId: number; level: number; xp: number }[]
+	},
 	resetLogs: vi.fn(),
 	toastSuccess: vi.fn(),
 	navigation: { requestScreen: vi.fn() }
@@ -90,7 +97,13 @@ const {
 	};
 });
 const { logMessage } = vi.hoisted(() => ({ logMessage: vi.fn() }));
-const { addUnlockedSkill } = vi.hoisted(() => ({ addUnlockedSkill: vi.fn() }));
+const { addUnlockedSkill, playerManagerStub } = vi.hoisted(() => {
+	const addUnlockedSkill = vi.fn();
+	return {
+		addUnlockedSkill,
+		playerManagerStub: { unlockedSkills: [] as { skillId: number; selected: boolean }[], addUnlockedSkill }
+	};
+});
 // Partial mock: keep $lib/api's real exports (other modules in the graph, e.g. $lib/common, rely on
 // them) but swap apiSocket for a stub whose listenCommand/disconnect we can assert against.
 vi.mock('$lib/api', async (importOriginal) => ({
@@ -131,7 +144,7 @@ vi.mock('$lib/engine/player/inventory-manager', () => ({
 		addUnlockedMod = vi.fn();
 	}
 }));
-vi.mock('$lib/engine/player/player-manager', () => ({ playerManager: { addUnlockedSkill } }));
+vi.mock('$lib/engine/player/player-manager', () => ({ playerManager: playerManagerStub }));
 vi.mock('$lib/engine/log', () => ({ logMessage }));
 
 import {
@@ -155,7 +168,8 @@ import {
 	ERarity,
 	type IApiSocketResponse,
 	type IProficiencyXpResultModel,
-	type IProficiencyOpenedModel
+	type IProficiencyOpenedModel,
+	type ISkillRecipe
 } from '$lib/api';
 
 /** Builds a ChallengeCompleted push response with the given reward ids (defaults: no rewards). */
@@ -173,6 +187,33 @@ beforeEach(() => {
 	staticDataStub.itemMods = undefined;
 	staticDataStub.skills = undefined;
 	staticDataStub.proficiencies = undefined;
+	staticDataStub.skillRecipes = undefined;
+	playerManagerStub.unlockedSkills = [];
+	playerProficienciesStub.all = [];
+	// Mirror the real managers so the before/after creatable-recipe diff sees state actually change: a
+	// granted skill joins the unlocked set, and an applied push updates the proficiency levels.
+	addUnlockedSkill.mockImplementation((skillId: number) => {
+		if (!playerManagerStub.unlockedSkills.some((skill) => skill.skillId === skillId)) {
+			playerManagerStub.unlockedSkills.push({ skillId, selected: false });
+		}
+	});
+	playerProficienciesStub.applyXpGained.mockImplementation(
+		(model: { proficiencies: { proficiencyId: number; newLevel: number; newXp: number }[] }) => {
+			for (const result of model.proficiencies) {
+				const existing = playerProficienciesStub.all.find((p) => p.proficiencyId === result.proficiencyId);
+				if (existing) {
+					existing.level = result.newLevel;
+					existing.xp = result.newXp;
+				} else {
+					playerProficienciesStub.all.push({
+						proficiencyId: result.proficiencyId,
+						level: result.newLevel,
+						xp: result.newXp
+					});
+				}
+			}
+		}
+	);
 });
 
 afterEach(() => {
@@ -460,6 +501,109 @@ describe('handleProficiencyXpGained', () => {
 
 		expect(toastSuccess).not.toHaveBeenCalled();
 		expect(playerProficienciesStub.applyXpGained).toHaveBeenCalledWith(response.data);
+	});
+});
+
+describe('handleProficiencyXpGained — new-recipe-available toast', () => {
+	const skillRecipe = (
+		id: number,
+		resultSkillId: number,
+		inputSkillIds: number[],
+		conditions: { proficiencyId: number; minLevel: number }[] = []
+	): ISkillRecipe => ({ id, resultSkillId, inputSkillIds, conditions });
+
+	beforeEach(() => {
+		// A small world: skills 0/1/2 are inputs, skill 4 the synthesis result; proficiency 0 grants skill 1
+		// at its level-5 milestone.
+		staticDataStub.skills = [];
+		staticDataStub.skills[0] = { id: 0, name: 'Ember Strike' };
+		staticDataStub.skills[1] = { id: 1, name: 'Frost Lance' };
+		staticDataStub.skills[4] = { id: 4, name: 'Frostfire' };
+		staticDataStub.skills[5] = { id: 5, name: 'Lava Surge' };
+		staticDataStub.proficiencies = [];
+		staticDataStub.proficiencies[0] = { id: 0, name: 'Pyromancy', levelRewards: [{ level: 5, rewardSkillId: 1 }] };
+	});
+
+	it('toasts when a milestone-granted skill completes a recipe’s inputs', () => {
+		staticDataStub.skillRecipes = [skillRecipe(0, 4, [0, 1])];
+		playerManagerStub.unlockedSkills = [{ skillId: 0, selected: false }]; // owns one input → not yet creatable
+
+		// The level-5 milestone grants skill 1, completing the recipe's inputs (0 + 1).
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([
+				proficiencyXpResult({ proficiencyId: 0, newLevel: 5, milestonesCrossed: [5], grantedSkillIds: [1] })
+			])
+		);
+
+		expect(toastSuccess).toHaveBeenCalledWith('New recipe available: Frostfire', expect.anything());
+	});
+
+	it('toasts when a level-up crosses a recipe’s proficiency condition', () => {
+		staticDataStub.skillRecipes = [skillRecipe(0, 5, [0, 1], [{ proficiencyId: 0, minLevel: 5 }])];
+		// Owns every input, but the condition gates it until proficiency 0 reaches level 5.
+		playerManagerStub.unlockedSkills = [
+			{ skillId: 0, selected: false },
+			{ skillId: 1, selected: false }
+		];
+		playerProficienciesStub.all = [{ proficiencyId: 0, level: 3, xp: 0 }];
+
+		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 5 })]));
+
+		expect(toastSuccess).toHaveBeenCalledWith('New recipe available: Lava Surge', expect.anything());
+	});
+
+	it('does not toast while the recipe is still missing an input', () => {
+		staticDataStub.skillRecipes = [skillRecipe(0, 4, [0, 1, 2])]; // needs a third input the grant won't supply
+		playerManagerStub.unlockedSkills = [{ skillId: 0, selected: false }];
+
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([
+				proficiencyXpResult({ proficiencyId: 0, newLevel: 5, milestonesCrossed: [5], grantedSkillIds: [1] })
+			])
+		);
+
+		expect(toastSuccess).not.toHaveBeenCalledWith(expect.stringContaining('New recipe available'), expect.anything());
+	});
+
+	it('does not re-toast a recipe that was already creatable before the push', () => {
+		staticDataStub.skillRecipes = [skillRecipe(0, 4, [0, 1])];
+		playerManagerStub.unlockedSkills = [
+			{ skillId: 0, selected: false },
+			{ skillId: 1, selected: false }
+		]; // already creatable before the push
+
+		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 5 })]));
+
+		expect(toastSuccess).not.toHaveBeenCalledWith(expect.stringContaining('New recipe available'), expect.anything());
+	});
+
+	it('skips a newly-creatable recipe whose result skill is missing from the catalogue', () => {
+		staticDataStub.skillRecipes = [skillRecipe(0, 99, [0, 1])]; // result 99 is not in the catalogue
+		playerManagerStub.unlockedSkills = [{ skillId: 0, selected: false }];
+
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([
+				proficiencyXpResult({ proficiencyId: 0, newLevel: 5, milestonesCrossed: [5], grantedSkillIds: [1] })
+			])
+		);
+
+		expect(toastSuccess).not.toHaveBeenCalledWith(expect.stringContaining('New recipe available'), expect.anything());
+	});
+
+	it('the toast View action opens the Synthesis screen', () => {
+		staticDataStub.skillRecipes = [skillRecipe(0, 4, [0, 1])];
+		playerManagerStub.unlockedSkills = [{ skillId: 0, selected: false }];
+
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([
+				proficiencyXpResult({ proficiencyId: 0, newLevel: 5, milestonesCrossed: [5], grantedSkillIds: [1] })
+			])
+		);
+
+		const recipeToast = toastSuccess.mock.calls.find((call) => call[0] === 'New recipe available: Frostfire');
+		const options = recipeToast?.[1] as { action: { onClick: () => void } };
+		options.action.onClick();
+		expect(navigation.requestScreen).toHaveBeenCalledWith('synthesis');
 	});
 });
 

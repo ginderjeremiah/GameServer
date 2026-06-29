@@ -9,7 +9,9 @@ import {
 	proficiencyXpMessage,
 	proficiencyLevelMessage,
 	proficiencyMilestoneMessage,
-	proficiencyOpenedMessage
+	proficiencyOpenedMessage,
+	creatableRecipeIds,
+	recipeAvailableMessage
 } from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
@@ -158,6 +160,11 @@ export const handleProficiencyXpGained = (response: IApiSocketResponse<'Proficie
 		return;
 	}
 
+	// Snapshot what was creatable before applying the gain, so the recipes that newly become creatable from
+	// this push — a milestone-granted input skill, or a level-up crossing a recipe's condition gate — can be
+	// toasted below once the owned skills and proficiency levels reflect it.
+	const creatableBefore = currentCreatableRecipeIds();
+
 	for (const result of data.proficiencies) {
 		notifyProficiencyResult(result, playerProficiencies.levelOf(result.proficiencyId));
 		for (const skillId of result.grantedSkillIds) {
@@ -169,6 +176,45 @@ export const handleProficiencyXpGained = (response: IApiSocketResponse<'Proficie
 	}
 
 	playerProficiencies.applyXpGained(data);
+
+	notifyNewlyCreatableRecipes(creatableBefore);
+};
+
+/** The recipe ids the player can synthesize right now, derived from the live owned (unlocked) skills and
+ *  proficiency levels against the delivered recipes — the same client-side availability the Synthesis
+ *  screen derives. Snapshotted before/after a progress push to detect a recipe that newly became creatable. */
+const currentCreatableRecipeIds = (): Set<number> =>
+	creatableRecipeIds(
+		staticData.skillRecipes ?? [],
+		new Set(playerManager.unlockedSkills.map((skill) => skill.skillId)),
+		new Map(playerProficiencies.all.map((proficiency) => [proficiency.proficiencyId, proficiency.level]))
+	);
+
+/**
+ * Toasts each recipe that became creatable as a result of the just-applied proficiency gain, comparing the
+ * current creatable set against the pre-push snapshot. Mirrors the milestone/challenge feedback — a success
+ * toast with a "View" action into the Synthesis screen — so the player learns a new recipe opened up even
+ * while idling on another screen. Synthesizing is player-driven and stays un-toasted (spike #1125 area F);
+ * this only fires for an availability change driven by background progress. Unknown reference ids are skipped.
+ */
+const notifyNewlyCreatableRecipes = (creatableBefore: ReadonlySet<number>) => {
+	const recipes = staticData.skillRecipes;
+	if (!recipes) {
+		return;
+	}
+	const creatableNow = currentCreatableRecipeIds();
+	for (const recipe of recipes) {
+		if (!creatableNow.has(recipe.id) || creatableBefore.has(recipe.id)) {
+			continue;
+		}
+		const result = staticData.skills?.[recipe.resultSkillId];
+		if (!result) {
+			continue;
+		}
+		toastSuccess(recipeAvailableMessage(result.name), {
+			action: { label: 'View', onClick: () => navigation.requestScreen('synthesis') }
+		});
+	}
 };
 
 /**

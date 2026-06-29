@@ -14,6 +14,7 @@
    the proficiency levels, and the recipes — all already on the client. */
 
 import type { IProficiency, ISkill, ISkillRecipe } from '$lib/api';
+import { isRecipeCreatable } from '$lib/common';
 
 /** A recipe's reveal/gating state. `hidden` recipes (no owned input) are dropped from the view-model
  *  entirely, so this enumerates only the rendered states:
@@ -138,7 +139,10 @@ export function buildSynthesis(
 			state = 'done';
 		} else if (!revealed) {
 			state = 'hinted';
-		} else if (conditions.every((condition) => condition.met)) {
+		} else if (isRecipeCreatable(recipe, ownedSkillIds, proficiencyLevels)) {
+			// `ready` is exactly "creatable now" — the shared predicate the new-recipe feedback uses, so the
+			// screen's actionable state and the toast can never diverge. At this branch every input is owned
+			// and the result is unowned, so the predicate reduces to "every condition met".
 			state = 'ready';
 		} else {
 			state = 'gated';
