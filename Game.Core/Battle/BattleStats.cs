@@ -16,6 +16,17 @@ namespace Game.Core.Battle
         public int AttacksDodged { get; set; }
         public double DamageDodged { get; set; }
 
+        /// <summary>
+        /// The reflected damage the player returned to the enemy this battle — the proficiency Retribution
+        /// event signal (the <c>Reflect</c> activity key). This is the player-as-defender reflection booked
+        /// when the enemy attacks; it is also folded into <see cref="PlayerDamageDealt"/> (reflected damage is
+        /// genuine damage the player dealt) but tracked separately here so the accrual trains Retribution on
+        /// reflection alone rather than on the untyped damage total. Reflection bypasses mitigation and is
+        /// untyped, so — like crit/dodge/heal — it maps straight to a single activity key with no damage-type
+        /// routing.
+        /// </summary>
+        public double PlayerReflectedDamageDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>

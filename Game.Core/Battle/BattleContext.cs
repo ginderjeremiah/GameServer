@@ -195,7 +195,8 @@ namespace Game.Core.Battle
         /// reflects — a dodged or absorbed hit returns nothing — and DoT is never routed here, so DoT is never
         /// reflected. The reflected amount is booked as the player's damage taken (when the enemy reflects onto
         /// the player) or dealt (when the player reflects onto the enemy), keeping the running totals reconciled
-        /// with the health change.
+        /// with the health change. The player-reflected case is additionally captured as the dedicated
+        /// <see cref="BattleStats.PlayerReflectedDamageDealt"/> Retribution signal (#1363).
         /// </summary>
         private void ReflectDamage(double netDamage)
         {
@@ -218,7 +219,10 @@ namespace Game.Core.Battle
             }
             else
             {
+                // The enemy is attacking and the player (defender) reflected: this is the player's reflected
+                // damage dealt — both part of the untyped damage total and the dedicated Retribution signal.
                 Stats.PlayerDamageDealt += reflected;
+                Stats.PlayerReflectedDamageDealt += reflected;
             }
         }
 
