@@ -1,7 +1,7 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
-import { mitigateDamage, cooldownMultiplier } from './battle-formulas';
-import { dotAccumulators, resistanceAttributes } from './damage-types';
+import { mitigateDamage, resistanceTotal, cooldownMultiplier } from './battle-formulas';
+import { dotAccumulators } from './damage-types';
 import { IBattlerAttribute, ISkillEffect, EAttribute, EDamageType, EModifierType } from '$lib/api';
 import { EAttributeModifierSource, type AttributeModifier } from './attribute-modifier';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
@@ -191,11 +191,7 @@ export class Battler {
 			if (perSecond === 0) {
 				continue;
 			}
-			let resistance = 0;
-			for (const attribute of resistanceAttributes(type)) {
-				resistance += this.attributes.getValue(attribute);
-			}
-			dot += ((perSecond * timeDelta) / 1000) * (1 - resistance);
+			dot += ((perSecond * timeDelta) / 1000) * (1 - resistanceTotal(type, this.attributes));
 		}
 		this.currentHealth -= dot;
 		return dot;

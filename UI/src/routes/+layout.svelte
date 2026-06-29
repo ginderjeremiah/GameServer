@@ -197,6 +197,23 @@ $effect(() => {
 	// log + options screens.
 	--eyebrow: color-mix(in srgb, var(--accent-light) 70%, transparent);
 
+	// Damage-type accents — one hue per EDamageTypeKey (eight leaf types + the
+	// Elemental/DoT categories), consumed via the helpers in
+	// $lib/common/damage-type-display for typed combat floaters, the resist
+	// combat-log feedback, and the by-type attribute-breakdown grouping (#1320).
+	// Physical is the neutral baseline; a theme can restyle the whole damage-type
+	// language by overriding these alone.
+	--dmg-physical: #{colors.$dmg-physical};
+	--dmg-fire: #{colors.$dmg-fire};
+	--dmg-water: #{colors.$dmg-water};
+	--dmg-earth: #{colors.$dmg-earth};
+	--dmg-wind: #{colors.$dmg-wind};
+	--dmg-bleed: #{colors.$dmg-bleed};
+	--dmg-poison: #{colors.$dmg-poison};
+	--dmg-burn: #{colors.$dmg-burn};
+	--dmg-elemental: #{colors.$dmg-elemental};
+	--dmg-dot: #{colors.$dmg-dot};
+
 	// Skill-effect accents — the buff (beneficial) vs debuff (detrimental) hue of a
 	// timed skill effect, and the neutral marker on a skill that carries effects.
 	// Consumed via the helpers in $lib/common/skill-effect-display (the effect chips,

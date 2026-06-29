@@ -1,7 +1,19 @@
 import { ELogType } from '$lib/api';
-import type { LogMessage, LogOutcome } from '$lib/engine/log';
+import type { LogMessage, LogOutcome, ResistOutcome } from '$lib/engine/log';
 
-export type GlyphKind = 'hit' | 'crit' | 'dodge' | 'block' | 'enemy' | 'loot' | 'system' | 'kill' | 'effect';
+export type GlyphKind =
+	| 'hit'
+	| 'crit'
+	| 'dodge'
+	| 'block'
+	| 'enemy'
+	| 'loot'
+	| 'system'
+	| 'kill'
+	| 'effect'
+	| 'resisted'
+	| 'vulnerable'
+	| 'absorbed';
 
 export interface LogKind {
 	/** Accent color for the chip, message, and left bar. */
@@ -49,6 +61,18 @@ const damageKinds: Record<LogOutcome, LogKind> = {
 };
 
 /**
+ * Visual override for a typed hit's resist outcome (#1320, Area F): a `Damage` entry whose
+ * {@link ResistOutcome} the engine set re-tags its glyph + chip label so resisted / vulnerable /
+ * absorbed lines read at a glance. `resisted`/`vulnerable` keep the base hit's player/enemy colour (the
+ * arrow direction conveys the rest); an `absorbed` hit became a heal, so it borrows the loot/heal hue.
+ */
+const resistKinds: Record<Exclude<ResistOutcome, 'normal'>, { glyph: GlyphKind; label: string; color?: string }> = {
+	resisted: { glyph: 'resisted', label: 'Resist' },
+	vulnerable: { glyph: 'vulnerable', label: 'Vuln' },
+	absorbed: { glyph: 'absorbed', label: 'Absorb', color: LOOT }
+};
+
+/**
  * Maps a {@link LogMessage} to its visual treatment for the sliding manifest.
  *
  * `Damage` entries carry a structured {@link LogOutcome} (set by the battle engine at the log site),
@@ -59,12 +83,20 @@ const damageKinds: Record<LogOutcome, LogKind> = {
 export function logKind(log: LogMessage): LogKind {
 	const fromPlayer = log.message.startsWith('You');
 	switch (log.logType) {
-		case ELogType.Damage:
-			if (log.outcome) {
-				return damageKinds[log.outcome];
-			}
+		case ELogType.Damage: {
 			// No structured outcome (e.g. live-preview samples): fall back to the "You" prefix split.
-			return fromPlayer ? damageKinds['player-hit'] : damageKinds['enemy-hit'];
+			const base = log.outcome
+				? damageKinds[log.outcome]
+				: fromPlayer
+					? damageKinds['player-hit']
+					: damageKinds['enemy-hit'];
+			// A typed hit's resist outcome re-tags the glyph + label over the base hit treatment (#1320).
+			if (log.resist && log.resist !== 'normal') {
+				const resist = resistKinds[log.resist];
+				return { color: resist.color ?? base.color, glyph: resist.glyph, label: resist.label };
+			}
+			return base;
+		}
 		case ELogType.ItemFound:
 			return { color: LOOT, glyph: 'loot', label: 'Loot' };
 		case ELogType.Exp:

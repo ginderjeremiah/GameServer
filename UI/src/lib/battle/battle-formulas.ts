@@ -66,6 +66,19 @@ export function amplifiedDamage(
 	return rawDamage * (1 + amplification);
 }
 
+/** The defender's total resistance to a hit of `damageType` — the additive sum of the applicable
+ *  resistance attributes, folded in the fixed {@link resistanceAttributes} order so it matches the value
+ *  {@link mitigateDamage} applies bit-for-bit. With none authored the sum is an exact 0. Shared by the
+ *  mitigation math and the combat-log/floater resist feedback, so the percentage the UI reports can never
+ *  drift from the percentage the simulation applied. */
+export function resistanceTotal(damageType: EDamageType, defenderAttributes: BattleAttributes): number {
+	let resistance = 0;
+	for (const attribute of resistanceAttributes(damageType)) {
+		resistance += defenderAttributes.getValue(attribute);
+	}
+	return resistance;
+}
+
 /** The net damage an incoming `dealt` hit (already amplified and crit-multiplied) of `damageType` deals to a
  *  defender: percentage resistance first (`dealt × (1 − Σ applies(type).resistance)`, UNCLAMPED — a negative
  *  total amplifies as vulnerability, a total above 1 drives the result negative as absorption), then flat
@@ -80,11 +93,7 @@ export function mitigateDamage(
 	defenderAttributes: BattleAttributes,
 	blockReduction = 0
 ): number {
-	let resistance = 0;
-	for (const attribute of resistanceAttributes(damageType)) {
-		resistance += defenderAttributes.getValue(attribute);
-	}
-	const mitigated = dealt * (1 - resistance);
+	const mitigated = dealt * (1 - resistanceTotal(damageType, defenderAttributes));
 	if (mitigated <= 0) {
 		// Absorption (or a zero hit): the defender takes a net heal and flat reduction never applies.
 		return mitigated;

@@ -100,3 +100,19 @@ $source-item: $success;
 $source-mod: $attr-intellect;
 $source-derived: $warning;
 $source-class: #d9a441;
+
+// damage-type accents (one hue per EDamageTypeKey: the eight leaf types plus the two cross-cutting
+// categories Elemental/DoT) — consumed via the helpers in $lib/common/damage-type-display for typed
+// combat floaters, the resist combat-log feedback, and the by-type attribute-breakdown grouping (#1320
+// Area F). Physical is the neutral baseline; each other hue stays visually distinct so a battle's mix
+// of types reads at a glance.
+$dmg-physical: #b6bcc8;
+$dmg-fire: #ef8a5d;
+$dmg-water: #6fb2e0;
+$dmg-earth: #c2a368;
+$dmg-wind: #9fd9c0;
+$dmg-bleed: #d76a72;
+$dmg-poison: #a9c45f;
+$dmg-burn: #f0b259;
+$dmg-elemental: #b29ae0;
+$dmg-dot: #b98fbf;

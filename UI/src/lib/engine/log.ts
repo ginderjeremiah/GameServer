@@ -1,14 +1,11 @@
 import { ELogType } from '$lib/api';
 import { playerManager } from './player/player-manager';
 import { addLog } from '$stores';
+import type { LogOutcome, ResistOutcome } from '$lib/common';
 
-/**
- * Structured combat-outcome discriminator carried alongside a `Damage`-channel entry. The battle
- * engine knows each hit's outcome explicitly (player vs enemy, crit/dodge/block) at the log site, so
- * it sets this rather than encoding the outcome only in the prose — letting `logKind` pick the glyph
- * from a typed value instead of sniffing the message text, which would silently drift on a reword.
- */
-export type LogOutcome = 'player-hit' | 'player-crit' | 'player-dodge' | 'player-block' | 'enemy-hit';
+// `LogOutcome` is defined in `$lib/common/damage-log` (so the pure message builder can type off it
+// without `$lib/common` depending on `$lib/engine`); re-exported here for this module's existing importers.
+export type { LogOutcome, ResistOutcome } from '$lib/common';
 
 export interface LogMessage {
 	id: number;
@@ -18,10 +15,13 @@ export interface LogMessage {
 	timestamp: number;
 	/** Optional outcome for `Damage` entries; absent for every other channel. */
 	outcome?: LogOutcome;
+	/** Optional damage-type resist outcome for `Damage` entries (resisted / vulnerable / absorbed); absent
+	 *  for an unresisted hit and every other channel, so `logKind` only tags the lines that need it. */
+	resist?: ResistOutcome;
 }
 
-export const logMessage = (logType: ELogType, message: string, outcome?: LogOutcome) => {
+export const logMessage = (logType: ELogType, message: string, outcome?: LogOutcome, resist?: ResistOutcome) => {
 	if (playerManager.logTypeEnabled(logType)) {
-		addLog(logType, message, outcome);
+		addLog(logType, message, outcome, resist);
 	}
 };

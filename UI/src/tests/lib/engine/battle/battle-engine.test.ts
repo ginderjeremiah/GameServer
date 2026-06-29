@@ -446,7 +446,35 @@ describe('BattleEngine', () => {
 
 			logicalUpdateCallbacks[0](500);
 
-			expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, expect.stringContaining('Slash'), 'player-hit');
+			// A physical hit with no typed resistance carries no resist outcome (the 4th arg is undefined).
+			expect(logMessage).toHaveBeenCalledWith(
+				ELogType.Damage,
+				expect.stringContaining('Slash'),
+				'player-hit',
+				undefined
+			);
+		});
+
+		it('surfaces the damage type and resist outcome for a typed hit on a resistant defender (#1320)', () => {
+			// A fire skill into a fire-resistant enemy: the engine names the type and flags the resist on the line.
+			mockSkills[0].damageType = EDamageType.Fire;
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				selectedSkills: [0],
+				attributes: [{ attributeId: EAttribute.FireResistance, amount: 0.5 }]
+			});
+
+			logicalUpdateCallbacks[0](500);
+
+			expect(logMessage).toHaveBeenCalledWith(
+				ELogType.Damage,
+				expect.stringContaining('fire damage — resisted'),
+				'player-hit',
+				'resisted'
+			);
 		});
 
 		it('does not process updates when not Active', () => {
@@ -610,7 +638,8 @@ describe('BattleEngine', () => {
 				expect(logMessage).toHaveBeenCalledWith(
 					ELogType.Damage,
 					expect.stringContaining('You landed a critical hit with Slash'),
-					'player-crit'
+					'player-crit',
+					undefined
 				);
 			});
 
@@ -621,7 +650,12 @@ describe('BattleEngine', () => {
 
 				logicalUpdateCallbacks[0](500);
 
-				expect(logMessage).toHaveBeenCalledWith(ELogType.Damage, "You dodged Goblin's Slash!", 'player-dodge');
+				expect(logMessage).toHaveBeenCalledWith(
+					ELogType.Damage,
+					"You dodged Goblin's Slash!",
+					'player-dodge',
+					undefined
+				);
 			});
 
 			it('logs a block line when the player blocks an incoming enemy hit', () => {
@@ -634,7 +668,8 @@ describe('BattleEngine', () => {
 				expect(logMessage).toHaveBeenCalledWith(
 					ELogType.Damage,
 					expect.stringContaining("You blocked Goblin's Slash"),
-					'player-block'
+					'player-block',
+					undefined
 				);
 			});
 		});
@@ -675,6 +710,17 @@ describe('BattleEngine', () => {
 				const hit = events.find((event) => event.target === 'enemy');
 				expect(hit).toMatchObject({ target: 'enemy', kind: 'hit' });
 				expect(hit?.amount).toBeGreaterThan(0);
+			});
+
+			it("carries the skill's damage type on a typed hit float (#1320)", () => {
+				mockSkills[0].damageType = EDamageType.Fire;
+				engine.start();
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+				logicalUpdateCallbacks[0](500);
+
+				const hit = events.find((event) => event.target === 'enemy');
+				expect(hit?.damageType).toBe(EDamageType.Fire);
 			});
 
 			it('emits an enemy-targeted crit when the player crits', () => {

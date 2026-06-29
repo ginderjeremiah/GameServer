@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
 	EAttribute,
 	EAttributeType,
+	EDamageTypeKey,
 	EItemModType,
 	type IAttribute,
 	type IBattlerAttribute,
@@ -486,5 +487,80 @@ describe('ATTRIBUTE_TYPE_GROUPS taxonomy coverage', () => {
 		for (const value of values) {
 			expect(mapped.has(value)).toBe(true);
 		}
+	});
+});
+
+describe('buildGroups — damage-type affinity sub-groups (#1320, Area F)', () => {
+	// The amplification/resistance family is typed `Affinity`; the breakdown splits it into one
+	// sub-group per damage-type key so the large set stays readable grouped under its type.
+	const affinityRefs: IAttribute[] = [
+		makeAttribute(EAttribute.FireAmplification, 'Fire Amplification', {
+			attributeType: EAttributeType.Affinity,
+			displayOrder: 20,
+			isPercentage: true
+		}),
+		makeAttribute(EAttribute.FireResistance, 'Fire Resistance', {
+			attributeType: EAttributeType.Affinity,
+			displayOrder: 21,
+			isPercentage: true
+		}),
+		makeAttribute(EAttribute.BleedResistance, 'Bleed Resistance', {
+			attributeType: EAttributeType.Affinity,
+			displayOrder: 30,
+			isPercentage: true
+		}),
+		makeAttribute(EAttribute.ElementalResistance, 'Elemental Resistance', {
+			attributeType: EAttributeType.Affinity,
+			displayOrder: 40,
+			isPercentage: true
+		})
+	];
+
+	const computedAffinity = (ids: EAttribute[]) =>
+		new Map(ids.map((id) => [id, computedWithSources(id, [EAttributeModifierSource.Item])] as const));
+
+	it('splits the affinity family into one sub-group per damage type, leaf types before categories', () => {
+		const groups = buildGroups(
+			computedAffinity([
+				EAttribute.FireAmplification,
+				EAttribute.FireResistance,
+				EAttribute.BleedResistance,
+				EAttribute.ElementalResistance
+			]),
+			affinityRefs
+		);
+
+		// Ordered by damage-type key: Fire (1), Bleed (5), Elemental (8) — leaf types ahead of the category.
+		expect(groups.map((g) => g.label)).toEqual(['Fire', 'Bleed', 'Elemental']);
+		expect(groups.map((g) => g.damageTypeKey)).toEqual([
+			EDamageTypeKey.Fire,
+			EDamageTypeKey.Bleed,
+			EDamageTypeKey.Elemental
+		]);
+		// Each sub-group keeps the Affinity taxonomy and a stable unique render key.
+		expect(groups.every((g) => g.type === EAttributeType.Affinity)).toBe(true);
+		expect(groups.map((g) => g.key)).toEqual(['affinity-1', 'affinity-5', 'affinity-8']);
+		// Fire groups both its amplification and resistance, sorted by display order (amp before resist).
+		expect(groups[0].attrs.map((a) => a.meta.id)).toEqual([EAttribute.FireAmplification, EAttribute.FireResistance]);
+		expect(groups[1].attrs.map((a) => a.meta.id)).toEqual([EAttribute.BleedResistance]);
+		expect(groups[2].attrs.map((a) => a.meta.id)).toEqual([EAttribute.ElementalResistance]);
+	});
+
+	it('leaves the non-affinity taxonomies as single groups alongside the damage-type sub-groups', () => {
+		const groups = buildGroups(
+			computedAffinity([EAttribute.FireResistance]).set(
+				EAttribute.Strength,
+				computedWithSources(EAttribute.Strength, [EAttributeModifierSource.PlayerStatPoints])
+			),
+			[
+				makeAttribute(EAttribute.Strength, 'Strength', { attributeType: EAttributeType.Primary, displayOrder: 0 }),
+				...affinityRefs
+			]
+		);
+
+		const primary = groups.find((g) => g.type === EAttributeType.Primary);
+		expect(primary?.key).toBe(String(EAttributeType.Primary));
+		expect(primary?.damageTypeKey).toBeUndefined();
+		expect(groups.find((g) => g.damageTypeKey === EDamageTypeKey.Fire)?.label).toBe('Fire');
 	});
 });

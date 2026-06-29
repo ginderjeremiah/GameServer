@@ -27,6 +27,15 @@
 		<path d="M7 2v10M2 7h10" />
 	{:else if glyph === 'effect'}
 		<path d="M7 1.5l4.5 2.6v5.8L7 12.5 2.5 9.9V4.1z M7 5v2.5M7 9v.01" />
+	{:else if glyph === 'resisted'}
+		<!-- A downward arrow: the hit was reduced. -->
+		<path d="M7 2v8M3.5 6.5L7 10l3.5-3.5" />
+	{:else if glyph === 'vulnerable'}
+		<!-- An upward arrow: the hit was amplified. -->
+		<path d="M7 12V4M3.5 7.5L7 4l3.5 3.5" />
+	{:else if glyph === 'absorbed'}
+		<!-- A shield with a plus: the hit was absorbed into a heal. -->
+		<path d="M7 1.8l4.3 1.7v3.4c0 3-1.9 4.6-4.3 5.8C4.6 11.5 2.7 9.9 2.7 6.9V3.5z M7 5v3M5.5 6.5h3" />
 	{:else}
 		<circle cx="7" cy="7" r="4.5" />
 		<path d="M7 5v3M7 9.5v0.01" />

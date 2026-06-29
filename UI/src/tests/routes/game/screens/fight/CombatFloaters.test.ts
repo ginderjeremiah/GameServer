@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
+import { EDamageType } from '$lib/api';
 import type { CombatFloatEvent } from '$lib/engine';
 
 // CombatFloaters subscribes to the engine's combat-float hook at init. Capture the registered
@@ -95,6 +96,49 @@ describe('CombatFloaters', () => {
 
 		const floater = getByTestId('player-floaters').querySelector('.floater') as HTMLElement;
 		expect(floater.getAttribute('style')).toContain('var(--enemy-accent)');
+	});
+
+	describe('typed damage (#1320)', () => {
+		it('tints a typed plain hit by its damage type and shows the type glyph', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'hit', amount: 45, damageType: EDamageType.Fire });
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('45');
+			expect(floater.getAttribute('style')).toContain('var(--dmg-fire)');
+			// An inline type glyph (not a PNG outcome icon) tags the type.
+			expect(floater.querySelector('.floater-glyph svg')).not.toBeNull();
+			expect(floater.querySelector('img.floater-icon')).toBeNull();
+		});
+
+		it('keeps a physical hit glyph-free (the untyped baseline) but still tints it neutral', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'hit', amount: 12, damageType: EDamageType.Physical });
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.getAttribute('style')).toContain('var(--dmg-physical)');
+			expect(floater.querySelector('.floater-glyph')).toBeNull();
+			expect(floater.querySelector('img.floater-icon')).toBeNull();
+		});
+
+		it('tints a typed crit by its type (not gold) while keeping the crit icon and label', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'crit', amount: 90, damageType: EDamageType.Water });
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.getAttribute('style')).toContain('var(--dmg-water)');
+			expect(floater.querySelector('.floater-label')?.textContent).toBe('CRIT');
+			expect(floater.querySelector('img.floater-icon')?.getAttribute('src')).toContain('Critical Damage.png');
+		});
+
+		it('shows an absorbed hit as a positive heal in the regen hue', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'hit', amount: -20, damageType: EDamageType.Fire });
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('+20');
+			expect(floater.getAttribute('style')).toContain('var(--health-remaining-color)');
+		});
 	});
 
 	it('removes a floater after its animation completes', () => {

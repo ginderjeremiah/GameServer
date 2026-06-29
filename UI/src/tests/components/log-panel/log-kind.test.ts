@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { ELogType } from '$lib/api';
-import type { LogOutcome } from '$lib/engine/log';
+import type { LogOutcome, ResistOutcome } from '$lib/engine/log';
 import { logKind, formatLogTime, logColors } from '../../../components/log-panel/log-kind';
 
-type LogMessage = { id: number; logType: ELogType; message: string; timestamp: number; outcome?: LogOutcome };
+type LogMessage = {
+	id: number;
+	logType: ELogType;
+	message: string;
+	timestamp: number;
+	outcome?: LogOutcome;
+	resist?: ResistOutcome;
+};
 
-function makeLog(logType: ELogType, message: string, outcome?: LogOutcome): LogMessage {
-	return { id: 1, logType, message, timestamp: 0, outcome };
+function makeLog(logType: ELogType, message: string, outcome?: LogOutcome, resist?: ResistOutcome): LogMessage {
+	return { id: 1, logType, message, timestamp: 0, outcome, resist };
 }
 
 describe('logKind', () => {
@@ -53,6 +60,35 @@ describe('logKind', () => {
 			const result = logKind(makeLog(ELogType.Damage, 'You landed a critical hit!', 'player-hit'));
 			expect(result.glyph).toBe('hit');
 			expect(result.glyph).not.toBe('crit');
+		});
+
+		describe('damage-type resist outcome (#1320)', () => {
+			it('re-tags a resisted hit with the resist glyph and chip label, keeping the base hit colour', () => {
+				const result = logKind(makeLog(ELogType.Damage, '', 'player-hit', 'resisted'));
+				expect(result.glyph).toBe('resisted');
+				expect(result.label).toBe('Resist');
+				expect(result.color).toBe(logColors.player);
+			});
+
+			it('re-tags a vulnerable hit with the vulnerable glyph and chip label', () => {
+				const result = logKind(makeLog(ELogType.Damage, '', 'enemy-hit', 'vulnerable'));
+				expect(result.glyph).toBe('vulnerable');
+				expect(result.label).toBe('Vuln');
+				expect(result.color).toBe(logColors.enemy);
+			});
+
+			it('re-tags an absorbed hit with the absorb glyph, label, and heal hue', () => {
+				const result = logKind(makeLog(ELogType.Damage, '', 'player-hit', 'absorbed'));
+				expect(result.glyph).toBe('absorbed');
+				expect(result.label).toBe('Absorb');
+				expect(result.color).toBe(logColors.loot);
+			});
+
+			it('leaves the base hit treatment untouched for a normal (unresisted) outcome', () => {
+				const result = logKind(makeLog(ELogType.Damage, '', 'player-hit', 'normal'));
+				expect(result.glyph).toBe('hit');
+				expect(result.label).toBe('Hit');
+			});
 		});
 
 		describe('without a structured outcome (e.g. Options live-preview samples)', () => {
