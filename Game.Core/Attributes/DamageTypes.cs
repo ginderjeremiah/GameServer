@@ -27,16 +27,21 @@ namespace Game.Core.Attributes
         /// <param name="Label">The lower-case noun phrase used in the amp/resist attribute descriptions.</param>
         /// <param name="Code">The short display code stem (the attribute code is this plus <c>AMP</c>/<c>RES</c>).</param>
         /// <param name="Amplification">The attacker-side amplification attribute keyed here.</param>
-        /// <param name="Resistance">The defender-side resistance attribute keyed here.</param>
+        /// <param name="Resistance">
+        /// The defender-side resistance attribute keyed here, or <c>null</c> for an <em>amplification-only</em> key
+        /// (the #1340 weapon leaves carry no per-weapon resistance — a weapon hit mitigates via the shared
+        /// <see cref="EDamageTypeKey.Physical"/> key instead).
+        /// </param>
         public readonly record struct KeyInfo(
             EDamageTypeKey Key,
             string Label,
             string Code,
             EAttribute Amplification,
-            EAttribute Resistance);
+            EAttribute? Resistance);
 
-        // The 10 keys in canonical order (eight leaf types, then the two cross-cutting categories). The single
-        // ordered list every other structure here is derived from.
+        // The keys in canonical order: the eight #1320 leaf types, the two cross-cutting categories, then the
+        // #1340 weapon leaves (appended to match the append-only enum order). The single ordered list every other
+        // structure here is derived from. The weapon keys are amplification-only — a null Resistance.
         private static readonly IReadOnlyList<KeyInfo> KeyInfos =
         [
             new(Physical, "physical", "PHY", PhysicalAmplification, PhysicalResistance),
@@ -49,6 +54,12 @@ namespace Game.Core.Attributes
             new(Burn, "burn", "BRN", BurnAmplification, BurnResistance),
             new(Elemental, "elemental", "ELE", ElementalAmplification, ElementalResistance),
             new(Dot, "damage-over-time", "DOT", DotAmplification, DotResistance),
+            new(Sword, "sword", "SWD", SwordAmplification, null),
+            new(Axe, "axe", "AXE", AxeAmplification, null),
+            new(Bow, "bow", "BOW", BowAmplification, null),
+            new(Club, "club", "CLB", ClubAmplification, null),
+            new(Dagger, "dagger", "DAG", DaggerAmplification, null),
+            new(Unarmed, "unarmed", "UNA", UnarmedAmplification, null),
         ];
 
         /// <summary>
@@ -86,14 +97,26 @@ namespace Game.Core.Attributes
                 [EDamageType.Bleed] = [Bleed, Dot],
                 [EDamageType.Poison] = [Poison, Dot],
                 [EDamageType.Burn] = [Burn, Fire, Elemental, Dot],
+                // Weapon leaves (#1340): the weapon's own (amplification-only) key, then the shared Physical key
+                // that carries its amplification AND its resistance (no per-weapon resistance).
+                [EDamageType.Sword] = [Sword, Physical],
+                [EDamageType.Axe] = [Axe, Physical],
+                [EDamageType.Bow] = [Bow, Physical],
+                [EDamageType.Club] = [Club, Physical],
+                [EDamageType.Dagger] = [Dagger, Physical],
+                [EDamageType.Unarmed] = [Unarmed, Physical],
             };
 
         private static readonly IReadOnlyDictionary<EDamageTypeKey, KeyInfo> InfoByKey =
             KeyInfos.ToDictionary(info => info.Key);
 
+        // Both the amplification and (where it exists) resistance attribute map back to the key. An
+        // amplification-only weapon key contributes only its amplification.
         private static readonly IReadOnlyDictionary<EAttribute, EDamageTypeKey> KeyByAttribute =
             KeyInfos
-                .SelectMany(info => new[] { (info.Amplification, info.Key), (info.Resistance, info.Key) })
+                .SelectMany(info => info.Resistance is EAttribute resistance
+                    ? new[] { (info.Amplification, info.Key), (resistance, info.Key) }
+                    : [(info.Amplification, info.Key)])
                 .ToDictionary(pair => pair.Item1, pair => pair.Item2);
 
         // Precomputed amp/resist attribute lists per leaf type, so the per-hit lookup on the battle hot path
@@ -101,13 +124,15 @@ namespace Game.Core.Attributes
         private static readonly IReadOnlyDictionary<EDamageType, IReadOnlyList<EAttribute>> AmplificationByType =
             AppliesMap.ToDictionary(e => e.Key, e => (IReadOnlyList<EAttribute>)e.Value.Select(k => InfoByKey[k].Amplification).ToArray());
 
+        // The amplification-only weapon keys drop out here (their null Resistance is filtered), so a weapon hit's
+        // resistance list is just the shared Physical key — physical resistance is its only mitigation lever.
         private static readonly IReadOnlyDictionary<EDamageType, IReadOnlyList<EAttribute>> ResistanceByType =
-            AppliesMap.ToDictionary(e => e.Key, e => (IReadOnlyList<EAttribute>)e.Value.Select(k => InfoByKey[k].Resistance).ToArray());
+            AppliesMap.ToDictionary(e => e.Key, e => (IReadOnlyList<EAttribute>)e.Value.Select(k => InfoByKey[k].Resistance).OfType<EAttribute>().ToArray());
 
-        /// <summary>The eight leaf damage types, in enum order.</summary>
+        /// <summary>The leaf damage types, in enum order.</summary>
         public static IReadOnlyList<EDamageType> LeafTypes { get; } = Enum.GetValues<EDamageType>();
 
-        /// <summary>The ten keys, in canonical iteration order.</summary>
+        /// <summary>The damage-type keys, in canonical iteration order.</summary>
         public static IReadOnlyList<KeyInfo> Keys => KeyInfos;
 
         /// <summary>
@@ -125,8 +150,11 @@ namespace Game.Core.Attributes
             return AppliesMap[type];
         }
 
-        /// <summary>The amplification / resistance attribute pair a <paramref name="key"/> backs.</summary>
-        public static (EAttribute Amplification, EAttribute Resistance) AttributesFor(EDamageTypeKey key)
+        /// <summary>
+        /// The amplification / resistance attribute pair a <paramref name="key"/> backs. The resistance is
+        /// <c>null</c> for an amplification-only weapon key (#1340).
+        /// </summary>
+        public static (EAttribute Amplification, EAttribute? Resistance) AttributesFor(EDamageTypeKey key)
         {
             return (InfoByKey[key].Amplification, InfoByKey[key].Resistance);
         }

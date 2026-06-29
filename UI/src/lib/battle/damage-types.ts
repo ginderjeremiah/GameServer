@@ -19,10 +19,11 @@ import {
 	DAMAGE_TYPE_DOT_ACCUMULATORS
 } from '$lib/api/types/damage-types';
 
-/** The amplification / resistance attribute pair a damage-type key backs. */
+/** The amplification / resistance attribute pair a damage-type key backs. The resistance is `null` for an
+ *  amplification-only weapon key (#1340) — a weapon hit mitigates via the shared `Physical` key instead. */
 export interface DamageTypeKeyAttributes {
 	readonly amplification: EAttribute;
-	readonly resistance: EAttribute;
+	readonly resistance: EAttribute | null;
 }
 
 /** A DoT leaf type paired with the per-second accumulator attribute that encodes it. */
@@ -49,9 +50,17 @@ export function amplificationAttributes(type: EDamageType): EAttribute[] {
 }
 
 /** The defender-side resistance attributes summed for a hit of the given leaf `type`, in fixed
- *  iteration order (per-hit lookup helper for the damage pipeline). */
+ *  iteration order (per-hit lookup helper for the damage pipeline). Amplification-only weapon keys (#1340)
+ *  contribute no resistance, so they drop out — a weapon hit resists via the shared `Physical` key only. */
 export function resistanceAttributes(type: EDamageType): EAttribute[] {
-	return applies(type).map((key) => DAMAGE_TYPE_KEY_ATTRIBUTES[key].resistance);
+	const resistances: EAttribute[] = [];
+	for (const key of applies(type)) {
+		const { resistance } = DAMAGE_TYPE_KEY_ATTRIBUTES[key];
+		if (resistance !== null) {
+			resistances.push(resistance);
+		}
+	}
+	return resistances;
 }
 
 // The attribute → key inverse, precomputed once (mirrors the backend's `DamageTypes.KeyByAttribute`)
@@ -59,10 +68,12 @@ export function resistanceAttributes(type: EDamageType): EAttribute[] {
 const KEY_BY_ATTRIBUTE: ReadonlyMap<EAttribute, EDamageTypeKey> = new Map(
 	Object.entries(DAMAGE_TYPE_KEY_ATTRIBUTES).flatMap(([key, attrs]) => {
 		const damageTypeKey = Number(key) as EDamageTypeKey;
-		return [
-			[attrs.amplification, damageTypeKey],
-			[attrs.resistance, damageTypeKey]
-		] as [EAttribute, EDamageTypeKey][];
+		const entries: [EAttribute, EDamageTypeKey][] = [[attrs.amplification, damageTypeKey]];
+		// An amplification-only weapon key (#1340) has no resistance attribute to invert.
+		if (attrs.resistance !== null) {
+			entries.push([attrs.resistance, damageTypeKey]);
+		}
+		return entries;
 	})
 );
 
