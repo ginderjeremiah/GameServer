@@ -8,9 +8,19 @@
 			{value}
 			onchange={(e) => onChange(+e.currentTarget.value)}
 		>
-			{#each options as option (option.value)}
-				<option value={option.value}>{option.text}</option>
-			{/each}
+			{#if groups}
+				{#each groups as group (group.label)}
+					<optgroup label={group.label}>
+						{#each group.options as option (option.value)}
+							<option value={option.value}>{option.text}</option>
+						{/each}
+					</optgroup>
+				{/each}
+			{:else}
+				{#each options as option (option.value)}
+					<option value={option.value}>{option.text}</option>
+				{/each}
+			{/if}
 		</select>
 		<SelectCaret />
 	</div>
@@ -23,7 +33,10 @@ import type { SelectOption } from '../entities/types';
 interface Props {
 	label?: string;
 	value: number;
-	options: SelectOption[];
+	/** Flat options. Mutually exclusive with `groups`; ignored when `groups` is provided. */
+	options?: SelectOption[];
+	/** Options bucketed into `<optgroup>`s (e.g. the activity-key picker's offense/event/resist split). */
+	groups?: { label: string; options: SelectOption[] }[];
 	onChange: (value: number) => void;
 	width?: number;
 	warn?: boolean;
@@ -31,7 +44,7 @@ interface Props {
 	ariaLabel?: string;
 }
 
-const { label, value, options, onChange, width, warn = false, ariaLabel }: Props = $props();
+const { label, value, options = [], groups, onChange, width, warn = false, ariaLabel }: Props = $props();
 </script>
 
 <style lang="scss">
