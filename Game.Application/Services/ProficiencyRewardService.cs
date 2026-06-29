@@ -19,11 +19,14 @@ namespace Game.Application.Services
     /// result through the progress aggregate. Both the live battle-completion handler and the offline-rewards
     /// batch run it, so the accrual is computed identically on both paths (the "offline == live" invariant).
     /// <para>
-    /// Offense is the activity wired here: per-skill direct-hit damage grouped by the skill's resolved damage
-    /// type, folded across each type's applicable keys (<see cref="DamageTypes.Applies"/>). The incoming book,
-    /// DoT-dealt, and proc/heal/reflect activities are wired by later sub-issues (#1337–#1339). The
-    /// <c>notify</c> flag drives the live client push: the live path notifies (a per-battle push), the offline
-    /// batch suppresses it (the welcome-back summary is the notification — spike #982 decision 9).
+    /// Two output-book axes are wired here: per-skill direct-hit damage grouped by the skill's resolved damage
+    /// type and folded across each type's applicable keys (<see cref="DamageTypes.Applies"/>), and the event-keyed
+    /// combat magnitudes — crit damage (Precision), dodged damage (Evasion), and healing done (Restoration) —
+    /// which are damage-type-neutral and map straight to a single activity key. The remaining avenues are wired by
+    /// sibling sub-issues: the incoming book and typed DoT-dealt (#1338), and Retribution (reflected damage), which
+    /// waits on the mitigation rework (#1330). The <c>notify</c> flag drives the live client push: the live path
+    /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
+    /// notification — spike #982 decision 9).
     /// </para>
     /// </summary>
     public class ProficiencyRewardService(IProficiencies proficiencies, ISkills skills)
@@ -159,13 +162,16 @@ namespace Game.Application.Services
             return true;
         }
 
-        // The per-path activity for the battle, routed to each path's frontier tier. Offense is the only
-        // activity wired here (incoming/DoT/proc come in #1337–#1339): per-skill direct-hit damage
+        // The per-path activity for the battle, routed to each path's frontier tier. Two output-book axes are
+        // wired here (the incoming book and typed DoT-dealt come in #1338). Offense: per-skill direct-hit damage
         // (SkillStats.TotalDamage) grouped by the firing skill's resolved damage type, then folded across each
         // type's applicable keys (DamageTypes.Applies) so a fire hit feeds both the Fire path and the Elemental
-        // path. Each key's summed damage is the activity of every (non-retired) path bound to it; the path
-        // trains in proportion to the share of damage its key captures, so focus beats spread. A fully-maxed
-        // path (no frontier) banks nothing; a retired path is absent from the index (frozen).
+        // path. Events: crit damage, dodged damage, and healing done — damage-type-neutral magnitudes that map
+        // straight to a single activity key (Crit / Dodge / Heal) without routing through applies(); Retribution
+        // (Reflect) stays inert until the reflection rework (#1330) produces a reflected-damage signal. Each key's
+        // summed activity is shared by every (non-retired) path bound to it; the path trains in proportion to the
+        // share its key captures, so focus beats spread. A fully-maxed path (no frontier) banks nothing; a retired
+        // path is absent from the index (frozen).
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
@@ -195,6 +201,22 @@ namespace Game.Application.Services
                     activityByKey[activityKey] = activityByKey.GetValueOrDefault(activityKey) + damage;
                 }
             }
+
+            // Event-keyed activities: combat magnitudes that are not typed damage, so each maps straight to a
+            // single global activity key (no applies() routing, no per-type split). Only positive amounts are
+            // recorded — a battle with no crit / dodge / healing trains none of these. Reflect (Retribution) is
+            // deliberately omitted: nothing produces a reflected-damage figure until the mitigation rework (#1330).
+            void AddEvent(EActivityKey key, double amount)
+            {
+                if (amount > 0)
+                {
+                    activityByKey[key] = activityByKey.GetValueOrDefault(key) + amount;
+                }
+            }
+
+            AddEvent(EActivityKey.Crit, stats.CriticalDamageDealt);
+            AddEvent(EActivityKey.Dodge, stats.DamageDodged);
+            AddEvent(EActivityKey.Heal, stats.PlayerDamageHealed);
 
             // Route each key's activity to the frontier tier of every path bound to it.
             var activities = new List<PathActivity>();
