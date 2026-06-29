@@ -95,7 +95,7 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 				{
 					key: 'passiveAttributeId',
 					label: 'Attribute',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					width: 200
 				},
@@ -110,7 +110,7 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 				{
 					key: 'passiveScalingAttributeId',
 					label: 'Scales With',
-					type: 'select',
+					type: 'attribute',
 					options: reference.optionalAttributeOptions,
 					width: 200
 				},
@@ -195,7 +195,7 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 				{
 					key: 'attributeId',
 					label: 'Attribute',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					min: 190,
 					unique: true

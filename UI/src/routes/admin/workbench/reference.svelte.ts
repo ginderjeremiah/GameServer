@@ -50,6 +50,7 @@ class WorkbenchReference {
 			zones,
 			items,
 			itemMods,
+			attributes,
 			tags,
 			tagCategories,
 			challengeTypes,
@@ -62,6 +63,9 @@ class WorkbenchReference {
 			fetchSocketData('GetZones'),
 			fetchSocketData('GetItems'),
 			fetchSocketData('GetItemMods'),
+			// The attribute reference set backs the searchable picker's by-type grouping; the admin can be
+			// entered directly (without the game's loading screen), so it must be loaded here too.
+			fetchSocketData('GetAttributes'),
 			ApiRequest.get('Tags'),
 			ApiRequest.get('Tags/TagCategories'),
 			fetchSocketData('GetChallengeTypes'),
@@ -74,6 +78,7 @@ class WorkbenchReference {
 		staticData.zones = zones;
 		staticData.items = items;
 		staticData.itemMods = itemMods;
+		staticData.attributes = attributes;
 		staticData.challenges = challenges;
 		staticData.paths = paths;
 		staticData.proficiencies = proficiencies;
