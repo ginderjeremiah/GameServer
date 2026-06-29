@@ -30,7 +30,8 @@ export const attributeColor = (id: EAttribute): string => {
 
 /** Icon filename (in `static/img`) per attribute. Frontend-owned, like `attributeColor`/
  *  `attributeCode`: the art lives in `UI/static/img` and the backend never references these
- *  paths. Every attribute except the obsolete `DropBonus` has art. The crit/dodge/block set
+ *  paths. The core/derived/HoT set has art; the obsolete `DropBonus`, the #1320 amp/resist family,
+ *  and the typed DoT accumulators have none yet and degrade to an empty icon. The crit/dodge/block set
  *  follows a shared visual language: the magnitude attributes (`CriticalDamage`/`BlockReduction`)
  *  use the clean base symbol, and the chance attributes reuse that symbol with a `%` badge. */
 const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
@@ -48,8 +49,10 @@ const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.DodgeChance]: 'Dodge Chance',
 	[EAttribute.BlockChance]: 'Block Chance',
 	[EAttribute.BlockReduction]: 'Block Reduction',
-	[EAttribute.DamageTakenPerSecond]: 'Damage Taken Per Second',
 	[EAttribute.HealthRegenPerSecond]: 'Health Regen Per Second'
+	// The typed DoT accumulators (Bleed/Poison/Burn DamagePerSecond) have no art yet — typed DoT icons
+	// are owned by the #1320 Area F UX work — so they degrade to no icon (the AttributeIcon component
+	// renders nothing for the empty case).
 };
 
 /** Path to the attribute's icon under `static/img`, or `''` for an attribute with no art yet.

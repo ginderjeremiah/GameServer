@@ -1,3 +1,4 @@
+using Game.Core.Attributes;
 using Game.Core.Skills;
 using static Game.Core.EAttribute;
 
@@ -48,19 +49,28 @@ namespace Game.Core.Battle
         /// <see cref="ESkillEffectTarget.Opponent"/> to the target battler. The effect's magnitude scales
         /// off the <b>caster</b> (active battler) — <c>Amount + casterAttribute × ScalingAmount</c>, mirroring
         /// how a <see cref="Skills.DamageMultiplier"/> scales skill damage off the caster — so a
-        /// <c>ScalingAmount</c> of <c>0</c> leaves the authored amount unchanged.
+        /// <c>ScalingAmount</c> of <c>0</c> leaves the authored amount unchanged. When the effect targets a DoT
+        /// per-second accumulator, the caster's typed amplification is then <b>frozen</b> into the magnitude at
+        /// apply time (spike #1320, Area C) — consistent with how the caster scaling already freezes — so the
+        /// accumulated DoT carries the caster's amplification while the defender's resistance is sampled live
+        /// each tick by <see cref="Battler.ApplyDamageOverTime"/>.
         /// </summary>
         public void ApplySkillEffect(SkillEffect effect)
         {
             var amount = effect.Amount + _activeBattler.GetAttributeValue(effect.ScalingAttributeId) * effect.ScalingAmount;
+            if (DamageTypes.DotTypeForAccumulator(effect.AttributeId) is EDamageType dotType)
+            {
+                amount = _activeBattler.AmplifyDamage(amount, dotType);
+            }
+
             var battler = effect.Target is ESkillEffectTarget.Self ? _activeBattler : _targetBattler;
             battler.ApplyEffect(effect, amount);
         }
 
         /// <summary>
         /// Resolves the end-of-tick damage/heal-over-time phase for both battlers, recording its statistics.
-        /// Called only when both battlers are still alive after the skill exchange. For each battler its
-        /// <see cref="EAttribute.DamageTakenPerSecond"/> (bypassing Defense) is applied, then its
+        /// Called only when both battlers are still alive after the skill exchange. For each battler its typed
+        /// damage-over-time (<see cref="Battler.ApplyDamageOverTime"/>, bypassing Defense) is applied, then its
         /// <see cref="EAttribute.HealthRegenPerSecond"/>, and only <b>then</b> is death checked — so a
         /// heal-over-time can save a battler from an otherwise-lethal DoT tick (#1090). The <b>enemy resolves
         /// first</b>: an enemy that the same-tick regen cannot save dies and the phase returns before the

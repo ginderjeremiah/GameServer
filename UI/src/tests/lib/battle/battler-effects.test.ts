@@ -404,7 +404,7 @@ describe('Skill effect attribute scaling', () => {
 		makeEffect(
 			1,
 			ESkillEffectTarget.Opponent,
-			EAttribute.DamageTakenPerSecond,
+			EAttribute.BleedDamagePerSecond,
 			EModifierType.Additive,
 			baseAmount,
 			1000,
@@ -419,7 +419,7 @@ describe('Skill effect attribute scaling', () => {
 		skillWith(poison(10, 0.5), caster).applyEffects(foe);
 
 		// 10 + caster Dexterity(20) × 0.5 = 20
-		expect(foe.attributes.getValue(EAttribute.DamageTakenPerSecond)).toBe(20);
+		expect(foe.attributes.getValue(EAttribute.BleedDamagePerSecond)).toBe(20);
 	});
 
 	it('reads the caster attribute, not the target', () => {
@@ -429,7 +429,7 @@ describe('Skill effect attribute scaling', () => {
 		skillWith(poison(0, 1.0), caster).applyEffects(foe);
 
 		// 0 + caster Dexterity(4) × 1.0 = 4, not the target's 100.
-		expect(foe.attributes.getValue(EAttribute.DamageTakenPerSecond)).toBe(4);
+		expect(foe.attributes.getValue(EAttribute.BleedDamagePerSecond)).toBe(4);
 	});
 
 	it('leaves the amount unchanged when scalingAmount is 0', () => {
@@ -438,7 +438,7 @@ describe('Skill effect attribute scaling', () => {
 
 		skillWith(poison(7, 0), caster).applyEffects(foe);
 
-		expect(foe.attributes.getValue(EAttribute.DamageTakenPerSecond)).toBe(7);
+		expect(foe.attributes.getValue(EAttribute.BleedDamagePerSecond)).toBe(7);
 	});
 
 	it('records the scaled amount on the active-effect view and reports it to onApplied', () => {
@@ -451,5 +451,102 @@ describe('Skill effect attribute scaling', () => {
 		// The chip view and the log both surface the scaled magnitude, not the authored base.
 		expect(foe.activeEffects[0].totalAmount).toBe(20);
 		expect(applied).toEqual([20]);
+	});
+
+	// Caster amplification freeze (#1320 Area C). Mirrors the backend
+	// `BattleContext_ApplySkillEffect_Freezes…` / `…Amplification…` tests.
+
+	it('freezes caster amplification into a DoT accumulator at apply time', () => {
+		const caster = makeBattler([{ id: EAttribute.BleedAmplification, amount: 0.5 }]);
+		const foe = makeBattler([{ id: EAttribute.Strength, amount: 0 }]);
+
+		const effect = makeEffect(
+			1,
+			ESkillEffectTarget.Opponent,
+			EAttribute.BleedDamagePerSecond,
+			EModifierType.Additive,
+			10,
+			1000
+		);
+		skillWith(effect, caster).applyEffects(foe);
+
+		// base 10 × (1 + 0.5 BleedAmplification) = 15
+		expect(foe.attributes.getValue(EAttribute.BleedDamagePerSecond)).toBe(15);
+	});
+
+	it('applies the amplification freeze after caster scaling', () => {
+		const caster = makeBattler([
+			{ id: EAttribute.Intellect, amount: 20 },
+			{ id: EAttribute.DotAmplification, amount: 0.5 }
+		]);
+		const foe = makeBattler([{ id: EAttribute.Strength, amount: 0 }]);
+
+		const effect = makeEffect(
+			1,
+			ESkillEffectTarget.Opponent,
+			EAttribute.PoisonDamagePerSecond,
+			EModifierType.Additive,
+			0,
+			1000,
+			EAttribute.Intellect,
+			0.5
+		);
+		skillWith(effect, caster).applyEffects(foe);
+
+		// base 0 + Intellect(20) × 0.5 = 10, × (1 + 0.5 DotAmplification) = 15
+		expect(foe.attributes.getValue(EAttribute.PoisonDamagePerSecond)).toBe(15);
+	});
+
+	it('amplifies burn through the cross-cutting fire key', () => {
+		const caster = makeBattler([{ id: EAttribute.FireAmplification, amount: 1.0 }]);
+		const foe = makeBattler([{ id: EAttribute.Strength, amount: 0 }]);
+
+		const effect = makeEffect(
+			1,
+			ESkillEffectTarget.Opponent,
+			EAttribute.BurnDamagePerSecond,
+			EModifierType.Additive,
+			10,
+			1000
+		);
+		skillWith(effect, caster).applyEffects(foe);
+
+		// base 10 × (1 + 1.0 FireAmplification) = 20
+		expect(foe.attributes.getValue(EAttribute.BurnDamagePerSecond)).toBe(20);
+	});
+
+	it('freezes the caster amplification, not the target', () => {
+		const caster = makeBattler([{ id: EAttribute.Strength, amount: 0 }]);
+		const foe = makeBattler([{ id: EAttribute.BleedAmplification, amount: 5.0 }]);
+
+		const effect = makeEffect(
+			1,
+			ESkillEffectTarget.Opponent,
+			EAttribute.BleedDamagePerSecond,
+			EModifierType.Additive,
+			10,
+			1000
+		);
+		skillWith(effect, caster).applyEffects(foe);
+
+		// The target's amplification is irrelevant: base 10 stays 10.
+		expect(foe.attributes.getValue(EAttribute.BleedDamagePerSecond)).toBe(10);
+	});
+
+	it('leaves the typeless HoT channel unamplified', () => {
+		const caster = makeBattler([{ id: EAttribute.DotAmplification, amount: 1.0 }]);
+		const foe = makeBattler([{ id: EAttribute.Strength, amount: 0 }]);
+
+		const effect = makeEffect(
+			1,
+			ESkillEffectTarget.Self,
+			EAttribute.HealthRegenPerSecond,
+			EModifierType.Additive,
+			12,
+			1000
+		);
+		skillWith(effect, caster).applyEffects(foe);
+
+		expect(caster.attributes.getValue(EAttribute.HealthRegenPerSecond)).toBe(12);
 	});
 });

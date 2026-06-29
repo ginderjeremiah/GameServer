@@ -145,22 +145,51 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Applies one tick of damage-over-time from <see cref="DamageTakenPerSecond"/> (authored per second,
-        /// scaled to <paramref name="ms"/>). Unlike <see cref="TakeDamage"/> it <b>bypasses Defense</b>, and
-        /// returns the damage dealt so the caller can attribute it to the battle statistics.
+        /// Applies one tick of typed damage-over-time (spike #1320, Area C). Loops the DoT types in the fixed
+        /// <see cref="DamageTypes.DotAccumulators"/> order, scaling each type's per-second accumulator to
+        /// <paramref name="ms"/> and applying this (defending) battler's resistance for that type <b>sampled
+        /// live</b> — <c>perSec × ms/1000 × (1 − Σ applies(type).Resistance)</c> — so a vulnerability debuff
+        /// makes existing DoTs hurt immediately. The caster's amplification was already frozen into the
+        /// accumulator at apply time (<see cref="BattleContext.ApplySkillEffect"/>). Unlike
+        /// <see cref="TakeDamage"/> it <b>bypasses Defense</b> — resistance is its only mitigation — and returns
+        /// the total damage dealt so the caller can attribute it to the battle statistics. With no DoT authored
+        /// every accumulator is <c>0</c>, so the loop adds nothing and the return is an exact <c>0</c>.
         /// </summary>
         /// <remarks>
         /// Intentionally <b>not</b> floored at zero, unlike <see cref="TakeDamage"/>. That floor exists only so
-        /// Defense mitigation can't drive net damage below zero and turn a hit into a heal; DoT has no mitigation
-        /// step, so a tick is negative only if a negative <see cref="DamageTakenPerSecond"/> is deliberately
-        /// authored — and a floor wouldn't prevent that, it would just silently rewrite the authored value to
-        /// zero. Authored healing belongs in the capped <see cref="ApplyHealOverTime"/> channel instead.
+        /// flat Defense can't drive net damage below zero and turn a hit into a heal; DoT bypasses Defense, so a
+        /// tick goes negative only through a deliberately authored negative accumulator or a resistance above
+        /// <c>1</c> (absorption) — and a floor wouldn't prevent that, it would just silently rewrite the value.
+        /// Authored healing belongs in the capped <see cref="ApplyHealOverTime"/> channel instead. The resistance
+        /// sum is folded in the fixed <see cref="DamageTypes.ResistanceAttributes"/> order, and each type's
+        /// contribution is summed in <see cref="DamageTypes.DotAccumulators"/> order, so both simulators agree
+        /// bit-for-bit. A single typed DoT with no resistance reduces to <c>perSec × ms/1000</c> — byte-identical
+        /// to the former single-accumulator outcome (the reduce-to-today identity).
         /// </remarks>
         public double ApplyDamageOverTime(int ms)
         {
-            var damage = _attributes[DamageTakenPerSecond] * ms / 1000.0;
-            CurrentHealth -= damage;
-            return damage;
+            var dot = 0.0;
+            var accumulators = DamageTypes.DotAccumulators;
+            for (var i = 0; i < accumulators.Count; i++)
+            {
+                var perSecond = _attributes[accumulators[i].Accumulator];
+                if (perSecond == 0)
+                {
+                    continue;
+                }
+
+                var resistance = 0.0;
+                var resistanceAttributes = DamageTypes.ResistanceAttributes(accumulators[i].Type);
+                for (var j = 0; j < resistanceAttributes.Count; j++)
+                {
+                    resistance += _attributes[resistanceAttributes[j]];
+                }
+
+                dot += perSecond * ms / 1000.0 * (1 - resistance);
+            }
+
+            CurrentHealth -= dot;
+            return dot;
         }
 
         /// <summary>

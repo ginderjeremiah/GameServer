@@ -23,7 +23,8 @@ export const effectRaisesAttribute = (modifierType: EModifierType, amount: numbe
 
 /** Classifies an effect as a buff or debuff *for the battler it lands on*: raising a beneficial
  *  attribute (or lowering a harmful one) is a buff; the inverse is a debuff. `isHarmful` flags an
- *  attribute whose increase is detrimental (e.g. `DamageTakenPerSecond`), inverting the direction. */
+ *  attribute whose increase is detrimental (e.g. a DoT accumulator like `BleedDamagePerSecond`),
+ *  inverting the direction. */
 export const effectDirection = (isHarmful: boolean, modifierType: EModifierType, amount: number): EffectDirection => {
 	const raises = effectRaisesAttribute(modifierType, amount);
 	const beneficial = isHarmful ? !raises : raises;

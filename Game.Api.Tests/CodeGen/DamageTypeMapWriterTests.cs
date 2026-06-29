@@ -36,7 +36,21 @@ namespace Game.Api.Tests.CodeGen
             Assert.Contains("import { EAttribute, EDamageType, EDamageTypeKey } from './enums.ts';", content);
             Assert.Contains("export const DAMAGE_TYPE_APPLIES = {", content);
             Assert.Contains("export const DAMAGE_TYPE_KEY_ATTRIBUTES = {", content);
-            Assert.EndsWith("} as const;", content);
+            Assert.Contains("export const DAMAGE_TYPE_DOT_ACCUMULATORS = [", content);
+            Assert.EndsWith("] as const;", content);
+        }
+
+        [Fact]
+        public void WriteDamageTypeMaps_EmitsDotAccumulators_InFixedTypeOrder()
+        {
+            var content = Write();
+
+            // The three DoT accumulators in the fixed order the end-of-tick DoT phase folds them.
+            Assert.Contains(
+                "\t{ type: EDamageType.Bleed, accumulator: EAttribute.BleedDamagePerSecond },\n"
+                + "\t{ type: EDamageType.Poison, accumulator: EAttribute.PoisonDamagePerSecond },\n"
+                + "\t{ type: EDamageType.Burn, accumulator: EAttribute.BurnDamagePerSecond },",
+                content);
         }
 
         [Fact]

@@ -145,7 +145,7 @@ describe('battleStep', () => {
 		it('reports per-tick DoT on one side and HoT on the other', () => {
 			// Enemy bleeds 12/s; player regenerates 8/s — both authored straight onto the battler.
 			const player = makeBattler([{ id: EAttribute.HealthRegenPerSecond, amount: 8 }, ...baseStats], []);
-			const enemy = makeBattler([{ id: EAttribute.DamageTakenPerSecond, amount: 12 }, ...baseStats], []);
+			const enemy = makeBattler([{ id: EAttribute.BleedDamagePerSecond, amount: 12 }, ...baseStats], []);
 			player.currentHealth -= 20; // leave room so the regen is not capped away
 			const log = newLog();
 
@@ -159,7 +159,7 @@ describe('battleStep', () => {
 
 		it('resets the sink at the start of each tick', () => {
 			const player = makeBattler(baseStats, []);
-			const bleedingEnemy = makeBattler([{ id: EAttribute.DamageTakenPerSecond, amount: 12 }, ...baseStats], []);
+			const bleedingEnemy = makeBattler([{ id: EAttribute.BleedDamagePerSecond, amount: 12 }, ...baseStats], []);
 			const cleanEnemy = makeBattler(baseStats, []);
 			const log = newLog();
 
@@ -180,7 +180,7 @@ describe('battleStep', () => {
 			// before the death check, restoring it to MaxHealth.
 			const player = makeBattler(
 				[
-					{ id: EAttribute.DamageTakenPerSecond, amount: 1500 },
+					{ id: EAttribute.BleedDamagePerSecond, amount: 1500 },
 					{ id: EAttribute.HealthRegenPerSecond, amount: 1500 },
 					...baseStats
 				],
@@ -199,7 +199,7 @@ describe('battleStep', () => {
 			const player = makeBattler(baseStats, []);
 			const enemy = makeBattler(
 				[
-					{ id: EAttribute.DamageTakenPerSecond, amount: 1500 },
+					{ id: EAttribute.BleedDamagePerSecond, amount: 1500 },
 					{ id: EAttribute.HealthRegenPerSecond, amount: 1500 },
 					...baseStats
 				],
@@ -216,7 +216,7 @@ describe('battleStep', () => {
 			// A 5-HP player takes 10 DoT and heals 4, dying at −1: the heal applies but is insufficient.
 			const player = makeBattler(
 				[
-					{ id: EAttribute.DamageTakenPerSecond, amount: 250 },
+					{ id: EAttribute.BleedDamagePerSecond, amount: 250 },
 					{ id: EAttribute.HealthRegenPerSecond, amount: 100 },
 					...baseStats
 				],

@@ -497,7 +497,7 @@ describe('BattleEngine', () => {
 				selectedSkills: [0],
 				attributes: [
 					{ attributeId: EAttribute.Endurance, amount: 200 }, // survive the full second
-					{ attributeId: EAttribute.DamageTakenPerSecond, amount: 12 }
+					{ attributeId: EAttribute.BleedDamagePerSecond, amount: 12 }
 				]
 			};
 			enemyLoadedCallbacks[0](enemyInstance);
@@ -562,7 +562,7 @@ describe('BattleEngine', () => {
 			engine.player.applyEffect({
 				id: 8,
 				target: ESkillEffectTarget.Self,
-				attributeId: EAttribute.DamageTakenPerSecond,
+				attributeId: EAttribute.BleedDamagePerSecond,
 				modifierTypeId: EModifierType.Additive,
 				amount: 6,
 				durationMs: 100000,

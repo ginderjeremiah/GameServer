@@ -33,9 +33,9 @@ namespace Game.Core.Attributes
         public bool IsPercentage { get; }
 
         /// <summary>
-        /// Whether raising the attribute is detrimental to its bearer (only
-        /// <see cref="EAttribute.DamageTakenPerSecond"/> today). Drives buff/debuff tinting; never used in
-        /// battle math, so it is parity-safe.
+        /// Whether raising the attribute is detrimental to its bearer (the typed DoT accumulators
+        /// Bleed/Poison/Burn DamagePerSecond). Drives buff/debuff tinting; never used in battle math, so it is
+        /// parity-safe.
         /// </summary>
         public bool IsHarmful { get; }
 
@@ -113,7 +113,9 @@ namespace Game.Core.Attributes
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
                 BlockChance => "The percentage chance to block part of the damage from an incoming attack.",
                 BlockReduction => "A flat reduction applied to damage received when an attack is blocked.",
-                DamageTakenPerSecond => "The amount of damage taken each second from damage-over-time effects.",
+                BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
+                PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
+                BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
                 HealthRegenPerSecond => "The amount of health restored each second from heal-over-time effects.",
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No description defined for the given attribute.")
             };
@@ -155,10 +157,14 @@ namespace Game.Core.Attributes
                 DodgeChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "DOD", 11, 0),
                 BlockChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "BLK", 12, 0),
                 BlockReduction => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "BLK RED", 13, 0),
-                DamageTakenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "DOT", 14, 0),
+                BleedDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "BLD DOT", 14, 0),
                 HealthRegenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: false, "REG", 15, 0),
                 // Obsolete: never displayed, so it gets neutral display metadata and sorts last.
                 DropBonus => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "DRP", 16, 0),
+                // The poison/burn accumulators sort after the amp/resist block (display order = enum value, the
+                // same convention that block uses) since they append after it; bleed keeps the former DoT slot.
+                PoisonDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "PSN DOT", 37, 0),
+                BurnDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "BRN DOT", 38, 0),
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No display metadata defined for the given attribute.")
             };
 #pragma warning restore CS0618

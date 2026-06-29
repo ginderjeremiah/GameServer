@@ -17,7 +17,7 @@ const DEFENSE = makeAttribute(EAttribute.Defense, 'Defense', {
 	attributeType: EAttributeType.Secondary,
 	description: 'Reduces incoming damage.'
 });
-const DOT = makeAttribute(EAttribute.DamageTakenPerSecond, 'Damage Taken Per Second', {
+const DOT = makeAttribute(EAttribute.BleedDamagePerSecond, 'Bleed Damage Per Second', {
 	attributeType: EAttributeType.Status,
 	description: 'Bleeding out.',
 	isHarmful: true
@@ -139,11 +139,11 @@ describe('AttributeTooltip', () => {
 		staticData.attributes = [DOT];
 		const { getByTestId } = render(AttributeTooltip, {
 			props: {
-				attributeId: EAttribute.DamageTakenPerSecond,
+				attributeId: EAttribute.BleedDamagePerSecond,
 				effect: { modifierType: EModifierType.Additive, amount: 3, count: 1, durationMs: 5000, remainingMs: 5000 }
 			}
 		});
-		// DamageTakenPerSecond is harmful, so a positive amount is a debuff despite raising the value.
+		// BleedDamagePerSecond is harmful, so a positive amount is a debuff despite raising the value.
 		expect(getByTestId('attr-tip-effect').textContent).toContain('Debuff');
 	});
 

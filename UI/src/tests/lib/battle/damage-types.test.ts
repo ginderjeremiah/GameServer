@@ -5,7 +5,9 @@ import {
 	attributesForKey,
 	amplificationAttributes,
 	resistanceAttributes,
-	keyForAttribute
+	keyForAttribute,
+	dotAccumulators,
+	dotTypeForAccumulator
 } from '$lib/battle/damage-types';
 
 /* Mirror of the backend `DamageTypesTests` (spike #1320). Keep the scenarios row-for-row aligned with
@@ -90,10 +92,34 @@ describe('damage-types keyForAttribute()', () => {
 		}
 	});
 
-	it.each([EAttribute.Strength, EAttribute.Defense, EAttribute.DamageTakenPerSecond])(
+	it.each([EAttribute.Strength, EAttribute.Defense, EAttribute.BleedDamagePerSecond])(
 		'returns undefined for non-amp/resist attribute %s',
 		(attribute) => {
 			expect(keyForAttribute(attribute)).toBeUndefined();
+		}
+	);
+});
+
+describe('damage-types DoT accumulators (#1320 Area C)', () => {
+	// The fixed iteration order the end-of-tick DoT phase folds the types in (a parity contract).
+	const expectedAccumulators: [EDamageType, EAttribute][] = [
+		[EDamageType.Bleed, EAttribute.BleedDamagePerSecond],
+		[EDamageType.Poison, EAttribute.PoisonDamagePerSecond],
+		[EDamageType.Burn, EAttribute.BurnDamagePerSecond]
+	];
+
+	it('lists the three DoT accumulators in fixed order', () => {
+		expect(dotAccumulators().map((a) => [a.type, a.accumulator])).toEqual(expectedAccumulators);
+	});
+
+	it.each(expectedAccumulators)('round-trips %s through dotTypeForAccumulator', (type, accumulator) => {
+		expect(dotTypeForAccumulator(accumulator)).toBe(type);
+	});
+
+	it.each([EAttribute.Strength, EAttribute.HealthRegenPerSecond, EAttribute.FireResistance])(
+		'returns undefined for non-DoT-accumulator attribute %s',
+		(attribute) => {
+			expect(dotTypeForAccumulator(attribute)).toBeUndefined();
 		}
 	);
 });

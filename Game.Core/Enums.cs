@@ -89,14 +89,18 @@ namespace Game.Core
         BlockReduction = 14,
 
         /// <summary>
-        /// A per-second attribute representing the amount of damage taken each second from damage-over-time
-        /// effects. Consumed by the end-of-tick DoT/HoT simulator phase (bypasses Defense).
+        /// A per-second accumulator for bleed damage-over-time (spike #1320). Consumed by the end-of-tick
+        /// DoT phase, which applies the bearer's live bleed resistance and bypasses Defense. The DoT type is
+        /// encoded by which accumulator an effect targets — there is no separate type field on a skill effect.
+        /// Reuses the slot of the former single <c>DamageTakenPerSecond</c> channel; <see cref="PoisonDamagePerSecond"/>
+        /// and <see cref="BurnDamagePerSecond"/> append after the amp/resist block (the enum grows append-only).
         /// </summary>
-        DamageTakenPerSecond = 15,
+        BleedDamagePerSecond = 15,
 
         /// <summary>
         /// A per-second attribute representing the amount of health restored each second from heal-over-time
-        /// effects. Consumed by the end-of-tick DoT/HoT simulator phase (capped at MaxHealth).
+        /// effects. Consumed by the end-of-tick DoT/HoT simulator phase (capped at MaxHealth). HoT stays
+        /// typeless (spike #1320).
         /// </summary>
         HealthRegenPerSecond = 16,
 
@@ -164,7 +168,23 @@ namespace Game.Core
         DotAmplification = 35,
 
         /// <summary>Resists all damage-over-time (bleed/poison/burn) damage taken by the defender. Decimal-percentage, base 0.</summary>
-        DotResistance = 36
+        DotResistance = 36,
+
+        /// <summary>
+        /// A per-second accumulator for poison damage-over-time (spike #1320), the counterpart of
+        /// <see cref="BleedDamagePerSecond"/> for the poison type. Appended after the amp/resist block rather
+        /// than re-homed next to bleed because the attribute enum is intrinsic, DB-backed reference data and
+        /// grows append-only; the end-of-tick DoT phase iterates a fixed type list, so the enum order is
+        /// immaterial to parity.
+        /// </summary>
+        PoisonDamagePerSecond = 37,
+
+        /// <summary>
+        /// A per-second accumulator for burn damage-over-time (spike #1320), the counterpart of
+        /// <see cref="BleedDamagePerSecond"/> for the burn type. Burn resists/amplifies as fire + elemental +
+        /// dot through the <see cref="Attributes.DamageTypes.Applies(EDamageType)"/> map.
+        /// </summary>
+        BurnDamagePerSecond = 38,
     }
 
     /// <summary>
@@ -262,8 +282,8 @@ namespace Game.Core
         Secondary = 2,
 
         /// <summary>
-        /// A transient per-second combat channel fed only by effects/gear (DamageTakenPerSecond,
-        /// HealthRegenPerSecond).
+        /// A transient per-second combat channel fed only by effects/gear (the typed DoT accumulators
+        /// Bleed/Poison/Burn DamagePerSecond and HealthRegenPerSecond).
         /// </summary>
         Status = 3,
 

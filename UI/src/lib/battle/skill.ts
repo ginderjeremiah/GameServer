@@ -8,7 +8,8 @@
 	EDamageType
 } from '$lib/api';
 import { Battler } from './battler';
-import { calculateSkillDamage, scaledEffectAmount } from './battle-formulas';
+import { calculateSkillDamage, scaledEffectAmount, amplifiedDamage } from './battle-formulas';
+import { dotTypeForAccumulator } from './damage-types';
 
 export class Skill implements ISkill {
 	id: number;
@@ -64,14 +65,20 @@ export class Skill implements ISkill {
 	 *  casting owner, each {@link ESkillEffectTarget.Opponent} effect to the given opponent. Called after
 	 *  the skill's damage is dealt, so a self damage-buff never boosts its own carrying hit. Each effect's
 	 *  magnitude scales off the CASTER's ({@link owner}'s) attributes — regardless of which battler it
-	 *  lands on — mirroring the backend `BattleContext.ApplySkillEffect`. The optional `onApplied`
-	 *  callback — supplied only by the live engine, never the headless simulator — is invoked for every
-	 *  application (each one stacks) with the battler it landed on and the resolved (scaled) amount, so the
-	 *  combat log can announce it. */
+	 *  lands on — mirroring the backend `BattleContext.ApplySkillEffect`. When the effect targets a DoT
+	 *  per-second accumulator, the caster's typed amplification is then frozen into the magnitude at apply
+	 *  time (#1320, Area C), so the accumulated DoT carries the caster's amplification while the defender's
+	 *  resistance is sampled live each tick. The optional `onApplied` callback — supplied only by the live
+	 *  engine, never the headless simulator — is invoked for every application (each one stacks) with the
+	 *  battler it landed on and the resolved amount, so the combat log can announce it. */
 	public applyEffects(opponent: Battler, onApplied?: (effect: ISkillEffect, target: Battler, amount: number) => void) {
 		for (const effect of this.effects) {
 			const target = effect.target === ESkillEffectTarget.Self ? this.owner : opponent;
-			const amount = scaledEffectAmount(effect, this.owner.attributes);
+			let amount = scaledEffectAmount(effect, this.owner.attributes);
+			const dotType = dotTypeForAccumulator(effect.attributeId);
+			if (dotType !== undefined) {
+				amount = amplifiedDamage(amount, dotType, this.owner.attributes);
+			}
 			target.applyEffect(effect, amount);
 			onApplied?.(effect, target, amount);
 		}
