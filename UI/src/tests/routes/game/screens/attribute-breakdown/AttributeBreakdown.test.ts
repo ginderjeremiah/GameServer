@@ -85,7 +85,11 @@ describe('Attribute Breakdown screen', () => {
 		// no core-attribute derivation — it appears only where authored, here via an equipped item — confirming
 		// the breakdown surfaces the reworked mitigation stats.
 		mockInventoryManager.equippedSlots = [
-			{ name: 'Spiked Shield', attributes: [{ attributeId: EAttribute.DamageReflection, amount: 0.25 }], appliedMods: [] }
+			{
+				name: 'Spiked Shield',
+				attributes: [{ attributeId: EAttribute.DamageReflection, amount: 0.25 }],
+				appliedMods: []
+			}
 		];
 		render(AttributeBreakdown);
 		expect(screen.getByTestId(`attr-row-${EAttribute.Toughness}`)).toBeTruthy();
