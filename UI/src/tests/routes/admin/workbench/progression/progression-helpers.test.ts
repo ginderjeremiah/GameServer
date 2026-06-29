@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
 import {
-	activityKeyOptions,
+	activityKeyGroups,
+	activityKeyLabel,
 	cumulativeXp,
 	decipherThresholds,
 	diffCatalogue,
@@ -56,12 +57,31 @@ describe('decipherThresholds', () => {
 	});
 });
 
-describe('activityKeyOptions', () => {
-	it('emits one option per EActivityKey value, labelled by name', () => {
-		expect(activityKeyOptions).toContainEqual({ value: EActivityKey.Physical, text: 'Physical' });
-		expect(activityKeyOptions).toContainEqual({ value: EActivityKey.Fire, text: 'Fire' });
-		// Numeric enum values only — no reverse-mapping string keys leak in.
-		expect(activityKeyOptions.every((o) => typeof o.value === 'number')).toBe(true);
+describe('activity-key picker', () => {
+	it('labels offense keys by their damage-type stem (DoT spelled out)', () => {
+		expect(activityKeyLabel(EActivityKey.Fire)).toBe('Fire');
+		expect(activityKeyLabel(EActivityKey.Dot)).toBe('DoT');
+	});
+
+	it('labels combat events by what they train, and resist keys with a (resist) suffix', () => {
+		expect(activityKeyLabel(EActivityKey.Crit)).toBe('Critical damage');
+		expect(activityKeyLabel(EActivityKey.FireResist)).toBe('Fire (resist)');
+		expect(activityKeyLabel(EActivityKey.DotResist)).toBe('DoT (resist)');
+	});
+
+	it('groups every key into damage-dealt / combat-events / resistance with no leaks or dupes', () => {
+		const keys = (Object.values(EActivityKey).filter((v) => typeof v === 'number') as number[]).sort((a, b) => a - b);
+		const grouped = activityKeyGroups.flatMap((g) => g.options.map((o) => o.value)).sort((a, b) => a - b);
+		expect(grouped).toEqual(keys);
+		expect(activityKeyGroups.map((g) => g.label)).toEqual([
+			'Damage dealt',
+			'Combat events',
+			'Damage taken — resistance'
+		]);
+		const groupOf = (key: number) => activityKeyGroups.find((g) => g.options.some((o) => o.value === key))?.label;
+		expect(groupOf(EActivityKey.Fire)).toBe('Damage dealt');
+		expect(groupOf(EActivityKey.Crit)).toBe('Combat events');
+		expect(groupOf(EActivityKey.FireResist)).toBe('Damage taken — resistance');
 	});
 });
 

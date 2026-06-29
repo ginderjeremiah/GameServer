@@ -14,10 +14,66 @@ export const newPath = (id: number): WorkbenchPath => ({
 	activityKey: EActivityKey.Physical
 });
 
-/** Activity-key select options (one per EActivityKey value), for the path identity editor. */
-export const activityKeyOptions: SelectOption[] = Object.entries(EActivityKey)
-	.filter(([, value]) => typeof value === 'number')
-	.map(([name, value]) => ({ value: value as number, text: name }));
+// ── Activity-key picker (path identity) ──
+
+/** Combat-event activity keys (not damage types) — labelled by the quantity they train on. */
+const ACTIVITY_EVENT_LABELS: Partial<Record<EActivityKey, string>> = {
+	[EActivityKey.Crit]: 'Critical damage',
+	[EActivityKey.Dodge]: 'Dodged damage',
+	[EActivityKey.Heal]: 'Healing done',
+	[EActivityKey.Reflect]: 'Reflected damage'
+};
+
+/** Spell the damage-type stem of an activity-key name ("Dot" → "DoT"; others read as authored). */
+const typeStemLabel = (stem: string): string => (stem === 'Dot' ? 'DoT' : stem);
+
+/**
+ * A path's activity key as a friendly label: a combat event by what it trains ("Critical damage"),
+ * an incoming-book key suffixed "(resist)", or the bare damage-type stem for the output book.
+ */
+export const activityKeyLabel = (key: EActivityKey): string => {
+	const event = ACTIVITY_EVENT_LABELS[key];
+	if (event) {
+		return event;
+	}
+	const name = EActivityKey[key];
+	return name.endsWith('Resist') ? `${typeStemLabel(name.slice(0, -'Resist'.length))} (resist)` : typeStemLabel(name);
+};
+
+/** A labelled group of select options (rendered as an `<optgroup>`). */
+export interface SelectOptionGroup {
+	label: string;
+	options: SelectOption[];
+}
+
+/**
+ * Activity-key options for the path identity picker, grouped into the two books plus the combat events:
+ * offense (damage dealt), combat events, and resistance (damage taken). Derived from the enum so an
+ * appended offense key (e.g. a weapon-type leaf) shows up automatically under "Damage dealt".
+ */
+export const activityKeyGroups: SelectOptionGroup[] = (() => {
+	const offense: SelectOption[] = [];
+	const events: SelectOption[] = [];
+	const resist: SelectOption[] = [];
+	for (const [name, value] of Object.entries(EActivityKey)) {
+		if (typeof value !== 'number') {
+			continue;
+		}
+		const eventLabel = ACTIVITY_EVENT_LABELS[value as EActivityKey];
+		if (eventLabel !== undefined) {
+			events.push({ value, text: eventLabel });
+		} else if (name.endsWith('Resist')) {
+			resist.push({ value, text: typeStemLabel(name.slice(0, -'Resist'.length)) });
+		} else {
+			offense.push({ value, text: typeStemLabel(name) });
+		}
+	}
+	return [
+		{ label: 'Damage dealt', options: offense },
+		{ label: 'Combat events', options: events },
+		{ label: 'Damage taken — resistance', options: resist }
+	];
+})();
 
 /** A new, unsaved proficiency (path tier) with the strawman cap/curve defaults. */
 export const newProficiency = (id: number, pathId: number, pathOrdinal: number): WorkbenchProficiency => ({

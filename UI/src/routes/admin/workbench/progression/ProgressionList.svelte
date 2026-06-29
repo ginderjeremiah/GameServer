@@ -56,10 +56,15 @@
 </div>
 
 <script lang="ts">
-import { EActivityKey } from '$lib/api';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
-import { hasTierCollision, pathWarnings, proficiencyWarnings, tiersOfPath } from './progression-helpers';
+import {
+	activityKeyLabel,
+	hasTierCollision,
+	pathWarnings,
+	proficiencyWarnings,
+	tiersOfPath
+} from './progression-helpers';
 
 interface Props {
 	store: ProgressionStore;
@@ -108,7 +113,7 @@ const rows = $derived.by<Row[]>(() => {
 				id: p.id,
 				name: p.name,
 				blank: 'Unnamed path',
-				meta: `${tiers.length} ${tiers.length === 1 ? 'tier' : 'tiers'} · ${EActivityKey[p.activityKey]}`,
+				meta: `${tiers.length} ${tiers.length === 1 ? 'tier' : 'tiers'} · ${activityKeyLabel(p.activityKey)}`,
 				status: store.pathStatus(p),
 				retired: store.isRetired(p),
 				warn: pathWarnings(p).length > 0 || hasTierCollision(tiers),
