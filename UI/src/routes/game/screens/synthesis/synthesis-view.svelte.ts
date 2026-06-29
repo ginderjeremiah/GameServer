@@ -10,9 +10,13 @@ import { apiSocket } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { playerProficiencies, staticData, toastError } from '$stores';
 import { buildSynthesis, representativeRecipe, type RecipeState, type RecipeView } from './synthesis';
+import { layoutSynthesisGraph } from './synthesis-graph';
 
 /** A recipe-list filter — `all` plus one per rendered {@link RecipeState}. */
 export type RecipeFilter = 'all' | RecipeState;
+
+/** The screen's two views: the `bench` recipe list → bench → dossier, and the `web` recipe-graph canvas. */
+export type SynthesisMode = 'bench' | 'web';
 
 export class SynthesisView {
 	/** True until the screen's first proficiency-progress fetch settles. */
@@ -23,6 +27,8 @@ export class SynthesisView {
 	selectedRecipeId = $state<number | null>(null);
 	/** The active list filter. */
 	filter = $state<RecipeFilter>('all');
+	/** The active view — the bench list or the recipe-graph web. */
+	mode = $state<SynthesisMode>('bench');
 	/** True while a `SynthesizeSkill` command is in flight, so the CTA can't be double-submitted. */
 	synthesizing = $state(false);
 
@@ -46,6 +52,10 @@ export class SynthesisView {
 			this.proficiencyLevels
 		)
 	);
+
+	/** The discovered recipes laid out as the recipe-graph DAG — input → fusion → result, with chaining.
+	 *  Recomputed from the same `recipes` view-models, so the graph and the list never diverge. */
+	readonly graph = $derived(layoutSynthesisGraph(this.recipes));
 
 	/** Per-state counts across all discovered recipes (drives the filter chips + header). */
 	readonly counts = $derived.by(() => {
@@ -81,6 +91,11 @@ export class SynthesisView {
 	/** Set the active list filter. */
 	setFilter(filter: RecipeFilter): void {
 		this.filter = filter;
+	}
+
+	/** Switch between the bench and web views. */
+	setMode(mode: SynthesisMode): void {
+		this.mode = mode;
 	}
 
 	/**
