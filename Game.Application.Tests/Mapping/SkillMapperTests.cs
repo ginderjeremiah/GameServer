@@ -41,20 +41,6 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(rarity, contract.RarityId);
         }
 
-        [Theory]
-        [InlineData(ERarity.Common)]
-        [InlineData(ERarity.Rare)]
-        [InlineData(ERarity.Legendary)]
-        [InlineData(ERarity.Mythic)]
-        public void ToCore_RoundTripsRarity(ERarity rarity)
-        {
-            var entity = NewSkill(ESkillAcquisition.Player, rarity);
-
-            var core = SkillMapper.ToCore(entity);
-
-            Assert.Equal(rarity, core.Rarity);
-        }
-
         private static EntitySkill NewSkill(ESkillAcquisition acquisition, ERarity rarity = ERarity.Common) => new()
         {
             Id = 0,

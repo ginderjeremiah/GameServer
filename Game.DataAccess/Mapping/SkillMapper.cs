@@ -62,7 +62,6 @@ namespace Game.DataAccess.Mapping
                 BaseDamage = (double)entity.BaseDamage,
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
-                Rarity = (ERarity)entity.RarityId,
                 DamageType = (EDamageType)entity.DamageType,
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new DamageMultiplier

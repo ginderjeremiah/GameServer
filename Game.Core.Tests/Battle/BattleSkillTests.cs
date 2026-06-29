@@ -236,7 +236,6 @@ namespace Game.Core.Tests.Battle
             Id = 1,
             Name = "Test Skill",
             Description = string.Empty,
-            Rarity = ERarity.Common,
             DamageType = EDamageType.Physical,
             CooldownMs = cooldownMs,
             BaseDamage = baseDamage,
