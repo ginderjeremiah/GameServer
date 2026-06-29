@@ -198,6 +198,9 @@ export interface ISkill {
 	cooldownMs: number;
 	iconPath: string;
 	rarityId: ERarity;
+	word: string;
+	pronunciation: string;
+	translation: string;
 	acquisition: ESkillAcquisition;
 	retiredAt?: string;
 }

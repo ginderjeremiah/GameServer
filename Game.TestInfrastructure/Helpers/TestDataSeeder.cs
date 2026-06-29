@@ -80,7 +80,10 @@ namespace Game.TestInfrastructure.Helpers
             decimal baseDamage = 10m,
             int cooldownMs = 1000,
             ESkillAcquisition acquisition = ESkillAcquisition.Player,
-            ERarity rarity = ERarity.Common)
+            ERarity rarity = ERarity.Common,
+            string word = "",
+            string pronunciation = "",
+            string translation = "")
         {
             var skill = new Skill
             {
@@ -90,6 +93,9 @@ namespace Game.TestInfrastructure.Helpers
                 CooldownMs = cooldownMs,
                 IconPath = "",
                 RarityId = (int)rarity,
+                Word = word,
+                Pronunciation = pronunciation,
+                Translation = translation,
                 Acquisition = (int)acquisition,
             };
 

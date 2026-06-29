@@ -5,6 +5,7 @@ import CardGame from './card-game/CardGame.svelte';
 import Challenges from './challenges/Challenges.svelte';
 import Inventory from './inventory/Inventory.svelte';
 import Skills from './skills/Skills.svelte';
+import Synthesis from './synthesis/Synthesis.svelte';
 import Attributes from './attributes/Attributes.svelte';
 import Proficiencies from './proficiencies/Proficiencies.svelte';
 import AttributeBreakdown from './attribute-breakdown/AttributeBreakdown.svelte';
@@ -42,6 +43,7 @@ export const GAME_SCREENS: ScreenDef[] = [
 	{ key: 'challenges', label: 'Challenges', group: 'combat', built: true, component: Challenges },
 	{ key: 'inventory', label: 'Inventory', group: 'character', built: true, component: Inventory },
 	{ key: 'skills', label: 'Skills', group: 'character', built: true, component: Skills },
+	{ key: 'synthesis', label: 'Synthesis', group: 'character', built: true, component: Synthesis },
 	{ key: 'attributes', label: 'Attributes', group: 'character', built: true, component: Attributes },
 	{ key: 'proficiencies', label: 'Proficiencies', group: 'character', built: true, component: Proficiencies },
 	{

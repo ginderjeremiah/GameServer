@@ -212,6 +212,9 @@ describe('Battler skill-effect bookkeeping', () => {
 				description: '',
 				iconPath: '',
 				rarityId: ERarity.Common,
+				word: '',
+				pronunciation: '',
+				translation: '',
 				acquisition: ESkillAcquisition.Player
 			},
 			caster
@@ -240,6 +243,9 @@ describe('Battler skill-effect bookkeeping', () => {
 				description: '',
 				iconPath: '',
 				rarityId: ERarity.Common,
+				word: '',
+				pronunciation: '',
+				translation: '',
 				acquisition: ESkillAcquisition.Player
 			},
 			caster
@@ -383,6 +389,9 @@ describe('Skill effect attribute scaling', () => {
 				description: '',
 				iconPath: '',
 				rarityId: ERarity.Common,
+				word: '',
+				pronunciation: '',
+				translation: '',
 				acquisition: ESkillAcquisition.Player
 			},
 			caster

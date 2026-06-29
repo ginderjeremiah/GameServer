@@ -838,6 +838,9 @@ namespace Game.Api.Tests.Integration
                         Description = "Updated",
                         IconPath = "skills/new.png",
                         RarityId = (int)ERarity.Common,
+                        Word = "",
+                        Pronunciation = "",
+                        Translation = "",
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },
@@ -880,6 +883,9 @@ namespace Game.Api.Tests.Integration
                         Description = "Should never be saved",
                         IconPath = "skills/ghost.png",
                         RarityId = (int)ERarity.Common,
+                        Word = "",
+                        Pronunciation = "",
+                        Translation = "",
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },
@@ -896,6 +902,9 @@ namespace Game.Api.Tests.Integration
                         Description = "x",
                         IconPath = "skills/phantom.png",
                         RarityId = (int)ERarity.Common,
+                        Word = "",
+                        Pronunciation = "",
+                        Translation = "",
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },

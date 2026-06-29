@@ -31,6 +31,9 @@ namespace Game.Api.Tests.Unit
             Description = "",
             IconPath = "",
             RarityId = rarity,
+            Word = "",
+            Pronunciation = "",
+            Translation = "",
             Acquisition = ESkillAcquisition.Player,
         };
     }

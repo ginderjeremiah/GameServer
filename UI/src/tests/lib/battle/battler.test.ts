@@ -27,6 +27,9 @@ const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISki
 	cooldownMs,
 	iconPath: '',
 	rarityId: ERarity.Common,
+	word: '',
+	pronunciation: '',
+	translation: '',
 	acquisition: ESkillAcquisition.Player
 });
 

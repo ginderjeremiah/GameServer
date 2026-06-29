@@ -6,6 +6,9 @@
 			<h1 class="title">Skills</h1>
 		</div>
 		<div class="spacer"></div>
+		<button type="button" class="synth-link" onclick={() => navigation.requestScreen('synthesis')}>
+			⟡ Synthesis
+		</button>
 		<div class="head-totals">
 			<div class="stat"><span class="v">{view.equipped.length}/{view.cap}</span><span class="k">equipped</span></div>
 			<div class="stat">
@@ -35,7 +38,7 @@
 
 <script lang="ts">
 import { formatNum } from '$lib/common';
-import { type TooltipComponent } from '$stores';
+import { navigation, type TooltipComponent } from '$stores';
 import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
 import { createAttributeTooltip, setAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { SkillsView } from './skills-view.svelte';
@@ -98,6 +101,24 @@ setAttributeTooltip(tip.controller);
 	font-weight: 500;
 	letter-spacing: -0.3px;
 	line-height: 1;
+}
+
+.synth-link {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.8px;
+	text-transform: uppercase;
+	padding: 7px 13px;
+	margin-right: 14px;
+	border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border-light));
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--accent) 8%, transparent);
+	color: var(--accent);
+	cursor: pointer;
+
+	&:hover {
+		background: color-mix(in srgb, var(--accent) 16%, transparent);
+	}
 }
 
 .head-totals {

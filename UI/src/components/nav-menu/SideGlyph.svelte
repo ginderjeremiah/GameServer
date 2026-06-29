@@ -11,6 +11,9 @@
 		<path d="M5.5 4V2.5h5V4" stroke-linecap="round" />
 	{:else if kind === 'skills'}
 		<path d="M8.7 1.3L2 9.3H8l-.7 5.4L14 6.7H8z" stroke-linejoin="round" stroke-linecap="round" />
+	{:else if kind === 'synthesis'}
+		<path d="M8 1.5L14.5 8L8 14.5L1.5 8z" stroke-linejoin="round" />
+		<path d="M8 5L11 8L8 11L5 8z" stroke-linejoin="round" />
 	{:else if kind === 'attributes'}
 		<path d="M8 1.5l4.7 2v4.7c0 2.9-2.3 4.7-4.7 5.8-2.4-1.1-4.7-2.9-4.7-5.8V3.5z" stroke-linejoin="round" />
 	{:else if kind === 'proficiencies'}

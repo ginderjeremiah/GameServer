@@ -13,6 +13,10 @@
 		<div class="title-line">
 			<h1 class="title">The Lexicon</h1>
 			<span class="sub">paths of mastery, deciphered as you train</span>
+			<div class="header-spacer"></div>
+			<button type="button" class="synth-link" onclick={() => navigation.requestScreen('synthesis')}>
+				⟡ Synthesis
+			</button>
 		</div>
 	</div>
 
@@ -59,6 +63,7 @@ import { onMount } from 'svelte';
 import { Loading } from '$components';
 import {
 	anchorPosition,
+	navigation,
 	playerProficiencies,
 	registerTooltipComponent,
 	toastError,
@@ -146,6 +151,27 @@ onMount(async () => {
 .sub {
 	font-size: 12.5px;
 	color: var(--text-tertiary);
+}
+
+.header-spacer {
+	flex: 1;
+}
+
+.synth-link {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.8px;
+	text-transform: uppercase;
+	padding: 7px 13px;
+	border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border-light));
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--accent) 8%, transparent);
+	color: var(--accent);
+	cursor: pointer;
+
+	&:hover {
+		background: color-mix(in srgb, var(--accent) 16%, transparent);
+	}
 }
 
 .body {

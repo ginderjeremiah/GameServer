@@ -17,6 +17,9 @@ export const makeSkill = (owner: Battler, over: Partial<ISkill> = {}): Skill =>
 			cooldownMs: 1000,
 			iconPath: '/icons/slash.png',
 			rarityId: ERarity.Common,
+			word: '',
+			pronunciation: '',
+			translation: '',
 			acquisition: ESkillAcquisition.Player,
 			...over
 		},

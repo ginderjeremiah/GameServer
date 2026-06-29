@@ -22,6 +22,9 @@ namespace Game.DataAccess.Mapping
                 CooldownMs = entity.CooldownMs,
                 IconPath = entity.IconPath,
                 RarityId = (ERarity)entity.RarityId,
+                Word = entity.Word,
+                Pronunciation = entity.Pronunciation,
+                Translation = entity.Translation,
                 Acquisition = (ESkillAcquisition)entity.Acquisition,
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new Contracts.AttributeMultiplier

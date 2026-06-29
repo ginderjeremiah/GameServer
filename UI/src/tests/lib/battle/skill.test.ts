@@ -15,6 +15,9 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	cooldownMs: 1000,
 	iconPath: '/icons/slash.png',
 	rarityId: ERarity.Common,
+	word: '',
+	pronunciation: '',
+	translation: '',
 	acquisition: ESkillAcquisition.Player,
 	...overrides
 });

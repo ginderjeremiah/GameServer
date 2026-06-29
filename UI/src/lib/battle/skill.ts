@@ -18,6 +18,11 @@ export class Skill implements ISkill {
 	// metadata + a server-side proficiency-XP tier weight, never a combat input), so it stays out of
 	// the parity surface even though the field rides along on the model.
 	rarityId: ERarity;
+	// The skill's word of power — display metadata surfaced on the Synthesis screen, never a combat
+	// input; carried only to satisfy the contract (like rarity/acquisition above).
+	word: string;
+	pronunciation: string;
+	translation: string;
 	chargeTime = 0;
 	renderChargeTime = 0;
 	owner: Battler;
@@ -33,6 +38,9 @@ export class Skill implements ISkill {
 		this.iconPath = data.iconPath;
 		this.acquisition = data.acquisition;
 		this.rarityId = data.rarityId;
+		this.word = data.word;
+		this.pronunciation = data.pronunciation;
+		this.translation = data.translation;
 		this.owner = owner;
 	}
 
