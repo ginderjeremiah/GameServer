@@ -55,6 +55,7 @@ describe('AttributePicker', () => {
 		const { container } = setup();
 		expect((container.querySelector('.attr-trigger-text') as HTMLElement).textContent).toBe('Strength');
 		expect(container.querySelector('.attr-panel')).toBeNull();
+		expect(container.querySelector('.attr-trigger')?.getAttribute('aria-expanded')).toBe('false');
 	});
 
 	it('opens a grouped, searchable panel and selects an option', async () => {
@@ -62,6 +63,8 @@ describe('AttributePicker', () => {
 		await openPanel(container);
 
 		expect(container.querySelector('.attr-panel')).not.toBeNull();
+		// The trigger announces the open state for assistive tech.
+		expect(container.querySelector('.attr-trigger')?.getAttribute('aria-expanded')).toBe('true');
 		// Grouped by taxonomy, so the band headers are present.
 		const heads = [...container.querySelectorAll('.attr-group-head')].map((h) => h.textContent?.trim());
 		expect(heads).toContain('Primary');

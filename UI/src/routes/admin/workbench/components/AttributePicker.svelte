@@ -18,6 +18,7 @@
 			class:invalid
 			aria-label={ariaLabel}
 			aria-haspopup="dialog"
+			aria-expanded={open}
 			onclick={() => openPanel()}
 		>
 			<span class="attr-trigger-text">{currentText}</span>
