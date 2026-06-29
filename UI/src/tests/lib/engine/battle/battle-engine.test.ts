@@ -351,64 +351,66 @@ describe('BattleEngine', () => {
 			expect(engine.loadingTotal).toBe(100);
 		});
 
-		it('counts the loading time down each render frame and resolves + unhooks at zero', async () => {
+		it('counts the loading time down each logical tick and resolves + unhooks at zero', async () => {
+			// The countdown is driven by the logical clock (not rAF), so it keeps advancing in a
+			// backgrounded tab instead of freezing the farm loop in Loading (#1366).
 			const promise = engine.startLoading(100);
-			const countdown = renderUpdateCallbacks[0];
-			expect(renderUpdateCallbacks).toHaveLength(1);
+			const countdown = logicalUpdateCallbacks[0];
+			expect(logicalUpdateCallbacks).toHaveLength(1);
 
-			// First frame doesn't reach zero — still ticking, not yet unhooked.
-			countdown(60, 0);
+			// First tick doesn't reach zero — still ticking, not yet unhooked.
+			countdown(60);
 			expect(engine.loadingTime).toBe(40);
-			expect(renderUpdateCallbacks).toHaveLength(1);
+			expect(logicalUpdateCallbacks).toHaveLength(1);
 
-			// Second frame drives it past zero — the promise resolves and the hook removes itself.
-			countdown(60, 0);
+			// Second tick drives it past zero — the promise resolves and the hook removes itself.
+			countdown(60);
 			await expect(promise).resolves.toBeUndefined();
-			expect(renderUpdateCallbacks).toHaveLength(0);
+			expect(logicalUpdateCallbacks).toHaveLength(0);
 		});
 
 		it('resolves the promise and removes the countdown hook when stopped mid-loading', async () => {
-			engine.start(); // registers the engine's own render hook
+			engine.start(); // registers the engine's own logical hook
 			const promise = engine.startLoading(1000);
-			// The engine render hook plus the loading countdown are both registered.
-			expect(renderUpdateCallbacks).toHaveLength(2);
+			// The engine logical hook plus the loading countdown are both registered.
+			expect(logicalUpdateCallbacks).toHaveLength(2);
 
 			engine.stop();
 
 			// A stop mid-cooldown must release the awaiting getNewEnemy path rather than hang it forever,
-			// and tear down every render hook so a later renderEngine.start() can't resume a stale countdown.
+			// and tear down the countdown hook so a later start() can't resume a stale countdown.
 			await expect(promise).resolves.toBeUndefined();
-			expect(renderUpdateCallbacks).toHaveLength(0);
+			expect(logicalUpdateCallbacks).toHaveLength(0);
 		});
 
 		it('resolves the promise and removes the countdown hook when reset mid-loading', async () => {
 			engine.start();
 			const promise = engine.startLoading(1000);
-			expect(renderUpdateCallbacks).toHaveLength(2);
+			expect(logicalUpdateCallbacks).toHaveLength(2);
 
 			engine.reset({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 
 			// Reset cancels the in-flight cooldown (releasing the awaiter) but leaves the engine's own
-			// render hook in place for the re-armed battle.
+			// logical hook in place for the re-armed battle.
 			await expect(promise).resolves.toBeUndefined();
-			expect(renderUpdateCallbacks).toHaveLength(1);
+			expect(logicalUpdateCallbacks).toHaveLength(1);
 		});
 
 		it('does not leave a stale countdown hook behind when re-invoked while one is pending', async () => {
 			const first = engine.startLoading(1000);
-			expect(renderUpdateCallbacks).toHaveLength(1);
+			expect(logicalUpdateCallbacks).toHaveLength(1);
 
 			// Re-invoking before the first countdown completes cancels it (releasing its awaiter) instead
 			// of stacking a second leaked hook.
 			const second = engine.startLoading(500);
 			await expect(first).resolves.toBeUndefined();
-			expect(renderUpdateCallbacks).toHaveLength(1);
+			expect(logicalUpdateCallbacks).toHaveLength(1);
 
 			// The new countdown still resolves normally at zero.
-			const countdown = renderUpdateCallbacks[0];
-			countdown(500, 0);
+			const countdown = logicalUpdateCallbacks[0];
+			countdown(500);
 			await expect(second).resolves.toBeUndefined();
-			expect(renderUpdateCallbacks).toHaveLength(0);
+			expect(logicalUpdateCallbacks).toHaveLength(0);
 		});
 	});
 
