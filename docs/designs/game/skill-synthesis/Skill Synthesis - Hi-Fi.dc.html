@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:'Aetheric';src:url('fonts/Aetheric.woff2') format('woff2');font-display:swap;}
+html,body{margin:0;padding:0;background:#0f1014;}
+*{box-sizing:border-box;}
+.sx-scroll::-webkit-scrollbar{width:8px;height:8px;}
+.sx-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:6px;}
+.sx-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26);}
+@keyframes sxpulse{0%,100%{box-shadow:0 0 6px rgba(161,194,247,.4);}50%{box-shadow:0 0 14px rgba(161,194,247,.85);}}
+@keyframes sxgoldpulse{0%,100%{box-shadow:0 0 10px rgba(232,200,120,.45);}50%{box-shadow:0 0 26px rgba(232,200,120,.9);}}
+@keyframes sxdot{0%,100%{opacity:.5;}50%{opacity:1;}}
+@keyframes sxspark{0%{opacity:0;transform:translate(0,0) scale(.3);}30%{opacity:1;}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1);}}
+@keyframes sxsweep{0%{transform:translateX(-160%);}55%,100%{transform:translateX(420%);}}
+@keyframes sxflash{0%,100%{box-shadow:0 0 0 0 transparent;}30%{box-shadow:0 0 60px 12px rgba(232,200,120,.8);}}
+@keyframes sxrise{0%{opacity:0;transform:translateY(14px);}100%{opacity:1;transform:translateY(0);}}
+@keyframes sxringspin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;}}
+</style>
+</helmet>
+
+<div ref="{{ stageRef }}" style="position:fixed; inset:0; overflow:hidden; background:radial-gradient(130% 130% at 50% 0%, #15161d, #050507); display:flex; align-items:center; justify-content:center;">
+<div ref="{{ frameRef }}" style="width:1320px; height:840px; flex:none; position:relative; overflow:hidden; display:flex; border:1px solid rgba(255,255,255,.1); border-radius:8px; box-shadow:0 30px 90px rgba(0,0,0,.6); background:linear-gradient(0deg,#0a0a0c 0%,#27272d 100%); font-family:Geist,system-ui,sans-serif; color:#f0f0f0; transform-origin:center center;">
+
+  <!-- ===== GLOBAL NAV RAIL ===== -->
+  <div style="flex:none; width:60px; background:#14151b; border-right:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; align-items:stretch; z-index:2;">
+    <div style="height:58px; display:flex; align-items:center; justify-content:center; border-bottom:1px solid rgba(255,255,255,.06);">
+      <div style="width:13px; height:13px; transform:rotate(45deg); border:1px solid #a1c2f7; position:relative; animation:sxpulse 1.8s ease-in-out infinite;"><div style="position:absolute; inset:3px; background:#a1c2f7;"></div></div>
+    </div>
+    <div style="flex:1; padding:12px 0; display:flex; flex-direction:column; gap:2px;">
+      <div title="Fight" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span style="font-size:17px; color:rgba(240,240,240,.5);">⚔</span></div>
+      <div title="Challenges" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span style="font-size:17px; color:rgba(240,240,240,.5);">❖</span></div>
+      <div title="Inventory" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span style="font-size:17px; color:rgba(240,240,240,.5);">▦</span></div>
+      <div title="Skills" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span style="font-size:17px; color:rgba(240,240,240,.5);">✶</span></div>
+      <div title="Synthesis" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; background:rgba(161,194,247,.08);"><span style="font-size:17px; color:#a1c2f7;">⟡</span><span style="position:absolute; left:0; top:7px; bottom:7px; width:2px; background:#a1c2f7; box-shadow:0 0 10px rgba(161,194,247,.75);"></span></div>
+      <div title="Proficiencies" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span style="font-size:17px; color:rgba(240,240,240,.5);">✦</span></div>
+      <div title="Stats" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span style="font-size:17px; color:rgba(240,240,240,.5);">▤</span></div>
+      <div title="Options" style="position:relative; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer;"><span style="font-size:17px; color:rgba(240,240,240,.5);">⚙</span></div>
+    </div>
+    <div style="height:44px; border-top:1px solid rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center;"><div style="width:6px; height:6px; border-radius:50%; background:#a1c2f7; box-shadow:0 0 8px rgba(161,194,247,.8); animation:sxdot 1.6s ease-in-out infinite;"></div></div>
+  </div>
+
+  <!-- ===== SCREEN ===== -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+
+    <!-- screen header -->
+    <div style="flex:none; display:flex; align-items:center; gap:13px; padding:18px 26px 15px; border-bottom:1px solid rgba(255,255,255,.08);">
+      <div style="width:10px; height:10px; transform:rotate(45deg); background:#a1c2f7; box-shadow:0 0 8px rgba(161,194,247,.6); flex:none;"></div>
+      <div>
+        <div style="font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.8px; text-transform:uppercase; color:rgba(192,216,255,.7);">Player-driven · combine owned skills into new ones</div>
+        <div style="font-size:22px; font-weight:500; letter-spacing:-.3px; margin-top:3px;">Synthesis</div>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="display:flex; align-items:center; gap:8px; margin-right:14px;">
+        <span style="font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.4px; text-transform:uppercase; color:rgba(240,240,240,.4);">discovered</span>
+        <span style="font-family:'Geist Mono',monospace; font-size:13px; color:#f0f0f0;">{{ discoveredCount }}</span>
+      </div>
+      <!-- view toggle -->
+      <div style="display:flex; border:1px solid rgba(255,255,255,.18); border-radius:4px; overflow:hidden;">
+        <button onClick="{{ setBench }}" style="{{ tabBenchStyle }}">◳ Bench</button>
+        <button onClick="{{ setWeb }}" style="{{ tabWebStyle }}">⌗ Web</button>
+      </div>
+    </div>
+
+    <!-- ===== BENCH VIEW ===== -->
+    <sc-if value="{{ isBench }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1; display:flex; flex-direction:column; min-height:0; padding:14px 26px 22px;">
+
+      <!-- filter chips -->
+      <div style="flex:none; display:flex; gap:7px; margin-bottom:14px;">
+        <sc-for list="{{ filterChips }}" as="c" hint-placeholder-count="5"><span style="{{ c.style }}">{{ c.label }}</span></sc-for>
+      </div>
+
+      <div style="flex:1; display:grid; grid-template-columns:300px 1fr 320px; gap:16px; min-height:0;">
+
+        <!-- COL 1 — discovered formulae -->
+        <div style="display:flex; flex-direction:column; min-height:0; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.08); border-radius:4px;">
+          <div style="flex:none; padding:11px 13px 10px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4);">Discovered formulae</span>
+            <span style="font-family:'Geist Mono',monospace; font-size:11px; color:rgba(240,240,240,.5);">{{ discoveredCount }}</span>
+          </div>
+          <div class="sx-scroll" style="flex:1; overflow-y:auto; padding:8px;">
+            <sc-for list="{{ recipeRows }}" as="r" hint-placeholder-count="5">
+              <div onClick="{{ r.onClick }}" title="{{ r.tip }}" style="{{ r.rowStyle }}">
+                <div style="{{ r.dotStyle }}"></div>
+                <div style="flex:1; min-width:0;">
+                  <div style="{{ r.nameStyle }}">{{ r.name }}</div>
+                  <div style="font-family:'Geist Mono',monospace; font-size:9.5px; color:rgba(240,240,240,.42); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.inputs }}</div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex:none;">
+                  <span style="{{ r.rarPillStyle }}">{{ r.rarLabel }}</span>
+                  <span style="{{ r.tagStyle }}">{{ r.tag }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- COL 2 — the act -->
+        <div style="position:relative; display:flex; flex-direction:column; border:1px solid rgba(255,255,255,.1); border-radius:6px; background:radial-gradient(120% 60% at 50% -6%, rgba(161,194,247,.07), transparent 62%), rgba(255,255,255,.02); padding:16px 20px 20px; overflow:hidden;">
+          <div style="flex:none; text-align:center; font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:2px; text-transform:uppercase; color:rgba(240,240,240,.4);">Synthesis bench</div>
+
+          <div style="flex:1; display:flex; align-items:center; justify-content:center; gap:18px; min-height:0;">
+            <!-- inputs -->
+            <div style="display:flex; flex-direction:column; align-items:center; gap:9px;">
+              <sc-for list="{{ benchInputs }}" as="i" hint-placeholder-count="2">
+                <sc-if value="{{ i.plus }}" hint-placeholder-val="{{ false }}"><div style="font-family:'Geist Mono'; font-size:20px; color:#a1c2f7; line-height:.4;">✛</div></sc-if>
+                <div style="{{ i.cardStyle }}">
+                  <div style="{{ i.tileStyle }}">{{ i.init }}</div>
+                  <div style="min-width:0;"><div style="{{ i.rarStyle }}">{{ i.rarLabel }}</div><div style="font-size:14px; font-weight:500; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ i.name }}</div></div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="font-size:30px; color:rgba(240,240,240,.35); line-height:1;">▶</div>
+
+            <!-- result -->
+            <div style="display:flex; flex-direction:column; align-items:center; gap:11px; min-width:170px; text-align:center;">
+              <span style="{{ benchRarityStyle }}">{{ benchRarity }}</span>
+              <sc-if value="{{ benchRevealed }}" hint-placeholder-val="{{ false }}">
+                <div style="{{ benchIconStyle }}">{{ resultInit }}</div>
+                <div style="{{ benchNameStyle }}">{{ benchName }}</div>
+                <div style="position:relative; display:flex; align-items:center; justify-content:center; gap:8px; padding:2px 12px;">
+                  <span style="{{ benchGlyphSmStyle }}">{{ benchGlyph }}</span>
+                  <span style="{{ benchMeaningStyle }}">{{ benchMeaning }}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ benchSealed }}" hint-placeholder-val="{{ true }}">
+                <div style="position:relative; display:flex; align-items:center; justify-content:center; padding:10px 18px;">
+                  <div style="{{ benchHaloStyle }}"></div>
+                  <div style="{{ benchGlyphStyle }}">{{ benchGlyph }}</div>
+                </div>
+                <div style="font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.4px; text-transform:uppercase; color:rgba(240,240,240,.35);">{{ benchSealLabel }}</div>
+              </sc-if>
+            </div>
+          </div>
+
+          <!-- conditions -->
+          <div style="flex:none; display:flex; align-items:center; gap:9px; justify-content:center; flex-wrap:wrap; margin-bottom:14px;">
+            <span style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:1.4px; text-transform:uppercase; color:rgba(240,240,240,.38);">conditions</span>
+            <sc-for list="{{ benchConditions }}" as="c" hint-placeholder-count="2"><span style="{{ c.style }}">{{ c.label }}</span></sc-for>
+          </div>
+
+          <!-- CTA -->
+          <div style="flex:none; text-align:center;">
+            <sc-if value="{{ ctaReady }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ onSynthesize }}" style="font-family:Geist,sans-serif; font-size:16px; font-weight:600; padding:11px 34px; cursor:pointer; background:#a1c2f7; color:#111; border:1px solid #a1c2f7; border-radius:4px; box-shadow:0 0 18px rgba(161,194,247,.35);">⟡ Synthesize</button>
+              <div style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:.3px; color:rgba(240,240,240,.4); margin-top:8px;">one-time · <span style="color:#bde0b4;">non-consumptive</span> · inputs are kept</div>
+            </sc-if>
+            <sc-if value="{{ ctaGated }}" hint-placeholder-val="{{ false }}">
+              <button disabled style="font-family:Geist,sans-serif; font-size:15px; font-weight:500; padding:11px 28px; cursor:not-allowed; background:transparent; color:#f0d28a; border:1px solid rgba(240,210,138,.5); border-radius:4px;">▲ Gate locked</button>
+              <div style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:.3px; color:#f0d28a; margin-top:8px;">{{ gateText }}</div>
+            </sc-if>
+            <sc-if value="{{ ctaHinted }}" hint-placeholder-val="{{ false }}">
+              <button disabled style="font-family:Geist,sans-serif; font-size:15px; font-weight:500; padding:11px 28px; cursor:not-allowed; background:transparent; color:rgba(240,240,240,.45); border:1px dashed rgba(255,255,255,.22); border-radius:4px;">? Undiscovered</button>
+              <div style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:.3px; color:rgba(240,240,240,.45); margin-top:8px;">{{ hintText }}</div>
+            </sc-if>
+            <sc-if value="{{ ctaDone }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; gap:9px; justify-content:center;">
+                <button style="font-family:Geist,sans-serif; font-size:14px; font-weight:600; padding:9px 20px; cursor:pointer; background:rgba(232,200,120,.16); color:#e8c878; border:1px solid rgba(232,200,120,.5); border-radius:4px;">Equip ▸</button>
+                <button style="font-family:Geist,sans-serif; font-size:14px; padding:9px 18px; cursor:pointer; background:transparent; color:#f0f0f0; border:1px solid rgba(255,255,255,.18); border-radius:4px;">View in Skills</button>
+              </div>
+              <div style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:.3px; color:#bde0b4; margin-top:8px;">✓ synthesized · now a normal skill</div>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- COL 3 — result dossier -->
+        <div class="sx-scroll" style="overflow-y:auto; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:15px 16px 18px;">
+          <div style="font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4);">Result</div>
+          <sc-if value="{{ benchRevealed }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:12px; margin-top:11px;">
+              <div style="{{ dossierIconStyle }}">{{ resultInit }}</div>
+              <div style="font-size:24px; font-weight:700; line-height:1;">{{ dossierName }}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:9px; margin-top:9px;">
+              <span style="{{ dossierGlyphStyle }}">{{ dossierGlyph }}</span>
+              <span style="{{ dossierWordStyle }}">{{ dossierWordLine }}</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ benchSealed }}" hint-placeholder-val="{{ true }}">
+            <div style="{{ dossierGlyphStyle }}; margin-top:12px;">{{ dossierGlyph }}</div>
+          </sc-if>
+          <div style="display:flex; gap:7px; margin-top:12px;">
+            <span style="{{ dossierRarityStyle }}">{{ dossierRarity }}</span>
+          </div>
+
+          <sc-if value="{{ dossierHasStats }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; gap:22px; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);">
+            <div><div style="font-size:22px; font-weight:500; line-height:1;">{{ dossierDmg }}</div><div style="font-family:'Geist Mono',monospace; font-size:8px; letter-spacing:1.2px; color:rgba(240,240,240,.4); margin-top:4px;">DAMAGE</div></div>
+            <div><div style="font-size:22px; font-weight:500; line-height:1;">{{ dossierCd }}</div><div style="font-family:'Geist Mono',monospace; font-size:8px; letter-spacing:1.2px; color:rgba(240,240,240,.4); margin-top:4px;">COOLDOWN</div></div>
+            <div><div style="font-size:22px; font-weight:500; line-height:1; color:#a1c2f7;">{{ dossierScales }}</div><div style="font-family:'Geist Mono',monospace; font-size:8px; letter-spacing:1.2px; color:rgba(240,240,240,.4); margin-top:4px;">SCALES</div></div>
+          </div>
+          <div style="margin-top:13px; font-family:'Geist Mono',monospace; font-size:10.5px; line-height:1.5; color:rgba(240,240,240,.6);">{{ dossierEffect }}</div>
+          </sc-if>
+
+          <sc-if value="{{ dossierSealed }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:16px; padding:13px 14px; border:1px dashed rgba(255,255,255,.16); border-radius:4px; background:rgba(255,255,255,.02);">
+            <div style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:1.4px; text-transform:uppercase; color:rgba(192,216,255,.6); margin-bottom:6px;">⟁ sealed</div>
+            <div style="font-size:12.5px; line-height:1.45; color:rgba(240,240,240,.6);">{{ dossierSealText }}</div>
+          </div>
+          </sc-if>
+
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===== WEB VIEW ===== -->
+    <sc-if value="{{ isWeb }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1; display:grid; grid-template-columns:1fr 300px; gap:16px; min-height:0; padding:16px 26px 22px;">
+      <!-- canvas -->
+      <div style="position:relative; border:1px solid rgba(255,255,255,.1); border-radius:6px; overflow:hidden; background:radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0) 0 0/24px 24px, #101118;">
+        <div style="position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 0 120px 36px rgba(8,8,11,.85);"></div>
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:820px; height:560px;">
+        <svg width="820" height="560" viewBox="0 0 820 560" style="position:absolute; inset:0;">
+          <!-- tier0 inputs -> tier1 fusion diamonds -->
+          <line x1="122" y1="64" x2="188" y2="104" stroke="rgba(240,240,240,.28)" stroke-width="1.5"></line>
+          <line x1="122" y1="144" x2="188" y2="104" stroke="rgba(240,240,240,.28)" stroke-width="1.5"></line>
+          <line x1="122" y1="64" x2="188" y2="212" stroke="rgba(240,240,240,.22)" stroke-width="1.5"></line>
+          <line x1="122" y1="224" x2="188" y2="212" stroke="rgba(240,240,240,.28)" stroke-width="1.5"></line>
+          <line x1="122" y1="326" x2="188" y2="366" stroke="rgba(240,240,240,.28)" stroke-width="1.5"></line>
+          <line x1="122" y1="406" x2="188" y2="366" stroke="rgba(240,240,240,.28)" stroke-width="1.5"></line>
+          <line x1="122" y1="508" x2="188" y2="508" stroke="rgba(240,240,240,.28)" stroke-width="1.5"></line>
+          <!-- tier1 diamond -> tier1 result -->
+          <line x1="212" y1="104" x2="246" y2="104" stroke="#86c98f" stroke-width="2.2"></line>
+          <line x1="212" y1="212" x2="246" y2="212" stroke="#a1c2f7" stroke-width="2" stroke-dasharray="7 5"></line>
+          <line x1="212" y1="366" x2="246" y2="366" stroke="#a1c2f7" stroke-width="2.2"></line>
+          <line x1="212" y1="508" x2="246" y2="508" stroke="rgba(240,240,240,.26)" stroke-width="1.4" stroke-dasharray="4 5"></line>
+          <!-- tier1 results -> tier2 fusion (Maelstrom) — the chain -->
+          <line x1="374" y1="104" x2="458" y2="235" stroke="#bfa2ec" stroke-width="1.6" stroke-dasharray="5 5"></line>
+          <line x1="374" y1="366" x2="458" y2="235" stroke="#bfa2ec" stroke-width="1.6" stroke-dasharray="5 5"></line>
+          <line x1="482" y1="235" x2="516" y2="235" stroke="#bfa2ec" stroke-width="2" stroke-dasharray="5 5"></line>
+        </svg>
+        <sc-for list="{{ webNodes }}" as="n" hint-placeholder-count="9">
+          <div onClick="{{ n.onClick }}" title="{{ n.tip }}" style="{{ n.style }}">
+            <div style="{{ n.topStyle }}">{{ n.top }}</div>
+            <div style="{{ n.midStyle }}">{{ n.mid }}</div>
+            <div style="{{ n.botStyle }}">{{ n.bot }}</div>
+          </div>
+        </sc-for>
+        <sc-for list="{{ webDiamonds }}" as="d" hint-placeholder-count="3"><div style="{{ d }}"></div></sc-for>
+        </div>
+        <div style="position:absolute; left:14px; bottom:12px; background:rgba(20,21,27,.9); border:1px solid rgba(255,255,255,.14); border-radius:4px; padding:7px 10px; font-family:'Geist Mono',monospace; font-size:8.5px; line-height:1.6; color:rgba(240,240,240,.5);">◆ fusion · ▢ input · ⬡ result<br>solid = owned · ·· = hint / gate</div>
+        <div style="position:absolute; right:14px; top:12px; font-family:'Geist Mono',monospace; font-size:9px; color:rgba(240,240,240,.4);">⊹ drag to pan · scroll to zoom</div>
+      </div>
+      <!-- inspector -->
+      <div class="sx-scroll" style="overflow-y:auto; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:15px 16px 18px;">
+        <div style="font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:1.6px; text-transform:uppercase; color:rgba(240,240,240,.4);">Selected node</div>
+        <div style="margin-top:11px;">
+          <div style="{{ dossierGlyphStyle }}">{{ dossierGlyph }}</div>
+          <div style="{{ dossierWordStyle }}; margin-top:6px;">{{ dossierWordLine }}</div>
+          <sc-if value="{{ benchRevealed }}" hint-placeholder-val="{{ false }}"><div style="font-size:20px; font-weight:600; line-height:1; margin-top:3px;">{{ dossierName }}</div></sc-if>
+          <div style="margin-top:10px;"><span style="{{ dossierRarityStyle }}">{{ dossierRarity }}</span></div>
+        </div>
+        <div style="margin-top:14px; font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.2px; text-transform:uppercase; color:rgba(240,240,240,.4);">inputs</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+          <sc-for list="{{ benchInputs }}" as="i" hint-placeholder-count="2"><div style="display:flex; gap:8px; align-items:center; font-size:13px;"><span style="color:{{ i.ownColor }};">{{ i.ownMark }}</span> {{ i.name }}</div></sc-for>
+        </div>
+        <div style="margin-top:14px; font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:1.2px; text-transform:uppercase; color:rgba(240,240,240,.4);">conditions</div>
+        <div style="margin-top:7px; font-family:'Geist Mono',monospace; font-size:11px; color:{{ webCondColor }};">{{ webCond }}</div>
+        <div style="margin-top:16px;">
+          <sc-if value="{{ ctaReady }}" hint-placeholder-val="{{ true }}"><button onClick="{{ onSynthesize }}" style="width:100%; font-family:Geist,sans-serif; font-size:15px; font-weight:600; padding:10px; cursor:pointer; background:#a1c2f7; color:#111; border:1px solid #a1c2f7; border-radius:4px;">⟡ Synthesize</button></sc-if>
+          <sc-if value="{{ ctaDone }}" hint-placeholder-val="{{ false }}"><div style="text-align:center; font-family:'Geist Mono',monospace; font-size:11px; color:#bde0b4;">✓ synthesized</div></sc-if>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+
+  <!-- ===== CONFIRM MODAL ===== -->
+  <sc-if value="{{ showConfirm }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;">
+    <div onClick="{{ onCancel }}" style="position:absolute; inset:0; background:rgba(6,6,9,.78); backdrop-filter:blur(5px);"></div>
+    <div style="position:relative; width:430px; background:linear-gradient(160deg, rgba(161,194,247,.08), #1b1c24); border:1px solid rgba(255,255,255,.18); border-radius:6px; padding:22px 24px 20px; box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 40px rgba(161,194,247,.1); animation:sxrise .18s ease-out;">
+      <div style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:2px; text-transform:uppercase; color:rgba(240,240,240,.4);">Synthesis</div>
+      <div style="font-size:20px; font-weight:500; letter-spacing:-.3px; margin-top:3px;">Synthesize {{ confirmName }}?</div>
+      <div style="display:flex; align-items:center; gap:10px; justify-content:center; margin:16px 0; padding:13px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1); border-radius:4px;">
+        <span style="font-size:13px; font-weight:500;">{{ confirmInputA }}</span>
+        <span style="font-family:'Geist Mono'; font-size:15px; color:#a1c2f7;">✛</span>
+        <span style="font-size:13px; font-weight:500;">{{ confirmInputB }}</span>
+        <span style="font-size:13px; color:rgba(240,240,240,.4);">▶</span>
+        <span style="{{ benchRarityStyle }}">{{ benchRarity }}</span>
+        <span style="font-family:'Aetheric',serif; font-size:22px; color:#c0d8ff;">{{ benchGlyph }}</span>
+      </div>
+      <div style="font-size:13px; color:rgba(240,240,240,.6); line-height:1.45; margin-bottom:18px;">Inputs are <span style="color:#f0f0f0;">kept</span> — nothing is consumed. The new skill joins your skills, unselected — its nature is revealed as you synthesize it. A one-time discovery.</div>
+      <div style="display:flex; gap:9px; justify-content:flex-end;">
+        <button onClick="{{ onCancel }}" style="font-family:Geist,sans-serif; font-size:13px; padding:8px 18px; cursor:pointer; background:transparent; color:#f0f0f0; border:1px solid rgba(255,255,255,.18); border-radius:4px;">Cancel</button>
+        <button onClick="{{ onConfirm }}" style="font-family:Geist,sans-serif; font-size:13px; font-weight:600; padding:8px 20px; cursor:pointer; background:#a1c2f7; color:#111; border:1px solid #a1c2f7; border-radius:4px;">⟡ Synthesize</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== CASCADE OVERLAY ===== -->
+  <sc-if value="{{ showCascade }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ onSkip }}" style="position:absolute; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(6,6,9,.93); backdrop-filter:blur(6px); cursor:pointer;">
+    <div style="font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:2.4px; text-transform:uppercase; color:rgba(192,216,255,.6); margin-bottom:28px;">{{ cascCaption }}</div>
+    <div style="position:relative; width:200px; height:200px; display:flex; align-items:center; justify-content:center;">
+      <div style="{{ cascRingStyle }}"></div>
+      <sc-for list="{{ cascSparks }}" as="s" hint-placeholder-count="0"><div style="{{ s }}"></div></sc-for>
+      <div style="position:relative; display:flex; gap:3px; font-size:52px; line-height:1;">
+        <sc-for list="{{ cascChars }}" as="c" hint-placeholder-count="6"><span style="{{ c.style }}">{{ c.ch }}</span></sc-for>
+      </div>
+    </div>
+    <div style="{{ cascWordStyle }}">{{ cascWord }}</div>
+    <div style="font-family:'Geist Mono',monospace; font-size:8.5px; letter-spacing:1.4px; color:rgba(240,240,240,.3); margin-top:30px;">click to skip</div>
+  </div>
+  </sc-if>
+
+  <!-- ===== SUCCESS MODAL ===== -->
+  <sc-if value="{{ showSuccess }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;">
+    <div style="position:absolute; inset:0; background:rgba(6,6,9,.9); backdrop-filter:blur(6px);"></div>
+    <div style="position:relative; width:380px; text-align:center; background:linear-gradient(160deg, rgba(232,200,120,.1), #1b1c24); border:1px solid rgba(232,200,120,.4); border-radius:8px; padding:26px 24px 22px; box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 50px rgba(232,200,120,.18); animation:sxrise .22s ease-out;">
+      <div style="font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:2.4px; text-transform:uppercase; color:#e8c878;">⟡ Synthesized</div>
+      <div style="margin:18px auto 12px; {{ successIconStyle }}">{{ resultInit }}</div>
+      <div style="font-size:34px; font-weight:700; line-height:1; margin-bottom:9px;">{{ benchName }}</div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:9px;">
+        <span style="font-family:'Aetheric',serif; font-size:24px; line-height:1; color:#e8c878; text-shadow:0 0 16px rgba(232,200,120,.5);">{{ benchGlyph }}</span>
+        <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.5px; color:#e8c878;">{{ benchRoman }} · {{ successMeaning }}</span>
+      </div>
+      <div style="font-family:'Geist Mono',monospace; font-size:9.5px; color:rgba(240,240,240,.5); margin-top:9px;">{{ benchRarity }} · added to your skills</div>
+      <div style="display:flex; gap:9px; justify-content:center; margin-top:18px;">
+        <button style="font-family:Geist,sans-serif; font-size:14px; font-weight:600; padding:9px 20px; cursor:pointer; background:#a1c2f7; color:#111; border:1px solid #a1c2f7; border-radius:4px;">Equip ▸</button>
+        <button onClick="{{ onCloseSuccess }}" style="font-family:Geist,sans-serif; font-size:14px; padding:9px 18px; cursor:pointer; background:transparent; color:#f0f0f0; border:1px solid rgba(255,255,255,.18); border-radius:4px;">Done</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:840}}">
+class Component extends DCLogic {
+  state = { view:'bench', sel:'frostfire', phase:'idle', beat:0, scramble:'', synthesized:['tempest'], showToast:false };
+  stageRef = React.createRef();
+  frameRef = React.createRef();
+
+  ATTR = { STR:'#e8b6a6', INT:'#c4b6ec', AGI:'#a1c2f7', DEX:'#f0d28a', END:'#bde0b4', LUK:'#8fded0' };
+  RAR  = { common:'#d4d4d4', uncommon:'#86c98f', rare:'#a1c2f7', epic:'#bfa2ec', legendary:'#e8c878', mythic:'#e8806f' };
+  // skill catalogue (base skills + synthesized results) — drives input tiles & rarity
+  SKILL = {
+    'Ember Strike':{attr:'STR',init:'ES',rarity:'common'}, 'Frost Lance':{attr:'INT',init:'FL',rarity:'uncommon'},
+    'Venom Spit':{attr:'INT',init:'VS',rarity:'common'}, 'Bleed':{attr:'DEX',init:'BL',rarity:'common'},
+    'Stone Spear':{attr:'STR',init:'SS',rarity:'uncommon'}, 'Rend':{attr:'STR',init:'RE',rarity:'common'},
+    'Riptide':{attr:'AGI',init:'RI',rarity:'rare'}, 'Arc Bolt':{attr:'INT',init:'AB',rarity:'uncommon'},
+    'Soul Drain':{attr:'INT',init:'SD',rarity:'rare'},
+    'Frostfire':{attr:'INT',init:'FF',rarity:'uncommon'}, 'Venom Bloom':{attr:'INT',init:'VB',rarity:'uncommon'},
+    'Lava Surge':{attr:'STR',init:'LS',rarity:'rare'}, 'Tempest Coil':{attr:'AGI',init:'TC',rarity:'rare'},
+    'Maelstrom':{attr:'AGI',init:'MA',rarity:'epic'}, 'Permafrost':{attr:'INT',init:'PF',rarity:'rare'},
+    'Rimewind':{attr:'AGI',init:'RW',rarity:'rare'}, 'Primordial Cataclysm':{attr:'STR',init:'PC',rarity:'legendary'},
+  };
+  // base skills the player owns; synthesized results add to the owned set (drives chaining)
+  ownedBase = ['Ember Strike','Frost Lance','Venom Spit','Bleed','Stone Spear','Rend','Riptide','Arc Bolt'];
+
+  RECIPES = [
+    { id:'frostfire', inputs:['Ember Strike','Frost Lance'], gate:null,
+      r:{ name:'Frostfire', glyph:'sijren', roman:'sij·ren', meaning:'The Riven Frost', rarity:'uncommon', attr:'INT', dmg:'64', cd:'1.4s', scales:'INT', effect:'on hit · applies Chill (−AGI) for 3s' } },
+    { id:'venom', inputs:['Venom Spit','Bleed'], gate:{prof:'Verdancy', need:3, have:4},
+      r:{ name:'Venom Bloom', glyph:'toxil', roman:'tox·il', meaning:'The Wilting Gift', rarity:'uncommon', attr:'INT', dmg:'48', cd:'1.1s', scales:'INT', effect:'on hit · stacks Poison; spreads on a kill' } },
+    { id:'lava', inputs:['Ember Strike','Stone Spear'], gate:{prof:'Geomancy', need:5, have:3},
+      r:{ name:'Lava Surge', glyph:'volkar', roman:'vol·kar', meaning:'The Molten Word', rarity:'rare', attr:'STR', dmg:'96', cd:'2.2s', scales:'STR', effect:'on hit · pools Magma underfoot' } },
+    { id:'tempest', inputs:['Riptide','Arc Bolt'], gate:null,
+      r:{ name:'Tempest Coil', glyph:'maroth', roman:'mar·oth', meaning:'The Coiling Storm', rarity:'rare', attr:'AGI', dmg:'72', cd:'1.6s', scales:'AGI·INT', effect:'on hit · chains lightning to 2 nearby foes' } },
+    { id:'hinted', inputs:['Rend','Soul Drain'], gate:null,
+      r:{ name:'Graverend', glyph:'dharok', roman:'dha·rok', meaning:'The Hollow Edge', rarity:'epic', attr:'STR', dmg:'88', cd:'1.9s', scales:'STR', effect:'on hit · heals you for part of the damage' } },
+    // chained recipes — a synthesized result feeds a deeper formula
+    { id:'maelstrom', inputs:['Frostfire','Tempest Coil'], gate:null,
+      r:{ name:'Maelstrom', glyph:'vyrate', roman:'vy·ra·te', meaning:'The Drowned Sky', rarity:'epic', attr:'AGI', dmg:'120', cd:'2.6s', scales:'AGI·INT', effect:'on hit · a pulling vortex that chills and shocks' } },
+    { id:'permafrost', inputs:['Frostfire','Frost Lance'], gate:null,
+      r:{ name:'Permafrost', glyph:'sijkae', roman:'sij·kae', meaning:'The Stilled Deep', rarity:'rare', attr:'INT', dmg:'78', cd:'1.8s', scales:'INT', effect:'on hit · Freeze chance scales with Chill stacks' } },
+    { id:'rimewind', inputs:['Frostfire','Riptide'], gate:null,
+      r:{ name:'Rimewind', glyph:'sijmar', roman:'sij·mar', meaning:'The Cold Tide', rarity:'rare', attr:'AGI', dmg:'70', cd:'1.5s', scales:'AGI', effect:'on hit · a chilling gust that slows on impact' } },
+    { id:'cataclysm', inputs:['Maelstrom','Lava Surge'], gate:{prof:'Pyromancy', need:8, have:3},
+      r:{ name:'Primordial Cataclysm', glyph:'vorthuun', roman:'vor·thuun', meaning:'The Unmaking', rarity:'legendary', attr:'STR', dmg:'210', cd:'4.0s', scales:'STR·INT', effect:'on hit · the screen-clearing apex of the chain' } },
+  ];
+
+  componentDidMount(){
+    this._onResize = () => this._fit();
+    window.addEventListener('resize', this._onResize);
+    requestAnimationFrame(()=>this._fit());
+    setTimeout(()=>this._fit(), 120);
+    setTimeout(()=>this._fit(), 600);
+  }
+  _fit(){
+    const st = this.stageRef.current, fr = this.frameRef.current;
+    if(!st || !fr) return;
+    const s = Math.min(1, st.clientWidth/1320, st.clientHeight/840);
+    fr.style.transform = 'scale('+s+')';
+  }
+  componentWillUnmount(){ this._clear(); if(this._onResize) window.removeEventListener('resize', this._onResize); }
+  _clear(){ (this._timers||[]).forEach(clearTimeout); this._timers=[]; if(this._scram){clearInterval(this._scram); this._scram=null;} if(this._reveal){clearInterval(this._reveal); this._reveal=null;} }
+
+  recById(id){ return this.RECIPES.find(x=>x.id===id); }
+  ownedNames(){
+    const set = new Set(this.ownedBase);
+    (this.state.synthesized||[]).forEach(id=>{ const rec=this.recById(id); if(rec) set.add(rec.r.name); });
+    return set;
+  }
+  // conservative hinted reveal: own all inputs -> ready/gated ; own some -> hinted ; own none -> hidden
+  stateOf(rec){
+    if(this.state.synthesized.includes(rec.id)) return 'done';
+    const owned = this.ownedNames();
+    const have = rec.inputs.filter(n=>owned.has(n)).length;
+    if(have===0) return 'hidden';
+    if(have < rec.inputs.length) return 'hinted';
+    if(rec.gate && rec.gate.have < rec.gate.need) return 'gated';
+    return 'ready';
+  }
+  discovered(){ return this.RECIPES.filter(x=>this.stateOf(x)!=='hidden'); }
+  tile(attr, init, size){
+    const c = this.ATTR[attr] || '#a1c2f7';
+    return `width:${size}px; height:${size}px; flex:none; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.14); border-radius:3px; background:radial-gradient(circle at 50% 32%, ${c}55, transparent 70%), rgba(255,255,255,.04); font-family:'Geist Mono',monospace; font-size:${Math.round(size*0.34)}px; font-weight:500; color:rgba(240,240,240,.86);`;
+  }
+  randGlyphs(n){ let s=''; const a='abcdefghijklmnopqrstuvwxyz'; for(let i=0;i<n;i++) s+=a[Math.floor(Math.random()*26)]; return s; }
+
+  setBench = () => this.setState({ view:'bench' });
+  setWeb   = () => this.setState({ view:'web' });
+  select   = (id) => this.setState({ sel:id });
+  openConfirm = () => this.setState({ phase:'confirm' });
+  cancel   = () => this.setState({ phase:'idle' });
+  closeSuccess = () => this.setState({ phase:'idle' });
+  dismissToast = () => this.setState({ showToast:false });
+
+  startCascade = () => {
+    const rec = this.recById(this.state.sel); const word = rec.r.glyph;
+    this._clear();
+    this.setState({ phase:'cascade', beat:1, revealed:[] });
+    this._timers = [
+      setTimeout(()=>this.setState({ beat:2 }), 420),
+      setTimeout(()=>{ this.setState({ beat:3 }); this._startReveal(word); }, 920),
+    ];
+  };
+  // decipher step: randomly flip each Aetheric glyph to its romanized letter, one at a time
+  _startReveal(word){
+    const n = word.length;
+    this._reveal = setInterval(()=>{
+      const cur = this.state.revealed || [];
+      if(cur.length >= n){
+        clearInterval(this._reveal); this._reveal=null;
+        this._timers.push(setTimeout(()=>this.setState({ beat:4 }), 240));
+        this._timers.push(setTimeout(()=>this.setState({ beat:5 }), 920));
+        this._timers.push(setTimeout(()=>this._finish(), 1520));
+        return;
+      }
+      const remaining=[]; for(let i=0;i<n;i++) if(cur.indexOf(i)<0) remaining.push(i);
+      const pick = remaining[Math.floor(Math.random()*remaining.length)];
+      this.setState({ revealed:[...cur, pick] });
+    }, 130);
+  }
+  _finish(){
+    this._clear();
+    const syn = this.state.synthesized.includes(this.state.sel) ? this.state.synthesized : [...this.state.synthesized, this.state.sel];
+    this.setState({ phase:'success', synthesized:syn });
+  }
+  skipCascade = () => { this._finish(); };
+
+  renderVals(){
+    const st = this.state;
+    const rec = this.recById(st.sel) || this.RECIPES[0];
+    const stt = this.stateOf(rec);
+    const isHinted = stt==='hinted';
+    const r = rec.r;
+
+    const discList = this.discovered();
+    const discovered = discList.length;
+    const ownedSet = this.ownedNames();
+
+    const tabBase = "font-family:'Geist Mono',monospace; font-size:11px; padding:7px 15px; cursor:pointer; border:none; display:flex; align-items:center; gap:6px;";
+    const tabOn = tabBase+"background:#a1c2f7; color:#111;";
+    const tabOff = tabBase+"background:transparent; color:rgba(240,240,240,.55);";
+
+    // filter chips (visual)
+    const counts = { ready:0, gated:0, hinted:0, done:0 };
+    discList.forEach(x=>{ counts[this.stateOf(x)]++; });
+    const chip=(label,on)=>({ label, style:"font-family:'Geist Mono',monospace; font-size:9.5px; letter-spacing:.4px; padding:4px 12px; border-radius:20px; border:1px solid "+(on?'#a1c2f7':'rgba(255,255,255,.16)')+'; '+(on?'background:#a1c2f7; color:#111;':'color:rgba(240,240,240,.5);') });
+    const filterChips = [ chip('All · '+discovered,true), chip('Ready · '+counts.ready,false), chip('Gated · '+counts.gated,false), chip('Hinted · '+counts.hinted,false), chip('Synthesized · '+counts.done,false) ];
+
+    // recipe rows
+    const dotFor = (s)=>{
+      if(s==='ready')  return 'width:11px;height:11px;flex:none;transform:rotate(45deg);background:#a1c2f7;box-shadow:0 0 7px rgba(161,194,247,.6);';
+      if(s==='gated')  return 'width:11px;height:11px;flex:none;border:1.5px solid #f0d28a;transform:rotate(45deg);';
+      if(s==='hinted') return 'width:12px;height:12px;flex:none;border:1.5px dashed rgba(255,255,255,.4);border-radius:50%;';
+      return 'width:12px;height:12px;flex:none;border:1.5px solid #bde0b4;border-radius:50%;box-shadow:0 0 6px rgba(189,224,180,.4);';
+    };
+    const tagFor = (s)=>{
+      const m={ready:['READY','#a1c2f7'],gated:['GATED','#f0d28a'],hinted:['HINT','rgba(240,240,240,.45)'],done:['✓ DONE','#bde0b4']};
+      const [t,c]=m[s];
+      return { tag:t, tagStyle:"font-family:'Geist Mono',monospace; font-size:8px; letter-spacing:1px; color:"+c+"; flex:none;" };
+    };
+    const recipeRows = discList.map(x=>{
+      const s=this.stateOf(x); const sel=x.id===st.sel; const tg=tagFor(s);
+      const done = s==='done';
+      const rc = this.RAR[x.r.rarity] || 'rgba(255,255,255,.4)';
+      const nm = done ? x.r.name : x.r.glyph;
+      const inp = x.inputs.map(n=> ownedSet.has(n) ? n : '▒▒▒').join(' ✛ ');
+      let rowStyle="display:flex; align-items:center; gap:10px; padding:9px 11px; margin-bottom:6px; border-radius:4px; cursor:pointer; border:1px solid "+(sel?'rgba(161,194,247,.45)':'rgba(255,255,255,.06)')+"; border-left:3px solid "+rc+"; background:"+(sel?'rgba(161,194,247,.1)':rc+'0d')+';';
+      return { name:nm, inputs:inp, tip:done?x.r.name:'sealed result', onClick:()=>this.select(x.id), rowStyle,
+        dotStyle:dotFor(s),
+        nameStyle: done
+          ? "font-size:14px; font-weight:500; line-height:1.1; color:#f0f0f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+          : "font-family:'Aetheric',serif; font-size:19px; line-height:1; color:"+rc+"; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;",
+        rarLabel: x.r.rarity.toUpperCase(),
+        rarPillStyle: "font-family:'Geist Mono',monospace; font-size:7.5px; font-weight:600; letter-spacing:1px; padding:1px 7px; border-radius:10px; color:"+rc+"; border:1px solid "+rc+"66; background:"+rc+"1a;",
+        tag:tg.tag, tagStyle:tg.tagStyle };
+    });
+
+    // bench inputs — rarity carried on each input skill; unowned inputs masked (conservative reveal)
+    const benchInputs = rec.inputs.map((nm,idx)=>{
+      const own = ownedSet.has(nm);
+      const sk = this.SKILL[nm] || {attr:'AGI',init:'?',rarity:null};
+      const irar = own ? sk.rarity : null;
+      const ic = own && irar ? this.RAR[irar] : 'rgba(255,255,255,.18)';
+      const cardStyle = `display:flex; align-items:center; gap:10px; width:190px; padding:8px 12px 8px 8px; border:1px solid ${ic}55; border-left:3px solid ${ic}; border-radius:4px; background:${own&&irar?ic+'12':'rgba(255,255,255,.02)'};`;
+      return { name: own?nm:'? ? ?', init: own?sk.init:'?', attr: sk.attr, plus:idx>0,
+        cardStyle,
+        tileStyle:this.tile(own?sk.attr:'AGI', own?sk.init:'?', 38) + (own?'':'opacity:.4; border-style:dashed;'),
+        rarLabel: own&&irar ? irar.toUpperCase() : 'UNDISCOVERED',
+        rarStyle: `font-family:'Geist Mono',monospace; font-size:7.5px; letter-spacing:1.4px; color:${own&&irar?ic:'rgba(240,240,240,.38)'};`,
+        ownColor: own?'#bde0b4':'rgba(240,240,240,.4)', ownMark: own?'✓':'?' };
+    });
+
+    // result is TEASED (rarity + word of power only) until synthesized; full identity revealed at 'done'.
+    // decipher illumination: hinted->undeciphered(dim), ready/gated->pronunciation(accent), done->translated(gold)
+    const revealed = stt==='done';
+    let wordColor, wordGlow, romanColor;
+    if(revealed){ wordColor='#e8c878'; wordGlow='text-shadow:0 0 18px rgba(232,200,120,.55);'; romanColor='#e8c878'; }
+    else if(isHinted){ wordColor='rgba(192,216,255,.5)'; wordGlow='text-shadow:0 0 8px rgba(192,216,255,.16);'; romanColor='rgba(240,240,240,.5)'; }
+    else { wordColor='#c0d8ff'; wordGlow='text-shadow:0 0 14px rgba(192,216,255,.4);'; romanColor='#c0d8ff'; }
+    const glyphText = r.glyph;
+    const romanText = r.roman;
+
+    const rarHex = this.RAR[r.rarity] || 'rgba(255,255,255,.4)';
+    const benchGlyphStyle = `font-family:'Aetheric',serif; font-size:54px; line-height:1; color:${wordColor}; ${wordGlow}`;
+    const benchHaloStyle = `position:absolute; width:170px; height:104px; border-radius:50%; background:radial-gradient(closest-side, ${rarHex}40, transparent 75%); filter:blur(9px); pointer-events:none;`;
+    const bigRarStyle = `display:inline-flex; align-items:center; gap:6px; font-family:'Geist Mono',monospace; font-size:9px; font-weight:600; letter-spacing:1.8px; padding:3px 11px; border-radius:20px; color:${rarHex}; border:1px solid ${rarHex}88; background:${rarHex}14;`;
+    const resultInit = (this.SKILL[r.name] && this.SKILL[r.name].init) || (r.name ? r.name.replace(/[^A-Za-z ]/g,'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase() : '?');
+    const benchIconStyle = this.tile(r.attr||'INT', resultInit, 50);
+    const dossierIconStyle = this.tile(r.attr||'INT', resultInit, 44);
+    const successIconStyle = this.tile(r.attr||'INT', resultInit, 64);
+
+    // conditions
+    let benchConditions=[];
+    if(isHinted){ benchConditions=[{label:'gather the other reagent', style:"font-family:'Geist Mono',monospace; font-size:9px; padding:4px 11px; border:1px solid rgba(255,255,255,.18); border-radius:20px; color:rgba(240,240,240,.5);"}]; }
+    else {
+      const inputsChip={label:'inputs 2 / 2 ✓', style:"font-family:'Geist Mono',monospace; font-size:9px; padding:4px 11px; border:1px solid rgba(255,255,255,.16); border-radius:20px; color:rgba(240,240,240,.55);"};
+      if(rec.gate){ const met=rec.gate.have>=rec.gate.need;
+        benchConditions=[ {label:rec.gate.prof+' Lv'+rec.gate.need+(met?' ✓':' ✗'), style:"font-family:'Geist Mono',monospace; font-size:9px; padding:4px 11px; border:1px solid "+(met?'rgba(189,224,180,.5)':'rgba(240,210,138,.5)')+'; border-radius:20px; color:'+(met?'#bde0b4':'#f0d28a')+';'}, inputsChip ];
+      } else {
+        benchConditions=[ {label:'no proficiency gate ✓', style:"font-family:'Geist Mono',monospace; font-size:9px; padding:4px 11px; border:1px solid rgba(189,224,180,.5); border-radius:20px; color:#bde0b4;"}, inputsChip ];
+      }
+    }
+
+    // CTA flags
+    const ctaReady = stt==='ready';
+    const ctaGated = stt==='gated';
+    const ctaHinted = stt==='hinted';
+    const ctaDone = stt==='done';
+    const gateText = rec.gate ? (rec.gate.prof+' Lv'+rec.gate.have+' → master to Lv'+rec.gate.need) : '';
+    const hintText = isHinted ? ('you hold '+rec.inputs.filter(n=>ownedSet.has(n)).join(', ')+' — find the other reagent') : '';
+
+    // dossier (shared with web inspector) — teased until synthesized
+    const dossierGlyphStyle = `font-family:'Aetheric',serif; font-size:30px; line-height:1; color:${wordColor}; ${wordGlow}`;
+    const dossierWordStyle = `font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:.6px; color:${romanColor};`;
+    const dossierWordLine = revealed ? (r.roman+' · '+r.meaning) : '';
+    const dossierName = r.name;
+    const sealText = isHinted
+      ? 'You hold one reagent. Find the other to reveal the formula — then synthesize to learn what it does.'
+      : 'Its name, stats and effect stay sealed until you synthesize it. You know only its rarity and its word of power.';
+    const rarStyle=()=> "font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:.5px; padding:2px 8px; border-radius:20px; color:"+rarHex+"; border:1px solid "+rarHex+"55; background:"+rarHex+"14;";
+
+    return {
+      stageRef:this.stageRef, frameRef:this.frameRef,
+      discoveredCount: discovered,
+      tabBenchStyle: st.view==='bench'?tabOn:tabOff,
+      tabWebStyle: st.view==='web'?tabOn:tabOff,
+      setBench:this.setBench, setWeb:this.setWeb,
+      isBench: st.view==='bench', isWeb: st.view==='web',
+      filterChips,
+      recipeRows,
+      benchInputs,
+      benchGlyphStyle, benchHaloStyle, benchGlyph:glyphText,
+      resultInit, benchIconStyle, dossierIconStyle, successIconStyle,
+      benchGlyphSmStyle:`font-family:'Aetheric',serif; font-size:30px; line-height:1; color:${wordColor}; ${wordGlow}`,
+      benchMeaning: r.roman+' · '+r.meaning,
+      benchMeaningStyle:`font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.5px; color:${romanColor};`,
+      benchRomanStyle:`font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.5px; color:${romanColor};`, benchRoman: revealed ? r.roman : '',
+      benchNameStyle:`font-size:30px; font-weight:700; line-height:.92; color:#f0f0f0;`,
+      benchName: r.name,
+      benchRarityStyle: bigRarStyle, benchRarity: r.rarity.toUpperCase(),
+      benchRevealed: revealed, benchSealed: !revealed,
+      benchSealLabel: isHinted ? 'undiscovered pairing' : 'synthesize to reveal',
+      benchConditions,
+      ctaReady, ctaGated, ctaHinted, ctaDone, gateText, hintText,
+      onSynthesize:this.openConfirm,
+
+      // dossier
+      dossierGlyphStyle, dossierGlyph:glyphText,
+      dossierWordStyle, dossierWordLine, dossierName,
+      dossierRarityStyle: `font-family:'Geist Mono',monospace; font-size:8.5px; font-weight:600; letter-spacing:1.4px; padding:2px 9px; border-radius:12px; color:${rarHex}; border:1px solid ${rarHex}88; background:${rarHex}14;`, dossierRarity: r.rarity.toUpperCase(),
+      dossierHasStats: revealed,
+      dossierDmg: r.dmg, dossierCd: r.cd, dossierScales: r.scales, dossierEffect: r.effect,
+      dossierSealed: !revealed, dossierSealText: sealText,
+      dossierFoundLabel: isHinted?'how to find it':'how it was found',
+      dossierFound: isHinted ? 'You own one of its inputs. Acquire the other and the formula reveals itself.' : 'Revealed when you owned both inputs. '+(revealed?'Synthesized — now a normal skill.':'Ready to synthesize.'),
+      dossierHasChain: revealed && !!r.chain,
+      dossierChain: r.chain||'',
+
+      // web
+      webNodes: this._webNodes(),
+      webDiamonds: this._webDiamonds(),
+      webCond: isHinted ? 'hint — pairing unknown' : (rec.gate ? (rec.gate.prof+' Lv'+rec.gate.need+(rec.gate.have>=rec.gate.need?' ✓':' ✗ (Lv'+rec.gate.have+')')) : 'none — ready'),
+      webCondColor: isHinted?'rgba(240,240,240,.5)':(rec.gate && rec.gate.have<rec.gate.need?'#f0d28a':'#bde0b4'),
+
+      // confirm
+      showConfirm: st.phase==='confirm',
+      confirmName: 'this skill',
+      confirmInputA: rec.inputs[0], confirmInputB: rec.inputs[1],
+      onConfirm:this.startCascade, onCancel:this.cancel,
+
+      // cascade
+      showCascade: st.phase==='cascade',
+      ...this._cascadeVals(),
+      onSkip:this.skipCascade,
+
+      // success
+      showSuccess: st.phase==='success',
+      successMeaning: r?r.meaning:'',
+      onCloseSuccess:this.closeSuccess,
+
+      // toast
+      showToast: st.showToast,
+      toastName: r?r.name:'', toastGlyph: r?r.glyph:'',
+      onDismissToast:this.dismissToast,
+    };
+  }
+
+  _cascadeVals(){
+    const st=this.state; const rec=this.recById(st.sel); const r=rec&&rec.r?rec.r:{glyph:'',roman:'',meaning:''};
+    const beat=st.beat||0; const revealed=st.revealed||[];
+    const caps={1:'sealing the inputs',2:'feeding the reagents',3:'deciphering the word',4:'the word speaks',5:'crystallizing'};
+    const gold = beat>=4;
+    const word = r.glyph||'';
+    // each glyph flips from Aetheric (accent) to its romanized letter (gold) as it's deciphered
+    const chars = word.split('').map((ch,i)=>{
+      const rv = gold || revealed.indexOf(i)>=0;
+      return { ch, style: rv
+        ? `font-family:Geist,sans-serif; font-weight:600; color:#e8c878; text-shadow:0 0 16px rgba(232,200,120,.6); transition:color .12s;`
+        : `font-family:'Aetheric',serif; color:#c0d8ff; text-shadow:0 0 10px rgba(192,216,255,.4);` };
+    });
+    const ringStyle = `position:absolute; inset:0; border-radius:50%; border:2px solid ${gold?'rgba(232,200,120,.7)':'rgba(192,216,255,.4)'}; box-shadow:0 0 40px ${gold?'rgba(232,200,120,.5)':'rgba(192,216,255,.3)'};`
+      + (gold?'animation:sxflash .6s ease-out;':'animation:sxringspin 3s linear infinite;');
+    let wl, wlStyle;
+    if(beat>=5){ wl = r.roman+' · '+r.meaning; wlStyle="font-family:'Geist Mono',monospace; font-size:13px; letter-spacing:.6px; color:#e8c878; margin-top:26px;"; }
+    else if(beat>=4){ wl = r.roman; wlStyle="font-family:'Geist Mono',monospace; font-size:13px; letter-spacing:.6px; color:#e8c878; margin-top:26px;"; }
+    else { wl='⟨ deciphering… ⟩'; wlStyle="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:1px; color:rgba(192,216,255,.6); margin-top:26px;"; }
+    let sparks=[];
+    if(gold){ for(let i=0;i<10;i++){ const ang=(i/10)*Math.PI*2; const dx=Math.cos(ang)*90, dy=Math.sin(ang)*90;
+      sparks.push(`position:absolute; left:50%; top:50%; width:5px; height:5px; border-radius:50%; background:#e8c878; --dx:${dx}px; --dy:${dy}px; animation:sxspark .7s ease-out forwards;`); } }
+    return { cascCaption:caps[beat]||'', cascRingStyle:ringStyle, cascChars:chars,
+      cascWord:wl, cascWordStyle:wlStyle, cascSparks:sparks };
+  }
+
+  _webDiamonds(){
+    const fS=(cx,cy,sz,c,filled,dash)=>`position:absolute; left:${cx-sz/2}px; top:${cy-sz/2}px; width:${sz}px; height:${sz}px; transform:rotate(45deg); background:${filled?c:'rgba(20,21,27,.92)'}; border:1.5px ${dash?'dashed':'solid'} ${c}; box-shadow:0 0 10px ${c}66;`;
+    const dia=(cx,cy,sz,id)=>{ const rec=this.recById(id); const s=this.stateOf(rec); const c=this.RAR[rec.r.rarity]||'#a1c2f7'; return fS(cx,cy,sz,c,(s==='ready'||s==='done'),(s==='hinted'||s==='gated')); };
+    return [ dia(200,104,24,'frostfire'), dia(200,212,26,'lava'), dia(200,366,24,'tempest'), dia(200,508,22,'hinted'), dia(470,235,24,'maelstrom') ];
+  }
+  _webNodes(){
+    const st=this.state;
+    // input node (tier 0) — rarity-bordered, rarity label; cy = vertical centre
+    const inp=(cy,name)=>{ const sk=this.SKILL[name]||{}; const irar=sk.rarity; const rc=irar?this.RAR[irar]:'rgba(255,255,255,.3)';
+      return { style:`position:absolute; left:6px; top:${cy-18}px; width:116px; padding:6px 9px; border:1px solid ${rc}44; border-left:3px solid ${rc}; border-radius:3px; background:${rc}10; text-align:left; cursor:default;`,
+        top:'', topStyle:'display:none;', mid:name, midStyle:'font-size:11.5px; font-weight:500; line-height:1.1;', bot:(irar?irar.toUpperCase():'input'), botStyle:`font-family:'Geist Mono',monospace; font-size:6.5px; letter-spacing:.8px; color:${rc}; margin-top:2px;`, onClick:()=>{}, tip:name }; };
+    // result node — rarity header bar + rarity border; TEASED shows aetheric glyph (no roman)
+    const res=(left,cy,id,w)=>{ const rec=this.recById(id); const s=this.stateOf(rec); const r=rec.r; const sel=st.sel===id;
+      const sm={ready:['#a1c2f7','● READY'],gated:['#f0d28a','▲ GATED'],done:['#bde0b4','✓ DONE'],hinted:['rgba(192,216,255,.55)','? HINT']};
+      const [scol,lab]=sm[s]||sm.ready; const rc=this.RAR[r.rarity]||'#a1c2f7'; const done=s==='done'; const bstyle=s==='hinted'?'dashed':'solid';
+      return { style:`position:absolute; left:${left}px; top:${cy-31}px; width:${w}px; padding:0 0 7px; border:2px ${bstyle} ${rc}; border-radius:6px; background:${sel?rc+'1f':'rgba(20,21,27,.94)'}; text-align:center; cursor:pointer; overflow:hidden;`+(sel?` box-shadow:0 0 0 1px ${rc},0 0 16px ${rc}55;`:` box-shadow:0 0 12px ${rc}2b;`),
+        top:r.rarity.toUpperCase(), topStyle:`font-family:'Geist Mono',monospace; font-size:7.5px; font-weight:600; letter-spacing:1.2px; color:#111; background:${rc}; padding:2px 0;`,
+        mid:done?r.name:r.glyph, midStyle:(done?'font-size:12px; font-weight:600; color:#f0f0f0;':"font-family:'Aetheric',serif; font-size:20px; color:"+rc+";")+' line-height:1; margin-top:6px;',
+        bot:lab, botStyle:`font-family:'Geist Mono',monospace; font-size:7px; letter-spacing:.6px; color:${scol}; margin-top:5px;`,
+        onClick:()=>this.select(id), tip:done?r.name:'sealed result' }; };
+    return [
+      inp(64,'Ember Strike'), inp(144,'Frost Lance'), inp(224,'Stone Spear'), inp(326,'Riptide'), inp(406,'Arc Bolt'), inp(508,'Rend'),
+      res(246,104,'frostfire',128), res(246,212,'lava',128), res(246,366,'tempest',128), res(246,508,'hinted',128),
+      res(516,235,'maelstrom',128),
+    ];
+  }
+}
+</script>
+</body>
+</html>
