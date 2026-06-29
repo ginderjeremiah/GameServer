@@ -149,7 +149,6 @@ namespace Game.Api.Tests.Unit
             Name = $"Skill {id}",
             BaseDamage = 1,
             Description = string.Empty,
-            Rarity = ERarity.Common,
             DamageType = EDamageType.Physical,
             CooldownMs = 1000,
             DamageMultipliers = [],
