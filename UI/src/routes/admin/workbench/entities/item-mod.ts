@@ -90,7 +90,7 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 				{
 					key: 'attributeId',
 					label: 'Attribute',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					min: 200,
 					unique: true

@@ -100,8 +100,8 @@ const baseByKey = $derived.by(() => {
 	return map;
 });
 
-// Disable Add once a unique select column has exhausted every option.
-const uniqueCol = $derived(section.columns.find((c) => c.type === 'select' && c.unique));
+// Disable Add once a unique select/attribute column has exhausted every option.
+const uniqueCol = $derived(section.columns.find((c) => (c.type === 'select' || c.type === 'attribute') && c.unique));
 const noFree = $derived(
 	uniqueCol ? (uniqueCol.options?.() ?? []).every((o) => rows.some((r) => r[uniqueCol.key] === o.value)) : false
 );

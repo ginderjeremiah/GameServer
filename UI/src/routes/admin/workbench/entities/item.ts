@@ -123,7 +123,7 @@ export const itemEntity: EntityConfig<IItem> = {
 				{
 					key: 'attributeId',
 					label: 'Attribute',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					min: 200,
 					unique: true

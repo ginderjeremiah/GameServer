@@ -55,6 +55,13 @@ namespace Game.Core.Battle.Offline
                 // proficiency-XP accrual normalizes each path's activity by, so the two payouts share one
                 // evaluation.
                 var rewards = result.Victory ? new DefeatRewards(playerModifiers, enemy) : null;
+                if (rewards is not null)
+                {
+                    // Snapshot the player's power onto this battle's stats so the offline accrual normalizes by
+                    // the identical measure the live path does (spike #1318) — victory-only, like the rewards.
+                    result.Stats.PlayerPower = rewards.PlayerPower;
+                }
+
                 outcomes.Add(new OfflineBattleOutcome(
                     enemy, result, rewards?.ExpReward ?? 0, rewards?.PlayerPower ?? 0));
 
