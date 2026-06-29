@@ -41,12 +41,14 @@ namespace Game.Api.CodeGen.Writers
             builder.AppendLine("} as const;");
             builder.AppendLine();
 
-            // Key → the amplification / resistance attribute it backs.
+            // Key → the amplification / resistance attribute it backs. An amplification-only weapon key (#1340)
+            // emits a null resistance.
             builder.AppendLine("export const DAMAGE_TYPE_KEY_ATTRIBUTES = {");
             foreach (var info in DamageTypes.Keys)
             {
+                var resistance = info.Resistance is EAttribute res ? $"EAttribute.{EnumName(res)}" : "null";
                 builder.AppendLine(
-                    $"\t[EDamageTypeKey.{EnumName(info.Key)}]: {{ amplification: EAttribute.{EnumName(info.Amplification)}, resistance: EAttribute.{EnumName(info.Resistance)} }},");
+                    $"\t[EDamageTypeKey.{EnumName(info.Key)}]: {{ amplification: EAttribute.{EnumName(info.Amplification)}, resistance: {resistance} }},");
             }
 
             builder.AppendLine("} as const;");

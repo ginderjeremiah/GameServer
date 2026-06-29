@@ -184,7 +184,9 @@ namespace Game.Application.Services
                 progress.TryGetProficiency(proficiencyId, out var existing) ? existing.Level : 0;
 
             var activityByKey = new Dictionary<EActivityKey, double>();
-            FoldIntoActivityKeys(activityByKey, stats.TypedDamageDealt, ActivityKeys.ForDamageKey);
+            // ForDamageKey resolves for every key; ForDamageKeyResist is null for the amp-only weapon keys
+            // (#1340), whose exposure routes to the shared Physical resist key only — the fold skips those nulls.
+            FoldIntoActivityKeys(activityByKey, stats.TypedDamageDealt, key => ActivityKeys.ForDamageKey(key));
             FoldIntoActivityKeys(activityByKey, stats.TypedDamageExposure, ActivityKeys.ForDamageKeyResist);
 
             // Event-keyed activities: combat magnitudes that are not typed damage, so each maps straight to a
@@ -226,14 +228,18 @@ namespace Game.Application.Services
         private static void FoldIntoActivityKeys(
             Dictionary<EActivityKey, double> activityByKey,
             IReadOnlyDictionary<EDamageType, double> quantityByType,
-            Func<EDamageTypeKey, EActivityKey> toActivityKey)
+            Func<EDamageTypeKey, EActivityKey?> toActivityKey)
         {
             foreach (var (type, quantity) in quantityByType)
             {
                 foreach (var key in DamageTypes.Applies(type))
                 {
-                    var activityKey = toActivityKey(key);
-                    activityByKey[activityKey] = activityByKey.GetValueOrDefault(activityKey) + quantity;
+                    // A key with no activity key for this book (an amp-only weapon key on the resist side) is
+                    // skipped — its quantity routes only through the keys that do resolve.
+                    if (toActivityKey(key) is EActivityKey activityKey)
+                    {
+                        activityByKey[activityKey] = activityByKey.GetValueOrDefault(activityKey) + quantity;
+                    }
                 }
             }
         }

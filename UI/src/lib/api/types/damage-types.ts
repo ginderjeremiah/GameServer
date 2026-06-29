@@ -12,6 +12,12 @@ export const DAMAGE_TYPE_APPLIES = {
 	[EDamageType.Bleed]: [EDamageTypeKey.Bleed, EDamageTypeKey.Dot],
 	[EDamageType.Poison]: [EDamageTypeKey.Poison, EDamageTypeKey.Dot],
 	[EDamageType.Burn]: [EDamageTypeKey.Burn, EDamageTypeKey.Fire, EDamageTypeKey.Elemental, EDamageTypeKey.Dot],
+	[EDamageType.Sword]: [EDamageTypeKey.Sword, EDamageTypeKey.Physical],
+	[EDamageType.Axe]: [EDamageTypeKey.Axe, EDamageTypeKey.Physical],
+	[EDamageType.Bow]: [EDamageTypeKey.Bow, EDamageTypeKey.Physical],
+	[EDamageType.Club]: [EDamageTypeKey.Club, EDamageTypeKey.Physical],
+	[EDamageType.Dagger]: [EDamageTypeKey.Dagger, EDamageTypeKey.Physical],
+	[EDamageType.Unarmed]: [EDamageTypeKey.Unarmed, EDamageTypeKey.Physical],
 } as const;
 
 export const DAMAGE_TYPE_KEY_ATTRIBUTES = {
@@ -25,6 +31,12 @@ export const DAMAGE_TYPE_KEY_ATTRIBUTES = {
 	[EDamageTypeKey.Burn]: { amplification: EAttribute.BurnAmplification, resistance: EAttribute.BurnResistance },
 	[EDamageTypeKey.Elemental]: { amplification: EAttribute.ElementalAmplification, resistance: EAttribute.ElementalResistance },
 	[EDamageTypeKey.Dot]: { amplification: EAttribute.DotAmplification, resistance: EAttribute.DotResistance },
+	[EDamageTypeKey.Sword]: { amplification: EAttribute.SwordAmplification, resistance: null },
+	[EDamageTypeKey.Axe]: { amplification: EAttribute.AxeAmplification, resistance: null },
+	[EDamageTypeKey.Bow]: { amplification: EAttribute.BowAmplification, resistance: null },
+	[EDamageTypeKey.Club]: { amplification: EAttribute.ClubAmplification, resistance: null },
+	[EDamageTypeKey.Dagger]: { amplification: EAttribute.DaggerAmplification, resistance: null },
+	[EDamageTypeKey.Unarmed]: { amplification: EAttribute.UnarmedAmplification, resistance: null },
 } as const;
 
 export const DAMAGE_TYPE_DOT_ACCUMULATORS = [

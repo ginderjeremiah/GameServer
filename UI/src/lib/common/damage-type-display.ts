@@ -1,4 +1,5 @@
 import { EDamageType, EDamageTypeKey } from '$lib/api';
+import { applies } from '$lib/battle/damage-types';
 
 /*
  * Frontend display helpers for damage types (#1320, Area F). The accent hues are declared as `--dmg-*`
@@ -7,11 +8,10 @@ import { EDamageType, EDamageTypeKey } from '$lib/api';
  * frontend concern — the backend never references them.
  *
  * Metadata is keyed by `EDamageTypeKey`, the superset that adds the cross-cutting `Elemental` / `Dot`
- * categories on top of the eight leaf `EDamageType` values (so the by-type attribute breakdown can
- * label a category group). A hit's leaf `EDamageType` reuses the same metadata: the eight leaf values
- * are codegen'd from the same backend taxonomy as `EDamageTypeKey` and therefore share their numeric
- * value (e.g. `EDamageType.Fire === EDamageTypeKey.Fire`), so a leaf type indexes the key-keyed maps
- * directly — see {@link leafKey}.
+ * categories (and the #1340 weapon leaves) on top of the leaf `EDamageType` values (so the by-type
+ * attribute breakdown can label a category group). A hit's leaf `EDamageType` reuses the same metadata
+ * via {@link leafKey}. The weapon leaves reuse the `physical` glyph and hue (they are physical-category)
+ * with their own display name; distinct weapon art is a deferred UI follow-up.
  */
 
 /** The inline-SVG glyph variants drawn by `DamageTypeGlyph` — one per damage-type key. */
@@ -45,12 +45,20 @@ const DAMAGE_TYPE_KEY_INFO: Record<EDamageTypeKey, DamageTypeKeyInfo> = {
 	[EDamageTypeKey.Poison]: { key: 'poison', name: 'Poison', glyph: 'poison' },
 	[EDamageTypeKey.Burn]: { key: 'burn', name: 'Burn', glyph: 'burn' },
 	[EDamageTypeKey.Elemental]: { key: 'elemental', name: 'Elemental', glyph: 'elemental' },
-	[EDamageTypeKey.Dot]: { key: 'dot', name: 'Damage Over Time', glyph: 'dot' }
+	[EDamageTypeKey.Dot]: { key: 'dot', name: 'Damage Over Time', glyph: 'dot' },
+	// Weapon leaves (#1340) reuse the physical glyph + hue with their own name (no per-weapon art yet).
+	[EDamageTypeKey.Sword]: { key: 'physical', name: 'Sword', glyph: 'physical' },
+	[EDamageTypeKey.Axe]: { key: 'physical', name: 'Axe', glyph: 'physical' },
+	[EDamageTypeKey.Bow]: { key: 'physical', name: 'Bow', glyph: 'physical' },
+	[EDamageTypeKey.Club]: { key: 'physical', name: 'Club', glyph: 'physical' },
+	[EDamageTypeKey.Dagger]: { key: 'physical', name: 'Dagger', glyph: 'physical' },
+	[EDamageTypeKey.Unarmed]: { key: 'physical', name: 'Unarmed', glyph: 'physical' }
 };
 
-/** The own category key of a leaf damage type. The eight leaf `EDamageType` values share their numeric
- *  value with the matching `EDamageTypeKey` (same backend taxonomy), so the leaf type *is* its own key. */
-const leafKey = (type: EDamageType): EDamageTypeKey => type as unknown as EDamageTypeKey;
+/** The own category key of a leaf damage type — the first key its `applies()` set resolves to (a leaf
+ *  type's own same-named key always leads, including the weapon leaves whose key ordinal differs from the
+ *  leaf's). Robust to the append-only enum order, where a leaf and its key no longer share a numeric value. */
+const leafKey = (type: EDamageType): EDamageTypeKey => applies(type)[0];
 
 /* ── damage-type-key helpers (the breakdown groups by these, incl. Elemental/DoT) ───────────────── */
 
