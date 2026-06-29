@@ -21,6 +21,14 @@ namespace Game.Core.Battle
         public double DifficultyMultiplier { get; }
 
         /// <summary>
+        /// The player's power for this battle — the sum of core additive attribute modifiers (the same measure
+        /// the difficulty ratio above is built from). Exposed so the effect-based proficiency accrual can
+        /// normalize each activity by the <em>identical</em> power measure the difficulty curve uses
+        /// (spike #1318), rather than re-deriving it and risking divergence.
+        /// </summary>
+        public double PlayerPower { get; }
+
+        /// <summary>
         /// Computes the rewards for defeating <paramref name="enemy"/>. The player's power is measured from
         /// <paramref name="playerModifiers"/> — the modifier set reconstructed from the battle snapshot
         /// (<see cref="BattleSnapshot.GetModifiers"/>) — rather than the live player aggregate, so the reward
@@ -29,8 +37,8 @@ namespace Game.Core.Battle
         public DefeatRewards(IEnumerable<AttributeModifier> playerModifiers, Enemy enemy)
         {
             var enemyAttTotal = SumCoreAttributes(enemy.GetAttributeModifiers());
-            var playerAttTotal = SumCoreAttributes(playerModifiers);
-            DifficultyMultiplier = GetDifficultyMultiplier(enemyAttTotal, playerAttTotal);
+            PlayerPower = SumCoreAttributes(playerModifiers);
+            DifficultyMultiplier = GetDifficultyMultiplier(enemyAttTotal, PlayerPower);
             ExpReward = ToIntReward(enemyAttTotal * DifficultyMultiplier);
         }
 

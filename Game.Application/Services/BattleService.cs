@@ -650,7 +650,11 @@ namespace Game.Application.Services
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
         // observed, so the server-measured cap is the (stronger) control there and a client timestamp adds
         // nothing. Both paths therefore require a server-validated timeline; neither can be claimed early.
-        private DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp)
+        // internal (not private) so an integration test can assert the live PlayerPower snapshot directly:
+        // EndBattleVictory returns only a client-facing DefeatResult, and the BattleStats this mutates is
+        // carried on the BattleCompletedEvent, which the dispatcher clears after handling — leaving no other
+        // seam to observe that result.Stats.PlayerPower is set from the snapshot rather than the live aggregate.
+        internal DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp)
         {
             // Measure the player's power for the reward from the same frozen snapshot the battle was simulated
             // against, not the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps)
@@ -665,6 +669,11 @@ namespace Game.Application.Services
 
             var rewards = new DefeatRewards(
                 snapshot.GetModifiersWithSignaturePassive(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
+
+            // Snapshot the player's power onto the battle stats so the proficiency accrual normalizes activity
+            // by the identical measure the difficulty curve uses (spike #1318) — captured here from the same
+            // snapshot modifiers, not the live aggregate.
+            result.Stats.PlayerPower = rewards.PlayerPower;
 
             player.GrantExp(rewards.ExpReward);
             // Thread the difficulty multiplier onto the battle-completed event so the progress handler can

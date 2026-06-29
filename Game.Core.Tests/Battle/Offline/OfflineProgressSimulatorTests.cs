@@ -356,6 +356,31 @@ namespace Game.Core.Tests.Battle.Offline
             });
         }
 
+        [Fact]
+        public void Simulate_SnapshotsPlayerPowerOntoEachVictoryStats()
+        {
+            // The effect-based proficiency accrual normalizes activity by the player's power, so the simulator
+            // snapshots it onto each won battle's stats — the same core-additive sum DefeatRewards measures
+            // from the stationary modifiers (here Strength 100 + Endurance 100 = 200).
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), StrongPlayerWinScenario()));
+
+            Assert.True(result.Wins > 1);
+            Assert.Equal(result.BattlesSimulated, result.Wins); // the strong player wins every battle
+            Assert.All(result.Battles, battle => Assert.Equal(200, battle.Result.Stats.PlayerPower, precision: 9));
+        }
+
+        [Fact]
+        public void Simulate_LeavesPlayerPowerAtZeroForLosses()
+        {
+            // A loss earns no DefeatRewards, so (like the live path) its stats carry no power snapshot — the
+            // default 0. Accrual is victory-only, so a loss's power is never read.
+            var result = _simulator.Simulate(BossParameters(ManyStepsBudget(), AlwaysLoseBossScenario()));
+
+            Assert.True(result.Losses > 1);
+            Assert.Equal(result.BattlesSimulated, result.Losses);
+            Assert.All(result.Battles, battle => Assert.Equal(0, battle.Result.Stats.PlayerPower));
+        }
+
         // ── Cancellation ─────────────────────────────────────────────────────
 
         [Fact]
