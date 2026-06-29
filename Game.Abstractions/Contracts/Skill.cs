@@ -15,6 +15,10 @@ namespace Game.Abstractions.Contracts
         public required string IconPath { get; set; }
         public ERarity RarityId { get; set; }
 
+        /// <summary>The leaf damage type this skill's direct hits deal (spike #1320); see
+        /// <see cref="Core.Skills.Skill.DamageType"/>. Backfills to <see cref="EDamageType.Physical"/>.</summary>
+        public EDamageType DamageType { get; set; }
+
         /// <summary>The skill's Aetheric conlang "word of power" (romanization rendered as glyphs, e.g.
         /// <c>sijren</c>), its <see cref="Pronunciation"/>, and its <see cref="Translation"/> — the decipher
         /// strings the Synthesis screen surfaces as a synthesized skill's identity (the same conlang the

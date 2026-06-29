@@ -102,17 +102,22 @@ namespace Game.Core.Battle
         /// seam for later enemy parity.
         /// </summary>
         /// <returns>
-        /// The actual damage applied after crit, Defense, and block — the same value booked into the battle
-        /// stats — so the caller can record a reconciling per-skill total instead of the raw pre-mitigation hit.
+        /// The actual damage applied after amplification, crit, resistance, Defense, and block — the same value
+        /// booked into the battle stats — so the caller can record a reconciling per-skill total instead of the
+        /// raw pre-mitigation hit.
         /// </returns>
-        public double DamageTarget(double rawDamage)
+        public double DamageTarget(double rawDamage, EDamageType damageType)
         {
+            // Attacker-side amplification first (before the crit draw, which it never feeds), so the typed hit
+            // entering the mitigation pipeline is the amplified value. Computing it here doesn't advance the RNG.
+            var dealt = _activeBattler.AmplifyDamage(rawDamage, damageType);
+
             double actualDamage;
             if (_isPlayerActive)
             {
                 var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
-                var damage = isCrit ? rawDamage * _activeBattler.GetAttributeValue(CriticalDamage) : rawDamage;
-                actualDamage = _targetBattler.TakeDamage(damage);
+                var damage = isCrit ? dealt * _activeBattler.GetAttributeValue(CriticalDamage) : dealt;
+                actualDamage = _targetBattler.TakeDamage(damage, damageType);
 
                 Stats.PlayerDamageDealt += actualDamage;
                 if (isCrit)
@@ -133,10 +138,10 @@ namespace Game.Core.Battle
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
                 var isBlock = _rng.Next() < _targetBattler.GetAttributeValue(BlockChance);
 
-                // The post-Defense damage the hit would deal if it landed normally — the basis for how much a
-                // dodge avoided or a block prevented (the same Defense clamp Battler.TakeDamage applies).
-                var afterDefense = rawDamage - _targetBattler.GetAttributeValue(Defense);
-                afterDefense = afterDefense > 0 ? afterDefense : 0;
+                // The net damage the hit would deal if it landed normally (resistance then flat Defense, no
+                // block) — the basis for how much a dodge avoided or a block prevented, via the same pipeline
+                // Battler.TakeDamage applies.
+                var afterDefense = _targetBattler.ComputeNetDamage(dealt, damageType);
 
                 if (isDodge)
                 {
@@ -146,13 +151,13 @@ namespace Game.Core.Battle
                 }
                 else if (isBlock)
                 {
-                    actualDamage = _targetBattler.TakeDamage(rawDamage, _targetBattler.GetAttributeValue(BlockReduction));
+                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _targetBattler.GetAttributeValue(BlockReduction));
                     Stats.AttacksBlocked++;
                     Stats.DamageBlocked += afterDefense - actualDamage;
                 }
                 else
                 {
-                    actualDamage = _targetBattler.TakeDamage(rawDamage);
+                    actualDamage = _targetBattler.TakeDamage(dealt, damageType);
                 }
 
                 Stats.PlayerDamageTaken += actualDamage;

@@ -737,6 +737,112 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2400),
+
+                // ── Direct-hit damage typing: amplification / resistance (#1320 Area B) ──────────
+                // Skills carry a leaf damage type; the attacker's amplification and defender's resistance for
+                // that type's applies() keys multiply the hit as separate budgets — × (1 + amp), × (1 − res),
+                // res unclamped — with crit attacker-side (pre-mitigation) and flat Defense last. All chances
+                // are 0 here, so the outcomes are hand-computable. Mirrored in the frontend suite.
+
+                // Attacker amplification: a Fire skill with +0.5 FireAmplification deals 20 × 1.5 = 30, −2 Def =
+                // 28/hit, so the 100-HP enemy dies on hit 4 at tick 40 → 1600ms (vs hit 6 / 2400ms un-amplified).
+                ["fireAmplification"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire)],
+                        extra: [(EAttribute.FireAmplification, 0.5)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
+                // Defender resistance: the enemy's +0.5 FireResistance halves a 40-damage Fire hit to 20, −2 Def
+                // = 18/hit, so the 100-HP enemy dies on hit 6 at tick 60 → 2400ms (vs hit 3 / 1200ms un-resisted).
+                ["fireResistance"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 40, cooldownMs: 400, damageType: EDamageType.Fire)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0, skills: [],
+                        extra: [(EAttribute.FireResistance, 0.5)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2400),
+
+                // Vulnerability (res < 0): a −1.0 FireResistance doubles the incoming Fire hit (factor 1 − (−1) =
+                // 2). A 20-damage hit becomes 40, −2 Def = 38/hit, so the 100-HP enemy dies on hit 3 at tick 30 →
+                // 1200ms (vs hit 6 / 2400ms at res 0). Resistance is deliberately left unclamped.
+                ["fireVulnerability"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0, skills: [],
+                        extra: [(EAttribute.FireResistance, -1.0)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
+                // Absorption (res > 1): a +2.0 FireResistance drives the post-resistance hit negative (20 × (1 −
+                // 2) = −20), so an absorbed hit deals no damage — flat Defense never applies, and the heal is
+                // capped at MaxHealth (the enemy is already full, so it stays at 100). The enemy never loses
+                // health and never dies; dealing no damage back, the battle runs to the timeout. (At res 0 the
+                // player's 18/hit would win by 2400ms.)
+                ["fireAbsorption"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0, skills: [],
+                        extra: [(EAttribute.FireResistance, 2.0)]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
+
+                // Crit punches through resistance AND Defense: a forced crit (CriticalDamage base 1.5 + 0.5 = 2.0)
+                // multiplies the Fire hit pre-mitigation. A normal hit (20 × (1 − 0.5 res) = 10, −10 Def) clamps
+                // to 0 — the enemy is unkillable without crit — but the crit (20 × 2 × 0.5 = 20, −10 Def = 10/hit)
+                // punches through, dropping the 50-HP enemy on hit 5 at tick 50 → 2000ms.
+                ["critPunchesThroughTyped"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire)],
+                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 0, endurance: 0, skills: [],
+                        extra: [(EAttribute.Defense, 8.0), (EAttribute.FireResistance, 0.5)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
+                // Reduce-to-today identity: a Fire-typed skill with no amplification or resistance authored
+                // anywhere behaves exactly like the untyped/physical hit it used to be — × (1 + 0) and × (1 − 0)
+                // are exact 1.0 factors. 20 raw − 2 Def = 18/hit, so the 100-HP enemy dies on hit 6 → 2400ms,
+                // identical to a baseDamage-20 physical skill.
+                ["typedFireNoModifiersUnchanged"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2400),
+
+                // Bidirectional: the ENEMY amplifies and the PLAYER resists. The enemy's +1.0 FireAmplification
+                // doubles its 20-damage Fire skill to 40; the player's +0.5 FireResistance halves that to 20, −2
+                // Def = 18/hit. The player (no skills) dies on the enemy's hit 6 at tick 60 → 2400ms. (Without the
+                // enemy amp it would be 8/hit → 5200ms; without the player resist, 38/hit → 1200ms.)
+                ["enemyAmplifiesPlayerResists"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0, skills: [],
+                        extra: [(EAttribute.FireResistance, 0.5)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire)],
+                        extra: [(EAttribute.FireAmplification, 1.0)]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: true,
+                    ExpectedTotalMs: 2400),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>
@@ -839,12 +945,14 @@ namespace Game.Core.Tests.Battle
         private static Skill MakeSkill(
             int id, double baseDamage, int cooldownMs,
             EAttribute? mult = null, double multAmount = 0,
-            List<SkillEffect>? effects = null) => new()
+            List<SkillEffect>? effects = null,
+            EDamageType damageType = EDamageType.Physical) => new()
             {
                 Id = id,
                 Name = $"Skill {id}",
                 Description = "",
                 Rarity = ERarity.Common,
+                DamageType = damageType,
                 CooldownMs = cooldownMs,
                 BaseDamage = baseDamage,
                 DamageMultipliers = mult is null

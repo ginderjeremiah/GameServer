@@ -68,16 +68,80 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Applies <paramref name="rawDamage"/> after subtracting flat <see cref="Defense"/> and the optional
-        /// <paramref name="blockReduction"/> (a second flat reduction in the same clamp, supplied by the
-        /// caller only when an incoming hit is blocked), never below zero. Returns the damage actually dealt.
+        /// Amplifies an outgoing <paramref name="rawDamage"/> hit of the given <paramref name="damageType"/> by
+        /// this (attacking) battler's amplification: <c>rawDamage × (1 + Σ applies(type).Amplification)</c>, the
+        /// additive sum folded in the fixed <see cref="DamageTypes.AmplificationAttributes"/> order so both
+        /// simulators agree bit-for-bit. With no amplification authored the sum is <c>0</c>, so the factor is an
+        /// exact <c>1.0</c> and the hit is unchanged (the reduce-to-today identity, spike #1320 Area B).
         /// </summary>
-        public double TakeDamage(double rawDamage, double blockReduction = 0)
+        public double AmplifyDamage(double rawDamage, EDamageType damageType)
         {
-            var damage = rawDamage - _attributes[Defense] - blockReduction;
-            damage = damage > 0 ? damage : 0;
-            CurrentHealth -= damage;
-            return damage;
+            var amplification = 0.0;
+            var amplificationAttributes = DamageTypes.AmplificationAttributes(damageType);
+            for (var i = 0; i < amplificationAttributes.Count; i++)
+            {
+                amplification += _attributes[amplificationAttributes[i]];
+            }
+
+            return rawDamage * (1 + amplification);
+        }
+
+        /// <summary>
+        /// The net damage an incoming hit of <paramref name="dealt"/> (already amplified and crit-multiplied) of
+        /// the given <paramref name="damageType"/> would deal to this (defending) battler, <b>without</b>
+        /// mutating health: percentage resistance first (<c>dealt × (1 − Σ applies(type).Resistance)</c>,
+        /// <b>unclamped</b> — a negative total amplifies as vulnerability, a total above <c>1</c> drives the
+        /// result negative as absorption), then flat <see cref="Defense"/> plus the optional
+        /// <paramref name="blockReduction"/> last and <b>only</b> while the post-resistance damage is still
+        /// positive — so flat reduction can neither heal nor deepen an absorption heal. The resistance sum is
+        /// folded in the fixed <see cref="DamageTypes.ResistanceAttributes"/> order for parity; with none
+        /// authored it is <c>0</c>, leaving the positive branch byte-identical to the old flat-Defense step.
+        /// </summary>
+        public double ComputeNetDamage(double dealt, EDamageType damageType, double blockReduction = 0)
+        {
+            var resistance = 0.0;
+            var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
+            for (var i = 0; i < resistanceAttributes.Count; i++)
+            {
+                resistance += _attributes[resistanceAttributes[i]];
+            }
+
+            var mitigated = dealt * (1 - resistance);
+            if (mitigated <= 0)
+            {
+                // Absorption (or a zero hit): the target takes a net heal and flat reduction never applies.
+                return mitigated;
+            }
+
+            var net = mitigated - _attributes[Defense] - blockReduction;
+            return net > 0 ? net : 0;
+        }
+
+        /// <summary>
+        /// Applies an incoming hit of <paramref name="dealt"/> (already amplified and crit-multiplied) of the
+        /// given <paramref name="damageType"/> via <see cref="ComputeNetDamage"/> — percentage resistance then
+        /// flat <see cref="Defense"/> and the optional <paramref name="blockReduction"/> (a second flat
+        /// reduction supplied only when the hit is blocked). Returns the net damage dealt; a negative result
+        /// (absorption) heals this battler, <b>capped at <see cref="MaxHealth"/></b> — the game has no
+        /// overheal/shield concept, so this matches <see cref="ApplyHealOverTime"/> rather than letting the
+        /// reactive absorption channel bank health above the cap.
+        /// </summary>
+        public double TakeDamage(double dealt, EDamageType damageType, double blockReduction = 0)
+        {
+            var net = ComputeNetDamage(dealt, damageType, blockReduction);
+            if (net < 0)
+            {
+                // Absorption: cap the heal at the remaining room to MaxHealth (consistent with ApplyHealOverTime),
+                // and report the actual healed amount so the per-skill / global stats stay reconciled.
+                var room = _attributes[MaxHealth] - CurrentHealth;
+                var heal = -net < room ? -net : room;
+                heal = heal > 0 ? heal : 0;
+                CurrentHealth += heal;
+                return -heal;
+            }
+
+            CurrentHealth -= net;
+            return net;
         }
 
         /// <summary>

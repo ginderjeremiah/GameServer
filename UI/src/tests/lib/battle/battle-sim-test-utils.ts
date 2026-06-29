@@ -1,6 +1,7 @@
 import { Battler, newItem } from '$lib/battle';
 import {
 	EAttribute,
+	EDamageType,
 	EItemCategory,
 	ERarity,
 	ESkillAcquisition,
@@ -34,14 +35,16 @@ export interface SkillSpec {
 	cooldownMs: number;
 	multipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
+	damageType: EDamageType;
 }
 
 export const makeSkill = (
 	baseDamage: number,
 	cooldownMs: number,
 	multipliers: IAttributeMultiplier[] = [],
-	effects: ISkillEffect[] = []
-): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects });
+	effects: ISkillEffect[] = [],
+	damageType: EDamageType = EDamageType.Physical
+): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects, damageType });
 
 /** A timed skill effect, mirroring the backend parity test's MakeEffect helper. The scaling fields
  *  default to no scaling (a `scalingAmount` of 0), so existing scenarios are unaffected. */
@@ -65,6 +68,7 @@ function registerSkill(registry: ISkill[], spec: SkillSpec): number {
 		name: `Skill ${id}`,
 		baseDamage: spec.baseDamage,
 		cooldownMs: spec.cooldownMs,
+		damageType: spec.damageType,
 		damageMultipliers: spec.multipliers,
 		effects: spec.effects,
 		description: '',

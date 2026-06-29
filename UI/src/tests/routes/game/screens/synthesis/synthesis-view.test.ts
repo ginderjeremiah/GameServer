@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
 import type { RecipeView } from '$routes/game/screens/synthesis/synthesis';
 
 /* The view-model reads the live stores + engine + socket, so those are mocked with mutable stand-ins the
@@ -46,6 +46,7 @@ const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
+	damageType: EDamageType.Physical,
 	acquisition: ESkillAcquisition.Synthesis,
 	...over
 });

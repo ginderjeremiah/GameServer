@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EAttribute } from '$lib/api';
+import { EDamageType, EAttribute } from '$lib/api';
 
 // The Battler constructor resolves selectedSkills through staticData; an empty registry suffices here.
 vi.mock('$stores', () => ({
@@ -45,7 +45,7 @@ describe('Battler damage/heal-over-time', () => {
 			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
 			{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
 		]);
-		battler.takeDamage(52); // Defense 2 → 50 damage → currentHealth 50
+		battler.takeDamage(52, EDamageType.Physical); // Defense 2 → 50 damage → currentHealth 50
 
 		const healed = battler.applyHealOverTime(40); // 75 * 40 / 1000 = 3
 
@@ -70,7 +70,7 @@ describe('Battler damage/heal-over-time', () => {
 			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
 			{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
 		]);
-		battler.takeDamage(4); // Defense 2 → 2 damage → currentHealth 98
+		battler.takeDamage(4, EDamageType.Physical); // Defense 2 → 2 damage → currentHealth 98
 
 		const healed = battler.applyHealOverTime(40); // would heal 3, but only 2 of room remains
 
@@ -83,7 +83,7 @@ describe('Battler damage/heal-over-time', () => {
 			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
 			{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
 		]);
-		battler.takeDamage(52); // currentHealth 50
+		battler.takeDamage(52, EDamageType.Physical); // currentHealth 50
 
 		battler.applyHealOverTime(40); // heals 3 → currentHealth 53
 

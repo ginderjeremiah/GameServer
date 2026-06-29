@@ -19,6 +19,15 @@
         public required int CooldownMs { get; init; }
 
         /// <summary>
+        /// The leaf damage type this skill's direct hits deal (spike #1320). The damage pipeline resolves it
+        /// to the attacker's amplification and defender's resistance attributes through
+        /// <see cref="Attributes.DamageTypes.Applies"/>; an untyped pre-feature skill backfills to
+        /// <see cref="EDamageType.Physical"/>, whose amp/resist attributes default to <c>0</c> (no behaviour
+        /// change until typed content is authored).
+        /// </summary>
+        public required EDamageType DamageType { get; init; }
+
+        /// <summary>
         /// The skill's rarity tier. The battle simulation never reads it, but the proficiency XP accrual does:
         /// at battle completion it maps the rarity to a tier weight (<see cref="Proficiencies.ProficiencyTierWeight"/>,
         /// #982/#1123) so a rarer fired skill pulls a larger share of the pie. See

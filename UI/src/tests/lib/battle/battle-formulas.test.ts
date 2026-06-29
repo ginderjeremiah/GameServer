@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { ERarity, EAttribute, ESkillAcquisition } from '$lib/api';
+import { ERarity, EAttribute, EDamageType, ESkillAcquisition } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import {
+	amplifiedDamage,
 	applyDefense,
 	calculateSkillDamage,
 	cooldownMultiplier,
 	expectedCritMultiplier,
+	mitigateDamage,
 	skillContributions
 } from '$lib/battle/battle-formulas';
 
@@ -18,6 +20,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	effects: [],
 	description: 'A basic slash',
 	cooldownMs: 1000,
+	damageType: EDamageType.Physical,
 	iconPath: '/icons/slash.png',
 	rarityId: ERarity.Common,
 	word: '',
@@ -166,6 +169,73 @@ describe('battle-formulas', () => {
 		it('subtracts block reduction alongside defense in the same clamp', () => {
 			expect(applyDefense(30, 10, 5)).toBe(15); // 30 − 10 − 5
 			expect(applyDefense(30, 10, 25)).toBe(0); // clamps when defense + block exceed the damage
+		});
+	});
+
+	// Damage typing (#1320): mirrors the backend `Battler.AmplifyDamage` / `Battler.ComputeNetDamage` math.
+	describe('amplifiedDamage', () => {
+		it('leaves damage unchanged with no amplification (reduce-to-today identity)', () => {
+			expect(amplifiedDamage(20, EDamageType.Physical, makeAttributes())).toBe(20);
+		});
+
+		it('sums the applicable amplification keys (fire + elemental)', () => {
+			// applies(Fire) = { Fire, Elemental }: 0.3 + 0.2 = 0.5 → 40 × 1.5 = 60.
+			const attrs = makeAttributes([
+				[EAttribute.FireAmplification, 0.3],
+				[EAttribute.ElementalAmplification, 0.2]
+			]);
+			expect(amplifiedDamage(40, EDamageType.Fire, attrs)).toBeCloseTo(60, 10);
+		});
+
+		it('ignores elemental amplification for a physical hit', () => {
+			// applies(Physical) = { Physical } only — Physical is not a cross-cutting category.
+			const attrs = makeAttributes([
+				[EAttribute.PhysicalAmplification, 0.5],
+				[EAttribute.ElementalAmplification, 1.0]
+			]);
+			expect(amplifiedDamage(20, EDamageType.Physical, attrs)).toBeCloseTo(30, 10);
+		});
+	});
+
+	describe('mitigateDamage', () => {
+		it('applies percentage resistance before flat defense', () => {
+			// FireResistance 0.5 halves 40 to 20, then flat Defense 12 → 8.
+			const attrs = makeAttributes([
+				[EAttribute.Defense, 12],
+				[EAttribute.FireResistance, 0.5]
+			]);
+			expect(mitigateDamage(40, EDamageType.Fire, attrs)).toBeCloseTo(8, 10);
+		});
+
+		it('sums resistance across the applicable keys (fire + elemental)', () => {
+			const attrs = makeAttributes([
+				[EAttribute.Defense, 2],
+				[EAttribute.FireResistance, 0.25],
+				[EAttribute.ElementalResistance, 0.25]
+			]);
+			expect(mitigateDamage(40, EDamageType.Fire, attrs)).toBeCloseTo(18, 10); // 40 × 0.5 − 2
+		});
+
+		it('treats negative resistance as vulnerability (unclamped)', () => {
+			const attrs = makeAttributes([
+				[EAttribute.Defense, 2],
+				[EAttribute.FireResistance, -0.5]
+			]);
+			expect(mitigateDamage(20, EDamageType.Fire, attrs)).toBeCloseTo(28, 10); // 20 × 1.5 − 2
+		});
+
+		it('returns a negative (healing) value on absorption and never applies flat defense', () => {
+			// FireResistance 2.0 → 20 × (1 − 2) = −20, with Defense NOT subtracted.
+			const attrs = makeAttributes([
+				[EAttribute.Defense, 2],
+				[EAttribute.FireResistance, 2.0]
+			]);
+			expect(mitigateDamage(20, EDamageType.Fire, attrs)).toBeCloseTo(-20, 10);
+		});
+
+		it('matches applyDefense for a typed hit with no resistance', () => {
+			const attrs = makeAttributes([[EAttribute.Defense, 12]]);
+			expect(mitigateDamage(50, EDamageType.Fire, attrs)).toBe(applyDefense(50, 12));
 		});
 	});
 

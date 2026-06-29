@@ -4,6 +4,7 @@
 import type {
 	EAttribute,
 	EChallengeType,
+	EDamageType,
 	EEntityType,
 	EEquipmentSlot,
 	EItemCategory,
@@ -198,6 +199,7 @@ export interface ISkill {
 	cooldownMs: number;
 	iconPath: string;
 	rarityId: ERarity;
+	damageType: EDamageType;
 	word: string;
 	pronunciation: string;
 	translation: string;

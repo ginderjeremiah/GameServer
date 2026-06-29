@@ -1,7 +1,7 @@
 /* Shared fixtures for the Fight screen tests. Not a test file (no
    .test/.spec suffix) so vitest does not collect it. */
 
-import { EAttribute, ERarity, ESkillAcquisition, type IBattlerAttribute, type ISkill } from '$lib/api';
+import { EDamageType, EAttribute, ERarity, ESkillAcquisition, type IBattlerAttribute, type ISkill } from '$lib/api';
 import { Battler, Skill } from '$lib/battle';
 
 /** Builds a real Skill bound to an owner, overriding only what a test cares about. */
@@ -20,6 +20,7 @@ export const makeSkill = (owner: Battler, over: Partial<ISkill> = {}): Skill =>
 			word: '',
 			pronunciation: '',
 			translation: '',
+			damageType: EDamageType.Physical,
 			acquisition: ESkillAcquisition.Player,
 			...over
 		},

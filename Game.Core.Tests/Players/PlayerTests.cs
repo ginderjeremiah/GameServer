@@ -1122,6 +1122,7 @@ namespace Game.Core.Tests.Players
             BaseDamage = 10,
             Description = string.Empty,
             Rarity = ERarity.Common,
+            DamageType = EDamageType.Physical,
             CooldownMs = 1000,
             DamageMultipliers = [],
             Effects = [],

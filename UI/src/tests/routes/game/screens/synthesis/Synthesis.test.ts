@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import { ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
 
 /* The screen drives the real playerProficiencies store (fetched over the socket) for the gate state and
    reads recipes/skills/proficiencies from staticData, so the socket fetch + staticData are stubbed; the
@@ -45,6 +45,7 @@ const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
+	damageType: EDamageType.Physical,
 	acquisition: ESkillAcquisition.Synthesis,
 	...over
 });

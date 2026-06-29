@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EModifierType, ESkillEffectTarget } from '$lib/api';
+import { EDamageType, EAttribute, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 
 const mockSkills: ISkill[] = [];
@@ -222,7 +222,7 @@ describe('battleStep', () => {
 				],
 				[]
 			);
-			player.takeDamage(47); // Defense 2 → 45 damage → currentHealth 5
+			player.takeDamage(47, EDamageType.Physical); // Defense 2 → 45 damage → currentHealth 5
 			const enemy = makeBattler(baseStats, []);
 			const log = newLog();
 

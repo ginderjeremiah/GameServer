@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ERarity, EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
+import { EDamageType, ERarity, EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 
 // A mutable skill registry backing the mocked `staticData.skills`, so the battleStep ordering test can
@@ -215,6 +215,7 @@ describe('Battler skill-effect bookkeeping', () => {
 				word: '',
 				pronunciation: '',
 				translation: '',
+				damageType: EDamageType.Physical,
 				acquisition: ESkillAcquisition.Player
 			},
 			caster
@@ -246,6 +247,7 @@ describe('Battler skill-effect bookkeeping', () => {
 				word: '',
 				pronunciation: '',
 				translation: '',
+				damageType: EDamageType.Physical,
 				acquisition: ESkillAcquisition.Player
 			},
 			caster
@@ -392,6 +394,7 @@ describe('Skill effect attribute scaling', () => {
 				word: '',
 				pronunciation: '',
 				translation: '',
+				damageType: EDamageType.Physical,
 				acquisition: ESkillAcquisition.Player
 			},
 			caster

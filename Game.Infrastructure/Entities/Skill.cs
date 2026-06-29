@@ -10,6 +10,11 @@
         public required string IconPath { get; set; }
         public int RarityId { get; set; }
 
+        /// <summary>The <see cref="Core.EDamageType"/> leaf type this skill's direct hits deal (spike #1320).
+        /// A plain enum-as-int column (like <see cref="Acquisition"/>); existing rows backfill to
+        /// <c>0</c> (<see cref="Core.EDamageType.Physical"/>).</summary>
+        public int DamageType { get; set; }
+
         /// <summary>The skill's Aetheric conlang "word of power" — the romanization rendered as glyphs
         /// (e.g. <c>sijren</c>). Decorative flavour (the same conlang the proficiency Lexicon uses), surfaced
         /// most prominently on the Synthesis screen as a synthesized skill's discovered identity:

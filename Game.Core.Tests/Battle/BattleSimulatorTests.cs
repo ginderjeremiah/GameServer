@@ -120,6 +120,7 @@ namespace Game.Core.Tests.Battle
                     Name = "Attack",
                     Description = "",
                     Rarity = ERarity.Common,
+                    DamageType = EDamageType.Physical,
                     CooldownMs = 1000,
                     BaseDamage = 10,
                     DamageMultipliers = [
@@ -151,6 +152,7 @@ namespace Game.Core.Tests.Battle
                     Name = "Scratch",
                     Description = "",
                     Rarity = ERarity.Common,
+                    DamageType = EDamageType.Physical,
                     CooldownMs = 1500,
                     BaseDamage = 5,
                     DamageMultipliers = [],

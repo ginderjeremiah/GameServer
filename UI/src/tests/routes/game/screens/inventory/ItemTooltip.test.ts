@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, EItemCategory, EItemModType, ERarity, ESkillAcquisition, type ISkill } from '$lib/api';
+import {
+	EDamageType,
+	EAttribute,
+	EItemCategory,
+	EItemModType,
+	ERarity,
+	ESkillAcquisition,
+	type ISkill
+} from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import type { Item } from '$lib/battle';
 import { staticData } from '$stores';
@@ -72,6 +80,7 @@ const skill = (id: number, name: string): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
+	damageType: EDamageType.Physical,
 	acquisition: ESkillAcquisition.Item
 });
 

@@ -1,6 +1,7 @@
 import {
 	ApiRequest,
 	EAttribute,
+	EDamageType,
 	EEntityType,
 	EEquipmentSlot,
 	EItemCategory,
@@ -107,6 +108,8 @@ class WorkbenchReference {
 	equipmentSlotOptions = (): SelectOption[] => toOptions(enumPairs(EEquipmentSlot));
 	itemCategoryOptions = (): SelectOption[] => toOptions(enumPairs(EItemCategory));
 	rarityOptions = (): SelectOption[] => toOptions(enumPairs(ERarity));
+	/** Leaf damage-type picker options (the eight EDamageType leaf types) for the skill editor. */
+	damageTypeOptions = (): SelectOption[] => toOptions(enumPairs(EDamageType));
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
 	skillEffectTargetOptions = (): SelectOption[] => toOptions(enumPairs(ESkillEffectTarget));
 	modifierTypeOptions = (): SelectOption[] => toOptions(enumPairs(EModifierType));
