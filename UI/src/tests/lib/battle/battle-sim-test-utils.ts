@@ -70,6 +70,9 @@ function registerSkill(registry: ISkill[], spec: SkillSpec): number {
 		description: '',
 		iconPath: '',
 		rarityId: ERarity.Common,
+		word: '',
+		pronunciation: '',
+		translation: '',
 		acquisition: ESkillAcquisition.Player
 	});
 	return id;

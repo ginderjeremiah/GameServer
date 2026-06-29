@@ -34,6 +34,9 @@ export const skillEntity: EntityConfig<ISkill> = {
 		cooldownMs: 2000,
 		iconPath: '',
 		rarityId: ERarity.Common,
+		word: '',
+		pronunciation: '',
+		translation: '',
 		// New skills default to player-acquirable; re-flag Item/Enemy skills as needed.
 		acquisition: ESkillAcquisition.Player,
 		description: '',
@@ -69,6 +72,9 @@ export const skillEntity: EntityConfig<ISkill> = {
 				{ key: 'cooldownMs', label: 'Cooldown', type: 'number', suffix: 'ms', width: 150 },
 				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },
 				{ key: 'iconPath', label: 'Icon Path', type: 'text', placeholder: 'skills/icon.png', grow: true },
+				{ key: 'word', label: 'Word of Power', type: 'text', placeholder: 'sijren', width: 200 },
+				{ key: 'pronunciation', label: 'Pronunciation', type: 'text', placeholder: 'sij·ren', width: 200 },
+				{ key: 'translation', label: 'Translation', type: 'text', placeholder: 'The Riven Frost', grow: true },
 				{
 					key: 'acquisition',
 					label: 'Acquisition (channels allowed to grant this skill)',

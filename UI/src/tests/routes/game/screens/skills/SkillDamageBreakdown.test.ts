@@ -27,6 +27,9 @@ const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
+	word: '',
+	pronunciation: '',
+	translation: '',
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

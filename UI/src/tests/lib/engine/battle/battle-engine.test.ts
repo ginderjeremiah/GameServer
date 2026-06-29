@@ -158,6 +158,9 @@ describe('BattleEngine', () => {
 			cooldownMs: 500,
 			iconPath: '',
 			rarityId: ERarity.Common,
+			word: '',
+			pronunciation: '',
+			translation: '',
 			acquisition: ESkillAcquisition.Player
 		};
 

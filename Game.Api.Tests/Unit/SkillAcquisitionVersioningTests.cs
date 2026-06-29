@@ -31,6 +31,9 @@ namespace Game.Api.Tests.Unit
             Effects = [],
             Description = "",
             IconPath = "",
+            Word = "",
+            Pronunciation = "",
+            Translation = "",
             Acquisition = acquisition,
         };
     }

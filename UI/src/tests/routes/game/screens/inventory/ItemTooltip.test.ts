@@ -69,6 +69,9 @@ const skill = (id: number, name: string): ISkill => ({
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
+	word: '',
+	pronunciation: '',
+	translation: '',
 	acquisition: ESkillAcquisition.Item
 });
 

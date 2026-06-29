@@ -13,6 +13,8 @@
 		<div class="title-line">
 			<h1 class="title">The Lexicon</h1>
 			<span class="sub">paths of mastery, deciphered as you train</span>
+			<div class="header-spacer"></div>
+			<SynthesisLink />
 		</div>
 	</div>
 
@@ -68,6 +70,7 @@ import LexiconRail from './LexiconRail.svelte';
 import TierSpine from './TierSpine.svelte';
 import WordDetail from './WordDetail.svelte';
 import WordOfPowerTooltip from './WordOfPowerTooltip.svelte';
+import SynthesisLink from '../synthesis/SynthesisLink.svelte';
 import type { TierView, WordTooltipController } from './proficiencies-lexicon';
 import { ProficienciesView } from './proficiencies-view.svelte';
 
@@ -146,6 +149,10 @@ onMount(async () => {
 .sub {
 	font-size: 12.5px;
 	color: var(--text-tertiary);
+}
+
+.header-spacer {
+	flex: 1;
 }
 
 .body {

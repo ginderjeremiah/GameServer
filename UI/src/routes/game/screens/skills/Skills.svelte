@@ -6,6 +6,7 @@
 			<h1 class="title">Skills</h1>
 		</div>
 		<div class="spacer"></div>
+		<div class="synth-link"><SynthesisLink /></div>
 		<div class="head-totals">
 			<div class="stat"><span class="v">{view.equipped.length}/{view.cap}</span><span class="k">equipped</span></div>
 			<div class="stat">
@@ -36,6 +37,7 @@
 <script lang="ts">
 import { formatNum } from '$lib/common';
 import { type TooltipComponent } from '$stores';
+import SynthesisLink from '../synthesis/SynthesisLink.svelte';
 import AttributeTooltip from '$components/tooltip/AttributeTooltip.svelte';
 import { createAttributeTooltip, setAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { SkillsView } from './skills-view.svelte';
@@ -98,6 +100,11 @@ setAttributeTooltip(tip.controller);
 	font-weight: 500;
 	letter-spacing: -0.3px;
 	line-height: 1;
+}
+
+// Spacing only — the link's own styling lives in the shared SynthesisLink component.
+.synth-link {
+	margin-right: 14px;
 }
 
 .head-totals {

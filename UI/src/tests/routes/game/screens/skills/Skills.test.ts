@@ -95,6 +95,9 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
+	word: '',
+	pronunciation: '',
+	translation: '',
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

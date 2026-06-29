@@ -455,6 +455,15 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(s => s.IconPath)
                     .HasMaxLength(50);
+
+                entity.Property(s => s.Word)
+                    .HasMaxLength(50);
+
+                entity.Property(s => s.Pronunciation)
+                    .HasMaxLength(50);
+
+                entity.Property(s => s.Translation)
+                    .HasMaxLength(100);
             });
 
             modelBuilder.Entity<SkillDamageMultiplier>(entity =>

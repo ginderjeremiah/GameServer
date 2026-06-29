@@ -15,6 +15,14 @@ namespace Game.Abstractions.Contracts
         public required string IconPath { get; set; }
         public ERarity RarityId { get; set; }
 
+        /// <summary>The skill's Aetheric conlang "word of power" (romanization rendered as glyphs, e.g.
+        /// <c>sijren</c>), its <see cref="Pronunciation"/>, and its <see cref="Translation"/> — the decipher
+        /// strings the Synthesis screen surfaces as a synthesized skill's identity (the same conlang the
+        /// proficiency Lexicon uses). Display/authoring metadata; the battle never reads it.</summary>
+        public required string Word { get; set; }
+        public required string Pronunciation { get; set; }
+        public required string Translation { get; set; }
+
         /// <summary>The channels allowed to grant this skill (authoring intent; see <see cref="ESkillAcquisition"/>).</summary>
         public ESkillAcquisition Acquisition { get; set; }
 
