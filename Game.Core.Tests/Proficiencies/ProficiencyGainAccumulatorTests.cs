@@ -70,15 +70,13 @@ namespace Game.Core.Tests.Proficiencies
         public void Add_DedupesOpenedNodes_ByProficiencyInFirstSeenOrder()
         {
             var acc = new ProficiencyGainAccumulator();
-            acc.Add(new ProficiencyAccrualResult([], [new ProficiencyOpened(8, SeedSkillId: 80)]));
+            acc.Add(new ProficiencyAccrualResult([], [new ProficiencyOpened(8)]));
             acc.Add(new ProficiencyAccrualResult([], [
-                new ProficiencyOpened(8, SeedSkillId: 80),
-                new ProficiencyOpened(9, SeedSkillId: null)]));
+                new ProficiencyOpened(8),
+                new ProficiencyOpened(9)]));
 
             var opened = acc.Build().Opened;
             Assert.Equal([8, 9], opened.Select(o => o.ProficiencyId));
-            Assert.Equal(80, opened[0].SeedSkillId);
-            Assert.Null(opened[1].SeedSkillId);
         }
 
         [Fact]

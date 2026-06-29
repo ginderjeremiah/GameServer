@@ -158,7 +158,7 @@ describe('proficiencies store', () => {
 
 			playerProficiencies.applyXpGained({
 				proficiencies: [],
-				opened: [{ proficiencyId: 5, seedSkillId: 12 }]
+				opened: [{ proficiencyId: 5 }]
 			});
 
 			expect(playerProficiencies.all).toEqual([playerProficiency(5, 0, 0)]);

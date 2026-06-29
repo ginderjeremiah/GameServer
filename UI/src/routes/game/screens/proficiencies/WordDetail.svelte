@@ -63,9 +63,6 @@
 		{/each}
 	</div>
 
-	<div class="section-head">Seed skill<span class="rule"></span></div>
-	<div class="seed" data-testid="seed-skill">{seedName ?? '—'}</div>
-
 	<div class="section-head">Trained by<span class="rule"></span></div>
 	<div class="chips" data-testid="trained-by">
 		{#if chips.length > 0}
@@ -110,7 +107,6 @@ const xpText = $derived(xpProgressText(tier));
 const reveal = $derived(decipherReveal(tier));
 const ladder = $derived(buildLadder(tier, staticData.attributes, resolveSkill));
 const chips = $derived(trainedBy(path.contributions, resolveSkill));
-const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.seedSkillId) : undefined);
 </script>
 
 <style lang="scss">
@@ -366,12 +362,6 @@ const seedName = $derived(tier.seedSkillId !== undefined ? resolveSkill(tier.see
 
 .rung.reached .ms-tag {
 	color: var(--gold);
-}
-
-.seed {
-	margin-top: 8px;
-	font-size: 15px;
-	color: var(--text-primary);
 }
 
 .chips {

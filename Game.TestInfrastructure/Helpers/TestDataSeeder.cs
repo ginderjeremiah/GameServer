@@ -581,7 +581,6 @@ namespace Game.TestInfrastructure.Helpers
             decimal xpGrowth = 2m,
             int? pathId = null,
             int pathOrdinal = 0,
-            int? seedSkillId = null,
             string word = "",
             string pronunciation = "",
             string translation = "")
@@ -601,7 +600,6 @@ namespace Game.TestInfrastructure.Helpers
                 MaxLevel = maxLevel,
                 BaseXp = baseXp,
                 XpGrowth = xpGrowth,
-                SeedSkillId = seedSkillId,
                 LevelModifiers = [],
                 LevelRewards = [],
                 Prerequisites = [],

@@ -48,7 +48,7 @@ namespace Game.Application.Tests.Services
         [Fact]
         public void HasProgress_OpenedNodeOnly_IsTrue()
         {
-            var summary = Summary(openedProficiencies: [new ProficiencyOpened(1, SeedSkillId: null)]);
+            var summary = Summary(openedProficiencies: [new ProficiencyOpened(1)]);
 
             Assert.True(summary.HasProgress);
         }

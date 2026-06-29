@@ -23,13 +23,6 @@ namespace Game.DataAccess.Repositories.Admin
 
         public AdminSaveResult SaveProficiencies(IReadOnlyList<Change<Contracts.Proficiency>> changes)
         {
-            // Anti-tamper: a tree-seed skill is a permanent grant, so it must declare itself Player-acquirable
-            // (the flag is intent; this reference is reality). Rejected up front before anything is staged.
-            if (FindSeedSkillFlagViolation(changes) is { } rejection)
-            {
-                return rejection;
-            }
-
             // A proficiency is a tier of a path; the path it names must exist (the FK would also reject it,
             // but a named check fails the whole set cleanly before anything is staged).
             if (FindPathViolation(changes) is { } pathRejection)
@@ -60,7 +53,6 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
-                    SeedSkillId = item.SeedSkillId,
                 }),
                 edit: item => _entityStore.Update(new Entities.Proficiency
                 {
@@ -76,7 +68,6 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
-                    SeedSkillId = item.SeedSkillId,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
@@ -128,8 +119,7 @@ namespace Game.DataAccess.Repositories.Admin
             // A milestone reward only pays out at a reachable, crossable level, so reject one authored outside
             // 1..MaxLevel before the anti-tamper skill check. Unlike modifiers, level 0 is not allowed: a reward
             // is granted by crossing a milestone (Proficiency.RewardSkillsCrossed uses l.Level > fromLevel, and
-            // fromLevel is never below 0), so a level-0 reward could never fire — the on-open grant is the
-            // proficiency's SeedSkillId.
+            // fromLevel is never below 0), so a level-0 reward could never fire.
             if (FindLevelOutOfRange(proficiency, data.Rewards.Select(r => r.Level), "level reward", minLevel: 1) is { } levelRejection)
             {
                 return levelRejection;
@@ -330,24 +320,6 @@ namespace Game.DataAccess.Repositories.Admin
             {
                 return AdminSaveResult.Failure(
                     $"These prerequisites would create a cycle: {string.Join(" -> ", cycle)}.");
-            }
-
-            return null;
-        }
-
-        private AdminSaveResult? FindSeedSkillFlagViolation(IReadOnlyList<Change<Contracts.Proficiency>> changes)
-        {
-            foreach (var change in changes)
-            {
-                if (change.ChangeType == EChangeType.Delete || change.Item.SeedSkillId is not { } skillId)
-                {
-                    continue;
-                }
-
-                if (CheckPlayerSkill(skillId, "seed skill") is { } rejection)
-                {
-                    return rejection;
-                }
             }
 
             return null;

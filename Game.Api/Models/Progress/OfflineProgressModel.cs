@@ -63,7 +63,6 @@ namespace Game.Api.Models.Progress
                     .Select(o => new ProficiencyOpenedModel
                     {
                         ProficiencyId = o.ProficiencyId,
-                        SeedSkillId = o.SeedSkillId,
                     })
                     .ToList(),
             };

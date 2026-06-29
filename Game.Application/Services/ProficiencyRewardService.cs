@@ -82,10 +82,12 @@ namespace Game.Application.Services
                 }
 
                 // Maxing a tier opens the next nodes: its within-path successor, plus any cross-path gateway
-                // whose prerequisites are now all maxed. Each open grants the opened tier's seed skill.
+                // whose prerequisites are now all maxed. Opening is notification-only — no skill is granted (the
+                // opened tier's native skill is re-homed onto this tier's max-level milestone reward, already
+                // applied above by RewardSkillsCrossed).
                 if (proficiency.IsMaxed(newLevel) && !proficiency.IsMaxed(oldLevel))
                 {
-                    OpenSuccessors(proficiency, progress, player, opened, openedIds);
+                    OpenSuccessors(proficiency, progress, opened, openedIds);
                 }
 
                 results.Add(new ProficiencyXpResult(
@@ -106,40 +108,34 @@ namespace Game.Application.Services
         // prerequisite is now maxed (decision 10's themed gateways). Within-path order is implicit in the
         // ordinals, so a successor tier needs no authored prerequisite row.
         private void OpenSuccessors(
-            Proficiency maxed, PlayerProgress progress, Player player,
+            Proficiency maxed, PlayerProgress progress,
             List<ProficiencyOpened> opened, HashSet<int> openedIds)
         {
             if (_proficiencies.GetPath(maxed.PathId).NextTier(maxed.PathOrdinal) is { } nextTier)
             {
-                Open(nextTier.ProficiencyId, player, opened, openedIds);
+                Open(nextTier.ProficiencyId, opened, openedIds);
             }
 
             foreach (var gatedId in _proficiencies.DependentsOf(maxed.Id))
             {
                 if (AllPrerequisitesMaxed(gatedId, progress))
                 {
-                    Open(gatedId, player, opened, openedIds);
+                    Open(gatedId, opened, openedIds);
                 }
             }
         }
 
-        // Grants the opened tier's seed skill (the native, full-pace training vehicle for a node with no world
-        // skill source — decision 8) and records the open for the client push. De-duped within the battle so
-        // two prerequisites maxing in one fight open a shared gateway once.
-        private void Open(int proficiencyId, Player player, List<ProficiencyOpened> opened, HashSet<int> openedIds)
+        // Records the open for the client push (notification-only — opening grants no skill; the opened tier's
+        // native training skill is re-homed onto the predecessor tier's max-level milestone reward). De-duped
+        // within the battle so two prerequisites maxing in one fight open a shared gateway once.
+        private static void Open(int proficiencyId, List<ProficiencyOpened> opened, HashSet<int> openedIds)
         {
             if (!openedIds.Add(proficiencyId))
             {
                 return;
             }
 
-            var seedSkillId = _proficiencies.GetProficiency(proficiencyId).SeedSkillId;
-            if (seedSkillId is { } skillId)
-            {
-                player.UnlockSkill(_skills.GetSkill(skillId));
-            }
-
-            opened.Add(new ProficiencyOpened(proficiencyId, seedSkillId));
+            opened.Add(new ProficiencyOpened(proficiencyId));
         }
 
         // Whether every prerequisite of the gated proficiency is at its cap on the player's current progress.

@@ -2,7 +2,7 @@ import type { IProficiencyLevelModifier, IProficiencyLevelReward, ISkillPathCont
 import { EAttribute, EModifierType } from '$lib/api';
 import { canonicalEqual } from '../save-helpers';
 import type { SelectOption } from '../entities/types';
-import { NO_SEED_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types';
+import type { WorkbenchPath, WorkbenchProficiency } from './types';
 
 // ── Factories ──
 
@@ -29,7 +29,6 @@ export const newProficiency = (id: number, pathId: number, pathOrdinal: number):
 	maxLevel: 10,
 	baseXp: 100,
 	xpGrowth: 1.4,
-	seedSkillId: NO_SEED_SKILL,
 	levelModifiers: [],
 	levelRewards: [],
 	prerequisiteIds: []
@@ -197,7 +196,6 @@ export const profIdentityDto = (prof: WorkbenchProficiency) => ({
 	maxLevel: prof.maxLevel,
 	baseXp: prof.baseXp,
 	xpGrowth: prof.xpGrowth,
-	seedSkillId: prof.seedSkillId === NO_SEED_SKILL ? undefined : prof.seedSkillId,
 	levelModifiers: [] as IProficiencyLevelModifier[],
 	levelRewards: [] as IProficiencyLevelReward[],
 	prerequisiteIds: [] as number[],
