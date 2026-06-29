@@ -269,13 +269,15 @@ namespace Game.Core
     /// <summary>
     /// The routing key a proficiency <see cref="Proficiencies.Path"/> trains on (spike #1318). A path declares
     /// exactly one; a battle quantity trains the path(s) its key resolves to via the effect-based accrual. The
-    /// set is the superset of the ten damage-type keys (<see cref="EDamageTypeKey"/> — the eight leaf types plus
-    /// the Elemental/DoT categories), routed to from a skill's resolved <see cref="EDamageType"/> through
-    /// <see cref="Attributes.DamageTypes.Applies(EDamageType)"/>, plus the four combat-event keys (crit, dodge,
-    /// heal, reflect) that are not damage types. Accrual is computed server-side at battle completion, off the
-    /// deterministic tick loop, so this enum is deliberately <em>not</em> <c>[ClientMirrored]</c> (it carries no
-    /// battle-parity surface); it reaches the client only as the <c>Path</c> contract's field, emitted by the
-    /// reflection-walk codegen like any other contract enum.
+    /// set spans both books: the ten <em>offense</em> keys (the output book — per-type damage dealt, mirroring
+    /// <see cref="EDamageTypeKey"/>'s eight leaf types plus the Elemental/DoT categories), the four combat-event
+    /// keys (crit, dodge, heal, reflect) that are not damage types, and the ten <em>resist</em> keys (the
+    /// incoming book — per-type pre-mitigation exposure, spike #1338). Offense and resist both route from a
+    /// resolved <see cref="EDamageType"/> through <see cref="Attributes.DamageTypes.Applies(EDamageType)"/>,
+    /// mapped to the offense or resist key respectively by <see cref="Proficiencies.ActivityKeys"/>. Accrual is
+    /// computed server-side at battle completion, off the deterministic tick loop, so this enum is deliberately
+    /// <em>not</em> <c>[ClientMirrored]</c> (it carries no battle-parity surface); it reaches the client only as
+    /// the <c>Path</c> contract's field, emitted by the reflection-walk codegen like any other contract enum.
     /// </summary>
     public enum EActivityKey
     {
@@ -324,6 +326,42 @@ namespace Game.Core
 
         /// <summary>Reflected damage (the Retribution mastery). Inert until the reflection rework #1330.</summary>
         Reflect = 13,
+
+        // The ten resist keys — the incoming-book counterparts of the ten damage-type keys above (spike #1338).
+        // A path keyed on one trains on the player's pre-mitigation exposure to that type's hits/DoT, routed
+        // through the same Applies(type) map on the incoming side (a fire hit trains FireResist and
+        // ElementalResist). Appended after the offense + event keys so the existing ordinals — persisted on the
+        // Path.ActivityKey column — are untouched. ActivityKeys.ForDamageKeyResist pins each to its damage-key.
+
+        /// <summary>Pre-mitigation physical exposure. Incoming counterpart of <see cref="Physical"/>.</summary>
+        PhysicalResist = 14,
+
+        /// <summary>Pre-mitigation fire exposure. Incoming counterpart of <see cref="Fire"/>.</summary>
+        FireResist = 15,
+
+        /// <summary>Pre-mitigation water exposure. Incoming counterpart of <see cref="Water"/>.</summary>
+        WaterResist = 16,
+
+        /// <summary>Pre-mitigation earth exposure. Incoming counterpart of <see cref="Earth"/>.</summary>
+        EarthResist = 17,
+
+        /// <summary>Pre-mitigation wind exposure. Incoming counterpart of <see cref="Wind"/>.</summary>
+        WindResist = 18,
+
+        /// <summary>Pre-mitigation bleed exposure. Incoming counterpart of <see cref="Bleed"/>.</summary>
+        BleedResist = 19,
+
+        /// <summary>Pre-mitigation poison exposure. Incoming counterpart of <see cref="Poison"/>.</summary>
+        PoisonResist = 20,
+
+        /// <summary>Pre-mitigation burn exposure. Incoming counterpart of <see cref="Burn"/>.</summary>
+        BurnResist = 21,
+
+        /// <summary>Pre-mitigation elemental exposure. Incoming counterpart of <see cref="Elemental"/>.</summary>
+        ElementalResist = 22,
+
+        /// <summary>Pre-mitigation damage-over-time exposure. Incoming counterpart of <see cref="Dot"/>.</summary>
+        DotResist = 23,
     }
 
     /// <summary>

@@ -13,10 +13,11 @@ namespace Game.Core.Battle
         private Battler _targetBattler;
         private bool _isPlayerActive;
 
-        // The player's typed-exposure recorder, cached once (a method group converts to a fresh delegate on
-        // each use) so the per-tick DoT phase can hand it to ApplyDamageOverTime without allocating on the
-        // replay hot path.
+        // The player's typed-exposure recorder (incoming book) and the player's typed DoT-damage-dealt recorder
+        // (offense book), each cached once — a method group converts to a fresh delegate on every use — so the
+        // per-tick DoT phase can hand them to ApplyDamageOverTime without allocating on the replay hot path.
         private readonly Action<EDamageType, double> _recordPlayerExposure;
+        private readonly Action<EDamageType, double> _recordPlayerDotDealt;
 
         public int TimeDelta { get; set; }
         public BattleStats Stats { get; } = new();
@@ -31,6 +32,7 @@ namespace Game.Core.Battle
             _isPlayerActive = true;
             TimeDelta = timeDelta;
             _recordPlayerExposure = Stats.AddTypedDamageExposure;
+            _recordPlayerDotDealt = Stats.AddTypedDamageDealt;
         }
 
         public void SwapActiveAndTargetBattlers()
@@ -89,10 +91,10 @@ namespace Game.Core.Battle
         /// </summary>
         public void ResolveDamageOverTime()
         {
-            // The enemy's DoT (the player's DoT damage dealt) is the offense DoT book, tracked separately
-            // (#1338), so no exposure recorder is passed here; the player's incoming DoT records its
-            // pre-mitigation exposure into the incoming book via the cached recorder.
-            Stats.PlayerDamageDealt += _enemyBattler.ApplyDamageOverTime(TimeDelta);
+            // The enemy's DoT is the player's DoT damage dealt: record its post-mitigation per-type amount into
+            // the typed offense book (#1338) — not as exposure, which is the player's incoming concern. The
+            // player's own incoming DoT records its pre-mitigation exposure into the incoming book instead.
+            Stats.PlayerDamageDealt += _enemyBattler.ApplyDamageOverTime(TimeDelta, recordDamageDealt: _recordPlayerDotDealt);
             _enemyBattler.ApplyHealOverTime(TimeDelta);
             if (_enemyBattler.IsDead)
             {

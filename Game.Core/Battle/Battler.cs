@@ -185,7 +185,18 @@ namespace Game.Core.Battle
         /// only when this battler's exposure is tracked (the player); <c>null</c> leaves the loop unchanged. It
         /// is a backend-only side channel that never touches the health math, so it adds no parity surface.
         /// </param>
-        public double ApplyDamageOverTime(int ms, Action<EDamageType, double>? recordExposure = null)
+        /// <param name="recordDamageDealt">
+        /// Optional per-type <b>post-mitigation</b> recorder for the proficiency offense book (spike #1338) —
+        /// invoked with each DoT type and the tick damage <em>after</em> this battler's resistance, the same
+        /// value the tick subtracts from health. Supplied when this battler is the victim of the player's DoT
+        /// (the enemy), so the player's DoT damage dealt is typed for the offense binding consistently with a
+        /// direct hit's post-mitigation actual damage; <c>null</c> leaves the loop unchanged. Like
+        /// <paramref name="recordExposure"/> it is a backend-only side channel that adds no parity surface.
+        /// </param>
+        public double ApplyDamageOverTime(
+            int ms,
+            Action<EDamageType, double>? recordExposure = null,
+            Action<EDamageType, double>? recordDamageDealt = null)
         {
             var dot = 0.0;
             var accumulators = DamageTypes.DotAccumulators;
@@ -210,7 +221,11 @@ namespace Game.Core.Battle
                     resistance += _attributes[resistanceAttributes[j]];
                 }
 
-                dot += preMitigation * (1 - resistance);
+                // The post-resistance tick is both what the health loses and what the attacker dealt of this
+                // type; compute it once so the recorded damage-dealt and the health math cannot drift.
+                var tickDamage = preMitigation * (1 - resistance);
+                recordDamageDealt?.Invoke(accumulators[i].Type, tickDamage);
+                dot += tickDamage;
             }
 
             CurrentHealth -= dot;

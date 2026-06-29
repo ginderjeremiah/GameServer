@@ -393,13 +393,12 @@ namespace Game.Application.Tests.Services
             var critTier = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Precision", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: critPath.Id, pathOrdinal: 0);
 
-            var fireSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", damageType: EDamageType.Fire);
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
             // Full-power fire damage and full-power crit damage in the same battle.
             var stats = new BattleStats { CriticalDamageDealt = FiredDamage };
-            stats.SkillStats[fireSkill.Id] = new SkillStats { Uses = 1, TotalDamage = FiredDamage };
+            stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
             var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
 
             var fireResult = Assert.Single(accrual.Results, r => r.ProficiencyId == fireTier.Id);
@@ -407,6 +406,81 @@ namespace Game.Application.Tests.Services
             Assert.True(fireResult.NewLevel >= 1);
             Assert.Equal(fireResult.NewLevel, critResult.NewLevel);
             Assert.Equal(fireResult.XpGained, critResult.XpGained);
+        }
+
+        [Fact]
+        public async Task ResistPaths_TrainFromPreMitigationExposure_RoutedToResistKeys()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The incoming book: a battle exposing the player to FiredDamage of pre-mitigation Fire trains the
+            // Fire-resist path and the Elemental-resist path (applies(Fire) = [Fire, Elemental] on the incoming
+            // side), each claiming the full pie. The Fire *offense* path keyed on the same type is untouched —
+            // exposure trains resist keys only.
+            var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, name: "Fire Ward");
+            var elementalResist = await CreateKeyedTierAsync(context, EActivityKey.ElementalResist, name: "Elemental Ward");
+            var fireOffense = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats();
+            stats.AddTypedDamageExposure(EDamageType.Fire, FiredDamage);
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Contains(accrual.Results, r => r.ProficiencyId == fireResist.Id);
+            Assert.Contains(accrual.Results, r => r.ProficiencyId == elementalResist.Id);
+            Assert.DoesNotContain(accrual.Results, r => r.ProficiencyId == fireOffense.Id);
+        }
+
+        [Fact]
+        public async Task OffenseAndResist_TrainInParallel_FromOneBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The two books are independent axes (no shared pie): a battle where the player both dealt Fire and
+            // was exposed to Fire trains the Fire *offense* path and the Fire *resist* path in parallel, each
+            // claiming its own full pie from its own book.
+            var fireOffense = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
+            var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, name: "Fire Ward");
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats();
+            stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
+            stats.AddTypedDamageExposure(EDamageType.Fire, FiredDamage);
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            var offense = Assert.Single(accrual.Results, r => r.ProficiencyId == fireOffense.Id);
+            var resist = Assert.Single(accrual.Results, r => r.ProficiencyId == fireResist.Id);
+            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, offense.XpGained);
+            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, resist.XpGained);
+        }
+
+        [Fact]
+        public async Task DotDamageDealt_TrainsOffenseDotPaths_TypeRoutedWithNoSkillAttribution()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The offense DoT binding: typed DoT damage dealt lands in the same offense book as direct hits, so
+            // FiredDamage of Bleed dealt trains the Bleed path and the Dot-category path (applies(Bleed) =
+            // [Bleed, Dot]) with no contributing-skill row. A Fire-offense path is untouched (Bleed is not fire).
+            var bleed = await CreateKeyedTierAsync(context, EActivityKey.Bleed, name: "Hemorrhage");
+            var dot = await CreateKeyedTierAsync(context, EActivityKey.Dot, name: "Affliction");
+            var fire = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            // No SkillStats row — the DoT is type-routed straight into the offense book.
+            var stats = new BattleStats();
+            stats.AddTypedDamageDealt(EDamageType.Bleed, FiredDamage);
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Contains(accrual.Results, r => r.ProficiencyId == bleed.Id);
+            Assert.Contains(accrual.Results, r => r.ProficiencyId == dot.Id);
+            Assert.DoesNotContain(accrual.Results, r => r.ProficiencyId == fire.Id);
         }
 
         // The damage a fired skill deals in these tests, equal to the power passed to the accrual — so
@@ -476,11 +550,23 @@ namespace Game.Application.Tests.Services
             return player;
         }
 
+        // A won battle whose one Fire-typed skill dealt FiredDamage: the typed offense book carries it (the
+        // accrual's offense binding consumes TypedDamageDealt directly), with the matching per-skill row.
         private static BattleStats FireSkill(int skillId)
         {
-            var stats = new BattleStats();
-            stats.SkillStats[skillId] = new SkillStats { Uses = 1, TotalDamage = FiredDamage };
+            var stats = new BattleStats { SkillStats = { [skillId] = new SkillStats { Uses = 1, TotalDamage = FiredDamage } } };
+            stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
             return stats;
+        }
+
+        // Seeds a single-tier path bound to the given activity key (an offense, resist, or category key), so a
+        // battle quantity routing to that key trains the tier. Default curve keeps a full-pie claim below the
+        // first level threshold (Xp banked, level 0) — matching the offense accrual assertions.
+        private static async Task<Game.Infrastructure.Entities.Proficiency> CreateKeyedTierAsync(
+            GameContext context, EActivityKey activityKey, string name)
+        {
+            var path = await TestDataSeeder.CreatePathAsync(context, name: name, activityKey: activityKey);
+            return await TestDataSeeder.CreateProficiencyAsync(context, name: name, pathId: path.Id, pathOrdinal: 0);
         }
     }
 }

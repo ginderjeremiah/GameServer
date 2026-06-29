@@ -197,8 +197,8 @@ namespace Game.Application.Tests.Events
             // The skill dealt damage equal to the player's power, so its path claims the full pie
             // (clamp(activity ÷ power) = 1); below the first threshold it accrues without leveling.
             const double power = 100.0;
-            var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1, TotalDamage = power };
+            var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
+            stats.AddTypedDamageDealt(EDamageType.Physical, power); // the offense book the accrual consumes
             await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
@@ -247,8 +247,8 @@ namespace Game.Application.Tests.Events
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
 
-            var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1, TotalDamage = power };
+            var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
+            stats.AddTypedDamageDealt(EDamageType.Physical, power); // the offense book the accrual consumes
             await MakeHandler(scope).HandleAsync(
                 VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
 
@@ -295,9 +295,17 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedEnemy);
 
             const double power = 100.0;
-            var stats = new BattleStats();
-            stats.SkillStats[fireSkill.Id] = new SkillStats { Uses = 1, TotalDamage = power };
-            stats.SkillStats[earthSkill.Id] = new SkillStats { Uses = 1, TotalDamage = power / 2 };
+            var stats = new BattleStats
+            {
+                SkillStats =
+                {
+                    [fireSkill.Id] = new SkillStats { Uses = 1, TotalDamage = power },
+                    [earthSkill.Id] = new SkillStats { Uses = 1, TotalDamage = power / 2 },
+                },
+            };
+            // The typed offense book the accrual consumes: Fire deals the full power, Earth half.
+            stats.AddTypedDamageDealt(EDamageType.Fire, power);
+            stats.AddTypedDamageDealt(EDamageType.Earth, power / 2);
             await MakeHandler(scope).HandleAsync(
                 VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
 
@@ -370,8 +378,8 @@ namespace Game.Application.Tests.Events
             // The skill dealt 1.5× the player's power, so each path claims pie × clamp(1.5) = pie × 1.5 — the
             // same on both the live and the offline path.
             const double power = 100.0;
-            var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1, TotalDamage = power * 1.5 };
+            var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power * 1.5 } } };
+            stats.AddTypedDamageDealt(EDamageType.Physical, power * 1.5); // the offense book the accrual consumes
 
             var liveLoaded = await playerRepo.GetPlayer(livePlayer.Id);
             Assert.NotNull(liveLoaded);
