@@ -13,7 +13,8 @@ import {
 /* Mirror of the backend `DamageTypesTests` (spike #1320). Keep the scenarios row-for-row aligned with
    Game.Core.Tests/Attributes/DamageTypesTests.cs so the two simulators cannot drift. */
 
-// The full taxonomy table (decision 3); key order is fixed and parity-critical.
+// The full taxonomy table (decision 3, extended with the #1340 weapon leaves); key order is fixed and
+// parity-critical. Each weapon leaf pulls its own key then the shared Physical key.
 const appliesCases: [EDamageType, EDamageTypeKey[]][] = [
 	[EDamageType.Physical, [EDamageTypeKey.Physical]],
 	[EDamageType.Fire, [EDamageTypeKey.Fire, EDamageTypeKey.Elemental]],
@@ -22,7 +23,13 @@ const appliesCases: [EDamageType, EDamageTypeKey[]][] = [
 	[EDamageType.Wind, [EDamageTypeKey.Wind, EDamageTypeKey.Elemental]],
 	[EDamageType.Bleed, [EDamageTypeKey.Bleed, EDamageTypeKey.Dot]],
 	[EDamageType.Poison, [EDamageTypeKey.Poison, EDamageTypeKey.Dot]],
-	[EDamageType.Burn, [EDamageTypeKey.Burn, EDamageTypeKey.Fire, EDamageTypeKey.Elemental, EDamageTypeKey.Dot]]
+	[EDamageType.Burn, [EDamageTypeKey.Burn, EDamageTypeKey.Fire, EDamageTypeKey.Elemental, EDamageTypeKey.Dot]],
+	[EDamageType.Sword, [EDamageTypeKey.Sword, EDamageTypeKey.Physical]],
+	[EDamageType.Axe, [EDamageTypeKey.Axe, EDamageTypeKey.Physical]],
+	[EDamageType.Bow, [EDamageTypeKey.Bow, EDamageTypeKey.Physical]],
+	[EDamageType.Club, [EDamageTypeKey.Club, EDamageTypeKey.Physical]],
+	[EDamageType.Dagger, [EDamageTypeKey.Dagger, EDamageTypeKey.Physical]],
+	[EDamageType.Unarmed, [EDamageTypeKey.Unarmed, EDamageTypeKey.Physical]]
 ];
 
 describe('damage-types applies()', () => {
@@ -31,7 +38,9 @@ describe('damage-types applies()', () => {
 	});
 
 	it.each(appliesCases)("leads with the leaf type's own key for %s", (type, expected) => {
-		expect(expected[0] as number).toBe(type as number);
+		// Matched by enum name rather than ordinal — the weapon keys were appended out of leaf-ordinal
+		// alignment (append-only), so the original types' coincidental ordinal match no longer holds.
+		expect(EDamageTypeKey[expected[0] as number]).toBe(EDamageType[type as number]);
 		expect(applies(type)[0]).toBe(expected[0]);
 	});
 });
@@ -44,6 +53,14 @@ describe('damage-types attributesForKey()', () => {
 		[EDamageTypeKey.Dot, EAttribute.DotAmplification, EAttribute.DotResistance]
 	])('returns the amp/resist pair for %s', (key, amp, resist) => {
 		expect(attributesForKey(key)).toEqual({ amplification: amp, resistance: resist });
+	});
+
+	it.each([
+		[EDamageTypeKey.Sword, EAttribute.SwordAmplification],
+		[EDamageTypeKey.Axe, EAttribute.AxeAmplification],
+		[EDamageTypeKey.Unarmed, EAttribute.UnarmedAmplification]
+	])('returns an amplification-only pair (null resistance) for weapon key %s', (key, amp) => {
+		expect(attributesForKey(key)).toEqual({ amplification: amp, resistance: null });
 	});
 });
 
@@ -66,9 +83,22 @@ describe('damage-types per-hit helpers', () => {
 		]);
 	});
 
+	it('maps Sword to weapon + physical amplification but physical-only resistance', () => {
+		// The amplification-only weapon key contributes no resistance, so a weapon hit mitigates via the
+		// shared Physical key alone (#1340).
+		expect(amplificationAttributes(EDamageType.Sword)).toEqual([
+			EAttribute.SwordAmplification,
+			EAttribute.PhysicalAmplification
+		]);
+		expect(resistanceAttributes(EDamageType.Sword)).toEqual([EAttribute.PhysicalResistance]);
+	});
+
 	it.each(appliesCases)('amp/resist helpers track applies() for %s', (type, keys) => {
 		expect(amplificationAttributes(type)).toEqual(keys.map((k) => attributesForKey(k).amplification));
-		expect(resistanceAttributes(type)).toEqual(keys.map((k) => attributesForKey(k).resistance));
+		// Amplification-only keys (the weapon leaves) contribute no resistance, so they drop out.
+		expect(resistanceAttributes(type)).toEqual(
+			keys.map((k) => attributesForKey(k).resistance).filter((r) => r !== null)
+		);
 	});
 });
 
@@ -84,11 +114,20 @@ describe('damage-types keyForAttribute()', () => {
 			EDamageTypeKey.Poison,
 			EDamageTypeKey.Burn,
 			EDamageTypeKey.Elemental,
-			EDamageTypeKey.Dot
+			EDamageTypeKey.Dot,
+			EDamageTypeKey.Sword,
+			EDamageTypeKey.Axe,
+			EDamageTypeKey.Bow,
+			EDamageTypeKey.Club,
+			EDamageTypeKey.Dagger,
+			EDamageTypeKey.Unarmed
 		]) {
 			const { amplification, resistance } = attributesForKey(type);
 			expect(keyForAttribute(amplification)).toBe(type);
-			expect(keyForAttribute(resistance)).toBe(type);
+			// A weapon key has no resistance attribute to round-trip.
+			if (resistance !== null) {
+				expect(keyForAttribute(resistance)).toBe(type);
+			}
 		}
 	});
 

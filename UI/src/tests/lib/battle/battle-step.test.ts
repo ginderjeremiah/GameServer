@@ -331,6 +331,29 @@ describe('battleStep', () => {
 			expect(enemy.currentHealth).toBe(enemyBefore); // a dodge zeroes the hit, so nothing reflects
 		});
 
+		it('reflects nothing when the incoming hit is absorbed', () => {
+			// The enemy both reflects and absorbs Fire (resistance > 1 → net heal). The player's physical hit lands
+			// and is reflected back (player 50 → 20), dropping the enemy to 20; the player's Fire hit is then
+			// absorbed (net −20 heal), and the reflection guard returns on the non-positive net — so the player
+			// takes no further damage. Mirrors the backend DamageTarget_AbsorbedHit_ReflectsNothing.
+			const player = makeBattler(baseStats, [
+				makeSkill(30, 40, [], [], EDamageType.Physical),
+				makeSkill(20, 40, [], [], EDamageType.Fire)
+			]);
+			const enemy = makeBattler(
+				[
+					{ id: EAttribute.FireResistance, amount: 2 },
+					{ id: EAttribute.DamageReflection, amount: 1 }
+				],
+				[]
+			);
+
+			battleStep(player, enemy, 40, new Mulberry32(0));
+
+			// Player took only the reflected physical 30 (50 → 20); the absorbed Fire hit reflected nothing.
+			expect(player.currentHealth).toBe(20);
+		});
+
 		it('never crits on the enemy’s attack, even with a forced crit chance', () => {
 			const player = makeBattler(baseStats, []);
 			const enemy = makeBattler(

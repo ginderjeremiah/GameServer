@@ -278,17 +278,20 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_AbsorbedHit_ReflectsNothing()
         {
-            // An absorbed hit (resistance > 1) is a net heal, not positive damage, so nothing is reflected even
-            // with reflection authored on the defender. A prior physical hit makes room for the absorption heal.
-            var player = MakeBattlerWith((Endurance, 0), (DamageReflection, 1.0)); // also reflects, to prove it stays 0
-            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0));
+            // The enemy both reflects AND absorbs Fire (resistance > 1 → net heal). Reflection guards on a
+            // POSITIVE net, so an absorbed hit returns nothing — without the guard the negative net would reflect
+            // as a heal to the attacker. A prior physical hit (itself reflected) drops the enemy below MaxHealth
+            // so the absorption actually heals it (a genuinely negative net); the player's health is captured
+            // AFTER that hit, so only the absorbed Fire hit is measured.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0), (DamageReflection, 1.0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.DamageTarget(30, EDamageType.Physical); // 30 to the enemy → CurrentHealth 20
+            context.DamageTarget(30, EDamageType.Physical); // enemy 50 → 20; the enemy reflects this 30 onto the player
             var playerBefore = player.CurrentHealth;
 
-            context.DamageTarget(20, EDamageType.Fire); // 20 × (1 − 2) = −20, absorbed heal — no reflection
+            context.DamageTarget(20, EDamageType.Fire); // 20 × (1 − 2) = −20, absorbed (enemy 20 → 40) — no reflection
 
-            Assert.Equal(playerBefore, player.CurrentHealth, 0.001); // the player took no reflected damage
+            Assert.Equal(playerBefore, player.CurrentHealth, 0.001); // the absorbed hit reflected nothing onto the attacker
         }
 
         // ── DamageTarget: damage typing (amplification / resistance, #1320) ──

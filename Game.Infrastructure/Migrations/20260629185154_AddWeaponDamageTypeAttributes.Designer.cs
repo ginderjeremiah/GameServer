@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    [Migration("20260629183334_RemoveBlockAddDamageReflection")]
-    partial class RemoveBlockAddDamageReflection
+    [Migration("20260629185154_AddWeaponDamageTypeAttributes")]
+    partial class AddWeaponDamageTypeAttributes
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -146,6 +146,18 @@ namespace Game.Infrastructure.Migrations
                             Id = 12,
                             Description = "The percentage chance to completely avoid the damage from an incoming attack.",
                             Name = "Dodge Chance"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Description = "The percentage chance to block part of the damage from an incoming attack.",
+                            Name = "Block Chance"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Description = "A flat reduction applied to damage received when an attack is blocked.",
+                            Name = "Block Reduction"
                         },
                         new
                         {
@@ -294,8 +306,38 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 39,
-                            Description = "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
-                            Name = "Damage Reflection"
+                            Description = "Increases the damage your sword attacks deal.",
+                            Name = "Sword Amplification"
+                        },
+                        new
+                        {
+                            Id = 40,
+                            Description = "Increases the damage your axe attacks deal.",
+                            Name = "Axe Amplification"
+                        },
+                        new
+                        {
+                            Id = 41,
+                            Description = "Increases the damage your bow attacks deal.",
+                            Name = "Bow Amplification"
+                        },
+                        new
+                        {
+                            Id = 42,
+                            Description = "Increases the damage your club attacks deal.",
+                            Name = "Club Amplification"
+                        },
+                        new
+                        {
+                            Id = 43,
+                            Description = "Increases the damage your dagger attacks deal.",
+                            Name = "Dagger Amplification"
+                        },
+                        new
+                        {
+                            Id = 44,
+                            Description = "Increases the damage your unarmed attacks deal.",
+                            Name = "Unarmed Amplification"
                         });
                 });
 
@@ -1758,6 +1800,18 @@ namespace Game.Infrastructure.Migrations
                             Id = 19,
                             EntityType = 0,
                             Name = "Damage Dodged"
+                        },
+                        new
+                        {
+                            Id = 20,
+                            EntityType = 0,
+                            Name = "Attacks Blocked"
+                        },
+                        new
+                        {
+                            Id = 21,
+                            EntityType = 0,
+                            Name = "Damage Blocked"
                         });
                 });
 

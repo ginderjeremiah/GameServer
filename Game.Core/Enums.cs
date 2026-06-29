@@ -182,6 +182,31 @@ namespace Game.Core
         /// </summary>
         BurnDamagePerSecond = 38,
 
+        // Weapon-type amplification attributes (spike #1318/#1340). One amplification per weapon damage-type
+        // leaf (the Physical category's weapon leaves), with deliberately NO matching resistance: a weapon hit
+        // resolves to PhysicalResistance via the shared Physical key, so physical resistance stays the only
+        // physical mitigation lever (per-weapon resistance is a deferred opt-in). Decimal-percentage, base 0,
+        // authored-only — inert until the damage pipeline reads them, like the #1320 amp/resist family.
+        // Appended after the typed DoT accumulators (the enum grows append-only).
+
+        /// <summary>Amplifies sword damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        SwordAmplification = 39,
+
+        /// <summary>Amplifies axe damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        AxeAmplification = 40,
+
+        /// <summary>Amplifies bow damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        BowAmplification = 41,
+
+        /// <summary>Amplifies club damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        ClubAmplification = 42,
+
+        /// <summary>Amplifies dagger damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        DaggerAmplification = 43,
+
+        /// <summary>Amplifies unarmed damage dealt by the attacker. Decimal-percentage, base 0.</summary>
+        UnarmedAmplification = 44,
+
         /// <summary>
         /// A derived game attribute. The percentage of a direct hit's post-mitigation damage returned to the
         /// attacker, bypassing the attacker's own mitigation (spike #1330). Decimal-percentage (0.30 = 30%),
@@ -190,7 +215,7 @@ namespace Game.Core
         /// than a stat tax. Deterministic (no proc) and scoped to direct hits; DoT is never reflected. See
         /// <see cref="Battle.BattleContext.DamageTarget"/>.
         /// </summary>
-        DamageReflection = 39,
+        DamageReflection = 45,
     }
 
     /// <summary>
@@ -225,14 +250,38 @@ namespace Game.Core
 
         /// <summary>Burn damage-over-time. Fire + Elemental + DoT (a burning ember is still fire).</summary>
         Burn = 7,
+
+        // Weapon-type leaves (spike #1318/#1340). Martial masteries become ordinary type-routed paths. Each
+        // belongs to the cross-cutting Physical category (applies() = [&lt;weapon&gt;, Physical]); a martial skill is
+        // authored with a fixed weapon type (static per-skill typing). Appended after the elemental/DoT leaves.
+
+        /// <summary>Sword damage. Physical.</summary>
+        Sword = 8,
+
+        /// <summary>Axe damage. Physical.</summary>
+        Axe = 9,
+
+        /// <summary>Bow damage. Physical.</summary>
+        Bow = 10,
+
+        /// <summary>Club damage. Physical.</summary>
+        Club = 11,
+
+        /// <summary>Dagger damage. Physical.</summary>
+        Dagger = 12,
+
+        /// <summary>Unarmed damage (the no-weapon default). Physical.</summary>
+        Unarmed = 13,
     }
 
     /// <summary>
     /// A key that an amplification / resistance attribute is bucketed under (spike #1320). The superset of the
-    /// eight leaf <see cref="EDamageType"/> values plus the two cross-cutting categories (<see cref="Elemental"/>,
-    /// <see cref="Dot"/>). Each key backs one <c>…Amplification</c> and one <c>…Resistance</c>
-    /// <see cref="EAttribute"/>; the static <see cref="Attributes.DamageTypes.Applies(EDamageType)"/> map resolves
-    /// a leaf type to the keys whose amp/resist apply to it, in the fixed iteration order parity depends on.
+    /// leaf <see cref="EDamageType"/> values (the eight #1320 leaves plus the #1340 weapon leaves) and the two
+    /// cross-cutting categories (<see cref="Elemental"/>, <see cref="Dot"/>). Each key backs one
+    /// <c>…Amplification</c> <see cref="EAttribute"/> and, for the non-weapon keys, one <c>…Resistance</c> — the
+    /// weapon keys are amplification-only (a weapon hit mitigates via the shared <see cref="Physical"/> key). The
+    /// static <see cref="Attributes.DamageTypes.Applies(EDamageType)"/> map resolves a leaf type to the keys whose
+    /// amp/resist apply to it, in the fixed iteration order parity depends on.
     /// </summary>
     [ClientMirrored]
     public enum EDamageTypeKey
@@ -266,20 +315,44 @@ namespace Game.Core
 
         /// <summary>The damage-over-time category (bleed / poison / burn).</summary>
         Dot = 9,
+
+        // Weapon-type keys (spike #1318/#1340), appended after the cross-cutting categories (the enum grows
+        // append-only, so these do not share the leaf-type ordinals the original eight keys do). Each backs an
+        // amplification attribute ONLY — there is no per-weapon resistance, so a weapon hit's mitigation rides
+        // the shared Physical key (see <see cref="Attributes.DamageTypes"/>).
+
+        /// <summary>The sword leaf type.</summary>
+        Sword = 10,
+
+        /// <summary>The axe leaf type.</summary>
+        Axe = 11,
+
+        /// <summary>The bow leaf type.</summary>
+        Bow = 12,
+
+        /// <summary>The club leaf type.</summary>
+        Club = 13,
+
+        /// <summary>The dagger leaf type.</summary>
+        Dagger = 14,
+
+        /// <summary>The unarmed leaf type.</summary>
+        Unarmed = 15,
     }
 
     /// <summary>
     /// The routing key a proficiency <see cref="Proficiencies.Path"/> trains on (spike #1318). A path declares
     /// exactly one; a battle quantity trains the path(s) its key resolves to via the effect-based accrual. The
-    /// set spans both books: the ten <em>offense</em> keys (the output book — per-type damage dealt, mirroring
-    /// <see cref="EDamageTypeKey"/>'s eight leaf types plus the Elemental/DoT categories), the four combat-event
-    /// keys (crit, dodge, heal, reflect) that are not damage types, and the ten <em>resist</em> keys (the
-    /// incoming book — per-type pre-mitigation exposure, spike #1338). Offense and resist both route from a
-    /// resolved <see cref="EDamageType"/> through <see cref="Attributes.DamageTypes.Applies(EDamageType)"/>,
-    /// mapped to the offense or resist key respectively by <see cref="Proficiencies.ActivityKeys"/>. Accrual is
-    /// computed server-side at battle completion, off the deterministic tick loop, so this enum is deliberately
-    /// <em>not</em> <c>[ClientMirrored]</c> (it carries no battle-parity surface); it reaches the client only as
-    /// the <c>Path</c> contract's field, emitted by the reflection-walk codegen like any other contract enum.
+    /// set spans both books: the <em>offense</em> keys (the output book — per-type damage dealt, mirroring
+    /// <see cref="EDamageTypeKey"/>'s leaf types — the eight #1320 leaves plus the #1340 weapon leaves — and the
+    /// Elemental/DoT categories), the four combat-event keys (crit, dodge, heal, reflect) that are not damage
+    /// types, and the ten <em>resist</em> keys (the incoming book — per-type pre-mitigation exposure, spike
+    /// #1338). Offense and resist both route from a resolved <see cref="EDamageType"/> through
+    /// <see cref="Attributes.DamageTypes.Applies(EDamageType)"/>, mapped to the offense or resist key respectively
+    /// by <see cref="Proficiencies.ActivityKeys"/>. Accrual is computed server-side at battle completion, off the
+    /// deterministic tick loop, so this enum is deliberately <em>not</em> <c>[ClientMirrored]</c> (it carries no
+    /// battle-parity surface); it reaches the client only as the <c>Path</c> contract's field, emitted by the
+    /// reflection-walk codegen like any other contract enum.
     /// </summary>
     public enum EActivityKey
     {
@@ -364,6 +437,28 @@ namespace Game.Core
 
         /// <summary>Pre-mitigation damage-over-time exposure. Incoming counterpart of <see cref="Dot"/>.</summary>
         DotResist = 23,
+
+        // The weapon-mastery (offense) keys (spike #1318/#1340) — one per weapon damage-type leaf, mirroring the
+        // EDamageTypeKey weapon members one-for-one (routed via ActivityKeys.ForDamageKey). Appended after the
+        // resist keys; the explicit ByDamageKey map means the ordinals need not align with EDamageTypeKey.
+
+        /// <summary>Sword damage dealt (the Swordsmanship mastery). Mirrors <see cref="EDamageTypeKey.Sword"/>.</summary>
+        Sword = 24,
+
+        /// <summary>Axe damage dealt (the Axe mastery). Mirrors <see cref="EDamageTypeKey.Axe"/>.</summary>
+        Axe = 25,
+
+        /// <summary>Bow damage dealt (the Marksmanship mastery). Mirrors <see cref="EDamageTypeKey.Bow"/>.</summary>
+        Bow = 26,
+
+        /// <summary>Club damage dealt (the Club mastery). Mirrors <see cref="EDamageTypeKey.Club"/>.</summary>
+        Club = 27,
+
+        /// <summary>Dagger damage dealt (the Dagger mastery). Mirrors <see cref="EDamageTypeKey.Dagger"/>.</summary>
+        Dagger = 28,
+
+        /// <summary>Unarmed damage dealt (the Martial-arts mastery). Mirrors <see cref="EDamageTypeKey.Unarmed"/>.</summary>
+        Unarmed = 29,
     }
 
     /// <summary>

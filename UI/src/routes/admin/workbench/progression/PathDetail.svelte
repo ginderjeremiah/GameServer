@@ -33,10 +33,10 @@
 					/>
 					<ProgSelect
 						label="Activity key"
-						width={200}
+						width={240}
 						value={path.activityKey}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.activityKey = v))}
-						options={activityKeyOptions}
+						groups={activityKeyGroups}
 					/>
 				</div>
 				<div class="mt16">
@@ -60,7 +60,7 @@
 
 <script lang="ts">
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
-import { activityKeyOptions, hasTierCollision, pathWarnings } from './progression-helpers';
+import { activityKeyGroups, hasTierCollision, pathWarnings } from './progression-helpers';
 import DetailHeader from './DetailHeader.svelte';
 import ProgInput from './ProgInput.svelte';
 import ProgSelect from './ProgSelect.svelte';

@@ -35,7 +35,7 @@ namespace Game.Infrastructure.Migrations
             migrationBuilder.InsertData(
                 table: "Attributes",
                 columns: new[] { "Id", "Description", "Name" },
-                values: new object[] { 39, "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.", "Damage Reflection" });
+                values: new object[] { 45, "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.", "Damage Reflection" });
         }
 
         /// <inheritdoc />
@@ -44,7 +44,7 @@ namespace Game.Infrastructure.Migrations
             migrationBuilder.DeleteData(
                 table: "Attributes",
                 keyColumn: "Id",
-                keyValue: 39);
+                keyValue: 45);
 
             migrationBuilder.InsertData(
                 table: "Attributes",

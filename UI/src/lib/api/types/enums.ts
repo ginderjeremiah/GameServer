@@ -26,6 +26,12 @@ export enum EActivityKey {
 	BurnResist = 21,
 	ElementalResist = 22,
 	DotResist = 23,
+	Sword = 24,
+	Axe = 25,
+	Bow = 26,
+	Club = 27,
+	Dagger = 28,
+	Unarmed = 29,
 }
 
 export enum EAttribute {
@@ -67,7 +73,13 @@ export enum EAttribute {
 	DotResistance = 36,
 	PoisonDamagePerSecond = 37,
 	BurnDamagePerSecond = 38,
-	DamageReflection = 39,
+	SwordAmplification = 39,
+	AxeAmplification = 40,
+	BowAmplification = 41,
+	ClubAmplification = 42,
+	DaggerAmplification = 43,
+	UnarmedAmplification = 44,
+	DamageReflection = 45,
 }
 
 export enum EAttributeModifierSource {
@@ -120,6 +132,12 @@ export enum EDamageType {
 	Bleed = 5,
 	Poison = 6,
 	Burn = 7,
+	Sword = 8,
+	Axe = 9,
+	Bow = 10,
+	Club = 11,
+	Dagger = 12,
+	Unarmed = 13,
 }
 
 export enum EDamageTypeKey {
@@ -133,6 +151,12 @@ export enum EDamageTypeKey {
 	Burn = 7,
 	Elemental = 8,
 	Dot = 9,
+	Sword = 10,
+	Axe = 11,
+	Bow = 12,
+	Club = 13,
+	Dagger = 14,
+	Unarmed = 15,
 }
 
 export enum EDeadLetterReason {
