@@ -1,4 +1,4 @@
-import { LogMessage, LogOutcome } from '$lib/engine/log';
+import { LogMessage, LogOutcome, ResistOutcome } from '$lib/engine/log';
 import { ELogType } from '$lib/api';
 
 const maxLogEntries = 40;
@@ -11,11 +11,11 @@ let lastId = 0;
 export const logs = () => logsData;
 
 /** Prepend a combat-log entry (newest-first), assigning its id and capping the list length. */
-export const addLog = (logType: ELogType, message: string, outcome?: LogOutcome) => {
+export const addLog = (logType: ELogType, message: string, outcome?: LogOutcome, resist?: ResistOutcome) => {
 	if (logsData.length >= maxLogEntries) {
 		logsData.pop();
 	}
-	logsData.unshift({ id: ++lastId, logType, message, timestamp: Date.now(), outcome });
+	logsData.unshift({ id: ++lastId, logType, message, timestamp: Date.now(), outcome, resist });
 };
 
 /** Clear the combat log and its id counter (e.g. on logout / session replacement) so the

@@ -9,6 +9,7 @@ import {
 	cooldownMultiplier,
 	expectedCritMultiplier,
 	mitigateDamage,
+	resistanceTotal,
 	skillContributions
 } from '$lib/battle/battle-formulas';
 
@@ -236,6 +237,29 @@ describe('battle-formulas', () => {
 		it('matches applyDefense for a typed hit with no resistance', () => {
 			const attrs = makeAttributes([[EAttribute.Defense, 12]]);
 			expect(mitigateDamage(50, EDamageType.Fire, attrs)).toBe(applyDefense(50, 12));
+		});
+	});
+
+	describe('resistanceTotal', () => {
+		it('sums resistance across the applicable keys (fire + elemental)', () => {
+			const attrs = makeAttributes([
+				[EAttribute.FireResistance, 0.25],
+				[EAttribute.ElementalResistance, 0.3]
+			]);
+			expect(resistanceTotal(EDamageType.Fire, attrs)).toBeCloseTo(0.55, 10);
+		});
+
+		it('is an exact 0 with no resistance authored', () => {
+			expect(resistanceTotal(EDamageType.Physical, makeAttributes())).toBe(0);
+		});
+
+		it('agrees with the percentage mitigateDamage applies', () => {
+			// The shared helper must report the same fraction the mitigation math used.
+			const attrs = makeAttributes([[EAttribute.FireResistance, 0.4]]);
+			expect(mitigateDamage(100, EDamageType.Fire, attrs)).toBeCloseTo(
+				100 * (1 - resistanceTotal(EDamageType.Fire, attrs)),
+				10
+			);
 		});
 	});
 

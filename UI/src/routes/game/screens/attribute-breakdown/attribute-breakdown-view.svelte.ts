@@ -18,10 +18,11 @@
    (combat-only modifiers) stay off the inspector, while crit/dodge/regen-gear appear automatically
    once they gain real contributors. */
 
-import { EAttribute, EAttributeType, type EItemModType, type IAttribute } from '$lib/api';
+import { EAttribute, EAttributeType, type EDamageTypeKey, type EItemModType, type IAttribute } from '$lib/api';
 import {
 	computeAttributes,
 	groupBySource,
+	keyForAttribute,
 	STATIC_ATTRIBUTE_MODIFIERS,
 	EModifierType,
 	EAttributeModifierSource,
@@ -29,7 +30,7 @@ import {
 	type AppliedModifier,
 	type ComputedAttribute
 } from '$lib/battle';
-import { attributeName } from '$lib/common';
+import { attributeName, damageTypeKeyName } from '$lib/common';
 import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData, playerProficiencies } from '$stores';
 
@@ -104,17 +105,53 @@ export interface BreakdownAttrEntry {
 	computed: ComputedAttribute<LabeledModifier>;
 }
 
-/** A display-taxonomy group of displayed attributes. */
+/** A display-taxonomy group of displayed attributes. The damage-type affinity family is split into one
+ *  sub-group per {@link damageTypeKey} (see {@link damageTypeSubgroups}); every other taxonomy is a
+ *  single group with `damageTypeKey` unset. */
 export interface BreakdownGroup {
+	/** Stable unique render key — the taxonomy type, or `affinity-<damageTypeKey>` for a by-type sub-group. */
+	key: string;
 	type: EAttributeType;
 	label: string;
+	/** Set for the damage-type affinity sub-groups, so the rail can tint/icon the header by its type. */
+	damageTypeKey?: EDamageTypeKey;
 	attrs: BreakdownAttrEntry[];
+}
+
+/** Splits the Affinity group's amplification/resistance attributes into one sub-group per damage-type
+ *  key (Physical … Dot, leaf types before the Elemental/DoT categories), each labelled by its type so
+ *  the large affinity set stays readable grouped under its type (#1320, Area F). Preserves each
+ *  bucket's incoming display-order sort. An amp/resist attribute always resolves to a key via
+ *  {@link keyForAttribute}; any future Affinity-typed attribute outside the family falls back to one
+ *  untyped "Affinity" group rather than being dropped. */
+function damageTypeSubgroups(entries: BreakdownAttrEntry[]): BreakdownGroup[] {
+	// Pair each entry with its damage-type key (the input is already display-order sorted), then emit one
+	// sub-group per distinct key in key order — each filtering its members back out in that display order.
+	const keyed = entries.map((entry) => ({ entry, key: keyForAttribute(entry.meta.id) }));
+	const distinctKeys = keyed
+		.map((k) => k.key)
+		.filter((key): key is EDamageTypeKey => key !== undefined)
+		.filter((key, i, all) => all.indexOf(key) === i)
+		.sort((a, b) => a - b);
+	const groups: BreakdownGroup[] = distinctKeys.map((key) => ({
+		key: `affinity-${key}`,
+		type: EAttributeType.Affinity,
+		label: damageTypeKeyName(key),
+		damageTypeKey: key,
+		attrs: keyed.filter((k) => k.key === key).map((k) => k.entry)
+	}));
+	const untyped = keyed.filter((k) => k.key === undefined).map((k) => k.entry);
+	if (untyped.length > 0) {
+		groups.push({ key: 'affinity', type: EAttributeType.Affinity, label: 'Affinity', attrs: untyped });
+	}
+	return groups;
 }
 
 /** Groups the displayed attributes — those with a non-combat contributor (see
  *  {@link hasNonCombatModifier}) — by display taxonomy, each sorted by the reference set's canonical
- *  display order, dropping empty groups. Pure over its inputs so the self-selecting membership and
- *  ordering are unit-testable independent of the live stores. */
+ *  display order, dropping empty groups. The damage-type Affinity family is further split by damage type
+ *  ({@link damageTypeSubgroups}). Pure over its inputs so the self-selecting membership and ordering are
+ *  unit-testable independent of the live stores. */
 export function buildGroups(
 	computed: Map<EAttribute, ComputedAttribute<LabeledModifier>>,
 	attributes: IAttribute[] | undefined
@@ -125,7 +162,13 @@ export function buildGroups(
 			.filter((c) => attributeMeta(c.attribute, attributes).type === group.type)
 			.sort((a, b) => attributeDisplayOrder(a.attribute, attributes) - attributeDisplayOrder(b.attribute, attributes))
 			.map((c) => ({ meta: attributeMeta(c.attribute, attributes), computed: c }));
-		return attrs.length > 0 ? [{ type: group.type, label: group.label, attrs }] : [];
+		if (attrs.length === 0) {
+			return [];
+		}
+		if (group.type === EAttributeType.Affinity) {
+			return damageTypeSubgroups(attrs);
+		}
+		return [{ key: String(group.type), type: group.type, label: group.label, attrs }];
 	});
 }
 

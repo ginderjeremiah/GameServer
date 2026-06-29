@@ -35,6 +35,12 @@ describe('logs store', () => {
 		expect(logs()[0].timestamp).toBe(Date.now());
 	});
 
+	it('stores the optional outcome and resist outcome on a damage entry', () => {
+		addLog(ELogType.Damage, 'You used Fireball and dealt 30 fire damage — resisted.', 'player-hit', 'resisted');
+
+		expect(logs()[0]).toMatchObject({ outcome: 'player-hit', resist: 'resisted' });
+	});
+
 	it('caps the list at 40 entries, dropping the oldest', () => {
 		for (let i = 0; i < 45; i++) {
 			addLog(ELogType.Exp, `Message ${i}`);

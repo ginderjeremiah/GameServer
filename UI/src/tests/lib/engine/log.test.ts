@@ -35,17 +35,34 @@ describe('logMessage', () => {
 		];
 	});
 
-	it('forwards an enabled log type to the store (no outcome by default)', () => {
+	it('forwards an enabled log type to the store (no outcome or resist by default)', () => {
 		logMessage(ELogType.Exp, 'Earned 50 exp.');
 
-		expect(addLog).toHaveBeenCalledWith(ELogType.Exp, 'Earned 50 exp.', undefined);
+		expect(addLog).toHaveBeenCalledWith(ELogType.Exp, 'Earned 50 exp.', undefined, undefined);
 	});
 
 	it('forwards a structured outcome through to the store', () => {
 		mockPlayerManager.logPreferences = [{ id: ELogType.Damage, enabled: true }];
 		logMessage(ELogType.Damage, 'You used Slash and dealt 10 damage!', 'player-hit');
 
-		expect(addLog).toHaveBeenCalledWith(ELogType.Damage, 'You used Slash and dealt 10 damage!', 'player-hit');
+		expect(addLog).toHaveBeenCalledWith(
+			ELogType.Damage,
+			'You used Slash and dealt 10 damage!',
+			'player-hit',
+			undefined
+		);
+	});
+
+	it('forwards the damage-type resist outcome through to the store', () => {
+		mockPlayerManager.logPreferences = [{ id: ELogType.Damage, enabled: true }];
+		logMessage(ELogType.Damage, 'Goblin used Ember and dealt 8 fire damage — resisted.', 'enemy-hit', 'resisted');
+
+		expect(addLog).toHaveBeenCalledWith(
+			ELogType.Damage,
+			'Goblin used Ember and dealt 8 fire damage — resisted.',
+			'enemy-hit',
+			'resisted'
+		);
 	});
 
 	it('does not forward a disabled log type', () => {
@@ -57,6 +74,6 @@ describe('logMessage', () => {
 	it('forwards an unknown log type (defaults to enabled)', () => {
 		logMessage(ELogType.EnemyDefeated, 'Enemy defeated!');
 
-		expect(addLog).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Enemy defeated!', undefined);
+		expect(addLog).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Enemy defeated!', undefined, undefined);
 	});
 });
