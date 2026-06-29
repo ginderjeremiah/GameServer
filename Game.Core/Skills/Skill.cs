@@ -27,16 +27,6 @@
         /// </summary>
         public required EDamageType DamageType { get; init; }
 
-        /// <summary>
-        /// The skill's rarity tier — display/authoring metadata only. Neither the battle simulation nor (as of
-        /// the effect-based proficiency accrual, spike #1318) the XP path reads it: rarity reverts to
-        /// display-only, surfaced from the skills contract, since damage already reflects a skill's power and an
-        /// explicit rarity weight would double-count. Retained on the lean model only pending its removal (the
-        /// accrual was its sole reader — follow-up cleanup). See <see cref="Items.Item.Rarity"/> for the shared
-        /// convention.
-        /// </summary>
-        public required ERarity Rarity { get; init; }
-
         public required IReadOnlyList<DamageMultiplier> DamageMultipliers { get; init; }
 
         public required IReadOnlyList<SkillEffect> Effects { get; init; }

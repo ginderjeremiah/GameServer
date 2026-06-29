@@ -19,14 +19,14 @@ namespace Game.Application.Services
     /// result through the progress aggregate. Both the live battle-completion handler and the offline-rewards
     /// batch run it, so the accrual is computed identically on both paths (the "offline == live" invariant).
     /// <para>
-    /// All avenues but Retribution are wired here, folded across each leaf type's applicable keys
+    /// Every avenue is wired here, folded across each leaf type's applicable keys
     /// (<see cref="DamageTypes.Applies"/>): the <b>offense</b> book trains offense keys on the typed damage the
     /// player dealt — direct hits and DoT alike (<see cref="BattleStats.TypedDamageDealt"/>) — the
     /// <b>incoming</b> book trains resist keys on the player's pre-mitigation typed exposure
     /// (<see cref="BattleStats.TypedDamageExposure"/>), and the event-keyed combat magnitudes — crit damage
-    /// (Precision), dodged damage (Evasion), and healing done (Restoration) — are damage-type-neutral and map
-    /// straight to a single activity key. Retribution (reflected damage) stays inert until the mitigation rework
-    /// (#1330) produces a reflected-damage signal. The <c>notify</c> flag drives the live client push: the live path
+    /// (Precision), dodged damage (Evasion), healing done (Restoration), and reflected damage dealt
+    /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363) — are damage-type-neutral
+    /// and map straight to a single activity key. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
     /// </para>
@@ -175,9 +175,9 @@ namespace Game.Application.Services
         //   • Resist (incoming book): the player's pre-mitigation typed exposure
         //     (BattleStats.TypedDamageExposure), routed to the resist keys, so a resist never throttles its own
         //     training signal.
-        //   • Events: crit damage, dodged damage, and healing done — damage-type-neutral magnitudes that map
-        //     straight to a single activity key (Crit / Dodge / Heal) without applies() routing. Retribution
-        //     (Reflect) stays inert until the reflection rework (#1330) produces a reflected-damage signal.
+        //   • Events: crit damage, dodged damage, healing done, and reflected damage dealt — damage-type-neutral
+        //     magnitudes that map straight to a single activity key (Crit / Dodge / Heal / Reflect) without
+        //     applies() routing.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
@@ -191,8 +191,7 @@ namespace Game.Application.Services
 
             // Event-keyed activities: combat magnitudes that are not typed damage, so each maps straight to a
             // single global activity key (no applies() routing, no per-type split). Only positive amounts are
-            // recorded — a battle with no crit / dodge / healing trains none of these. Reflect (Retribution) is
-            // deliberately omitted: nothing produces a reflected-damage figure until the mitigation rework (#1330).
+            // recorded — a battle with no crit / dodge / healing / reflection trains none of these.
             void AddEvent(EActivityKey key, double amount)
             {
                 if (amount > 0)
@@ -204,6 +203,7 @@ namespace Game.Application.Services
             AddEvent(EActivityKey.Crit, stats.CriticalDamageDealt);
             AddEvent(EActivityKey.Dodge, stats.DamageDodged);
             AddEvent(EActivityKey.Heal, stats.PlayerDamageHealed);
+            AddEvent(EActivityKey.Reflect, stats.PlayerReflectedDamageDealt);
 
             // Route each key's activity to the frontier tier of every path bound to it.
             var activities = new List<PathActivity>();

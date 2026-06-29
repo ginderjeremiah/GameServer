@@ -387,8 +387,7 @@ namespace Game.Core
         Dot = 9,
 
         // The four combat-event keys — not damage types, so absent from EDamageTypeKey. The proc / heal bindings
-        // (#1339) wire crit / dodge / heal; Reflect stays inert until the reflection rework (#1330) produces a
-        // reflected-damage signal. A path keyed on an unwired key simply accrues nothing until its binding lands.
+        // (#1339) wire crit / dodge / heal; Reflect is wired to the player's reflected damage dealt (#1363).
 
         /// <summary>Critical damage dealt (the Precision mastery).</summary>
         Crit = 10,
@@ -399,7 +398,7 @@ namespace Game.Core
         /// <summary>Healing done (the Restoration mastery).</summary>
         Heal = 12,
 
-        /// <summary>Reflected damage (the Retribution mastery). Inert until the reflection rework #1330.</summary>
+        /// <summary>Reflected damage dealt (the Retribution mastery). The player-as-defender reflection (#1363).</summary>
         Reflect = 13,
 
         // The ten resist keys — the incoming-book counterparts of the ten damage-type keys above (spike #1338).

@@ -333,13 +333,35 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task ReflectedDamage_IsNotYetWired_SoARetributionPathTrainsNothing()
+        public async Task ReflectedDamage_TrainsTheRetributionPath()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // Retribution waits on the reflection rework (#1330) — no reflected-damage signal is produced yet, so
-            // a Reflect-keyed path accrues nothing even from a battle full of every other event activity.
+            // Retribution trains from the reflected damage the player returned to the enemy (#1363) — an
+            // output-book event, type-neutral like Precision/Evasion/Restoration.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Retribution", activityKey: EActivityKey.Reflect);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Retribution", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(
+                scope, playerId, new BattleStats { PlayerReflectedDamageDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoReflectedDamage_TrainsNoRetribution()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle that produces other events but no reflected damage routes no
+            // Reflect activity, so a Reflect-keyed path is never reached even alongside crit/dodge/heal.
             var path = await TestDataSeeder.CreatePathAsync(context, name: "Retribution", activityKey: EActivityKey.Reflect);
             await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Retribution", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
@@ -354,7 +376,7 @@ namespace Game.Application.Tests.Services
             };
             var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
 
-            // Only a Reflect path exists, and Reflect is unwired — nothing trains.
+            // Only a Reflect path exists and no reflected damage occurred — nothing trains.
             Assert.Empty(accrual.Results);
         }
 

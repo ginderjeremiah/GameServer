@@ -1115,7 +1115,6 @@ namespace Game.Core.Tests.Battle
                 Id = id,
                 Name = $"Skill {id}",
                 Description = "",
-                Rarity = ERarity.Common,
                 DamageType = damageType,
                 CooldownMs = cooldownMs,
                 BaseDamage = baseDamage,

@@ -238,6 +238,7 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(playerBefore - 20, player.CurrentHealth, 0.001); // 40 × 0.5, unmitigated
             Assert.Equal(40, context.Stats.PlayerDamageDealt, 0.001);     // just the hit; reflection is not the player's damage dealt here
             Assert.Equal(20, context.Stats.PlayerDamageTaken, 0.001);     // the enemy reflected 20 onto the player
+            Assert.Equal(0, context.Stats.PlayerReflectedDamageDealt, 0.001); // the enemy reflected, not the player
         }
 
         [Fact]
@@ -256,6 +257,7 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(enemyBefore - 20, enemy.CurrentHealth, 0.001); // 50 × 0.4 reflected onto the enemy
             Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(20, context.Stats.PlayerReflectedDamageDealt, 0.001); // the dedicated Retribution signal (#1363)
             Assert.Equal(50, context.Stats.PlayerDamageTaken, 0.001); // the player still took the full hit
         }
 

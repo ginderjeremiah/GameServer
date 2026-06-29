@@ -558,7 +558,6 @@ namespace Game.Core.Tests.Battle.Performance
                 Id = id,
                 Name = $"Skill {id}",
                 Description = string.Empty,
-                Rarity = ERarity.Common,
                 DamageType = EDamageType.Physical,
                 CooldownMs = SkillCooldownMs, // fires every couple of ticks, so the damage path runs heavily
                 BaseDamage = 0,               // zero damage keeps both combatants immortal (runs to the cap)
