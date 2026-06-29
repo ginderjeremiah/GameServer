@@ -1,6 +1,6 @@
 <!-- Shared skill-card stats sub-block: the dmg / cd / dps rows + the damage-multiplier chips.
      Consumed by both the editable EquippedBand and the read-only InnateBand so the two stay in
-     sync (effective dmg/dps are defense-aware reads off the live view). -->
+     sync (effective dmg/dps are Toughness-aware reads off the live view). -->
 <div class="es">
 	<div class="stat"><span class="v accent">{fmt(view.effective(skill.id))}</span><span class="k">dmg</span></div>
 	<div class="stat"><span class="v">{metrics.cooldown.toFixed(1)}s</span><span class="k">cd</span></div>

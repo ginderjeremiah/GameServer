@@ -42,7 +42,8 @@ const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Dexterity]: 'Dexterity',
 	[EAttribute.Luck]: 'Luck',
 	[EAttribute.MaxHealth]: 'Max Health',
-	[EAttribute.Defense]: 'Defense',
+	// Reuses the former Defense art until dedicated Toughness art lands (#1334 owns the UX/art pass).
+	[EAttribute.Toughness]: 'Defense',
 	[EAttribute.CooldownRecovery]: 'Cooldown Recovery',
 	[EAttribute.CriticalChance]: 'Critical Chance',
 	[EAttribute.CriticalDamage]: 'Critical Damage',

@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260629160628_RenameDefenseToToughnessAttribute")]
+    partial class RenameDefenseToToughnessAttribute
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1065,13 +1068,14 @@ namespace Game.Infrastructure.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
                     NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
 
-                    b.Property<int>("ActivityKey")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("FalloffBase")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1573,6 +1577,28 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("SkillId");
 
                     b.ToTable("SkillEffects");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.SkillPathContribution", b =>
+                {
+                    b.Property<int>("SkillId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PathId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HomeTier")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Weight")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.HasKey("SkillId", "PathId");
+
+                    b.HasIndex("PathId");
+
+                    b.ToTable("SkillPathContributions");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipe", b =>
@@ -2612,6 +2638,25 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
+            modelBuilder.Entity("Game.Infrastructure.Entities.SkillPathContribution", b =>
+                {
+                    b.HasOne("Game.Infrastructure.Entities.Path", "Path")
+                        .WithMany("SkillContributions")
+                        .HasForeignKey("PathId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Infrastructure.Entities.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Path");
+
+                    b.Navigation("Skill");
+                });
+
             modelBuilder.Entity("Game.Infrastructure.Entities.SkillRecipe", b =>
                 {
                     b.HasOne("Game.Infrastructure.Entities.Skill", "ResultSkill")
@@ -2855,6 +2900,8 @@ namespace Game.Infrastructure.Migrations
             modelBuilder.Entity("Game.Infrastructure.Entities.Path", b =>
                 {
                     b.Navigation("Proficiencies");
+
+                    b.Navigation("SkillContributions");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.Player", b =>

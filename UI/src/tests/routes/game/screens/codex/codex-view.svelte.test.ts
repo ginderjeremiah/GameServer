@@ -134,7 +134,7 @@ function seed(): void {
 				{
 					id: 1,
 					target: ESkillEffectTarget.Opponent,
-					attributeId: EAttribute.Defense,
+					attributeId: EAttribute.Toughness,
 					modifierTypeId: EModifierType.Multiplicative,
 					amount: 0.5,
 					durationMs: 4000,
@@ -182,7 +182,7 @@ function seed(): void {
 	staticData.statisticTypes = SERVER_STAT_TYPES;
 	staticData.attributes = [
 		{ id: EAttribute.Strength, name: 'Strength', code: 'STR', isHarmful: false },
-		{ id: EAttribute.Defense, name: 'Defense', code: '', isHarmful: false }
+		{ id: EAttribute.Toughness, name: 'Toughness', code: '', isHarmful: false }
 	];
 	playerChallenges.all = [{ challengeId: 0, progress: 62, completed: false }];
 }
@@ -455,7 +455,7 @@ describe('CodexView dossier projections', () => {
 		view.selectEnemy(0); // level → 12
 		const str = view.attributes.primary.find((p) => p.attributeId === EAttribute.Strength);
 		expect(str?.value).toBe(Math.round(10 + 1 * 12)); // 22
-		expect(view.attributes.secondary.map((s) => s.attributeId)).toEqual([EAttribute.MaxHealth, EAttribute.Defense]);
+		expect(view.attributes.secondary.map((s) => s.attributeId)).toEqual([EAttribute.MaxHealth, EAttribute.Toughness]);
 	});
 });
 
@@ -693,7 +693,7 @@ describe('CodexView skill dossier', () => {
 
 	it('describes effects via the shared helper, classifying buff vs debuff', () => {
 		const view = new CodexView();
-		view.selectSkill(1); // War Cry: +15 STR (self, buff) and ×0.5 Defense (enemy, debuff)
+		view.selectSkill(1); // War Cry: +15 STR (self, buff) and ×0.5 Toughness (enemy, debuff)
 		expect(view.skillEffects).toEqual([
 			{
 				id: 0,
@@ -706,7 +706,7 @@ describe('CodexView skill dossier', () => {
 			{
 				id: 1,
 				magnitude: '×0.5',
-				attributeName: 'Defense',
+				attributeName: 'Toughness',
 				targetLabel: 'enemy',
 				duration: '4s',
 				color: 'var(--effect-debuff)'

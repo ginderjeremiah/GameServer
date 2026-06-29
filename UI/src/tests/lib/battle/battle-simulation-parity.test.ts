@@ -70,8 +70,8 @@ interface ParityScenario {
 
 const scenarios: ParityScenario[] = [
 	// Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
-	//   Player: MaxHealth=900, Def=42, CDR=1.09 → cdMult=1.09; damage 85, after def 68.
-	//   Enemy:  MaxHealth=400, Def=17; damage 5-42 clamped to 0.
+	//   Player: MaxHealth=900, Toughness=60, CDR=1.09 → cdMult=1.09; damage 85 → enemy Toughness 30 → 34/hit.
+	//   Enemy:  MaxHealth=400, Toughness=30; damage 5 → player Toughness 60 → 1.25/hit. 12 hits → 13440ms.
 	//   6 hits at ticks 28,56,84,112,140,168 → 6720ms.
 	{
 		name: 'cooldownRecovery',
@@ -93,12 +93,12 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(5, 2000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 6720 }
+		expected: { victory: true, playerDied: false, totalMs: 13440 }
 	},
 
 	// Two player skills on different cooldowns vs an enemy that deals real damage.
-	//   Player: MaxHealth=600, Def=22; skillA 50 raw→33 every 20 ticks, skillB 25 raw→8 every 30 ticks.
-	//   Enemy:  MaxHealth=450, Def=17; attack 30 raw→8 every 25 ticks.
+	//   Player: MaxHealth=600, Toughness=40; skillA 50 raw→20/hit every 20 ticks, skillB 25 raw→10/hit every 30 ticks.
+	//   Enemy:  MaxHealth=450, Toughness=30; attack 30 raw→player Toughness 40→10/hit every 25 ticks. Kill at tick 340 → 13600ms.
 	//   Cumulative player damage first reaches 450 at tick 240 → 9600ms.
 	{
 		name: 'multiSkill',
@@ -118,13 +118,15 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(30, 1000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 9600 }
+		expected: { victory: true, playerDied: false, totalMs: 13600 }
 	},
 
-	// Both sides have so much Defense that every hit clamps to 0 — runs to timeout.
-	//   Player/Enemy: Def=52 each; attacks 5 raw → 5-52 clamped to 0.
+	// Both sides have so much Toughness (Endurance 50 → Toughness 100) that each 5-damage hit is reduced to a
+	// trickle (5 × 20/(100+20) ≈ 0.83), and with their Endurance-inflated MaxHealth (1050 each) that trickle
+	// cannot kill within the cap — a draw. The curve never clamps a hit fully to 0 (it asymptotes below 100%),
+	// so the stalemate now comes from EHP outpacing the trickle rather than a hard floor.
 	{
-		name: 'highDefenseFloor',
+		name: 'highToughnessTrickle',
 		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
 		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
@@ -153,17 +155,18 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// A dedicated-boss encounter: a higher-level boss bringing its FULL authored loadout (3 skills)
-	// against a player who out-tanks it. Mirrors the backend `bossFullLoadout` scenario.
-	//   Player: Str=60, End=40 → MaxHealth=1150, Def=42; skill 130 raw → 68 after boss def, every 25 ticks.
-	//   Boss:   Str=20, End=60 → MaxHealth=1350, Def=62; only the 50-dmg skill pierces (8 dmg), rest clamp to 0.
-	//   20 player hits reach 1360 ≥ 1350 at tick 500 → 20000ms; the boss never threatens the player.
+	// against a player who out-tanks it. Mirrors the backend `bossFullLoadout` scenario. Under the curve the
+	// boss's smaller skills no longer clamp to 0 — they all chip — so the player is built tankier to still win.
+	//   Player: Str=60, End=50 → MaxHealth=1350, Toughness=100; skill 130 raw → boss Toughness 60 → 32.5/hit, every 25 ticks.
+	//   Boss:   Str=20, End=30 → MaxHealth=750, Toughness=60; 3 skills → 8.33 + 3.33 + 5 = 16.67/volley every 25 ticks.
+	//   24 player hits reach 780 ≥ 750 at tick 600 → 24000ms; the boss's chip never threatens the 1350-HP player.
 	{
 		name: 'bossFullLoadout',
 		player: () =>
 			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 60 },
-					{ id: EAttribute.Endurance, amount: 40 }
+					{ id: EAttribute.Endurance, amount: 50 }
 				],
 				[makeSkill(10, 1000, [{ attributeId: EAttribute.Strength, multiplier: 2.0 }])]
 			),
@@ -171,11 +174,11 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 20 },
-					{ id: EAttribute.Endurance, amount: 60 }
+					{ id: EAttribute.Endurance, amount: 30 }
 				],
 				[makeSkill(50, 1000), makeSkill(20, 1000), makeSkill(30, 1000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 20000 }
+		expected: { victory: true, playerDied: false, totalMs: 24000 }
 	},
 
 	// The cooldownRecovery matchup capped before either skill fires: stops at maxMs.
@@ -209,10 +212,10 @@ const scenarios: ParityScenario[] = [
 	// one source changes the kill count; the item's Agility and the prefix's Dexterity
 	// additionally feed CooldownRecovery, so the whole merge is exercised end to end.
 	//   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
-	//   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Def=32, CDR=1.10 → cdMult=1.10.
-	//   Player skill: 10 + 45*1.5 = 77.5 raw, after enemy def 17 → 60.5, fires every 28 ticks
+	//   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Toughness=40, CDR=1.10 → cdMult=1.10.
+	//   Player skill: 10 + 45*1.5 = 77.5 raw → enemy Toughness 30 → 31/hit, fires every 28 ticks
 	//     (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
-	//   Enemy: MaxHealth=400, Def=17; attack 5-32 clamps to 0, so the player never dies.
+	//   Enemy: MaxHealth=400, Toughness=30; attack 5 → 1.67/hit, so the player never dies. 13 hits → 14560ms.
 	//   7 hits reach 423.5 ≥ 400 at tick 196 → 7840ms (vs 21600ms for the same allocations
 	//   with no equipment — proof the merged attributes change the outcome).
 	{
@@ -252,20 +255,20 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(5, 2000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 7840 }
+		expected: { victory: true, playerDied: false, totalMs: 14560 }
 	},
 
 	// Fractional enemy attribute distribution (#941): the only scenario whose enemy attribute is a FRACTIONAL
 	// value (Strength 7.5, produced on the backend by a 2.5/level distribution at level 3 and serialized to the
 	// client, which re-derives MaxHealth from it). Strength feeds only MaxHealth: 50 + 5×7.5 = 87.5, a fractional
 	// max with a TIGHT kill margin. Mirrors the backend `fractionalEnemyDistribution` scenario.
-	//   Player: skill baseDamage 31, no multiplier, cooldown 400 → 31−2 Def = 29/hit every 10 ticks.
-	//   Enemy:  MaxHealth 87.5, Def 2, no skills.
-	//   Cumulative 29,58,87 (the 87.5 survives the 87), 116 → dies on hit 4 at tick 160 → 1600ms. Had the .5 been
+	//   Player: skill baseDamage 29, no multiplier, cooldown 400 → 29/hit (the enemy has no Toughness) every 10 ticks.
+	//   Enemy:  MaxHealth 87.5, no Toughness, no skills.
+	//   Cumulative 29,58,87 (the 87.5 survives the 87), 116 → dies on hit 4 at tick 40 → 1600ms. Had the .5 been
 	//   lost to a float roundtrip (MaxHealth 87) the enemy would die a hit earlier at 1200.
 	{
 		name: 'fractionalEnemyDistribution',
-		player: () => makeBattler([], [makeSkill(31, 400)]),
+		player: () => makeBattler([], [makeSkill(29, 400)]),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 7.5 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 1600 }
 	},
@@ -274,7 +277,7 @@ const scenarios: ParityScenario[] = [
 	// the boost (which also raises damage via the Strength→damage path); re-applying it each fire now STACKS
 	// (each fire adds another +10). Mirrors the backend `selfStrengthBuffStacksEachFire` scenario.
 	//   Player: Str=10, cdMult=1; skill = Str×1.0 raw, cooldown 400. Effect: Self +10 Strength, permanent.
-	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Enemy:  Str=10 → MaxHealth=100, no Toughness, no skills.
 	//   Fire 1 deals 10−2=8 then stacks → Str 20; fire 2 deals 18 → Str 30; fire 3 deals 28; fire 4 deals
 	//   38; fire 5 deals 48. Enemy HP 100 → 92,74,46,8,−40: dies on fire 5 at 2000. (Refresh-only: 2800.)
 	{
@@ -292,14 +295,14 @@ const scenarios: ParityScenario[] = [
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 2000 }
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
 	},
 
 	// A self CooldownRecovery buff is read live each tick AND stacks on each fire, so the fire interval keeps
 	// shortening as the buff compounds. Mirrors the backend `cdrBuffShortensFireInterval` scenario.
 	//   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400. Each hit deals 18.
 	//     Effect: Self +1.0 CooldownRecovery (additive), permanent — a stack per fire.
-	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Enemy:  Str=10 → MaxHealth=100, no Toughness, no skills.
 	//   Fire 1 at tick 10 → cdMult=2; next fires 5,4,3,2,2 ticks apart (ticks 15,19,22,24,26). Six 18-dmg
 	//   hits drop the 100-HP enemy on fire 6 at tick 26 → 1040ms. (Refresh-only held cdMult=2 → 1400.)
 	{
@@ -326,14 +329,14 @@ const scenarios: ParityScenario[] = [
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 1040 }
+		expected: { victory: true, playerDied: false, totalMs: 960 }
 	},
 
 	// Same-tick ordering: slot 0's self buff (applied after its own pre-buff hit) influences slot 1 firing
 	// after it on the same tick; the buff also STACKS on each fire, so the per-volley damage ramps. Mirrors
 	// the backend `sameTickEarlierSlotBuffsLaterSlot` scenario.
 	//   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent — a stack per fire), slot1 = Str×1.0 (no
-	//     effect), both cooldown 400 (fire ticks 10,20,30…). Enemy: Str=16 → MaxHealth=130, Def=2, no skills.
+	//     effect), both cooldown 400 (fire ticks 10,20,30…). Enemy: Str=16 → MaxHealth=130, no Toughness, no skills.
 	//   Tick 10: 8 (slot0) + 18 (slot1, Str 20) = 26; tick 20: 18 + 28 = 46; tick 30: 28 + 38 → enemy dies at 1200.
 	{
 		name: 'sameTickEarlierSlotBuffsLaterSlot',
@@ -359,7 +362,7 @@ const scenarios: ParityScenario[] = [
 	// `opponentMaxHealthDebuffClamps` scenario.
 	//   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400 (fires tick 10,20…).
 	//     Effect: Opponent ×0.5 MaxHealth (multiplicative), permanent — a stack per fire.
-	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Enemy:  Str=10 → MaxHealth=100, no Toughness, no skills.
 	//   Tick 10: 100→90, ×0.5 → 50 (clamp 90→50); tick 20: →40, ×0.5 → 25; tick 30: →15, ×0.5 → 12.5;
 	//   tick 40: →2.5, ×0.5 → 6.25; tick 50: →dead at 2000ms.
 	{
@@ -395,7 +398,7 @@ const scenarios: ParityScenario[] = [
 	// only at the damage mutations) would miss. Mirrors the backend `maxHealthDebuffIsLethal` scenario.
 	//   Player: skill baseDamage 0, no multiplier, cooldown 400 (fires tick 10). Effect: Opponent −200 MaxHealth
 	//     (additive), permanent.
-	//   Enemy:  Str=10 → MaxHealth=100, Def=2, no skills.
+	//   Enemy:  Str=10 → MaxHealth=100, no Toughness, no skills.
 	//   Tick 10: 0 direct damage, then −200 MaxHealth → MaxHealth −100, clamp 100→−100 → dead at 400ms.
 	{
 		name: 'maxHealthDebuffIsLethal',
@@ -428,7 +431,7 @@ const scenarios: ParityScenario[] = [
 	// tick, because each slot reads the cooldown multiplier live in loadout order; slot 0 fires every tick
 	// and its buff STACKS, so cdMult climbs 1→2→3→… Mirrors the backend `cdrBuffSpeedsLaterSlotSameTick`.
 	//   Player: base CDR=1. slot0 = pure buffer (0 dmg, cooldown 40, Self +1.0 CDR permanent — a stack per
-	//     tick), slot1 = baseDamage 27, cooldown 400. Enemy Str=5 → MaxHealth=75, Def=2, no skills (25/hit).
+	//     tick), slot1 = baseDamage 27, cooldown 400. Enemy Str=5 → MaxHealth=75, no Toughness, no skills (25/hit).
 	//   slot1 accrues 80,120,160,200,… so its charge passes 400 at ticks 4, 6, 8 → 3 hits kill at tick 8 → 320ms.
 	{
 		name: 'cdrBuffSpeedsLaterSlotSameTick',
@@ -459,7 +462,7 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// DoT kill timing: a constant poison on the enemy (a base PoisonDamagePerSecond debuff, no direct damage)
-	// ticks it down. DTPS 50 -> 50*40/1000 = 2 damage at the END of each tick, bypassing Defense. 2/tick over
+	// ticks it down. DTPS 50 -> 50*40/1000 = 2 damage at the END of each tick, bypassing mitigation. 2/tick over
 	// 25 ticks brings the 50-HP enemy to 0 -> victory at tick 1000.
 	{
 		name: 'poisonKillTiming',
@@ -501,9 +504,9 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Heal-over-time offsets incoming damage and flips the outcome. The player carries a constant
-	// HealthRegenPerSecond 75 (base regen) -> 3 HP at each tick's end; the enemy chips 2/tick (baseDamage 4 -
-	// Def 2). The regen fully offsets the chip (capped at MaxHealth), so the 50-HP player never dies, and
-	// dealing no damage back the battle runs to the timeout. Without the regen the 2/tick would kill at 1000.
+	// HealthRegenPerSecond 75 (base regen) -> 3 HP at each tick's end; the enemy chips 2/tick (baseDamage 2, the
+	// player has no Toughness). The regen fully offsets the chip (capped at MaxHealth), so the 50-HP player never
+	// dies, and dealing no damage back the battle runs to the timeout. Without the regen the 2/tick would kill at 1000.
 	{
 		name: 'regenOutpacesDamage',
 		player: () =>
@@ -514,7 +517,7 @@ const scenarios: ParityScenario[] = [
 				],
 				[]
 			),
-		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], [makeSkill(4, 40)]),
+		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], [makeSkill(2, 40)]),
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
@@ -559,12 +562,12 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
-	// DoT bypasses Defense. The enemy's high Defense (12) clamps the player's direct 10-damage hit to 0, but
-	// its constant 250 PoisonDamagePerSecond (base poison) -> 10/tick ignores Defense and grinds the enemy's
-	// 250 HP down: victory at tick 1000. If DoT respected Defense (10-12 clamped to 0) the enemy would never die.
+	// DoT bypasses the Toughness curve. The enemy's Endurance 10 → Toughness 20 would halve a direct hit against
+	// the level-1 player, but its constant 250 PoisonDamagePerSecond (base poison) -> 10/tick ignores mitigation
+	// and grinds the enemy's 250 HP down: victory at tick 1000. If DoT were mitigated (5/tick) it would die at 2000.
 	{
-		name: 'dotBypassesDefense',
-		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], [makeSkill(10, 40)]),
+		name: 'dotBypassesMitigation',
+		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], [makeSkill(0, 40)]),
 		enemy: () =>
 			makeBattler(
 				[
@@ -646,7 +649,7 @@ const scenarios: ParityScenario[] = [
 	// DoT stacking: a poison re-applied every tick STACKS (each application adds another
 	// PoisonDamagePerSecond debuff) instead of refreshing, so the per-tick damage ramps. The skill
 	// (cooldown 40) applies Opponent +25 PoisonDamagePerSecond each tick; at tick n the enemy carries n
-	// stacks = 25n DTPS → 25n×40/1000 = n damage that tick (bypassing Defense). Cumulative n(n+1)/2 reaches
+	// stacks = 25n DTPS → 25n×40/1000 = n damage that tick (bypassing mitigation). Cumulative n(n+1)/2 reaches
 	// the 50-HP enemy's total on tick 10 (45 after tick 9, +10 = 55) → victory at 400ms. (Refresh-only would
 	// hold 25 DTPS = 1/tick → 2000ms.) Mirrors the backend `dotStacksEachApplication` scenario.
 	{
@@ -682,7 +685,7 @@ const scenarios: ParityScenario[] = [
 	// always lands before the 3-tick duration would lapse, so nothing ever expires and the stacks accumulate,
 	// the damage ramping like a permanent poison. Mirrors the backend `dotReapplyExtendsSharedExpiration`.
 	//   Player: skill baseDamage 0, cooldown 80 → fires ticks 2,4,6; Opponent +250 PoisonDamagePerSecond, 120ms.
-	//   Enemy:  Str=14 → MaxHealth=120, Def=2, no skills. Each stack = 250 DTPS → 10/tick (bypassing Defense).
+	//   Enemy:  Str=14 → MaxHealth=120, no Toughness, no skills. Each stack = 250 DTPS → 10/tick (bypassing mitigation).
 	//   Stacks 1 (ticks 2-3), 2 (4-5), 3 (6-7); cum 10,20,40,60,90,120 → the 120-HP enemy dies on tick 7 →
 	//   280ms. (Independent per-application expiry — the bug this fixes — would lapse older applications and kill at 400ms.)
 	{
@@ -716,7 +719,7 @@ const scenarios: ParityScenario[] = [
 	// scales with the caster's Intellect at 1.0/point. Intellect feeds no derived attribute, so it perturbs
 	// nothing but this scaling. The skill (baseDamage 0, cooldown 2000) fires once at tick 50, applying
 	// Opponent +PoisonDamagePerSecond = 0 + Intellect(50)×1.0 = 50 DTPS (permanent). 50 DTPS → 2/tick
-	// (bypassing Defense); from tick 50 the 50-HP enemy loses 2/tick and dies on tick 74 → 2960ms. (Without
+	// (bypassing mitigation); from tick 50 the 50-HP enemy loses 2/tick and dies on tick 74 → 2960ms. (Without
 	// scaling the authored 0 deals nothing.) Mirrors the backend `effectScalesWithCasterIntellect` scenario.
 	{
 		name: 'effectScalesWithCasterIntellect',
@@ -753,8 +756,8 @@ const scenarios: ParityScenario[] = [
 	// on both sides. Mirrors the backend `forcedCrit` / `forcedDodge` / `forcedBlock` / `drawOrderMultiSkill`
 	// / `enemyForcedChanceIgnored` scenarios.
 
-	// Forced crit: CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, so 20 raw × 2 = 40, −2 def =
-	// 38/hit, and the 100-HP enemy dies on hit 3 at 1200ms.
+	// Forced crit: CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, so 20 raw × 2 = 40/hit (the
+	// enemy has no Toughness), and the 100-HP enemy dies on hit 3 at 1200ms.
 	{
 		name: 'forcedCrit',
 		player: () =>
@@ -771,7 +774,7 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Forced dodge: the enemy's 1000-damage one-shot is negated every hit, so the player grinds it down
-	// (18/hit) for the win on hit 6 at 2400ms instead of dying at tick 10.
+	// (20/hit, no Toughness) for the win on hit 5 at 2000ms instead of dying at tick 10.
 	{
 		name: 'forcedDodge',
 		player: () =>
@@ -783,12 +786,13 @@ const scenarios: ParityScenario[] = [
 				[makeSkill(20, 400)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(1000, 400)]),
-		expected: { victory: true, playerDied: false, totalMs: 2400 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
-	// Forced block: BlockReduction is the base 2 (sourced by #799) + 18 = 20, so 25 − 2 def − 20 block =
-	// 3/hit instead of 23/hit, and the player survives the enemy's every-5-tick assault long enough to kill
-	// the 200-HP enemy (48/hit) on hit 5 at 2000ms. Block flips the loss (player would die at tick 25) into a win.
+	// Forced block: BlockReduction is the base 2 (sourced by #799) + 18 = 20, so with no Toughness the 25 hit
+	// becomes 25 − 20 block = 5/hit instead of 25/hit, and the player survives the enemy's every-5-tick assault
+	// long enough to kill the 200-HP enemy (50/hit) on hit 4 at 1600ms. Block flips the loss (player would die
+	// at tick 25) into a win.
 	{
 		name: 'forcedBlock',
 		player: () =>
@@ -801,13 +805,14 @@ const scenarios: ParityScenario[] = [
 				[makeSkill(50, 400)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 30 }], [makeSkill(25, 200)]),
-		expected: { victory: true, playerDied: false, totalMs: 2000 }
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
 	},
 
 	// Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two enemy
 	// skills (two dodge+block draw pairs) fire on the same ticks. CriticalDamage and BlockReduction each fold
-	// in the #799 base (1.5 + 0.5 = 2 multiplier; 2 + 8 = 10 reduction). Player crits both hits (18 + 28 =
-	// 46/tick) and blocks both enemy hits (0 + 2 = 2/tick); the 100-HP enemy dies on the player's tick-30 volley → 1200ms.
+	// in the #799 base (1.5 + 0.5 = 2 multiplier; 2 + 8 = 10 reduction). Neither side has Toughness. Player
+	// crits both hits (20 + 30 = 50/tick) and blocks both enemy hits (2 + 4 = 6/tick); the 100-HP enemy dies on
+	// the player's tick-20 volley → 800ms.
 	{
 		name: 'drawOrderMultiSkill',
 		player: () =>
@@ -822,12 +827,12 @@ const scenarios: ParityScenario[] = [
 				[makeSkill(10, 400), makeSkill(15, 400)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(12, 400), makeSkill(14, 400)]),
-		expected: { victory: true, playerDied: false, totalMs: 1200 }
+		expected: { victory: true, playerDied: false, totalMs: 800 }
 	},
 
 	// Enemies never crit/dodge/block: with every chance forced to 1 on the enemy, its hit still lands
-	// un-critted (18, not 38) and the player's hits still land in full (not zeroed by its 50 BlockReduction),
-	// so the player wins on hit 6 at 2400ms — proving the rolls are gated on the player alone.
+	// un-critted (20, not 40) and the player's hits still land in full (not zeroed by its 50 BlockReduction),
+	// so the player wins on hit 5 at 2000ms — proving the rolls are gated on the player alone.
 	{
 		name: 'enemyForcedChanceIgnored',
 		player: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(20, 400)]),
@@ -843,14 +848,14 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(20, 400)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 2400 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
 	// Fractional crit chance against a fixed seed (#941): unlike the forced-1/0 crit rows, CriticalChance is a
 	// real 0.5 fraction, so whether each player fire crits depends on the actual Mulberry32 [0,1) draw. With
 	// PARITY_SEED the first six crit draws are crit,crit,no,no,crit,crit. Mirrors the backend `fractionalCritChance`.
 	//   Player: skill baseDamage 12, cooldown 400 (one crit draw per fire); CriticalDamage base 1.5 + 0.5 = 2.0 →
-	//     a crit deals 12×2−2 = 22, a non-crit 12−2 = 10. Enemy: Str 10 → MaxHealth 100, Def 2, no skills.
+	//     a crit deals 12×2 = 24, a non-crit 12 (no Toughness). Enemy: Str 10 → MaxHealth 100, no Toughness, no skills.
 	//   Hits 22,22,10,10,22 (cum 86) then the 6th draw's crit (+22 → 108 ≥ 100) kills on fire 6 → 2400ms; a
 	//   non-crit there (96) would push the kill to fire 7.
 	{
@@ -884,7 +889,7 @@ const scenarios: ParityScenario[] = [
 			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [selected], [grant]);
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 1200 }
+		expected: { victory: true, playerDied: false, totalMs: 800 }
 	},
 
 	// Two equipped items grant the SAME skill: it is de-duplicated to one (not fielded twice). The single
@@ -928,7 +933,7 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a skill whose
-	// self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw less 2 Def deals
+	// self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw (no Toughness) deals
 	// 8,18,28,38,48,58 (Str climbing 10→60); cumulative 8,26,54,92,140,198 drops the 150-HP enemy on fire 6 at
 	// tick 60 → 2400ms — proving granted skills wrap into a full battle skill (charge + effects).
 	{
@@ -945,16 +950,16 @@ const scenarios: ParityScenario[] = [
 			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [], [grant]);
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 20 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 2400 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
 	// ── Direct-hit damage typing: amplification / resistance (#1320 Area B) ──────
 	// Skills carry a leaf damage type; the attacker's amplification and defender's resistance for that type's
 	// applies() keys multiply the hit as separate budgets — × (1 + amp), × (1 − res), res unclamped — with
-	// crit attacker-side (pre-mitigation) and flat Defense last. All chances are 0, so outcomes are
+	// crit attacker-side (pre-mitigation) and the Toughness curve last. All chances are 0, so outcomes are
 	// hand-computable. Mirrors the backend `fireAmplification` … `enemyAmplifiesPlayerResists` scenarios.
 
-	// Attacker amplification: a Fire skill with +0.5 FireAmplification deals 20 × 1.5 = 30, −2 Def = 28/hit, so
+	// Attacker amplification: a Fire skill with +0.5 FireAmplification deals 20 × 1.5 = 30/hit (no Toughness), so
 	// the 100-HP enemy dies on hit 4 at tick 40 → 1600ms (vs hit 6 / 2400ms un-amplified).
 	{
 		name: 'fireAmplification',
@@ -970,7 +975,7 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 1600 }
 	},
 
-	// Defender resistance: the enemy's +0.5 FireResistance halves a 40-damage Fire hit to 20, −2 Def = 18/hit,
+	// Defender resistance: the enemy's +0.5 FireResistance halves a 40-damage Fire hit to 20/hit (no Toughness),
 	// so the 100-HP enemy dies on hit 6 at tick 60 → 2400ms (vs hit 3 / 1200ms un-resisted).
 	{
 		name: 'fireResistance',
@@ -984,11 +989,11 @@ const scenarios: ParityScenario[] = [
 				],
 				[]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 2400 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
 	// Vulnerability (res < 0): a −1.0 FireResistance doubles the incoming Fire hit (factor 1 − (−1) = 2). A
-	// 20-damage hit becomes 40, −2 Def = 38/hit, so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs hit
+	// 20-damage hit becomes 40/hit (no Toughness), so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs hit
 	// 6 / 2400ms at res 0). Resistance is deliberately left unclamped.
 	{
 		name: 'fireVulnerability',
@@ -1006,7 +1011,7 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Absorption (res > 1): a +2.0 FireResistance drives the post-resistance hit negative (20 × (1 − 2) = −20),
-	// so an absorbed hit deals no damage — flat Defense never applies, and the heal is capped at MaxHealth (the
+	// so an absorbed hit deals no damage — the Toughness curve never applies, and the heal is capped at MaxHealth (the
 	// enemy is already full, so it stays at 100). The enemy never loses health and never dies; dealing no damage
 	// back, the battle runs to the timeout. (At res 0 the player's 18/hit would win by 2400ms.)
 	{
@@ -1023,10 +1028,10 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
-	// Crit punches through resistance AND Defense: a forced crit (CriticalDamage base 1.5 + 0.5 = 2.0)
-	// multiplies the Fire hit pre-mitigation. A normal hit (20 × (1 − 0.5 res) = 10, −10 Def) clamps to 0 — the
-	// enemy is unkillable without crit — but the crit (20 × 2 × 0.5 = 20, −10 Def = 10/hit) punches through,
-	// dropping the 50-HP enemy on hit 5 at tick 50 → 2000ms.
+	// Crit multiplies pre-mitigation, so it punches through resistance AND the Toughness curve: a forced crit
+	// (CriticalDamage base 1.5 + 0.5 = 2.0) on a Fire hit. The enemy's Toughness 20 vs the level-1 player halves
+	// the post-resistance hit, so a normal hit deals 20 × (1 − 0.5 res) × 0.5 = 5 while the crit deals
+	// 20 × 2 × 0.5 × 0.5 = 10/hit — dropping the 50-HP enemy on hit 5 at tick 50 → 2000ms.
 	{
 		name: 'critPunchesThroughTyped',
 		player: () =>
@@ -1040,7 +1045,7 @@ const scenarios: ParityScenario[] = [
 		enemy: () =>
 			makeBattler(
 				[
-					{ id: EAttribute.Defense, amount: 8 },
+					{ id: EAttribute.Toughness, amount: 20 },
 					{ id: EAttribute.FireResistance, amount: 0.5 }
 				],
 				[]
@@ -1050,17 +1055,17 @@ const scenarios: ParityScenario[] = [
 
 	// Reduce-to-today identity: a Fire-typed skill with no amplification or resistance authored anywhere behaves
 	// exactly like the untyped/physical hit it used to be — × (1 + 0) and × (1 − 0) are exact 1.0 factors. 20
-	// raw − 2 Def = 18/hit, so the 100-HP enemy dies on hit 6 → 2400ms, identical to a baseDamage-20 physical skill.
+	// raw → 20/hit (no Toughness), so the 100-HP enemy dies on hit 5 → 2000ms, identical to a baseDamage-20 physical skill.
 	{
 		name: 'typedFireNoModifiersUnchanged',
 		player: () =>
 			makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(20, 400, [], [], EDamageType.Fire)]),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
-		expected: { victory: true, playerDied: false, totalMs: 2400 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
 	// Bidirectional: the ENEMY amplifies and the PLAYER resists. The enemy's +1.0 FireAmplification doubles its
-	// 20-damage Fire skill to 40; the player's +0.5 FireResistance halves that to 20, −2 Def = 18/hit. The
+	// 20-damage Fire skill to 40; the player's +0.5 FireResistance halves that to 20/hit (no Toughness). The
 	// player (no skills) dies on the enemy's hit 6 at tick 60 → 2400ms. (Without the enemy amp it would be
 	// 8/hit → 5200ms; without the player resist, 38/hit → 1200ms.)
 	{
@@ -1081,12 +1086,12 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(20, 400, [], [], EDamageType.Fire)]
 			),
-		expected: { victory: false, playerDied: true, totalMs: 2400 }
+		expected: { victory: false, playerDied: true, totalMs: 2000 }
 	},
 
 	// ── Typed damage-over-time: per-type accumulators + live resistance (#1320 Area C) ─────────
 	// DoT is encoded by which per-second accumulator an effect targets; the end-of-tick phase loops the DoT
-	// types in fixed order, applying each type's resistance sampled live off the bearer and bypassing Defense.
+	// types in fixed order, applying each type's resistance sampled live off the bearer and bypassing mitigation.
 	// A bearer is the defender of its own DoT. Mirrors the backend `poisonResistanceSlowsKill` …
 	// `poisonVulnerabilityDebuffSampledLive` scenarios.
 
@@ -1283,12 +1288,12 @@ describe('Battle simulation parity with backend', () => {
 		const enemy = scenarios[0].enemy();
 
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(900);
-		expect(player.attributes.getValue(EAttribute.Defense)).toBe(42);
+		expect(player.attributes.getValue(EAttribute.Toughness)).toBe(60); // 2·Endurance(30)
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1.09, 10);
 		expect(player.cdMultiplier).toBeCloseTo(1.09, 10);
 
 		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(400);
-		expect(enemy.attributes.getValue(EAttribute.Defense)).toBe(17);
+		expect(enemy.attributes.getValue(EAttribute.Toughness)).toBe(30); // 2·Endurance(15)
 	});
 
 	it('composes the equippedItemWithMods stat + item + mod attributes to the expected values', () => {
@@ -1307,7 +1312,7 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.attributes.getValue(EAttribute.Agility)).toBe(20);
 		expect(player.attributes.getValue(EAttribute.Dexterity)).toBe(20);
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(675);
-		expect(player.attributes.getValue(EAttribute.Defense)).toBe(32);
+		expect(player.attributes.getValue(EAttribute.Toughness)).toBe(40); // 2·Endurance(20)
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1.1, 10);
 		expect(player.cdMultiplier).toBeCloseTo(1.1, 10);
 	});
@@ -1339,7 +1344,7 @@ describe('Battle simulation parity with backend', () => {
 			{ id: EAttribute.Dexterity, amount: 10 },
 			// The FINAL values including derived stats, re-fed into the derived pipeline:
 			{ id: EAttribute.MaxHealth, amount: 900 }, // 50 + 20*30 + 5*50
-			{ id: EAttribute.Defense, amount: 42 }, // 2 + 30 + 0.5*20
+			{ id: EAttribute.Toughness, amount: 60 }, // 2*30
 			{ id: EAttribute.CooldownRecovery, amount: 1.09 } // 1 + 0.004*20 + 0.001*10
 		];
 		const player = makeBattler(playerFinalAttrs, [
@@ -1349,12 +1354,12 @@ describe('Battle simulation parity with backend', () => {
 
 		// Derived stats are now DOUBLED.
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(1800);
-		expect(player.attributes.getValue(EAttribute.Defense)).toBe(84);
+		expect(player.attributes.getValue(EAttribute.Toughness)).toBe(120); // injected 60 + derived 2·30
 		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(2.18, 10);
 		expect(player.cdMultiplier).toBeCloseTo(2.18, 10);
 
 		const result = new BattleSimulator(player, enemy, PARITY_SEED).simulate();
-		expect(result.totalMs).toBe(3360);
-		expect(result.totalMs).toBeLessThan(6720);
+		expect(result.totalMs).toBe(6720);
+		expect(result.totalMs).toBeLessThan(13440);
 	});
 });

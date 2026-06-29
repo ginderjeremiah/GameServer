@@ -23,12 +23,12 @@ describe('AttributeIcon', () => {
 	});
 
 	it('applies the size prop to width and height (default 16px)', () => {
-		const sized = render(AttributeIcon, { props: { id: EAttribute.Defense, size: 24 } });
+		const sized = render(AttributeIcon, { props: { id: EAttribute.Toughness, size: 24 } });
 		const img = sized.container.querySelector('img') as HTMLElement;
 		expect(img.style.width).toBe('24px');
 		expect(img.style.height).toBe('24px');
 		cleanup();
-		const dflt = render(AttributeIcon, { props: { id: EAttribute.Defense } });
+		const dflt = render(AttributeIcon, { props: { id: EAttribute.Toughness } });
 		const dimg = dflt.container.querySelector('img') as HTMLElement;
 		expect(dimg.style.width).toBe('16px');
 		expect(dimg.style.height).toBe('16px');

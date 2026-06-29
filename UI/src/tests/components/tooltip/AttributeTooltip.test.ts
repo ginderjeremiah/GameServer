@@ -13,9 +13,10 @@ const STRENGTH = makeAttribute(EAttribute.Strength, 'Strength', {
 	attributeType: EAttributeType.Primary,
 	description: 'Raw physical power.'
 });
-const DEFENSE = makeAttribute(EAttribute.Defense, 'Defense', {
+const TOUGHNESS = makeAttribute(EAttribute.Toughness, 'Toughness', {
 	attributeType: EAttributeType.Secondary,
-	description: 'Reduces incoming damage.'
+	description:
+		'Reduces all incoming direct damage by a percentage that grows with diminishing returns, never reaching full immunity.'
 });
 const DOT = makeAttribute(EAttribute.BleedDamagePerSecond, 'Bleed Damage Per Second', {
 	attributeType: EAttributeType.Status,
@@ -52,8 +53,8 @@ describe('AttributeTooltip', () => {
 	});
 
 	it('uses a neutral accent for a non-core attribute', () => {
-		staticData.attributes = [DEFENSE];
-		const { container } = render(AttributeTooltip, { props: { attributeId: EAttribute.Defense } });
+		staticData.attributes = [TOUGHNESS];
+		const { container } = render(AttributeTooltip, { props: { attributeId: EAttribute.Toughness } });
 		expect((container.querySelector('.tt-shell') as HTMLElement).getAttribute('style')).toContain(
 			'var(--text-secondary)'
 		);
@@ -120,10 +121,10 @@ describe('AttributeTooltip', () => {
 	});
 
 	it('classifies a lowered beneficial attribute as a debuff and depletes the pill', () => {
-		staticData.attributes = [DEFENSE];
+		staticData.attributes = [TOUGHNESS];
 		const { getByTestId, container } = render(AttributeTooltip, {
 			props: {
-				attributeId: EAttribute.Defense,
+				attributeId: EAttribute.Toughness,
 				effect: { modifierType: EModifierType.Additive, amount: -5, count: 1, durationMs: 2000, remainingMs: 1000 }
 			}
 		});

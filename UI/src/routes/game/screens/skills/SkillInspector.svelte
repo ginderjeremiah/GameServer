@@ -132,14 +132,11 @@ const rawNote = $derived.by(() => {
 	// Critical row and the crit-inclusive effective hit; omitted when no crit can occur.
 	const critBonus = view.critBonus(id);
 	const critPart = critBonus > 0 ? ` · +${fmt(critBonus)} crit` : '';
-	if (view.defense <= 0) {
-		return `${raw} raw damage${critPart} · target has no defense`;
+	if (view.toughness <= 0) {
+		return `${raw} raw damage${critPart} · target has no toughness`;
 	}
-	const applied = fmt(view.appliedDefense(id));
-	if (view.effective(id) === 0) {
-		return `${raw} raw${critPart} − ${applied} def · fully blocked`;
-	}
-	return `${raw} raw${critPart} − ${applied} def`;
+	const mitigated = fmt(view.mitigatedAmount(id));
+	return `${raw} raw${critPart} − ${mitigated} mitigated`;
 });
 </script>
 

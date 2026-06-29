@@ -92,7 +92,7 @@ describe('damage-types keyForAttribute()', () => {
 		}
 	});
 
-	it.each([EAttribute.Strength, EAttribute.Defense, EAttribute.BleedDamagePerSecond])(
+	it.each([EAttribute.Strength, EAttribute.Toughness, EAttribute.BleedDamagePerSecond])(
 		'returns undefined for non-amp/resist attribute %s',
 		(attribute) => {
 			expect(keyForAttribute(attribute)).toBeUndefined();

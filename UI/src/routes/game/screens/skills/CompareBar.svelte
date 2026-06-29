@@ -11,24 +11,24 @@
 					onclick={() => view.selectPreset(preset)}
 				>
 					<span class="en">{preset.isBoss ? `◆ ${preset.name}` : preset.name}</span>
-					<span class="ed">DEF {Math.round(preset.defense)}</span>
+					<span class="ed">TGH {Math.round(preset.toughness)}</span>
 				</button>
 			{/each}
 		</div>
 	{:else}
-		<span class="vs-note">Drag to preview damage against an enemy's flat Defense</span>
+		<span class="vs-note">Drag to preview damage against an enemy's Toughness</span>
 	{/if}
 	<div class="vs-slider">
-		<span class="vs-eyebrow">Defense</span>
+		<span class="vs-eyebrow">Toughness</span>
 		<input
 			type="range"
 			min="0"
-			max={view.maxDamage}
-			value={view.defense}
-			aria-label="Compare-vs enemy defense"
-			oninput={(e) => view.setDefense(+e.currentTarget.value)}
+			max={view.maxToughness}
+			value={view.toughness}
+			aria-label="Compare-vs enemy toughness"
+			oninput={(e) => view.setToughness(+e.currentTarget.value)}
 		/>
-		<span class="vs-defval">DEF <b>{Math.round(view.defense)}</b></span>
+		<span class="vs-defval">TGH <b>{Math.round(view.toughness)}</b></span>
 	</div>
 </div>
 

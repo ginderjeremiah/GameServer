@@ -9,8 +9,8 @@ namespace Game.Core.Battle
         public int PlayerSkillsUsed { get; set; }
 
         // Player-only crit/dodge/block outcomes, accumulated across the battle (enemies never crit/dodge/block).
-        // The damage figures are post-Defense: crit damage is what the crit hits actually dealt, dodged damage is
-        // the post-Defense hit avoided, and blocked damage is the reduction the block prevented.
+        // The damage figures are post-mitigation: crit damage is what the crit hits actually dealt, dodged damage
+        // is the post-mitigation hit avoided, and blocked damage is the reduction the block prevented.
         public int CriticalHits { get; set; }
         public double CriticalDamageDealt { get; set; }
         public int AttacksDodged { get; set; }

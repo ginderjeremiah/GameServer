@@ -49,7 +49,7 @@ function stubView(over: Partial<Record<string, unknown>> = {}): SkillsView {
 		critChance: 0.5,
 		critDamage: 2,
 		critBonus: () => 25,
-		appliedDefense: () => 5,
+		mitigatedAmount: () => 5,
 		effective: () => 70,
 		...over
 	} as unknown as SkillsView;
@@ -73,12 +73,12 @@ describe('SkillDamageBreakdown — critical row', () => {
 			props: { view: stubView({ critChance: 0, critBonus: () => 0 }), metrics: stubMetrics() }
 		});
 		expect(container.querySelector('.brk-line.crit')).toBeNull();
-		// The defense and effective-hit lines still render.
+		// The Toughness-mitigation and effective-hit lines still render.
 		expect(container.querySelector('.brk-line.def .brk-v')?.textContent).toContain('5');
 		expect(container.querySelector('.brk-line.total .brk-v')?.textContent).toContain('70');
 	});
 
-	it('orders the crit row between the scaling rows and the enemy-defense line', () => {
+	it('orders the crit row between the scaling rows and the Toughness-mitigation line', () => {
 		const { container } = render(SkillDamageBreakdown, { props: { view: stubView(), metrics: stubMetrics() } });
 		// Drop Svelte's scoped style class (e.g. `svelte-xxxx`) so only the semantic classes are compared.
 		const rows = Array.from(container.querySelectorAll('.brk-line')).map((el) =>

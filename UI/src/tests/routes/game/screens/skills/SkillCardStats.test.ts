@@ -9,6 +9,7 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
 		currentZone: 0,
+		level: 1,
 		attributes: [] as { attributeId: number; amount: number }[],
 		get selectedSkills(): number[] {
 			return playerManager.unlockedSkills

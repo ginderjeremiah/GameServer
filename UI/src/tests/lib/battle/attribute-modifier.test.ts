@@ -56,26 +56,13 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Dexterity
 			},
-			// Defense = base 2 + 1·END + 0.5·AGI
+			// Toughness = 2·Endurance (no base, Endurance-only)
 			{
-				attribute: EAttribute.Defense,
+				attribute: EAttribute.Toughness,
 				amount: 2.0,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.BaseValue
-			},
-			{
-				attribute: EAttribute.Defense,
-				amount: 1.0,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Endurance
-			},
-			{
-				attribute: EAttribute.Defense,
-				amount: 0.5,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Agility
 			},
 			// MaxHealth = base 50 + 20·END + 5·STR
 			{

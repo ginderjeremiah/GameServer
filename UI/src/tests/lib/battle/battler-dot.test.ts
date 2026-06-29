@@ -26,8 +26,8 @@ const makeBattler = (attrs: { id: EAttribute; amount: number }[]) =>
 	});
 
 describe('Battler damage/heal-over-time', () => {
-	it('scales a typed accumulator by the tick and bypasses Defense', () => {
-		// Endurance 50 → Defense 52, but damage-over-time ignores Defense entirely.
+	it('scales a typed accumulator by the tick and bypasses mitigation', () => {
+		// Endurance 50 → Toughness 100, but damage-over-time ignores mitigation entirely.
 		const battler = makeBattler([
 			{ id: EAttribute.Endurance, amount: 50 },
 			{ id: EAttribute.BleedDamagePerSecond, amount: 50 }
@@ -82,13 +82,13 @@ describe('Battler damage/heal-over-time', () => {
 
 	it('heals as absorption when resistance is above one', () => {
 		// A +2.0 BleedResistance drives the tick negative (2 × (1 − 2) = −2): absorption heals. DoT bypasses
-		// Defense and is not floored, so the negative tick restores health (here the battler is below max).
+		// mitigation and is not floored, so the negative tick restores health (here the battler is below max).
 		const battler = makeBattler([
 			{ id: EAttribute.Strength, amount: 10 },
 			{ id: EAttribute.BleedDamagePerSecond, amount: 50 },
 			{ id: EAttribute.BleedResistance, amount: 2.0 }
 		]);
-		battler.takeDamage(52, EDamageType.Physical); // Defense 2 → 50 damage → currentHealth 50
+		battler.takeDamage(50, EDamageType.Physical, 1); // no Toughness → 50 damage → currentHealth 50
 
 		const dealt = battler.applyDamageOverTime(40);
 
@@ -148,7 +148,7 @@ describe('Battler damage/heal-over-time', () => {
 			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
 			{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
 		]);
-		battler.takeDamage(52, EDamageType.Physical); // Defense 2 → 50 damage → currentHealth 50
+		battler.takeDamage(50, EDamageType.Physical, 1); // no Toughness → 50 damage → currentHealth 50
 
 		const healed = battler.applyHealOverTime(40); // 75 * 40 / 1000 = 3
 
@@ -173,7 +173,7 @@ describe('Battler damage/heal-over-time', () => {
 			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
 			{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
 		]);
-		battler.takeDamage(4, EDamageType.Physical); // Defense 2 → 2 damage → currentHealth 98
+		battler.takeDamage(2, EDamageType.Physical, 1); // no Toughness → 2 damage → currentHealth 98
 
 		const healed = battler.applyHealOverTime(40); // would heal 3, but only 2 of room remains
 
@@ -186,7 +186,7 @@ describe('Battler damage/heal-over-time', () => {
 			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
 			{ id: EAttribute.HealthRegenPerSecond, amount: 75 }
 		]);
-		battler.takeDamage(52, EDamageType.Physical); // currentHealth 50
+		battler.takeDamage(50, EDamageType.Physical, 1); // no Toughness → 50 damage → currentHealth 50
 
 		battler.applyHealOverTime(40); // heals 3 → currentHealth 53
 

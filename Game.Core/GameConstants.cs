@@ -19,6 +19,15 @@ namespace Game.Core
         /// <summary>The maximum number of skills a player may equip in their battle loadout. Enemies bring the same cap into battle for player/enemy symmetry.</summary>
         public const int MaxSelectedSkills = 4;
 
+        /// <summary>
+        /// The <c>K</c> in the <see cref="EAttribute.Toughness"/> mitigation curve
+        /// <c>Toughness / (Toughness + K·attackerLevel)</c>. Scaling the denominator by the <em>attacker's</em>
+        /// level keeps a level-appropriate Toughness investment in a stable mitigation band as both Toughness and
+        /// incoming damage grow with content, rather than trending toward useless (high zones) or immune (low
+        /// zones). Must match on both sides for battle parity. A strawman to tune during balancing.
+        /// </summary>
+        public const int ToughnessMitigationConstant = 20;
+
         /// <summary>The experience required to advance a level scales linearly as <c>Level * <see cref="ExpPerLevel"/></c>.</summary>
         public const int ExpPerLevel = 100;
 

@@ -49,7 +49,7 @@ const tableSection = (key: string) => skillEntity.sections.find((s) => s.key ===
 const effect = (over: Partial<ISkill['effects'][number]> = {}): ISkill['effects'][number] => ({
 	id: 1,
 	target: ESkillEffectTarget.Opponent,
-	attributeId: EAttribute.Defense,
+	attributeId: EAttribute.Toughness,
 	modifierTypeId: EModifierType.Multiplicative,
 	amount: 0.5,
 	durationMs: 3000,

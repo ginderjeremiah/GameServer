@@ -80,29 +80,29 @@ namespace Game.Core.Tests.Battle
         // ── DamageTarget: player crit ────────────────────────────────────────
 
         [Fact]
-        public void DamageTarget_PlayerCrit_MultipliesRawBeforeDefense()
+        public void DamageTarget_PlayerCrit_MultipliesRawBeforeMitigation()
         {
             // CriticalChance 1 always succeeds; CriticalDamage is the base 1.5 + 0.5 = 2, read directly as the multiplier.
             var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5));
-            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Physical); // crit ⇒ 20×2 = 40, then −2 Defense = 38
+            context.DamageTarget(20, EDamageType.Physical); // crit ⇒ 20×2 = 40; no Toughness ⇒ 40 dealt
 
-            Assert.Equal(50 - 38, enemy.CurrentHealth, 0.001);
-            Assert.Equal(38, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(50 - 40, enemy.CurrentHealth, 0.001);
+            Assert.Equal(40, context.Stats.PlayerDamageDealt, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_PlayerNoCrit_DealsRawMinusDefense()
+        public void DamageTarget_PlayerNoCrit_DealsRawUnmitigated()
         {
             var player = MakeBattlerWith((CriticalChance, 0), (CriticalDamage, 2));
-            var enemy = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Physical); // no crit ⇒ 20 − 2 Defense = 18
+            context.DamageTarget(20, EDamageType.Physical); // no crit ⇒ 20, no Toughness ⇒ 20
 
-            Assert.Equal(50 - 18, enemy.CurrentHealth, 0.001);
+            Assert.Equal(50 - 20, enemy.CurrentHealth, 0.001);
         }
 
         // ── DamageTarget: enemy attacking the player (dodge / block) ──────────
@@ -123,26 +123,27 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_PlayerBlocksEnemyHit_SubtractsDefenseAndBlockReduction()
+        public void DamageTarget_PlayerBlocksEnemyHit_AppliesBlockReductionAfterToughness()
         {
-            // BlockReduction is the base 2 + 8 = 10; Defense 2.
+            // BlockReduction is the base 2 + 8 = 10. The player has no Endurance (Toughness 0), so the flat
+            // block reduction is all that applies.
             var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
             var before = player.CurrentHealth;
 
-            context.DamageTarget(20, EDamageType.Physical); // blocked ⇒ 20 − 2 Defense − 10 BlockReduction = 8
+            context.DamageTarget(20, EDamageType.Physical); // blocked ⇒ 20 (no Toughness) − 10 BlockReduction = 10
 
-            Assert.Equal(before - 8, player.CurrentHealth, 0.001);
-            Assert.Equal(8, context.Stats.PlayerDamageTaken, 0.001);
+            Assert.Equal(before - 10, player.CurrentHealth, 0.001);
+            Assert.Equal(10, context.Stats.PlayerDamageTaken, 0.001);
         }
 
         [Fact]
         public void DamageTarget_EnemyAttacking_NeverCrits()
         {
             // The enemy carries a forced crit, but the roll is gated on the player attacking, so the enemy's
-            // hit lands un-multiplied (20 − 2 = 18, not 40 − 2 = 38).
+            // hit lands un-multiplied (20, not 40). The player has no Toughness, so it lands in full.
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 2));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -151,22 +152,22 @@ namespace Game.Core.Tests.Battle
 
             context.DamageTarget(20, EDamageType.Physical);
 
-            Assert.Equal(before - 18, player.CurrentHealth, 0.001);
+            Assert.Equal(before - 20, player.CurrentHealth, 0.001);
         }
 
         // ── DamageTarget: crit/dodge/block statistics ────────────────────────
 
         [Fact]
-        public void DamageTarget_PlayerCrit_RecordsCritHitAndPostDefenseDamage()
+        public void DamageTarget_PlayerCrit_RecordsCritHitAndPostMitigationDamage()
         {
             var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
-            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, −2 Defense = 38 dealt
+            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, no Toughness ⇒ 40 dealt
 
             Assert.Equal(1, context.Stats.CriticalHits);
-            Assert.Equal(38, context.Stats.CriticalDamageDealt, 0.001);
+            Assert.Equal(40, context.Stats.CriticalDamageDealt, 0.001);
         }
 
         [Fact]
@@ -183,30 +184,31 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_PlayerDodge_RecordsDodgeAndPostDefenseDamageAvoided()
+        public void DamageTarget_PlayerDodge_RecordsDodgeAndPostMitigationDamageAvoided()
         {
-            var player = MakeBattlerWith((DodgeChance, 1)); // Defense 2
+            var player = MakeBattlerWith((DodgeChance, 1)); // Toughness 0
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20, EDamageType.Physical); // would deal 20 − 2 Defense = 18, fully avoided
+            context.DamageTarget(20, EDamageType.Physical); // would deal 20 (no Toughness), fully avoided
 
             Assert.Equal(1, context.Stats.AttacksDodged);
-            Assert.Equal(18, context.Stats.DamageDodged, 0.001);
+            Assert.Equal(20, context.Stats.DamageDodged, 0.001);
             Assert.Equal(0, context.Stats.AttacksBlocked);
         }
 
         [Fact]
         public void DamageTarget_PlayerBlock_RecordsBlockAndReductionPrevented()
         {
-            // BlockReduction base 2 + 8 = 10; Defense 2.
+            // BlockReduction base 2 + 8 = 10. The player has no Toughness, so the would-be hit is 20 and the
+            // block reduces it to 10 ⇒ reduction prevented = 10.
             var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20, EDamageType.Physical); // after Defense 18, blocked to 8 ⇒ reduction prevented = 10
+            context.DamageTarget(20, EDamageType.Physical); // 20 unmitigated, blocked to 10 ⇒ reduction prevented = 10
 
             Assert.Equal(1, context.Stats.AttacksBlocked);
             Assert.Equal(10, context.Stats.DamageBlocked, 0.001);
@@ -216,17 +218,17 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerBlock_ReductionNeverExceedsTheWouldBeDamage()
         {
-            // The block over-absorbs: after Defense only 3 damage remained, so the reduction prevented is 3,
-            // not the full BlockReduction (the blocked amount can never exceed the would-be hit).
+            // The block over-absorbs: only 5 damage was coming in, so the reduction prevented is 5, not the full
+            // BlockReduction (the blocked amount can never exceed the would-be hit).
             var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8)); // BlockReduction 10
-            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(5, EDamageType.Physical); // after Defense 3, blocked to 0 ⇒ reduction prevented = 3
+            context.DamageTarget(5, EDamageType.Physical); // 5 unmitigated, blocked to 0 ⇒ reduction prevented = 5
 
             Assert.Equal(1, context.Stats.AttacksBlocked);
-            Assert.Equal(3, context.Stats.DamageBlocked, 0.001);
+            Assert.Equal(5, context.Stats.DamageBlocked, 0.001);
         }
 
         [Fact]
@@ -277,56 +279,58 @@ namespace Game.Core.Tests.Battle
         {
             // The attacker's amplification and the defender's resistance are SEPARATE budgets — × (1 + amp)
             // then × (1 − res) — not a single (1 + amp − res). With FireAmp 0.5 and FireResist 0.5 on a 40-damage
-            // Fire hit: 40 × 1.5 = 60, × 0.5 = 30, − 2 Defense = 28. A combined budget would cancel to 40 − 2 = 38.
+            // Fire hit: 40 × 1.5 = 60, × 0.5 = 30; no Toughness ⇒ 30. A combined budget would cancel to
+            // × (1 + 0.5 − 0.5) = 40.
             var player = MakeBattlerWith((FireAmplification, 0.5));
-            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Defense 2, MaxHealth 50
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Toughness 0, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
             context.DamageTarget(40, EDamageType.Fire);
 
-            Assert.Equal(50 - 28, enemy.CurrentHealth, 0.001);
-            Assert.Equal(28, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(50 - 30, enemy.CurrentHealth, 0.001);
+            Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
         }
 
         [Fact]
         public void DamageTarget_FireAmplification_AlsoSummedFromElementalAmplification()
         {
             // applies(Fire) = { Fire, Elemental }, so a hit is amplified by the additive SUM of both keys.
-            // FireAmp 0.3 + ElementalAmp 0.2 = 0.5 → 40 × 1.5 = 60, − 2 Defense = 58.
+            // FireAmp 0.3 + ElementalAmp 0.2 = 0.5 → 40 × 1.5 = 60; no Toughness ⇒ 60.
             var player = MakeBattlerWith((FireAmplification, 0.3), (ElementalAmplification, 0.2));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
             context.DamageTarget(40, EDamageType.Fire);
 
-            Assert.Equal(50 - 58, enemy.CurrentHealth, 0.001);
+            Assert.Equal(50 - 60, enemy.CurrentHealth, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_ResistanceAboveOne_HealsTheTargetAndIgnoresFlatDefense()
+        public void DamageTarget_ResistanceAboveOne_HealsTheTargetAndIgnoresMitigation()
         {
             // Absorption: FireResistance 2.0 drives the post-resistance hit negative (20 × (1 − 2) = −20), a net
-            // heal — and flat Defense is NOT subtracted from an absorbed hit (a heal of 20, not 18). A physical
-            // hit first brings the enemy below MaxHealth so the heal lands (the heal is capped at MaxHealth).
+            // heal — and the Toughness curve is NOT applied to an absorbed hit (a heal of 20). A physical hit
+            // first brings the enemy below MaxHealth so the heal lands (the heal is capped at MaxHealth).
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Defense 2, MaxHealth 50
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Toughness 0, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.DamageTarget(27, EDamageType.Physical); // 27 − 2 Defense = 25 → CurrentHealth 25
+            context.DamageTarget(30, EDamageType.Physical); // 30 (no Toughness) → CurrentHealth 20
 
             context.DamageTarget(20, EDamageType.Fire);
 
-            // Healed 20 (flat ignored) → 45; the booked damage is 25 (physical) + (−20) (absorption) = 5.
-            Assert.Equal(45, enemy.CurrentHealth, 0.001);
-            Assert.Equal(5, context.Stats.PlayerDamageDealt, 0.001);
+            // Healed 20 (mitigation ignored) → 40; the booked damage is 30 (physical) + (−20) (absorption) = 10.
+            Assert.Equal(40, enemy.CurrentHealth, 0.001);
+            Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_CritAmplifiesBeforeResistanceAndDefense()
+        public void DamageTarget_CritAmplifiesBeforeResistanceAndToughness()
         {
-            // Order: amp (none) → crit (× 2) → resist (× 0.5) → flat Defense. A normal hit (20 × 0.5 = 10, − 10
-            // Defense) clamps to 0, but the crit (20 × 2 = 40, × 0.5 = 20, − 10 = 10) punches through.
+            // Order: amp (none) → crit (× 2) → resist (× 0.5) → Toughness curve. The enemy's Toughness 20 against
+            // the level-1 player halves the post-resistance hit. A normal Fire hit (20 × 0.5 = 10, × 0.5 = 5)
+            // deals only 5, but the crit (20 × 2 = 40, × 0.5 = 20, × 0.5 = 10) punches through for 10.
             var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2.0
-            var enemy = MakeBattlerWith((Endurance, 0), (Defense, 8), (FireResistance, 0.5)); // Defense 10, MaxHealth 50
+            var enemy = MakeBattlerWith((Endurance, 0), (Toughness, 20), (FireResistance, 0.5)); // Toughness 20, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
             context.DamageTarget(20, EDamageType.Fire);
@@ -340,14 +344,14 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_PlayerHit_RecordsTypedDamageDealtMatchingPlayerDamageDealt()
         {
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Fire); // 20 − 2 Defense = 18 dealt
+            context.DamageTarget(20, EDamageType.Fire); // no Toughness ⇒ 20 dealt
 
             // The typed offense book sums the same post-mitigation figure each hit booked into PlayerDamageDealt.
-            Assert.Equal(18, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(18, TypedDealt(context, EDamageType.Fire), 0.001);
+            Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(20, TypedDealt(context, EDamageType.Fire), 0.001);
         }
 
         [Fact]
@@ -357,24 +361,24 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Fire);     // 18
-            context.DamageTarget(10, EDamageType.Fire);     // 8
-            context.DamageTarget(30, EDamageType.Physical); // 28
+            context.DamageTarget(20, EDamageType.Fire);     // 20
+            context.DamageTarget(10, EDamageType.Fire);     // 10
+            context.DamageTarget(30, EDamageType.Physical); // 30
 
-            Assert.Equal(26, TypedDealt(context, EDamageType.Fire), 0.001); // 18 + 8
-            Assert.Equal(28, TypedDealt(context, EDamageType.Physical), 0.001);
+            Assert.Equal(30, TypedDealt(context, EDamageType.Fire), 0.001); // 20 + 10
+            Assert.Equal(30, TypedDealt(context, EDamageType.Physical), 0.001);
         }
 
         [Fact]
         public void DamageTarget_PlayerCrit_TypedDamageDealtUsesPostMitigationActual()
         {
             var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
-            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, − 2 Defense = 38
+            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, no Toughness ⇒ 40
 
-            Assert.Equal(38, TypedDealt(context, EDamageType.Physical), 0.001);
+            Assert.Equal(40, TypedDealt(context, EDamageType.Physical), 0.001);
         }
 
         [Fact]
@@ -394,18 +398,18 @@ namespace Game.Core.Tests.Battle
         // ── DamageTarget: pre-mitigation typed exposure (incoming book, #1337) ─
 
         [Fact]
-        public void DamageTarget_EnemyHit_RecordsExposureBeforeResistanceAndDefense()
+        public void DamageTarget_EnemyHit_RecordsExposureBeforeResistanceAndMitigation()
         {
-            // Exposure is the pre-mitigation hit (40 Fire), captured before the player's FireResistance and
-            // Defense reduce the damage actually taken (40 × 0.5 − 2 = 18).
-            var player = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Defense 2
+            // Exposure is the pre-mitigation hit (40 Fire), captured before the player's FireResistance reduces
+            // the damage actually taken (40 × 0.5 = 20; the player has no Toughness, so the curve passes it through).
+            var player = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Toughness 0
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
             context.DamageTarget(40, EDamageType.Fire);
 
-            Assert.Equal(18, context.Stats.PlayerDamageTaken, 0.001);
+            Assert.Equal(20, context.Stats.PlayerDamageTaken, 0.001);
             Assert.Equal(40, Exposure(context, EDamageType.Fire), 0.001);
         }
 

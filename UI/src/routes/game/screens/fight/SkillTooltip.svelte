@@ -8,13 +8,7 @@
 	{/snippet}
 
 	<TooltipSection label="Damage breakdown">
-		<DamageBreakdown
-			base={baseDamage}
-			{multipliers}
-			{crit}
-			enemyDefense={opponent ? enemyDefense : undefined}
-			{total}
-		/>
+		<DamageBreakdown base={baseDamage} {multipliers} {crit} mitigated={opponent ? mitigated : undefined} {total} />
 	</TooltipSection>
 
 	<TooltipSection label="Tempo" last={effectLines.length === 0}>
@@ -30,7 +24,13 @@
 
 <script lang="ts">
 import { EAttribute } from '$lib/api';
-import { applyDefense, expectedCritMultiplier, scaledEffectAmount, skillContributions, type Skill } from '$lib/battle';
+import {
+	toughnessMitigatedDamage,
+	expectedCritMultiplier,
+	scaledEffectAmount,
+	skillContributions,
+	type Skill
+} from '$lib/battle';
 import {
 	attributeIsHarmful,
 	attributeName,
@@ -77,11 +77,11 @@ const multipliers = $derived(
 	}))
 );
 const totalDamage = $derived(skill?.calculateDamage() ?? 0);
-const enemyDefense = $derived(opponent?.attributes.getValue(EAttribute.Defense) ?? 0);
+const enemyToughness = $derived(opponent?.attributes.getValue(EAttribute.Toughness) ?? 0);
 
 // Crit folds into the shown damage as its long-run average: the expected multiplier scales the raw
-// damage BEFORE Defense (mirroring the battle, where a crit punches through Defense), then Defense is
-// subtracted once. Display-only — the live battle rolls each crit individually.
+// damage BEFORE mitigation (mirroring the battle, where a crit punches through the Toughness curve), then
+// the curve applies once. Display-only — the live battle rolls each crit individually.
 const critChance = $derived(skill?.owner.attributes.getValue(EAttribute.CriticalChance) ?? 0);
 const critDamage = $derived(skill?.owner.attributes.getValue(EAttribute.CriticalDamage) ?? 0);
 const critBonus = $derived(totalDamage * (expectedCritMultiplier(critChance, critDamage) - 1));
@@ -95,7 +95,9 @@ const crit = $derived(
 			}
 		: undefined
 );
-const total = $derived(applyDefense(totalDamage + critBonus, enemyDefense));
+const total = $derived(toughnessMitigatedDamage(totalDamage + critBonus, enemyToughness, skill?.owner.level ?? 1));
+// Damage the Toughness curve removed (pre-mitigation hit − net), for the breakdown's mitigation row.
+const mitigated = $derived(totalDamage + critBonus - total);
 const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);
 // Pure readout guards a zero/non-positive cooldown (an always-ready skill) against NaN/Infinity.
 const cooldown = $derived(cooldownReadout(skill?.cooldownMs ?? 0, skill?.renderChargeTime ?? 0, cdMultiplier));

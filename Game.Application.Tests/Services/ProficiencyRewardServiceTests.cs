@@ -297,7 +297,7 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // The Evasion track trains from dodged damage (the avoided post-Defense hit) — incoming-book event,
+            // The Evasion track trains from dodged damage (the avoided post-mitigation hit) — incoming-book event,
             // type-neutral like Precision.
             var path = await TestDataSeeder.CreatePathAsync(context, name: "Evasion", activityKey: EActivityKey.Dodge);
             var tier = await TestDataSeeder.CreateProficiencyAsync(

@@ -6,6 +6,7 @@
    against backend drift too. */
 
 import { EAttribute, EDamageType, type IAttributeMultiplier, type ISkill, type ISkillEffect } from '$lib/api';
+import { TOUGHNESS_MITIGATION_CONSTANT } from '$lib/api/types/game-constants';
 import type { BattleAttributes } from './battle-attributes';
 import { amplificationAttributes, resistanceAttributes } from './damage-types';
 
@@ -43,10 +44,27 @@ export function skillContributions(skill: ISkill, attributes: BattleAttributes):
 	}));
 }
 
-/** Damage dealt after subtracting the defender's flat Defense and the optional flat blockReduction (a
- *  second reduction in the same clamp, supplied only when an incoming hit is blocked), never below zero. */
-export function applyDefense(rawDamage: number, defense: number, blockReduction = 0): number {
-	return Math.max(rawDamage - defense - blockReduction, 0);
+/** Damage dealt after the defender's {@link EAttribute.Toughness} mitigation curve and the optional flat
+ *  blockReduction (supplied only when an incoming hit is blocked), never below zero. The curve reduces a hit
+ *  by `Toughness / (Toughness + K·attackerLevel)` (K = {@link TOUGHNESS_MITIGATION_CONSTANT}): effective HP is
+ *  linear in Toughness while the reduction asymptotes below 100% (no immunity), and the attacker's level scales
+ *  the denominator so the band stays stable as content scales (#1330). With no Toughness the factor is an exact
+ *  1.0 and the hit is unchanged. Mirrors the backend `Battler.ComputeNetDamage` — the expression must match
+ *  bit-for-bit for battle parity. */
+export function toughnessMitigatedDamage(
+	rawDamage: number,
+	toughness: number,
+	attackerLevel: number,
+	blockReduction = 0
+): number {
+	const scaled = TOUGHNESS_MITIGATION_CONSTANT * attackerLevel;
+	const toughnessReduction = toughness / (toughness + scaled);
+	// Clamp with the backend's exact `net > 0 ? net : 0` rather than Math.max: the two agree for every reachable
+	// input, but only the ternary floors a NaN to 0. NaN arises solely from a 0/0 reduction (toughness AND
+	// attackerLevel both 0 — unreachable since battler Level ≥ 1); mirroring the operator keeps this bit-for-bit
+	// with `Battler.ComputeNetDamage` even there, where Math.max(NaN, 0) would leak NaN.
+	const net = rawDamage * (1 - toughnessReduction) - blockReduction;
+	return net > 0 ? net : 0;
 }
 
 /** Amplifies an outgoing `rawDamage` hit of `damageType` by the ATTACKER's amplification:
@@ -81,24 +99,30 @@ export function resistanceTotal(damageType: EDamageType, defenderAttributes: Bat
 
 /** The net damage an incoming `dealt` hit (already amplified and crit-multiplied) of `damageType` deals to a
  *  defender: percentage resistance first (`dealt × (1 − Σ applies(type).resistance)`, UNCLAMPED — a negative
- *  total amplifies as vulnerability, a total above 1 drives the result negative as absorption), then flat
- *  Defense + optional `blockReduction` last and ONLY while the post-resistance damage is still positive, so
- *  flat reduction can neither heal nor deepen an absorption heal. The resistance sum is folded in the fixed
- *  {@link resistanceAttributes} order for parity; with none authored it is 0, leaving the positive branch
- *  byte-identical to {@link applyDefense}. A negative result heals the defender. Mirrors the backend
- *  `Battler.ComputeNetDamage`. */
+ *  total amplifies as vulnerability, a total above 1 drives the result negative as absorption), then — only
+ *  while the post-resistance damage is still positive — the {@link EAttribute.Toughness} mitigation curve
+ *  (scaled by `attackerLevel`) and the optional `blockReduction` last, so mitigation can neither heal nor
+ *  deepen an absorption heal. The resistance sum is folded in the fixed {@link resistanceAttributes} order for
+ *  parity; with no resistance and no Toughness the positive branch reduces to `dealt − blockReduction`. A
+ *  negative result heals the defender. Mirrors the backend `Battler.ComputeNetDamage`. */
 export function mitigateDamage(
 	dealt: number,
 	damageType: EDamageType,
 	defenderAttributes: BattleAttributes,
+	attackerLevel: number,
 	blockReduction = 0
 ): number {
 	const mitigated = dealt * (1 - resistanceTotal(damageType, defenderAttributes));
 	if (mitigated <= 0) {
-		// Absorption (or a zero hit): the defender takes a net heal and flat reduction never applies.
+		// Absorption (or a zero hit): the defender takes a net heal and mitigation never applies.
 		return mitigated;
 	}
-	return applyDefense(mitigated, defenderAttributes.getValue(EAttribute.Defense), blockReduction);
+	return toughnessMitigatedDamage(
+		mitigated,
+		defenderAttributes.getValue(EAttribute.Toughness),
+		attackerLevel,
+		blockReduction
+	);
 }
 
 /** The cooldown multiplier — the CooldownRecovery attribute read directly. It is a base-1 multiplier

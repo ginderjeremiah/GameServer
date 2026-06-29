@@ -34,7 +34,7 @@ const refAttributes: IAttribute[] = [
 	makeAttribute(EAttribute.Dexterity, 'Dexterity'),
 	makeAttribute(EAttribute.Luck, 'Luck'),
 	makeAttribute(EAttribute.MaxHealth, 'Max Health'),
-	makeAttribute(EAttribute.Defense, 'Defense'),
+	makeAttribute(EAttribute.Toughness, 'Toughness'),
 	makeAttribute(EAttribute.CooldownRecovery, 'Cooldown Recovery')
 ];
 

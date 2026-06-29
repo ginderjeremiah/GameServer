@@ -41,10 +41,10 @@ namespace Game.Core.Tests.Attributes
                     [(EAttribute.Strength, 10), (EAttribute.Endurance, 20)],
                     [EAttribute.MaxHealth]),
 
-                // Defense = 2 (base) + 1·Endurance + 0.5·Agility
-                ["defense"] = new DerivedStatScenario(
-                    [(EAttribute.Endurance, 30), (EAttribute.Agility, 20)],
-                    [EAttribute.Defense]),
+                // Toughness = 2·Endurance (no base, Endurance-only)
+                ["toughness"] = new DerivedStatScenario(
+                    [(EAttribute.Endurance, 30)],
+                    [EAttribute.Toughness]),
 
                 // CooldownRecovery = 1 (base) + 0.004·Agility + 0.001·Dexterity
                 ["cooldownRecovery"] = new DerivedStatScenario(
@@ -76,12 +76,13 @@ namespace Game.Core.Tests.Attributes
                     [(EAttribute.Endurance, 20)],
                     [EAttribute.BlockReduction]),
 
-                // With no allocations every derived stat collapses to just its base: the two with a base
-                // carry it (CriticalDamage 1.5, BlockReduction 2), the three pure-derived chances are 0.
+                // With no allocations every derived stat collapses to just its base: the three with a base
+                // carry it (MaxHealth 50, CriticalDamage 1.5, BlockReduction 2), the pure-derived stats
+                // (Toughness, CooldownRecovery's coefficients aside, and the chances) are 0/base.
                 ["zeroBaseStats"] = new DerivedStatScenario(
                     [],
                     [
-                        EAttribute.MaxHealth, EAttribute.Defense, EAttribute.CooldownRecovery,
+                        EAttribute.MaxHealth, EAttribute.Toughness, EAttribute.CooldownRecovery,
                         EAttribute.CriticalDamage, EAttribute.BlockReduction,
                         EAttribute.CriticalChance, EAttribute.DodgeChance, EAttribute.BlockChance,
                     ]),

@@ -27,7 +27,7 @@ namespace Game.Core.Battle
                 // applied — so a self damage-buff never boosts the hit that carries it, and an earlier
                 // loadout slot's effect does influence a later slot firing on the same tick.
                 var damage = CalculateDamage(context);
-                // Record the actual post-crit/post-defense/block damage DamageTarget returns, so per-skill
+                // Record the actual post-crit/post-mitigation/block damage DamageTarget returns, so per-skill
                 // stats reconcile with the global stats (which DamageTarget also books) rather than the raw
                 // pre-mitigation value. Recording therefore has to follow the hit, not precede it.
                 var actualDamage = context.DamageTarget(damage, Skill.DamageType);

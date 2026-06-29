@@ -25,10 +25,10 @@
 			</span>
 		</div>
 	{/if}
-	{#if enemyDefense !== undefined}
+	{#if mitigated !== undefined}
 		<div class="tt-dmg-row">
-			<span class="tt-dmg-label">Enemy defense</span>
-			<span class="tt-dmg-value negative">-{formatNum(enemyDefense)}</span>
+			<span class="tt-dmg-label">Toughness mitigation</span>
+			<span class="tt-dmg-value negative">-{formatNum(mitigated)}</span>
 		</div>
 	{/if}
 	<div class="tt-dmg-total">
@@ -53,7 +53,7 @@ interface DamageMultiplier {
 	value: number;
 }
 
-/** The expected contribution from critical hits, folded into the total before defense. */
+/** The expected contribution from critical hits, folded into the total before mitigation. */
 interface CritContribution {
 	/** Pre-formatted crit chance (e.g. `5%`). */
 	chance: string;
@@ -68,12 +68,12 @@ interface Props {
 	multipliers: DamageMultiplier[];
 	/** The expected crit contribution, or undefined when no crit can occur (0 chance). */
 	crit: CritContribution | undefined;
-	/** Enemy defense subtracted from the total, or undefined when there is no opponent. */
-	enemyDefense: number | undefined;
+	/** Damage removed by the defender's Toughness mitigation curve, or undefined when there is no opponent. */
+	mitigated: number | undefined;
 	total: number;
 }
 
-const { base, multipliers, crit, enemyDefense, total }: Props = $props();
+const { base, multipliers, crit, mitigated, total }: Props = $props();
 </script>
 
 <style lang="scss">

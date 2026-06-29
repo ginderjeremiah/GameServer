@@ -1,6 +1,6 @@
 /* The single source for an enemy's battle build at a level. An enemy's `attributeDistribution`
    carries only the six core (primary) attributes; each entry contributes `baseAmount +
-   amountPerLevel * level` additively, then the derived secondary stats (Max Health, Defense) are
+   amountPerLevel * level` additively, then the derived secondary stats (Max Health, Toughness) are
    resolved through the same `BattleAttributes` composition the battle uses — so every display
    surface (Codex dossier, Skills Compare-vs) matches combat by construction. Mirrors the backend
    enemy build (`Enemy.GetAttributeModifiers`).
@@ -28,12 +28,12 @@ export interface EnemyAttributeValue {
 export interface EnemyAttributes {
 	/** The six core attributes straight from the distribution. */
 	primary: EnemyAttributeValue[];
-	/** Derived stats not stored on the enemy (Max Health, Defense), computed via the battle pass. */
+	/** Derived stats not stored on the enemy (Max Health, Toughness), computed via the battle pass. */
 	secondary: EnemyAttributeValue[];
 }
 
 /** The derived secondary stats surfaced in the dossier, in display order. */
-const DERIVED_SECONDARY: EAttribute[] = [EAttribute.MaxHealth, EAttribute.Defense];
+const DERIVED_SECONDARY: EAttribute[] = [EAttribute.MaxHealth, EAttribute.Toughness];
 
 /** Memoised `BattleAttributes` by enemy identity → level — the single enemy battle build. */
 const buildCache = new WeakMap<IEnemy, Map<number, BattleAttributes>>();
@@ -62,9 +62,9 @@ export function enemyBattleAttributes(enemy: IEnemy, level: number): BattleAttri
 	return built;
 }
 
-/** An enemy's flat Defense at a level — the value the battle subtracts in `Battler.takeDamage`. */
-export function enemyDefense(enemy: IEnemy, level: number): number {
-	return enemyBattleAttributes(enemy, level).getValue(EAttribute.Defense);
+/** An enemy's Toughness at a level — the value the battle's mitigation curve reads in `Battler.takeDamage`. */
+export function enemyToughness(enemy: IEnemy, level: number): number {
+	return enemyBattleAttributes(enemy, level).getValue(EAttribute.Toughness);
 }
 
 /** The enemy's primary + derived-secondary attribute values at a level (memoised per enemy+level).

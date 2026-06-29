@@ -30,10 +30,11 @@ namespace Game.Core.Attributes.Modifiers
             new() { Attribute = CooldownRecovery, Amount = 0.004, Source = Derived, DerivedSource = Agility, Type = Additive },
             new() { Attribute = CooldownRecovery, Amount = 0.001, Source = Derived, DerivedSource = Dexterity, Type = Additive },
 
-            // Defense = 2 (base) + 1·Endurance + 0.5·Agility
-            new() { Attribute = Defense, Amount = 2.0, Source = BaseValue, Type = Additive },
-            new() { Attribute = Defense, Amount = 1.0, Source = Derived, DerivedSource = Endurance, Type = Additive },
-            new() { Attribute = Defense, Amount = 0.5, Source = Derived, DerivedSource = Agility, Type = Additive },
+            // Toughness = 2·Endurance (no base, Endurance-only). It feeds the diminishing mitigation curve
+            // (Toughness / (Toughness + K·attackerLevel)), so a non-Endurance build simply has no Toughness and
+            // leans on Dodge/offense instead — the archetype split (spike #1330): Endurance → Toughness curve,
+            // Agility → Dodge. The coefficient is a strawman to tune during balancing.
+            new() { Attribute = Toughness, Amount = 2.0, Source = Derived, DerivedSource = Endurance, Type = Additive },
 
             // MaxHealth = 50 (base) + 20·Endurance + 5·Strength
             new() { Attribute = MaxHealth, Amount = 50.0, Source = BaseValue, Type = Additive },
@@ -60,7 +61,7 @@ namespace Game.Core.Attributes.Modifiers
             // BlockChance = 0.002·Endurance (no base).
             new() { Attribute = BlockChance, Amount = 0.002, Source = Derived, DerivedSource = Endurance, Type = Additive },
 
-            // BlockReduction = 2 (base) + 0.5·Endurance. A flat reduction (like Defense), subtracted in the same clamp on a block.
+            // BlockReduction = 2 (base) + 0.5·Endurance. A flat reduction applied after the Toughness curve on a block.
             new() { Attribute = BlockReduction, Amount = 2.0, Source = BaseValue, Type = Additive },
             new() { Attribute = BlockReduction, Amount = 0.5, Source = Derived, DerivedSource = Endurance, Type = Additive },
         ];

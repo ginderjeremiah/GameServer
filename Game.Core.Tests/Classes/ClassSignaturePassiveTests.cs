@@ -40,7 +40,7 @@ namespace Game.Core.Tests.Classes
         {
             var passive = new ClassSignaturePassive
             {
-                Attribute = EAttribute.Defense,
+                Attribute = EAttribute.Toughness,
                 Amount = 2m,
                 ScalingAttribute = EAttribute.Endurance,
                 ScalingAmount = 0.5m,
@@ -54,7 +54,7 @@ namespace Game.Core.Tests.Classes
                 return 15d;
             });
 
-            Assert.Equal(EAttribute.Defense, modifier.Attribute);
+            Assert.Equal(EAttribute.Toughness, modifier.Attribute);
             Assert.Equal(9.5d, modifier.Amount);
             Assert.Equal(EAttributeModifierSource.Class, modifier.Source);
         }

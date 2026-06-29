@@ -59,7 +59,7 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Fact]
-        public void Indexer_Defense_IncludesBaseAndDerived()
+        public void Indexer_Toughness_IsDerivedFromEndurance()
         {
             var modifiers = new List<AttributeModifier>
             {
@@ -69,8 +69,8 @@ namespace Game.Core.Tests.Attributes
 
             var collection = new AttributeCollection(modifiers);
 
-            // Defense = base(2) + Endurance(10)*1.0 + Agility(4)*0.5 = 2 + 10 + 2 = 14
-            Assert.Equal(14, collection[EAttribute.Defense]);
+            // Toughness = 2·Endurance(10) = 20 (no base, and Agility does not contribute).
+            Assert.Equal(20, collection[EAttribute.Toughness]);
         }
 
         [Fact]

@@ -82,7 +82,7 @@ const refAttributes: IAttribute[] = [
 	}),
 	makeAttribute(EAttribute.Luck, 'Luck', { code: 'LUK', attributeType: EAttributeType.Primary, displayOrder: 5 }),
 	makeAttribute(EAttribute.MaxHealth, 'Max Health', { attributeType: EAttributeType.Secondary, displayOrder: 6 }),
-	makeAttribute(EAttribute.Defense, 'Defense', { attributeType: EAttributeType.Secondary, displayOrder: 7 }),
+	makeAttribute(EAttribute.Toughness, 'Toughness', { attributeType: EAttributeType.Secondary, displayOrder: 7 }),
 	makeAttribute(EAttribute.CooldownRecovery, 'Cooldown Recovery', {
 		attributeType: EAttributeType.Secondary,
 		displayOrder: 8,
@@ -162,7 +162,7 @@ describe('buildPlayerModifiers', () => {
 		mockInventoryManager.equippedSlots = [
 			mockItem(
 				'Aegis Greathelm',
-				[{ attributeId: EAttribute.Defense, amount: 14 }],
+				[{ attributeId: EAttribute.Toughness, amount: 14 }],
 				[
 					{
 						name: 'Tempered',
@@ -174,7 +174,7 @@ describe('buildPlayerModifiers', () => {
 		];
 		const mods = buildPlayerModifiers();
 		const item = mods.find((m) => m.source === EAttributeModifierSource.Item);
-		expect(item).toMatchObject({ attribute: EAttribute.Defense, amount: 14, label: 'Aegis Greathelm' });
+		expect(item).toMatchObject({ attribute: EAttribute.Toughness, amount: 14, label: 'Aegis Greathelm' });
 		const mod = mods.find((m) => m.source === EAttributeModifierSource.ItemMod);
 		expect(mod).toMatchObject({
 			attribute: EAttribute.Endurance,
@@ -195,7 +195,7 @@ describe('buildPlayerModifiers', () => {
 	});
 
 	it('composes the class locked base and proficiency bonuses after gear and before the static modifiers', () => {
-		mockInventoryManager.equippedSlots = [mockItem('Aegis', [{ attributeId: EAttribute.Defense, amount: 14 }])];
+		mockInventoryManager.equippedSlots = [mockItem('Aegis', [{ attributeId: EAttribute.Toughness, amount: 14 }])];
 		mockPlayerManager.battleLockedBaseModifiers = classLockedBaseModifiers(
 			[{ attributeId: EAttribute.Strength, baseAmount: 5, amountPerLevel: 1 }],
 			mockPlayerManager.level // 5 + 1×12 = 17
@@ -225,7 +225,7 @@ describe('buildPlayerModifiers', () => {
 		mockPlayerManager.battleSignaturePassiveModifier = (resolve) =>
 			classSignaturePassiveModifier(
 				{
-					attributeId: EAttribute.Defense,
+					attributeId: EAttribute.Toughness,
 					amount: 0,
 					scalingAmount: 0.5,
 					scalingAttributeId: EAttribute.Strength,
@@ -235,8 +235,8 @@ describe('buildPlayerModifiers', () => {
 			);
 		const mods = buildPlayerModifiers();
 		const last = mods[mods.length - 1];
-		// Strength resolves to 20 (allocation; no static base), so the passive adds 0.5 × 20 = 10 to Defense.
-		expect(last).toMatchObject({ source: EAttributeModifierSource.Class, attribute: EAttribute.Defense });
+		// Strength resolves to 20 (allocation; no static base), so the passive adds 0.5 × 20 = 10 to Toughness.
+		expect(last).toMatchObject({ source: EAttributeModifierSource.Class, attribute: EAttribute.Toughness });
 		expect(last.amount).toBeCloseTo(10);
 	});
 
@@ -259,7 +259,7 @@ describe('AttributeBreakdownView', () => {
 				'Aegis Greathelm',
 				[
 					{ attributeId: EAttribute.Endurance, amount: 8 },
-					{ attributeId: EAttribute.Defense, amount: 14 }
+					{ attributeId: EAttribute.Toughness, amount: 14 }
 				],
 				[
 					{
@@ -277,8 +277,8 @@ describe('AttributeBreakdownView', () => {
 		expect(view.computedFor(EAttribute.Endurance).total).toBe(30);
 		// MaxHealth: 50 base + 20×END(30) + 5×STR(14) = 720.
 		expect(view.computedFor(EAttribute.MaxHealth).total).toBe(720);
-		// Defense: 2 base + 1×END(30) + 0.5×AGI(0) + 14 item = 46.
-		expect(view.computedFor(EAttribute.Defense).total).toBe(46);
+		// Toughness: 2×END(30) + 14 item = 74.
+		expect(view.computedFor(EAttribute.Toughness).total).toBe(74);
 	});
 
 	it('groups the displayed attributes by display taxonomy (Primary / Secondary), sorted by display order', () => {
@@ -295,7 +295,7 @@ describe('AttributeBreakdownView', () => {
 		// crit/dodge/block set, which now derives from the core attributes (#799).
 		expect(secondary?.attrs.map((a) => a.meta.id)).toEqual([
 			EAttribute.MaxHealth,
-			EAttribute.Defense,
+			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
 			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
@@ -311,14 +311,14 @@ describe('AttributeBreakdownView', () => {
 
 	it('self-selects only attributes with a real (non-combat) contributor', () => {
 		// No allocations or gear: only the engine base/derived formulas contribute. The Secondary aggregates
-		// surface — MaxHealth/Defense/CooldownRecovery plus the crit/dodge/block set, which now derives from
+		// surface — MaxHealth/Toughness/CooldownRecovery plus the crit/dodge/block set, which now derives from
 		// the core attributes (#799). The obsolete attribute and the combat-only Status channels have no
 		// contributors and drop out, and no Primary group is shown.
 		const view = new AttributeBreakdownView();
 		const ids = view.groups.flatMap((g) => g.attrs.map((a) => a.meta.id));
 		expect(ids).toEqual([
 			EAttribute.MaxHealth,
-			EAttribute.Defense,
+			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
 			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
@@ -347,7 +347,7 @@ describe('battle-assembly parity', () => {
 		{ level: 1, attributeId: EAttribute.Endurance, amount: 6, modifierTypeId: EModifierType.Additive }
 	]; // END +6
 	const scaledPassive: ISignaturePassive = {
-		attributeId: EAttribute.Defense,
+		attributeId: EAttribute.Toughness,
 		amount: 0,
 		scalingAmount: 0.5,
 		scalingAttributeId: EAttribute.Strength,
@@ -363,7 +363,7 @@ describe('battle-assembly parity', () => {
 		mockInventoryManager.equippedSlots = [
 			mockItem(
 				'Aegis Greathelm',
-				[{ attributeId: EAttribute.Defense, amount: 14 }],
+				[{ attributeId: EAttribute.Toughness, amount: 14 }],
 				[
 					{
 						name: 'Tempered',
@@ -388,7 +388,7 @@ describe('battle-assembly parity', () => {
 		// statics setData appends), then the signature passive added last, resolved against the assembled set.
 		const atts: IBattlerAttribute[] = [
 			...mockPlayerManager.attributes,
-			{ attributeId: EAttribute.Defense, amount: 14 },
+			{ attributeId: EAttribute.Toughness, amount: 14 },
 			{ attributeId: EAttribute.Endurance, amount: 10 }
 		];
 		const battler = new BattleAttributes();
@@ -398,13 +398,13 @@ describe('battle-assembly parity', () => {
 		]);
 		battler.addModifier(classSignaturePassiveModifier(scaledPassive, (a) => battler.getValue(a)));
 
-		for (const attr of [EAttribute.Strength, EAttribute.Endurance, EAttribute.Defense, EAttribute.MaxHealth]) {
+		for (const attr of [EAttribute.Strength, EAttribute.Endurance, EAttribute.Toughness, EAttribute.MaxHealth]) {
 			expect(view.computedFor(attr).total).toBeCloseTo(battler.getValue(attr), 10);
 		}
 		// Sanity-check the load-bearing numbers: STR = 14 + 17 locked base = 31; the passive then adds
-		// 0.5 × 31 = 15.5 to Defense (2 base + 1×END + 14 gear + 15.5 = 59.5, END = 12 + 10 + 6 = 28).
+		// 0.5 × 31 = 15.5 to Toughness (2×END + 14 gear + 15.5 = 85.5, END = 12 + 10 + 6 = 28).
 		expect(view.computedFor(EAttribute.Strength).total).toBe(31);
-		expect(view.computedFor(EAttribute.Defense).total).toBeCloseTo(59.5);
+		expect(view.computedFor(EAttribute.Toughness).total).toBeCloseTo(85.5);
 	});
 
 	it('surfaces the locked base, proficiency, and signature passive in the by-source grouping', () => {
@@ -416,7 +416,7 @@ describe('battle-assembly parity', () => {
 		};
 		expect(sourcesFor(EAttribute.Strength)).toContain(EAttributeModifierSource.AttributeDistribution);
 		expect(sourcesFor(EAttribute.Endurance)).toContain(EAttributeModifierSource.Proficiency);
-		expect(sourcesFor(EAttribute.Defense)).toContain(EAttributeModifierSource.Class);
+		expect(sourcesFor(EAttribute.Toughness)).toContain(EAttributeModifierSource.Class);
 	});
 });
 

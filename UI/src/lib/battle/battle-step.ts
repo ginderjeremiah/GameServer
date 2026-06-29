@@ -6,7 +6,7 @@ import { amplifiedDamage } from './battle-formulas';
 
 /**
  * A single skill activation produced by one battle tick: which skill fired, the
- * final damage it dealt after the defender's defense clamp, and whether the
+ * final damage it dealt after the defender's mitigation, and whether the
  * player (true) or the enemy (false) was the attacker. The crit/dodged/blocked
  * flags carry the player-only roll outcomes for the combat log: `crit` on a player
  * attack, `dodged`/`blocked` on an incoming enemy attack (a dodged hit is never
@@ -95,14 +95,16 @@ export function battleStep(
 	// draws from the shared seeded RNG in a fixed, outcome-independent order (1 crit draw per player fire,
 	// then 2 — dodge, block — per enemy fire) so both simulators stay in lockstep.
 	player.advanceCooldowns(timeDelta, (skill) => {
-		// Player crit: one draw (always), the raw damage multiplied by CriticalDamage BEFORE Defense.
+		// Player crit: one draw (always), the raw damage multiplied by CriticalDamage BEFORE mitigation.
 		const crit = rng.next() < player.attributes.getValue(EAttribute.CriticalChance);
 		const raw = skill.calculateDamage();
-		// Attacker-side amplification, then crit, then the typed mitigation pipeline (resistance, Defense).
+		// Attacker-side amplification, then crit, then the typed mitigation pipeline (resistance, Toughness curve
+		// scaled by the player's level).
 		const dealt = amplifiedDamage(raw, skill.damageType, player.attributes);
 		const damage = enemy.takeDamage(
 			crit ? dealt * player.attributes.getValue(EAttribute.CriticalDamage) : dealt,
-			skill.damageType
+			skill.damageType,
+			player.level
 		);
 		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, blocked: false });
 		skill.applyEffects(enemy, onApplied);
@@ -111,17 +113,24 @@ export function battleStep(
 	if (!enemy.isDead) {
 		enemy.advanceCooldowns(timeDelta, (skill) => {
 			// Dodge then block, both drawn unconditionally (even on a dodge) so the stream never branches on a
-			// roll result. A dodge zeroes the hit; a non-dodged block flatly subtracts BlockReduction too.
+			// roll result. A dodge zeroes the hit; a non-dodged block flatly subtracts BlockReduction after the
+			// Toughness curve.
 			const dodged = rng.next() < player.attributes.getValue(EAttribute.DodgeChance);
 			const blocked = rng.next() < player.attributes.getValue(EAttribute.BlockChance);
 			const raw = skill.calculateDamage();
-			// Attacker-side amplification reads the enemy (the attacker here); resistance reads the player.
+			// Attacker-side amplification reads the enemy (the attacker here); resistance + the Toughness curve
+			// (scaled by the enemy's level) read the player.
 			const dealt = amplifiedDamage(raw, skill.damageType, enemy.attributes);
 			let damage = 0;
 			if (!dodged) {
 				damage = blocked
-					? player.takeDamage(dealt, skill.damageType, player.attributes.getValue(EAttribute.BlockReduction))
-					: player.takeDamage(dealt, skill.damageType);
+					? player.takeDamage(
+							dealt,
+							skill.damageType,
+							enemy.level,
+							player.attributes.getValue(EAttribute.BlockReduction)
+						)
+					: player.takeDamage(dealt, skill.damageType, enemy.level);
 			}
 			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, blocked });
 			skill.applyEffects(player, onApplied);
@@ -129,7 +138,7 @@ export function battleStep(
 	}
 
 	// End-of-tick damage/heal-over-time, reached only while both battlers still live (mirroring the
-	// backend's both-alive guard). For each battler the typed DoT accumulators (bypassing Defense) then
+	// backend's both-alive guard). For each battler the typed DoT accumulators (bypassing the Toughness curve) then
 	// HealthRegenPerSecond (capped at MaxHealth) apply before its death check — so a heal-over-time can
 	// save a battler from an otherwise-lethal DoT tick. The enemy resolves first: an enemy a same-tick
 	// regen cannot save dies before the player's DoT applies, so a same-tick mutual DoT kill leaves the

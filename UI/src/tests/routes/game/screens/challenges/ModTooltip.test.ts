@@ -15,7 +15,7 @@ const makeMod = (overrides: Partial<IItemMod> = {}): IItemMod => ({
 	attributes: [
 		{ attributeId: EAttribute.Strength, amount: 5 },
 		{ attributeId: EAttribute.MaxHealth, amount: 12 },
-		{ attributeId: EAttribute.Defense, amount: -2 }
+		{ attributeId: EAttribute.Toughness, amount: -2 }
 	],
 	tags: [],
 	...overrides
@@ -43,7 +43,7 @@ describe('ModTooltip', () => {
 		const { container } = render(ModTooltip, { props: { mod: makeMod() } });
 		const grid = container.querySelector('.tt-stats-grid') as HTMLElement;
 		const names = Array.from(grid.querySelectorAll('.tt-stat-name')).map((n) => n.textContent);
-		expect(names).toEqual(['Strength', 'Max Health', 'Defense']);
+		expect(names).toEqual(['Strength', 'Max Health', 'Toughness']);
 
 		const values = Array.from(grid.querySelectorAll('.tt-stat-value')) as HTMLElement[];
 		expect(values.map((v) => v.textContent?.trim())).toEqual(['+5', '+12', '-2']);

@@ -82,6 +82,7 @@ namespace Game.Core.Tests.Attributes
         [InlineData(EAttribute.Strength, EAttributeType.Primary, "STR")]
         [InlineData(EAttribute.Luck, EAttributeType.Primary, "LUK")]
         [InlineData(EAttribute.MaxHealth, EAttributeType.Secondary, "HP")]
+        [InlineData(EAttribute.Toughness, EAttributeType.Secondary, "TGH")]
         [InlineData(EAttribute.CooldownRecovery, EAttributeType.Secondary, "CDR")]
         [InlineData(EAttribute.BleedDamagePerSecond, EAttributeType.Status, "BLD DOT")]
         [InlineData(EAttribute.PoisonDamagePerSecond, EAttributeType.Status, "PSN DOT")]
@@ -112,7 +113,7 @@ namespace Game.Core.Tests.Attributes
 
         [Theory]
         [InlineData(EAttribute.Strength)]
-        [InlineData(EAttribute.Defense)]
+        [InlineData(EAttribute.Toughness)]
         public void Constructor_LeavesDamageTypeKeyNullForNonAmpResistAttributes(EAttribute id)
         {
             Assert.Null(new Attribute(id).DamageTypeKey);

@@ -115,8 +115,10 @@ namespace Game.Core.Tests.Battle.Performance
         private const int StackingLongTicks = 1600;
         private const double StackingFlatnessBudget = 2.0;
 
-        // Combatant base spread. The enormous Endurance yields a MaxHealth and Defense large enough that
-        // every incoming hit clamps to zero, so the battle deterministically runs to the tick cap.
+        // Combatant base spread. The skills deal no damage (zero base, zero-weight multipliers), so neither
+        // combatant can die and the battle deterministically runs to the tick cap — the Toughness curve never
+        // fully clamps a real hit, so immortality comes from the zero damage, not from mitigation. The large
+        // Endurance still composes a realistic MaxHealth/Toughness for the per-tick work.
         private const int BattlerBaseStrength = 100;
         private const int BattlerBaseEndurance = 1000;
 
@@ -139,11 +141,12 @@ namespace Game.Core.Tests.Battle.Performance
 
         // Effects rotate across the core attributes that actually have derived dependents, so a churn
         // invalidation cascades into the attributes read on the hot path: Strength→MaxHealth,
-        // Endurance→MaxHealth/Defense, Agility→Defense/CooldownRecovery, Dexterity→CooldownRecovery. A
-        // 4-skill loadout therefore churns every derived attribute. Intellect/Luck are omitted because
-        // nothing derives from them today, so buffing them would invalidate only their own (unread) node.
-        // The buffs are additive and Self-targeted, which only ever raises Defense/MaxHealth/CooldownRecovery
-        // — so the combatant stays immortal and the battle still runs to the tick cap.
+        // Endurance→MaxHealth/Toughness, Agility→CooldownRecovery/DodgeChance,
+        // Dexterity→CooldownRecovery/CriticalChance. A 4-skill loadout therefore churns every derived
+        // attribute read each tick (MaxHealth for the death check, CooldownRecovery for charge, the crit/dodge
+        // chances on each fire). Intellect/Luck are omitted because nothing the hot path reads derives from
+        // them. The buffs are additive and Self-targeted, so they only ever raise those stats — and the skills
+        // deal no damage regardless, so the combatant stays immortal and the battle runs to the tick cap.
         private static readonly EAttribute[] BuffableCoreAttributes = [Strength, Endurance, Agility, Dexterity];
 
         private enum EffectMode
@@ -484,9 +487,10 @@ namespace Game.Core.Tests.Battle.Performance
         }
 
         /// <summary>
-        /// Builds a combatant that deliberately never dies — high Endurance yields enormous MaxHealth
-        /// and a Defense that clamps every incoming hit to zero — so the battle deterministically runs
-        /// to the tick cap. Skills still fire on every cooldown, so the per-tick hot path (charge,
+        /// Builds a combatant that deliberately never dies — its skills deal no damage (zero base, zero-weight
+        /// multipliers), so neither side can be killed and the battle deterministically runs to the tick cap.
+        /// (The Toughness curve never fully clamps a real hit, so immortality comes from the zero damage, not
+        /// mitigation.) Skills still fire on every cooldown, so the per-tick hot path (charge,
         /// <see cref="BattleSkill.CalculateDamage"/>, stat recording, and — with churning effects — the
         /// attribute-cache invalidate/recompute cascade) is fully exercised; only the life-total
         /// bookkeeping is neutralised.
@@ -515,8 +519,11 @@ namespace Game.Core.Tests.Battle.Performance
             {
                 multipliers.Add(new DamageMultiplier
                 {
+                    // Zero-weight so the skill deals no damage (the combatants are immortal by construction),
+                    // while CalculateDamage still performs the per-multiplier read+multiply+add the cost
+                    // measurement exercises.
                     Attribute = Strength,
-                    Amount = 0.5,
+                    Amount = 0,
                 });
             }
 
@@ -554,7 +561,7 @@ namespace Game.Core.Tests.Battle.Performance
                 Rarity = ERarity.Common,
                 DamageType = EDamageType.Physical,
                 CooldownMs = SkillCooldownMs, // fires every couple of ticks, so the damage path runs heavily
-                BaseDamage = 10,
+                BaseDamage = 0,               // zero damage keeps both combatants immortal (runs to the cap)
                 DamageMultipliers = multipliers,
                 Effects = effects,
             };

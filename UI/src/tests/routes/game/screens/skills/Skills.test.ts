@@ -21,6 +21,7 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 		const playerManager = {
 			unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
 			currentZone: 0,
+			level: 1,
 			attributes: [] as { attributeId: number; amount: number }[],
 			get selectedSkills(): number[] {
 				return playerManager.unlockedSkills
@@ -119,7 +120,7 @@ const ZONES: IZone[] = [
 	{ id: 0, name: 'Vale', description: '', order: 0, levelMin: 2, levelMax: 8, bossEnemyId: 2, bossLevel: 10 }
 ];
 
-// amountPerLevel 1 keeps the spawn's Defense (2 + 1·level) under this catalogue's slider ceiling.
+// amountPerLevel 1 gives each enemy Toughness 2·(1·level), within the preset-derived slider ceiling.
 const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
 	name: `Enemy ${over.id}`,
 	isBoss: false,
@@ -301,8 +302,8 @@ describe('Skills screen', () => {
 		// Zone 0's in-zone spawn (Imp) + the boss (Ogre King); Wolf spawns elsewhere.
 		expect(pills.map((p) => p.querySelector('.en')?.textContent)).toEqual(['Imp', '◆ Ogre King']);
 
-		await fireEvent.click(pills[0]); // Imp: Defense = 2 + 1*5 = 7
-		expect(container.querySelector('.vs-defval b')?.textContent).toBe('7');
+		await fireEvent.click(pills[0]); // Imp: Toughness = 2·(1*5) = 10
+		expect(container.querySelector('.vs-defval b')?.textContent).toBe('10');
 		expect(pills[0].classList.contains('on')).toBe(true);
 
 		// Dragging the slider deselects the active pill.
@@ -312,10 +313,11 @@ describe('Skills screen', () => {
 		expect(container.querySelector('.vs-defval b')?.textContent).toBe('3');
 	});
 
-	it('resorts the available rail when a compare-vs preset is clicked', async () => {
-		// Two available skills whose DPS ranking flips when Ogre King's defense (12) is applied.
-		// FastLow:  baseDmg=20, cd=1s  → DPS 20 at def=0, DPS  8.0 at def=12 (effective=8)
-		// SlowHigh: baseDmg=100, cd=10s → DPS 10 at def=0, DPS  8.8 at def=12 (effective=88)
+	it('preserves the DPS order when a compare-vs preset is clicked (the curve scales uniformly)', async () => {
+		// The Toughness curve is one multiplicative factor applied to every hit, so it scales both rows
+		// equally and can never reorder them by effective DPS — flat Defense could flip them, the curve can't.
+		// FastLow:  baseDmg=20,  cd=1s  → raw DPS 20
+		// SlowHigh: baseDmg=100, cd=10s → raw DPS 10
 		staticData.skills = [
 			...SKILLS.slice(0, 3),
 			skill({ id: 3, name: 'FastLow', baseDamage: 20, damageMultipliers: [], cooldownMs: 1000 }),
@@ -340,21 +342,22 @@ describe('Skills screen', () => {
 		expect(availableRowNames()[0]).toBe('FastLow');
 		expect(availableRowNames()[1]).toBe('SlowHigh');
 
-		// Ogre King pill: defense=12. SlowHigh (8.8 DPS) overtakes FastLow (8.0 DPS).
+		// Ogre King pill: Toughness = 2·(1·10) = 20, halving every hit vs the level-1 player — order unchanged.
 		const ogreKing = Array.from(container.querySelectorAll<HTMLButtonElement>('.epill')).find((p) =>
 			p.textContent?.includes('Ogre King')
 		)!;
 		await fireEvent.click(ogreKing);
 
-		expect(availableRowNames()[0]).toBe('SlowHigh');
-		expect(availableRowNames()[1]).toBe('FastLow');
+		expect(container.querySelector('.vs-defval b')?.textContent).toBe('20');
+		expect(availableRowNames()[0]).toBe('FastLow');
+		expect(availableRowNames()[1]).toBe('SlowHigh');
 	});
 
 	it('marks effect-bearing skills with a badge and leaves effect-free skills unmarked', () => {
 		const effect: ISkillEffect = {
 			id: 7,
 			target: ESkillEffectTarget.Opponent,
-			attributeId: EAttribute.Defense,
+			attributeId: EAttribute.Toughness,
 			modifierTypeId: EModifierType.Additive,
 			amount: -10,
 			durationMs: 5000,
@@ -378,7 +381,7 @@ describe('Skills screen', () => {
 		const effect: ISkillEffect = {
 			id: 7,
 			target: ESkillEffectTarget.Opponent,
-			attributeId: EAttribute.Defense,
+			attributeId: EAttribute.Toughness,
 			modifierTypeId: EModifierType.Additive,
 			amount: -10,
 			durationMs: 5000,
@@ -391,7 +394,7 @@ describe('Skills screen', () => {
 		const row = container.querySelector<HTMLElement>('.effect-row');
 		expect(row).toBeTruthy();
 		expect(row?.querySelector('.emag')?.textContent).toBe('-10');
-		expect(row?.querySelector('.eattr')?.textContent).toBe('Defense');
+		expect(row?.querySelector('.eattr')?.textContent).toBe('Toughness');
 		expect(row?.querySelector('.emeta')?.textContent).toContain('5s');
 	});
 

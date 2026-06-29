@@ -121,10 +121,10 @@ describe('groupBySource', () => {
 
 	it('orders groups by SOURCE_ORDER even when modifiers arrive out of order', () => {
 		const computed = computeAttributes([
-			additive(EAttribute.Defense, 6, EAttributeModifierSource.ItemMod),
-			additive(EAttribute.Defense, 14, EAttributeModifierSource.Item)
+			additive(EAttribute.Toughness, 6, EAttributeModifierSource.ItemMod),
+			additive(EAttribute.Toughness, 14, EAttributeModifierSource.Item)
 		]);
-		const { groups } = groupBySource(computed.get(EAttribute.Defense)!);
+		const { groups } = groupBySource(computed.get(EAttribute.Toughness)!);
 		const positions = groups.map((g) => SOURCE_ORDER.indexOf(g.source));
 		expect(positions).toEqual([...positions].sort((a, b) => a - b));
 	});
@@ -145,7 +145,7 @@ describe('parity with BattleAttributes', () => {
 		EAttribute.Dexterity,
 		EAttribute.Luck,
 		EAttribute.MaxHealth,
-		EAttribute.Defense,
+		EAttribute.Toughness,
 		EAttribute.CooldownRecovery
 	];
 
@@ -166,7 +166,7 @@ describe('parity with BattleAttributes', () => {
 				{ attributeId: EAttribute.Strength, amount: 14 },
 				{ attributeId: EAttribute.Endurance, amount: 20 },
 				{ attributeId: EAttribute.MaxHealth, amount: 30 },
-				{ attributeId: EAttribute.Defense, amount: 14 },
+				{ attributeId: EAttribute.Toughness, amount: 14 },
 				{ attributeId: EAttribute.Agility, amount: 9 },
 				{ attributeId: EAttribute.Dexterity, amount: 12 }
 			]

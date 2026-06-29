@@ -301,7 +301,7 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void ToBattler_ComposesAttributeScaledClassSignaturePassive_OffAssembledValue()
         {
-            // The passive scales off the fully-assembled Endurance (free pool + locked base), landing on Defense
+            // The passive scales off the fully-assembled Endurance (free pool + locked base), landing on Toughness
             // which also carries the static Endurance-derived term — pinning that the passive reads the same
             // resolved Endurance and accumulates after the statics.
             var snapshot = new BattleSnapshot
@@ -315,7 +315,7 @@ namespace Game.Core.Tests.Battle
 
             var passive = new ClassSignaturePassive
             {
-                Attribute = EAttribute.Defense,
+                Attribute = EAttribute.Toughness,
                 Amount = 2m,
                 ScalingAttribute = EAttribute.Endurance,
                 ScalingAmount = 0.5m,
@@ -325,9 +325,9 @@ namespace Game.Core.Tests.Battle
                 resolveClass: ClassResolver(MakeClassWithPassive(3, passive, Distribution(EAttribute.Endurance, 4m, amountPerLevel: 3m))));
 
             // Endurance = 5 (free pool) + (4 + 3 × 2) locked base = 15.
-            // Defense (static 2 + 1·Endurance + 0.5·Agility) + passive (2 + 0.5 × 15 = 9.5) = 2 + 15 + 0 + 9.5 = 26.5.
+            // Toughness (static 2·Endurance = 30) + passive (2 + 0.5 × 15 = 9.5) = 39.5.
             Assert.Equal(15, battler.GetAttributeValue(EAttribute.Endurance));
-            Assert.Equal(26.5, battler.GetAttributeValue(EAttribute.Defense));
+            Assert.Equal(39.5, battler.GetAttributeValue(EAttribute.Toughness));
         }
 
         [Fact]

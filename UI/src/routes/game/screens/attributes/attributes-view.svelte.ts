@@ -69,7 +69,7 @@ export interface DerivedStatDef {
  *  (including the `%` for percentage attributes) comes from the shared `formatAttributeValue`. */
 export const DERIVED_STATS: DerivedStatDef[] = [
 	{ id: EAttribute.MaxHealth, group: 'Survivability' },
-	{ id: EAttribute.Defense, group: 'Survivability' },
+	{ id: EAttribute.Toughness, group: 'Survivability' },
 	{ id: EAttribute.CooldownRecovery, group: 'Utility' }
 ];
 
@@ -170,7 +170,7 @@ export function radarValueAtPointer(
  *  full name so a newly surfaced derived stat still reads correctly. */
 const DERIVED_SHORT: Partial<Record<EAttribute, string>> = {
 	[EAttribute.MaxHealth]: 'HP',
-	[EAttribute.Defense]: 'Def',
+	[EAttribute.Toughness]: 'Tgh',
 	[EAttribute.CooldownRecovery]: 'CDR'
 };
 

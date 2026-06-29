@@ -141,8 +141,8 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // A zone with two deterministic spawns: a weak enemy the player one-shots (a win) and a deadly,
-            // high-HP enemy that survives the player's hit and one-shots them back (a loss). Random spawning
+            // A zone with two deterministic spawns: a weak enemy the player quickly kills (a win) and a deadly,
+            // high-HP enemy that shrugs off the player's hits and one-shots them back (a loss). Random spawning
             // mixes the two across the window, so a kill-tracking statistic is touched only in the win battles —
             // exercising the consolidation's reliance on the union of every battle's touched stats rather than
             // just the final battle's (which may be a loss).
@@ -151,7 +151,7 @@ namespace Game.Application.Tests.Services
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
             var winEnemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, winEnemy.Id, winEnemySkill.Id);
-            // Huge Endurance: too much HP to be one-shot and enough Defense to shrug off the player's hit.
+            // Huge Endurance: too much HP to be one-shot and enough Toughness to shrug off the player's hit.
             var lossEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Juggernaut",
                 strengthBase: 1m, strengthPerLevel: 0m, enduranceBase: 100_000m, endurancePerLevel: 0m);
             var lossEnemySkill = await TestDataSeeder.CreateSkillAsync(context, "Obliterate", baseDamage: 100_000m, cooldownMs: 500);
