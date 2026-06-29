@@ -657,21 +657,6 @@ describe('BattleEngine', () => {
 					undefined
 				);
 			});
-
-			it('logs a block line when the player blocks an incoming enemy hit', () => {
-				forcePlayerChance(EAttribute.BlockChance);
-				engine.start();
-				enemyLoadedCallbacks[0](tankyEnemy);
-
-				logicalUpdateCallbacks[0](500);
-
-				expect(logMessage).toHaveBeenCalledWith(
-					ELogType.Damage,
-					expect.stringContaining("You blocked Goblin's Slash"),
-					'player-block',
-					undefined
-				);
-			});
 		});
 
 		// The floating-number layer consumes these events; they mirror the same flags as the combat-log
@@ -741,16 +726,6 @@ describe('BattleEngine', () => {
 				logicalUpdateCallbacks[0](500);
 
 				expect(events).toContainEqual({ target: 'player', kind: 'dodge' });
-			});
-
-			it('emits a player-targeted block when the player blocks', () => {
-				forcePlayerChance(EAttribute.BlockChance);
-				engine.start();
-				enemyLoadedCallbacks[0](tankyEnemy);
-
-				logicalUpdateCallbacks[0](500);
-
-				expect(events).toContainEqual(expect.objectContaining({ target: 'player', kind: 'block' }));
 			});
 		});
 	});

@@ -92,15 +92,16 @@ namespace Game.Core.Battle
         /// mutating health: percentage resistance first (<c>dealt × (1 − Σ applies(type).Resistance)</c>,
         /// <b>unclamped</b> — a negative total amplifies as vulnerability, a total above <c>1</c> drives the
         /// result negative as absorption), then — only while the post-resistance damage is still positive — the
-        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + K·attackerLevel))</c>
-        /// and finally the optional flat <paramref name="blockReduction"/> (floored at <c>0</c>). The toughness
-        /// curve is a diminishing-returns percentage: effective HP is linear in Toughness while the reduction
-        /// asymptotes below <c>100%</c> (no immunity), and <paramref name="attackerLevel"/> scales the denominator
-        /// so the band stays stable as content scales (spike #1330). The resistance sum is folded in the fixed
-        /// <see cref="DamageTypes.ResistanceAttributes"/> order for parity; with no resistance and no Toughness the
-        /// positive branch reduces to <c>dealt − blockReduction</c>.
+        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + K·attackerLevel))</c>.
+        /// The toughness curve is a diminishing-returns percentage: effective HP is linear in Toughness while the
+        /// reduction asymptotes below <c>100%</c> (no immunity), and <paramref name="attackerLevel"/> scales the
+        /// denominator so the band stays stable as content scales (spike #1330). The resistance sum is folded in
+        /// the fixed <see cref="DamageTypes.ResistanceAttributes"/> order for parity; with no resistance and no
+        /// Toughness the positive branch reduces to <c>dealt</c>. The whole stack is multiplicative — with Block's
+        /// flat reduction removed (spike #1330 Area B) there is no flat subtraction left, so the only path to a
+        /// negative (absorbing) result is a resistance above <c>1</c>, and no clamp is needed.
         /// </summary>
-        public double ComputeNetDamage(double dealt, EDamageType damageType, int attackerLevel, double blockReduction = 0)
+        public double ComputeNetDamage(double dealt, EDamageType damageType, int attackerLevel)
         {
             var resistance = 0.0;
             var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
@@ -112,35 +113,34 @@ namespace Game.Core.Battle
             var mitigated = dealt * (1 - resistance);
             if (mitigated <= 0)
             {
-                // Absorption (or a zero hit): the target takes a net heal; neither the toughness curve nor flat
-                // reduction applies (mitigation can neither heal nor deepen an absorption heal).
+                // Absorption (or a zero hit): the target takes a net heal; the toughness curve does not apply
+                // (mitigation can neither heal nor deepen an absorption heal).
                 return mitigated;
             }
 
             // Toughness mitigation: Toughness / (Toughness + K·attackerLevel) as a multiplier, so EHP is linear in
-            // Toughness and the reduction asymptotes below 100%. K·attackerLevel keeps the band stable across
-            // content scaling. Both simulators must compute this expression identically for battle parity.
+            // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
+            // K·attackerLevel keeps the band stable across content scaling. Both simulators must compute this
+            // expression identically for battle parity.
             var toughness = _attributes[Toughness];
             var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
             var toughnessReduction = toughness / (toughness + scaled);
 
-            var net = mitigated * (1 - toughnessReduction) - blockReduction;
-            return net > 0 ? net : 0;
+            return mitigated * (1 - toughnessReduction);
         }
 
         /// <summary>
         /// Applies an incoming hit of <paramref name="dealt"/> (already amplified and crit-multiplied) of the
-        /// given <paramref name="damageType"/> via <see cref="ComputeNetDamage"/> — percentage resistance, the
-        /// <see cref="EAttribute.Toughness"/> mitigation curve (scaled by the <paramref name="attackerLevel"/>),
-        /// then the optional flat <paramref name="blockReduction"/> (supplied only when the hit is blocked).
+        /// given <paramref name="damageType"/> via <see cref="ComputeNetDamage"/> — percentage resistance then
+        /// the <see cref="EAttribute.Toughness"/> mitigation curve (scaled by the <paramref name="attackerLevel"/>).
         /// Returns the net damage dealt; a negative result (absorption) heals this battler, <b>capped at
         /// <see cref="MaxHealth"/></b> — the game has no overheal/shield concept, so this matches
         /// <see cref="ApplyHealOverTime"/> rather than letting the reactive absorption channel bank health above
         /// the cap.
         /// </summary>
-        public double TakeDamage(double dealt, EDamageType damageType, int attackerLevel, double blockReduction = 0)
+        public double TakeDamage(double dealt, EDamageType damageType, int attackerLevel)
         {
-            var net = ComputeNetDamage(dealt, damageType, attackerLevel, blockReduction);
+            var net = ComputeNetDamage(dealt, damageType, attackerLevel);
             if (net < 0)
             {
                 // Absorption: cap the heal at the remaining room to MaxHealth (consistent with ApplyHealOverTime),
@@ -157,22 +157,34 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
+        /// Subtracts <paramref name="amount"/> of reflected damage directly from this (attacking) battler's
+        /// health, <b>bypassing all of its own mitigation</b> (resistance and the Toughness curve) — the
+        /// deterministic damage-reflection channel (spike #1330). The caller resolves the amount
+        /// (defender net × the defender's <see cref="EAttribute.DamageReflection"/>) and reflects only a
+        /// positive hit, so this is a raw health subtraction with no floor or cap.
+        /// </summary>
+        public void TakeReflectedDamage(double amount)
+        {
+            CurrentHealth -= amount;
+        }
+
+        /// <summary>
         /// Applies one tick of typed damage-over-time (spike #1320, Area C). Loops the DoT types in the fixed
         /// <see cref="DamageTypes.DotAccumulators"/> order, scaling each type's per-second accumulator to
         /// <paramref name="ms"/> and applying this (defending) battler's resistance for that type <b>sampled
         /// live</b> — <c>perSec × ms/1000 × (1 − Σ applies(type).Resistance)</c> — so a vulnerability debuff
         /// makes existing DoTs hurt immediately. The caster's amplification was already frozen into the
         /// accumulator at apply time (<see cref="BattleContext.ApplySkillEffect"/>). Unlike
-        /// <see cref="TakeDamage"/> it <b>bypasses the Toughness curve and flat block</b> — resistance is its only
-        /// mitigation — and returns the total damage dealt so the caller can attribute it to the battle statistics. With no DoT authored
-        /// every accumulator is <c>0</c>, so the loop adds nothing and the return is an exact <c>0</c>.
+        /// <see cref="TakeDamage"/> it <b>bypasses the Toughness curve</b> — resistance is its only mitigation —
+        /// and is never reflected (reflection is scoped to direct hits, spike #1330); it returns the total damage
+        /// dealt so the caller can attribute it to the battle statistics. With no DoT authored every accumulator
+        /// is <c>0</c>, so the loop adds nothing and the return is an exact <c>0</c>.
         /// </summary>
         /// <remarks>
-        /// Intentionally <b>not</b> floored at zero, unlike <see cref="TakeDamage"/>. That floor exists only so the
-        /// flat block reduction can't drive net damage below zero and turn a hit into a heal; DoT bypasses
-        /// mitigation entirely, so a tick goes negative only through a deliberately authored negative accumulator or a resistance above
-        /// <c>1</c> (absorption) — and a floor wouldn't prevent that, it would just silently rewrite the value.
-        /// Authored healing belongs in the capped <see cref="ApplyHealOverTime"/> channel instead. The resistance
+        /// Intentionally <b>not</b> floored at zero. DoT bypasses mitigation entirely, so a tick goes negative
+        /// only through a deliberately authored negative accumulator or a resistance above <c>1</c> (absorption)
+        /// — and a floor wouldn't prevent that, it would just silently rewrite the value. Authored healing
+        /// belongs in the capped <see cref="ApplyHealOverTime"/> channel instead. The resistance
         /// sum is folded in the fixed <see cref="DamageTypes.ResistanceAttributes"/> order, and each type's
         /// contribution is summed in <see cref="DamageTypes.DotAccumulators"/> order, so both simulators agree
         /// bit-for-bit. A single typed DoT with no resistance reduces to <c>perSec × ms/1000</c> — byte-identical

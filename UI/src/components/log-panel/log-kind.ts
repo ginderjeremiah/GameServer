@@ -5,7 +5,6 @@ export type GlyphKind =
 	| 'hit'
 	| 'crit'
 	| 'dodge'
-	| 'block'
 	| 'enemy'
 	| 'loot'
 	| 'system'
@@ -49,14 +48,13 @@ const EFFECT = logColors.effect;
 
 /**
  * Visual treatment per structured combat outcome. The `Damage` channel carries player-vs-enemy and
- * the player-only crit/dodge/block outcomes (#178) on one `ELogType`; keying the glyph off the typed
+ * the player-only crit/dodge outcomes (#178) on one `ELogType`; keying the glyph off the typed
  * {@link LogOutcome} the engine sets keeps it stable when a message is reworded.
  */
 const damageKinds: Record<LogOutcome, LogKind> = {
 	'player-hit': { color: PLAYER, glyph: 'hit', label: 'Hit' },
 	'player-crit': { color: PLAYER, glyph: 'crit', label: 'Crit' },
 	'player-dodge': { color: ENEMY, glyph: 'dodge', label: 'Dodge' },
-	'player-block': { color: ENEMY, glyph: 'block', label: 'Block' },
 	'enemy-hit': { color: ENEMY, glyph: 'enemy', label: 'Hurt' }
 };
 

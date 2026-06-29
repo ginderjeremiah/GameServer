@@ -292,16 +292,14 @@ describe('AttributeBreakdownView', () => {
 		// Only the allocated core attributes self-select into Primary.
 		expect(primary?.attrs.map((a) => a.meta.id)).toEqual([EAttribute.Strength, EAttribute.Endurance]);
 		// The engine base/derived aggregates always contribute, so they stay in Secondary — including the
-		// crit/dodge/block set, which now derives from the core attributes (#799).
+		// crit/dodge set, which now derives from the core attributes (#799).
 		expect(secondary?.attrs.map((a) => a.meta.id)).toEqual([
 			EAttribute.MaxHealth,
 			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
 			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
-			EAttribute.DodgeChance,
-			EAttribute.BlockChance,
-			EAttribute.BlockReduction
+			EAttribute.DodgeChance
 		]);
 		// CooldownRecovery carries its reference-data precision (0 decimals) and percentage flag.
 		const cdrMeta = secondary?.attrs.find((a) => a.meta.id === EAttribute.CooldownRecovery)?.meta;
@@ -311,7 +309,7 @@ describe('AttributeBreakdownView', () => {
 
 	it('self-selects only attributes with a real (non-combat) contributor', () => {
 		// No allocations or gear: only the engine base/derived formulas contribute. The Secondary aggregates
-		// surface — MaxHealth/Toughness/CooldownRecovery plus the crit/dodge/block set, which now derives from
+		// surface — MaxHealth/Toughness/CooldownRecovery plus the crit/dodge set, which now derives from
 		// the core attributes (#799). The obsolete attribute and the combat-only Status channels have no
 		// contributors and drop out, and no Primary group is shown.
 		const view = new AttributeBreakdownView();
@@ -322,9 +320,7 @@ describe('AttributeBreakdownView', () => {
 			EAttribute.CooldownRecovery,
 			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
-			EAttribute.DodgeChance,
-			EAttribute.BlockChance,
-			EAttribute.BlockReduction
+			EAttribute.DodgeChance
 		]);
 		expect(view.groups.some((g) => g.type === EAttributeType.Primary)).toBe(false);
 		expect(ids).not.toContain(EAttribute.DropBonus);

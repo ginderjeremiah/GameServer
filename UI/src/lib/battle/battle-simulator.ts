@@ -30,7 +30,7 @@ export class BattleSimulator {
 
 	public simulate(maxMs: number = DEFAULT_MAX_BATTLE_MS): BattleResult {
 		// One Mulberry32 seeded once from the battle seed and advanced in lockstep with the backend, so both
-		// simulators draw the crit/dodge/block rolls from the identical stream (battle parity).
+		// simulators draw the crit/dodge rolls from the identical stream (battle parity).
 		const rng = new Mulberry32(this.seed);
 		let totalMs = tickSize;
 		for (; totalMs <= maxMs; totalMs += tickSize) {

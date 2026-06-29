@@ -10,7 +10,6 @@ const ALL_GLYPHS: GlyphKind[] = [
 	'hit',
 	'crit',
 	'dodge',
-	'block',
 	'enemy',
 	'loot',
 	'system',

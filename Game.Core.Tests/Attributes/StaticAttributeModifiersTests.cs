@@ -33,13 +33,8 @@ namespace Game.Core.Tests.Attributes
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
-                // DodgeChance = 0.001·Agility
+                // DodgeChance = 0.001·Agility (DamageReflection is authored-only, so it has no static modifier)
                 (EAttribute.DodgeChance, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
-                // BlockChance = 0.002·Endurance
-                (EAttribute.BlockChance, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
-                // BlockReduction = 2 (base) + 0.5·Endurance
-                (EAttribute.BlockReduction, 2.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
-                (EAttribute.BlockReduction, 0.5, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
             };
 
             Assert.Equal(expected.Length, StaticAttributeModifiers.All.Count);

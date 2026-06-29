@@ -34,7 +34,7 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
-        public void RecordBattleCompleted_TracksCritDodgeBlockStatistics()
+        public void RecordBattleCompleted_TracksCritDodgeStatistics()
         {
             var progress = MakeProgress();
             var stats = new BattleStats
@@ -43,8 +43,6 @@ namespace Game.Core.Tests.Progress
                 CriticalDamageDealt = 88.5,
                 AttacksDodged = 2,
                 DamageDodged = 14.25,
-                AttacksBlocked = 4,
-                DamageBlocked = 22.0,
             };
 
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 4000, stats,
@@ -54,8 +52,6 @@ namespace Game.Core.Tests.Progress
             Assert.Equal(88.5m, progress.GetStatisticValue(EStatisticType.CriticalDamageDealt, null));
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.AttacksDodged, null));
             Assert.Equal(14.25m, progress.GetStatisticValue(EStatisticType.DamageDodged, null));
-            Assert.Equal(4m, progress.GetStatisticValue(EStatisticType.AttacksBlocked, null));
-            Assert.Equal(22.0m, progress.GetStatisticValue(EStatisticType.DamageBlocked, null));
         }
 
         [Fact]

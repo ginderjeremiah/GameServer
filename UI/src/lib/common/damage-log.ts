@@ -14,11 +14,11 @@ import { damageTypeName } from './damage-type-display';
 
 /**
  * Structured combat-outcome discriminator carried alongside a `Damage`-channel entry. The battle
- * engine knows each hit's outcome explicitly (player vs enemy, crit/dodge/block) at the log site, so
- * it sets this rather than encoding the outcome only in the prose — letting `logKind` pick the glyph
+ * engine knows each hit's outcome explicitly (player vs enemy, crit/dodge) at the log site, so it
+ * sets this rather than encoding the outcome only in the prose — letting `logKind` pick the glyph
  * from a typed value instead of sniffing the message text, which would silently drift on a reword.
  */
-export type LogOutcome = 'player-hit' | 'player-crit' | 'player-dodge' | 'player-block' | 'enemy-hit';
+export type LogOutcome = 'player-hit' | 'player-crit' | 'player-dodge' | 'enemy-hit';
 
 /**
  * How a hit's damage-type resistance resolved, for the combat-log feedback (#1320, Area F):
@@ -81,7 +81,7 @@ export const damageLogMessage = (
 
 	if (resist === 'absorbed') {
 		const heal = formatNum(Math.max(-damage, 0));
-		return outcome === 'enemy-hit' || outcome === 'player-block'
+		return outcome === 'enemy-hit'
 			? `You absorbed ${enemyName}'s ${skillName}, recovering ${heal} health!`
 			: `${enemyName} absorbed your ${skillName}, recovering ${heal} health!`;
 	}
@@ -93,8 +93,6 @@ export const damageLogMessage = (
 			return `You landed a critical hit with ${skillName} for ${amount} ${word}damage${suffix}`;
 		case 'player-hit':
 			return `You used ${skillName} and dealt ${amount} ${word}damage${suffix}`;
-		case 'player-block':
-			return `You blocked ${enemyName}'s ${skillName}, taking only ${amount} ${word}damage${suffix}`;
 		case 'enemy-hit':
 			return `${enemyName} used ${skillName} and dealt ${amount} ${word}damage${suffix}`;
 	}

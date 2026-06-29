@@ -60,14 +60,12 @@ namespace Game.Core.Progress
             Record(EStatisticType.EnemiesEncountered, null, 1);
             Record(EStatisticType.EnemiesEncountered, enemy.Id, 1);
 
-            // Player-only crit/dodge/block tallies — recorded globally only (no per-skill/per-enemy breakdown),
+            // Player-only crit/dodge tallies — recorded globally only (no per-skill/per-enemy breakdown),
             // alongside the damage statistics they mirror.
             Record(EStatisticType.CriticalHits, null, stats.CriticalHits);
             Record(EStatisticType.CriticalDamageDealt, null, (decimal)Math.Round(stats.CriticalDamageDealt, 3));
             Record(EStatisticType.AttacksDodged, null, stats.AttacksDodged);
             Record(EStatisticType.DamageDodged, null, (decimal)Math.Round(stats.DamageDodged, 3));
-            Record(EStatisticType.AttacksBlocked, null, stats.AttacksBlocked);
-            Record(EStatisticType.DamageBlocked, null, (decimal)Math.Round(stats.DamageBlocked, 3));
 
             if (victory)
             {

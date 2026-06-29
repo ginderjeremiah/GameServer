@@ -1,7 +1,7 @@
 <!-- The floating combat-number layer over a battler card. Subscribes to the engine's per-activation
      combat events and, for the events striking this card's side, spawns a short-lived number/label
      that pops and drifts up. The number is tinted by its damage type (a typed, non-physical plain hit
-     also shows the type glyph); crit/dodge/block keep their own outcome icon, and an absorbed hit shows
+     also shows the type glyph); crit/dodge keep their own outcome icon, and an absorbed hit shows
      its net heal in the regen hue (#1320, Area F). Purely presentational (aria-hidden) — the combat log
      is the accessible record of the same events. -->
 <div class="floaters" aria-hidden="true" data-testid={testId} style:--float-duration="{DURATION_MS}ms">
@@ -47,21 +47,20 @@ interface Floater {
 	color: string;
 	size: number;
 	crit: boolean;
-	/** Inline damage-type glyph for a typed (non-physical) plain hit; crit/dodge/block use `icon` instead. */
+	/** Inline damage-type glyph for a typed (non-physical) plain hit; crit/dodge use `icon` instead. */
 	glyph?: DamageGlyph;
 	icon: string;
 	amount: string;
 	label: string;
 }
 
-/** Clean per-outcome icon art (in `static/img`) for the crit/dodge/block floaters; a plain hit shows
- *  its damage-type glyph instead (or nothing, for physical). These reuse the clean base symbols — the
- *  crit/block magnitude attribute icons plus the standalone `Dodge` — so the popup and the attribute
- *  display share one visual language. */
+/** Clean per-outcome icon art (in `static/img`) for the crit/dodge floaters; a plain hit shows its
+ *  damage-type glyph instead (or nothing, for physical). These reuse the clean base symbols — the crit
+ *  magnitude attribute icon plus the standalone `Dodge` — so the popup and the attribute display share
+ *  one visual language. */
 const FLOAT_ICON: Partial<Record<CombatFloatEvent['kind'], string>> = {
 	crit: '/img/Critical Damage.png',
-	dodge: '/img/Dodge.png',
-	block: '/img/Block Reduction.png'
+	dodge: '/img/Dodge.png'
 };
 
 /** Drives both the JS removal timer and the CSS `dmg-rise` animation (via the `--float-duration`
@@ -86,8 +85,6 @@ const colorFor = (event: CombatFloatEvent): string => {
 			return 'var(--gold)';
 		case 'dodge':
 			return 'var(--text-secondary)';
-		case 'block':
-			return 'var(--block-color)';
 		default:
 			// A player hit lands on the enemy (brand accent); an incoming enemy hit on the player (enemy hue).
 			return event.target === 'enemy' ? 'var(--accent)' : 'var(--enemy-accent)';
@@ -104,7 +101,7 @@ const colorOf = (event: CombatFloatEvent): string => {
 };
 
 /** A plain hit's damage-type glyph — shown only for a typed (non-physical) hit so basic attacks stay
- *  clean and crit/dodge/block keep their own outcome icon. Physical is the untyped baseline. */
+ *  clean and crit/dodge keep their own outcome icon. Physical is the untyped baseline. */
 const glyphOf = (event: CombatFloatEvent): DamageGlyph | undefined =>
 	event.kind === 'hit' && event.damageType !== undefined && event.damageType !== EDamageType.Physical
 		? damageTypeGlyph(event.damageType)
@@ -124,8 +121,6 @@ const labelFor = (kind: CombatFloatEvent['kind']): string => {
 			return 'CRIT';
 		case 'dodge':
 			return 'DODGE';
-		case 'block':
-			return 'BLOCK';
 		default:
 			return '';
 	}
@@ -194,7 +189,7 @@ onMount(() => {
 	}
 }
 
-// Per-outcome combat icon (crit/dodge/block); sized in em so it tracks the floater's font-size.
+// Per-outcome combat icon (crit/dodge); sized in em so it tracks the floater's font-size.
 .floater-icon {
 	width: 1.15em;
 	height: 1.15em;

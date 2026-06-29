@@ -107,26 +107,29 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// Deals one skill hit's <paramref name="rawDamage"/> to the current target, drawing the per-fire
-        /// seeded RNG and applying the player-only crit/dodge/block rolls (gated on the acting battler). The
-        /// draw order is a pure function of the skill-fire sequence — never of a roll outcome — so the per-tick
-        /// draw count stays <c>playerFires×1 + enemyFires×2</c>:
+        /// seeded RNG and applying the player-only crit/dodge rolls (gated on the acting battler). The draw
+        /// order is a pure function of the skill-fire sequence — never of a roll outcome — so the per-tick draw
+        /// count stays <c>playerFires×1 + enemyFires×1</c>:
         /// <list type="bullet">
         /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage). On a crit
         /// the raw damage is multiplied by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b>
         /// mitigation, so high crit damage punches through <see cref="EAttribute.Toughness"/>.</item>
-        /// <item>When the <b>enemy</b> attacks the player, two draws are taken unconditionally — dodge then
-        /// block, <b>both</b> always drawn (even when the hit is dodged). A dodge zeroes the hit; a non-dodged
-        /// block applies <see cref="EAttribute.BlockReduction"/> as a flat reduction after the Toughness
-        /// curve.</item>
+        /// <item>When the <b>enemy</b> attacks the player, a <b>single</b> dodge draw is taken (Block was retired
+        /// in spike #1330, so the former second draw is gone). A dodge zeroes the hit.</item>
         /// </list>
-        /// The Toughness curve scales by the <b>active (attacking) battler's level</b>, so the mitigation band
-        /// stays stable as content scales. Enemies never crit/dodge/block: the gating reads the rolls only on the
-        /// player's side, leaving a clean seam for later enemy parity.
+        /// After a direct hit lands, <b>damage reflection</b> (spike #1330) returns the defender's
+        /// <see cref="EAttribute.DamageReflection"/> share of the net damage to the attacker, bypassing the
+        /// attacker's own mitigation — deterministic (no draw) and applied in <b>both</b> directions. The
+        /// Toughness curve scales by the <b>active (attacking) battler's level</b>, so the mitigation band stays
+        /// stable as content scales. Enemies never crit/dodge: the gating reads the rolls only on the player's
+        /// side, leaving a clean seam for later enemy parity (reflection, being authored-only, already applies
+        /// to either side wherever it is granted).
         /// </summary>
         /// <returns>
-        /// The actual damage applied after amplification, crit, resistance, the Toughness curve, and block — the
-        /// same value booked into the battle stats — so the caller can record a reconciling per-skill total
-        /// instead of the raw pre-mitigation hit.
+        /// The actual damage applied after amplification, crit, resistance, and the Toughness curve — the same
+        /// value booked into the battle stats — so the caller can record a reconciling per-skill total instead
+        /// of the raw pre-mitigation hit. Reflected damage dealt back to the attacker is booked separately and
+        /// is not part of this return.
         /// </returns>
         public double DamageTarget(double rawDamage, EDamageType damageType)
         {
@@ -156,44 +159,67 @@ namespace Game.Core.Battle
             }
             else
             {
-                // Both draws are always taken (dodge then block), even on a dodge, so the stream never
-                // branches on a roll result.
+                // A single dodge draw — the only player-only roll left on an enemy attack now that Block is gone
+                // (spike #1330), so an enemy attack advances the seeded stream by exactly one.
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
-                var isBlock = _rng.Next() < _targetBattler.GetAttributeValue(BlockChance);
-
-                // The net damage the hit would deal if it landed normally (resistance then the Toughness curve, no
-                // block) — the basis for how much a dodge avoided or a block prevented, via the same pipeline
-                // Battler.TakeDamage applies. The curve scales by the attacking (active) battler's level.
-                var afterMitigation = _targetBattler.ComputeNetDamage(dealt, damageType, _activeBattler.Level);
 
                 if (isDodge)
                 {
+                    // The net damage the hit would have dealt if it landed (resistance then the Toughness curve),
+                    // via the same pipeline Battler.TakeDamage applies — the basis for how much the dodge avoided.
+                    // The curve scales by the attacking (active) battler's level. Computing it draws no RNG.
                     actualDamage = 0;
                     Stats.AttacksDodged++;
-                    Stats.DamageDodged += afterMitigation;
+                    Stats.DamageDodged += _targetBattler.ComputeNetDamage(dealt, damageType, _activeBattler.Level);
                 }
                 else
                 {
-                    // The hit landed (blocked or not), so the player was exposed to its full pre-mitigation
-                    // typed damage — recorded for the incoming book before resistance/mitigation. A dodge above
-                    // evaded the hit entirely, so it is excluded (its avoided damage trains evasion instead).
+                    // The hit landed, so the player was exposed to its full pre-mitigation typed damage —
+                    // recorded for the incoming book before resistance/mitigation. A dodge above evaded the hit
+                    // entirely, so it is excluded (its avoided damage trains evasion instead).
                     Stats.AddTypedDamageExposure(damageType, dealt);
-                    if (isBlock)
-                    {
-                        actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level, _targetBattler.GetAttributeValue(BlockReduction));
-                        Stats.AttacksBlocked++;
-                        Stats.DamageBlocked += afterMitigation - actualDamage;
-                    }
-                    else
-                    {
-                        actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level);
-                    }
+                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level);
                 }
 
                 Stats.PlayerDamageTaken += actualDamage;
             }
 
+            ReflectDamage(actualDamage);
             return actualDamage;
+        }
+
+        /// <summary>
+        /// Applies deterministic damage reflection (spike #1330): the defender (<see cref="_targetBattler"/>)
+        /// returns its <see cref="EAttribute.DamageReflection"/> share of a direct hit's net damage to the
+        /// attacker (<see cref="_activeBattler"/>), bypassing the attacker's own mitigation. Only a positive net
+        /// reflects — a dodged or absorbed hit returns nothing — and DoT is never routed here, so DoT is never
+        /// reflected. The reflected amount is booked as the player's damage taken (when the enemy reflects onto
+        /// the player) or dealt (when the player reflects onto the enemy), keeping the running totals reconciled
+        /// with the health change.
+        /// </summary>
+        private void ReflectDamage(double netDamage)
+        {
+            if (netDamage <= 0)
+            {
+                return;
+            }
+
+            var reflection = _targetBattler.GetAttributeValue(DamageReflection);
+            if (reflection <= 0)
+            {
+                return;
+            }
+
+            var reflected = netDamage * reflection;
+            _activeBattler.TakeReflectedDamage(reflected);
+            if (_isPlayerActive)
+            {
+                Stats.PlayerDamageTaken += reflected;
+            }
+            else
+            {
+                Stats.PlayerDamageDealt += reflected;
+            }
         }
 
         public void RecordSkillUse(int skillId, double damage)

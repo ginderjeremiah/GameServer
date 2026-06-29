@@ -41,11 +41,11 @@ export const onBattleStageChanged = battleStageChangedHook.onNotified;
  *  float spawns over (the side that was struck / defended); `kind` picks its label, and `amount` is the
  *  damage to show — omitted for a dodge, which has no number; a negative amount is an absorbed hit's net
  *  heal. `damageType` (present for every kind but `dodge`) tints the number and picks its type glyph
- *  (#1320, Area F). Player-only crit/dodge/block mirror the battle-step roll surface (the enemy never
- *  dodges/blocks/crits). */
+ *  (#1320, Area F). Player-only crit/dodge mirror the battle-step roll surface (the enemy never
+ *  dodges/crits). */
 export interface CombatFloatEvent {
 	target: 'player' | 'enemy';
-	kind: 'hit' | 'crit' | 'dodge' | 'block';
+	kind: 'hit' | 'crit' | 'dodge';
 	amount?: number;
 	damageType?: EDamageType;
 }
@@ -288,18 +288,18 @@ export class BattleEngine {
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
 		this.timeElapsed += timeDelta;
 		if (this.stage === Active) {
-			for (const { skill, damage, byPlayer, crit, dodged, blocked } of battleStep(
+			for (const { skill, damage, byPlayer, crit, dodged } of battleStep(
 				this.player,
 				this.enemy,
 				timeDelta,
 				this.rng,
 				this.stepLog
 			)) {
-				const outcome = damageLogOutcome(byPlayer, crit, dodged, blocked);
+				const outcome = damageLogOutcome(byPlayer, crit, dodged);
 				const damageType = skill.damageType;
 				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged hit
 				// never resolved, so it can't be resisted). Computed here, not in the parity-critical battleStep,
-				// so the headless simulator stays byte-identical — like the existing crit/dodge/block log flags.
+				// so the headless simulator stays byte-identical — like the existing crit/dodge log flags.
 				const resist = dodged
 					? 'normal'
 					: classifyResist(resistanceTotal(damageType, (byPlayer ? this.enemy : this.player).attributes), damage);
@@ -399,18 +399,15 @@ export class BattleEngine {
 }
 
 /** Resolves the structured {@link LogOutcome} for one damage exchange from the battle-step flags.
- *  The crit/dodge/block flags are only ever set on the player's side (crit on the player's own hit;
- *  dodge/block on an incoming enemy hit — a dodged hit is never also blocked), so the mapping is
- *  unambiguous. Drives both the log prose and the glyph, keeping them in lockstep. */
-function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean, blocked: boolean): LogOutcome {
+ *  The crit/dodge flags are only ever set on the player's side (crit on the player's own hit; dodge
+ *  on an incoming enemy hit), so the mapping is unambiguous. Drives both the log prose and the glyph,
+ *  keeping them in lockstep. */
+function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): LogOutcome {
 	if (byPlayer) {
 		return crit ? 'player-crit' : 'player-hit';
 	}
 	if (dodged) {
 		return 'player-dodge';
-	}
-	if (blocked) {
-		return 'player-block';
 	}
 	return 'enemy-hit';
 }
@@ -418,8 +415,8 @@ function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean, blo
 /** Maps one activation's resolved {@link LogOutcome} to the float that spawns for it, so the float and
  *  the combat-log line are both driven by the single {@link damageLogOutcome} classifier rather than a
  *  parallel copy of the flag branching. A player hit/crit floats over the enemy; an incoming enemy hit
- *  floats over the player as a dodge (no number), a block, or a plain hit. `damageType` rides every
- *  damaging kind (not a dodge) so the floater can tint by type (#1320, Area F). */
+ *  floats over the player as a dodge (no number) or a plain hit. `damageType` rides every damaging
+ *  kind (not a dodge) so the floater can tint by type (#1320, Area F). */
 function combatFloatEvent(outcome: LogOutcome, damage: number, damageType: EDamageType): CombatFloatEvent {
 	switch (outcome) {
 		case 'player-crit':
@@ -428,8 +425,6 @@ function combatFloatEvent(outcome: LogOutcome, damage: number, damageType: EDama
 			return { target: 'enemy', kind: 'hit', amount: damage, damageType };
 		case 'player-dodge':
 			return { target: 'player', kind: 'dodge' };
-		case 'player-block':
-			return { target: 'player', kind: 'block', amount: damage, damageType };
 		case 'enemy-hit':
 			return { target: 'player', kind: 'hit', amount: damage, damageType };
 	}

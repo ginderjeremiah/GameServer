@@ -121,28 +121,6 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Agility
-			},
-			// BlockChance = 0.002·END
-			{
-				attribute: EAttribute.BlockChance,
-				amount: 0.002,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Endurance
-			},
-			// BlockReduction = base 2 + 0.5·END
-			{
-				attribute: EAttribute.BlockReduction,
-				amount: 2.0,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.BaseValue
-			},
-			{
-				attribute: EAttribute.BlockReduction,
-				amount: 0.5,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Endurance
 			}
 		]);
 	});

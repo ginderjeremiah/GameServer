@@ -118,7 +118,6 @@ describe('attributeIcon', () => {
 		expect(attributeIcon(EAttribute.CooldownRecovery)).toBe('/img/Cooldown Recovery.png');
 		expect(attributeIcon(EAttribute.HealthRegenPerSecond)).toBe('/img/Health Regen Per Second.png');
 		expect(attributeIcon(EAttribute.CriticalChance)).toBe('/img/Critical Chance.png');
-		expect(attributeIcon(EAttribute.BlockReduction)).toBe('/img/Block Reduction.png');
 	});
 
 	it('maps every attribute with art to a non-empty path', () => {
@@ -135,8 +134,6 @@ describe('attributeIcon', () => {
 			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
 			EAttribute.DodgeChance,
-			EAttribute.BlockChance,
-			EAttribute.BlockReduction,
 			EAttribute.HealthRegenPerSecond
 		];
 		for (const id of withArt) {
@@ -151,6 +148,7 @@ describe('attributeIcon', () => {
 		expect(attributeIcon(EAttribute.BleedDamagePerSecond)).toBe('');
 		expect(attributeIcon(EAttribute.PoisonDamagePerSecond)).toBe('');
 		expect(attributeIcon(EAttribute.BurnDamagePerSecond)).toBe('');
+		expect(attributeIcon(EAttribute.DamageReflection)).toBe('');
 		expect(attributeIcon(999 as EAttribute)).toBe('');
 	});
 });
