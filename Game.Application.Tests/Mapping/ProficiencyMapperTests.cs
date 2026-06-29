@@ -90,28 +90,20 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
-        public void PathMapper_ToContract_RoundTripsContributions()
+        public void PathMapper_ToContract_RoundTripsActivityKey()
         {
             var path = new Entities.Path
             {
                 Id = 0,
                 Name = "Fire",
                 Description = "The fire line.",
-                FalloffBase = 0.3m,
-                SkillContributions =
-                [
-                    new() { SkillId = 5, PathId = 0, HomeTier = 1, Weight = 1.5m },
-                ],
+                ActivityKey = (int)EActivityKey.Fire,
             };
 
             var contract = PathMapper.ToContract(path);
 
             Assert.Equal("Fire", contract.Name);
-            Assert.Equal(0.3m, contract.FalloffBase);
-            var contribution = Assert.Single(contract.Contributions);
-            Assert.Equal(5, contribution.SkillId);
-            Assert.Equal(1, contribution.HomeTier);
-            Assert.Equal(1.5m, contribution.Weight);
+            Assert.Equal(EActivityKey.Fire, contract.ActivityKey);
         }
 
         private static Entities.ProficiencyLevelModifier Modifier(int level, EAttribute attribute, decimal amount) => new()

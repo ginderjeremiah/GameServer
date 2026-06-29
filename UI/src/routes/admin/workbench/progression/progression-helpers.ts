@@ -1,19 +1,23 @@
-import type { IProficiencyLevelModifier, IProficiencyLevelReward, ISkillPathContribution } from '$lib/api';
-import { EAttribute, EModifierType } from '$lib/api';
+import type { IProficiencyLevelModifier, IProficiencyLevelReward } from '$lib/api';
+import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
 import { canonicalEqual } from '../save-helpers';
 import type { SelectOption } from '../entities/types';
 import type { WorkbenchPath, WorkbenchProficiency } from './types';
 
 // ── Factories ──
 
-/** A new, unsaved path with the strawman falloff default. */
+/** A new, unsaved path keyed on physical damage by default (the author then picks its activity key). */
 export const newPath = (id: number): WorkbenchPath => ({
 	id,
 	name: '',
 	description: '',
-	falloffBase: 0.6,
-	contributions: []
+	activityKey: EActivityKey.Physical
 });
+
+/** Activity-key select options (one per EActivityKey value), for the path identity editor. */
+export const activityKeyOptions: SelectOption[] = Object.entries(EActivityKey)
+	.filter(([, value]) => typeof value === 'number')
+	.map(([name, value]) => ({ value: value as number, text: name }));
 
 /** A new, unsaved proficiency (path tier) with the strawman cap/curve defaults. */
 export const newProficiency = (id: number, pathId: number, pathOrdinal: number): WorkbenchProficiency => ({
@@ -56,10 +60,6 @@ export const hasTierCollision = (tiers: WorkbenchProficiency[]): boolean => {
 	return false;
 };
 
-/** Home-tier select options for a path's contribution rows (one per tier, by ordinal). */
-export const homeTierOptions = (tiers: WorkbenchProficiency[]): SelectOption[] =>
-	tiers.map((tier) => ({ value: tier.pathOrdinal, text: `T${tier.pathOrdinal} · ${tier.name || 'Untitled'}` }));
-
 // ── XP curve ──
 
 /** Per-level cost: `baseXp × xpGrowth^(n-1)` for n in 1..maxLevel (derived, not stored). */
@@ -88,12 +88,6 @@ export const decipherThresholds = (maxLevel: number): { pronunciation: number; t
 	const max = Math.max(1, Math.floor(maxLevel));
 	return { pronunciation: Math.ceil(max / 2), translation: max };
 };
-
-// ── Contribution falloff preview ──
-
-/** Pull multiplier per tier of distance above a skill's home: `falloffBase^distance` (distance 0 = 1). */
-export const falloffSteps = (falloffBase: number, count = 3): { distance: number; factor: number }[] =>
-	Array.from({ length: count }, (_unused, distance) => ({ distance, factor: Math.pow(falloffBase, distance) }));
 
 // ── Milestone (payout) projection over the two backend collections ──
 
@@ -133,9 +127,6 @@ export const pathWarnings = (path: WorkbenchPath): string[] => {
 	const warnings: string[] = [];
 	if (!path.name.trim()) {
 		warnings.push('Missing name');
-	}
-	if (!(path.falloffBase > 0)) {
-		warnings.push('Falloff base must be greater than zero');
 	}
 	return warnings;
 };
@@ -178,8 +169,7 @@ export const pathIdentityDto = (path: WorkbenchPath) => ({
 	id: path.id,
 	name: path.name,
 	description: path.description,
-	falloffBase: path.falloffBase,
-	contributions: [] as ISkillPathContribution[],
+	activityKey: path.activityKey,
 	retiredAt: path.retiredAt
 });
 

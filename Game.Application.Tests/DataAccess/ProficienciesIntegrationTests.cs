@@ -11,7 +11,7 @@ namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
     /// Exercises the proficiency reference repo against a real database: the contract projection, the
-    /// shared core model with its assembled levels, and the derived skill → contributions reverse index.
+    /// shared core model with its assembled levels, and the derived activity-key → paths routing index.
     /// </summary>
     [Collection("Integration")]
     public class ProficienciesIntegrationTests : ApplicationIntegrationTestBase
@@ -20,7 +20,7 @@ namespace Game.Application.Tests.DataAccess
             : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task GetProficiency_AssemblesLevels_AndContributionIndexIsExposed()
+        public async Task GetProficiency_AssemblesLevels_AndPathRoutingIsExposed()
         {
             int proficiencyId, skillId, pathId;
             using (var seedScope = CreateScope())
@@ -28,7 +28,7 @@ namespace Game.Application.Tests.DataAccess
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
 
-                var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
+                var path = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
                 pathId = path.Id;
@@ -68,13 +68,6 @@ namespace Game.Application.Tests.DataAccess
                     Level = 5,
                     RewardSkillId = skillId,
                 });
-                context.SkillPathContributions.Add(new Entities.SkillPathContribution
-                {
-                    SkillId = skillId,
-                    PathId = proficiency.PathId,
-                    HomeTier = proficiency.PathOrdinal,
-                    Weight = 1.5m,
-                });
                 await context.SaveChangesAsync(CancellationToken);
             }
             await ReloadReferenceCachesAsync();
@@ -95,12 +88,10 @@ namespace Game.Application.Tests.DataAccess
             Assert.Empty(level5.Modifiers);
             Assert.Equal(skillId, level5.RewardSkillId);
 
-            // The reverse index exposes the contribution's path, home tier, and weight directly; the accrual
-            // resolves the frontier tier and falloff against the path at battle completion.
-            var contribution = Assert.Single(proficiencies.ContributionsForSkill(skillId));
-            Assert.Equal(pathId, contribution.PathId);
-            Assert.Equal(0, contribution.HomeTier);
-            Assert.Equal(1.5d, contribution.Weight);
+            // The routing index exposes the paths bound to an activity key; the accrual resolves each path's
+            // frontier tier against it at battle completion.
+            var routed = Assert.Single(proficiencies.PathsForActivityKey(EActivityKey.Fire));
+            Assert.Equal(pathId, routed.Id);
 
             // The decipher "words of power" round-trip through GetProficiencies onto the contract verbatim.
             var contract = proficiencies.AllProficiencies().Single(p => p.Id == proficiencyId);
@@ -110,111 +101,98 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal("The First Flame", contract.Translation);
             Assert.Contains(
                 proficiencies.AllPaths(),
-                p => p.Name == "Fire" && p.Contributions.Any(c => c.SkillId == skillId && c.HomeTier == 0));
+                p => p.Name == "Fire" && p.ActivityKey == EActivityKey.Fire);
         }
 
         [Fact]
-        public async Task ContributionsForSkill_ReturnsEmpty_WhenSkillFeedsNoProficiency()
+        public async Task PathsForActivityKey_ReturnsEmpty_WhenNoPathTrainsTheKey()
         {
-            int skillId;
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
-
-            Assert.Empty(proficiencies.ContributionsForSkill(skillId));
-        }
-
-        [Fact]
-        public async Task ContributionsForSkill_ExposesThePathAndHomeTier()
-        {
-            int pathId, skillId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
-
-                var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
+                var path = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
-                pathId = path.Id;
-
-                context.Proficiencies.AddRange(
-                    NewTier(path.Id, ordinal: 0, name: "Fire Magic"),
-                    NewTier(path.Id, ordinal: 1, name: "Inferno Magic"));
-                await context.SaveChangesAsync(CancellationToken);
-
-                // Homed at tier 1: the index must carry the authored home tier verbatim (not collapse it to
-                // tier 0), since the accrual resolves the falloff distance from it.
-                context.SkillPathContributions.Add(new Entities.SkillPathContribution
-                {
-                    SkillId = skillId,
-                    PathId = path.Id,
-                    HomeTier = 1,
-                    Weight = 2m,
-                });
-                await context.SaveChangesAsync(CancellationToken);
             }
             await ReloadReferenceCachesAsync();
 
             using var scope = CreateScope();
             var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
 
-            var contribution = Assert.Single(proficiencies.ContributionsForSkill(skillId));
-            Assert.Equal(pathId, contribution.PathId);
-            Assert.Equal(1, contribution.HomeTier);
-            Assert.Equal(2d, contribution.Weight);
+            Assert.Empty(proficiencies.PathsForActivityKey(EActivityKey.Water));
         }
 
         [Fact]
-        public async Task ContributionsForSkill_ReturnsEmpty_WhenSkillOnlyFeedsARetiredPath()
-        {
-            int skillId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
-
-                // A retired path: a skill that only contributes to it must drop out of the reverse index, so
-                // the accrual routes no XP into the frozen track (the path is out of circulation).
-                var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m, RetiredAt = DateTime.UtcNow };
-                context.Paths.Add(path);
-                await context.SaveChangesAsync(CancellationToken);
-
-                context.Proficiencies.Add(NewTier(path.Id, ordinal: 0, name: "Fire Magic"));
-                await context.SaveChangesAsync(CancellationToken);
-
-                context.SkillPathContributions.Add(new Entities.SkillPathContribution
-                {
-                    SkillId = skillId,
-                    PathId = path.Id,
-                    HomeTier = 0,
-                    Weight = 2m,
-                });
-                await context.SaveChangesAsync(CancellationToken);
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
-
-            Assert.Empty(proficiencies.ContributionsForSkill(skillId));
-        }
-
-        [Fact]
-        public async Task GetPath_ExposesFalloffBaseAndTiersOrderedByOrdinal()
+        public async Task PathsForActivityKey_ExposesThePathBoundToTheKey_WithItsTiers()
         {
             int pathId, tierZeroId, tierOneId;
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
 
-                var pathEntity = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
+                var path = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
+                context.Paths.Add(path);
+                await context.SaveChangesAsync(CancellationToken);
+                pathId = path.Id;
+
+                var tierZero = NewTier(path.Id, ordinal: 0, name: "Fire Magic");
+                var tierOne = NewTier(path.Id, ordinal: 1, name: "Inferno Magic");
+                context.Proficiencies.AddRange(tierZero, tierOne);
+                await context.SaveChangesAsync(CancellationToken);
+                tierZeroId = tierZero.Id;
+                tierOneId = tierOne.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+
+            var routed = Assert.Single(proficiencies.PathsForActivityKey(EActivityKey.Fire));
+            Assert.Equal(pathId, routed.Id);
+            Assert.Equal(
+                [(tierZeroId, 0), (tierOneId, 1)],
+                routed.Tiers.Select(t => (t.ProficiencyId, t.Ordinal)));
+        }
+
+        [Fact]
+        public async Task PathsForActivityKey_ExcludesRetiredPaths()
+        {
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+
+                // A retired path keyed on Fire must drop out of the routing index, so the accrual routes no XP
+                // into the frozen track (the path is out of circulation).
+                var path = new Entities.Path
+                {
+                    Name = "Fire",
+                    Description = "d",
+                    ActivityKey = (int)EActivityKey.Fire,
+                    RetiredAt = DateTime.UtcNow,
+                };
+                context.Paths.Add(path);
+                await context.SaveChangesAsync(CancellationToken);
+
+                context.Proficiencies.Add(NewTier(path.Id, ordinal: 0, name: "Fire Magic"));
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+
+            Assert.Empty(proficiencies.PathsForActivityKey(EActivityKey.Fire));
+        }
+
+        [Fact]
+        public async Task GetPath_ExposesActivityKeyAndTiersOrderedByOrdinal()
+        {
+            int pathId, tierZeroId, tierOneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+
+                var pathEntity = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
                 context.Paths.Add(pathEntity);
                 await context.SaveChangesAsync(CancellationToken);
                 pathId = pathEntity.Id;
@@ -233,7 +211,7 @@ namespace Game.Application.Tests.DataAccess
             var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
 
             var path = proficiencies.GetPath(pathId);
-            Assert.Equal(0.3d, path.FalloffBase);
+            Assert.Equal(EActivityKey.Fire, path.ActivityKey);
             Assert.Equal(
                 [(tierZeroId, 0), (tierOneId, 1)],
                 path.Tiers.Select(t => (t.ProficiencyId, t.Ordinal)));

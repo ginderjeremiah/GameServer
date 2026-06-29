@@ -28,10 +28,12 @@
         public required EDamageType DamageType { get; init; }
 
         /// <summary>
-        /// The skill's rarity tier. The battle simulation never reads it, but the proficiency XP accrual does:
-        /// at battle completion it maps the rarity to a tier weight (<see cref="Proficiencies.ProficiencyTierWeight"/>,
-        /// #982/#1123) so a rarer fired skill pulls a larger share of the pie. See
-        /// <see cref="Items.Item.Rarity"/> for the shared convention.
+        /// The skill's rarity tier — display/authoring metadata only. Neither the battle simulation nor (as of
+        /// the effect-based proficiency accrual, spike #1318) the XP path reads it: rarity reverts to
+        /// display-only, surfaced from the skills contract, since damage already reflects a skill's power and an
+        /// explicit rarity weight would double-count. Retained on the lean model only pending its removal (the
+        /// accrual was its sole reader — follow-up cleanup). See <see cref="Items.Item.Rarity"/> for the shared
+        /// convention.
         /// </summary>
         public required ERarity Rarity { get; init; }
 

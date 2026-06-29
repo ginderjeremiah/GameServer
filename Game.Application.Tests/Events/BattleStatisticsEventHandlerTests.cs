@@ -184,7 +184,7 @@ namespace Game.Application.Tests.Events
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
             var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire");
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
             var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
@@ -194,11 +194,12 @@ namespace Game.Application.Tests.Events
 
             var handler = MakeHandler(scope);
 
-            // The skill fired once in the won battle, so its proficiency is represented and (being the only one)
-            // takes the whole pie; below the first threshold it accrues without leveling.
+            // The skill dealt damage equal to the player's power, so its path claims the full pie
+            // (clamp(activity ÷ power) = 1); below the first threshold it accrues without leveling.
+            const double power = 100.0;
             var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1 };
-            await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
+            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1, TotalDamage = power };
+            await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = Assert.Single(await progressRepo.GetProficiencies(player.Id));
@@ -216,7 +217,7 @@ namespace Game.Application.Tests.Events
         }
 
         [Fact]
-        public async Task Victory_CoastingOnAStaleSkill_AccruesTheDiscountedPie_NotTheFullPie()
+        public async Task Victory_FrontierTier_TrainsAtFullPace_WhenLowerTierMaxed()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -227,18 +228,17 @@ namespace Game.Application.Tests.Events
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
 
-            // A two-tier Fire path (falloff 0.3). The only contributing skill is homed at tier 0, but the
-            // player has already maxed tier 0, so the path's frontier is tier 1 — the stale skill supplements
-            // it one tier behind, at the 0.3 discount, and the un-earned 0.7 of the pie evaporates (the
-            // absolute slowdown, end to end). The maxed tier 0 banks nothing more.
-            const decimal falloffBase = 0.3m;
+            // A two-tier path whose tier 0 the player has already maxed, so the frontier is tier 1. The skill's
+            // damage routes to the path and trains the frontier at full pace — there is no falloff/staleness
+            // discount in the effect-based model (the maxed tier 0 simply banks nothing more).
             const int maxLevel = 10;
-            var path = await TestDataSeeder.CreatePathAsync(context, name: "Fire", falloffBase: falloffBase);
+            const double power = 100.0;
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Fire");
             var tierZero = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Fire Magic", maxLevel: maxLevel, pathId: path.Id, pathOrdinal: 0);
             var tierOne = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Inferno Magic", maxLevel: maxLevel, pathId: path.Id, pathOrdinal: 1);
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, tierZero.Id, skill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, tierZero.Id, skill.Id);
             await TestDataSeeder.AddPlayerProficiencyAsync(context, player.Id, tierZero.Id, level: maxLevel);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
@@ -248,18 +248,17 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedEnemy);
 
             var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1 };
+            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1, TotalDamage = power };
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = await progressRepo.GetProficiencies(player.Id);
 
-            // The frontier tier banks only the discounted pie (0.3 × pie), not the full pie a relative split
-            // would have minted for a solo path.
+            // The frontier tier banks the full pie (activity ÷ power = 1, no discount).
             var frontier = Assert.Single(stored, p => p.ProficiencyId == tierOne.Id);
             Assert.Equal(0, frontier.Level);
-            Assert.Equal((decimal)(ServerGameConstants.ProficiencyXpPerVictory * (double)falloffBase), frontier.Xp);
+            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, frontier.Xp);
 
             var maxed = Assert.Single(stored, p => p.ProficiencyId == tierZero.Id);
             Assert.Equal(maxLevel, maxed.Level);
@@ -267,7 +266,7 @@ namespace Game.Application.Tests.Events
         }
 
         [Fact]
-        public async Task Victory_RarerFiredSkill_PullsALargerShareOfThePie(/* #1123 */)
+        public async Task Victory_TwoTypedSkills_TrainTheirPathsIndependently()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -275,24 +274,19 @@ namespace Game.Application.Tests.Events
             var user = await TestDataSeeder.CreateUserAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
-            // Two single-tier paths, each fed on-tier by one skill, both fired in the won battle. The skills
-            // differ only in rarity — Common (tier weight 1) vs Rare (tier weight 1.5² = 2.25) — so the pie
-            // splits by their attention ratio: the rare skill's path claims 2.25 / 3.25 of the pie, the common
-            // path 1 / 3.25. Tier weight is the only thing differing, so this isolates the #1123 curve.
-            var commonSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", rarity: ERarity.Common);
-            var rareSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Stoneskin", rarity: ERarity.Rare);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, commonSkill.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, rareSkill.Id);
+            // Two single-tier paths trained by two distinct-typed skills. Each path claims pie × clamp(its own
+            // damage ÷ power) independently — the claims overlap and need not sum to 1 (no shared pie). Fire
+            // deals the full power in damage (claims the full pie); Earth deals half (claims half the pie).
+            var fireSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", damageType: EDamageType.Fire);
+            var earthSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Stoneskin", damageType: EDamageType.Earth);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, fireSkill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, earthSkill.Id);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
 
-            var firePath = await TestDataSeeder.CreatePathAsync(context, name: "Fire");
-            var earthPath = await TestDataSeeder.CreatePathAsync(context, name: "Earth");
-            var fireTier = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Fire Magic", pathId: firePath.Id, pathOrdinal: 0);
-            var earthTier = await TestDataSeeder.CreateProficiencyAsync(
-                context, name: "Earth Magic", pathId: earthPath.Id, pathOrdinal: 0);
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, fireTier.Id, commonSkill.Id, weight: 1m);
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, earthTier.Id, rareSkill.Id, weight: 1m);
+            var fireTier = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire Magic");
+            var earthTier = await TestDataSeeder.CreateProficiencyAsync(context, name: "Earth Magic");
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, fireTier.Id, fireSkill.Id);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, earthTier.Id, earthSkill.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
             var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
@@ -300,30 +294,25 @@ namespace Game.Application.Tests.Events
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
 
+            const double power = 100.0;
             var stats = new BattleStats();
-            stats.SkillStats[commonSkill.Id] = new SkillStats { Uses = 1 };
-            stats.SkillStats[rareSkill.Id] = new SkillStats { Uses = 1 };
+            stats.SkillStats[fireSkill.Id] = new SkillStats { Uses = 1, TotalDamage = power };
+            stats.SkillStats[earthSkill.Id] = new SkillStats { Uses = 1, TotalDamage = power / 2 };
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, stats, difficultyMultiplier: 1.0), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = await progressRepo.GetProficiencies(player.Id);
-
-            const double commonWeight = 1.0;
-            const double rareWeight = 1.5 * 1.5;
-            const double totalWeight = commonWeight + rareWeight;
             var pie = ServerGameConstants.ProficiencyXpPerVictory;
 
             var fire = Assert.Single(stored, p => p.ProficiencyId == fireTier.Id);
-            Assert.Equal((decimal)(pie * commonWeight / totalWeight), fire.Xp, precision: 3);
+            Assert.Equal((decimal)pie, fire.Xp, precision: 3);
             var earth = Assert.Single(stored, p => p.ProficiencyId == earthTier.Id);
-            Assert.Equal((decimal)(pie * rareWeight / totalWeight), earth.Xp, precision: 3);
-            // The rarer skill's path banks strictly more of the same pie.
-            Assert.True(earth.Xp > fire.Xp);
+            Assert.Equal((decimal)(pie * 0.5), earth.Xp, precision: 3);
         }
 
         [Fact]
-        public async Task Victory_SkillThatDidNotFire_AccruesNoProficiencyXp()
+        public async Task Victory_NoDamageDealt_AccruesNoProficiencyXp()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -334,7 +323,7 @@ namespace Game.Application.Tests.Events
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
             var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire");
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
             var loadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(player.Id);
@@ -342,10 +331,10 @@ namespace Game.Application.Tests.Events
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
 
-            // A victory where no skill fired (empty skill stats): nothing is represented, so no proficiency is
-            // trained — representation, not the victory itself, is what accrues XP.
+            // A victory with empty battle stats (no skill dealt damage): no activity, so no path is trained —
+            // the effect (damage), not the victory itself, is what accrues XP.
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, new BattleStats(), difficultyMultiplier: 1.0), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, new BattleStats(), playerPower: 100.0), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             Assert.Empty(await progressRepo.GetProficiencies(player.Id));
@@ -359,7 +348,7 @@ namespace Game.Application.Tests.Events
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             // Two identically-set-up players: one accrues through the live handler, the other through the
-            // shared accrual the offline batch calls — the same (stats, difficulty multiplier) on both.
+            // shared accrual the offline batch calls — the same (stats, player power) on both.
             var liveUser = await TestDataSeeder.CreateUserAsync(context, username: "live-player");
             var livePlayer = await TestDataSeeder.CreatePlayerAsync(context, liveUser.Id);
             var offlineUser = await TestDataSeeder.CreateUserAsync(context, username: "offline-player");
@@ -370,7 +359,7 @@ namespace Game.Application.Tests.Events
             await TestDataSeeder.LinkSkillToPlayerAsync(context, offlinePlayer.Id, skill.Id);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
             var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire");
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
@@ -378,20 +367,22 @@ namespace Game.Application.Tests.Events
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
 
+            // The skill dealt 1.5× the player's power, so each path claims pie × clamp(1.5) = pie × 1.5 — the
+            // same on both the live and the offline path.
+            const double power = 100.0;
             var stats = new BattleStats();
-            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1 };
-            const double multiplier = 1.5;
+            stats.SkillStats[skill.Id] = new SkillStats { Uses = 1, TotalDamage = power * 1.5 };
 
             var liveLoaded = await playerRepo.GetPlayer(livePlayer.Id);
             Assert.NotNull(liveLoaded);
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(liveLoaded, loadedEnemy, stats, multiplier), CancellationToken);
+                VictoryEvent(liveLoaded, loadedEnemy, stats, playerPower: power), CancellationToken);
 
             var offlineLoaded = await playerRepo.GetPlayer(offlinePlayer.Id);
             Assert.NotNull(offlineLoaded);
             var offlineProgress = await progressRepo.Load(offlineLoaded);
             scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>()
-                .AccrueAndApply(offlineProgress, stats, multiplier, offlineLoaded, notify: false);
+                .AccrueAndApply(offlineProgress, stats, totalAttributes: power, offlineLoaded, notify: false);
             await progressRepo.Save(offlineProgress);
 
             var live = Assert.Single(await progressRepo.GetProficiencies(livePlayer.Id));
@@ -399,7 +390,7 @@ namespace Game.Application.Tests.Events
             Assert.Equal(live.Level, offline.Level);
             Assert.Equal(live.Xp, offline.Xp);
             // Sanity: the shared accrual actually produced XP (pie × 1.5), so the equality isn't vacuous.
-            Assert.Equal((decimal)(ServerGameConstants.ProficiencyXpPerVictory * multiplier), live.Xp);
+            Assert.Equal((decimal)(ServerGameConstants.ProficiencyXpPerVictory * 1.5), live.Xp);
         }
 
         private BattleStatisticsEventHandler MakeHandler(IServiceScope scope) => new(
@@ -407,9 +398,9 @@ namespace Game.Application.Tests.Events
             scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
             scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>());
 
-        private static BattleCompletedEvent VictoryEvent(Player player, Game.Core.Enemies.Enemy enemy, BattleStats stats, double difficultyMultiplier) =>
+        private static BattleCompletedEvent VictoryEvent(Player player, Game.Core.Enemies.Enemy enemy, BattleStats stats, double playerPower) =>
             new(player, enemy, Victory: true, PlayerDied: false, TotalMs: 5000,
-                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, DifficultyMultiplier: difficultyMultiplier);
+                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, PlayerPower: playerPower);
 
         /// <summary>
         /// Seeds a fresh player (with one starter, equipped skill), an enemy, and one candidate of each

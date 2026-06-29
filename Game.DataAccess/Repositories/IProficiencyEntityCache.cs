@@ -18,10 +18,6 @@ namespace Game.DataAccess.Repositories
         /// of range.</summary>
         PathEntity? LookupPath(int pathId);
 
-        /// <summary>The cached proficiency that is the tier at <paramref name="ordinal"/> of path
-        /// <paramref name="pathId"/>, or null if no such tier exists.</summary>
-        ProficiencyEntity? LookupProficiencyByTier(int pathId, int ordinal);
-
         /// <summary>Every cached proficiency entity (each with its prerequisites loaded), for graph-wide
         /// authoring checks such as prerequisite cycle detection.</summary>
         IReadOnlyList<ProficiencyEntity> AllProficiencyEntities();

@@ -1,18 +1,19 @@
 namespace Game.Core.Proficiencies
 {
     /// <summary>
-    /// The XP-routing view of a path — an immutable, cached reference instance carrying the per-tier
-    /// contribution falloff and the path's ordered tiers (each a proficiency with its cap). At battle
-    /// completion the accrual routes a represented path to its <see cref="Frontier"/> tier (the lowest
-    /// un-maxed tier) and discounts an off-tier skill's pull by <see cref="FalloffAt"/> over the tier
-    /// distance, so coasting on stale skills trains the path slower in absolute terms (spike #982 decision 13).
+    /// The XP-routing view of a path — an immutable, cached reference instance carrying the single
+    /// <see cref="ActivityKey"/> the path trains on and the path's ordered tiers (each a proficiency with its
+    /// cap). At battle completion the effect-based accrual sums the battle's activity for the path's key and
+    /// routes it to the path's <see cref="Frontier"/> tier (the lowest un-maxed tier), claiming
+    /// <c>pie × clamp(activity ÷ power)</c> for that tier (spike #1318).
     /// </summary>
     public class Path
     {
         public required int Id { get; init; }
 
-        /// <summary>The geometric base of the per-tier contribution falloff (<c>1</c> = no falloff).</summary>
-        public required double FalloffBase { get; init; }
+        /// <summary>The activity this path trains on — a damage-type key, category, or combat event. A battle
+        /// quantity whose key resolves to this trains the path's frontier tier (see <see cref="EActivityKey"/>).</summary>
+        public required EActivityKey ActivityKey { get; init; }
 
         /// <summary>The path's tiers ascending by <see cref="PathTier.Ordinal"/>; empty for a degenerate path
         /// with no proficiencies (which trains nothing).</summary>
@@ -37,14 +38,6 @@ namespace Game.Core.Proficiencies
 
             return null;
         }
-
-        /// <summary>
-        /// The absolute falloff multiplier for a skill homed <paramref name="distance"/> tiers below the
-        /// frontier: <c>FalloffBase^distance</c>, so <c>falloff(0) = 1</c> (on-tier, full pull) and a deeper
-        /// frontier discounts an older skill geometrically. Distance is always ≥ 0 — a skill never trains a
-        /// tier below where it was acquired.
-        /// </summary>
-        public double FalloffAt(int distance) => Math.Pow(FalloffBase, distance);
 
         /// <summary>
         /// The tier immediately after <paramref name="ordinal"/> within the path (its

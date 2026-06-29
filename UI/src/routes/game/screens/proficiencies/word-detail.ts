@@ -6,7 +6,7 @@
    resolver + the attributes set, mirroring the param-based `$lib/common` helpers) so the whole derivation
    is unit-testable without rendering; `WordDetail.svelte` only wires these to the live stores. */
 
-import { EModifierType, type IAttribute, type IProficiencyLevelModifier, type ISkillPathContribution } from '$lib/api';
+import { EActivityKey, EModifierType, type IAttribute, type IProficiencyLevelModifier } from '$lib/api';
 import { attributeName, formatAttributeDelta, formatNum } from '$lib/common';
 import type { TierState, TierView } from './proficiencies-lexicon';
 
@@ -123,21 +123,8 @@ export function buildLadder(
 	return rows;
 }
 
-/** The distinct skill names that train a path, for the inspector's "Trained by" chips. A skill may
- *  contribute at several home tiers, so contributions are deduped by skill id (first occurrence wins);
- *  an id with no live skill is dropped rather than shown as a blank chip. */
-export function trainedBy(contributions: readonly ISkillPathContribution[], resolveSkill: SkillNameResolver): string[] {
-	const names: string[] = [];
-	const seen = new Set<number>();
-	for (const contribution of contributions) {
-		if (seen.has(contribution.skillId)) {
-			continue;
-		}
-		seen.add(contribution.skillId);
-		const name = resolveSkill(contribution.skillId);
-		if (name) {
-			names.push(name);
-		}
-	}
-	return names;
+/** The activity a path trains on, as the inspector's single "Trained by" chip label — a path earns from
+ *  any effect whose key resolves to it (spike #1318). */
+export function trainedBy(activityKey: EActivityKey): string[] {
+	return [EActivityKey[activityKey]];
 }

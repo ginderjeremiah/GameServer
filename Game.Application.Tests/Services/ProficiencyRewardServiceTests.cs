@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Application.Services;
+using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Core.Players.Events;
@@ -237,8 +238,8 @@ namespace Game.Application.Tests.Services
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
             var stats = FireSkill(firedSkillId);
 
-            service.AccrueAndApply(progress, stats, difficultyMultiplier: 1.0, player, notify: false);
-            service.AccrueAndApply(progress, stats, difficultyMultiplier: 1.0, player, notify: false);
+            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
+            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
 
             Assert.Single(player.Skills, s => s.Id == rewardSkill.Id);
         }
@@ -269,8 +270,13 @@ namespace Game.Application.Tests.Services
             Assert.Single(player.Skills);
         }
 
-        // Seeds a fresh player whose one (selected) starter skill contributes to a single-tier proficiency, so
-        // a won battle that fires it routes the whole pie there. Returns the player, fired skill, and proficiency.
+        // The damage a fired skill deals in these tests, equal to the power passed to the accrual — so
+        // activity ÷ power = 1 and each won battle claims the full pie (ServerGameConstants.ProficiencyXpPerVictory),
+        // keeping the per-level math identical to the assertions below.
+        private const double FiredDamage = 100.0;
+
+        // Seeds a fresh player whose one (selected) starter skill trains a single-tier proficiency's path, so a
+        // won battle that fires it routes the full pie there. Returns the player, fired skill, and proficiency.
         private static async Task<(int PlayerId, int FiredSkillId, Game.Infrastructure.Entities.Proficiency Proficiency)> SeedSingleTierAsync(
             GameContext context, int maxLevel, decimal baseXp, decimal xpGrowth)
         {
@@ -285,9 +291,11 @@ namespace Game.Application.Tests.Services
         {
             var user = await TestDataSeeder.CreateUserAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt");
+            // A Fire-typed skill, so it routes only to the (Fire-keyed) path it is linked to and leaves the
+            // other test paths (Physical by default) untrained — the isolation the old contribution join gave.
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", damageType: EDamageType.Fire);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiencyId, skill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiencyId, skill.Id);
             return (player.Id, skill.Id);
         }
 
@@ -297,7 +305,7 @@ namespace Game.Application.Tests.Services
             var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
             var player = await LoadPlayerAsync(scope, playerId);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), difficultyMultiplier: 1.0, player, notify);
+            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), totalAttributes: FiredDamage, player, notify);
             return (player, accrual);
         }
 
@@ -311,7 +319,7 @@ namespace Game.Application.Tests.Services
         private static BattleStats FireSkill(int skillId)
         {
             var stats = new BattleStats();
-            stats.SkillStats[skillId] = new SkillStats { Uses = 1 };
+            stats.SkillStats[skillId] = new SkillStats { Uses = 1, TotalDamage = FiredDamage };
             return stats;
         }
     }

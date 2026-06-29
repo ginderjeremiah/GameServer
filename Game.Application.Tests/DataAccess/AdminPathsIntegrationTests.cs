@@ -13,9 +13,9 @@ using Entities = Game.Infrastructure.Entities;
 namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
-    /// Exercises <see cref="IAdminPaths"/>: the retire-only identity save and the skill-contributions
-    /// reconciler with its skill-exists and home-tier-is-a-real-tier guards. Seed, write, and assert each use
-    /// a separate DI scope, as a real admin call does.
+    /// Exercises <see cref="IAdminPaths"/>: the retire-only identity save (persisting the path's activity key)
+    /// and the retire-soft-lock guard for a path that gates a live gateway. Seed, write, and assert each use a
+    /// separate DI scope, as a real admin call does.
     /// </summary>
     [Collection("Integration")]
     public class AdminPathsIntegrationTests : ApplicationIntegrationTestBase
@@ -42,85 +42,26 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task SetContributions_UnknownSkill_ReturnsFailure()
+        public async Task SavePaths_PersistsTheActivityKey()
         {
-            int pathId;
-            using (var seedScope = CreateScope())
-            {
-                pathId = (await SeedPathWithTierAsync(seedScope)).PathId;
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var admin = scope.ServiceProvider.GetRequiredService<IAdminPaths>();
-
-            var result = admin.SetContributions(new SetPathContributionsData
-            {
-                Id = pathId,
-                Contributions = [new Contracts.SkillPathContribution { SkillId = 99999, HomeTier = 0, Weight = 1m }],
-            });
-
-            Assert.False(result.Succeeded);
-            Assert.Contains("does not exist", result.ErrorMessage);
-        }
-
-        [Fact]
-        public async Task SetContributions_HomeTierIsNotATierOfThePath_ReturnsFailure()
-        {
-            int pathId, skillId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                skillId = (await SeedSkillAsync(context)).Id;
-                pathId = (await SeedPathWithTierAsync(seedScope)).PathId;
-            }
-            await ReloadReferenceCachesAsync();
-
-            using var scope = CreateScope();
-            var admin = scope.ServiceProvider.GetRequiredService<IAdminPaths>();
-
-            // The path has a single tier (ordinal 0); ordinal 5 is not a tier of it.
-            var result = admin.SetContributions(new SetPathContributionsData
-            {
-                Id = pathId,
-                Contributions = [new Contracts.SkillPathContribution { SkillId = skillId, HomeTier = 5, Weight = 1m }],
-            });
-
-            Assert.False(result.Succeeded);
-            Assert.Contains("not a tier of path", result.ErrorMessage);
-        }
-
-        [Fact]
-        public async Task SetContributions_ReconcilesAgainstTheHomeTier()
-        {
-            int pathId, skillId;
-            using (var seedScope = CreateScope())
-            {
-                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                skillId = (await SeedSkillAsync(context)).Id;
-                pathId = (await SeedPathWithTierAsync(seedScope)).PathId;
-            }
-            await ReloadReferenceCachesAsync();
-
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminPaths>();
-                Assert.True(admin.SetContributions(new SetPathContributionsData
-                {
-                    Id = pathId,
-                    Contributions = [new Contracts.SkillPathContribution { SkillId = skillId, HomeTier = 0, Weight = 2.5m }],
-                }).Succeeded);
+                Assert.True(admin.SavePaths(
+                [
+                    new Change<Contracts.Path>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewPath(name: "Inferno", activityKey: EActivityKey.Fire),
+                    },
+                ]).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
 
             using var assertScope = CreateScope();
-            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
-            var contribution = Assert.Single(await assertContext.SkillPathContributions
-                .Where(c => c.PathId == pathId)
-                .ToListAsync(CancellationToken));
-            Assert.Equal(skillId, contribution.SkillId);
-            Assert.Equal(0, contribution.HomeTier);
-            Assert.Equal(2.5m, contribution.Weight);
+            var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var path = Assert.Single(await context.Paths.Where(p => p.Name == "Inferno").ToListAsync(CancellationToken));
+            Assert.Equal((int)EActivityKey.Fire, path.ActivityKey);
         }
 
         [Fact]
@@ -217,65 +158,12 @@ namespace Game.Application.Tests.DataAccess
             Assert.True(result.Succeeded);
         }
 
-        /// <summary>Seeds a path with a single tier (a proficiency at ordinal 0) and returns that tier.</summary>
-        private async Task<Entities.Proficiency> SeedPathWithTierAsync(IServiceScope scope)
-        {
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var path = new Entities.Path { Name = "Fire", Description = "", FalloffBase = 0.3m };
-            context.Paths.Add(path);
-            await context.SaveChangesAsync(CancellationToken);
-
-            var proficiency = new Entities.Proficiency
-            {
-                Name = "Fire Magic",
-                Description = "",
-                IconPath = "",
-                Word = "",
-                Pronunciation = "",
-                Translation = "",
-                PathId = path.Id,
-                PathOrdinal = 0,
-                MaxLevel = 10,
-                BaseXp = 100m,
-                XpGrowth = 2m,
-                LevelModifiers = [],
-                LevelRewards = [],
-                Prerequisites = [],
-            };
-            context.Proficiencies.Add(proficiency);
-            await context.SaveChangesAsync(CancellationToken);
-            return proficiency;
-        }
-
-        private async Task<Entities.Skill> SeedSkillAsync(GameContext context)
-        {
-            var skill = new Entities.Skill
-            {
-                Name = "Fireball",
-                Description = "",
-                IconPath = "",
-                Word = "",
-                Pronunciation = "",
-                Translation = "",
-                BaseDamage = 1m,
-                CooldownMs = 1000,
-                Acquisition = (int)ESkillAcquisition.Player,
-                SkillDamageMultipliers = [],
-                SkillEffects = [],
-                RarityId = (int)ERarity.Common,
-            };
-            context.Skills.Add(skill);
-            await context.SaveChangesAsync(CancellationToken);
-            return skill;
-        }
-
         private async Task<int> SeedPathAsync(GameContext context, string name, bool retired = false)
         {
             var path = new Entities.Path
             {
                 Name = name,
                 Description = "",
-                FalloffBase = 0.3m,
                 RetiredAt = retired ? DateTime.UtcNow : null,
             };
             context.Paths.Add(path);
@@ -325,19 +213,16 @@ namespace Game.Application.Tests.DataAccess
                 Id = id,
                 Name = name,
                 Description = "",
-                FalloffBase = 0.3m,
                 RetiredAt = DateTime.UtcNow,
-                Contributions = [],
             },
         };
 
-        private static Contracts.Path NewPath(int id = 0, string name = "Fire") => new()
+        private static Contracts.Path NewPath(int id = 0, string name = "Fire", EActivityKey activityKey = EActivityKey.Physical) => new()
         {
             Id = id,
             Name = name,
             Description = "",
-            FalloffBase = 0.3m,
-            Contributions = [],
+            ActivityKey = activityKey,
         };
     }
 }

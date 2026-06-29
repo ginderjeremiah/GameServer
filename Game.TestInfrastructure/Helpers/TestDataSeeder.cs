@@ -81,6 +81,7 @@ namespace Game.TestInfrastructure.Helpers
             int cooldownMs = 1000,
             ESkillAcquisition acquisition = ESkillAcquisition.Player,
             ERarity rarity = ERarity.Common,
+            EDamageType damageType = EDamageType.Physical,
             string word = "",
             string pronunciation = "",
             string translation = "")
@@ -93,6 +94,7 @@ namespace Game.TestInfrastructure.Helpers
                 CooldownMs = cooldownMs,
                 IconPath = "",
                 RarityId = (int)rarity,
+                DamageType = (int)damageType,
                 Word = word,
                 Pronunciation = pronunciation,
                 Translation = translation,
@@ -296,20 +298,20 @@ namespace Game.TestInfrastructure.Helpers
             await context.SaveChangesAsync();
         }
 
-        // Adds a skill-to-path contribution (the join the battle XP accrual reads) homed at the given
-        // proficiency's tier: firing skillId in a won battle feeds proficiencyId's XP, weighted by weight.
-        public static async Task LinkSkillToProficiencyAsync(GameContext context, int proficiencyId, int skillId, decimal weight = 1m)
+        // Routes the given skill's damage type to the proficiency's path, so the skill's direct-hit damage in a
+        // won battle trains that path's frontier tier (the effect-based accrual, spike #1318). Aligns the path's
+        // ActivityKey with the skill's leaf damage-type key.
+        public static async Task LinkSkillToProficiencyAsync(GameContext context, int proficiencyId, int skillId)
         {
             var proficiency = await context.Proficiencies.FindAsync(proficiencyId)
                 ?? throw new InvalidOperationException($"Proficiency {proficiencyId} has not been seeded.");
+            var skill = await context.Skills.FindAsync(skillId)
+                ?? throw new InvalidOperationException($"Skill {skillId} has not been seeded.");
+            var path = await context.Paths.FindAsync(proficiency.PathId)
+                ?? throw new InvalidOperationException($"Path {proficiency.PathId} has not been seeded.");
 
-            context.Set<SkillPathContribution>().Add(new SkillPathContribution
-            {
-                PathId = proficiency.PathId,
-                HomeTier = proficiency.PathOrdinal,
-                SkillId = skillId,
-                Weight = weight,
-            });
+            var leafKey = Game.Core.Attributes.DamageTypes.Applies((EDamageType)skill.DamageType)[0];
+            path.ActivityKey = (int)Game.Core.Proficiencies.ActivityKeys.ForDamageKey(leafKey);
             await context.SaveChangesAsync();
         }
 
@@ -561,14 +563,14 @@ namespace Game.TestInfrastructure.Helpers
         public static async Task<Path> CreatePathAsync(
             GameContext context,
             string name = "Test Path",
-            decimal falloffBase = 0.3m,
+            EActivityKey activityKey = EActivityKey.Physical,
             DateTime? retiredAt = null)
         {
             var path = new Path
             {
                 Name = name,
                 Description = "",
-                FalloffBase = falloffBase,
+                ActivityKey = (int)activityKey,
                 RetiredAt = retiredAt,
             };
 

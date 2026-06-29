@@ -1,7 +1,7 @@
 # Spike #1318 — Other avenues for progressing proficiencies (effect-based accrual)
 
 - **Spike issue:** [#1318](https://github.com/ginderjeremiah/GameServer/issues/1318)
-- **Status:** Design decided (ideation complete); implementation split into native sub-issues (see [Implementation issues](#implementation-issues)). Gated on the damage-types pipeline ([#1320](https://github.com/ginderjeremiah/GameServer/issues/1320)). Not yet implemented.
+- **Status:** Design decided (ideation complete); implementation split into native sub-issues (see [Implementation issues](#implementation-issues)). Gated on the damage-types pipeline ([#1320](https://github.com/ginderjeremiah/GameServer/issues/1320)). Engine + offense routing (#1336) implemented; the remaining avenues (#1338/#1339), weapon leaves (#1340), and admin authoring (#1341) are pending.
 - **Related:** reworks the shipped proficiency accrual ([#982](https://github.com/ginderjeremiah/GameServer/issues/982) — #1116 / #1160 / #1161); depends on damage types ([#1320](https://github.com/ginderjeremiah/GameServer/issues/1320), foundation shipped) and the mitigation rework ([#1330](https://github.com/ginderjeremiah/GameServer/issues/1330), reflection); spins off two follow-up spikes ([#1342](https://github.com/ginderjeremiah/GameServer/issues/1342), [#1343](https://github.com/ginderjeremiah/GameServer/issues/1343)).
 
 ## Goal

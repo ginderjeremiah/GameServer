@@ -569,11 +569,11 @@ namespace Game.Application.Services
                     victoryExpRewards.Add(battle.ExpReward);
 
                     // Accrue proficiency XP per won battle, exactly as the live handler does — same inputs
-                    // (this battle's skill stats + difficulty multiplier), same service — so the offline
-                    // accrual matches what the player would have earned live (the "offline == live" invariant).
-                    // The push is suppressed; the folded results ride the welcome-back summary instead.
+                    // (this battle's skill stats + player power), same service — so the offline accrual matches
+                    // what the player would have earned live (the "offline == live" invariant). The push is
+                    // suppressed; the folded results ride the welcome-back summary instead.
                     proficiencyGains.Add(_proficiencyRewards.AccrueAndApply(
-                        progress, battle.Result.Stats, battle.DifficultyMultiplier, player, notify: false));
+                        progress, battle.Result.Stats, battle.PlayerPower, player, notify: false));
                 }
             }
 
@@ -667,11 +667,12 @@ namespace Game.Application.Services
                 snapshot.GetModifiersWithSignaturePassive(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
 
             player.GrantExp(rewards.ExpReward);
-            // Thread the difficulty multiplier onto the battle-completed event so the progress handler can
-            // scale the proficiency-XP pie by it — the same curve the exp reward above used (spike #982).
+            // Thread the player's power onto the battle-completed event so the progress handler can normalize
+            // each path's activity by it for the effect-based proficiency accrual (spike #1318) — the same
+            // snapshot-measured power the exp reward above used.
             player.RecordBattleCompleted(
                 enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp,
-                rewards.DifficultyMultiplier);
+                rewards.PlayerPower);
 
             return rewards;
         }

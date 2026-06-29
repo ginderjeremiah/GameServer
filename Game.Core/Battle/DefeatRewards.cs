@@ -11,14 +11,22 @@ namespace Game.Core.Battle
         public int ExpReward { get; set; }
 
         /// <summary>
-        /// The difficulty curve factor for this battle — the same <c>ratio²</c> band/clamp the exp reward
-        /// scales by. 1 when the enemy is within ±20% of the player's power, quadratically smaller for a
-        /// trivial enemy (anti-grind) and quadratically larger (clamped at
-        /// <see cref="ServerGameConstants.MaxExpRewardMultiplier"/>) for an over-level one. Proficiency-XP
-        /// accrual scales its fixed pie by this same factor (spike #982 decision 4), so the two payouts
-        /// share one difficulty curve rather than maintaining two.
+        /// The difficulty curve factor for this battle — the <c>ratio²</c> band/clamp the exp reward scales by.
+        /// 1 when the enemy is within ±20% of the player's power, quadratically smaller for a trivial enemy
+        /// (anti-grind) and quadratically larger (clamped at
+        /// <see cref="ServerGameConstants.MaxExpRewardMultiplier"/>) for an over-level one. Drives the exp
+        /// reward only; the effect-based proficiency accrual no longer reads it (power-normalization subsumes
+        /// it — see <see cref="PlayerPower"/>).
         /// </summary>
         public double DifficultyMultiplier { get; }
+
+        /// <summary>
+        /// The player's measured power for this battle — the sum of their core additive attribute modifiers
+        /// (the same measure the difficulty ratio normalizes by). The effect-based proficiency accrual
+        /// normalizes each path's activity by it (spike #1318): <c>XP = pie × clamp(activity ÷ power)</c>, so
+        /// power-normalization is the continuous difficulty curve that subsumes <see cref="DifficultyMultiplier"/>.
+        /// </summary>
+        public double PlayerPower { get; }
 
         /// <summary>
         /// Computes the rewards for defeating <paramref name="enemy"/>. The player's power is measured from
@@ -30,6 +38,7 @@ namespace Game.Core.Battle
         {
             var enemyAttTotal = SumCoreAttributes(enemy.GetAttributeModifiers());
             var playerAttTotal = SumCoreAttributes(playerModifiers);
+            PlayerPower = playerAttTotal;
             DifficultyMultiplier = GetDifficultyMultiplier(enemyAttTotal, playerAttTotal);
             ExpReward = ToIntReward(enemyAttTotal * DifficultyMultiplier);
         }

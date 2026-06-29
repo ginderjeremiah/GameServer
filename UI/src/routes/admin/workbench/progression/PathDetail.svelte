@@ -9,8 +9,7 @@
 		headline={path.description}
 		tabs={[
 			{ key: 'identity', label: 'Identity', warn: identityWarn },
-			{ key: 'tiers', label: 'Tiers', count: tiers.length, dirty: tiersDirty, warn: collision },
-			{ key: 'contrib', label: 'Contributions', count: path.contributions.length, dirty: contribDirty }
+			{ key: 'tiers', label: 'Tiers', count: tiers.length, dirty: tiersDirty, warn: collision }
 		]}
 		activeTab={store.pathTab}
 		onTab={(k) => store.setPathTab(k as PathTab)}
@@ -32,12 +31,12 @@
 						warn={!path.name.trim()}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.name = v))}
 					/>
-					<ProgNumber
-						label="Falloff base"
-						width={160}
-						value={path.falloffBase}
-						warn={!(path.falloffBase > 0)}
-						onChange={(v) => store.patchPath(path.id, (d) => (d.falloffBase = v))}
+					<ProgSelect
+						label="Activity key"
+						width={200}
+						value={path.activityKey}
+						onChange={(v) => store.patchPath(path.id, (d) => (d.activityKey = v))}
+						options={activityKeyOptions}
 					/>
 				</div>
 				<div class="mt16">
@@ -54,26 +53,18 @@
 					Tiers<span class="sub">— ordered proficiencies · reorder with ↑ ↓ · open ›</span><span class="ln"></span>
 				</div>
 				<TiersSpine {store} pathId={path.id} />
-			{:else if store.pathTab === 'contrib'}
-				<div class="sec-title">
-					Contributions<span class="sub">— skills that feed this path, with their home tier</span><span class="ln"
-					></span>
-				</div>
-				<ContributionsEditor {store} pathId={path.id} />
 			{/if}
 		</div>
 	</div>
 {/if}
 
 <script lang="ts">
-import { childChanged } from '../save-helpers';
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
-import { hasTierCollision, pathWarnings } from './progression-helpers';
+import { activityKeyOptions, hasTierCollision, pathWarnings } from './progression-helpers';
 import DetailHeader from './DetailHeader.svelte';
 import ProgInput from './ProgInput.svelte';
-import ProgNumber from './ProgNumber.svelte';
+import ProgSelect from './ProgSelect.svelte';
 import TiersSpine from './TiersSpine.svelte';
-import ContributionsEditor from './ContributionsEditor.svelte';
 
 interface Props {
 	store: ProgressionStore;
@@ -88,7 +79,6 @@ const tiers = $derived(store.currentTiers);
 const identityWarn = $derived(!!path && pathWarnings(path).length > 0);
 const collision = $derived(hasTierCollision(tiers));
 const tiersDirty = $derived(!!baseline && tiers.some((t) => store.profStatus(t) !== 'clean'));
-const contribDirty = $derived(!!baseline && childChanged(path?.contributions, baseline.contributions));
 </script>
 
 <style lang="scss">

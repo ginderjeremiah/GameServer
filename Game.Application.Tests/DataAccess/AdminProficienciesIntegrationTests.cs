@@ -502,7 +502,7 @@ namespace Game.Application.Tests.DataAccess
         private async Task<Entities.Path> SeedPathAsync(IServiceScope scope)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var path = new Entities.Path { Name = "Fire", Description = "", FalloffBase = 0.3m };
+            var path = new Entities.Path { Name = "Fire", Description = "" };
             context.Paths.Add(path);
             await context.SaveChangesAsync(CancellationToken);
             return path;
