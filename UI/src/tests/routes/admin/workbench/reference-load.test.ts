@@ -34,6 +34,7 @@ const SOCKET_SETS: Record<string, { id: number; name: string }[]> = {
 	GetZones: [{ id: 0, name: 'Verdant Hollow' }],
 	GetItems: [{ id: 0, name: 'Iron Helm' }],
 	GetItemMods: [{ id: 0, name: 'Sharp' }],
+	GetAttributes: [{ id: 0, name: 'Strength' }],
 	GetChallengeTypes: [{ id: 1, name: 'Enemies Killed' }],
 	GetChallenges: [{ id: 0, name: 'First Blood' }],
 	GetPaths: [{ id: 0, name: 'Fire Magic' }],
@@ -67,6 +68,7 @@ describe('WorkbenchReference.load', () => {
 			'GetZones',
 			'GetItems',
 			'GetItemMods',
+			'GetAttributes',
 			'GetChallengeTypes',
 			'GetChallenges',
 			'GetPaths',
@@ -74,8 +76,8 @@ describe('WorkbenchReference.load', () => {
 		]) {
 			expect(mockFetchSocket).toHaveBeenCalledWith(command);
 		}
-		// Only tags + categories use HTTP — the transport split is exactly 9 socket / 2 HTTP.
-		expect(mockFetchSocket).toHaveBeenCalledTimes(9);
+		// Only tags + categories use HTTP — the transport split is exactly 10 socket / 2 HTTP.
+		expect(mockFetchSocket).toHaveBeenCalledTimes(10);
 		expect(mockGet).toHaveBeenCalledTimes(2);
 		expect(mockGet).toHaveBeenCalledWith('Tags');
 		expect(mockGet).toHaveBeenCalledWith('Tags/TagCategories');
@@ -86,6 +88,7 @@ describe('WorkbenchReference.load', () => {
 		expect(staticData.zones).toBe(SOCKET_SETS.GetZones);
 		expect(staticData.items).toBe(SOCKET_SETS.GetItems);
 		expect(staticData.itemMods).toBe(SOCKET_SETS.GetItemMods);
+		expect(staticData.attributes).toBe(SOCKET_SETS.GetAttributes);
 		expect(staticData.challenges).toBe(SOCKET_SETS.GetChallenges);
 		expect(staticData.paths).toBe(SOCKET_SETS.GetPaths);
 		expect(staticData.proficiencies).toBe(SOCKET_SETS.GetProficiencies);

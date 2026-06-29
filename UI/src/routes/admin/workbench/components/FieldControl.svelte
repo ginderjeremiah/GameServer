@@ -85,6 +85,18 @@
 			{#if dirty}<DirtyDot />{/if}
 		</div>
 	</div>
+{:else if field.type === 'attribute'}
+	<div class="attr-fld" style:width="{field.width ?? 170}px">
+		{@render label()}
+		<AttributePicker
+			value={value as number}
+			options={field.options?.(value as number) ?? []}
+			onChange={(v) => set(v)}
+			ariaLabel={field.label}
+			{dirty}
+			invalid={!!warn}
+		/>
+	</div>
 {:else}
 	<div class="fld" style:flex={field.grow ? '1 1 280px' : 'none'} style:min-width={field.grow ? '240px' : 'auto'}>
 		{@render label()}
@@ -118,6 +130,7 @@ import { fieldWarn } from '../validation';
 import SelectCaret from './SelectCaret.svelte';
 import NumInput from './NumInput.svelte';
 import DirtyDot from './DirtyDot.svelte';
+import AttributePicker from './AttributePicker.svelte';
 
 interface Props {
 	field: FieldConfig<Identified>;
