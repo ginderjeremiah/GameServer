@@ -359,6 +359,25 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task ZeroEventActivity_TrainsNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with no crit damage produces no Crit activity, so a
+            // Crit-keyed path is not even routed to (no zero-activity slice reaches the calculator).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Precision", activityKey: EActivityKey.Crit);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Precision", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CriticalDamageDealt = 0 });
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
         public async Task OffenseAndEventAxes_TrainInParallel_WithoutDilution()
         {
             using var scope = CreateScope();
