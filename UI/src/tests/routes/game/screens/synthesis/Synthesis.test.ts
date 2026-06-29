@@ -189,4 +189,33 @@ describe('Synthesis screen', () => {
 		await fireEvent.click(screen.getByText('View in Skills'));
 		expect(navigation.requestedScreen).toBe('skills');
 	});
+
+	it('toggles to the web view, rendering the recipe graph in place of the bench list', async () => {
+		render(Synthesis);
+		await screen.findByTestId('recipe-0');
+		await fireEvent.click(screen.getByTestId('view-web'));
+
+		expect(screen.getByTestId('synthesis-graph')).toBeTruthy();
+		// The bench list and filter chips give way to the graph canvas.
+		expect(screen.queryByTestId('synthesis-list')).toBeNull();
+		expect(screen.getByTestId('graph-node-result-0')).toBeTruthy();
+	});
+
+	it('selecting a graph node drives the shared dossier', async () => {
+		render(Synthesis);
+		await screen.findByTestId('recipe-0');
+		await fireEvent.click(screen.getByTestId('view-web'));
+		// The gated recipe's result is revealed (only the gate blocks it), so its node names the result.
+		await fireEvent.click(screen.getByTestId('graph-node-result-1'));
+		expect(screen.getAllByText('Lava Surge').length).toBeGreaterThan(0);
+	});
+
+	it('keeps a hinted result node sealed in the web view (no identity leaked)', async () => {
+		render(Synthesis);
+		await screen.findByTestId('recipe-0');
+		await fireEvent.click(screen.getByTestId('view-web'));
+		await fireEvent.click(screen.getByTestId('graph-node-result-2'));
+		// The hinted result (Graverend) is never named — not in its node, not in the dossier.
+		expect(screen.queryByText('Graverend')).toBeNull();
+	});
 });

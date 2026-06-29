@@ -114,6 +114,20 @@ describe('SynthesisView — derivation from stores', () => {
 		const view = new SynthesisView();
 		expect(view.isEmpty).toBe(true);
 	});
+
+	it('switches between bench and web views and derives the recipe graph from the same recipes', () => {
+		mockPlayerManager.unlockedSkills = [{ skillId: 0, selected: false }]; // owns one input → hinted
+		const view = new SynthesisView();
+
+		expect(view.mode).toBe('bench');
+		view.setMode('web');
+		expect(view.mode).toBe('web');
+
+		// The graph mirrors the discovered recipes: the hinted recipe contributes a fusion + a masked result.
+		expect(view.graph.nodes.length).toBeGreaterThan(0);
+		expect(view.graph.nodes.some((n) => n.kind === 'fusion' && n.recipeId === 0)).toBe(true);
+		expect(view.graph.nodes.some((n) => n.kind === 'result' && n.masked)).toBe(true);
+	});
 });
 
 describe('SynthesisView.synthesize — the action path', () => {

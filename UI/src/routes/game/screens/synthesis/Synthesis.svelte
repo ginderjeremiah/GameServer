@@ -35,39 +35,73 @@
 				</p>
 			</div>
 		{:else if !view.loading}
-			<div class="filters">
-				{#each filterChips as chip (chip.key)}
+			<div class="toolbar">
+				{#if view.mode === 'bench'}
+					<div class="filters">
+						{#each filterChips as chip (chip.key)}
+							<button
+								type="button"
+								class="chip"
+								class:active={view.filter === chip.key}
+								onclick={() => view.setFilter(chip.key)}
+							>
+								{chip.label} · {chip.count}
+							</button>
+						{/each}
+					</div>
+				{:else}
+					<div class="filters"></div>
+				{/if}
+
+				<div class="view-toggle" role="tablist" aria-label="Synthesis view">
 					<button
 						type="button"
-						class="chip"
-						class:active={view.filter === chip.key}
-						onclick={() => view.setFilter(chip.key)}
+						role="tab"
+						class="tab"
+						class:active={view.mode === 'bench'}
+						aria-selected={view.mode === 'bench'}
+						data-testid="view-bench"
+						onclick={() => view.setMode('bench')}>▤ Bench</button
 					>
-						{chip.label} · {chip.count}
-					</button>
-				{/each}
-			</div>
-
-			<div class="cols">
-				<div class="list sx-scroll" data-testid="synthesis-list">
-					{#if view.visibleRecipes.length === 0}
-						<div class="list-empty">No recipes in this filter.</div>
-					{:else}
-						{#each view.visibleRecipes as recipe (recipe.id)}
-							<RecipeRow {recipe} selected={recipe.id === view.selected?.id} onSelect={(id) => view.select(id)} />
-						{/each}
-					{/if}
+					<button
+						type="button"
+						role="tab"
+						class="tab"
+						class:active={view.mode === 'web'}
+						aria-selected={view.mode === 'web'}
+						data-testid="view-web"
+						onclick={() => view.setMode('web')}>⌗ Web</button
+					>
 				</div>
-
-				<SynthesisBench
-					recipe={view.selected}
-					synthesizing={view.synthesizing}
-					onSynthesize={confirmAndSynthesize}
-					onViewInSkills={viewInSkills}
-				/>
-
-				<ResultDossier recipe={view.selected} />
 			</div>
+
+			{#if view.mode === 'bench'}
+				<div class="cols">
+					<div class="list sx-scroll" data-testid="synthesis-list">
+						{#if view.visibleRecipes.length === 0}
+							<div class="list-empty">No recipes in this filter.</div>
+						{:else}
+							{#each view.visibleRecipes as recipe (recipe.id)}
+								<RecipeRow {recipe} selected={recipe.id === view.selected?.id} onSelect={(id) => view.select(id)} />
+							{/each}
+						{/if}
+					</div>
+
+					<SynthesisBench
+						recipe={view.selected}
+						synthesizing={view.synthesizing}
+						onSynthesize={confirmAndSynthesize}
+						onViewInSkills={viewInSkills}
+					/>
+
+					<ResultDossier recipe={view.selected} />
+				</div>
+			{:else}
+				<div class="web-cols">
+					<SynthesisGraph layout={view.graph} selectedRecipeId={view.selected?.id ?? null} onSelect={selectFromGraph} />
+					<ResultDossier recipe={view.selected} />
+				</div>
+			{/if}
 		{/if}
 	</div>
 
@@ -83,6 +117,7 @@ import { confirmModal, navigation, playerProficiencies, toastError } from '$stor
 import RecipeRow from './RecipeRow.svelte';
 import SynthesisBench from './SynthesisBench.svelte';
 import ResultDossier from './ResultDossier.svelte';
+import SynthesisGraph from './SynthesisGraph.svelte';
 import { RECIPE_STATE_LABEL, type RecipeView } from './synthesis';
 import { type RecipeFilter, SynthesisView } from './synthesis-view.svelte';
 
@@ -115,6 +150,14 @@ async function confirmAndSynthesize(recipe: RecipeView): Promise<void> {
 
 function viewInSkills(): void {
 	navigation.requestScreen('skills');
+}
+
+// A graph node carries the recipe it belongs to (fusion + result); a leaf input node has none, so a click
+// on it is a no-op. Selecting drives the shared dossier exactly as the bench list does.
+function selectFromGraph(recipeId?: number): void {
+	if (recipeId !== undefined) {
+		view.select(recipeId);
+	}
 }
 
 onMount(async () => {
@@ -205,12 +248,45 @@ onMount(async () => {
 	padding: 14px 24px 22px;
 }
 
-.filters {
+.toolbar {
 	flex-shrink: 0;
 	display: flex;
-	gap: 7px;
+	align-items: flex-start;
+	gap: 12px;
 	margin-bottom: 14px;
+}
+
+.filters {
+	flex: 1;
+	display: flex;
+	gap: 7px;
 	flex-wrap: wrap;
+}
+
+.view-toggle {
+	flex-shrink: 0;
+	display: flex;
+	gap: 4px;
+	padding: 3px;
+	border: 1px solid var(--border-light);
+	border-radius: 6px;
+}
+
+.tab {
+	font-family: var(--mono);
+	font-size: 9.5px;
+	letter-spacing: 0.4px;
+	padding: 4px 12px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-tertiary);
+	cursor: pointer;
+
+	&.active {
+		background: var(--accent);
+		color: var(--text-on-accent);
+	}
 }
 
 .chip {
@@ -236,6 +312,14 @@ onMount(async () => {
 	min-height: 0;
 	display: grid;
 	grid-template-columns: 300px 1fr 320px;
+	gap: 16px;
+}
+
+.web-cols {
+	flex: 1;
+	min-height: 0;
+	display: grid;
+	grid-template-columns: 1fr 320px;
 	gap: 16px;
 }
 
@@ -278,6 +362,10 @@ onMount(async () => {
 @media (max-width: 1000px) {
 	.cols {
 		grid-template-columns: 260px 1fr;
+	}
+
+	.web-cols {
+		grid-template-columns: 1fr 260px;
 	}
 }
 </style>
