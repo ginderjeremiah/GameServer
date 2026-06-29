@@ -16,6 +16,16 @@ export enum EActivityKey {
 	Dodge = 11,
 	Heal = 12,
 	Reflect = 13,
+	PhysicalResist = 14,
+	FireResist = 15,
+	WaterResist = 16,
+	EarthResist = 17,
+	WindResist = 18,
+	BleedResist = 19,
+	PoisonResist = 20,
+	BurnResist = 21,
+	ElementalResist = 22,
+	DotResist = 23,
 }
 
 export enum EAttribute {

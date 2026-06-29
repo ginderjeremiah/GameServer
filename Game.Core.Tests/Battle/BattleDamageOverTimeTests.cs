@@ -183,7 +183,7 @@ namespace Game.Core.Tests.Battle
         // ── Statistics attribution (backend-only) ────────────────────────────
 
         [Fact]
-        public void DotOnEnemy_CountsTowardPlayerDamageDealt_NotHighestAttackOrSkillStats()
+        public void DotOnEnemy_CountsTowardPlayerDamageDealt_TypedButNotHighestAttackOrSkillStats()
         {
             // A constant poison on the enemy (a base BleedDamagePerSecond) ticks it for 2/tick; the 50-HP
             // enemy dies after exactly 50 DoT damage (25 ticks). The player fires a 0-damage skill so a
@@ -199,6 +199,8 @@ namespace Game.Core.Tests.Battle
             // DoT is not a "single attack" and is not attributed to the sourcing skill (per-skill DoT deferred).
             Assert.Equal(0, result.Stats.HighestPlayerAttack);
             Assert.Equal(0, result.Stats.SkillStats[1].TotalDamage);
+            // It is, however, type-routed into the offense book — the player dealt 50 Bleed damage (#1338).
+            Assert.Equal(50, result.Stats.TypedDamageDealt[EDamageType.Bleed]);
         }
 
         [Fact]
@@ -318,7 +320,7 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void ApplyDamageOverTime_NoRecorder_DealsIdenticalDamage()
         {
-            // The recorder is a pure side channel: omitting it leaves the dealt damage (and health math) unchanged.
+            // The recorders are pure side channels: omitting them leaves the dealt damage (and health math) unchanged.
             var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 0.5));
 
             var dealt = battler.ApplyDamageOverTime(40);
@@ -326,11 +328,44 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(1, dealt);
         }
 
+        // ── Post-mitigation damage-dealt recorder (offense book, #1338) ──────
+
         [Fact]
-        public void ResolveDamageOverTime_RecordsPlayerDotExposure_NotEnemyDotAsExposure()
+        public void ApplyDamageOverTime_RecordDamageDealt_ReportsPostMitigationPerType()
         {
-            // The player's incoming DoT records pre-mitigation exposure into the incoming book; the enemy's DoT
-            // (the player's DoT damage dealt) is the offense book (#1338) and is NOT recorded as exposure.
+            // The damage-dealt recorder receives each DoT type's POST-resistance tick (50 → 1), the same value
+            // the tick subtracts from health — the attacker's offense trains on what it actually dealt, so a
+            // victim's resistance legitimately discounts it (unlike the pre-mitigation exposure recorder).
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 0.5));
+            var dealtByType = new Dictionary<EDamageType, double>();
+
+            var dealt = battler.ApplyDamageOverTime(40, recordDamageDealt: (type, amount) => dealtByType[type] = amount);
+
+            Assert.Equal(1, dealt);                          // post-resistance (mitigated)
+            Assert.Equal(1, dealtByType[EDamageType.Bleed]); // recorded value matches the mitigated tick
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_RecordDamageDealt_ReportsOnlyActiveTypes()
+        {
+            // Each authored DoT type reports its post-mitigation tick; a type with a zero accumulator is skipped.
+            var battler = MakeBattler(
+                Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BurnDamagePerSecond, 250));
+            var dealtByType = new Dictionary<EDamageType, double>();
+
+            battler.ApplyDamageOverTime(40, recordDamageDealt: (type, amount) => dealtByType[type] = amount);
+
+            Assert.Equal(2, dealtByType[EDamageType.Bleed]); // 50 → 2 (no resistance)
+            Assert.Equal(10, dealtByType[EDamageType.Burn]); // 250 → 10
+            Assert.False(dealtByType.ContainsKey(EDamageType.Poison));
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_RecordsPlayerDotExposure_AndEnemyDotAsDamageDealt()
+        {
+            // The two books split by side: the player's incoming DoT records pre-mitigation exposure into the
+            // incoming book, while the enemy's DoT (the player's DoT damage dealt) records post-mitigation into
+            // the offense book (#1338). Neither leaks into the other.
             var player = MakeBattler(Stat(Strength, 0), Stat(BurnDamagePerSecond, 250)); // player takes Burn
             var enemy = MakeBattler(Stat(Strength, 0), Stat(BleedDamagePerSecond, 50));  // enemy takes Bleed
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
@@ -339,6 +374,8 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(10, context.Stats.TypedDamageExposure[EDamageType.Burn], 0.001); // 250 → 10 pre-mitigation
             Assert.False(context.Stats.TypedDamageExposure.ContainsKey(EDamageType.Bleed));
+            Assert.Equal(2, context.Stats.TypedDamageDealt[EDamageType.Bleed], 0.001);     // 50 → 2 dealt to enemy
+            Assert.False(context.Stats.TypedDamageDealt.ContainsKey(EDamageType.Burn));
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

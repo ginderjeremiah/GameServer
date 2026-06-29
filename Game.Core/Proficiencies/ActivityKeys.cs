@@ -4,10 +4,12 @@ namespace Game.Core.Proficiencies
 {
     /// <summary>
     /// Maps a damage-type key (<see cref="EDamageTypeKey"/>) to the proficiency routing key
-    /// (<see cref="EActivityKey"/>) a path trains on. Offense activity routes a skill's resolved
-    /// <see cref="EDamageType"/> through <see cref="DamageTypes.Applies(EDamageType)"/> to a set of damage-type
-    /// keys; each trains the path bound to the corresponding activity key. The two enums share the ten
-    /// damage-key members one-for-one — this pins that correspondence explicitly rather than relying on the two
+    /// (<see cref="EActivityKey"/>) a path trains on, on either side of the two-book model (spike #1318).
+    /// A resolved <see cref="EDamageType"/> runs through <see cref="DamageTypes.Applies(EDamageType)"/> to a set
+    /// of damage-type keys; each trains the path bound to the corresponding activity key — the <em>offense</em>
+    /// key for the output book (<see cref="ForDamageKey"/>) or the <em>resist</em> key for the incoming book
+    /// (<see cref="ForDamageKeyResist"/>). Each enum shares the ten damage-key members one-for-one with
+    /// <see cref="EDamageTypeKey"/> — these maps pin that correspondence explicitly rather than relying on the
     /// enums keeping matching ordinals.
     /// </summary>
     public static class ActivityKeys
@@ -27,7 +29,25 @@ namespace Game.Core.Proficiencies
                 [EDamageTypeKey.Dot] = EActivityKey.Dot,
             };
 
-        /// <summary>The proficiency routing key a damage-type <paramref name="key"/> trains.</summary>
+        private static readonly IReadOnlyDictionary<EDamageTypeKey, EActivityKey> ResistByDamageKey =
+            new Dictionary<EDamageTypeKey, EActivityKey>
+            {
+                [EDamageTypeKey.Physical] = EActivityKey.PhysicalResist,
+                [EDamageTypeKey.Fire] = EActivityKey.FireResist,
+                [EDamageTypeKey.Water] = EActivityKey.WaterResist,
+                [EDamageTypeKey.Earth] = EActivityKey.EarthResist,
+                [EDamageTypeKey.Wind] = EActivityKey.WindResist,
+                [EDamageTypeKey.Bleed] = EActivityKey.BleedResist,
+                [EDamageTypeKey.Poison] = EActivityKey.PoisonResist,
+                [EDamageTypeKey.Burn] = EActivityKey.BurnResist,
+                [EDamageTypeKey.Elemental] = EActivityKey.ElementalResist,
+                [EDamageTypeKey.Dot] = EActivityKey.DotResist,
+            };
+
+        /// <summary>The offense routing key a damage-type <paramref name="key"/> trains (output book).</summary>
         public static EActivityKey ForDamageKey(EDamageTypeKey key) => ByDamageKey[key];
+
+        /// <summary>The resist routing key a damage-type <paramref name="key"/> trains (incoming book).</summary>
+        public static EActivityKey ForDamageKeyResist(EDamageTypeKey key) => ResistByDamageKey[key];
     }
 }

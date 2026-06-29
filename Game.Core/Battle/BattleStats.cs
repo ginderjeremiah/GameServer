@@ -21,10 +21,11 @@ namespace Game.Core.Battle
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>
-        /// Per-leaf-type direct-hit damage the player dealt this battle — the proficiency offense "output book"
-        /// (spike #1318). Sums the same post-mitigation amount each hit booked into <see cref="PlayerDamageDealt"/>,
-        /// so a focused build trains its damage type fully while a dabbled one trains it proportionally. Typed
-        /// DoT damage dealt is the incoming/offense DoT binding's concern (#1338); only direct hits land here.
+        /// Per-leaf-type damage the player dealt this battle — the proficiency offense "output book" (spike
+        /// #1318), consumed directly by the accrual's offense binding. Sums the same post-mitigation amount each
+        /// hit booked into <see cref="PlayerDamageDealt"/>, so a focused build trains its damage type fully while
+        /// a dabbled one trains it proportionally. Covers both direct hits and the player's typed DoT damage
+        /// dealt (#1338 — a bleed tick is type-routed to Bleed with no source-skill attribution).
         /// </summary>
         public Dictionary<EDamageType, double> TypedDamageDealt { get; set; } = [];
 

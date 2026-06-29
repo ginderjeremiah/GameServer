@@ -19,12 +19,14 @@ namespace Game.Application.Services
     /// result through the progress aggregate. Both the live battle-completion handler and the offline-rewards
     /// batch run it, so the accrual is computed identically on both paths (the "offline == live" invariant).
     /// <para>
-    /// Two output-book axes are wired here: per-skill direct-hit damage grouped by the skill's resolved damage
-    /// type and folded across each type's applicable keys (<see cref="DamageTypes.Applies"/>), and the event-keyed
-    /// combat magnitudes — crit damage (Precision), dodged damage (Evasion), and healing done (Restoration) —
-    /// which are damage-type-neutral and map straight to a single activity key. The remaining avenues are wired by
-    /// sibling sub-issues: the incoming book and typed DoT-dealt (#1338), and Retribution (reflected damage), which
-    /// waits on the mitigation rework (#1330). The <c>notify</c> flag drives the live client push: the live path
+    /// All avenues but Retribution are wired here, folded across each leaf type's applicable keys
+    /// (<see cref="DamageTypes.Applies"/>): the <b>offense</b> book trains offense keys on the typed damage the
+    /// player dealt — direct hits and DoT alike (<see cref="BattleStats.TypedDamageDealt"/>) — the
+    /// <b>incoming</b> book trains resist keys on the player's pre-mitigation typed exposure
+    /// (<see cref="BattleStats.TypedDamageExposure"/>), and the event-keyed combat magnitudes — crit damage
+    /// (Precision), dodged damage (Evasion), and healing done (Restoration) — are damage-type-neutral and map
+    /// straight to a single activity key. Retribution (reflected damage) stays inert until the mitigation rework
+    /// (#1330) produces a reflected-damage signal. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
     /// </para>
@@ -162,45 +164,28 @@ namespace Game.Application.Services
             return true;
         }
 
-        // The per-path activity for the battle, routed to each path's frontier tier. Two output-book axes are
-        // wired here (the incoming book and typed DoT-dealt come in #1338). Offense: per-skill direct-hit damage
-        // (SkillStats.TotalDamage) grouped by the firing skill's resolved damage type, then folded across each
-        // type's applicable keys (DamageTypes.Applies) so a fire hit feeds both the Fire path and the Elemental
-        // path. Events: crit damage, dodged damage, and healing done — damage-type-neutral magnitudes that map
-        // straight to a single activity key (Crit / Dodge / Heal) without routing through applies(); Retribution
-        // (Reflect) stays inert until the reflection rework (#1330) produces a reflected-damage signal. Each key's
-        // summed activity is shared by every (non-retired) path bound to it; the path trains in proportion to the
-        // share its key captures, so focus beats spread. A fully-maxed path (no frontier) banks nothing; a retired
-        // path is absent from the index (frozen).
+        // The per-path activity for the battle, routed to each path's frontier tier. A typed quantity folds
+        // across every key its applies() set includes (Fire feeds Fire + Elemental; Burn feeds Burn + Fire +
+        // Elemental + Dot), mapped to the offense or resist activity key for its book; each key's summed quantity
+        // is the activity of every (non-retired) path bound to it, so a path trains in proportion to the share its
+        // key captures (focus beats spread within a book) and the axes train in parallel. A fully-maxed path (no
+        // frontier) banks nothing; a retired path is absent from the index (frozen). The avenues:
+        //   • Offense (output book): the typed damage the player dealt — direct hits and DoT alike
+        //     (BattleStats.TypedDamageDealt), post-mitigation, routed to the offense keys.
+        //   • Resist (incoming book): the player's pre-mitigation typed exposure
+        //     (BattleStats.TypedDamageExposure), routed to the resist keys, so a resist never throttles its own
+        //     training signal.
+        //   • Events: crit damage, dodged damage, and healing done — damage-type-neutral magnitudes that map
+        //     straight to a single activity key (Crit / Dodge / Heal) without applies() routing. Retribution
+        //     (Reflect) stays inert until the reflection rework (#1330) produces a reflected-damage signal.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
                 progress.TryGetProficiency(proficiencyId, out var existing) ? existing.Level : 0;
 
-            // Sum direct-hit damage by the firing skill's resolved leaf damage type.
-            var damageByType = new Dictionary<EDamageType, double>();
-            foreach (var (skillId, skillStats) in stats.SkillStats)
-            {
-                if (skillStats.TotalDamage <= 0)
-                {
-                    continue;
-                }
-
-                var type = _skills.GetSkill(skillId).DamageType;
-                damageByType[type] = damageByType.GetValueOrDefault(type) + skillStats.TotalDamage;
-            }
-
-            // Fold per-type damage into per-activity-key totals: a key accrues every type whose applies() set
-            // includes it (Fire feeds Fire + Elemental; Burn feeds Burn + Fire + Elemental + Dot).
             var activityByKey = new Dictionary<EActivityKey, double>();
-            foreach (var (type, damage) in damageByType)
-            {
-                foreach (var key in DamageTypes.Applies(type))
-                {
-                    var activityKey = ActivityKeys.ForDamageKey(key);
-                    activityByKey[activityKey] = activityByKey.GetValueOrDefault(activityKey) + damage;
-                }
-            }
+            FoldIntoActivityKeys(activityByKey, stats.TypedDamageDealt, ActivityKeys.ForDamageKey);
+            FoldIntoActivityKeys(activityByKey, stats.TypedDamageExposure, ActivityKeys.ForDamageKeyResist);
 
             // Event-keyed activities: combat magnitudes that are not typed damage, so each maps straight to a
             // single global activity key (no applies() routing, no per-type split). Only positive amounts are
@@ -232,6 +217,25 @@ namespace Game.Application.Services
             }
 
             return activities;
+        }
+
+        // Folds a book's per-leaf-type quantities into per-activity-key totals: each type adds its quantity to
+        // every key its applies() set resolves to, mapped to that book's activity key by toActivityKey (offense
+        // or resist). Accumulates into the shared map so both books route through one pass below; offense and
+        // resist keys are disjoint, so the two books never collide on a key.
+        private static void FoldIntoActivityKeys(
+            Dictionary<EActivityKey, double> activityByKey,
+            IReadOnlyDictionary<EDamageType, double> quantityByType,
+            Func<EDamageTypeKey, EActivityKey> toActivityKey)
+        {
+            foreach (var (type, quantity) in quantityByType)
+            {
+                foreach (var key in DamageTypes.Applies(type))
+                {
+                    var activityKey = toActivityKey(key);
+                    activityByKey[activityKey] = activityByKey.GetValueOrDefault(activityKey) + quantity;
+                }
+            }
         }
     }
 }
