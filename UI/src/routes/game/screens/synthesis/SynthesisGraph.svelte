@@ -43,7 +43,6 @@
 </div>
 
 <script lang="ts">
-import { onMount } from 'svelte';
 import { recipeStateAccent } from './synthesis';
 import { type SynthesisGraphLayout, type Viewport, zoomAt } from './synthesis-graph';
 import SynthesisGraphNode from './SynthesisGraphNode.svelte';
@@ -135,15 +134,14 @@ function onWheel(event: WheelEvent): void {
 	vp = zoomAt(vp, factor, event.clientX - rect.left, event.clientY - rect.top);
 }
 
-// Recentre on mount and whenever the graph's content extent changes (recipe set / view switched). Reads
-// only the layout dims + container, so writing `vp` here can't loop.
+// Recentre on mount (this runs once after the initial render, when `container` is bound) and whenever the
+// graph's content extent changes (recipe set / view switched). Reads only the layout dims + container, so
+// writing `vp` here can't loop.
 $effect(() => {
 	void layout.width;
 	void layout.height;
 	recenter();
 });
-
-onMount(recenter);
 </script>
 
 <style lang="scss">

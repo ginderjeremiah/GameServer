@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
-import { buildSynthesis } from '$routes/game/screens/synthesis/synthesis';
+import { buildSynthesis, type RecipeView } from '$routes/game/screens/synthesis/synthesis';
 import {
 	clampScale,
 	layoutSynthesisGraph,
@@ -156,6 +156,25 @@ describe('layoutSynthesisGraph', () => {
 		const sharedInput = layout.nodes.filter((n) => n.key === 's0');
 		expect(sharedInput).toHaveLength(1);
 		expect(layout.edges.filter((e) => e.from === 's0')).toHaveLength(2);
+	});
+
+	it('fails soft on a cyclic recipe set instead of overflowing the stack', () => {
+		// A malformed (authoring-guards-against) cycle: skill 1 is made from skill 2 and vice versa. The
+		// layering must terminate (the in-progress guard treats the back-edge as a leaf) rather than recurse
+		// forever and crash the screen.
+		const view = (id: number, result: ISkill, input: ISkill): RecipeView => ({
+			id,
+			state: 'ready',
+			inputs: [{ skillId: input.id, owned: true, skill: input }],
+			ownedInputCount: 1,
+			inputCount: 1,
+			conditions: [],
+			result
+		});
+		const cyclic = [view(0, skills[1], skills[2]), view(1, skills[2], skills[1])];
+
+		expect(() => layoutSynthesisGraph(cyclic)).not.toThrow();
+		expect(layoutSynthesisGraph(cyclic).nodes.length).toBeGreaterThan(0);
 	});
 });
 

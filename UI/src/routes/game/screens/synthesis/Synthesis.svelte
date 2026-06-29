@@ -49,8 +49,6 @@
 							</button>
 						{/each}
 					</div>
-				{:else}
-					<div class="filters"></div>
 				{/if}
 
 				<div class="view-toggle" role="tablist" aria-label="Synthesis view">
@@ -265,6 +263,8 @@ onMount(async () => {
 
 .view-toggle {
 	flex-shrink: 0;
+	// Right-aligns the toggle whether or not the bench-only filter row is present.
+	margin-left: auto;
 	display: flex;
 	gap: 4px;
 	padding: 3px;

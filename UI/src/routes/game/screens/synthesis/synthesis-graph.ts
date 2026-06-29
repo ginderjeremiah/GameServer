@@ -176,15 +176,23 @@ function positionNodes(nodes: Map<string, GraphNode>, edges: readonly GraphEdge[
 		preds.get(edge.to)?.push(edge.from);
 	}
 
-	// Longest-path layering — the graph is acyclic (authoring guards acyclicity, #1125 decision 11).
+	// Longest-path layering — the graph is acyclic (authoring guards acyclicity, #1125 decision 11). The
+	// `inProgress` guard fails soft on a cycle (treat the back-edge as a leaf) so bad data degrades the
+	// drawing rather than overflowing the stack and crashing the screen.
 	const layerOf = new Map<string, number>();
+	const inProgress = new Set<string>();
 	const computeLayer = (key: string): number => {
 		const cached = layerOf.get(key);
 		if (cached !== undefined) {
 			return cached;
 		}
+		if (inProgress.has(key)) {
+			return 0;
+		}
+		inProgress.add(key);
 		const parents = preds.get(key) ?? [];
 		const layer = parents.length ? Math.max(...parents.map(computeLayer)) + 1 : 0;
+		inProgress.delete(key);
 		layerOf.set(key, layer);
 		return layer;
 	};
