@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
 
 /* The screen drives the real playerProficiencies store (fetched over the socket) for the gate state and
    reads recipes/skills/proficiencies from staticData, so the socket fetch + staticData are stubbed; the
-   rest of the stores stay real (the $components barrel pulls in the engine, which reads them). The owned
+   rest of the stores stay real (the $components barrel pulls in the engine, which reads them) so the
+   confirm modal + navigation behave like production. Only the socket command sender is stubbed. The owned
    skills come from the real playerManager singleton, set per test. */
-const { mockFetchSocket, mockToastError, staticData } = vi.hoisted(() => ({
+const { mockFetchSocket, mockSendCommand, mockToastError, staticData } = vi.hoisted(() => ({
 	mockFetchSocket: vi.fn(),
+	mockSendCommand: vi.fn(),
 	mockToastError: vi.fn(),
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	staticData: {} as any
@@ -15,7 +17,11 @@ const { mockFetchSocket, mockToastError, staticData } = vi.hoisted(() => ({
 
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/api')>();
-	return { ...actual, fetchSocketData: mockFetchSocket };
+	return {
+		...actual,
+		fetchSocketData: mockFetchSocket,
+		apiSocket: { ...actual.apiSocket, sendSocketCommand: mockSendCommand }
+	};
 });
 vi.mock('$stores', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$stores')>();
@@ -23,7 +29,7 @@ vi.mock('$stores', async (importOriginal) => {
 });
 
 import Synthesis from '$routes/game/screens/synthesis/Synthesis.svelte';
-import { playerProficiencies } from '$stores';
+import { cancelActiveModal, confirmActiveModal, navigation, playerProficiencies } from '$stores';
 import { playerManager } from '$lib/engine';
 
 const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
@@ -87,6 +93,8 @@ beforeEach(() => {
 	staticData.proficiencies = PROFICIENCIES;
 	staticData.attributes = undefined;
 	mockToastError.mockClear();
+	mockSendCommand.mockReset();
+	navigation.clear();
 	// Owns inputs 0,1,2 and the result skill 5 (so recipe 3 is "done").
 	playerManager.unlockedSkills = [
 		{ skillId: 0, selected: false },
@@ -152,5 +160,32 @@ describe('Synthesis screen', () => {
 		expect(await screen.findByTestId('synthesis-error')).toBeTruthy();
 		expect(screen.queryByTestId('synthesis-empty')).toBeNull();
 		expect(mockToastError).toHaveBeenCalledTimes(1);
+	});
+
+	it('clicking the CTA confirms then fires SynthesizeSkill for the ready recipe', async () => {
+		mockSendCommand.mockResolvedValue({ data: { resultSkillId: 4 } });
+		render(Synthesis);
+		// The ready recipe (id 0) is the default selection; its CTA is enabled.
+		await fireEvent.click(await screen.findByTestId('synthesize-cta'));
+		// The confirm dialog is enqueued (one-time, non-consumptive guard) — confirm it.
+		confirmActiveModal();
+		await waitFor(() => expect(mockSendCommand).toHaveBeenCalledWith('SynthesizeSkill', 0));
+		// On success the result unlocks onto the player, flipping the recipe to done.
+		await waitFor(() => expect(playerManager.unlockedSkills.some((s) => s.skillId === 4)).toBe(true));
+	});
+
+	it('cancelling the confirm dialog does not fire the command', async () => {
+		render(Synthesis);
+		await fireEvent.click(await screen.findByTestId('synthesize-cta'));
+		cancelActiveModal();
+		await Promise.resolve();
+		expect(mockSendCommand).not.toHaveBeenCalled();
+	});
+
+	it('a done recipe routes "View in Skills" through the navigation store', async () => {
+		render(Synthesis);
+		await fireEvent.click(await screen.findByTestId('recipe-3')); // the done recipe
+		await fireEvent.click(screen.getByText('View in Skills'));
+		expect(navigation.requestedScreen).toBe('skills');
 	});
 });
