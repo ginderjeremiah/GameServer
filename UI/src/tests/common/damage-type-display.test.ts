@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { EDamageType, EDamageTypeKey } from '$lib/api';
 import {
 	damageTypeColor,
-	damageTypeGlyph,
+	damageTypeIcon,
 	damageTypeKeyColor,
-	damageTypeKeyGlyph,
+	damageTypeKeyIcon,
 	damageTypeKeyName,
 	damageTypeName
 } from '../../lib/common/damage-type-display';
@@ -17,23 +17,30 @@ describe('damage-type-key helpers', () => {
 		expect(damageTypeKeyColor(EDamageTypeKey.Dot)).toBe('var(--dmg-dot)');
 	});
 
+	it('keeps the weapon leaves on the shared physical hue', () => {
+		expect(damageTypeKeyColor(EDamageTypeKey.Sword)).toBe('var(--dmg-physical)');
+		expect(damageTypeKeyColor(EDamageTypeKey.Unarmed)).toBe('var(--dmg-physical)');
+	});
+
 	it('names the cross-cutting categories readably', () => {
 		expect(damageTypeKeyName(EDamageTypeKey.Elemental)).toBe('Elemental');
 		expect(damageTypeKeyName(EDamageTypeKey.Dot)).toBe('Damage Over Time');
 		expect(damageTypeKeyName(EDamageTypeKey.Bleed)).toBe('Bleed');
 	});
 
-	it('maps a key to its glyph variant', () => {
-		expect(damageTypeKeyGlyph(EDamageTypeKey.Water)).toBe('water');
-		expect(damageTypeKeyGlyph(EDamageTypeKey.Dot)).toBe('dot');
+	it('maps a key to its static/img icon path', () => {
+		expect(damageTypeKeyIcon(EDamageTypeKey.Water)).toBe('/img/Water.png');
+		expect(damageTypeKeyIcon(EDamageTypeKey.Dot)).toBe('/img/Damage Over Time.png');
+		// Weapon leaves carry their own weapon icon despite the shared physical hue.
+		expect(damageTypeKeyIcon(EDamageTypeKey.Sword)).toBe('/img/Sword.png');
 	});
 });
 
 describe('leaf damage-type helpers', () => {
-	it('maps a leaf type to its accent / name / glyph', () => {
+	it('maps a leaf type to its accent / name / icon', () => {
 		expect(damageTypeColor(EDamageType.Fire)).toBe('var(--dmg-fire)');
 		expect(damageTypeName(EDamageType.Burn)).toBe('Burn');
-		expect(damageTypeGlyph(EDamageType.Earth)).toBe('earth');
+		expect(damageTypeIcon(EDamageType.Earth)).toBe('/img/Earth.png');
 	});
 
 	it('treats Physical as the neutral baseline', () => {
@@ -58,7 +65,7 @@ describe('leaf damage-type helpers', () => {
 			const key = type as unknown as EDamageTypeKey;
 			expect(damageTypeColor(type)).toBe(damageTypeKeyColor(key));
 			expect(damageTypeName(type)).toBe(damageTypeKeyName(key));
-			expect(damageTypeGlyph(type)).toBe(damageTypeKeyGlyph(key));
+			expect(damageTypeIcon(type)).toBe(damageTypeKeyIcon(key));
 		}
 	});
 });

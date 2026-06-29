@@ -57,11 +57,7 @@
 					<div class="attr-group">
 						{#if group.damageTypeKey !== undefined}
 							<div class="attr-group-head dmg" style:color={damageTypeKeyColor(group.damageTypeKey)}>
-								<DamageTypeGlyph
-									glyph={damageTypeKeyGlyph(group.damageTypeKey)}
-									color={damageTypeKeyColor(group.damageTypeKey)}
-									size={11}
-								/>
+								<DamageTypeIcon dmgKey={group.damageTypeKey} size={13} />
 								{group.label}
 							</div>
 						{:else if group.label}
@@ -93,8 +89,8 @@
 
 <script lang="ts">
 import { Popover } from '$components';
-import DamageTypeGlyph from '$components/DamageTypeGlyph.svelte';
-import { damageTypeKeyColor, damageTypeKeyGlyph } from '$lib/common';
+import DamageTypeIcon from '$components/DamageTypeIcon.svelte';
+import { damageTypeKeyColor } from '$lib/common';
 import { staticData } from '$stores';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import DirtyDot from './DirtyDot.svelte';

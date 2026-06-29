@@ -6,11 +6,7 @@
 		<div class="group">
 			{#if group.damageTypeKey !== undefined}
 				<span class="group-label damage-type" style:color={damageTypeKeyColor(group.damageTypeKey)}>
-					<DamageTypeGlyph
-						glyph={damageTypeKeyGlyph(group.damageTypeKey)}
-						color={damageTypeKeyColor(group.damageTypeKey)}
-						size={12}
-					/>
+					<DamageTypeIcon dmgKey={group.damageTypeKey} size={14} />
 					{group.label}
 				</span>
 			{:else}
@@ -30,8 +26,8 @@
 
 <script lang="ts">
 import AttributeListRow from './AttributeListRow.svelte';
-import DamageTypeGlyph from '$components/DamageTypeGlyph.svelte';
-import { damageTypeKeyColor, damageTypeKeyGlyph } from '$lib/common';
+import DamageTypeIcon from '$components/DamageTypeIcon.svelte';
+import { damageTypeKeyColor } from '$lib/common';
 import type { AttributeBreakdownView } from './attribute-breakdown-view.svelte';
 
 interface Props {

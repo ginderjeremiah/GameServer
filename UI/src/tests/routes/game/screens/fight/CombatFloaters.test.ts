@@ -88,25 +88,23 @@ describe('CombatFloaters', () => {
 	});
 
 	describe('typed damage (#1320)', () => {
-		it('tints a typed plain hit by its damage type and shows the type glyph', () => {
+		it('tints a typed plain hit by its damage type and shows the type icon', () => {
 			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
 			emit({ target: 'enemy', kind: 'hit', amount: 45, damageType: EDamageType.Fire });
 
 			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
 			expect(floater.textContent).toContain('45');
 			expect(floater.getAttribute('style')).toContain('var(--dmg-fire)');
-			// An inline type glyph (not a PNG outcome icon) tags the type.
-			expect(floater.querySelector('.floater-glyph svg')).not.toBeNull();
-			expect(floater.querySelector('img.floater-icon')).toBeNull();
+			// The damage-type PNG tags the type (no outcome icon for a plain hit).
+			expect(floater.querySelector('img.floater-icon')?.getAttribute('src')).toContain('Fire.png');
 		});
 
-		it('keeps a physical hit glyph-free (the untyped baseline) but still tints it neutral', () => {
+		it('keeps a physical hit icon-free (the untyped baseline) but still tints it neutral', () => {
 			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
 			emit({ target: 'enemy', kind: 'hit', amount: 12, damageType: EDamageType.Physical });
 
 			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
 			expect(floater.getAttribute('style')).toContain('var(--dmg-physical)');
-			expect(floater.querySelector('.floater-glyph')).toBeNull();
 			expect(floater.querySelector('img.floater-icon')).toBeNull();
 		});
 

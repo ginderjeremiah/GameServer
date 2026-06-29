@@ -30,11 +30,13 @@ export const attributeColor = (id: EAttribute): string => {
 
 /** Icon filename (in `static/img`) per attribute. Frontend-owned, like `attributeColor`/
  *  `attributeCode`: the art lives in `UI/static/img` and the backend never references these
- *  paths. The core/derived/HoT set has art; the obsolete `DropBonus`, the #1320 amp/resist family,
- *  the typed DoT accumulators, and the authored-only `DamageReflection` (dedicated art tracked in
- *  #1378) have none yet and degrade to an empty icon. The crit/dodge set follows a shared
- *  visual language: the magnitude attribute (`CriticalDamage`) uses the clean base symbol, and the
- *  chance attributes reuse that symbol with a `%` badge. */
+ *  paths. Two shared badge languages keep families consistent: the crit/dodge set uses a clean
+ *  base symbol for the magnitude attribute (`CriticalDamage`) and that symbol plus a `%` badge for
+ *  the chance attributes; the damage-type amplification/resistance family (#1320/#1340) uses the
+ *  type's base icon plus an `amp` (up-arrow) or `resist` (shield) badge, composited by
+ *  `badge.py` so the `…Amplification` / `…Resistance` siblings are identical bar the badge. Only
+ *  the obsolete `DropBonus` and the typed DoT accumulators (Bleed/Poison/Burn DamagePerSecond, owned
+ *  by the #1320 Area F UX work) have no art and degrade to an empty icon. */
 const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Strength]: 'Strength',
 	[EAttribute.Endurance]: 'Endurance',
@@ -43,16 +45,41 @@ const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Dexterity]: 'Dexterity',
 	[EAttribute.Luck]: 'Luck',
 	[EAttribute.MaxHealth]: 'Max Health',
-	// Reuses the former Defense art until dedicated Toughness art lands (#1378).
-	[EAttribute.Toughness]: 'Defense',
+	[EAttribute.Toughness]: 'Toughness',
 	[EAttribute.CooldownRecovery]: 'Cooldown Recovery',
 	[EAttribute.CriticalChance]: 'Critical Chance',
 	[EAttribute.CriticalDamage]: 'Critical Damage',
 	[EAttribute.DodgeChance]: 'Dodge Chance',
-	[EAttribute.HealthRegenPerSecond]: 'Health Regen Per Second'
-	// The typed DoT accumulators (Bleed/Poison/Burn DamagePerSecond) have no art yet — typed DoT icons
-	// are owned by the #1320 Area F UX work — so they degrade to no icon (the AttributeIcon component
-	// renders nothing for the empty case).
+	[EAttribute.HealthRegenPerSecond]: 'Health Regen Per Second',
+	[EAttribute.DamageReflection]: 'Damage Reflection',
+	// Damage-type amplification / resistance (#1320): each type's base icon + an amp / resist badge.
+	[EAttribute.PhysicalAmplification]: 'Physical Amplification',
+	[EAttribute.PhysicalResistance]: 'Physical Resistance',
+	[EAttribute.FireAmplification]: 'Fire Amplification',
+	[EAttribute.FireResistance]: 'Fire Resistance',
+	[EAttribute.WaterAmplification]: 'Water Amplification',
+	[EAttribute.WaterResistance]: 'Water Resistance',
+	[EAttribute.EarthAmplification]: 'Earth Amplification',
+	[EAttribute.EarthResistance]: 'Earth Resistance',
+	[EAttribute.WindAmplification]: 'Wind Amplification',
+	[EAttribute.WindResistance]: 'Wind Resistance',
+	[EAttribute.BleedAmplification]: 'Bleed Amplification',
+	[EAttribute.BleedResistance]: 'Bleed Resistance',
+	[EAttribute.PoisonAmplification]: 'Poison Amplification',
+	[EAttribute.PoisonResistance]: 'Poison Resistance',
+	[EAttribute.BurnAmplification]: 'Burn Amplification',
+	[EAttribute.BurnResistance]: 'Burn Resistance',
+	[EAttribute.ElementalAmplification]: 'Elemental Amplification',
+	[EAttribute.ElementalResistance]: 'Elemental Resistance',
+	[EAttribute.DotAmplification]: 'Damage Over Time Amplification',
+	[EAttribute.DotResistance]: 'Damage Over Time Resistance',
+	// Weapon-type amplification (#1340): amp-only (a weapon hit mitigates via Physical resistance).
+	[EAttribute.SwordAmplification]: 'Sword Amplification',
+	[EAttribute.AxeAmplification]: 'Axe Amplification',
+	[EAttribute.BowAmplification]: 'Bow Amplification',
+	[EAttribute.ClubAmplification]: 'Club Amplification',
+	[EAttribute.DaggerAmplification]: 'Dagger Amplification',
+	[EAttribute.UnarmedAmplification]: 'Unarmed Amplification'
 };
 
 /** Path to the attribute's icon under `static/img`, or `''` for an attribute with no art yet.

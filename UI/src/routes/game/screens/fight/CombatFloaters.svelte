@@ -13,11 +13,7 @@
 			style:color={floater.color}
 			style:font-size="{floater.size}px"
 		>
-			{#if floater.glyph}
-				<span class="floater-glyph"
-					><DamageTypeGlyph glyph={floater.glyph} color={floater.color} size={Math.round(floater.size * 0.82)} /></span
-				>
-			{:else if floater.icon}
+			{#if floater.icon}
 				<img class="floater-icon" src={floater.icon} alt="" />
 			{/if}
 			{#if floater.amount}<span>{floater.amount}</span>{/if}
@@ -28,10 +24,9 @@
 
 <script lang="ts">
 import { onMount } from 'svelte';
-import { formatNum, damageTypeColor, damageTypeGlyph, type DamageGlyph } from '$lib/common';
+import { formatNum, damageTypeColor, damageTypeIcon } from '$lib/common';
 import { onCombatFloat, type CombatFloatEvent } from '$lib/engine';
 import { EDamageType } from '$lib/api';
-import DamageTypeGlyph from '$components/DamageTypeGlyph.svelte';
 
 type Props = {
 	/** Which card this layer sits over; only events targeting this side spawn here. */
@@ -47,15 +42,15 @@ interface Floater {
 	color: string;
 	size: number;
 	crit: boolean;
-	/** Inline damage-type glyph for a typed (non-physical) plain hit; crit/dodge use `icon` instead. */
-	glyph?: DamageGlyph;
+	/** Per-outcome art for a crit/dodge, or a typed (non-physical) plain hit's damage-type icon; empty
+	 *  for a plain physical hit. */
 	icon: string;
 	amount: string;
 	label: string;
 }
 
 /** Clean per-outcome icon art (in `static/img`) for the crit/dodge floaters; a plain hit shows its
- *  damage-type glyph instead (or nothing, for physical). These reuse the clean base symbols — the crit
+ *  damage-type icon instead (or nothing, for physical). These reuse the clean base symbols — the crit
  *  magnitude attribute icon plus the standalone `Dodge` — so the popup and the attribute display share
  *  one visual language. */
 const FLOAT_ICON: Partial<Record<CombatFloatEvent['kind'], string>> = {
@@ -100,12 +95,17 @@ const colorOf = (event: CombatFloatEvent): string => {
 	return event.damageType !== undefined ? damageTypeColor(event.damageType) : colorFor(event);
 };
 
-/** A plain hit's damage-type glyph — shown only for a typed (non-physical) hit so basic attacks stay
- *  clean and crit/dodge keep their own outcome icon. Physical is the untyped baseline. */
-const glyphOf = (event: CombatFloatEvent): DamageGlyph | undefined =>
-	event.kind === 'hit' && event.damageType !== undefined && event.damageType !== EDamageType.Physical
-		? damageTypeGlyph(event.damageType)
-		: undefined;
+/** The floater's icon: a crit/dodge's per-outcome art, otherwise a typed (non-physical) plain hit's
+ *  damage-type icon so basic/physical attacks stay clean. Physical is the untyped baseline. */
+const iconOf = (event: CombatFloatEvent): string => {
+	const outcome = FLOAT_ICON[event.kind];
+	if (outcome) {
+		return outcome;
+	}
+	return event.kind === 'hit' && event.damageType !== undefined && event.damageType !== EDamageType.Physical
+		? damageTypeIcon(event.damageType)
+		: '';
+};
 
 /** The number shown: an absorbed heal as `+N`, a dodge/no-amount event as nothing, else the damage. */
 const amountOf = (event: CombatFloatEvent): string => {
@@ -138,8 +138,7 @@ const spawn = (event: CombatFloatEvent) => {
 		color: colorOf(event),
 		size: crit ? 30 : 21,
 		crit,
-		glyph: glyphOf(event),
-		icon: FLOAT_ICON[event.kind] ?? '',
+		icon: iconOf(event),
 		amount: amountOf(event),
 		label: labelFor(event.kind)
 	});
@@ -189,20 +188,13 @@ onMount(() => {
 	}
 }
 
-// Per-outcome combat icon (crit/dodge); sized in em so it tracks the floater's font-size.
+// Per-outcome / damage-type combat icon; sized in em so it tracks the floater's font-size.
 .floater-icon {
 	width: 1.15em;
 	height: 1.15em;
 	margin-right: -0.22em;
 	vertical-align: -0.22em;
 	object-fit: contain;
-}
-
-// Inline damage-type glyph for a typed plain hit; aligned to sit on the number's baseline like the icon.
-.floater-glyph {
-	display: inline-flex;
-	margin-right: -0.1em;
-	vertical-align: -0.16em;
 }
 
 .floater-label {

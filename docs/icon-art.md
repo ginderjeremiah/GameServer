@@ -45,6 +45,12 @@ Tooling:
 - `strip-bg.py` — chroma background remover. Bundled with the `/image` skill at
   `.claude/skills/image/scripts/strip-bg.py` (alongside `generate.py`), so it travels
   with the repo.
+- `badge.py` — composites an amp / resist **badge** onto a stripped base icon (the
+  damage-type amplification/resistance family — see the _Damage types_ catalog section).
+  The badge art (`badges/amp.png`, `badges/resist.png`) is generated soft-cel art, not a vector;
+  `badge.py` autocrops it, scales it to ~42% of the icon width, and drops it lower-right with a soft
+  shadow. Keeps the `…Amplification` / `…Resistance` siblings identical bar the badge (the crit `%`-badge
+  pattern, generalised).
 - `generate-agy.py` — **default** generation backend: routes through the Antigravity
   CLI (`agy`) on your **subscription's image quota** instead of billing the paid API.
   Same prompt; `--strip` chains `strip-bg.py`. `agy` needs a real console, so run it
@@ -215,6 +221,30 @@ Compose every prompt as `"<SUBJECT>. <STYLE> <BACKGROUND>"`.
     `strip-bg.py --fill-holes` restores enclosed transparent pixels (RGB is
     preserved when alpha is zeroed, so the colour comes back). Opt-in — it would
     wrongly fill legitimate interior gaps like the bow's.
+11. **`agy`'s image quota runs out mid-batch (~20 icons), and resets in ~5h.** When it
+    does, a `--detached` run "succeeds" but its child reports `no generated image found in
+    agy's brain folder` — the agent ran but had no image quota left to draw. Don't retry on
+    `agy`; **fall back to the paid API** `generate.py` (`--model nb2`, then `strip-bg.py`
+    separately — `generate.py` has no `--strip`). It bills `GEMINI_API_KEY` but is unmetered
+    by the subscription, so it clears a stuck batch immediately. (A large batch is exactly the
+    case `docs` already flags `generate.py` for.)
+12. **Drive a multi-icon batch serially, one `--detached` call at a time.** Two concurrent
+    `agy` sessions race on the session dir and one dies with `no status file`. A bash loop that
+    calls `generate-agy.py --detached` per icon serialises naturally (each call blocks on its
+    child), so a whole base set generates unattended without contention.
+13. **`--strip-arg` doesn't survive the `--detached` re-spawn.** Passing
+    `--strip-arg=--trim-corners` to a detached run failed (`no status file`); generate plain,
+    then apply `strip-bg.py --trim-corners` as a separate step on the saved `…-vN.jpg`.
+14. **A "death / decay / dark" themed prompt can draw an opaque DARK backdrop panel** — which,
+    unlike a lime corner wedge (gotcha 7), the hue key can't remove (dark pixels are low-saturation,
+    protected). The wilting-flower DoT drew a full dark panel twice. Fix in the prompt, not the strip:
+    spell out that the subject "sits alone on a flat pure lime-green background with absolutely nothing
+    behind it — no dark, black, grey, or coloured panel/box/shadow/vignette." Verify by checking the
+    stripped PNG's edge pixels are transparent (a panel leaves them opaque).
+15. **Multi-colour subjects (e.g. the Elemental orb's four element quadrants) can't use the global
+    hue key** — a quadrant whose hue nears the backdrop's gets keyed out. Strip with `--connected`
+    (edge-flood: removes only backdrop connected to the frame edge, protecting every interior colour),
+    and keep the subject free of enclosed background pockets so none survive.
 
 ## Icon catalog
 
@@ -284,43 +314,42 @@ sentence to force small-size legibility, in place of the gear closing sentence:
 | File | Subject prompt (the part before STYLE) | Notes |
 |---|---|---|
 | `Strength.png` | A single flexed muscular arm bent at the elbow with a clenched fist, a strong bulging bicep — the classic 'strength' flex, side view. Periwinkle blue-violet skin (≈ `#a8c0f0`). | Periwinkle skin like the skill hands. |
-| `Endurance.png` | A single stylized mountain peak — a bold triangular mountain with a rounded snow-capped top and simple flat facet shading. Cool blue-grey rock, lighter off-white cap. | Mountain (not a heart/shield) to avoid colliding with Max Health / Defense. |
+| `Endurance.png` | A single stylized mountain peak — a bold triangular mountain with a rounded snow-capped top and simple flat facet shading. Cool blue-grey rock, lighter off-white cap. | Mountain (not a heart/shield) to avoid colliding with Max Health / Toughness. |
 | `Intellect.png` | A stylized human brain, three-quarter front angle, simple rounded lobes and a few clean fold lines. Soft periwinkle-blue and lavender (not fleshy pink). | Cool/UI-tied palette, deliberately not pink. |
 | `Agility.png` | A single winged boot — a simple low boot with a small feathered wing on the heel/ankle (a Hermes winged sandal). Muted brown boot, cool blue-grey/off-white wing. Fills most of the frame. | |
 | `Dexterity.png` | A bullseye target of concentric rings, face-on, with a single slim arrow struck dead centre. Cool blue-grey and off-white rings, small bright centre. | Concentric rings stay legible even at 16px. |
 | `Luck.png` | A single four-leaf clover: four rounded heart-shaped leaves and a short stem. Fresh muted green. | **Magenta backdrop** (green subject), `--bg-hue 300`. |
 | `Max Health.png` | A single bold heart symbol, smooth and rounded. Warm red. Fills most of the frame. | |
-| `Defense.png` | A single sturdy heater-style medieval shield, face-on, with a raised central boss and a subtle vertical seam. Cool blue-grey steel face, muted gold-bronze rim. | |
 | `Cooldown Recovery.png` | A single classic hourglass (sand timer), face-on: two rounded glass bulbs in a simple frame, sand falling through. Cool blue-grey frame, pale warm sand. Fills most of the frame. | Hourglass beat a stopwatch+arrow, which blurred below ~24px. |
 | `Damage Taken Per Second.png` | Two blood droplets — one large dominant teardrop with a small highlight, plus a second much smaller drop beside/below it. Deep red. Fills most of the frame. | Two-drop motif separates it from the single Max Health heart. |
 | `Health Regen Per Second.png` | A single heart with a small upward arrow and a tiny sparkle above it. A fresh healing **green** heart (not red). | **Magenta backdrop** (green subject), `--bg-hue 300`. |
 
-### Crit / dodge / block (issue #801)
+### Crit / dodge (issue #801; Block retired #1378)
 
-The player crit/dodge/block attributes (the #178 spike) share a small **visual
-language** so the five attributes read as three families. Each family has **one clean
-base symbol**; the _magnitude_ attribute uses the clean symbol unchanged, and the
-_chance_ attribute reuses it with a **composited `%` badge** in the lower-right corner:
+The player crit/dodge attributes (the #178 spike) share a small **visual language**: each
+family has **one clean base symbol**; the _magnitude_ attribute uses the clean symbol
+unchanged, and the _chance_ attribute reuses it with a **composited `%` badge** in the
+lower-right corner:
 
 - **Crit** — an explosive impact burst (white-hot core, jagged shockwave rays).
 - **Dodge** — a cool blue-grey humanoid silhouette mid-sidestep with two faded **phantom
   afterimages** trailing it.
-- **Block** — two forearms crossed in an **X**, in **brown leather vambraces with bronze
-  studs** (warm leather deliberately set apart from the cool-steel `Defense` shield and the
-  periwinkle `Punch` fist).
 
-**Base symbols.** The three exact subject prompts (the part before STYLE), generated on the
-`agy`/NB2 backend on the lime backdrop, keyed with the default `--bg-hue 85` (no green
-subjects). Like the other attributes they use the locked STYLE **minus** the metal/leather
-palette sentence **plus** the 16px legibility sentence, with the bracer/skin colours baked
-into the subject:
+> **Block retired (#1378).** The Block mechanic was removed with the mitigation rework (#1333),
+> so its art (`Block Reduction.png`, `Block Chance.png`) and the brown-leather-bracers base symbol
+> were deleted. The reflection that replaced Block has its own art — see
+> [Toughness & Damage Reflection](#toughness--damage-reflection-1378).
+
+**Base symbols.** The two exact subject prompts (the part before STYLE), generated on the
+`agy`/NB2 backend on the lime backdrop, keyed with the default `--bg-hue 85`. Like the other
+attributes they use the locked STYLE **minus** the metal/leather palette sentence **plus** the
+16px legibility sentence, with the skin colours baked into the subject:
 
 <!-- prettier-ignore -->
 | Base | Subject prompt (the part before STYLE) |
 |---|---|
 | crit | A single bold explosive critical-hit impact burst - a sharp jagged multi-pointed starburst exploding outward with a bright white-hot center and sharp angular shockwave rays of varying length, conveying a powerful high-impact strike. Centred, filling most of the frame. Bright white-yellow core, vivid orange middle, deep red-orange pointed tips. |
 | dodge | A single sleek bold humanoid silhouette dodging to the side - leaning and stepping sideways to evade an incoming attack, the body angled and weight shifted to one side so it clearly reads as sidestepping rather than running forward, with two translucent phantom afterimage copies trailing to show the quick evasive motion. The leading silhouette is a solid cool slate blue-grey, the trailing afterimages a faded lighter blue-grey, never green. Centred, filling most of the frame. |
-| block | Two forearms crossed in a bold X shape in a defensive block-and-brace pose, each forearm wearing a sturdy brown leather vambrace arm-guard with small bronze studs and buckles. Soft periwinkle blue-violet skin on the visible hands. The crossed brown leather bracers forming a clear X are the focal point. Centred, filling most of the frame. |
 
 **Files.** Each base ships twice — the clean symbol and a `%`-badged variant:
 
@@ -331,19 +360,89 @@ into the subject:
 | `Critical Chance.png` | crit | + `%` (chance) |
 | `Dodge.png` | dodge | clean — standalone, for the combat-float popup |
 | `Dodge Chance.png` | dodge | + `%` (chance) |
-| `Block Reduction.png` | block | clean (magnitude) |
-| `Block Chance.png` | block | + `%` (chance) |
 
 The `%` badge is **not generated** — it is composited onto the stripped base PNG (a bold
 outlined off-white `%`, lower-right, ~46% of the icon width with a thick dark outline so it
 reads even over the light dodge figure), so the chance and magnitude siblings stay
 pixel-identical apart from the badge, and the badge is trivially restyled.
 
-The clean symbols double as the **combat-float popup** art: `CombatFloaters.svelte` has a
-`.floater-icon` slot (still a placeholder square) for the per-outcome CRIT/DODGE/BLOCK
-floaters — `Critical Damage.png` / `Dodge.png` / `Block Reduction.png` are the intended art
-for it. `Dodge` needs its own file because dodge has no magnitude attribute to carry the
+The clean symbols double as the **combat-float popup** art: `CombatFloaters.svelte`'s
+`.floater-icon` renders `Critical Damage.png` / `Dodge.png` for the per-outcome CRIT/DODGE
+floaters. `Dodge` needs its own file because dodge has no magnitude attribute to carry the
 clean symbol.
+
+### Damage types & amplification / resistance (#1320/#1340)
+
+The eight leaf damage types + the two cross-cutting categories (Elemental, DoT) each get **one
+base icon** that serves two roles: the **damage-type icon** itself (drawn by `DamageTypeIcon`
+in the breakdown headers / combat floaters, replacing the old inline-SVG `DamageTypeGlyph`
+stopgap) **and** the **base** for that type's amplification / resistance attribute icons. Amp
+and resist are not regenerated — `badge.py` composites a generated soft-cel **amp** (up-arrow,
+"deal more") or **resist** (shield, "take less") badge onto the base, lower-right, so
+`<Type> Amplification.png` and `<Type> Resistance.png` are identical apart from the badge.
+
+Subjects bake the type's `--dmg-*` hue and use the attribute STYLE (drop the metal/leather
+palette sentence, add the 16px legibility sentence). Backdrop is lime (`--bg-hue 85`) except
+the two near-lime subjects — **Wind** (mint) and **Poison** (yellow-green) — which use the
+**magenta** backdrop (`--bg-hue 300`). **Elemental** is the exception to the global hue key: its
+four element-coloured quadrants would be partly keyed out, so it strips with `--connected`
+(edge-flood, removes only the connected exterior backdrop). Keep critical detail out of the
+lower-right corner — that is where the amp/resist badge lands.
+
+<!-- prettier-ignore -->
+| Base file | Subject prompt (the part before STYLE) | Notes |
+|---|---|---|
+| `Physical.png` | Two steel swords crossed in a bold symmetric X, both blades pointing up and outward to the top corners, with simple crossguards and short wrapped grips meeting at the bottom centre. Cool blue-grey steel blades, like hex #b6bcc8, with small muted brown grips and a hint of muted gold-bronze on the guards. A clean iconic crossed-swords emblem. Centred, filling most of the frame. | Crossed swords — refined from a too-ambiguous impact burst. API/nb2. |
+| `Fire.png` | A cluster of bold flames - two or three orange flame tongues of varying height rising together from a common base, like a small bonfire or fireball, with a brighter yellow-orange core. Warm orange fire, like hex #ef8a5d, deeper red-orange at the outer edges. Centred, filling most of the frame. | Multi-flame cluster, set apart from Burn's single ember-flame. API/nb2. |
+| `Water.png` | A single bold curling ocean wave - a powerful breaking wave that curls over at the crest with a little white foam and a few spray droplets, stylized and clean and dynamic. Clear blue water, like hex #6fb2e0, with soft off-white foam. Centred, filling most of the frame. | Wave (more powerful than the earlier droplet). API/nb2. |
+| `Earth.png` | A single chunky angular boulder - one heavy rounded rock with a couple of smaller stones at its base and a few simple facet lines, solid and weighty. Muted tan-brown earth color, like hex #c2a368. NOT a mountain or a tall peak, a low chunky rock. Centred, filling most of the frame. | Boulder, not a mountain (avoids the Endurance peak). |
+| `Wind.png` | A single bold swirling wind gust - one clean curling spiral of wind with two short tapering trailing motion streaks, conveying a gust of moving air. Soft mint-teal color, like hex #9fd9c0. Centred, filling most of the frame. | **Magenta backdrop** (mint ≈ lime hue). |
+| `Bleed.png` | Two blood droplets - one large dominant teardrop centred with a small soft highlight, plus a second smaller droplet beside it to the upper left. Deep vivid red blood, like hex #d76a72. Centred, filling most of the frame. | Blood drops (the old Damage-Taken motif); the claw-slashes were freed for enemy art. Needed `--trim-corners`. API/nb2. |
+| `Poison.png` | A single rounded droplet of venom in sickly toxic green, like hex #a9c45f, marked with a small bold white skull-and-crossbones symbol on its face - a clear little skull above two crossed bones. Menacing and deadly poison. Centred, filling most of the frame. | Skull-and-crossbones in a toxic drop. **Magenta backdrop** (green subject). API/nb2. |
+| `Burn.png` | A single LARGE bold amber flame rising from a small glowing ember at its base, with one or two small sparks, conveying a smouldering burn. Warm amber-gold colour, like hex #f0b259, clearly more golden-amber than a bright orange fire. Large and bold, filling almost the entire frame. Centred. | Amber/ember vs Fire's orange; regenerated larger. API/nb2. |
+| `Elemental.png` | A round elemental medallion divided into four equal pie quadrants, each a different classical element: a warm orange flame in one quadrant, a blue water droplet in another, a tan-brown rock in another, and a mint-green wind swirl in the last, all enclosed by a clean lavender-purple ring around the rim. Conveys all four elements combined into one emblem. Centred, filling most of the frame. | Four-element orb. Stripped with `--connected` (the four hues confuse a global key). API/nb2. |
+| `Damage Over Time.png` | A single wilting, drooping flower for a damage-over-time game icon - a limp bent stem and a couple of withered drooping leaves in muted dried olive-brown (a dull desaturated brown-green, NOT a bright vivid green), topped by a drooping withered bloom of faded dusty mauve-purple petals (around hex #b98fbf) turning brown and brittle at the edges, with one shrivelled petal falling away below. Muted, desaturated, naturalistic colours. Centred, filling most of the frame. | Wilting flower (decay over time); naturalistic palette keeps the mauve bloom for the DoT hue. Needed extra-strong anti-panel wording (a "death/decay" prompt drew a dark backdrop panel twice). API/nb2. |
+
+**Amp/resist files** (composited via `badge.py`, no regeneration): `<Type> Amplification.png`
+(amp badge) and `<Type> Resistance.png` (resist badge) for each of the ten bases above. The two
+**badge** source arts under `.claude/skills/image/scripts/badges/` are generated, not vector:
+
+<!-- prettier-ignore -->
+| Badge | Subject prompt (the part before STYLE) |
+|---|---|
+| `amp` | A single bold upward-pointing arrow, thick and chunky with gently rounded corners, pointing straight up - a simple solid arrow shape (triangular head over a short wide shaft). Warm cream off-white color with soft gentle cel-shading, a touch brighter at the top and a touch deeper at the base, and a clean thin dark outline. Centred, filling most of the frame. |
+| `resist` | A single bold heater shield, front view - a simple solid shield with a wide flat top and sides tapering to a point at the bottom, a subtle raised center boss, and gently rounded edges. Warm cream off-white color with soft gentle cel-shading, a touch brighter at the top and a touch deeper toward the point, and a clean thin dark outline. Centred, filling most of the frame. |
+
+### Weapon-type icons (#1340)
+
+The six weapon damage-type leaves (physical-category) each get a base weapon icon, which ships
+as the type icon **and** (via `badge.py` amp badge) the `<Weapon> Amplification.png` attribute
+icon — weapon types are **amp-only** (a weapon hit mitigates through `Physical Resistance`).
+These use the **gear** STYLE (keep the metal/leather palette sentence) + the 16px legibility
+sentence; lime backdrop.
+
+<!-- prettier-ignore -->
+| Base file | Subject prompt (the part before STYLE) | Notes |
+|---|---|---|
+| `Sword.png` | A single upright steel sword pointing straight up - a straight double-edged blade with a subtle central fuller, a simple crossguard, and a short wrapped grip with a small pommel. Cool blue-grey steel blade, muted brown grip, small muted gold-bronze guard. Centred, filling most of the frame. | |
+| `Axe.png` | A single one-handed battle axe held upright - one broad curved steel axe head on a straight wooden handle with a small grip wrap near the base. Cool blue-grey steel head, muted brown wooden handle. Centred, filling most of the frame. | Needed `strip-bg.py --trim-corners` (painted panel). |
+| `Bow.png` | A single wooden recurve bow held upright as a vertical curved arc, with a leather-wrapped grip in the middle and a taut bowstring. Muted brown wood, lighter taut string. No arrow. Centred, filling most of the frame. | API/nb2 (agy quota exhausted mid-batch). |
+| `Club.png` | A single crude heavy wooden club held upright - a thick gnarled tree-branch cudgel, wider and knobbly at the top with rough bark, narrowing to a grip at the bottom. Muted brown wood. Centred, filling most of the frame. | |
+| `Dagger.png` | A single short steel dagger pointing straight up - one slightly curved short blade, a simple small crossguard, and a wrapped grip. Cool blue-grey steel blade, muted brown grip. Centred, filling most of the frame. | API/nb2. |
+| `Unarmed.png` | A single clenched fist, knuckles facing forward, in a bold straight-on punch pose. Periwinkle blue-violet skin, like hex #a8c0f0. Centred, filling most of the frame. | Periwinkle skin (like the skill hands); API/nb2. Uses the attribute STYLE (no gear palette). |
+
+### Toughness & Damage Reflection (#1378)
+
+The two mitigation-rework attributes. Both use the attribute STYLE (steel colours baked into
+the subject) + the 16px legibility sentence, lime backdrop. `Toughness` replaced the old
+`Defense` shield (now retired); a breastplate keeps it distinct from the `Endurance` mountain,
+the `Max Health` heart, and the resist shield-badge.
+
+<!-- prettier-ignore -->
+| File | Subject prompt (the part before STYLE) | Notes |
+|---|---|---|
+| `Toughness.png` | A single sturdy steel breastplate body-armor (a cuirass), front view - a smooth rounded plain chest plate with a raised central ridge down the middle and subtle layered overlapping plates at the shoulders and waist. Keep the chest surface completely plain and smooth with no emblem, crest, engraving, animal, or decoration. Cool blue-grey steel with soft cel-shading. Centred, filling most of the frame. | Re-rolled to drop a lion crest (noisy when small). |
+| `Damage Reflection.png` | A single bold reflect-damage symbol: a vivid red arrow flies in from the lower-left, strikes an angled steel deflector plate at the centre, and ricochets sharply back out toward the upper-left, the two arrow segments forming a clear bent V with a bright spark at the bounce point - unmistakably an attack being bounced back the way it came. Cool blue-grey steel plate, vivid red-orange arrow and spark. Bold, simple, low-detail. Centred, filling most of the frame. | v2 — a clearer ricochet than the first "arrows into a wall" draft. |
 
 ## Status
 
@@ -353,7 +452,18 @@ All 14 current icons (11 gear + 3 skills above) were **regenerated on `nb2`
 paneling, the bow's arrow direction, and the Punch thumb on the first try; only
 `daggers` and `leather-pants` still needed `--trim-corners`). The **11 attribute
 icons** (the Attributes section above) were generated the same way on `nb2` on
-2026-06-14 (issue #531). The **crit/dodge/block set** (5 attribute icons + the standalone
-`Dodge.png`, three base symbols) was added on the `agy`/NB2 backend on **2026-06-17** (issue
-#801) — see the _Crit / dodge / block_ section above. Skill slots are expected to grow to a
-**64×64 minimum (possibly 96×96)**, so favour legibility at those sizes for new skill art.
+2026-06-14 (issue #531). The **crit/dodge set** (the standalone `Dodge.png` + the crit/dodge
+attribute icons, two base symbols) was added on the `agy`/NB2 backend on **2026-06-17** (issue
+#801) — see the _Crit / dodge_ section above; the former block art was retired with the
+mechanic (#1378).
+
+The **damage-type / amplification-resistance / weapon family + the #1378 mitigation attrs**
+were added **2026-06-29**: 16 base icons (10 damage types + 6 weapons) + the 2 amp/resist badge
+sources, composited by `badge.py` into 26 amp/resist/weapon-amp variants, plus `Toughness.png`
+and `Damage Reflection.png` — 44 new files. Generated on the `agy`/NB2 backend until its image
+quota ran out ~20 icons in, then finished on the paid API (`generate.py --model nb2`) — see
+gotchas 11–13. This replaced the inline-SVG `DamageTypeGlyph` with PNG `DamageTypeIcon` art and
+retired `Defense.png` (Toughness's old placeholder) and the Block art.
+
+Skill slots are expected to grow to a **64×64 minimum (possibly 96×96)**, so favour legibility
+at those sizes for new skill art.

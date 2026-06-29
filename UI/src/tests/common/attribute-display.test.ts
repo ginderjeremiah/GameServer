@@ -134,9 +134,52 @@ describe('attributeIcon', () => {
 			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
 			EAttribute.DodgeChance,
-			EAttribute.HealthRegenPerSecond
+			EAttribute.HealthRegenPerSecond,
+			EAttribute.DamageReflection
 		];
 		for (const id of withArt) {
+			expect(attributeIcon(id)).toMatch(/^\/img\/.+\.png$/);
+		}
+	});
+
+	it('maps the damage-type amp/resist + weapon-amp family to its badge-composited art (#1320/#1340)', () => {
+		// Amplification = the type's base icon + amp badge; Resistance = base + resist badge (composited).
+		expect(attributeIcon(EAttribute.FireAmplification)).toBe('/img/Fire Amplification.png');
+		expect(attributeIcon(EAttribute.PhysicalResistance)).toBe('/img/Physical Resistance.png');
+		expect(attributeIcon(EAttribute.ElementalResistance)).toBe('/img/Elemental Resistance.png');
+		// The DoT category's files use its full display name; weapon types are amp-only.
+		expect(attributeIcon(EAttribute.DotAmplification)).toBe('/img/Damage Over Time Amplification.png');
+		expect(attributeIcon(EAttribute.SwordAmplification)).toBe('/img/Sword Amplification.png');
+		// Every amp/resist/weapon-amp attribute resolves to a path (none left blank).
+		const family = [
+			EAttribute.PhysicalAmplification,
+			EAttribute.PhysicalResistance,
+			EAttribute.FireAmplification,
+			EAttribute.FireResistance,
+			EAttribute.WaterAmplification,
+			EAttribute.WaterResistance,
+			EAttribute.EarthAmplification,
+			EAttribute.EarthResistance,
+			EAttribute.WindAmplification,
+			EAttribute.WindResistance,
+			EAttribute.BleedAmplification,
+			EAttribute.BleedResistance,
+			EAttribute.PoisonAmplification,
+			EAttribute.PoisonResistance,
+			EAttribute.BurnAmplification,
+			EAttribute.BurnResistance,
+			EAttribute.ElementalAmplification,
+			EAttribute.ElementalResistance,
+			EAttribute.DotAmplification,
+			EAttribute.DotResistance,
+			EAttribute.SwordAmplification,
+			EAttribute.AxeAmplification,
+			EAttribute.BowAmplification,
+			EAttribute.ClubAmplification,
+			EAttribute.DaggerAmplification,
+			EAttribute.UnarmedAmplification
+		];
+		for (const id of family) {
 			expect(attributeIcon(id)).toMatch(/^\/img\/.+\.png$/);
 		}
 	});
@@ -148,7 +191,6 @@ describe('attributeIcon', () => {
 		expect(attributeIcon(EAttribute.BleedDamagePerSecond)).toBe('');
 		expect(attributeIcon(EAttribute.PoisonDamagePerSecond)).toBe('');
 		expect(attributeIcon(EAttribute.BurnDamagePerSecond)).toBe('');
-		expect(attributeIcon(EAttribute.DamageReflection)).toBe('');
 		expect(attributeIcon(999 as EAttribute)).toBe('');
 	});
 });

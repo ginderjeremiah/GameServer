@@ -34,8 +34,11 @@ describe('AttributeIcon', () => {
 		expect(dimg.style.height).toBe('16px');
 	});
 
-	it('renders nothing for an attribute without art (crit/dodge/block, DropBonus)', () => {
+	it('renders nothing for an attribute without art (DropBonus, typed DoT accumulators)', () => {
 		const { container } = render(AttributeIcon, { props: { id: EAttribute.DropBonus } });
 		expect(container.querySelector('img')).toBeFalsy();
+		cleanup();
+		const dot = render(AttributeIcon, { props: { id: EAttribute.BleedDamagePerSecond } });
+		expect(dot.container.querySelector('img')).toBeFalsy();
 	});
 });
