@@ -126,5 +126,7 @@ export function buildLadder(
 /** The activity a path trains on, as the inspector's single "Trained by" chip label — a path earns from
  *  any effect whose key resolves to it (spike #1318). */
 export function trainedBy(activityKey: EActivityKey): string[] {
+	// TODO(#1341): surface a friendly label (e.g. Dot → "Damage over time") rather than the raw enum name,
+	// as part of the authoring/labels pass.
 	return [EActivityKey[activityKey]];
 }
