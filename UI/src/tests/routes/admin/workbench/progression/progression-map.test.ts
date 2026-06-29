@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { EActivityKey } from '$lib/api';
 import { bezierPath, mapColumns, mapEdgeDefs, tierNodeId } from '$routes/admin/workbench/progression/progression-map';
 import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
 
@@ -6,8 +7,7 @@ const path = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath => (
 	id,
 	name: `Path ${id}`,
 	description: '',
-	falloffBase: 0.6,
-	contributions: [],
+	activityKey: EActivityKey.Physical,
 	...over
 });
 

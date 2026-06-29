@@ -203,9 +203,10 @@ namespace Game.Application.Tests.Services
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
 
-            // The player's only selected skill contributes to a fresh proficiency, so every win trains it.
+            // The player's only selected skill trains a fresh proficiency's path (its damage routes there), so
+            // every win trains it.
             var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Smashing", baseXp: 100m, xpGrowth: 2m);
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, playerSkill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, playerSkill.Id);
 
             var user = await TestDataSeeder.CreateUserAsync(context);
             var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
@@ -225,21 +226,23 @@ namespace Game.Application.Tests.Services
             var stored = Assert.Single(await progressRepo.GetProficiencies(playerEntity.Id));
             Assert.Equal(proficiency.Id, stored.ProficiencyId);
 
-            // Enemy power == player power → difficulty multiplier 1, so each win accrues the whole pie. The
-            // cumulative XP (residual + the consumed thresholds of the curve baseXp 100 / growth 2) equals
-            // wins × pie — the offline accrual matches the live per-victory amount applied once per win.
+            // The player's Smash damage trains its path each win, so the window accrues positive XP. The
+            // cumulative XP (residual + the consumed thresholds of the curve baseXp 100 / growth 2) is the
+            // window's total — it must match the folded summary gain exactly (the "offline == live, folded onto
+            // the welcome-back summary" invariant, spike #982 decision 9), not be re-derived from a per-win pie
+            // (the effect-based amount is pie × clamp(damage ÷ power), not a flat pie).
             var cumulative = stored.Xp;
             for (var level = 0; level < stored.Level; level++)
             {
                 cumulative += (decimal)(100 * Math.Pow(2, level));
             }
-            Assert.Equal((decimal)(summary.BattlesWon * ServerGameConstants.ProficiencyXpPerVictory), cumulative);
+            Assert.True(cumulative > 0, "Expected the offline window to accrue proficiency XP.");
 
-            // The summary carries the folded gain (spike #982 decision 9) — the window's total XP and the final
-            // level/residual XP match the persisted state, so the welcome-back gate can report it.
+            // The summary carries the folded gain — the window's total XP and the final level/residual XP match
+            // the persisted state, so the welcome-back gate can report it.
             var gain = Assert.Single(summary.ProficiencyGains);
             Assert.Equal(proficiency.Id, gain.ProficiencyId);
-            Assert.Equal((decimal)(summary.BattlesWon * ServerGameConstants.ProficiencyXpPerVictory), gain.XpGained);
+            Assert.Equal(cumulative, gain.XpGained);
             Assert.Equal(stored.Level, gain.NewLevel);
             Assert.Equal(stored.Xp, gain.NewXp);
         }

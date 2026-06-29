@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/svelte';
-import { EAttribute, EAttributeType, EModifierType } from '$lib/api';
+import { EActivityKey, EAttribute, EAttributeType, EModifierType } from '$lib/api';
 import type {
 	PathView,
 	TierView,
@@ -73,7 +73,7 @@ const pathView = (o: Partial<PathView> = {}): PathView => ({
 	name: 'Pyromancy',
 	word: 'aenkor',
 	iconPath: '',
-	contributions: [],
+	activityKey: EActivityKey.Physical,
 	tiers: [],
 	...o
 });
@@ -205,24 +205,9 @@ describe('WordDetail — per-level ladder', () => {
 /* ── trained-by chips ──────────────────────────────────────────────────────── */
 
 describe('WordDetail — trained-by chips', () => {
-	it('renders a chip per distinct contributing skill name', () => {
-		const path = pathView({
-			contributions: [
-				{ skillId: 4, homeTier: 0, weight: 1 },
-				{ skillId: 4, homeTier: 1, weight: 0.5 },
-				{ skillId: 5, homeTier: 0, weight: 1 }
-			]
-		});
-		renderInspector(tierView({ id: 1 }), path);
+	it('renders the activity key the path trains on as a chip', () => {
+		renderInspector(tierView({ id: 1 }), pathView({ activityKey: EActivityKey.Fire }));
 		const chips = screen.getByTestId('trained-by');
-		expect(within(chips).getByText('Fireball')).toBeTruthy();
-		expect(within(chips).getByText('Ember Strike')).toBeTruthy();
-		// Deduped — the doubled Fireball contribution yields a single chip.
-		expect(within(chips).getAllByText('Fireball')).toHaveLength(1);
-	});
-
-	it('shows the empty hint when no skill trains the path', () => {
-		renderInspector(tierView({ id: 1 }), pathView({ contributions: [] }));
-		expect(within(screen.getByTestId('trained-by')).getByText('— none yet —')).toBeTruthy();
+		expect(within(chips).getByText('Fire')).toBeTruthy();
 	});
 });

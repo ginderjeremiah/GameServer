@@ -13,6 +13,11 @@ namespace Game.Core.Battle
         private Battler _targetBattler;
         private bool _isPlayerActive;
 
+        // The player's typed-exposure recorder, cached once (a method group converts to a fresh delegate on
+        // each use) so the per-tick DoT phase can hand it to ApplyDamageOverTime without allocating on the
+        // replay hot path.
+        private readonly Action<EDamageType, double> _recordPlayerExposure;
+
         public int TimeDelta { get; set; }
         public BattleStats Stats { get; } = new();
 
@@ -25,6 +30,7 @@ namespace Game.Core.Battle
             _targetBattler = enemyBattler;
             _isPlayerActive = true;
             TimeDelta = timeDelta;
+            _recordPlayerExposure = Stats.AddTypedDamageExposure;
         }
 
         public void SwapActiveAndTargetBattlers()
@@ -83,6 +89,9 @@ namespace Game.Core.Battle
         /// </summary>
         public void ResolveDamageOverTime()
         {
+            // The enemy's DoT (the player's DoT damage dealt) is the offense DoT book, tracked separately
+            // (#1338), so no exposure recorder is passed here; the player's incoming DoT records its
+            // pre-mitigation exposure into the incoming book via the cached recorder.
             Stats.PlayerDamageDealt += _enemyBattler.ApplyDamageOverTime(TimeDelta);
             _enemyBattler.ApplyHealOverTime(TimeDelta);
             if (_enemyBattler.IsDead)
@@ -90,7 +99,7 @@ namespace Game.Core.Battle
                 return;
             }
 
-            Stats.PlayerDamageTaken += _playerBattler.ApplyDamageOverTime(TimeDelta);
+            Stats.PlayerDamageTaken += _playerBattler.ApplyDamageOverTime(TimeDelta, _recordPlayerExposure);
             Stats.PlayerDamageHealed += _playerBattler.ApplyHealOverTime(TimeDelta);
         }
 
@@ -131,6 +140,7 @@ namespace Game.Core.Battle
                 actualDamage = _targetBattler.TakeDamage(damage, damageType, _activeBattler.Level);
 
                 Stats.PlayerDamageDealt += actualDamage;
+                Stats.AddTypedDamageDealt(damageType, actualDamage);
                 if (isCrit)
                 {
                     Stats.CriticalHits++;
@@ -160,15 +170,22 @@ namespace Game.Core.Battle
                     Stats.AttacksDodged++;
                     Stats.DamageDodged += afterMitigation;
                 }
-                else if (isBlock)
-                {
-                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level, _targetBattler.GetAttributeValue(BlockReduction));
-                    Stats.AttacksBlocked++;
-                    Stats.DamageBlocked += afterMitigation - actualDamage;
-                }
                 else
                 {
-                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level);
+                    // The hit landed (blocked or not), so the player was exposed to its full pre-mitigation
+                    // typed damage — recorded for the incoming book before resistance/Defense. A dodge above
+                    // evaded the hit entirely, so it is excluded (its avoided damage trains evasion instead).
+                    Stats.AddTypedDamageExposure(damageType, dealt);
+                    if (isBlock)
+                    {
+                        actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level, _targetBattler.GetAttributeValue(BlockReduction));
+                        Stats.AttacksBlocked++;
+                        Stats.DamageBlocked += afterDefense - actualDamage;
+                    }
+                    else
+                    {
+                        actualDamage = _targetBattler.TakeDamage(dealt, damageType);
+                    }
                 }
 
                 Stats.PlayerDamageTaken += actualDamage;

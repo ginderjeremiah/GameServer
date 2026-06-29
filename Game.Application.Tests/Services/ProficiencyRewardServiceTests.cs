@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Application.Services;
+using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Core.Players.Events;
@@ -237,8 +238,8 @@ namespace Game.Application.Tests.Services
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
             var stats = FireSkill(firedSkillId);
 
-            service.AccrueAndApply(progress, stats, difficultyMultiplier: 1.0, player, notify: false);
-            service.AccrueAndApply(progress, stats, difficultyMultiplier: 1.0, player, notify: false);
+            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
+            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
 
             Assert.Single(player.Skills, s => s.Id == rewardSkill.Id);
         }
@@ -269,8 +270,152 @@ namespace Game.Application.Tests.Services
             Assert.Single(player.Skills);
         }
 
-        // Seeds a fresh player whose one (selected) starter skill contributes to a single-tier proficiency, so
-        // a won battle that fires it routes the whole pie there. Returns the player, fired skill, and proficiency.
+        [Fact]
+        public async Task CritDamage_TrainsThePrecisionPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A path keyed on the Crit event trains from the battle's crit damage — no skill contribution and no
+            // damage-type routing involved (Precision is a single global, type-neutral track; spike #1318).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Precision", activityKey: EActivityKey.Crit);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Precision", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CriticalDamageDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task DodgedDamage_TrainsTheEvasionPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The Evasion track trains from dodged damage (the avoided post-Defense hit) — incoming-book event,
+            // type-neutral like Precision.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Evasion", activityKey: EActivityKey.Dodge);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Evasion", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { DamageDodged = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task HealingDone_TrainsTheRestorationPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Restoration trains from healing done (PlayerDamageHealed) — an output-book event.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Restoration", activityKey: EActivityKey.Heal);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Restoration", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { PlayerDamageHealed = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task ReflectedDamage_IsNotYetWired_SoARetributionPathTrainsNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Retribution waits on the reflection rework (#1330) — no reflected-damage signal is produced yet, so
+            // a Reflect-keyed path accrues nothing even from a battle full of every other event activity.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Retribution", activityKey: EActivityKey.Reflect);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Retribution", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats
+            {
+                CriticalDamageDealt = FiredDamage,
+                DamageDodged = FiredDamage,
+                PlayerDamageHealed = FiredDamage,
+            };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            // Only a Reflect path exists, and Reflect is unwired — nothing trains.
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
+        public async Task ZeroEventActivity_TrainsNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with no crit damage produces no Crit activity, so a
+            // Crit-keyed path is not even routed to (no zero-activity slice reaches the calculator).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Precision", activityKey: EActivityKey.Crit);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Precision", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CriticalDamageDealt = 0 });
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
+        public async Task OffenseAndEventAxes_TrainInParallel_WithoutDilution()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Spike #1318 decision 4: axes do not share a pie. A battle that both deals fire damage and lands
+            // crits trains the Fire offense path and the Precision event path each at activity ÷ power = 1 — with
+            // identical curves they reach the same level, proving neither axis dilutes the other.
+            var firePath = await TestDataSeeder.CreatePathAsync(context, name: "Fire", activityKey: EActivityKey.Fire);
+            var fireTier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Fire", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: firePath.Id, pathOrdinal: 0);
+            var critPath = await TestDataSeeder.CreatePathAsync(context, name: "Precision", activityKey: EActivityKey.Crit);
+            var critTier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Precision", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: critPath.Id, pathOrdinal: 0);
+
+            var fireSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", damageType: EDamageType.Fire);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            // Full-power fire damage and full-power crit damage in the same battle.
+            var stats = new BattleStats { CriticalDamageDealt = FiredDamage };
+            stats.SkillStats[fireSkill.Id] = new SkillStats { Uses = 1, TotalDamage = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            var fireResult = Assert.Single(accrual.Results, r => r.ProficiencyId == fireTier.Id);
+            var critResult = Assert.Single(accrual.Results, r => r.ProficiencyId == critTier.Id);
+            Assert.True(fireResult.NewLevel >= 1);
+            Assert.Equal(fireResult.NewLevel, critResult.NewLevel);
+            Assert.Equal(fireResult.XpGained, critResult.XpGained);
+        }
+
+        // The damage a fired skill deals in these tests, equal to the power passed to the accrual — so
+        // activity ÷ power = 1 and each won battle claims the full pie (ServerGameConstants.ProficiencyXpPerVictory),
+        // keeping the per-level math identical to the assertions below.
+        private const double FiredDamage = 100.0;
+
+        // Seeds a fresh player whose one (selected) starter skill trains a single-tier proficiency's path, so a
+        // won battle that fires it routes the full pie there. Returns the player, fired skill, and proficiency.
         private static async Task<(int PlayerId, int FiredSkillId, Game.Infrastructure.Entities.Proficiency Proficiency)> SeedSingleTierAsync(
             GameContext context, int maxLevel, decimal baseXp, decimal xpGrowth)
         {
@@ -285,9 +430,11 @@ namespace Game.Application.Tests.Services
         {
             var user = await TestDataSeeder.CreateUserAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt");
+            // A Fire-typed skill, so it routes only to the (Fire-keyed) path it is linked to and leaves the
+            // other test paths (Physical by default) untrained — the isolation the old contribution join gave.
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", damageType: EDamageType.Fire);
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiencyId, skill.Id, weight: 1m);
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiencyId, skill.Id);
             return (player.Id, skill.Id);
         }
 
@@ -297,8 +444,29 @@ namespace Game.Application.Tests.Services
             var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
             var player = await LoadPlayerAsync(scope, playerId);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), difficultyMultiplier: 1.0, player, notify);
+            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), totalAttributes: FiredDamage, player, notify);
             return (player, accrual);
+        }
+
+        // Accrues an arbitrary battle's stats (the event bindings build their own BattleStats rather than firing a
+        // skill), normalized by the default power so a full-power activity claims the whole pie.
+        private async Task<(Player Player, ProficiencyAccrualResult Accrual)> AccrueStatsAsync(
+            IServiceScope scope, int playerId, BattleStats stats, bool notify = false)
+        {
+            var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
+            var player = await LoadPlayerAsync(scope, playerId);
+            var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
+            var accrual = service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify);
+            return (player, accrual);
+        }
+
+        // Seeds a bare player (no skills) — the event bindings train from BattleStats event fields, not from any
+        // fired skill, so no loadout is needed.
+        private static async Task<int> SeedPlayerAsync(GameContext context)
+        {
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            return player.Id;
         }
 
         private static async Task<Player> LoadPlayerAsync(IServiceScope scope, int playerId)
@@ -311,7 +479,7 @@ namespace Game.Application.Tests.Services
         private static BattleStats FireSkill(int skillId)
         {
             var stats = new BattleStats();
-            stats.SkillStats[skillId] = new SkillStats { Uses = 1 };
+            stats.SkillStats[skillId] = new SkillStats { Uses = 1, TotalDamage = FiredDamage };
             return stats;
         }
     }

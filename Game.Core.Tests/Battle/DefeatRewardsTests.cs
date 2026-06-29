@@ -239,6 +239,37 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(int.MaxValue, rewards.ExpReward);
         }
 
+        [Fact]
+        public void PlayerPower_EqualsSumOfCoreAdditiveModifiers()
+        {
+            var player = MakePlayer(allocations: [(Strength, 10), (Endurance, 5)]);
+            var enemy = MakeEnemy(strength: 1);
+
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
+
+            // The effect-based proficiency accrual normalizes activity by this measure (spike #1318), so it
+            // must equal the difficulty system's player-power sum (core additive modifiers) to avoid diverging.
+            Assert.Equal(15, rewards.PlayerPower, precision: 9);
+        }
+
+        [Fact]
+        public void PlayerPower_ExcludesDerivedAndMultiplicativeModifiers()
+        {
+            var player = MakePlayer(allocations: [(Strength, 15)]);
+            EquipAccessory(player,
+            [
+                Modifier(MaxHealth, 100, EModifierType.Additive),      // derived attribute → excluded
+                Modifier(Strength, 1.5, EModifierType.Multiplicative), // scaling factor → excluded
+            ]);
+            var enemy = MakeEnemy(strength: 1);
+
+            var rewards = new DefeatRewards(player.GetAllModifiers(), enemy);
+
+            // Only the additive core Strength (15) counts — the same exclusion the difficulty power measure
+            // applies, so power normalization and the difficulty curve share one definition of "power".
+            Assert.Equal(15, rewards.PlayerPower, precision: 9);
+        }
+
         private static Player MakePlayer(
             (EAttribute Attribute, double Amount)[] allocations,
             int statPointsGained = 0) =>

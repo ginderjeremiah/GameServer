@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import type { IPath, IProficiency } from '$lib/api';
+import { EActivityKey } from '$lib/api';
 
 /* The screen drives the real playerProficiencies store (fetched over the socket) and reads the
    proficiency/path reference data from staticData, so the socket fetch and staticData are stubbed; the
@@ -48,8 +49,8 @@ const PROFICIENCIES: IProficiency[] = [
 	prof({ id: 2, pathId: 1, pathOrdinal: 0, name: 'Earth' })
 ];
 const PATHS: IPath[] = [
-	{ id: 0, name: 'Pyromancy', description: '', falloffBase: 0.5, contributions: [] },
-	{ id: 1, name: 'Geomancy', description: '', falloffBase: 0.5, contributions: [] }
+	{ id: 0, name: 'Pyromancy', description: '', activityKey: EActivityKey.Fire },
+	{ id: 1, name: 'Geomancy', description: '', activityKey: EActivityKey.Earth }
 ];
 
 beforeEach(() => {

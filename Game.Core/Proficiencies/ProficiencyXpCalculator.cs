@@ -1,68 +1,49 @@
 namespace Game.Core.Proficiencies
 {
     /// <summary>
-    /// The absolute-falloff proficiency-XP split for a won battle (spike #982 decision 13). A constant pie,
-    /// scaled by the battle's difficulty multiplier, is divided across the paths <em>represented</em> in the
-    /// fight by their <strong>falloff-free attention</strong> (how much of the loadout points at each path),
-    /// then each path's slice is scaled by its <strong>on-tier efficiency</strong> — the attention-weighted
-    /// average falloff of its fired contributions. The un-earned remainder is <em>not</em> minted: the pie is
-    /// a ceiling, not a constant, so coasting on stale skills genuinely trains slower (not just relatively).
-    /// Pure and reference-data-free: the caller resolves which skills fired, the frontier tier each path
-    /// routes to, and the per-skill falloff, so the math here is the testable core.
+    /// The effect-based proficiency-XP claim for a won battle (spike #1318). Each path independently claims
+    /// <c>pie × clamp(activity ÷ power)</c> of XP, routed to its frontier tier — the claims overlap and need
+    /// <em>not</em> sum to 1, because there is no shared pie to split (different paths and axes train in
+    /// parallel). <c>activity ÷ power</c> is the continuous difficulty ratio (a quantity relative to the
+    /// player's total attributes), so power-normalization <em>subsumes</em> the banded difficulty multiplier:
+    /// it is deliberately not applied again, which would put power in the denominator twice and open a
+    /// strip-power exploit. The clamp mirrors <see cref="ServerGameConstants.MaxExpRewardMultiplier"/>. Pure and
+    /// reference-data-free: the caller resolves each path's frontier tier and summed activity, so the math here
+    /// is the testable core.
     /// </summary>
     public static class ProficiencyXpCalculator
     {
         /// <summary>
-        /// One fired skill's pull on the frontier tier of a path: the tier the contribution routes to
-        /// (<see cref="ProficiencyId"/>), its falloff-free <see cref="Attention"/> (<c>skillTierWeight ×
-        /// contributionWeight</c>), and the absolute <see cref="Falloff"/> over the home-tier→frontier
-        /// distance (<c>1</c> on-tier). Several fired skills routing to the same tier sum into that tier's
-        /// attention, and their attention-weighted falloff is the tier's on-tier efficiency.
+        /// One path's claim input: the frontier tier the claim routes to (<see cref="ProficiencyId"/>) and the
+        /// path's total <see cref="Activity"/> this battle (e.g. the summed damage of the path's activity key).
         /// </summary>
-        public readonly record struct WeightedContribution(int ProficiencyId, double Attention, double Falloff);
+        public readonly record struct PathActivity(int ProficiencyId, double Activity);
 
-        /// <summary>A frontier tier's share of the battle's pie (its attention slice scaled by efficiency).</summary>
+        /// <summary>A frontier tier's earned XP for the battle.</summary>
         public readonly record struct ProficiencyXpSlice(int ProficiencyId, double Xp);
 
         /// <summary>
-        /// Splits the battle's pie across the represented paths' frontier tiers. The total is
-        /// <paramref name="fixedPie"/> × <paramref name="difficultyMultiplier"/>; each tier first claims a
-        /// share proportional to its summed <see cref="WeightedContribution.Attention"/> (the ceiling), then
-        /// that ceiling is scaled by the tier's on-tier efficiency (the attention-weighted average falloff) —
-        /// the un-earned remainder evaporates rather than being redistributed, so a path's absolute pace
-        /// reflects only its own staleness. Returns slices ascending by proficiency id (a stable order so the
-        /// live and offline paths, and their tests, agree). Empty when nothing is represented or the total
-        /// attention is non-positive.
+        /// The per-path XP claims for the battle: each path earns <paramref name="pie"/> ×
+        /// <c>min(activity ÷ power, </c><paramref name="maxMultiplier"/><c>)</c>, independent of the others
+        /// (no shared pie — the claims overlap and need not sum to 1). Returns slices ascending by proficiency
+        /// id (a stable order so the live and offline paths, and their tests, agree). A path with non-positive
+        /// activity earns nothing and is omitted; a non-positive <paramref name="power"/> — a degenerate state,
+        /// since a real character always carries positive locked-base attributes — yields no slices rather than
+        /// dividing by zero.
         /// </summary>
         public static IReadOnlyList<ProficiencyXpSlice> Split(
-            double fixedPie, double difficultyMultiplier, IEnumerable<WeightedContribution> contributions)
+            double pie, double power, double maxMultiplier, IEnumerable<PathActivity> activities)
         {
-            // Per frontier tier, the attention-weighted falloff of its fired skills (Σ attention × falloff) —
-            // its attention share of the pie already folded together with its on-tier efficiency — alongside
-            // the loadout's total falloff-free attention (the denominator that makes the slowdown absolute).
-            var earnedAttentionByTier = new Dictionary<int, double>();
-            var totalAttention = 0.0;
-            foreach (var contribution in contributions)
-            {
-                earnedAttentionByTier[contribution.ProficiencyId] =
-                    earnedAttentionByTier.GetValueOrDefault(contribution.ProficiencyId)
-                        + contribution.Attention * contribution.Falloff;
-                totalAttention += contribution.Attention;
-            }
-
-            if (totalAttention <= 0)
+            if (power <= 0)
             {
                 return [];
             }
 
-            // Each tier earns its falloff-weighted attention as a fraction of the falloff-free total: its
-            // attention share of the pie scaled by its on-tier efficiency, folded into one division. Dividing
-            // by the falloff-free total (not the earned total) is what leaves the un-earned remainder unminted,
-            // and folding the two steps avoids a 0/0 = NaN for a zero-attention tier (it degrades to 0).
-            var total = fixedPie * difficultyMultiplier;
-            return [.. earnedAttentionByTier
-                .OrderBy(pair => pair.Key)
-                .Select(pair => new ProficiencyXpSlice(pair.Key, total * pair.Value / totalAttention))];
+            return [.. activities
+                .Where(activity => activity.Activity > 0)
+                .OrderBy(activity => activity.ProficiencyId)
+                .Select(activity => new ProficiencyXpSlice(
+                    activity.ProficiencyId, pie * Math.Min(activity.Activity / power, maxMultiplier)))];
         }
     }
 }

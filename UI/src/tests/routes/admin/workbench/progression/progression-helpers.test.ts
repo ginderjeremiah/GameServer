@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { EAttribute, EModifierType } from '$lib/api';
+import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
 import {
+	activityKeyOptions,
 	cumulativeXp,
 	decipherThresholds,
 	diffCatalogue,
-	falloffSteps,
 	hasTierCollision,
-	homeTierOptions,
 	isMilestoneLevel,
 	modifiersAtLevel,
 	newPath,
@@ -57,13 +56,12 @@ describe('decipherThresholds', () => {
 	});
 });
 
-describe('falloffSteps', () => {
-	it('decays geometrically with distance, starting at 1', () => {
-		const steps = falloffSteps(0.5);
-		expect(steps.map((s) => s.distance)).toEqual([0, 1, 2]);
-		expect(steps[0].factor).toBe(1);
-		expect(steps[1].factor).toBeCloseTo(0.5);
-		expect(steps[2].factor).toBeCloseTo(0.25);
+describe('activityKeyOptions', () => {
+	it('emits one option per EActivityKey value, labelled by name', () => {
+		expect(activityKeyOptions).toContainEqual({ value: EActivityKey.Physical, text: 'Physical' });
+		expect(activityKeyOptions).toContainEqual({ value: EActivityKey.Fire, text: 'Fire' });
+		// Numeric enum values only — no reverse-mapping string keys leak in.
+		expect(activityKeyOptions.every((o) => typeof o.value === 'number')).toBe(true);
 	});
 });
 
@@ -88,17 +86,6 @@ describe('tier layout', () => {
 	it('hasTierCollision detects a duplicate ordinal', () => {
 		expect(hasTierCollision([tier({ id: 1, pathOrdinal: 0 }), tier({ id: 2, pathOrdinal: 1 })])).toBe(false);
 		expect(hasTierCollision([tier({ id: 1, pathOrdinal: 0 }), tier({ id: 2, pathOrdinal: 0 })])).toBe(true);
-	});
-
-	it('homeTierOptions emits one option per tier ordinal', () => {
-		const opts = homeTierOptions([
-			tier({ id: 1, pathOrdinal: 0, name: 'Fire' }),
-			tier({ id: 2, pathOrdinal: 1, name: 'Inferno' })
-		]);
-		expect(opts).toEqual([
-			{ value: 0, text: 'T0 · Fire' },
-			{ value: 1, text: 'T1 · Inferno' }
-		]);
 	});
 });
 
@@ -126,12 +113,9 @@ describe('milestone projection', () => {
 });
 
 describe('validation', () => {
-	it('pathWarnings flags a blank name and non-positive falloff', () => {
+	it('pathWarnings flags a blank name', () => {
 		expect(pathWarnings(newPath(1))).toContain('Missing name');
-		expect(pathWarnings({ ...newPath(1), name: 'Fire', falloffBase: 0 })).toContain(
-			'Falloff base must be greater than zero'
-		);
-		expect(pathWarnings({ ...newPath(1), name: 'Fire', falloffBase: 0.6 })).toHaveLength(0);
+		expect(pathWarnings({ ...newPath(1), name: 'Fire' })).toHaveLength(0);
 	});
 
 	it('proficiencyWarnings flags missing words of power and out-of-range levels', () => {
@@ -186,15 +170,14 @@ describe('resolveNewIds & resolveId', () => {
 });
 
 describe('DTO builders', () => {
-	it('pathIdentityDto strips contributions to the empty child set', () => {
+	it('pathIdentityDto carries the activity key', () => {
 		const dto = pathIdentityDto({
 			id: 1,
 			name: 'Fire',
 			description: 'd',
-			falloffBase: 0.6,
-			contributions: [{ skillId: 1, homeTier: 0, weight: 1 }]
+			activityKey: EActivityKey.Fire
 		});
-		expect(dto.contributions).toEqual([]);
+		expect(dto.activityKey).toBe(EActivityKey.Fire);
 		expect(dto.name).toBe('Fire');
 	});
 

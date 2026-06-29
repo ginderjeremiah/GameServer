@@ -101,7 +101,7 @@ namespace Game.Application.Tests.DataAccess
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                var path = new Entities.Path { Name = "Shared Path", Description = "", FalloffBase = 0.3m };
+                var path = new Entities.Path { Name = "Shared Path", Description = "" };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
 

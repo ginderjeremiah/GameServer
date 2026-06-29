@@ -20,7 +20,7 @@ import { NO_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 export type RecordStatus = 'clean' | 'added' | 'modified';
-export type PathTab = 'identity' | 'tiers' | 'contrib';
+export type PathTab = 'identity' | 'tiers';
 export type TierTab = 'identity' | 'xp' | 'milestones' | 'gateways';
 
 /** Format a one-shot retire timestamp. Not reactive state — just an ISO string. */
@@ -290,41 +290,6 @@ export class ProgressionStore {
 		}
 	}
 
-	// ── Contributions (path child collection) ──
-
-	addContribution(pathId: number) {
-		const path = this.paths.find((p) => p.id === pathId);
-		if (!path) {
-			return;
-		}
-		const used = path.contributions.map((c) => c.skillId);
-		const skillId = firstFree(used, reference.skillOptions());
-		const tiers = tiersOfPath(this.profs, pathId);
-		const homeTier = tiers[0]?.pathOrdinal ?? 0;
-		this.patchPath(pathId, (draft) => {
-			draft.contributions = [...draft.contributions, { skillId, homeTier, weight: 1 }];
-		});
-	}
-
-	updateContribution(
-		pathId: number,
-		index: number,
-		patch: Partial<{ skillId: number; homeTier: number; weight: number }>
-	) {
-		this.patchPath(pathId, (draft) => {
-			const row = draft.contributions[index];
-			if (row) {
-				draft.contributions[index] = { ...row, ...patch };
-			}
-		});
-	}
-
-	removeContribution(pathId: number, index: number) {
-		this.patchPath(pathId, (draft) => {
-			draft.contributions = draft.contributions.filter((_row, i) => i !== index);
-		});
-	}
-
 	// ── Milestone payouts (proficiency modifiers + rewards) ──
 
 	addModifier(profId: number, level: number) {
@@ -400,7 +365,6 @@ export class ProgressionStore {
 		this.saving = true;
 		let committed = false;
 		try {
-			const basePathMap = this.basePathMap;
 			const baseProfMap = this.baseProfMap;
 			const pathDiff = diffCatalogue(this.paths, this.basePaths);
 			const profDiff = diffCatalogue(this.profs, this.baseProfs);
@@ -449,19 +413,7 @@ export class ProgressionStore {
 				profDiff.added
 			);
 
-			// 5. Path contributions — after the tiers exist (the backend validates each home tier).
-			for (const path of [...pathDiff.added, ...pathDiff.modified.map((m) => m.record)]) {
-				const baseline = basePathMap[path.id];
-				if (childChanged(path.contributions, baseline?.contributions)) {
-					await ApiRequest.post('AdminTools/SetPathContributions', {
-						id: resolveId(path.id, pathIdMap),
-						contributions: path.contributions
-					});
-					committed = true;
-				}
-			}
-
-			// 6. Proficiency child collections — modifiers, rewards, and cross-path prerequisites.
+			// 5. Proficiency child collections — modifiers, rewards, and cross-path prerequisites.
 			for (const prof of [...profDiff.added, ...profDiff.modified.map((m) => m.record)]) {
 				const baseline = baseProfMap[prof.id];
 				const id = resolveId(prof.id, profIdMap);

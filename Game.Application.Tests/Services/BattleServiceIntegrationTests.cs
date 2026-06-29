@@ -2,6 +2,7 @@ using Game.Abstractions.DataAccess;
 using Game.Application;
 using Game.Application.Services;
 using Game.Core;
+using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -289,6 +290,53 @@ namespace Game.Application.Tests.Services
 
             Assert.NotNull(result);
             Assert.Equal(100, result.ExpReward);
+        }
+
+        [Fact]
+        public async Task RecordVictory_SnapshotsPlayerPowerOntoStats_FromSnapshotNotLiveAggregate()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Player power 100 (Strength 50 + Endurance 50) is frozen into the battle snapshot at StartBattle.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // Deflate the LIVE player's power to ~2 after the snapshot is frozen (a valid mid-battle stat
+            // reallocation). The accrual must normalize by the snapshot-era power (100), so a regression
+            // sourcing PlayerPower from the live aggregate — or dropping the assignment — would read 2 or 0.
+            foreach (var allocation in player.StatPoints.StatAllocations)
+            {
+                allocation.Amount = 1;
+            }
+
+            var coreEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(coreEnemy);
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, new BattleStats());
+
+            var rewards = battleService.RecordVictory(player, coreEnemy, result, state, DateTime.UtcNow);
+
+            // The reward measures the snapshot-era power (the full pre-deflation spread, ≥ 100), not the
+            // deflated live aggregate (a handful of 1s) — so sourcing PlayerPower from live state would read
+            // far below 100, and dropping the assignment would leave the stats at the default 0.
+            Assert.True(rewards.PlayerPower >= 100, $"Expected the snapshot power, got {rewards.PlayerPower}.");
+            Assert.Equal(rewards.PlayerPower, result.Stats.PlayerPower, precision: 9);
         }
 
         [Fact]

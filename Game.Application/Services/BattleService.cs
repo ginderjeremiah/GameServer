@@ -569,11 +569,11 @@ namespace Game.Application.Services
                     victoryExpRewards.Add(battle.ExpReward);
 
                     // Accrue proficiency XP per won battle, exactly as the live handler does — same inputs
-                    // (this battle's skill stats + difficulty multiplier), same service — so the offline
-                    // accrual matches what the player would have earned live (the "offline == live" invariant).
-                    // The push is suppressed; the folded results ride the welcome-back summary instead.
+                    // (this battle's skill stats + player power), same service — so the offline accrual matches
+                    // what the player would have earned live (the "offline == live" invariant). The push is
+                    // suppressed; the folded results ride the welcome-back summary instead.
                     proficiencyGains.Add(_proficiencyRewards.AccrueAndApply(
-                        progress, battle.Result.Stats, battle.DifficultyMultiplier, player, notify: false));
+                        progress, battle.Result.Stats, battle.PlayerPower, player, notify: false));
                 }
             }
 
@@ -650,7 +650,11 @@ namespace Game.Application.Services
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
         // observed, so the server-measured cap is the (stronger) control there and a client timestamp adds
         // nothing. Both paths therefore require a server-validated timeline; neither can be claimed early.
-        private DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp)
+        // internal (not private) so an integration test can assert the live PlayerPower snapshot directly:
+        // EndBattleVictory returns only a client-facing DefeatResult, and the BattleStats this mutates is
+        // carried on the BattleCompletedEvent, which the dispatcher clears after handling — leaving no other
+        // seam to observe that result.Stats.PlayerPower is set from the snapshot rather than the live aggregate.
+        internal DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp)
         {
             // Measure the player's power for the reward from the same frozen snapshot the battle was simulated
             // against, not the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps)
@@ -666,12 +670,18 @@ namespace Game.Application.Services
             var rewards = new DefeatRewards(
                 snapshot.GetModifiersWithSignaturePassive(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
 
+            // Snapshot the player's power onto the battle stats so the proficiency accrual normalizes activity
+            // by the identical measure the difficulty curve uses (spike #1318) — captured here from the same
+            // snapshot modifiers, not the live aggregate.
+            result.Stats.PlayerPower = rewards.PlayerPower;
+
             player.GrantExp(rewards.ExpReward);
-            // Thread the difficulty multiplier onto the battle-completed event so the progress handler can
-            // scale the proficiency-XP pie by it — the same curve the exp reward above used (spike #982).
+            // Thread the player's power onto the battle-completed event so the progress handler can normalize
+            // each path's activity by it for the effect-based proficiency accrual (spike #1318) — the same
+            // snapshot-measured power the exp reward above used.
             player.RecordBattleCompleted(
                 enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp,
-                rewards.DifficultyMultiplier);
+                rewards.PlayerPower);
 
             return rewards;
         }

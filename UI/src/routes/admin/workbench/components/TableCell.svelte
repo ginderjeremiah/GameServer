@@ -12,6 +12,17 @@
 			{#if dirty}<DirtyDot />{/if}
 		</div>
 	</td>
+{:else if col.type === 'attribute'}
+	<td style:min-width="{col.min ?? 160}px">
+		<AttributePicker
+			value={row[col.key]}
+			options={col.options?.(row[col.key]) ?? []}
+			onChange={(v) => onChange(v)}
+			ariaLabel={col.label}
+			disabledValues={col.unique ? taken : undefined}
+			{dirty}
+		/>
+	</td>
 {:else if col.type === 'number'}
 	<td class:r={col.align === 'r'} style:width="{col.width ?? 110}px">
 		<div class="fld">
@@ -39,6 +50,7 @@ import Bar from '$components/Bar.svelte';
 import NumInput from './NumInput.svelte';
 import SelectCaret from './SelectCaret.svelte';
 import DirtyDot from './DirtyDot.svelte';
+import AttributePicker from './AttributePicker.svelte';
 
 interface Props {
 	col: ColumnConfig;

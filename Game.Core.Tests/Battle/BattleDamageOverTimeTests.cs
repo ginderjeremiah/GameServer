@@ -284,6 +284,63 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(4, context.Stats.PlayerDamageHealed);
         }
 
+        // ── Pre-mitigation exposure recorder (incoming book, #1337) ──────────
+
+        [Fact]
+        public void ApplyDamageOverTime_RecordExposure_ReportsPreMitigationPerType()
+        {
+            // The recorder receives each DoT type's PRE-resistance tick (50 → 2) while the dealt value is the
+            // post-resistance 1, so a resist never throttles the exposure training signal.
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 0.5));
+            var exposure = new Dictionary<EDamageType, double>();
+
+            var dealt = battler.ApplyDamageOverTime(40, (type, amount) => exposure[type] = amount);
+
+            Assert.Equal(1, dealt);                       // post-resistance (mitigated)
+            Assert.Equal(2, exposure[EDamageType.Bleed]); // pre-mitigation (exposure)
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_RecordExposure_ReportsOnlyActiveTypes()
+        {
+            // Each authored DoT type reports its pre-mitigation tick; a type with a zero accumulator is skipped.
+            var battler = MakeBattler(
+                Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BurnDamagePerSecond, 250));
+            var exposure = new Dictionary<EDamageType, double>();
+
+            battler.ApplyDamageOverTime(40, (type, amount) => exposure[type] = amount);
+
+            Assert.Equal(2, exposure[EDamageType.Bleed]); // 50 → 2
+            Assert.Equal(10, exposure[EDamageType.Burn]); // 250 → 10
+            Assert.False(exposure.ContainsKey(EDamageType.Poison));
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_NoRecorder_DealsIdenticalDamage()
+        {
+            // The recorder is a pure side channel: omitting it leaves the dealt damage (and health math) unchanged.
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 0.5));
+
+            var dealt = battler.ApplyDamageOverTime(40);
+
+            Assert.Equal(1, dealt);
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_RecordsPlayerDotExposure_NotEnemyDotAsExposure()
+        {
+            // The player's incoming DoT records pre-mitigation exposure into the incoming book; the enemy's DoT
+            // (the player's DoT damage dealt) is the offense book (#1338) and is NOT recorded as exposure.
+            var player = MakeBattler(Stat(Strength, 0), Stat(BurnDamagePerSecond, 250)); // player takes Burn
+            var enemy = MakeBattler(Stat(Strength, 0), Stat(BleedDamagePerSecond, 50));  // enemy takes Bleed
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ResolveDamageOverTime();
+
+            Assert.Equal(10, context.Stats.TypedDamageExposure[EDamageType.Burn], 0.001); // 250 → 10 pre-mitigation
+            Assert.False(context.Stats.TypedDamageExposure.ContainsKey(EDamageType.Bleed));
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static Battler MakeBattler(params AttributeModifier[] modifiers) =>

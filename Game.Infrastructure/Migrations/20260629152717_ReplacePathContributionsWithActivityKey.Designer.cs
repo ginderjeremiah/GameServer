@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260629152717_ReplacePathContributionsWithActivityKey")]
+    partial class ReplacePathContributionsWithActivityKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,7 +78,7 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
-                            Description = "A measure of one's resilience and physical fortitude. Contributes to maximum health and toughness.",
+                            Description = "A measure of one's resilience and physical fortitude. Contributes to maximum health and defense.",
                             Name = "Endurance"
                         },
                         new
@@ -87,7 +90,7 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 3,
-                            Description = "A measure of one's speed and reflexes. Improves cooldown recovery and the chance to dodge attacks.",
+                            Description = "A measure of one's speed and reflexes. Improves cooldown recovery and contributes to defense.",
                             Name = "Agility"
                         },
                         new
@@ -111,8 +114,8 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 7,
-                            Description = "Reduces all incoming direct damage by a percentage that grows with diminishing returns, never reaching full immunity.",
-                            Name = "Toughness"
+                            Description = "A flat reduction applied to all incoming damage.",
+                            Name = "Defense"
                         },
                         new
                         {

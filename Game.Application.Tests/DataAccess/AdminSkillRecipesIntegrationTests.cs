@@ -364,7 +364,7 @@ namespace Game.Application.Tests.DataAccess
         private async Task<Entities.Proficiency> SeedProficiencyAsync(IServiceScope scope)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var path = new Entities.Path { Name = "Fire", Description = "d", FalloffBase = 0.3m };
+            var path = new Entities.Path { Name = "Fire", Description = "d" };
             context.Paths.Add(path);
             await context.SaveChangesAsync(CancellationToken);
 

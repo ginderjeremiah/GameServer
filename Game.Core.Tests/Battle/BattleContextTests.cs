@@ -338,7 +338,146 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(50 - 10, enemy.CurrentHealth, 0.001);
         }
 
+        // ── DamageTarget: typed damage dealt (offense book, #1337) ───────────
+
+        [Fact]
+        public void DamageTarget_PlayerHit_RecordsTypedDamageDealtMatchingPlayerDamageDealt()
+        {
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, EDamageType.Fire); // 20 − 2 Defense = 18 dealt
+
+            // The typed offense book sums the same post-mitigation figure each hit booked into PlayerDamageDealt.
+            Assert.Equal(18, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(18, TypedDealt(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerHitsDifferentTypes_AccumulatedPerType()
+        {
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, EDamageType.Fire);     // 18
+            context.DamageTarget(10, EDamageType.Fire);     // 8
+            context.DamageTarget(30, EDamageType.Physical); // 28
+
+            Assert.Equal(26, TypedDealt(context, EDamageType.Fire), 0.001); // 18 + 8
+            Assert.Equal(28, TypedDealt(context, EDamageType.Physical), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerCrit_TypedDamageDealtUsesPostMitigationActual()
+        {
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // Defense 2
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, EDamageType.Physical); // 20×2 = 40, − 2 Defense = 38
+
+            Assert.Equal(38, TypedDealt(context, EDamageType.Physical), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyAttacking_RecordsNoTypedDamageDealt()
+        {
+            // The offense book is the player's; an enemy hit never adds to it (it feeds the incoming book).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, EDamageType.Physical);
+
+            Assert.Empty(context.Stats.TypedDamageDealt);
+        }
+
+        // ── DamageTarget: pre-mitigation typed exposure (incoming book, #1337) ─
+
+        [Fact]
+        public void DamageTarget_EnemyHit_RecordsExposureBeforeResistanceAndDefense()
+        {
+            // Exposure is the pre-mitigation hit (40 Fire), captured before the player's FireResistance and
+            // Defense reduce the damage actually taken (40 × 0.5 − 2 = 18).
+            var player = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(40, EDamageType.Fire);
+
+            Assert.Equal(18, context.Stats.PlayerDamageTaken, 0.001);
+            Assert.Equal(40, Exposure(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyAmplifiedHit_ExposureReflectsAmplifiedPreMitigationValue()
+        {
+            // Exposure is captured after the attacker's amplification (it sizes the incoming hit) but before
+            // the defender's resistance: enemy FireAmplification 0.5 → 40 × 1.5 = 60 exposure.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireAmplification, 0.5));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(40, EDamageType.Fire);
+
+            Assert.Equal(60, Exposure(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerBlock_RecordsFullPreMitigationExposure()
+        {
+            // A block is mitigation, so the player was still exposed to the full pre-mitigation hit (20),
+            // even though the block reduces the damage actually taken.
+            var player = MakeBattlerWith((BlockChance, 1), (BlockReduction, 8));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, EDamageType.Physical);
+
+            Assert.Equal(20, Exposure(context, EDamageType.Physical), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerDodge_RecordsNoExposure()
+        {
+            // A dodged hit was evaded, not mitigated — it does not train the resist (incoming) book; its
+            // avoided damage trains evasion instead.
+            var player = MakeBattlerWith((DodgeChance, 1));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, EDamageType.Physical);
+
+            Assert.Empty(context.Stats.TypedDamageExposure);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerActive_RecordsNoExposure()
+        {
+            // The incoming book is the player's exposure; the player's own hits never add to it.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, EDamageType.Physical);
+
+            Assert.Empty(context.Stats.TypedDamageExposure);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
+
+        private static double TypedDealt(BattleContext context, EDamageType type) =>
+            context.Stats.TypedDamageDealt.TryGetValue(type, out var value) ? value : 0;
+
+        private static double Exposure(BattleContext context, EDamageType type) =>
+            context.Stats.TypedDamageExposure.TryGetValue(type, out var value) ? value : 0;
 
         private static BattleContext MakeContext()
         {

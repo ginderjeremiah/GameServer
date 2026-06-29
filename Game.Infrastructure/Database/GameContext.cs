@@ -63,7 +63,6 @@ namespace Game.Infrastructure.Database
         public DbSet<ProficiencyLevelModifier> ProficiencyLevelModifiers { get; set; }
         public DbSet<ProficiencyLevelReward> ProficiencyLevelRewards { get; set; }
         public DbSet<ProficiencyPrerequisite> ProficiencyPrerequisites { get; set; }
-        public DbSet<SkillPathContribution> SkillPathContributions { get; set; }
         public DbSet<StatisticType> StatisticTypes { get; set; }
         public DbSet<ItemModType> ItemModTypes { get; set; }
         public DbSet<TagCategory> TagCategories { get; set; }
@@ -547,9 +546,6 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(p => p.Description)
                     .HasMaxLength(500);
-
-                entity.Property(p => p.FalloffBase)
-                    .HasPrecision(18, 3);
             });
 
             modelBuilder.Entity<Proficiency>(entity =>
@@ -636,22 +632,6 @@ namespace Game.Infrastructure.Database
                     .WithMany()
                     .HasForeignKey(p => p.PrerequisiteProficiencyId)
                     .OnDelete(DeleteBehavior.Restrict);
-            });
-
-            modelBuilder.Entity<SkillPathContribution>(entity =>
-            {
-                entity.HasKey(sp => new { sp.SkillId, sp.PathId });
-
-                entity.Property(sp => sp.Weight)
-                    .HasPrecision(18, 3);
-
-                entity.HasOne(sp => sp.Skill)
-                    .WithMany()
-                    .HasForeignKey(sp => sp.SkillId);
-
-                entity.HasOne(sp => sp.Path)
-                    .WithMany(p => p.SkillContributions)
-                    .HasForeignKey(sp => sp.PathId);
             });
 
             modelBuilder.Entity<StatisticType>(entity =>

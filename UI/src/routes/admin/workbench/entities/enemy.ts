@@ -103,7 +103,7 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 				{
 					key: 'attributeId',
 					label: 'Attribute',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					min: 190,
 					unique: true

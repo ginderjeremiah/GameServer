@@ -34,7 +34,7 @@
 		{#each modRows as mr (mr.index)}
 			<div class="mod-row">
 				<div class="m-attr">
-					<ProgSelect
+					<AttributePicker
 						ariaLabel="Attribute"
 						value={mr.modifier.attributeId}
 						options={attrOptionsFor(mr.modifier.attributeId)}
@@ -105,6 +105,7 @@ import { cumulativeXp, modifiersAtLevel, rewardAtLevel } from './progression-hel
 import { NO_SKILL, type WorkbenchProficiency } from './types';
 import ProgSelect from './ProgSelect.svelte';
 import ProgNumber from './ProgNumber.svelte';
+import AttributePicker from '../components/AttributePicker.svelte';
 
 interface Props {
 	store: ProgressionStore;

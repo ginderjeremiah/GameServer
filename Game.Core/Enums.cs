@@ -267,6 +267,66 @@ namespace Game.Core
     }
 
     /// <summary>
+    /// The routing key a proficiency <see cref="Proficiencies.Path"/> trains on (spike #1318). A path declares
+    /// exactly one; a battle quantity trains the path(s) its key resolves to via the effect-based accrual. The
+    /// set is the superset of the ten damage-type keys (<see cref="EDamageTypeKey"/> — the eight leaf types plus
+    /// the Elemental/DoT categories), routed to from a skill's resolved <see cref="EDamageType"/> through
+    /// <see cref="Attributes.DamageTypes.Applies(EDamageType)"/>, plus the four combat-event keys (crit, dodge,
+    /// heal, reflect) that are not damage types. Accrual is computed server-side at battle completion, off the
+    /// deterministic tick loop, so this enum is deliberately <em>not</em> <c>[ClientMirrored]</c> (it carries no
+    /// battle-parity surface); it reaches the client only as the <c>Path</c> contract's field, emitted by the
+    /// reflection-walk codegen like any other contract enum.
+    /// </summary>
+    public enum EActivityKey
+    {
+        /// <summary>Physical damage dealt. Mirrors <see cref="EDamageTypeKey.Physical"/>.</summary>
+        Physical = 0,
+
+        /// <summary>Fire damage dealt. Mirrors <see cref="EDamageTypeKey.Fire"/>.</summary>
+        Fire = 1,
+
+        /// <summary>Water damage dealt. Mirrors <see cref="EDamageTypeKey.Water"/>.</summary>
+        Water = 2,
+
+        /// <summary>Earth damage dealt. Mirrors <see cref="EDamageTypeKey.Earth"/>.</summary>
+        Earth = 3,
+
+        /// <summary>Wind damage dealt. Mirrors <see cref="EDamageTypeKey.Wind"/>.</summary>
+        Wind = 4,
+
+        /// <summary>Bleed damage dealt. Mirrors <see cref="EDamageTypeKey.Bleed"/>.</summary>
+        Bleed = 5,
+
+        /// <summary>Poison damage dealt. Mirrors <see cref="EDamageTypeKey.Poison"/>.</summary>
+        Poison = 6,
+
+        /// <summary>Burn damage dealt. Mirrors <see cref="EDamageTypeKey.Burn"/>.</summary>
+        Burn = 7,
+
+        /// <summary>All elemental (fire / water / earth / wind) damage dealt. Mirrors <see cref="EDamageTypeKey.Elemental"/>.</summary>
+        Elemental = 8,
+
+        /// <summary>All damage-over-time (bleed / poison / burn) damage dealt. Mirrors <see cref="EDamageTypeKey.Dot"/>.</summary>
+        Dot = 9,
+
+        // The four combat-event keys — not damage types, so absent from EDamageTypeKey. The proc / heal bindings
+        // (#1339) wire crit / dodge / heal; Reflect stays inert until the reflection rework (#1330) produces a
+        // reflected-damage signal. A path keyed on an unwired key simply accrues nothing until its binding lands.
+
+        /// <summary>Critical damage dealt (the Precision mastery).</summary>
+        Crit = 10,
+
+        /// <summary>Damage dodged (the Evasion mastery).</summary>
+        Dodge = 11,
+
+        /// <summary>Healing done (the Restoration mastery).</summary>
+        Heal = 12,
+
+        /// <summary>Reflected damage (the Retribution mastery). Inert until the reflection rework #1330.</summary>
+        Reflect = 13,
+    }
+
+    /// <summary>
     /// The display/classification taxonomy for an <see cref="EAttribute"/>, surfaced on the attribute
     /// reference data so the client groups and renders attributes from a single backend source of truth.
     /// This is a display-only taxonomy and is intentionally kept distinct from the core/derived power-calc

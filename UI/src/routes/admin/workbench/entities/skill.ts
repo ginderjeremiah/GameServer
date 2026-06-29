@@ -125,7 +125,7 @@ export const skillEntity: EntityConfig<ISkill> = {
 				{
 					key: 'attributeId',
 					label: 'Attribute',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					min: 200,
 					unique: true
@@ -167,7 +167,7 @@ export const skillEntity: EntityConfig<ISkill> = {
 				{
 					key: 'attributeId',
 					label: 'Attribute',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					min: 170
 				},
@@ -183,7 +183,7 @@ export const skillEntity: EntityConfig<ISkill> = {
 				{
 					key: 'scalingAttributeId',
 					label: 'Scales with',
-					type: 'select',
+					type: 'attribute',
 					options: reference.attributeOptions,
 					min: 170
 				},

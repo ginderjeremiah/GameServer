@@ -33,7 +33,7 @@ vi.mock('$lib/api', async (importOriginal) => {
 vi.mock('$stores', () => ({ staticData: staticDataMock, toastError: toastErrorMock }));
 vi.mock('$routes/admin/workbench/reference.svelte', () => ({ reference: referenceMock }));
 
-import { EChangeType } from '$lib/api';
+import { EActivityKey, EChangeType } from '$lib/api';
 import { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,14 +50,13 @@ const applyPost = (endpoint: string, body: Rec) => {
 		let id = nextId(serverPaths);
 		for (const change of body as Rec[]) {
 			if (change.changeType === EChangeType.Add) {
-				serverPaths.push({ ...change.item, id: id++, retiredAt: change.item.retiredAt ?? null, contributions: [] });
+				serverPaths.push({ ...change.item, id: id++, retiredAt: change.item.retiredAt ?? null });
 			} else if (change.changeType === EChangeType.Edit) {
 				const existing = serverPaths.find((p) => p.id === change.item.id);
 				if (existing) {
 					Object.assign(existing, {
 						...change.item,
-						retiredAt: change.item.retiredAt ?? null,
-						contributions: existing.contributions
+						retiredAt: change.item.retiredAt ?? null
 					});
 				}
 			}
@@ -86,11 +85,6 @@ const applyPost = (endpoint: string, body: Rec) => {
 					});
 				}
 			}
-		}
-	} else if (endpoint === 'AdminTools/SetPathContributions') {
-		const path = serverPaths.find((p) => p.id === body.id);
-		if (path) {
-			path.contributions = body.contributions;
 		}
 	} else if (endpoint === 'AdminTools/SetProficiencyModifiers') {
 		const prof = serverProfs.find((p) => p.id === body.id);
@@ -143,7 +137,7 @@ beforeEach(() => {
 
 const seedServer = () => {
 	serverPaths = [
-		{ id: 0, name: 'Fire', description: 'fire path', falloffBase: 0.6, retiredAt: null, contributions: [] }
+		{ id: 0, name: 'Fire', description: 'fire path', activityKey: EActivityKey.Physical, retiredAt: null }
 	];
 	serverProfs = [fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0' })];
 };
@@ -230,7 +224,7 @@ describe('save orchestration', () => {
 		const pathLocal = store.selectedPathId as number;
 		store.patchPath(pathLocal, (d) => {
 			d.name = 'Fire';
-			d.falloffBase = 0.6;
+			d.activityKey = EActivityKey.Fire;
 		});
 		const tierLocal = store.currentTiers[0].id;
 		store.patchProf(tierLocal, (d) => {
@@ -240,7 +234,6 @@ describe('save orchestration', () => {
 			d.translation = 'Fire';
 			d.iconPath = 'fire.png';
 		});
-		store.addContribution(pathLocal);
 		store.addModifier(tierLocal, 2);
 
 		await store.save();
@@ -250,24 +243,19 @@ describe('save orchestration', () => {
 		const profAdds = callsTo('AdminTools/AddEditProficiencies')[0];
 		expect(profAdds[0].item.pathId).toBe(0);
 
-		// Contributions land on the resolved path id; modifiers on the resolved proficiency id.
-		expect(callsTo('AdminTools/SetPathContributions')[0]).toEqual({
-			id: 0,
-			contributions: [{ skillId: 0, homeTier: 0, weight: 1 }]
-		});
+		// Modifiers land on the resolved proficiency id.
 		const mods = callsTo('AdminTools/SetProficiencyModifiers')[0];
 		expect(mods.id).toBe(0);
 		expect(mods.modifiers).toHaveLength(1);
 		expect(mods.modifiers[0].level).toBe(2);
 
 		// Final server truth + re-seeded, selection followed the remap, no residual changes.
-		expect(serverPaths[0].contributions).toHaveLength(1);
 		expect(serverProfs[0].levelModifiers).toHaveLength(1);
 		expect(store.selectedPathId).toBe(0);
 		expect(store.totalChanges).toBe(0);
 	});
 
-	it('sends only an identity Edit when just the path identity changed (no contributions call)', async () => {
+	it('sends only an identity Edit when just the path identity changed', async () => {
 		seedServer();
 		const store = new ProgressionStore();
 		await store.load();
@@ -278,7 +266,6 @@ describe('save orchestration', () => {
 		const pathEdits = callsTo('AdminTools/AddEditPaths')[0];
 		expect(pathEdits).toHaveLength(1);
 		expect(pathEdits[0].changeType).toBe(EChangeType.Edit);
-		expect(callsTo('AdminTools/SetPathContributions')).toHaveLength(0);
 		expect(serverPaths[0].name).toBe('Inferno');
 	});
 
@@ -337,9 +324,8 @@ describe('navigation & detail mutations', () => {
 				id: 0,
 				name: 'Fire',
 				description: 'd',
-				falloffBase: 0.6,
-				retiredAt: null,
-				contributions: [{ skillId: 1, homeTier: 0, weight: 1 }]
+				activityKey: EActivityKey.Fire,
+				retiredAt: null
 			}
 		];
 		serverProfs = [
@@ -360,8 +346,8 @@ describe('navigation & detail mutations', () => {
 		const store = new ProgressionStore();
 		await store.load();
 
-		store.setPathTab('contrib');
-		expect(store.pathTab).toBe('contrib');
+		store.setPathTab('identity');
+		expect(store.pathTab).toBe('identity');
 
 		store.drillTier(0);
 		expect(store.drilledTier?.id).toBe(0);
@@ -379,19 +365,6 @@ describe('navigation & detail mutations', () => {
 		store.selectPath(0);
 		expect(store.selectedPathId).toBe(0);
 		expect(store.pathTab).toBe('tiers');
-	});
-
-	it('edits and removes contributions', async () => {
-		richServer();
-		const store = new ProgressionStore();
-		await store.load();
-
-		store.updateContribution(0, 0, { weight: 0.5 });
-		expect(reqPath(store, 0).contributions[0].weight).toBe(0.5);
-		store.addContribution(0);
-		expect(reqPath(store, 0).contributions).toHaveLength(2);
-		store.removeContribution(0, 1);
-		expect(reqPath(store, 0).contributions).toHaveLength(1);
 	});
 
 	it('edits milestone modifiers, rewards and payouts', async () => {

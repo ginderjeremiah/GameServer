@@ -178,7 +178,14 @@ namespace Game.Core.Battle
         /// bit-for-bit. A single typed DoT with no resistance reduces to <c>perSec × ms/1000</c> — byte-identical
         /// to the former single-accumulator outcome (the reduce-to-today identity).
         /// </remarks>
-        public double ApplyDamageOverTime(int ms)
+        /// <param name="ms">The elapsed simulated time this tick.</param>
+        /// <param name="recordExposure">
+        /// Optional per-type <b>pre-mitigation</b> recorder for the proficiency incoming book (spike #1337) —
+        /// invoked with each DoT type and its tick damage <em>before</em> this battler's resistance. Supplied
+        /// only when this battler's exposure is tracked (the player); <c>null</c> leaves the loop unchanged. It
+        /// is a backend-only side channel that never touches the health math, so it adds no parity surface.
+        /// </param>
+        public double ApplyDamageOverTime(int ms, Action<EDamageType, double>? recordExposure = null)
         {
             var dot = 0.0;
             var accumulators = DamageTypes.DotAccumulators;
@@ -190,6 +197,12 @@ namespace Game.Core.Battle
                     continue;
                 }
 
+                // The pre-mitigation tick (before this battler's resistance) is its exposure to this DoT type;
+                // record it for the incoming book when a recorder is supplied. Folded out of the dot sum below
+                // so the recorded value and the mitigated value share one multiplication (no parity drift).
+                var preMitigation = perSecond * ms / 1000.0;
+                recordExposure?.Invoke(accumulators[i].Type, preMitigation);
+
                 var resistance = 0.0;
                 var resistanceAttributes = DamageTypes.ResistanceAttributes(accumulators[i].Type);
                 for (var j = 0; j < resistanceAttributes.Count; j++)
@@ -197,7 +210,7 @@ namespace Game.Core.Battle
                     resistance += _attributes[resistanceAttributes[j]];
                 }
 
-                dot += perSecond * ms / 1000.0 * (1 - resistance);
+                dot += preMitigation * (1 - resistance);
             }
 
             CurrentHealth -= dot;

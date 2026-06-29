@@ -2,8 +2,8 @@ import type { IPath, IProficiency } from '$lib/api';
 
 /**
  * A path as edited in the workbench. Identical to the {@link IPath} contract — its ordered tiers
- * are the proficiencies carrying its id (kept in a sibling catalogue), and its skill contributions
- * ride along on `contributions` (persisted through the dedicated SetPathContributions endpoint).
+ * are the proficiencies carrying its id (kept in a sibling catalogue), and it declares the single
+ * activity key it trains on.
  */
 export type WorkbenchPath = IPath;
 

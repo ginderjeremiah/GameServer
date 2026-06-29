@@ -5,9 +5,8 @@ namespace Game.Infrastructure.Entities
     /// <c>docs/spikes/982-proficiency-system.md</c>). Static, authored reference data with a zero-based
     /// identity. Leveling and bonus/skill payouts are implemented in later sub-issues; this entity carries
     /// only the authored definition: its position in a <see cref="Path"/>, the level cap, the XP curve
-    /// params, the per-level bonus/skill payouts, and the cross-path prerequisite edges. Skill contributions
-    /// now hang off the owning <see cref="Path"/> (<see cref="Path.SkillContributions"/>), not the proficiency.
-    /// A freshly-opened tier's native, full-pace training skill is re-homed onto the previous tier's max-level
+    /// params, the per-level bonus/skill payouts, and the cross-path prerequisite edges. A freshly-opened
+    /// tier's native training skill is re-homed onto the previous tier's max-level
     /// <see cref="ProficiencyLevelReward"/> (skill synthesis, spike #1125, supersedes the former tree-seed skill).
     /// </summary>
     public class Proficiency : IZeroBasedIdentityEntity

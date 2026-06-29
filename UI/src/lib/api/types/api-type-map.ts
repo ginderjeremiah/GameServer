@@ -36,7 +36,6 @@ import type {
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
-	ISetPathContributionsData,
 	ISetProficiencyModifiersData,
 	ISetProficiencyPrerequisitesData,
 	ISetProficiencyRewardsData,
@@ -81,7 +80,6 @@ export type ApiResponseTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
-	'AdminTools/SetPathContributions': undefined;
 	'AdminTools/SetProficiencyModifiers': undefined;
 	'AdminTools/SetProficiencyPrerequisites': undefined;
 	'AdminTools/SetProficiencyRewards': undefined;
@@ -135,7 +133,6 @@ export type ApiRequestTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
-	'AdminTools/SetPathContributions': ISetPathContributionsData;
 	'AdminTools/SetProficiencyModifiers': ISetProficiencyModifiersData;
 	'AdminTools/SetProficiencyPrerequisites': ISetProficiencyPrerequisitesData;
 	'AdminTools/SetProficiencyRewards': ISetProficiencyRewardsData;

@@ -15,12 +15,12 @@
 
 import type { DescribedTooltipController } from '$components/tooltip/tooltip-hover';
 import type {
+	EActivityKey,
 	IPath,
 	IPlayerProficiency,
 	IProficiency,
 	IProficiencyLevelModifier,
-	IProficiencyLevelReward,
-	ISkillPathContribution
+	IProficiencyLevelReward
 } from '$lib/api';
 
 /** The visible state of a tier on its path. Hidden/locked tiers are absent from the view-model entirely
@@ -70,9 +70,9 @@ export interface PathView {
 	/** The rail reuses the root tier's word/icon — there is no path-level word. */
 	word: string;
 	iconPath: string;
-	/** The skills that train this path (`{ skillId, homeTier, weight }`), for the inspector's "Trained by"
-	 *  chips. Path-level (a skill feeds the path, not an individual tier — spike #982 decision 12). */
-	contributions: ISkillPathContribution[];
+	/** The activity this path trains on (a damage-type key, category, or combat event), for the inspector's
+	 *  "Trained by" label — a path earns from any effect whose key resolves to it (spike #1318). */
+	activityKey: EActivityKey;
 	/** Visible tiers in ascending `pathOrdinal` (root first); the spine reverses for display. */
 	tiers: TierView[];
 }
@@ -120,14 +120,6 @@ export function representativeTier(path: PathView): TierView | undefined {
 	return path.tiers.find((t) => t.frontier) ?? path.tiers.at(-1);
 }
 
-/** Whether the player's firing skills feed the path's frontier tier — any skill that fires in battle
- *  (a selected loadout skill or an innate item-granted skill) and contributes to the path at a home tier
- *  at or below the frontier (a skill never trains a tier below where it was acquired, so the distance is
- *  always ≥ 0; spike #982 decision 12). */
-function hasContributingSkill(path: IPath, frontierOrdinal: number, firingSkills: ReadonlySet<number>): boolean {
-	return path.contributions.some((c) => c.homeTier <= frontierOrdinal && firingSkills.has(c.skillId));
-}
-
 /**
  * Composes the proficiency/path reference data and the player's progress into the per-path spine view-
  * models the screen renders — the pure logic core.
@@ -141,7 +133,7 @@ export function buildLexicon(
 	proficiencies: readonly IProficiency[],
 	paths: readonly IPath[],
 	player: readonly IPlayerProficiency[],
-	firingSkills: readonly number[]
+	firingActivityKeys: readonly number[]
 ): PathView[] {
 	// Index the player's progress; an absent proficiency is unopened (level 0, no row).
 	const levelById = new Map<number, number>();
@@ -182,7 +174,6 @@ export function buildLexicon(
 		}
 	}
 
-	const firingSet = new Set(firingSkills);
 	const result: PathView[] = [];
 	for (const [pathId, tierProfs] of tiersByPath) {
 		const path = pathById.get(pathId);
@@ -190,7 +181,7 @@ export function buildLexicon(
 			continue;
 		}
 		const ordered = [...tierProfs].sort((a, b) => a.pathOrdinal - b.pathOrdinal);
-		const tiers = derivePathSpine(path, ordered, levelById, xpById, maxedIds, openedIds, firingSet);
+		const tiers = derivePathSpine(path, ordered, levelById, xpById, maxedIds, openedIds, firingActivityKeys);
 		if (tiers.length === 0) {
 			continue;
 		}
@@ -201,7 +192,7 @@ export function buildLexicon(
 			name: path.name,
 			word: tiers[0].word,
 			iconPath: tiers[0].iconPath,
-			contributions: path.contributions,
+			activityKey: path.activityKey,
 			tiers
 		});
 	}
@@ -219,7 +210,7 @@ function derivePathSpine(
 	xpById: ReadonlyMap<number, number>,
 	maxedIds: ReadonlySet<number>,
 	openedIds: ReadonlySet<number>,
-	firingSkills: ReadonlySet<number>
+	firingActivityKeys: readonly number[]
 ): TierView[] {
 	// Reachability builds a contiguous prefix from the root — a tier whose predecessor is un-maxed (so
 	// hidden) keeps every deeper tier hidden too. The root reveals when the path is discovered: a pure root
@@ -251,7 +242,7 @@ function derivePathSpine(
 		let state: TierState;
 		if (maxed) {
 			state = 'maxed';
-		} else if (isFrontier && hasContributingSkill(path, prof.pathOrdinal, firingSkills)) {
+		} else if (isFrontier && firingActivityKeys.includes(path.activityKey)) {
 			state = 'training';
 		} else {
 			state = 'unlocked';

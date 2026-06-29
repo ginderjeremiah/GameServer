@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/svelte';
+import { EActivityKey } from '$lib/api';
 import TierSpine from '$routes/game/screens/proficiencies/TierSpine.svelte';
 import type {
 	PathView,
@@ -32,7 +33,7 @@ const pathView = (tiers: TierView[]): PathView => ({
 	name: 'Pyromancy',
 	word: tiers[0]?.word ?? '',
 	iconPath: '',
-	contributions: [],
+	activityKey: EActivityKey.Physical,
 	tiers
 });
 

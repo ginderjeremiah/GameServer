@@ -34,7 +34,9 @@ export interface FlagOption {
 export interface FieldConfig<T> {
 	key: keyof T & string;
 	label: string;
-	type: 'text' | 'number' | 'toggle' | 'textarea' | 'select' | 'flags';
+	/** `attribute` renders the searchable, group-by-type AttributePicker over the same `options`
+	 *  provider as `select` — used for every EAttribute picker now the enum is large (#1327). */
+	type: 'text' | 'number' | 'toggle' | 'textarea' | 'select' | 'attribute' | 'flags';
 	placeholder?: string;
 	/** Lets a text/textarea field stretch to fill the row. */
 	grow?: boolean;
@@ -62,7 +64,8 @@ export interface FieldConfig<T> {
 export interface ColumnConfig {
 	key: string;
 	label: string;
-	type: 'select' | 'number' | 'share';
+	/** `attribute` renders the searchable, group-by-type AttributePicker (#1327); otherwise as `select`. */
+	type: 'select' | 'attribute' | 'number' | 'share';
 	/** Select option provider; receives the row's current value so a retired reference stays visible. */
 	options?: (current?: number) => SelectOption[];
 	align?: 'r';
