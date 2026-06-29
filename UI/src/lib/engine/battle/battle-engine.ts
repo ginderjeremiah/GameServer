@@ -88,7 +88,7 @@ export class BattleEngine {
 	private logicalUnhook?: Action;
 	private renderUnhook?: Action;
 	private enemyLoadedUnhook?: Action;
-	/** Tears down the in-flight post-victory loading countdown (removes its render hook and resolves the
+	/** Tears down the in-flight post-victory loading countdown (removes its logical hook and resolves the
 	 *  awaited promise); undefined when no countdown is active. */
 	private finishLoading?: Action;
 
@@ -143,8 +143,8 @@ export class BattleEngine {
 			// no progress on their own. Resetting here lets a return from the admin screen resume cleanly.
 			this.setBattleStage(Idle);
 		}
-		// A loading countdown is driven by the render engine independently of `running`, so cancel it
-		// unconditionally — otherwise its render hook leaks and the awaiting getNewEnemy path hangs.
+		// A loading countdown is driven by the logical engine independently of `running`, so cancel it
+		// unconditionally — otherwise its logical hook leaks and the awaiting getNewEnemy path hangs.
 		this.finishLoading?.();
 	}
 
@@ -261,20 +261,23 @@ export class BattleEngine {
 	}
 
 	public startLoading(loadingTime: number) {
-		// Cancel any countdown still in flight so re-invoking can't leak the previous render hook.
+		// Cancel any countdown still in flight so re-invoking can't leak the previous logical hook.
 		this.finishLoading?.();
 		this.loadingTime = loadingTime;
 		this.loadingTotal = loadingTime;
 		this.setBattleStage(Loading);
 		const { promise, resolve } = Promise.withResolvers<void>();
-		const unhook = onRenderUpdate((delta) => {
+		// Drive the countdown off the logical clock, not the render (rAF) loop: rAF is suspended while the
+		// tab is backgrounded, which would freeze the cooldown and park the farm loop in Loading until the
+		// tab is refocused (#1366). The logical loop keeps running (throttled, with catch-up) when hidden.
+		const unhook = onLogicalUpdate((delta) => {
 			this.loadingTime -= delta;
 			if (this.loadingTime <= 0) {
 				this.finishLoading?.();
 			}
-		}, false);
+		});
 		// Single idempotent teardown shared by the natural countdown-complete path and the stop()/reset()
-		// cancellation path: remove the render hook and release the awaiting caller exactly once.
+		// cancellation path: remove the logical hook and release the awaiting caller exactly once.
 		this.finishLoading = () => {
 			this.finishLoading = undefined;
 			unhook();
