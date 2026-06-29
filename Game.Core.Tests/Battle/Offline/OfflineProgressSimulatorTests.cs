@@ -519,21 +519,22 @@ namespace Game.Core.Tests.Battle.Offline
 
         private static Scenario StalemateScenario(int? bossEnemyId = null, int bossLevel = 1) => new()
         {
-            // Both sides have huge Endurance (so MaxHealth/Defense clamp every hit to zero) and so neither can
-            // damage the other — every battle runs to the cap as a draw.
+            // Both sides have huge Endurance, which gives both an enormous MaxHealth AND an enormous Toughness —
+            // so the trickle of post-mitigation damage cannot kill within the cap and every battle is a draw.
             Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: bossEnemyId, bossLevel: bossLevel),
             Snapshot = PlayerSnapshot(strength: 1, endurance: 1000),
             ResolveEnemy = level => MakeEnemy(level, strength: 1, endurance: 1000, skillCount: 1),
         };
 
         /// <summary>
-        /// A boss fight balanced so the player's crit rolls decide it. The boss's Defense (sourced from
-        /// Agility, so its health stays low) fully absorbs a normal player hit but not a crit, which punches
-        /// through (crit multiplies before Defense). The player's long skill cooldown limits it to a handful
-        /// of fires across the battle cap, so whether enough of them crit — varying with each battle's fresh
-        /// seed — flips the outcome between a win and a draw. The boss deals no damage through the player's
-        /// Defense, so the player never dies (the loop's continue-through-losses behaviour is pinned
-        /// separately by <see cref="AlwaysLoseBossScenario"/>).
+        /// A boss fight balanced so the player's crit rolls decide it. The boss carries an injected Toughness
+        /// (so its MaxHealth stays low) that heavily mitigates every player hit; a crit multiplies the raw
+        /// damage before mitigation, so it deals 1.75× a normal hit. The player's long skill cooldown limits it
+        /// to ~4 fires across the cap, and the boss's MaxHealth is tuned so it dies only once at least two of
+        /// those fires crit — so whether enough crit, varying with each battle's fresh seed, flips the outcome
+        /// between a win and a draw. The boss's chip damage never out-races the player's MaxHealth, so the
+        /// player never dies (the loop's continue-through-losses behaviour is pinned separately by
+        /// <see cref="AlwaysLoseBossScenario"/>).
         /// </summary>
         private static Scenario CoinFlipBossScenario() => new()
         {
@@ -543,8 +544,6 @@ namespace Game.Core.Tests.Battle.Offline
             // A long cooldown → only ~4 fires across the 120s cap, so crit count (and thus the outcome)
             // swings battle to battle.
             ResolveSkill = _ => SlowHeavySkill(),
-            // Defense from Agility (62), low MaxHealth (50): a normal 60 hit is absorbed, a 105 crit deals 43,
-            // so two crits win. Endurance/Strength left at 0 so health doesn't balloon.
             ResolveEnemy = level => CoinFlipBoss(level),
         };
 
@@ -688,8 +687,11 @@ namespace Game.Core.Tests.Battle.Offline
             Effects = [],
         };
 
-        // The coin-flip boss: Defense (62) comes from Agility so its MaxHealth stays at the 50 base. A normal
-        // 60 player hit is fully absorbed; a 105 crit punches through for 43, so two crits are needed to win.
+        // The coin-flip boss: an injected Toughness 80 heavily mitigates each hit while Strength 2 keeps
+        // MaxHealth low (50 + 5·2 = 60). Against the level-1 player (K·level = 20) the curve reduces by
+        // 80/(80+20) = 0.8, so a normal 60-damage hit deals 60×0.2 = 12 and a 1.75× crit (105) deals 21.
+        // Across 4 fires the boss takes 48 + 9·crits, so it dies (≥60) only with at least two crits — the
+        // crit count flips the outcome between a win and a draw.
         private static Enemy CoinFlipBoss(int level) => new()
         {
             Id = EnemyId,
@@ -698,7 +700,8 @@ namespace Game.Core.Tests.Battle.Offline
             Level = level,
             AttributeDistributions =
             [
-                new AttributeDistribution { AttributeId = Agility, BaseAmount = 120, AmountPerLevel = 0 },
+                new AttributeDistribution { AttributeId = Strength, BaseAmount = 2, AmountPerLevel = 0 },
+                new AttributeDistribution { AttributeId = Toughness, BaseAmount = 80, AmountPerLevel = 0 },
             ],
             AvailableSkills = [EnemyAttackSkill(0)],
         };

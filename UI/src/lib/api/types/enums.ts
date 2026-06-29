@@ -9,7 +9,7 @@ export enum EAttribute {
 	Dexterity = 4,
 	Luck = 5,
 	MaxHealth = 6,
-	Defense = 7,
+	Toughness = 7,
 	CooldownRecovery = 8,
 	/** @deprecated Drop system has been replaced by challenge-based unlocks. */
 	DropBonus = 9,

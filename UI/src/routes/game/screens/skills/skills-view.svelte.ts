@@ -18,14 +18,14 @@ import { EAttribute, type ISkill, type IZone, apiSocket } from '$lib/api';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import {
 	BattleAttributes,
-	applyDefense,
+	toughnessMitigatedDamage,
 	calculateSkillDamage,
 	cooldownMultiplier,
 	expectedCritMultiplier,
 	skillContributions,
 	type SkillContribution
 } from '$lib/battle';
-import { damagePerSecond, enemyDefense, SerializedQueue } from '$lib/common';
+import { damagePerSecond, enemyToughness, SerializedQueue } from '$lib/common';
 import { playerManager, inventoryManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
@@ -49,11 +49,11 @@ export const FILTERABLE_ATTRIBUTES: EAttribute[] = [
 	EAttribute.Luck
 ];
 
-/** Everything the page needs to render and rank one skill — defense-independent
- *  (effective values are derived per-render from the live Compare-vs defense). */
+/** Everything the page needs to render and rank one skill — Toughness-independent
+ *  (effective values are derived per-render from the live Compare-vs Toughness). */
 export interface SkillMetrics {
 	skill: ISkill;
-	/** Raw damage at the player's current attributes, before enemy defense. */
+	/** Raw damage at the player's current attributes, before enemy mitigation. */
 	rawDamage: number;
 	/** Cooldown in seconds, adjusted for the player's CooldownRecovery (matches
 	 *  the in-battle skill tooltip's `adjustedCd`). */
@@ -72,47 +72,48 @@ export interface InnateSkill {
 	duplicate: boolean;
 }
 
-/** A Compare-vs quick-pick: an enemy from the current zone whose flat Defense snaps the slider. */
+/** A Compare-vs quick-pick: an enemy from the current zone whose Toughness snaps the slider. */
 export interface ComparePreset {
 	/** Stable identity — distinguishes the boss pill from a same-id idle-spawn pill. */
 	key: string;
 	name: string;
 	/** True for the zone's dedicated boss (evaluated at its fixed level), false for an idle spawn. */
 	isBoss: boolean;
-	/** The enemy's flat Defense at its evaluated level. */
-	defense: number;
+	/** The enemy's Toughness at its evaluated level. */
+	toughness: number;
 }
 
 /* ── pure helpers (no reactive state — unit-tested directly) ───────────────── */
 
-/** Comparator over `SkillMetrics` for the given sort + Compare-vs defense.
- *  DPS/Damage rank by *effective* value (defense-aware), descending. The crit multiplier scales raw
- *  damage before defense (mirroring {@link SkillsView.effective}), so the ranking matches the
- *  crit-inclusive numbers the rows display; it defaults to 1 (no crit) for unit-test convenience. */
+/** Comparator over `SkillMetrics` for the given sort + Compare-vs Toughness.
+ *  DPS/Damage rank by *effective* value (mitigation-aware), descending. The crit multiplier scales raw
+ *  damage before mitigation (mirroring {@link SkillsView.effective}), so the ranking matches the
+ *  crit-inclusive numbers the rows display; the player is the attacker, so `attackerLevel` scales the curve.
+ *  Both default for unit-test convenience (no crit, level 1). */
 export function sortMetrics(
 	sort: SkillSort,
-	defense: number,
+	toughness: number,
+	attackerLevel = 1,
 	critMultiplier = 1
 ): (a: SkillMetrics, b: SkillMetrics) => number {
+	const mitigated = (raw: number) => toughnessMitigatedDamage(raw * critMultiplier, toughness, attackerLevel);
 	switch (sort) {
 		case 'name':
 			return (a, b) => a.skill.name.localeCompare(b.skill.name);
 		case 'cd':
 			return (a, b) => a.cooldown - b.cooldown;
 		case 'dmg':
-			return (a, b) =>
-				applyDefense(b.rawDamage * critMultiplier, defense) - applyDefense(a.rawDamage * critMultiplier, defense);
+			return (a, b) => mitigated(b.rawDamage) - mitigated(a.rawDamage);
 		case 'dps':
 		default:
 			return (a, b) =>
-				damagePerSecond(applyDefense(b.rawDamage * critMultiplier, defense), b.cooldown) -
-				damagePerSecond(applyDefense(a.rawDamage * critMultiplier, defense), a.cooldown);
+				damagePerSecond(mitigated(b.rawDamage), b.cooldown) - damagePerSecond(mitigated(a.rawDamage), a.cooldown);
 	}
 }
 
 /** The representative level for a zone's idle spawns: the midpoint of its encounter range.
- *  Spawns roll uniformly in [levelMin, levelMax] and defense scales linearly with level, so the
- *  midpoint is the expected encounter level — and thus the expected defense — without a server roll. */
+ *  Spawns roll uniformly in [levelMin, levelMax] and Toughness scales linearly with level, so the
+ *  midpoint is the expected encounter level — and thus the expected Toughness — without a server roll. */
 export function zoneSpawnLevel(zone: IZone): number {
 	return (zone.levelMin + zone.levelMax) / 2;
 }
@@ -135,9 +136,9 @@ export class SkillsView {
 	search = $state('');
 	sort = $state<SkillSort>('dps');
 	filterAttributes = $state<EAttribute[]>([]);
-	/** Compare-vs flat defense (0 ⇒ no defender). Drives every effective value. */
-	defense = $state(0);
-	/** The selected Compare-vs preset pill, or null when defense was set manually (slider drag). */
+	/** Compare-vs Toughness (0 ⇒ no defender). Drives every effective value through the mitigation curve. */
+	toughness = $state(0);
+	/** The selected Compare-vs preset pill, or null when Toughness was set manually (slider drag). */
 	selectedPresetKey = $state<string | null>(null);
 	modalOpen = $state(false);
 	/** When set, an equip on a full loadout is awaiting the slot to replace. */
@@ -184,14 +185,14 @@ export class SkillsView {
 
 	/** The player's expected critical-hit damage multiplier (≥1), folded into every effective-damage
 	 *  read so the page mirrors the in-fight skill tooltip and the battle (a crit scales raw damage
-	 *  before Defense). Player-wide — the crit attributes are the player's own — so it applies uniformly
+	 *  before mitigation). Player-wide — the crit attributes are the player's own — so it applies uniformly
 	 *  across the loadout; reuses the shared display-only `expectedCritMultiplier` rather than duplicating
 	 *  the formula. The live battle still rolls each crit individually. */
 	readonly critChance = $derived(this.battleAttributes.getValue(EAttribute.CriticalChance));
 	readonly critDamage = $derived(this.battleAttributes.getValue(EAttribute.CriticalDamage));
 	readonly critMultiplier = $derived(expectedCritMultiplier(this.critChance, this.critDamage));
 
-	/** Defense-independent metrics per catalogue skill, keyed by id. Recomputed
+	/** Toughness-independent metrics per catalogue skill, keyed by id. Recomputed
 	 *  wholesale when attributes/equipment change — read via {@link metric}. */
 	readonly metricsById = $derived.by(() => {
 		const attrs = this.battleAttributes;
@@ -213,15 +214,9 @@ export class SkillsView {
 		return this.metricsById[id];
 	}
 
-	/** Slider ceiling: enough defense to fully block the biggest hit — the biggest crit-scaled raw
-	 *  damage, since a crit punches through Defense (mirrors {@link effective}). */
-	readonly maxDamage = $derived(
-		Math.max(1, ...this.catalogue.map((s) => (this.metricsById[s.id]?.rawDamage ?? 0) * this.critMultiplier))
-	);
-
 	/** Enemy quick-picks for the Compare-vs bar, sourced from the player's current zone: every
-	 *  non-retired enemy that spawns there (defense at the range midpoint) plus the zone's dedicated
-	 *  boss (defense at its fixed level). Empty until zone/enemy reference data is loaded. */
+	 *  non-retired enemy that spawns there (Toughness at the range midpoint) plus the zone's dedicated
+	 *  boss (Toughness at its fixed level). Empty until zone/enemy reference data is loaded. */
 	readonly comparePresets = $derived.by<ComparePreset[]>(() => {
 		const zone = staticData.zones?.[playerManager.currentZone];
 		if (!zone) {
@@ -235,7 +230,7 @@ export class SkillsView {
 				key: `spawn-${enemy.id}`,
 				name: enemy.name,
 				isBoss: false,
-				defense: enemyDefense(enemy, spawnLevel)
+				toughness: enemyToughness(enemy, spawnLevel)
 			}));
 		const boss = zone.bossEnemyId == null ? undefined : enemies[zone.bossEnemyId];
 		if (boss) {
@@ -243,11 +238,17 @@ export class SkillsView {
 				key: `boss-${boss.id}`,
 				name: boss.name,
 				isBoss: true,
-				defense: enemyDefense(boss, zone.bossLevel)
+				toughness: enemyToughness(boss, zone.bossLevel)
 			});
 		}
 		return presets;
 	});
+
+	/** Slider ceiling: the toughest Toughness among the Compare-vs presets, so every enemy you currently face
+	 *  is reachable on the slider. The mitigation curve asymptotes (no value fully blocks a hit), so there is no
+	 *  natural "block everything" ceiling — this caps exploration at your hardest current target. Falls back to
+	 *  1 until zone/enemy reference data loads. */
+	readonly maxToughness = $derived(Math.max(1, ...this.comparePresets.map((p) => p.toughness)));
 
 	/** Core attributes any catalogue skill scales on (the offered filter chips). */
 	readonly usedAttributes = $derived(
@@ -277,7 +278,7 @@ export class SkillsView {
 				}
 				return true;
 			});
-		return list.sort(sortMetrics(this.sort, this.defense, this.critMultiplier));
+		return list.sort(sortMetrics(this.sort, this.toughness, playerManager.level, this.critMultiplier));
 	});
 
 	/** Equipped rail rows, ordered by loadout slot (not by the active sort). Built from
@@ -318,13 +319,13 @@ export class SkillsView {
 	/** Metrics for the inspected skill, falling back to the first listed skill. */
 	readonly selected = $derived(this.metricsById[this.selectedId] ?? this.railList[0]);
 
-	/** Combined effective DPS of the equipped loadout vs the current defense. */
+	/** Combined effective DPS of the equipped loadout vs the current Toughness. */
 	readonly combinedEffectiveDps = $derived(this.equipped.reduce((sum, id) => sum + this.effectiveDps(id), 0));
 
-	/** Combined effective single-hit burst of the equipped loadout vs the current defense. */
+	/** Combined effective single-hit burst of the equipped loadout vs the current Toughness. */
 	readonly combinedEffectiveBurst = $derived(this.equipped.reduce((sum, id) => sum + this.effective(id), 0));
 
-	/* ── per-skill effective reads (defense-aware) ───────────────────────────── */
+	/* ── per-skill effective reads (Toughness-aware) ─────────────────────────── */
 
 	isEquipped(id: number): boolean {
 		return this.equipped.includes(id);
@@ -343,26 +344,26 @@ export class SkillsView {
 		return this.metricsById[id]?.cooldown ?? 0;
 	}
 
-	/** Effective single-hit damage: raw damage scaled by the expected crit multiplier (a crit
-	 *  punches through Defense, so it scales before subtraction), then less the Compare-vs defense. */
+	/** Effective single-hit damage: raw damage scaled by the expected crit multiplier (a crit applies before
+	 *  mitigation, so it scales first), then run through the Compare-vs Toughness curve at the player's level. */
 	effective(id: number): number {
-		return applyDefense(this.rawDamage(id) * this.critMultiplier, this.defense);
+		return toughnessMitigatedDamage(this.rawDamage(id) * this.critMultiplier, this.toughness, playerManager.level);
 	}
 
 	effectiveDps(id: number): number {
 		return damagePerSecond(this.effective(id), this.cooldown(id));
 	}
 
-	/** Expected crit damage folded into a skill's hit before Defense (`raw × (critMultiplier − 1)`),
+	/** Expected crit damage folded into a skill's hit before mitigation (`raw × (critMultiplier − 1)`),
 	 *  0 when no crit can occur — drives the breakdown's Critical row and the raw-note's crit clause. */
 	critBonus(id: number): number {
 		return this.rawDamage(id) * (this.critMultiplier - 1);
 	}
 
-	/** Defense actually applied to a skill (clamped to its crit-scaled hit, for display), so the
-	 *  breakdown's raw + crit − defense reconciles with {@link effective}. */
-	appliedDefense(id: number): number {
-		return Math.min(this.defense, this.rawDamage(id) * this.critMultiplier);
+	/** Damage the Compare-vs Toughness curve removes from a skill's crit-scaled hit (`raw×crit − effective`),
+	 *  so the breakdown's raw + crit − mitigation reconciles with {@link effective}. */
+	mitigatedAmount(id: number): number {
+		return this.rawDamage(id) * this.critMultiplier - this.effective(id);
 	}
 
 	/* ── selection + loadout edits ───────────────────────────────────────────── */
@@ -413,15 +414,15 @@ export class SkillsView {
 		this.commit(next);
 	}
 
-	setDefense(defense: number): void {
-		this.defense = Math.max(0, Math.min(defense, this.maxDamage));
+	setToughness(toughness: number): void {
+		this.toughness = Math.max(0, Math.min(toughness, this.maxToughness));
 		// A manual slider drag drops the active preset selection (mirrors the mock).
 		this.selectedPresetKey = null;
 	}
 
-	/** Snap the Compare-vs defense to an enemy preset and mark its pill selected. */
+	/** Snap the Compare-vs Toughness to an enemy preset and mark its pill selected. */
 	selectPreset(preset: ComparePreset): void {
-		this.defense = Math.max(0, Math.min(preset.defense, this.maxDamage));
+		this.toughness = Math.max(0, Math.min(preset.toughness, this.maxToughness));
 		this.selectedPresetKey = preset.key;
 	}
 

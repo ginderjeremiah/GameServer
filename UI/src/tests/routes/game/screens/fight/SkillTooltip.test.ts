@@ -30,7 +30,8 @@ beforeEach(() => {
 			{ attributeId: EAttribute.CooldownRecovery, amount: 1 }
 		]
 	});
-	opponent = makeBattler({ name: 'Dire Wolf', attributes: [{ attributeId: EAttribute.Defense, amount: 5 }] });
+	// Toughness 60 vs the level-12 attacker → 60/(60 + 20·12) = 0.2 reduction (a clean ×0.8 on the hit).
+	opponent = makeBattler({ name: 'Dire Wolf', attributes: [{ attributeId: EAttribute.Toughness, amount: 60 }] });
 	mockBattleEngine.getOpponent.mockReturnValue(opponent);
 	staticData.attributes = [];
 });
@@ -56,7 +57,7 @@ describe('SkillTooltip', () => {
 		expect(shell.getAttribute('style')).toContain('border-left: 3px solid var(--rarity-rare)');
 	});
 
-	it('shows the damage breakdown: base, per-attribute multiplier, enemy defense and total', () => {
+	it('shows the damage breakdown: base, per-attribute multiplier, Toughness mitigation and total', () => {
 		staticData.attributes = [makeAttribute(EAttribute.Strength, 'Strength')];
 		const skill = makeSkill(owner, {
 			name: 'Cleave',
@@ -68,14 +69,14 @@ describe('SkillTooltip', () => {
 
 		expect(getByText('Cleave')).toBeTruthy();
 		const list = container.querySelector('.tt-dmg-list') as HTMLElement;
-		// base 10, STR(20) x2 = +40, enemy defense -5  ->  total 10 + 40 - 5 = 45
+		// base 10, STR(20) x2 = +40 → raw 50; Toughness 60 vs the level-12 attacker removes 50 × 0.2 = 10 → total 40.
 		expect(list.textContent).toContain('Strength');
 		expect(list.textContent).toContain('10');
 		expect(list.textContent).toContain('+40');
-		expect(list.textContent).toContain('-5');
+		expect(list.textContent).toContain('-10');
 		// No crit row when the battler has no crit chance (the default fixture owner).
 		expect(list.textContent).not.toContain('Critical');
-		expect((container.querySelector('.tt-total-value') as HTMLElement).textContent).toContain('45');
+		expect((container.querySelector('.tt-total-value') as HTMLElement).textContent).toContain('40');
 	});
 
 	it('folds the expected crit contribution into the breakdown and total', () => {
@@ -101,24 +102,25 @@ describe('SkillTooltip', () => {
 		const { container } = render(SkillTooltip, { props: { skill } });
 
 		const list = container.querySelector('.tt-dmg-list') as HTMLElement;
-		// raw = base 10 + STR(20)×2 = 50; crit adds 50 × 0.5·(2−1) = +25; enemy defense −5.
+		// raw = base 10 + STR(20)×2 = 50; crit adds 50 × 0.5·(2−1) = +25; Toughness curve removes 75 × 0.2 = 15.
 		expect(list.textContent).toContain('Critical');
 		expect(list.textContent).toContain('50%'); // crit chance
 		expect(list.textContent).toContain('×2'); // crit damage multiplier
 		expect(list.textContent).toContain('+25'); // expected crit bonus
-		// total = 50 + 25 − 5 = 70
-		expect((container.querySelector('.tt-total-value') as HTMLElement).textContent).toContain('70');
+		expect(list.textContent).toContain('Toughness mitigation');
+		// total = (50 + 25) × 0.8 = 60
+		expect((container.querySelector('.tt-total-value') as HTMLElement).textContent).toContain('60');
 	});
 
-	it('omits the enemy-defense row and uses raw damage when there is no opponent', () => {
+	it('omits the mitigation row and uses raw damage when there is no opponent', () => {
 		mockBattleEngine.getOpponent.mockReturnValue(undefined);
 		const skill = makeSkill(owner, {
 			baseDamage: 10,
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 2 }]
 		});
 		const { container } = render(SkillTooltip, { props: { skill } });
-		expect(container.textContent).not.toContain('Enemy defense');
-		// total = base 10 + STR(20) x2 (40), with no defense subtracted = 50
+		expect(container.textContent).not.toContain('Toughness mitigation');
+		// total = base 10 + STR(20) x2 (40), with no mitigation = 50
 		expect((container.querySelector('.tt-total-value') as HTMLElement).textContent).toContain('50');
 	});
 
@@ -145,16 +147,16 @@ describe('SkillTooltip', () => {
 		});
 		const { container } = render(SkillTooltip, { props: { skill } });
 		const metrics = container.querySelector('.tt-metrics') as HTMLElement;
-		// adjustedCd = 1000ms / 1000 / cdMult(2) = 0.5s; total 45; DPS = 45 / 0.5 = 90
+		// adjustedCd = 1000ms / 1000 / cdMult(2) = 0.5s; total 50 × 0.8 = 40; DPS = 40 / 0.5 = 80
 		expect(metrics.textContent).toContain('0.5s');
-		expect(metrics.textContent).toContain('90');
+		expect(metrics.textContent).toContain('80');
 	});
 
 	it('renders an "On hit" effect line per authored effect, tinted by buff/debuff direction', async () => {
 		const { EModifierType, ESkillEffectTarget } = await import('$lib/api');
 		staticData.attributes = [
 			makeAttribute(EAttribute.Strength, 'Strength'),
-			makeAttribute(EAttribute.Defense, 'Defense')
+			makeAttribute(EAttribute.Toughness, 'Toughness')
 		];
 		const skill = makeSkill(owner, {
 			name: 'Warcry',
@@ -172,7 +174,7 @@ describe('SkillTooltip', () => {
 				{
 					id: 2,
 					target: ESkillEffectTarget.Opponent,
-					attributeId: EAttribute.Defense,
+					attributeId: EAttribute.Toughness,
 					modifierTypeId: EModifierType.Additive,
 					amount: -10,
 					durationMs: 3000,

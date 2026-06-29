@@ -67,8 +67,8 @@ namespace Game.Api.Tests.CodeGen
             // derivedSource at all) would no longer match the generated table.
             var modifier = new AttributeModifier
             {
-                Attribute = EAttribute.Defense,
-                Amount = 2.0,
+                Attribute = EAttribute.MaxHealth,
+                Amount = 50.0,
                 Type = EModifierType.Additive,
                 Source = EAttributeModifierSource.BaseValue
             };
@@ -76,7 +76,7 @@ namespace Game.Api.Tests.CodeGen
             var content = WriteAndRead([modifier]);
 
             Assert.Contains(
-                "{ attribute: EAttribute.Defense, amount: 2, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue }",
+                "{ attribute: EAttribute.MaxHealth, amount: 50, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue }",
                 content);
             Assert.DoesNotContain("derivedSource", content);
         }

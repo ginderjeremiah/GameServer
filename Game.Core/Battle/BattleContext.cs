@@ -70,7 +70,7 @@ namespace Game.Core.Battle
         /// <summary>
         /// Resolves the end-of-tick damage/heal-over-time phase for both battlers, recording its statistics.
         /// Called only when both battlers are still alive after the skill exchange. For each battler its typed
-        /// damage-over-time (<see cref="Battler.ApplyDamageOverTime"/>, bypassing Defense) is applied, then its
+        /// damage-over-time (<see cref="Battler.ApplyDamageOverTime"/>, bypassing mitigation) is applied, then its
         /// <see cref="EAttribute.HealthRegenPerSecond"/>, and only <b>then</b> is death checked — so a
         /// heal-over-time can save a battler from an otherwise-lethal DoT tick (#1090). The <b>enemy resolves
         /// first</b>: an enemy that the same-tick regen cannot save dies and the phase returns before the
@@ -102,19 +102,20 @@ namespace Game.Core.Battle
         /// <list type="bullet">
         /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage). On a crit
         /// the raw damage is multiplied by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b>
-        /// Defense is subtracted, so high crit damage punches through Defense.</item>
+        /// mitigation, so high crit damage punches through <see cref="EAttribute.Toughness"/>.</item>
         /// <item>When the <b>enemy</b> attacks the player, two draws are taken unconditionally — dodge then
         /// block, <b>both</b> always drawn (even when the hit is dodged). A dodge zeroes the hit; a non-dodged
-        /// block applies <see cref="EAttribute.BlockReduction"/> as a second flat reduction alongside
-        /// Defense.</item>
+        /// block applies <see cref="EAttribute.BlockReduction"/> as a flat reduction after the Toughness
+        /// curve.</item>
         /// </list>
-        /// Enemies never crit/dodge/block: the gating reads the rolls only on the player's side, leaving a clean
-        /// seam for later enemy parity.
+        /// The Toughness curve scales by the <b>active (attacking) battler's level</b>, so the mitigation band
+        /// stays stable as content scales. Enemies never crit/dodge/block: the gating reads the rolls only on the
+        /// player's side, leaving a clean seam for later enemy parity.
         /// </summary>
         /// <returns>
-        /// The actual damage applied after amplification, crit, resistance, Defense, and block — the same value
-        /// booked into the battle stats — so the caller can record a reconciling per-skill total instead of the
-        /// raw pre-mitigation hit.
+        /// The actual damage applied after amplification, crit, resistance, the Toughness curve, and block — the
+        /// same value booked into the battle stats — so the caller can record a reconciling per-skill total
+        /// instead of the raw pre-mitigation hit.
         /// </returns>
         public double DamageTarget(double rawDamage, EDamageType damageType)
         {
@@ -127,7 +128,7 @@ namespace Game.Core.Battle
             {
                 var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
                 var damage = isCrit ? dealt * _activeBattler.GetAttributeValue(CriticalDamage) : dealt;
-                actualDamage = _targetBattler.TakeDamage(damage, damageType);
+                actualDamage = _targetBattler.TakeDamage(damage, damageType, _activeBattler.Level);
 
                 Stats.PlayerDamageDealt += actualDamage;
                 if (isCrit)
@@ -148,26 +149,26 @@ namespace Game.Core.Battle
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
                 var isBlock = _rng.Next() < _targetBattler.GetAttributeValue(BlockChance);
 
-                // The net damage the hit would deal if it landed normally (resistance then flat Defense, no
+                // The net damage the hit would deal if it landed normally (resistance then the Toughness curve, no
                 // block) — the basis for how much a dodge avoided or a block prevented, via the same pipeline
-                // Battler.TakeDamage applies.
-                var afterDefense = _targetBattler.ComputeNetDamage(dealt, damageType);
+                // Battler.TakeDamage applies. The curve scales by the attacking (active) battler's level.
+                var afterMitigation = _targetBattler.ComputeNetDamage(dealt, damageType, _activeBattler.Level);
 
                 if (isDodge)
                 {
                     actualDamage = 0;
                     Stats.AttacksDodged++;
-                    Stats.DamageDodged += afterDefense;
+                    Stats.DamageDodged += afterMitigation;
                 }
                 else if (isBlock)
                 {
-                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _targetBattler.GetAttributeValue(BlockReduction));
+                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level, _targetBattler.GetAttributeValue(BlockReduction));
                     Stats.AttacksBlocked++;
-                    Stats.DamageBlocked += afterDefense - actualDamage;
+                    Stats.DamageBlocked += afterMitigation - actualDamage;
                 }
                 else
                 {
-                    actualDamage = _targetBattler.TakeDamage(dealt, damageType);
+                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level);
                 }
 
                 Stats.PlayerDamageTaken += actualDamage;

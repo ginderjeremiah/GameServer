@@ -94,7 +94,7 @@ beforeEach(() => {
 	staticData.skills = SKILLS;
 	staticData.attributes = [
 		attribute(EAttribute.CriticalChance, 'Fire Damage', true),
-		attribute(EAttribute.Defense, 'Defense')
+		attribute(EAttribute.Toughness, 'Toughness')
 	];
 });
 

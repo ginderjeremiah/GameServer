@@ -290,7 +290,7 @@ describe('BattleEngine', () => {
 			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
-			engine.enemy.takeDamage(1e9, EDamageType.Physical);
+			engine.enemy.takeDamage(1e9, EDamageType.Physical, 1);
 			engine.resume();
 
 			expect(engine.stage).toBe(BattleStage.Idle);
@@ -303,7 +303,7 @@ describe('BattleEngine', () => {
 
 			// Kill the player, then run a sub-cooldown tick so no skill fires and the enemy survives —
 			// leaving the player-dead branch as the only outcome.
-			engine.player.takeDamage(1e9, EDamageType.Physical);
+			engine.player.takeDamage(1e9, EDamageType.Physical, 1);
 			logicalUpdateCallbacks[0](40);
 
 			expect(engine.stage).toBe(BattleStage.Defeated);
@@ -334,7 +334,7 @@ describe('BattleEngine', () => {
 
 			// Pre-kill the enemy, then cross the cap in one tick: the death branch is checked before the
 			// timeout, so the outcome is a victory rather than a draw.
-			engine.enemy.takeDamage(1e9, EDamageType.Physical);
+			engine.enemy.takeDamage(1e9, EDamageType.Physical, 1);
 			logicalUpdateCallbacks[0](DEFAULT_MAX_BATTLE_MS);
 
 			expect(engine.stage).toBe(BattleStage.Victorious);

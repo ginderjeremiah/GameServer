@@ -36,7 +36,7 @@ const attr = (id: EAttribute, name: string, isPercentage = false): IAttribute =>
 // A percentage attribute (renders a `+2%`-style delta) and a flat one (renders a plain `+5`).
 const ATTRIBUTES: IAttribute[] = [
 	attr(EAttribute.CriticalChance, 'Fire Damage', true),
-	attr(EAttribute.Defense, 'Defense', false)
+	attr(EAttribute.Toughness, 'Toughness', false)
 ];
 
 const modifier = (o: Partial<IProficiencyLevelModifier> & { level: number }): IProficiencyLevelModifier => ({
@@ -135,27 +135,27 @@ describe('formatModifier', () => {
 	it('formats an additive flat modifier without a percent sign', () => {
 		const mod = modifier({
 			level: 1,
-			attributeId: EAttribute.Defense,
+			attributeId: EAttribute.Toughness,
 			modifierTypeId: EModifierType.Additive,
 			amount: 5
 		});
-		expect(formatModifier(mod, ATTRIBUTES)).toBe('+5 Defense');
+		expect(formatModifier(mod, ATTRIBUTES)).toBe('+5 Toughness');
 	});
 
 	it('formats a multiplicative modifier as a ×factor', () => {
 		const mod = modifier({
 			level: 1,
-			attributeId: EAttribute.Defense,
+			attributeId: EAttribute.Toughness,
 			modifierTypeId: EModifierType.Multiplicative,
 			amount: 1.5
 		});
-		expect(formatModifier(mod, ATTRIBUTES)).toBe('×1.5 Defense');
+		expect(formatModifier(mod, ATTRIBUTES)).toBe('×1.5 Toughness');
 	});
 
 	it('falls back to the humanised enum name when the attribute is not in the reference set', () => {
-		const mod = modifier({ level: 1, attributeId: EAttribute.Defense, amount: 3 });
+		const mod = modifier({ level: 1, attributeId: EAttribute.Toughness, amount: 3 });
 		// No attributes passed → name degrades to the enum key, magnitude still renders.
-		expect(formatModifier(mod, undefined)).toBe('+3 Defense');
+		expect(formatModifier(mod, undefined)).toBe('+3 Toughness');
 	});
 });
 
@@ -180,13 +180,13 @@ describe('buildLadder', () => {
 			maxLevel: 3,
 			levelModifiers: [
 				modifier({ level: 1, attributeId: EAttribute.CriticalChance, amount: 0.02 }),
-				modifier({ level: 3, attributeId: EAttribute.Defense, modifierTypeId: EModifierType.Additive, amount: 4 })
+				modifier({ level: 3, attributeId: EAttribute.Toughness, modifierTypeId: EModifierType.Additive, amount: 4 })
 			]
 		});
 		const rows = buildLadder(tier, ATTRIBUTES, resolveSkill);
 		expect(rows[0].bonus).toBe('+2% Fire Damage');
 		expect(rows[1].bonus).toBe(''); // level 2 has no authored payout
-		expect(rows[2].bonus).toBe('+4 Defense');
+		expect(rows[2].bonus).toBe('+4 Toughness');
 	});
 
 	it('joins multiple modifiers authored at the same level', () => {
@@ -195,11 +195,11 @@ describe('buildLadder', () => {
 			maxLevel: 2,
 			levelModifiers: [
 				modifier({ level: 2, attributeId: EAttribute.CriticalChance, amount: 0.03 }),
-				modifier({ level: 2, attributeId: EAttribute.Defense, modifierTypeId: EModifierType.Additive, amount: 2 })
+				modifier({ level: 2, attributeId: EAttribute.Toughness, modifierTypeId: EModifierType.Additive, amount: 2 })
 			]
 		});
 		const rows = buildLadder(tier, ATTRIBUTES, resolveSkill);
-		expect(rows[1].bonus).toBe('+3% Fire Damage · +2 Defense');
+		expect(rows[1].bonus).toBe('+3% Fire Damage · +2 Toughness');
 	});
 
 	it('flags reward levels as milestones and resolves the granted skill name', () => {

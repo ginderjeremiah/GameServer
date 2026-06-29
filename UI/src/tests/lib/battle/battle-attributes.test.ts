@@ -83,13 +83,10 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.MaxHealth]
 			},
 
-			// Defense = 2 (base) + 1*Endurance + 0.5*Agility
-			defense: {
-				allocations: [
-					[EAttribute.Endurance, 30],
-					[EAttribute.Agility, 20]
-				],
-				derivedAttributes: [EAttribute.Defense]
+			// Toughness = 2·Endurance (no base, Endurance-only)
+			toughness: {
+				allocations: [[EAttribute.Endurance, 30]],
+				derivedAttributes: [EAttribute.Toughness]
 			},
 
 			// CooldownRecovery = 1 (base) + 0.004*Agility + 0.001*Dexterity
@@ -134,13 +131,13 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.BlockReduction]
 			},
 
-			// With no allocations every derived stat collapses to just its base: the two with a base carry
-			// it (CriticalDamage 1.5, BlockReduction 2), the three pure-derived chances are 0.
+			// With no allocations every derived stat collapses to just its base: the three with a base carry
+			// it (MaxHealth 50, CriticalDamage 1.5, BlockReduction 2), the pure-derived stats are 0/base.
 			zeroBaseStats: {
 				allocations: [],
 				derivedAttributes: [
 					EAttribute.MaxHealth,
-					EAttribute.Defense,
+					EAttribute.Toughness,
 					EAttribute.CooldownRecovery,
 					EAttribute.CriticalDamage,
 					EAttribute.BlockReduction,

@@ -188,42 +188,43 @@ namespace Game.Core.Tests.Battle
         public void Update_PlayerCrit_RecordsActualDamagePerSkill_ReconcilingWithGlobal()
         {
             // A crit makes the raw pre-mitigation value understate the real hit: BaseDamage 20, crit
-            // ×2 ⇒ 40, then −2 enemy Defense ⇒ 38 actual. The per-skill stat must book 38 (not the raw
+            // ×2 ⇒ 40; the enemy has no Toughness, so 40 lands. The per-skill stat must book 40 (not the raw
             // 20) so it reconciles with the global stat DamageTarget books from the same hit.
             var skill = MakeSkill(cooldownMs: 100, baseDamage: 20);
             var battleSkill = new BattleSkill(skill);
 
             // CriticalChance 1 always crits; CriticalDamage base 1.5 + 0.5 = 2.0.
             var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5));
-            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Defense 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 200, new Mulberry32(0));
 
             battleSkill.Update(context);
 
             var skillStats = context.Stats.SkillStats[skill.Id];
-            Assert.Equal(38.0, skillStats.TotalDamage, 0.001);
-            Assert.NotEqual(20.0, skillStats.TotalDamage, 0.001); // not the raw pre-crit/pre-defense value
+            Assert.Equal(40.0, skillStats.TotalDamage, 0.001);
+            Assert.NotEqual(20.0, skillStats.TotalDamage, 0.001); // not the raw pre-crit value
             Assert.Equal(context.Stats.PlayerDamageDealt, skillStats.TotalDamage, 0.001);
             Assert.Equal(context.Stats.HighestPlayerAttack, skillStats.HighestSingleAttack, 0.001);
         }
 
         [Fact]
-        public void Update_EnemyDefenseClamp_RecordsActualDamagePerSkill_ReconcilingWithGlobal()
+        public void Update_EnemyToughnessMitigation_RecordsActualDamagePerSkill_ReconcilingWithGlobal()
         {
-            // High enemy Defense makes the raw value overstate the real hit (the other direction of the
-            // bug): BaseDamage 20 − 12 Defense ⇒ 8 actual. The per-skill stat must book 8, not 20.
+            // Enemy Toughness makes the raw value overstate the real hit (the other direction of the
+            // bug): Endurance 10 → Toughness 20, so against the level-1 player the curve reduces by
+            // 20/(20+20) = 0.5 — BaseDamage 20 ⇒ 10 actual. The per-skill stat must book 10, not 20.
             var skill = MakeSkill(cooldownMs: 100, baseDamage: 20);
             var battleSkill = new BattleSkill(skill);
 
             var player = MakeBattlerWith((CriticalChance, 0)); // never crits
-            var enemy = MakeBattlerWith((Endurance, 10));      // Defense = 2 + 10 = 12, MaxHealth 250
+            var enemy = MakeBattlerWith((Endurance, 10));      // Toughness = 2·10 = 20, MaxHealth 250
             var context = new BattleContext(player, enemy, timeDelta: 200, new Mulberry32(0));
 
             battleSkill.Update(context);
 
             var skillStats = context.Stats.SkillStats[skill.Id];
-            Assert.Equal(8.0, skillStats.TotalDamage, 0.001);
-            Assert.NotEqual(20.0, skillStats.TotalDamage, 0.001); // not the raw pre-defense value
+            Assert.Equal(10.0, skillStats.TotalDamage, 0.001);
+            Assert.NotEqual(20.0, skillStats.TotalDamage, 0.001); // not the raw pre-mitigation value
             Assert.Equal(context.Stats.PlayerDamageDealt, skillStats.TotalDamage, 0.001);
             Assert.Equal(context.Stats.HighestPlayerAttack, skillStats.HighestSingleAttack, 0.001);
         }

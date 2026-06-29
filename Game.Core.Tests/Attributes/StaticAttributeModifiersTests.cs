@@ -21,10 +21,8 @@ namespace Game.Core.Tests.Attributes
                 (EAttribute.CooldownRecovery, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CooldownRecovery, 0.004, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
                 (EAttribute.CooldownRecovery, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Dexterity),
-                // Defense = 2 (base) + 1·Endurance + 0.5·Agility
-                (EAttribute.Defense, 2.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
-                (EAttribute.Defense, 1.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
-                (EAttribute.Defense, 0.5, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
+                // Toughness = 2·Endurance (no base, Endurance-only)
+                (EAttribute.Toughness, 2.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
                 // MaxHealth = 50 (base) + 20·Endurance + 5·Strength
                 (EAttribute.MaxHealth, 50.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.MaxHealth, 20.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),

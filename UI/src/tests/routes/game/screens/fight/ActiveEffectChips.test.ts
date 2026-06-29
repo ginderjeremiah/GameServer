@@ -39,7 +39,7 @@ let battler: Battler;
 beforeEach(() => {
 	staticData.attributes = [
 		makeAttribute(EAttribute.Strength, 'Strength'),
-		makeAttribute(EAttribute.Defense, 'Defense')
+		makeAttribute(EAttribute.Toughness, 'Toughness')
 	];
 	// A skill owning the effect id the fixtures use, so the tooltip can resolve the source.
 	staticData.skills = [{ id: 0, name: 'Battle Cry', effects: [effect({ id: 1 })] } as ISkill];
@@ -57,7 +57,7 @@ describe('ActiveEffectChips', () => {
 	it('renders one icon tile per active effect, tinted by buff/debuff direction', () => {
 		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
 		battler.applyEffect(
-			effect({ id: 2, target: ESkillEffectTarget.Opponent, attributeId: EAttribute.Defense, amount: -5 })
+			effect({ id: 2, target: ESkillEffectTarget.Opponent, attributeId: EAttribute.Toughness, amount: -5 })
 		);
 		const { container } = render(ActiveEffectChips, { props: { battler } });
 
@@ -70,7 +70,7 @@ describe('ActiveEffectChips', () => {
 		expect(chips[1].querySelector('.chip-mag')?.textContent).toContain('-5');
 		// The attribute name moves to the tooltip/accessible name rather than crowding the tile.
 		expect(chips[0].getAttribute('aria-label')).toContain('Strength');
-		expect(chips[1].getAttribute('aria-label')).toContain('Defense');
+		expect(chips[1].getAttribute('aria-label')).toContain('Toughness');
 	});
 
 	it('groups stacked applications of one effect into a single chip with a count badge and combined total', () => {
@@ -210,7 +210,7 @@ describe('ActiveEffectChips', () => {
 
 	it('associates each chip with the shared attribute tooltip via aria-describedby', () => {
 		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
-		battler.applyEffect(effect({ id: 2, attributeId: EAttribute.Defense, amount: -5 }));
+		battler.applyEffect(effect({ id: 2, attributeId: EAttribute.Toughness, amount: -5 }));
 		const { container } = render(ActiveEffectChips, { props: { battler } });
 
 		const ids = [...container.querySelectorAll('.effect-chip')].map((c) => c.getAttribute('aria-describedby'));

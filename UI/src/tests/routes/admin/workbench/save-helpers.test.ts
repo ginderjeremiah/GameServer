@@ -102,12 +102,15 @@ const makeEffect = (id: number, overrides: Partial<ISkillEffect> = {}): ISkillEf
 
 describe('skillEffectChanges', () => {
 	it('adds new effects (id <= 0), edits changed effects, and deletes removed effects', () => {
-		const current: ISkillEffect[] = [makeEffect(1, { amount: 15 }), makeEffect(0, { attributeId: EAttribute.Defense })];
+		const current: ISkillEffect[] = [
+			makeEffect(1, { amount: 15 }),
+			makeEffect(0, { attributeId: EAttribute.Toughness })
+		];
 		const baseline: ISkillEffect[] = [makeEffect(1), makeEffect(2, { attributeId: EAttribute.Intellect })];
 		const changes = skillEffectChanges(current, baseline);
 		expect(changes).toEqual([
 			{ changeType: EChangeType.Edit, item: makeEffect(1, { amount: 15 }) },
-			{ changeType: EChangeType.Add, item: makeEffect(0, { attributeId: EAttribute.Defense }) },
+			{ changeType: EChangeType.Add, item: makeEffect(0, { attributeId: EAttribute.Toughness }) },
 			{ changeType: EChangeType.Delete, item: makeEffect(2, { attributeId: EAttribute.Intellect }) }
 		]);
 	});

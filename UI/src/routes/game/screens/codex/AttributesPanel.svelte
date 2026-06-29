@@ -1,7 +1,7 @@
 <!-- Attributes sub-tab: the enemy's attribute distribution scaled to a chosen level. A boss is a
      fixed-level encounter; a normal enemy gets a live level slider. "Show scaling" reveals the
      base + per-level breakdown. Primary bars come straight from the distribution; the derived
-     Max Health / Defense cards are computed through the real battle attribute composition. -->
+     Max Health / Toughness cards are computed through the real battle attribute composition. -->
 <div class="attributes">
 	<div class="section-head">
 		<span class="label">Attribute distribution</span>
@@ -86,7 +86,7 @@ interface Props {
 let { view }: Props = $props();
 
 // Derived secondaries have no themed `--attr-*` hue, so map the two surfaced ones to semantic tokens
-// (health → success/green, defense → accent/blue), matching the design's intent.
+// (health → success/green, toughness → accent/blue), matching the design's intent.
 const secondaryColor = (id: EAttribute): string => (id === EAttribute.MaxHealth ? 'var(--success)' : 'var(--accent)');
 
 // A derived stat's per-level slope can carry float noise; round it for the scaling readout.

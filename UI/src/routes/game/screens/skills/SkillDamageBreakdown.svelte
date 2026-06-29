@@ -26,7 +26,9 @@
 		</div>
 	{/if}
 	<div class="brk-line def">
-		<span class="brk-k">Enemy defense</span><span class="brk-v">−{fmt(view.appliedDefense(metrics.skill.id))}</span>
+		<span class="brk-k">Toughness mitigation</span><span class="brk-v"
+			>−{fmt(view.mitigatedAmount(metrics.skill.id))}</span
+		>
 	</div>
 	<div class="brk-line total">
 		<span class="brk-k">Effective hit</span><span class="brk-v">{fmt(view.effective(metrics.skill.id))}</span>

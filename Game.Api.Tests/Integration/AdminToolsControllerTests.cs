@@ -677,7 +677,7 @@ namespace Game.Api.Tests.Integration
 
             using var authClient = await SetupAuthenticatedClientAsync();
 
-            // Add two effects: a self Strength buff and an opponent Defense debuff.
+            // Add two effects: a self Strength buff and an opponent Toughness debuff.
             var addData = new
             {
                 Id = skill.Id,
@@ -702,7 +702,7 @@ namespace Game.Api.Tests.Integration
                         {
                             Id = 0,
                             Target = (int)ESkillEffectTarget.Opponent,
-                            AttributeId = (int)EAttribute.Defense,
+                            AttributeId = (int)EAttribute.Toughness,
                             ModifierTypeId = (int)EModifierType.Multiplicative,
                             Amount = 0.5m,
                             DurationMs = 3000
@@ -723,7 +723,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(15m, selfBuff.Amount);
             Assert.Equal(5000, selfBuff.DurationMs);
             var debuff = Assert.Single(afterAdd.Effects, e => e.Target == ESkillEffectTarget.Opponent);
-            Assert.Equal(EAttribute.Defense, debuff.AttributeId);
+            Assert.Equal(EAttribute.Toughness, debuff.AttributeId);
 
             // Edit the self buff's amount and delete the opponent debuff.
             var editData = new
@@ -750,7 +750,7 @@ namespace Game.Api.Tests.Integration
                         {
                             debuff.Id,
                             Target = (int)ESkillEffectTarget.Opponent,
-                            AttributeId = (int)EAttribute.Defense,
+                            AttributeId = (int)EAttribute.Toughness,
                             ModifierTypeId = (int)EModifierType.Multiplicative,
                             Amount = 0.5m,
                             DurationMs = 3000

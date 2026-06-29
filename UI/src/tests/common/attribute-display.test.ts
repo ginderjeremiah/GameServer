@@ -130,7 +130,7 @@ describe('attributeIcon', () => {
 			EAttribute.Dexterity,
 			EAttribute.Luck,
 			EAttribute.MaxHealth,
-			EAttribute.Defense,
+			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
 			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,

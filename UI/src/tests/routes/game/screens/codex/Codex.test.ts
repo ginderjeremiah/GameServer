@@ -128,7 +128,7 @@ function seedStaticData(): void {
 	staticData.attributes = [
 		{ id: EAttribute.Strength, name: 'Strength', code: 'STR', attributeType: 1 },
 		{ id: EAttribute.MaxHealth, name: 'Max Health', code: '', attributeType: 2 },
-		{ id: EAttribute.Defense, name: 'Defense', code: '', attributeType: 2 }
+		{ id: EAttribute.Toughness, name: 'Toughness', code: '', attributeType: 2 }
 	];
 }
 

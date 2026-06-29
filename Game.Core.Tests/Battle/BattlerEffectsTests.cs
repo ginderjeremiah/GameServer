@@ -307,7 +307,7 @@ namespace Game.Core.Tests.Battle
         public void BattleSkill_Fire_DealsDamageBeforeApplyingItsSelfBuff()
         {
             var player = MakeBattler(Stat(Strength, 10));
-            var enemy = MakeBattler(Stat(Strength, 10)); // Defense = 2
+            var enemy = MakeBattler(Stat(Strength, 10)); // Toughness 0 (no Endurance)
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 
             // A skill that scales with Strength and buffs the caster's Strength when it fires.
@@ -329,8 +329,8 @@ namespace Game.Core.Tests.Battle
 
             skill.Update(context); // charges 40 ≥ 40 cooldown → fires this tick
 
-            // The carrying hit used pre-buff Strength (10): 10 - 2 defense = 8 dealt.
-            Assert.Equal(92, enemy.CurrentHealth);
+            // The carrying hit used pre-buff Strength (10): 10 dealt (the enemy has no Toughness).
+            Assert.Equal(90, enemy.CurrentHealth);
             // The self buff lands only after the hit, so the caster's Strength is now boosted for later hits.
             Assert.Equal(20, player.GetAttributeValue(Strength));
         }

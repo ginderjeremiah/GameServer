@@ -63,16 +63,16 @@ namespace Game.Core.Tests.Attributes
                     Passive: new PassiveSpec(EAttribute.Strength, 4m, null, 0m, EModifierType.Additive),
                     Expected: [(EAttribute.Strength, 14)]),
 
-                // Passive scaling off a CORE attribute, landing on a DERIVED one with a static additive base.
-                // Endurance = 5 (alloc) + (4 + 3 × 2) locked base = 15. Passive on Defense = 2 + 0.5 × 15 = 9.5.
-                // Defense (static 2 + 1·Endurance + 0.5·Agility) = 2 + 15 + 0 + 9.5 = 26.5 — the passive accumulates
-                // after the statics, the same order on both sides.
+                // Passive scaling off a CORE attribute, landing on a DERIVED one.
+                // Endurance = 5 (alloc) + (4 + 3 × 2) locked base = 15. Passive on Toughness = 2 + 0.5 × 15 = 9.5.
+                // Toughness (static 2·Endurance) = 30 + 9.5 = 39.5 — the passive accumulates after the statics,
+                // the same order on both sides.
                 ["scaledOffCoreOntoDerived"] = new Scenario(
                     Allocations: [(EAttribute.Endurance, 5)],
                     Distributions: [new DistributionSpec(EAttribute.Endurance, 4m, 3m)],
                     Level: 2,
-                    Passive: new PassiveSpec(EAttribute.Defense, 2m, EAttribute.Endurance, 0.5m, EModifierType.Additive),
-                    Expected: [(EAttribute.Defense, 26.5), (EAttribute.Endurance, 15)]),
+                    Passive: new PassiveSpec(EAttribute.Toughness, 2m, EAttribute.Endurance, 0.5m, EModifierType.Additive),
+                    Expected: [(EAttribute.Toughness, 39.5), (EAttribute.Endurance, 15)]),
 
                 // Fractional scaling: Luck = 0 + 0.1 × Strength(3). In double this is 0.30000000000000004; the
                 // decimal-then-cast path would produce 0.3, flagging the replay. Pins that both sides share double

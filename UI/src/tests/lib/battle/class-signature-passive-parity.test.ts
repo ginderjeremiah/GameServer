@@ -56,17 +56,17 @@ describe('class signature passive (parity)', () => {
 			expected: [[EAttribute.Strength, 14]]
 		},
 
-		// Passive scaling off a CORE attribute, landing on a DERIVED one with a static additive base.
-		// Endurance = 5 (alloc) + (4 + 3 × 2) locked base = 15. Passive on Defense = 2 + 0.5 × 15 = 9.5.
-		// Defense (static 2 + 1·Endurance + 0.5·Agility) = 2 + 15 + 0 + 9.5 = 26.5 — the passive accumulates
-		// after the statics, the same order on both sides.
+		// Passive scaling off a CORE attribute, landing on a DERIVED one.
+		// Endurance = 5 (alloc) + (4 + 3 × 2) locked base = 15. Passive on Toughness = 2 + 0.5 × 15 = 9.5.
+		// Toughness (static 2·Endurance) = 30 + 9.5 = 39.5 — the passive accumulates after the statics, the
+		// same order on both sides.
 		scaledOffCoreOntoDerived: {
 			allocations: [[EAttribute.Endurance, 5]],
 			distributions: [[EAttribute.Endurance, 4, 3]],
 			level: 2,
-			passive: [EAttribute.Defense, 2, EAttribute.Endurance, 0.5, EModifierType.Additive],
+			passive: [EAttribute.Toughness, 2, EAttribute.Endurance, 0.5, EModifierType.Additive],
 			expected: [
-				[EAttribute.Defense, 26.5],
+				[EAttribute.Toughness, 39.5],
 				[EAttribute.Endurance, 15]
 			]
 		},

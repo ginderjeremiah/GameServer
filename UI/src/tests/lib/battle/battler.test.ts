@@ -257,63 +257,93 @@ describe('Battler', () => {
 	});
 
 	describe('takeDamage', () => {
-		it('reduces health by damage minus defense', () => {
-			const battler = new Battler(
-				makeBattlerData({
-					attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }]
-				})
-			);
+		// ── Toughness mitigation curve (#1330) ──
+		// Mirrors the backend `BattlerTests` with the same scenarios and expected results. K = 20.
 
-			const defense = battler.attributes.getValue(EAttribute.Defense);
+		it('applies the Toughness mitigation curve', () => {
+			// Toughness = 2·Endurance(10) = 20. Against a level-1 attacker → 20/(20+20) = 0.5 → 50 hit deals 25.
+			const battler = new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }] }));
 			const initialHealth = battler.currentHealth;
-			const rawDamage = 50;
 
-			const finalDmg = battler.takeDamage(rawDamage, EDamageType.Physical);
+			const finalDmg = battler.takeDamage(50, EDamageType.Physical, 1);
 
-			expect(finalDmg).toBe(rawDamage - defense);
-			expect(battler.currentHealth).toBe(initialHealth - finalDmg);
+			expect(finalDmg).toBeCloseTo(25, 10);
+			expect(battler.currentHealth).toBeCloseTo(initialHealth - 25, 10);
 		});
 
-		it('floors damage at 0 when defense exceeds raw damage', () => {
+		it('leaves a hit unreduced with no Toughness', () => {
+			// The reduce-to-nothing identity: no Endurance → Toughness 0 → 0 reduction.
+			const battler = new Battler(makeBattlerData({ attributes: [] }));
+
+			expect(battler.takeDamage(40, EDamageType.Physical, 1)).toBeCloseTo(40, 10);
+		});
+
+		it('never fully mitigates a hit (asymptote below 100%)', () => {
+			// Endurance 100 → Toughness 200; even so 5 × 20 / (200 + 20) = 0.4545… > 0, never zero.
 			const battler = new Battler(
-				makeBattlerData({
-					attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }]
-				})
+				makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }] })
 			);
 
-			const finalDmg = battler.takeDamage(5, EDamageType.Physical);
-			expect(finalDmg).toBe(0);
-			expect(battler.currentHealth).toBe(battler.attributes.getValue(EAttribute.MaxHealth));
+			const net = battler.takeDamage(5, EDamageType.Physical, 1);
+			expect(net).toBeGreaterThan(0);
+			expect(net).toBeCloseTo((5 * 20) / 220, 10);
+		});
+
+		it('mitigates less against a higher-level attacker (K·level scaling)', () => {
+			// Toughness 20: vs level 1 → 0.5 (40→20); vs level 3 → 0.25 (40→30).
+			const low = new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }] }));
+			const high = new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }] }));
+
+			expect(low.takeDamage(40, EDamageType.Physical, 1)).toBeCloseTo(20, 10);
+			expect(high.takeDamage(40, EDamageType.Physical, 3)).toBeCloseTo(30, 10);
+		});
+
+		it('has effective HP linear in Toughness', () => {
+			// The EHP multiplier (raw/net = (Toughness + K·L)/(K·L)) rises by a constant step per Toughness point:
+			// Toughness 0 → ×1, 20 → ×2, 40 → ×3 against a level-1 attacker — equal +1 steps, so it is linear.
+			const ehp0 = 40 / new Battler(makeBattlerData({ attributes: [] })).takeDamage(40, EDamageType.Physical, 1);
+			const ehp20 =
+				40 /
+				new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }] })).takeDamage(
+					40,
+					EDamageType.Physical,
+					1
+				);
+			const ehp40 =
+				40 /
+				new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 20 }] })).takeDamage(
+					40,
+					EDamageType.Physical,
+					1
+				);
+
+			expect(ehp0).toBeCloseTo(1, 10);
+			expect(ehp20).toBeCloseTo(2, 10);
+			expect(ehp40).toBeCloseTo(3, 10);
+			expect(ehp20 - ehp0).toBeCloseTo(ehp40 - ehp20, 10); // equal steps ⇒ linear
 		});
 
 		it('sets isDead when health drops to 0', () => {
-			const battler = new Battler(
-				makeBattlerData({
-					attributes: []
-				})
-			);
+			// No attributes → Toughness 0, so the hit lands in full.
+			const battler = new Battler(makeBattlerData({ attributes: [] }));
 
-			battler.takeDamage(battler.currentHealth + battler.attributes.getValue(EAttribute.Defense), EDamageType.Physical);
+			battler.takeDamage(battler.currentHealth, EDamageType.Physical, 1);
 			expect(battler.isDead).toBe(true);
 		});
 
 		it('sets isDead when health drops below 0', () => {
-			const battler = new Battler(
-				makeBattlerData({
-					attributes: []
-				})
-			);
+			const battler = new Battler(makeBattlerData({ attributes: [] }));
 
-			battler.takeDamage(99999, EDamageType.Physical);
+			battler.takeDamage(99999, EDamageType.Physical, 1);
 			expect(battler.isDead).toBe(true);
 			expect(battler.currentHealth).toBeLessThan(0);
 		});
 
-		// ── Damage typing: percentage resistance then flat Defense (#1320) ──
+		// ── Damage typing: percentage resistance then the Toughness curve (#1320 / #1330) ──
 		// Mirrors the backend `BattlerTests` resistance cases with the same scenarios and expected results.
 
-		it('applies percentage resistance before flat defense', () => {
-			// FireResistance 0.5 halves the 40-damage hit to 20, then flat Defense 12 → 8 net.
+		it('applies percentage resistance before the Toughness curve', () => {
+			// FireResistance 0.5 halves the 40 hit to 20, then Toughness 20 (vs a level-1 attacker → 0.5) → 10.
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [
@@ -323,11 +353,11 @@ describe('Battler', () => {
 				})
 			);
 
-			expect(battler.takeDamage(40, EDamageType.Fire)).toBeCloseTo(8, 10);
+			expect(battler.takeDamage(40, EDamageType.Fire, 1)).toBeCloseTo(10, 10);
 		});
 
 		it('sums resistance across the applicable keys (fire + elemental)', () => {
-			// applies(Fire) = { Fire, Elemental }: 0.25 + 0.25 = 0.5 → 40 × 0.5 = 20, − 2 Defense = 18.
+			// applies(Fire) = { Fire, Elemental }: 0.25 + 0.25 = 0.5 → 40 × 0.5 = 20; no Toughness leaves it at 20.
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [
@@ -337,21 +367,21 @@ describe('Battler', () => {
 				})
 			);
 
-			expect(battler.takeDamage(40, EDamageType.Fire)).toBeCloseTo(18, 10);
+			expect(battler.takeDamage(40, EDamageType.Fire, 1)).toBeCloseTo(20, 10);
 		});
 
 		it('treats negative resistance as vulnerability (unclamped)', () => {
-			// −0.5 FireResistance makes the target take 1.5× (20 × 1.5 = 30, − 2 Defense = 28).
+			// −0.5 FireResistance makes the target take 1.5× (20 × 1.5 = 30); no Toughness leaves it at 30.
 			const battler = new Battler(
 				makeBattlerData({ attributes: [{ attributeId: EAttribute.FireResistance, amount: -0.5 }] })
 			);
 
-			expect(battler.takeDamage(20, EDamageType.Fire)).toBeCloseTo(28, 10);
+			expect(battler.takeDamage(20, EDamageType.Fire, 1)).toBeCloseTo(30, 10);
 		});
 
-		it('heals on absorption (resistance > 1) and never applies flat defense', () => {
-			// FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with flat Defense NOT subtracted. Bring the
-			// battler below MaxHealth first so the whole heal lands.
+		it('heals on absorption (resistance > 1) and never applies the Toughness curve', () => {
+			// FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with the curve NOT applied. Bring the battler
+			// below MaxHealth first so the whole heal lands.
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [
@@ -360,12 +390,12 @@ describe('Battler', () => {
 					]
 				})
 			);
-			battler.takeDamage(27, EDamageType.Physical); // 27 − 2 Defense = 25 → currentHealth 25
+			battler.takeDamage(30, EDamageType.Physical, 1); // 30 (no Toughness) → currentHealth 20
 
-			const net = battler.takeDamage(20, EDamageType.Fire);
+			const net = battler.takeDamage(20, EDamageType.Fire, 1);
 
 			expect(net).toBeCloseTo(-20, 10);
-			expect(battler.currentHealth).toBeCloseTo(45, 10);
+			expect(battler.currentHealth).toBeCloseTo(40, 10);
 		});
 
 		it('caps the absorption heal at MaxHealth (no overheal)', () => {
@@ -379,19 +409,26 @@ describe('Battler', () => {
 					]
 				})
 			);
-			battler.takeDamage(7, EDamageType.Physical); // 7 − 2 Defense = 5 → currentHealth 45
+			battler.takeDamage(5, EDamageType.Physical, 1); // 5 (no Toughness) → currentHealth 45
 
-			const net = battler.takeDamage(20, EDamageType.Fire);
+			const net = battler.takeDamage(20, EDamageType.Fire, 1);
 
 			expect(net).toBeCloseTo(-5, 10);
 			expect(battler.currentHealth).toBeCloseTo(50, 10);
 		});
 
-		it('is identical to the old flat step for a typed hit with no resistance', () => {
-			// The reduce-to-today identity at the unit level: 50 − 12 Defense = 38, unchanged by typing.
-			const battler = new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 10 }] }));
+		it('composes resistance then the Toughness curve for a typed hit', () => {
+			// FireResistance 0.5 halves a 50 hit to 25, then Toughness 20 (vs a level-1 attacker → 0.5) → 12.5.
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.Endurance, amount: 10 },
+						{ attributeId: EAttribute.FireResistance, amount: 0.5 }
+					]
+				})
+			);
 
-			expect(battler.takeDamage(50, EDamageType.Fire)).toBeCloseTo(38, 10);
+			expect(battler.takeDamage(50, EDamageType.Fire, 1)).toBeCloseTo(12.5, 10);
 		});
 	});
 

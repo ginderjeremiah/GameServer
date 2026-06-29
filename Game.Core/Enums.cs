@@ -13,7 +13,7 @@ namespace Game.Core
         Strength = 0,
 
         /// <summary>
-        /// One of the core game attributes. Primarily determines a characters <see cref="MaxHealth"/> and <see cref="Defense"/> attributes.
+        /// One of the core game attributes. Primarily determines a characters <see cref="MaxHealth"/> and <see cref="Toughness"/> attributes.
         /// </summary>
         Endurance = 1,
 
@@ -23,7 +23,7 @@ namespace Game.Core
         Intellect = 2,
 
         /// <summary>
-        /// One of the core game attributes. Primarily determines a character;s <see cref="CooldownRecovery"/> and also contributes to <see cref="Defense"/>.
+        /// One of the core game attributes. Primarily determines a character's <see cref="CooldownRecovery"/> and <see cref="DodgeChance"/>.
         /// </summary>
         Agility = 3,
 
@@ -43,9 +43,13 @@ namespace Game.Core
         MaxHealth = 6,
 
         /// <summary>
-        /// A derived game attribute. Represents a flat reduction for all incoming damage.
+        /// A derived game attribute. Bulk mitigation sourced from Endurance, applied as a diminishing-returns
+        /// percentage — <c>Toughness / (Toughness + K·attackerLevel)</c> — that multiplies incoming direct hits.
+        /// Effective HP is linear in this stat (each point is worth a constant % of EHP) while the reduction
+        /// itself asymptotes below 100% (no immunity, no breakpoint). The per-level scale K is
+        /// <see cref="GameConstants.ToughnessMitigationConstant"/>; see <see cref="Battle.Battler.ComputeNetDamage"/>.
         /// </summary>
-        Defense = 7,
+        Toughness = 7,
 
         /// <summary>
         /// A derived game attribute. Represents a % multiplier to the rate that skills become available again after being used.
@@ -66,7 +70,7 @@ namespace Game.Core
 
         /// <summary>
         /// A derived game attribute. A base-≥1 multiplier (base 1.5) read directly: on a critical hit the raw
-        /// damage is multiplied by it before Defense is subtracted, so it can punch through Defense.
+        /// damage is multiplied by it before mitigation, so it can punch through <see cref="Toughness"/>.
         /// </summary>
         CriticalDamage = 11,
 
@@ -83,14 +87,14 @@ namespace Game.Core
         BlockChance = 13,
 
         /// <summary>
-        /// A derived game attribute. A flat reduction (base 2) applied alongside Defense when an incoming
-        /// attack is blocked.
+        /// A derived game attribute. A flat reduction (base 2) applied after <see cref="Toughness"/> mitigation
+        /// when an incoming attack is blocked.
         /// </summary>
         BlockReduction = 14,
 
         /// <summary>
         /// A per-second accumulator for bleed damage-over-time (spike #1320). Consumed by the end-of-tick
-        /// DoT phase, which applies the bearer's live bleed resistance and bypasses Defense. The DoT type is
+        /// DoT phase, which applies the bearer's live bleed resistance and bypasses mitigation. The DoT type is
         /// encoded by which accumulator an effect targets — there is no separate type field on a skill effect.
         /// Reuses the slot of the former single <c>DamageTakenPerSecond</c> channel; <see cref="PoisonDamagePerSecond"/>
         /// and <see cref="BurnDamagePerSecond"/> append after the amp/resist block (the enum grows append-only).
@@ -276,7 +280,7 @@ namespace Game.Core
         Primary = 1,
 
         /// <summary>
-        /// An aggregate stat computed from a base/derived formula (MaxHealth, Defense, CooldownRecovery,
+        /// An aggregate stat computed from a base/derived formula (MaxHealth, Toughness, CooldownRecovery,
         /// and the crit/dodge/block set).
         /// </summary>
         Secondary = 2,

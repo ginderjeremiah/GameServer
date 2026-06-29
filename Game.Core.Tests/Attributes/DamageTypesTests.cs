@@ -121,7 +121,7 @@ namespace Game.Core.Tests.Attributes
 
         [Theory]
         [InlineData(EAttribute.Strength)]
-        [InlineData(EAttribute.Defense)]
+        [InlineData(EAttribute.Toughness)]
         [InlineData(EAttribute.BleedDamagePerSecond)]
         public void KeyForAttribute_ReturnsNullForNonAmpResistAttributes(EAttribute attribute)
         {

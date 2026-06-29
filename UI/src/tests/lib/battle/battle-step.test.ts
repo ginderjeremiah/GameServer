@@ -27,7 +27,8 @@ const newLog = (): BattleStepLog => ({
 	enemyHotHeal: 0,
 	playerHotHeal: 0
 });
-// A combatant with no Strength/Endurance has MaxHealth=50, Def=2 (the derived-stat floor).
+// A combatant with no Strength/Endurance has MaxHealth=50 and Toughness=0 (Toughness = 2·Endurance),
+// so an incoming hit lands in full — the mitigation curve is exercised separately.
 const baseStats = [{ id: EAttribute.Endurance, amount: 0 }];
 
 describe('battleStep', () => {
@@ -44,8 +45,8 @@ describe('battleStep', () => {
 
 		expect(activations).toHaveLength(1);
 		expect(activations[0].byPlayer).toBe(true);
-		expect(activations[0].damage).toBe(28); // 30 raw - 2 def
-		expect(enemy.currentHealth).toBe(enemyHealth - 28);
+		expect(activations[0].damage).toBe(30); // 30 raw, enemy Toughness 0
+		expect(enemy.currentHealth).toBe(enemyHealth - 30);
 	});
 
 	it('lets the enemy fire back when it survives the player’s hit', () => {
@@ -56,19 +57,21 @@ describe('battleStep', () => {
 		const activations = battleStep(player, enemy, 1000, noRng());
 
 		expect(activations.map((a) => a.byPlayer)).toEqual([true, false]);
-		expect(activations[1].damage).toBe(18); // 20 raw - 2 def
-		expect(player.currentHealth).toBe(playerHealth - 18);
+		expect(activations[1].damage).toBe(20); // 20 raw, player Toughness 0
+		expect(player.currentHealth).toBe(playerHealth - 20);
 	});
 
-	it('clamps damage at zero when defense exceeds the raw hit', () => {
+	it('mitigates but never fully blocks a hit, even against huge Toughness', () => {
+		// The curve asymptotes below 100%: Toughness 180 (Endurance 90) vs a level-1 attacker keeps
+		// 20/(180 + 20) = 10% of a 5-damage hit, so 0.5 trickles through — the old flat-Defense clamp to 0 is gone.
 		const player = makeBattler(baseStats, [makeSkill(5, 1000)]);
-		const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 100 }], []);
+		const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 90 }], []);
 		const enemyHealth = enemy.currentHealth;
 
 		const activations = battleStep(player, enemy, 1000, noRng());
 
-		expect(activations[0].damage).toBe(0);
-		expect(enemy.currentHealth).toBe(enemyHealth);
+		expect(activations[0].damage).toBeCloseTo(0.5, 5);
+		expect(enemy.currentHealth).toBeCloseTo(enemyHealth - 0.5, 5);
 	});
 
 	it('does not let a dead enemy counterattack in the same tick', () => {
@@ -97,13 +100,13 @@ describe('battleStep', () => {
 
 	describe('log sink', () => {
 		it('records a newly-applied effect and the side it landed on', () => {
-			// The player's skill debuffs the enemy's Defense (an Opponent-targeted effect).
+			// The player's skill debuffs the enemy's Toughness (an Opponent-targeted effect).
 			const player = makeBattler(baseStats, [
 				makeSkill(
 					0,
 					1000,
 					[],
-					[makeEffect(1, ESkillEffectTarget.Opponent, EAttribute.Defense, EModifierType.Additive, -5, 1000)]
+					[makeEffect(1, ESkillEffectTarget.Opponent, EAttribute.Toughness, EModifierType.Additive, -5, 1000)]
 				)
 			]);
 			const enemy = makeBattler(baseStats, []);
@@ -222,7 +225,7 @@ describe('battleStep', () => {
 				],
 				[]
 			);
-			player.takeDamage(47, EDamageType.Physical); // Defense 2 → 45 damage → currentHealth 5
+			player.takeDamage(45, EDamageType.Physical, 1); // no Toughness → 45 damage → currentHealth 5
 			const enemy = makeBattler(baseStats, []);
 			const log = newLog();
 
@@ -237,7 +240,7 @@ describe('battleStep', () => {
 	// Player-only crit/dodge/block, mirroring the backend BattleContextTests. Chances are forced to 1/0
 	// so the outcome is deterministic regardless of the seed; the draw-order test pins the per-fire counts.
 	describe('crit / dodge / block (player-only, seeded)', () => {
-		it('multiplies a player crit by CriticalDamage before defense', () => {
+		it('multiplies a player crit by CriticalDamage before mitigation', () => {
 			// CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, read directly as the multiplier.
 			const player = makeBattler(
 				[
@@ -251,18 +254,18 @@ describe('battleStep', () => {
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
 			expect(activations[0].crit).toBe(true);
-			expect(activations[0].damage).toBe(38); // 20×2 − 2 def
-			expect(enemy.currentHealth).toBe(50 - 38);
+			expect(activations[0].damage).toBe(40); // 20×2, enemy Toughness 0
+			expect(enemy.currentHealth).toBe(50 - 40);
 		});
 
-		it('deals raw damage minus defense when the player does not crit', () => {
+		it('deals raw damage when the player does not crit', () => {
 			const player = makeBattler([{ id: EAttribute.CriticalChance, amount: 0 }], [makeSkill(20, 40)]);
 			const enemy = makeBattler(baseStats, []);
 
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
 			expect(activations[0].crit).toBe(false);
-			expect(activations[0].damage).toBe(18); // 20 − 2 def
+			expect(activations[0].damage).toBe(20); // 20, enemy Toughness 0
 		});
 
 		it('zeroes an incoming hit the player dodges', () => {
@@ -278,8 +281,9 @@ describe('battleStep', () => {
 			expect(player.currentHealth).toBe(before);
 		});
 
-		it('subtracts defense and BlockReduction on a blocked hit', () => {
-			// BlockReduction is the base 2 (sourced by #799) + 8 = 10.
+		it('subtracts BlockReduction on a blocked hit', () => {
+			// BlockReduction is the base 2 (sourced by #799) + 8 = 10. The player has no Toughness, so the
+			// curve passes the hit through unchanged and BlockReduction subtracts flatly after it.
 			const player = makeBattler(
 				[
 					{ id: EAttribute.BlockChance, amount: 1 },
@@ -293,8 +297,8 @@ describe('battleStep', () => {
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
 			expect(activations[0].blocked).toBe(true);
-			expect(activations[0].damage).toBe(8); // 20 − 2 def − 10 block
-			expect(player.currentHealth).toBe(before - 8);
+			expect(activations[0].damage).toBe(10); // 20 (player Toughness 0) − 10 block
+			expect(player.currentHealth).toBe(before - 10);
 		});
 
 		it('never crits on the enemy’s attack, even with a forced crit chance', () => {
@@ -310,7 +314,7 @@ describe('battleStep', () => {
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
 			expect(activations[0].crit).toBe(false);
-			expect(activations[0].damage).toBe(18); // 20 − 2 def, NOT 40 − 2
+			expect(activations[0].damage).toBe(20); // 20 (no crit), NOT 40
 		});
 
 		it('draws once per player fire and twice per enemy fire, in order', () => {

@@ -107,7 +107,7 @@ namespace Game.Api.Tests.Unit
             var player = MakePlayer(skills: [], selectedSkills: []);
             var passive = new Game.Abstractions.Contracts.SignaturePassive
             {
-                AttributeId = EAttribute.Defense,
+                AttributeId = EAttribute.Toughness,
                 Amount = 2m,
                 ScalingAttributeId = EAttribute.Endurance,
                 ScalingAmount = 0.5m,
@@ -116,7 +116,7 @@ namespace Game.Api.Tests.Unit
 
             var data = PlayerDataModel.FromPlayer(player, [], passive);
 
-            Assert.Equal(EAttribute.Defense, data.SignaturePassive.AttributeId);
+            Assert.Equal(EAttribute.Toughness, data.SignaturePassive.AttributeId);
             Assert.Equal(2m, data.SignaturePassive.Amount);
             Assert.Equal(EAttribute.Endurance, data.SignaturePassive.ScalingAttributeId);
             Assert.Equal(0.5m, data.SignaturePassive.ScalingAmount);

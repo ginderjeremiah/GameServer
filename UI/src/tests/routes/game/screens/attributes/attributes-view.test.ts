@@ -67,7 +67,7 @@ describe('deriveStats', () => {
 	it('matches the real BattleAttributes formulas for a zero build', () => {
 		const d = deriveStats([0, 0, 0, 0, 0, 0]);
 		expect(d[EAttribute.MaxHealth]).toBe(50);
-		expect(d[EAttribute.Defense]).toBe(2);
+		expect(d[EAttribute.Toughness]).toBe(0);
 		expect(d[EAttribute.CooldownRecovery]).toBe(1);
 	});
 
@@ -82,7 +82,7 @@ describe('deriveStats', () => {
 		// The deprecated DropBonus and the unimplemented crit/dodge/block stats are
 		// intentionally excluded.
 		const ids = DERIVED_STATS.map((d) => d.id);
-		expect(ids).toEqual([EAttribute.MaxHealth, EAttribute.Defense, EAttribute.CooldownRecovery]);
+		expect(ids).toEqual([EAttribute.MaxHealth, EAttribute.Toughness, EAttribute.CooldownRecovery]);
 		expect(ids).not.toContain(EAttribute.DropBonus);
 		expect(ids).not.toContain(EAttribute.CriticalChance);
 	});
@@ -93,18 +93,15 @@ describe('perPointYields', () => {
 		expect(perPointYields(idx.str)).toEqual([{ id: EAttribute.MaxHealth, delta: 5 }]);
 	});
 
-	it('END yields +20 Max Health and +1 Defense per point', () => {
+	it('END yields +20 Max Health and +2 Toughness per point', () => {
 		expect(perPointYields(idx.end)).toEqual([
 			{ id: EAttribute.MaxHealth, delta: 20 },
-			{ id: EAttribute.Defense, delta: 1 }
+			{ id: EAttribute.Toughness, delta: 2 }
 		]);
 	});
 
-	it('AGI yields +0.5 Defense and +0.004 Cooldown Recovery per point', () => {
-		expect(perPointYields(idx.agi)).toEqual([
-			{ id: EAttribute.Defense, delta: 0.5 },
-			{ id: EAttribute.CooldownRecovery, delta: 0.004 }
-		]);
+	it('AGI yields +0.004 Cooldown Recovery per point', () => {
+		expect(perPointYields(idx.agi)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.004 }]);
 	});
 
 	it('DEX yields +0.001 Cooldown Recovery per point (a small multiplier increment, not rounded away)', () => {
@@ -149,8 +146,8 @@ describe('perPointYields', () => {
 describe('feedsFor', () => {
 	it('reports the derived stats each attribute drives', () => {
 		expect(feedsFor(idx.str)).toEqual([EAttribute.MaxHealth]);
-		expect(feedsFor(idx.end)).toEqual([EAttribute.MaxHealth, EAttribute.Defense]);
-		expect(feedsFor(idx.agi)).toEqual([EAttribute.Defense, EAttribute.CooldownRecovery]);
+		expect(feedsFor(idx.end)).toEqual([EAttribute.MaxHealth, EAttribute.Toughness]);
+		expect(feedsFor(idx.agi)).toEqual([EAttribute.CooldownRecovery]);
 		expect(feedsFor(idx.dex)).toEqual([EAttribute.CooldownRecovery]);
 		expect(feedsFor(idx.int)).toEqual([]);
 		expect(feedsFor(idx.luk)).toEqual([]);
@@ -160,7 +157,7 @@ describe('feedsFor', () => {
 describe('contributorsFor', () => {
 	it('reports the core attributes feeding each derived stat (inverse of feedsFor)', () => {
 		expect(contributorsFor(EAttribute.MaxHealth)).toEqual([EAttribute.Strength, EAttribute.Endurance]);
-		expect(contributorsFor(EAttribute.Defense)).toEqual([EAttribute.Endurance, EAttribute.Agility]);
+		expect(contributorsFor(EAttribute.Toughness)).toEqual([EAttribute.Endurance]);
 		expect(contributorsFor(EAttribute.CooldownRecovery)).toEqual([EAttribute.Agility, EAttribute.Dexterity]);
 	});
 

@@ -103,17 +103,17 @@ describe('describeEffect', () => {
 		const description = describeEffect(
 			effect({
 				target: ESkillEffectTarget.Opponent,
-				attributeId: EAttribute.Defense,
+				attributeId: EAttribute.Toughness,
 				modifierTypeId: EModifierType.Additive,
 				amount: -10,
 				durationMs: 3000
 			}),
-			'Defense',
+			'Toughness',
 			false
 		);
 
 		expect(description.direction).toBe('debuff');
-		expect(description.text).toBe('-10 Defense (enemy), 3s');
+		expect(description.text).toBe('-10 Toughness (enemy), 3s');
 	});
 
 	it('uses the provided (caster-scaled) amount for the magnitude and direction', () => {
@@ -145,17 +145,17 @@ describe('effectLogMessage', () => {
 	it('phrases a debuff landing on the enemy as "<name> is weakened"', () => {
 		const message = effectLogMessage(
 			effect({
-				attributeId: EAttribute.Defense,
+				attributeId: EAttribute.Toughness,
 				modifierTypeId: EModifierType.Additive,
 				amount: -10,
 				durationMs: 3000
 			}),
-			'Defense',
+			'Toughness',
 			false,
 			false,
 			'Goblin'
 		);
-		expect(message).toBe('Goblin is weakened: -10 Defense for 3s');
+		expect(message).toBe('Goblin is weakened: -10 Toughness for 3s');
 	});
 
 	it('classifies the direction by what the effect does to its target, not the magnitude sign', () => {

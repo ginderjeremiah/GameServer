@@ -19,6 +19,7 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 	const playerManager = {
 		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
 		currentZone: 0,
+		level: 1,
 		attributes: [] as { attributeId: number; amount: number }[],
 		get selectedSkills(): number[] {
 			return playerManager.unlockedSkills
@@ -135,9 +136,9 @@ const SKILLS: ISkill[] = [
 	skill({ id: 5, name: 'Foxtrot', baseDamage: 8, cooldownMs: 800, retiredAt: '2026-01-01T00:00:00Z' })
 ];
 
-/* Compare-vs fixtures. Enemy Defense resolves through the real BattleAttributes as
-   `2 (base) + 1·Endurance + 0.5·Agility`, so each enemy's distribution is chosen for a
-   clean expected value: with only per-level Endurance, Defense = 2 + amountPerLevel·level. */
+/* Compare-vs fixtures. Enemy Toughness resolves through the real BattleAttributes as
+   `2·Endurance` (no base, no Agility term), so each enemy's distribution is chosen for a
+   clean expected value: with only per-level Endurance, Toughness = 2·amountPerLevel·level. */
 const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
 	name: `Enemy ${over.id}`,
 	isBoss: false,
@@ -202,7 +203,7 @@ beforeEach(() => {
 	view = new SkillsView();
 });
 
-/* The raw-damage / defense-subtraction / cooldown-multiplier formulas are the shared battle
+/* The raw-damage / toughness-mitigation / cooldown-multiplier formulas are the shared battle
    formulas (`$lib/battle/battle-formulas`), unit-tested in `tests/lib/battle/battle-formulas.test.ts`;
    here only the page-local helpers and the view's consumption of the shared ones are covered. */
 describe('pure helpers', () => {
@@ -211,15 +212,15 @@ describe('pure helpers', () => {
 		expect(damagePerSecond(50, 0)).toBe(0);
 	});
 
-	it('sorts by name, ascending cooldown, and defense-aware dps/damage', () => {
+	it('sorts by name, ascending cooldown, and toughness-aware dps/damage', () => {
 		const a = metric({ skill: skill({ id: 0, name: 'Zeta' }), rawDamage: 100, cooldown: 2 });
 		const b = metric({ skill: skill({ id: 1, name: 'Alpha' }), rawDamage: 30, cooldown: 1 });
 
 		expect([a, b].sort(sortMetrics('name', 0)).map((m) => m.skill.name)).toEqual(['Alpha', 'Zeta']);
 		expect([a, b].sort(sortMetrics('cd', 0)).map((m) => m.skill.id)).toEqual([1, 0]);
-		// dps with no defense: a=50, b=30 → a first.
+		// dps with no toughness: a=100/2=50, b=30/1=30 → a first.
 		expect([b, a].sort(sortMetrics('dps', 0)).map((m) => m.skill.id)).toEqual([0, 1]);
-		// dps with defense 80: a=(100-80)/2=10, b=0 → a first; damage a=20, b=0.
+		// dps with toughness 80 (factor 20/100=0.2): a=100·0.2/2=10, b=30·0.2/1=6 → a first; damage a=20, b=6.
 		expect([b, a].sort(sortMetrics('dmg', 80)).map((m) => m.skill.id)).toEqual([0, 1]);
 	});
 
@@ -228,16 +229,17 @@ describe('pure helpers', () => {
 	});
 
 	it('folds the crit multiplier into the effective dps/damage ranking', () => {
-		// Two skills whose effective-DPS order flips once a global crit multiplier scales raw damage
-		// before defense (a crit punches through Defense, mirroring the battle and the displayed numbers).
+		// The crit multiplier scales raw damage before the Toughness curve, mirroring the battle and the
+		// displayed numbers. The curve is multiplicative, so a uniform crit scales both rows' effective
+		// values by the same factor — it preserves dps ordering rather than flipping it.
 		const a = metric({ skill: skill({ id: 0 }), rawDamage: 30, cooldown: 3 });
 		const b = metric({ skill: skill({ id: 1 }), rawDamage: 22, cooldown: 2 });
-		// defense 10, no crit: A=(30−10)/3≈6.67 > B=(22−10)/2=6 → A first.
-		expect([b, a].sort(sortMetrics('dps', 10)).map((m) => m.skill.id)).toEqual([0, 1]);
-		// crit ×2: A=(60−10)/3≈16.67 < B=(44−10)/2=17 → B overtakes.
-		expect([a, b].sort(sortMetrics('dps', 10, 2)).map((m) => m.skill.id)).toEqual([1, 0]);
-		// dmg sort, defense 25: no crit both 5/0 → stable; ×2 lifts A=(60−25)=35 > B=(44−25)=19.
-		expect([a, b].sort(sortMetrics('dmg', 25, 2)).map((m) => m.skill.id)).toEqual([0, 1]);
+		// toughness 10 (level 1 → factor 20/30), no crit: A=30·(2/3)/3≈6.67 < B=22·(2/3)/2≈7.33 → B first.
+		expect([b, a].sort(sortMetrics('dps', 10)).map((m) => m.skill.id)).toEqual([1, 0]);
+		// crit ×2 (attackerLevel 1): both effective values double, so the order is unchanged → B still first.
+		expect([a, b].sort(sortMetrics('dps', 10, 1, 2)).map((m) => m.skill.id)).toEqual([1, 0]);
+		// dmg sort, toughness 25 (factor 20/45), crit ×2: A=60·(20/45)≈26.7 > B=44·(20/45)≈19.6 → A first.
+		expect([a, b].sort(sortMetrics('dmg', 25, 1, 2)).map((m) => m.skill.id)).toEqual([0, 1]);
 	});
 });
 
@@ -268,8 +270,8 @@ describe('SkillsView — initial state', () => {
 		expect(view.unlockedIds.has(4)).toBe(false); // not owned
 	});
 
-	it('exposes the skill catalogue defense ceiling for the slider', () => {
-		expect(view.maxDamage).toBe(50); // skill 3 (Delta) base damage — the largest unlocked
+	it('exposes the toughest compare-vs preset as the slider ceiling', () => {
+		expect(view.maxToughness).toBe(60); // Ogre King boss Toughness (2·Endurance 30) — the hardest target
 	});
 
 	it('resolves metrics through the shared battle formulas and the derived attribute composition', () => {
@@ -343,14 +345,13 @@ describe('SkillsView — rail filtering & sorting', () => {
 		expect(view.railList.map((m) => m.skill.id)).toEqual([0]);
 	});
 
-	it('ranks by effective dps and flips order once defense is applied', () => {
+	it('ranks by effective dps, with the multiplicative curve preserving order under toughness', () => {
 		view.setSort('dps');
-		// no defense: dps = base/cd → Delta(50) > Bravo(20) > Alpha(12) > Charlie(10)
+		// no toughness: dps = base/cd → Delta(50) > Bravo(20) > Alpha(12) > Charlie(10)
 		expect(view.railList.map((m) => m.skill.id)).toEqual([3, 1, 0, 2]);
-		// defense 15 blocks Alpha/Charlie entirely; Bravo's higher base keeps it ahead.
-		view.setDefense(15);
-		const ranked = view.railList.map((m) => m.skill.id);
-		expect(ranked.slice(0, 2)).toEqual([3, 1]);
+		// toughness 15 scales every hit by the same factor (20/35), so the dps order is unchanged.
+		view.setToughness(15);
+		expect(view.railList.map((m) => m.skill.id)).toEqual([3, 1, 0, 2]);
 	});
 
 	it('groups equipped rows by slot and lists the rest as available', () => {
@@ -490,16 +491,16 @@ describe('SkillsView — persistence failure', () => {
 	});
 });
 
-describe('SkillsView — compare-vs defense', () => {
-	it('clamps the defense to the slider range', () => {
-		view.setDefense(-5);
-		expect(view.defense).toBe(0);
-		view.setDefense(9999);
-		expect(view.defense).toBe(view.maxDamage);
+describe('SkillsView — compare-vs toughness', () => {
+	it('clamps the toughness to the slider range', () => {
+		view.setToughness(-5);
+		expect(view.toughness).toBe(0);
+		view.setToughness(9999);
+		expect(view.toughness).toBe(view.maxToughness);
 	});
 
 	it('reports combined effective dps/burst over the equipped loadout', () => {
-		// base damages of [0,1,2] = 12 + 40 + 5 = 57 at zero defense.
+		// base damages of [0,1,2] = 12 + 40 + 5 = 57 at zero toughness (no mitigation).
 		expect(Math.round(view.combinedEffectiveBurst)).toBe(57);
 		expect(view.combinedEffectiveDps).toBeGreaterThan(0);
 	});
@@ -510,8 +511,8 @@ describe('SkillsView — compare-vs enemy presets', () => {
 		const presets = view.comparePresets;
 		// Imp spawns in zone 0; Wolf spawns elsewhere; Wraith is retired; Ogre King is the boss.
 		expect(presets.map((p) => p.key)).toEqual(['spawn-0', 'boss-2']);
-		expect(presets[0]).toMatchObject({ name: 'Imp', isBoss: false, defense: 12 }); // 2 + 2*5
-		expect(presets[1]).toMatchObject({ name: 'Ogre King', isBoss: true, defense: 32 }); // 2 + 3*10
+		expect(presets[0]).toMatchObject({ name: 'Imp', isBoss: false, toughness: 20 }); // 2·(2·5)
+		expect(presets[1]).toMatchObject({ name: 'Ogre King', isBoss: true, toughness: 60 }); // 2·(3·10)
 	});
 
 	it('is empty when the current zone has no reference data yet', () => {
@@ -523,37 +524,37 @@ describe('SkillsView — compare-vs enemy presets', () => {
 	it('snaps the slider to a preset and marks its pill selected', () => {
 		const [spawn, boss] = view.comparePresets;
 		view.selectPreset(spawn);
-		expect(view.defense).toBe(12);
+		expect(view.toughness).toBe(20);
 		expect(view.selectedPresetKey).toBe('spawn-0');
 
 		view.selectPreset(boss);
-		expect(view.defense).toBe(32);
+		expect(view.toughness).toBe(60);
 		expect(view.selectedPresetKey).toBe('boss-2');
 	});
 
-	it('clamps a preset defense above the slider ceiling but keeps the pill selected', () => {
-		view.selectPreset({ key: 'spawn-9', name: 'Colossus', isBoss: false, defense: 9999 });
-		expect(view.defense).toBe(view.maxDamage);
+	it('clamps a preset toughness above the slider ceiling but keeps the pill selected', () => {
+		view.selectPreset({ key: 'spawn-9', name: 'Colossus', isBoss: false, toughness: 9999 });
+		expect(view.toughness).toBe(view.maxToughness);
 		expect(view.selectedPresetKey).toBe('spawn-9');
 	});
 
 	it('deselects the active pill when the slider is dragged manually', () => {
 		view.selectPreset(view.comparePresets[0]);
 		expect(view.selectedPresetKey).toBe('spawn-0');
-		view.setDefense(7);
-		expect(view.defense).toBe(7);
+		view.setToughness(7);
+		expect(view.toughness).toBe(7);
 		expect(view.selectedPresetKey).toBeNull();
 	});
 
 	it('resorts railList by effective dps when a preset is selected', () => {
 		view.setSort('dps');
-		// At 0 defense: Delta(50/1=50) > Bravo(40/2=20) > Alpha(12/1=12) > Charlie(5/0.5=10).
+		// At 0 toughness: Delta(50/1=50) > Bravo(40/2=20) > Alpha(12/1=12) > Charlie(5/0.5=10).
 		expect(view.railList.map((m) => m.skill.id)).toEqual([3, 1, 0, 2]);
 
-		// Imp (defense=12): Delta=(50-12)/1=38, Bravo=(40-12)/2=14, Alpha=Charlie=0.
+		// Imp (toughness=20, level 1 → factor 20/40=0.5): every hit halves, so the order is unchanged.
 		const [spawn] = view.comparePresets;
 		view.selectPreset(spawn);
-		expect(view.defense).toBe(spawn.defense);
+		expect(view.toughness).toBe(spawn.toughness);
 		expect(view.railList.map((m) => m.skill.id).slice(0, 2)).toEqual([3, 1]);
 	});
 });
@@ -585,31 +586,33 @@ describe('SkillsView — critical hits fold into effective damage', () => {
 		expect(noCrit.critBonus(0)).toBe(0);
 	});
 
-	it('scales raw damage by the crit multiplier before defense in effective/dps/burst', () => {
+	it('scales raw damage by the crit multiplier before the toughness curve in effective/dps/burst', () => {
 		const k = view.critMultiplier;
-		view.setDefense(10);
+		view.setToughness(10);
+		// Toughness 10 at the player's level 1 → curve factor 20/(10+20) = 2/3.
+		const curve = 20 / (10 + 20);
 		// Alpha (id 0): baseDamage 12, no Strength allocated → rawDamage 12.
 		expect(view.rawDamage(0)).toBe(12);
-		expect(view.effective(0)).toBeCloseTo(Math.max(12 * k - 10, 0), 10); // (12·1.5−10)=8
+		expect(view.effective(0)).toBeCloseTo(12 * k * curve, 10); // 12·1.5·(2/3) = 12
 		expect(view.effectiveDps(0)).toBeCloseTo(view.effective(0) / view.cooldown(0), 10);
-		// Combined burst sums each loadout skill's crit-scaled effective hit.
-		const expectedBurst = [0, 1, 2].reduce((sum, id) => sum + Math.max(view.rawDamage(id) * k - 10, 0), 0);
+		// Combined burst sums each loadout skill's crit-scaled, curve-mitigated hit.
+		const expectedBurst = [0, 1, 2].reduce((sum, id) => sum + view.rawDamage(id) * k * curve, 0);
 		expect(view.combinedEffectiveBurst).toBeCloseTo(expectedBurst, 10);
 	});
 
-	it('reports the expected crit bonus and clamps applied defense to the crit-scaled hit', () => {
+	it('reports the expected crit bonus and the curve-mitigated amount of the crit-scaled hit', () => {
 		const k = view.critMultiplier;
 		expect(view.critBonus(1)).toBeCloseTo(view.rawDamage(1) * (k - 1), 10); // Bravo: 40·0.5 = 20
-		// A defense above the crit-scaled hit fully blocks it; applied defense clamps to that hit so the
-		// breakdown's raw + crit − defense reconciles to 0.
-		view.setDefense(1000);
-		expect(view.appliedDefense(1)).toBeCloseTo(view.rawDamage(1) * k, 10);
-		expect(view.effective(1)).toBe(0);
+		// The curve asymptotes, so even overwhelming toughness leaves a positive sliver through — it never
+		// fully blocks. mitigatedAmount is the crit-scaled hit minus that remaining effective damage.
+		view.setToughness(1000);
+		expect(view.effective(1)).toBeGreaterThan(0);
+		expect(view.mitigatedAmount(1)).toBeCloseTo(view.rawDamage(1) * k - view.effective(1), 10);
 	});
 
-	it('raises the slider ceiling to the biggest crit-scaled hit', () => {
-		// Among the unlocked skills, Delta (id 3) has the largest raw damage (50); the ceiling scales
-		// by the crit multiplier.
-		expect(view.maxDamage).toBeCloseTo(50 * view.critMultiplier, 10);
+	it('caps the slider ceiling at the toughest compare-vs preset', () => {
+		// The ceiling is the hardest current target's Toughness (Ogre King boss = 60), independent of the
+		// crit multiplier — the curve has no "block everything" point to scale toward.
+		expect(view.maxToughness).toBe(60);
 	});
 });

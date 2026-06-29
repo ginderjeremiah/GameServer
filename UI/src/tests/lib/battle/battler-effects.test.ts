@@ -273,11 +273,11 @@ describe('Battler skill-effect bookkeeping', () => {
 	it('exposes a reactive view of active effects for the chips, populated from the authored effect', () => {
 		const battler = makeBattler();
 
-		battler.applyEffect(effect(7, EAttribute.Defense, EModifierType.Additive, 4, 1000));
+		battler.applyEffect(effect(7, EAttribute.Toughness, EModifierType.Additive, 4, 1000));
 
 		expect(battler.activeEffects).toHaveLength(1);
 		expect(battler.activeEffects[0]).toEqual({
-			attribute: EAttribute.Defense,
+			attribute: EAttribute.Toughness,
 			modifierType: EModifierType.Additive,
 			totalAmount: 4,
 			count: 1,
@@ -362,12 +362,12 @@ describe('Battler skill-effect bookkeeping', () => {
 				)
 			]
 		);
-		const enemy = make([{ id: EAttribute.Strength, amount: 10 }], []); // Defense = 2
+		const enemy = make([{ id: EAttribute.Strength, amount: 10 }], []); // no Endurance → Toughness 0
 
 		battleStep(player, enemy, 40, new Mulberry32(0)); // charges 40 ≥ 40 cooldown → fires this tick
 
-		// The carrying hit used pre-buff Strength (10): 10 - 2 defense = 8 dealt.
-		expect(enemy.currentHealth).toBe(92);
+		// The carrying hit used pre-buff Strength (10): 10 dealt (the enemy has no Toughness).
+		expect(enemy.currentHealth).toBe(90);
 		// The self buff lands only after the hit, so the caster is now boosted for later hits.
 		expect(player.attributes.getValue(EAttribute.Strength)).toBe(20);
 	});

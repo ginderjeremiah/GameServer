@@ -74,7 +74,7 @@ describe('Skills', () => {
 					{
 						id: 1,
 						target: ESkillEffectTarget.Opponent,
-						attributeId: EAttribute.Defense,
+						attributeId: EAttribute.Toughness,
 						modifierTypeId: EModifierType.Additive,
 						amount: -5,
 						durationMs: 3000,
