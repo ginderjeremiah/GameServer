@@ -54,6 +54,13 @@ namespace Game.Core.Battle.Offline
                 // path. The same DefeatRewards yields both the exp and the difficulty multiplier the offline
                 // proficiency-XP accrual scales its pie by, so the two payouts share one curve evaluation.
                 var rewards = result.Victory ? new DefeatRewards(playerModifiers, enemy) : null;
+                if (rewards is not null)
+                {
+                    // Snapshot the player's power onto this battle's stats so the offline accrual normalizes by
+                    // the identical measure the live path does (spike #1318) — victory-only, like the rewards.
+                    result.Stats.PlayerPower = rewards.PlayerPower;
+                }
+
                 outcomes.Add(new OfflineBattleOutcome(
                     enemy, result, rewards?.ExpReward ?? 0, rewards?.DifficultyMultiplier ?? 0));
 

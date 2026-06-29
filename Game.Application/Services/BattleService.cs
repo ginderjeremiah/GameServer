@@ -666,6 +666,11 @@ namespace Game.Application.Services
             var rewards = new DefeatRewards(
                 snapshot.GetModifiersWithSignaturePassive(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
 
+            // Snapshot the player's power onto the battle stats so the proficiency accrual normalizes activity
+            // by the identical measure the difficulty curve uses (spike #1318) — captured here from the same
+            // snapshot modifiers, not the live aggregate.
+            result.Stats.PlayerPower = rewards.PlayerPower;
+
             player.GrantExp(rewards.ExpReward);
             // Thread the difficulty multiplier onto the battle-completed event so the progress handler can
             // scale the proficiency-XP pie by it — the same curve the exp reward above used (spike #982).
