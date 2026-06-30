@@ -109,6 +109,10 @@ Created as native sub-issues of #1343:
 
 **A** is the foundation (inert data + authoring). **B** is the parity-critical core and adds the only frontend↔backend parity vectors. **C** and **D** are the player-facing surface once **B** exists. The rest carry unit/integration tests.
 
+### Verification (part D — landed)
+
+The cross-school payoff was confirmed **end-to-end with no accrual-code change** (`MultiTypedDamageProficiencyTests`): an example "Flaming Sword" (60% Physical / 40% Fire) and an even-split "Storm Blade" (Wind / Water / Physical) are driven through the unmodified battle pipeline against a fire-resistant enemy, and the per-portion typed books (`TypedDamageDealt` / `TypedDamageExposure`) it produces are fed straight into the unmodified `ProficiencyRewardService`. Each portion's path trains in proportion to its share: a 60/40 hit trains its two offense paths 6:4, the Fire path trains *half* as much against a fire-resistant target (the per-portion resistance), an even split trains all three paths equally, and an enemy fielding the same skill trains the player's per-type resist paths the same way. The split ratio is the cross-school contribution weight, exactly as the design promised — `ProficiencyXpCalculator` needed no change. Example game content (skills/enemies) is authored in the Workbench/DB, not source-controlled, so the verification realizes it in-test (source-controlled content seeding is the separate spike #1390).
+
 ## Documentation to update on landing
 
 - `docs/game-design.md` — the **Damage types** section: a skill's direct hit may carry **multiple leaf types with a split**, amplified/resisted per portion, and the split ratio is the cross-school proficiency contribution weight. Note DoT remains per-effect. (With **A**, **B**.)
