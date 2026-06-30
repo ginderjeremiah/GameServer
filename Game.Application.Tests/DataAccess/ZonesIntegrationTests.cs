@@ -168,5 +168,33 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.Throws<ArgumentOutOfRangeException>(() => zones.IsZoneRetired(99999));
         }
+
+        [Fact]
+        public async Task IsHomeZone_ReflectsTheCatalogueHomeFlag()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var combat = await TestDataSeeder.CreateZoneAsync(context, "Combat Zone", order: 0);
+            var home = await TestDataSeeder.CreateZoneAsync(context, "Home", order: 1, isHome: true);
+            await ReloadReferenceCachesAsync();
+
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            Assert.False(zones.IsHomeZone(combat.Id));
+            Assert.True(zones.IsHomeZone(home.Id));
+            // The flag also rides the read contract so the client can identify the Home zone.
+            Assert.True(zones.GetZone(home.Id).IsHome);
+            Assert.False(zones.GetZone(combat.Id).IsHome);
+        }
+
+        [Fact]
+        public void IsHomeZone_InvalidId_Throws()
+        {
+            using var scope = CreateScope();
+            var zones = scope.ServiceProvider.GetRequiredService<IZones>();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => zones.IsHomeZone(99999));
+        }
     }
 }

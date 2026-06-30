@@ -127,6 +127,78 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetEnemies_HomeZone_ReturnsFailure()
+        {
+            int homeZoneId, enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var home = await TestDataSeeder.CreateZoneAsync(context, "Home", isHome: true);
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                homeZoneId = home.Id;
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The Home zone is a no-combat sanctuary, so assigning it a spawn table is rejected outright.
+            var data = new SetZoneEnemiesData
+            {
+                ZoneId = homeZoneId,
+                ZoneEnemies = [new Contracts.ZoneEnemy { EnemyId = enemyId, Weight = 1 }],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SetEnemies(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "The Home zone cannot have enemy spawns. Home is a no-combat sanctuary where no enemies spawn.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveZones_HomeZoneWithBoss_ReturnsFailure()
+        {
+            int bossEnemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                bossEnemyId = (await TestDataSeeder.CreateEnemyAsync(context, "Boss", isBoss: true)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A Home zone declaring a (valid) boss is rejected: Home spawns no enemies, and a boss is the
+            // non-random enemy source. The boss reference itself is valid, so this exercises the Home guard.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SaveZones(
+            [
+                new Change<Contracts.Zone>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = new Contracts.Zone
+                    {
+                        Name = "Home",
+                        Description = "",
+                        LevelMin = 1,
+                        LevelMax = 1,
+                        BossLevel = 1,
+                        BossEnemyId = bossEnemyId,
+                        IsHome = true,
+                    },
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "The Home zone cannot have a boss. Home is a no-combat sanctuary where no enemies spawn.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
         public void SaveZones_EditUnknownZone_ReturnsNotFound()
         {
             // An Edit of a non-existent zone (no boss/unlock references, so the FK pre-pass passes) must be

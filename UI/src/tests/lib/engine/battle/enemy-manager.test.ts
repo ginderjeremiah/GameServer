@@ -3,23 +3,25 @@ import { apiSocket, ELogType, type IApiSocketResponse, type IEnemyInstance } fro
 import { delay } from '$lib/common';
 import { logMessage } from '$lib/engine/log';
 import { EnemyManager, onNewEnemyLoaded } from '$lib/engine/battle/enemy-manager';
-// The mocked engine index (below) is the same module enemy-manager reads playerManager from, so this
-// import resolves to that mock — letting the relocation-sync test observe the adopted zone.
-import { playerManager } from '$lib/engine';
+// The mocked engine index (below) is the same module enemy-manager reads playerManager/battleEngine from,
+// so these imports resolve to that mock — letting the relocation-sync and Home tests observe the state.
+import { playerManager, battleEngine } from '$lib/engine';
+import { staticData } from '$stores';
 
 vi.mock('$lib/engine/log', () => ({ logMessage: vi.fn() }));
 
 // EnemyManager pulls battleEngine/BattleStage/onBattleStageChanged/playerManager from the engine
 // index ('../'). Stub it so importing the unit doesn't spin up the whole engine — getNewEnemy only
-// reads playerManager.currentZone.
+// reads playerManager.currentZone, and entering Home calls battleEngine.rest().
 vi.mock('$lib/engine', () => ({
-	battleEngine: { stage: 0, startLoading: vi.fn() },
+	battleEngine: { stage: 0, startLoading: vi.fn(), rest: vi.fn() },
 	BattleStage: { Idle: 0, Victorious: 1, Defeated: 2 },
 	onBattleStageChanged: vi.fn(() => () => {}),
 	playerManager: { currentZone: 3 }
 }));
 
-vi.mock('$stores', () => ({ staticData: { enemies: [] } }));
+// staticData.zones is id-indexed; the Home tests populate it so isHomeZone() can resolve the flag.
+vi.mock('$stores', () => ({ staticData: { enemies: [], zones: [] } }));
 
 // Keep the real hook plumbing (createHook); only replace delay so retries resolve immediately
 // instead of waiting on real timers, while still letting us assert how long it backed off for.
@@ -276,5 +278,59 @@ describe('EnemyManager.start', () => {
 
 		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 }));
 		expect(manager.currentEnemy).toEqual(makeEnemy(5));
+	});
+});
+
+describe('EnemyManager Home zone', () => {
+	// id-indexed reference data: zone 3 is a combat zone, zone 5 is the no-combat Home sanctuary.
+	const COMBAT_ZONE = 3;
+	const HOME_ZONE = 5;
+	let manager: EnemyManager;
+	let sendSocketCommand: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		manager = new EnemyManager();
+		manager.started = true;
+		staticData.zones = [];
+		staticData.zones[COMBAT_ZONE] = { isHome: false } as (typeof staticData.zones)[number];
+		staticData.zones[HOME_ZONE] = { isHome: true } as (typeof staticData.zones)[number];
+		playerManager.currentZone = COMBAT_ZONE;
+		vi.mocked(battleEngine.rest).mockClear();
+		sendSocketCommand = vi.spyOn(apiSocket, 'sendSocketCommand');
+		// Default every command to a harmless resolved value so the real socket transport is never hit
+		// (entering Home fires SetAutoChallengeBoss via returnToIdle); individual tests assert the calls.
+		sendSocketCommand.mockReset();
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy()));
+	});
+
+	it('halts the idle loop while in Home — no NewEnemy is requested and the enemy is cleared', async () => {
+		playerManager.currentZone = HOME_ZONE;
+		manager.currentEnemy = makeEnemy(9);
+
+		await manager.getNewEnemy();
+
+		expect(sendSocketCommand).not.toHaveBeenCalled();
+		expect(manager.currentEnemy).toBeUndefined();
+	});
+
+	it('navigateToZone into Home stops the live battle and clears the enemy without fetching', () => {
+		manager.currentEnemy = makeEnemy(4);
+
+		manager.navigateToZone(HOME_ZONE);
+
+		expect(playerManager.currentZone).toBe(HOME_ZONE);
+		expect(battleEngine.rest).toHaveBeenCalled();
+		expect(manager.currentEnemy).toBeUndefined();
+		expect(sendSocketCommand).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
+	});
+
+	it('navigateToZone out of Home resumes the idle loop in the destination zone', async () => {
+		playerManager.currentZone = HOME_ZONE;
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy(2)));
+
+		manager.navigateToZone(COMBAT_ZONE);
+
+		expect(playerManager.currentZone).toBe(COMBAT_ZONE);
+		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', { newZoneId: COMBAT_ZONE }));
 	});
 });

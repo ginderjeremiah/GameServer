@@ -165,7 +165,8 @@ const ZONES: IZone[] = [
 		levelMin: 2,
 		levelMax: 8,
 		bossEnemyId: 2,
-		bossLevel: 10
+		bossLevel: 10,
+		isHome: false
 	}
 ];
 

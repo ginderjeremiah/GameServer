@@ -77,14 +77,19 @@ namespace Game.Application.Services
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
             }
 
-            // A real zone change is gated on the target being unlocked and in circulation (anti-cheat). A
-            // legitimate client never navigates into a locked or retired zone — the UI gates both — so such a
-            // target is ignored and the battle simply proceeds in the player's current zone. Same-zone
+            // A real zone change is gated on the target being unlocked, in circulation, and a combat zone
+            // (anti-cheat). A legitimate client never navigates a battle into a locked, retired, or Home zone —
+            // the UI gates all three (and never spawns a battle in Home at all) — so such a target is ignored
+            // and the battle simply proceeds in the player's current zone. Refusing the Home target keeps the
+            // "fake zone" invariant the offline path relies on: a player's persisted CurrentZoneId is never the
+            // no-combat Home sanctuary, so offline rewards always replay their last real combat zone. Same-zone
             // re-requests skip the check (and the redundant save) entirely.
             if (newZoneId.HasValue && newZoneId.Value != player.CurrentZoneId)
             {
                 var targetZone = _zones.GetDomainZone(newZoneId.Value);
-                if (!_zones.IsZoneRetired(newZoneId.Value) && await IsZoneUnlocked(player.Id, targetZone, cancellationToken))
+                if (!_zones.IsZoneRetired(newZoneId.Value)
+                    && !_zones.IsHomeZone(newZoneId.Value)
+                    && await IsZoneUnlocked(player.Id, targetZone, cancellationToken))
                 {
                     player.ChangeZone(newZoneId.Value);
                     zoneId = newZoneId.Value;

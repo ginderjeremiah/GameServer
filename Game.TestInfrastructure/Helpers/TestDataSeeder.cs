@@ -264,6 +264,7 @@ namespace Game.TestInfrastructure.Helpers
             int? bossEnemyId = null,
             int bossLevel = 1,
             int? unlockChallengeId = null,
+            bool isHome = false,
             DateTime? retiredAt = null)
         {
             var zone = new Zone
@@ -276,6 +277,7 @@ namespace Game.TestInfrastructure.Helpers
                 BossEnemyId = bossEnemyId,
                 BossLevel = bossLevel,
                 UnlockChallengeId = unlockChallengeId,
+                IsHome = isHome,
                 RetiredAt = retiredAt,
             };
 

@@ -491,12 +491,40 @@ describe('BattleEngine', () => {
 			expect(logMessage).not.toHaveBeenCalledWith(ELogType.Damage, expect.any(String));
 		});
 
-		it('accumulates timeElapsed', () => {
+		it('accumulates timeElapsed while a battle is active', () => {
 			engine.start();
+			// The battle clock advances only while a battle is live, so load an enemy to enter the Active
+			// stage. Slash charges for 500ms, so within these 300ms it never fires — the enemy stays alive
+			// and the engine stays Active.
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 			logicalUpdateCallbacks[0](100);
 			logicalUpdateCallbacks[0](200);
 
 			expect(engine.timeElapsed).toBe(300);
+		});
+
+		it('does not advance timeElapsed while idle (between battles / resting at Home)', () => {
+			engine.start();
+			// No enemy loaded, so the engine stays Idle. The clock must stay frozen — a value later read as
+			// an abandon's client-fought duration must reflect only real combat time, not time parked idle
+			// (e.g. resting in the no-combat Home zone, where the clock would otherwise drift up).
+			logicalUpdateCallbacks[0](100);
+			logicalUpdateCallbacks[0](200);
+
+			expect(engine.timeElapsed).toBe(0);
+		});
+
+		it('rest() stops the live battle: drops to Idle and clears the battle clock', () => {
+			engine.start();
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			logicalUpdateCallbacks[0](100);
+			expect(engine.timeElapsed).toBe(100);
+
+			// Parking in the no-combat Home zone stops the live fight outright.
+			engine.rest();
+
+			expect(engine.stage).toBe(BattleStage.Idle);
+			expect(engine.timeElapsed).toBe(0);
 		});
 
 		it('logs a skill-effect line when a skill applies a new effect', () => {

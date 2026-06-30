@@ -42,6 +42,14 @@ namespace Game.DataAccess.Repositories.Admin
                     return AdminSaveResult.Failure("Boss enemy is invalid. A zone's boss must be an existing enemy marked as a boss.");
                 }
 
+                // The Home zone is a no-combat sanctuary: no enemies spawn there and never will. A boss is the
+                // non-random enemy source, so reject one on a Home zone (the random spawn table is guarded
+                // separately in SetEnemies / AdminEnemies.SetSpawns).
+                if (change.Item.IsHome && change.Item.BossEnemyId is not null)
+                {
+                    return AdminSaveResult.Failure("The Home zone cannot have a boss. Home is a no-combat sanctuary where no enemies spawn.");
+                }
+
                 // Challenges are zero-based-id reference data, so a valid id is an in-range index (an O(1)
                 // check, like the enemy/zone validators above).
                 if (change.Item.UnlockChallengeId is int unlockChallengeId
@@ -89,6 +97,14 @@ namespace Game.DataAccess.Repositories.Admin
             if (zone is null)
             {
                 return AdminSaveResult.NotFound("Zone");
+            }
+
+            // The Home zone is a no-combat sanctuary: no enemies spawn there and never will. Reject assigning
+            // a spawn table to it (clearing it to empty stays allowed). Mirrors the per-enemy guard in
+            // AdminEnemies.SetSpawns so neither authoring direction can populate Home's spawn table.
+            if (zone.IsHome && data.ZoneEnemies.Count > 0)
+            {
+                return AdminSaveResult.Failure("The Home zone cannot have enemy spawns. Home is a no-combat sanctuary where no enemies spawn.");
             }
 
             return ChildCollectionReconciler.Reconcile(

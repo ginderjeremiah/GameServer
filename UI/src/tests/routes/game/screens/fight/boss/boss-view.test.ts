@@ -31,7 +31,8 @@ const bossZone: IZone = {
 	levelMin: 8,
 	levelMax: 11,
 	bossEnemyId: 0,
-	bossLevel: 18
+	bossLevel: 18,
+	isHome: false
 };
 const bosslessZone: IZone = {
 	id: 1,
@@ -40,7 +41,8 @@ const bosslessZone: IZone = {
 	order: 1,
 	levelMin: 1,
 	levelMax: 10,
-	bossLevel: 1
+	bossLevel: 1,
+	isHome: false
 };
 const boss: IEnemy = {
 	id: 0,

@@ -7,7 +7,7 @@
 		<ZoneNav />
 	</div>
 
-	{#if boss.hasBoss}
+	{#if boss.hasBoss && !atHome}
 		<div class="boss-affordance-wrapper">
 			<div class="boss-affordance-inner">
 				<BossAffordanceSlot view={boss} />
@@ -15,31 +15,35 @@
 		</div>
 	{/if}
 
-	<div class="combatants">
-		<BattlerCard battler={battleEngine.player} side="player" />
+	{#if atHome}
+		<HomeRest />
+	{:else}
+		<div class="combatants">
+			<BattlerCard battler={battleEngine.player} side="player" />
 
-		<!-- Center column: the battle status readout rides above the VS badge, clear of the zone-nav/boss
-		     band. Between enemies (the Loading cooldown) it swaps the battle clock for the next-enemy
-		     countdown; otherwise it shows the elapsed-vs-limit battle timer. -->
-		<div class="center-column">
-			{#if battleEngine.stage === BattleStage.Loading}
-				<EnemyCooldown remainingMs={battleEngine.loadingTime} totalMs={battleEngine.loadingTotal} />
-			{:else}
-				<BattleTimer elapsedMs={battleEngine.timeElapsed} maxMs={DEFAULT_MAX_BATTLE_MS} />
-			{/if}
-			<div class="vs-badge" class:boss={boss.engaged} data-testid="vs-badge">
-				<div class="vs-diamond"></div>
-				<div class="vs-diamond-inner"></div>
-				<span class="vs-text">vs</span>
+			<!-- Center column: the battle status readout rides above the VS badge, clear of the zone-nav/boss
+			     band. Between enemies (the Loading cooldown) it swaps the battle clock for the next-enemy
+			     countdown; otherwise it shows the elapsed-vs-limit battle timer. -->
+			<div class="center-column">
+				{#if battleEngine.stage === BattleStage.Loading}
+					<EnemyCooldown remainingMs={battleEngine.loadingTime} totalMs={battleEngine.loadingTotal} />
+				{:else}
+					<BattleTimer elapsedMs={battleEngine.timeElapsed} maxMs={DEFAULT_MAX_BATTLE_MS} />
+				{/if}
+				<div class="vs-badge" class:boss={boss.engaged} data-testid="vs-badge">
+					<div class="vs-diamond"></div>
+					<div class="vs-diamond-inner"></div>
+					<span class="vs-text">vs</span>
+				</div>
 			</div>
-		</div>
 
-		{#if boss.engaged}
-			<BossBattlerCard battler={battleEngine.enemy} />
-		{:else}
-			<BattlerCard battler={battleEngine.enemy} side="enemy" />
-		{/if}
-	</div>
+			{#if boss.engaged}
+				<BossBattlerCard battler={battleEngine.enemy} />
+			{:else}
+				<BattlerCard battler={battleEngine.enemy} side="enemy" />
+			{/if}
+		</div>
+	{/if}
 
 	{#if boss.victory}
 		<ZoneClearedOverlay
@@ -53,6 +57,7 @@
 
 <script lang="ts">
 import ZoneNav from './ZoneNav.svelte';
+import HomeRest from './HomeRest.svelte';
 import BattlerCard from './BattlerCard.svelte';
 import BattleTimer from './BattleTimer.svelte';
 import EnemyCooldown from './EnemyCooldown.svelte';
@@ -61,10 +66,13 @@ import BossBattlerCard from './boss/BossBattlerCard.svelte';
 import BossAtmosphere from './boss/BossAtmosphere.svelte';
 import ZoneClearedOverlay from './boss/ZoneClearedOverlay.svelte';
 import { BossView } from './boss/boss-view.svelte';
-import { battleEngine, BattleStage } from '$lib/engine';
+import { battleEngine, BattleStage, playerManager } from '$lib/engine';
+import { staticData } from '$stores';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 
 const boss = new BossView();
+// The no-combat Home sanctuary shows a resting panel instead of the combatants (and no boss affordance).
+const atHome = $derived(staticData.zones?.[playerManager.currentZone]?.isHome === true);
 </script>
 
 <style lang="scss">

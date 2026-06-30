@@ -1414,6 +1414,43 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_TransitionToHomeZone_KeepsPlayerInCurrentZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+
+            // The Home zone is a no-combat sanctuary: a battle is never started in it, so a (tampered) request
+            // to move a battle into Home is refused — the player's persisted zone never becomes Home, which is
+            // the invariant the offline-rewards path relies on.
+            var combatZone = await TestDataSeeder.CreateZoneAsync(context, "Combat", order: 0);
+            var homeZone = await TestDataSeeder.CreateZoneAsync(context, "Home", order: 1, isHome: true);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, combatZone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: combatZone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var result = await battleService.StartBattle(player, state, zoneId: combatZone.Id, newZoneId: homeZone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(combatZone.Id, player.CurrentZoneId);
+            Assert.Equal(combatZone.Id, state.BattleZoneId);
+        }
+
+        [Fact]
         public async Task StartBattle_CurrentZoneRetired_RelocatesToNearestViableZone()
         {
             using var scope = CreateScope();

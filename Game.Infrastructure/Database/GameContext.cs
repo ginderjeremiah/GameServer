@@ -798,6 +798,10 @@ namespace Game.Infrastructure.Database
                 entity.Property(z => z.BossLevel)
                     .HasDefaultValue(1);
 
+                // Backfills existing zones to "not Home" — Home is a deliberately-authored singular sanctuary.
+                entity.Property(z => z.IsHome)
+                    .HasDefaultValue(false);
+
                 // The dedicated boss is an optional reference to an enemy. Navigation-less FK: deleting the
                 // referenced enemy clears the zone's boss (SetNull) rather than blocking the delete.
                 entity.HasOne<Enemy>()
