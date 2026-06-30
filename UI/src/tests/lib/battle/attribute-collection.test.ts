@@ -3,6 +3,7 @@ import { EAttribute, type IBattlerAttribute } from '$lib/api';
 import {
 	BattleAttributes,
 	computeAttributes,
+	foldAttributeValue,
 	groupBySource,
 	SOURCE_ORDER,
 	STATIC_ATTRIBUTE_MODIFIERS,
@@ -10,6 +11,15 @@ import {
 	EAttributeModifierSource,
 	type AttributeModifier
 } from '$lib/battle';
+
+/** A `Derived` modifier scaling `amount` by the final value of `derivedSource`. */
+const derived = (attribute: EAttribute, amount: number, derivedSource: EAttribute): AttributeModifier => ({
+	attribute,
+	amount,
+	type: EModifierType.Additive,
+	source: EAttributeModifierSource.Derived,
+	derivedSource
+});
 
 /** Builds a modifier list from plain additive contributions plus the engine's
  *  static base/derived modifiers — the same shape the breakdown assembles from
@@ -27,6 +37,9 @@ const additive = (
 		EAttributeModifierSource.Derived
 	> = EAttributeModifierSource.PlayerStatPoints
 ): AttributeModifier => ({ attribute, amount, type: EModifierType.Additive, source });
+
+/** The highest attribute id, for iterating every slot the way BattleAttributes' value array does. */
+const maxAttributeId = Math.max(...Object.values(EAttribute).filter((v): v is number => typeof v === 'number'));
 
 describe('computeAttributes', () => {
 	it('sums additive modifiers for a core attribute', () => {
@@ -94,6 +107,47 @@ describe('computeAttributes', () => {
 		};
 		expect(() => computeAttributes([modifier])).toThrow('Unsupported EModifierType: 99');
 	});
+
+	it('treats a circular derived chain as zero instead of recursing forever', () => {
+		// Intellect derives from Luck and Luck from Intellect: the in-progress guard breaks the cycle by
+		// treating a re-entered attribute as 0, so both resolve to 0 rather than overflowing the stack.
+		const computed = computeAttributes([
+			derived(EAttribute.Intellect, 2, EAttribute.Luck),
+			derived(EAttribute.Luck, 3, EAttribute.Intellect)
+		]);
+		expect(computed.get(EAttribute.Intellect)?.total).toBe(0);
+		expect(computed.get(EAttribute.Luck)?.total).toBe(0);
+	});
+});
+
+describe('foldAttributeValue', () => {
+	it('applies additives then multiplicatives, scaling a derived modifier by its source', () => {
+		// running = (4 + 2*Source(10)) then *1.5 = 24 * 1.5 = 36.
+		const value = foldAttributeValue(
+			[
+				additive(EAttribute.Strength, 4),
+				derived(EAttribute.Strength, 2, EAttribute.Luck),
+				{
+					attribute: EAttribute.Strength,
+					amount: 1.5,
+					type: EModifierType.Multiplicative,
+					source: EAttributeModifierSource.ItemMod
+				}
+			],
+			(attr) => (attr === EAttribute.Luck ? 10 : 0)
+		);
+		expect(value).toBe(36);
+	});
+
+	it('throws for an unsupported modifier type', () => {
+		const modifier: AttributeModifier = {
+			attribute: EAttribute.Strength,
+			amount: 5,
+			type: 99 as EModifierType,
+			source: EAttributeModifierSource.Item
+		};
+		expect(() => foldAttributeValue([modifier], () => 0)).toThrow('Unsupported EModifierType: 99');
+	});
 });
 
 describe('groupBySource', () => {
@@ -131,11 +185,11 @@ describe('groupBySource', () => {
 });
 
 /* ── parity with the battle model ─────────────────────────────────────────────
-   `BattleAttributes` is now a thin wrapper over the same `computeAttributes`
-   pipeline, so formula constants live in one place (`STATIC_ATTRIBUTE_MODIFIERS`).
-   These cases serve as a regression guard: they verify that `BattleAttributes`
-   delegates correctly and that changes to the pipeline or the static modifiers
-   don't silently break the battle simulation's derived-stat totals. */
+   `BattleAttributes` recomputes incrementally through the shared `foldAttributeValue`
+   kernel rather than rebuilding via `computeAttributes`, but both fold the same
+   `STATIC_ATTRIBUTE_MODIFIERS` the same way. These cases are a regression guard that the
+   two stay equal: they verify `BattleAttributes`' totals match a full `computeAttributes`
+   so a change to the kernel or the static modifiers can't silently diverge the simulation. */
 describe('parity with BattleAttributes', () => {
 	const IMPLEMENTED: EAttribute[] = [
 		EAttribute.Strength,
@@ -186,4 +240,56 @@ describe('parity with BattleAttributes', () => {
 			}
 		});
 	}
+
+	// BattleAttributes now recomputes incrementally (only the changed attribute + its derived
+	// dependents) rather than rebuilding from the full modifier list. This guards that the incremental
+	// add/remove path never drifts from a fresh, full `computeAttributes` over the same modifier set —
+	// the FE-internal invariant #1364's optimization rests on. Every step exercises a derived cascade
+	// (Strength/Endurance → MaxHealth, Endurance → Toughness, Luck → Critical*).
+	it('incremental add/remove stays equal to a full recompute at every step', () => {
+		const battle = new BattleAttributes([], true);
+		const live: AttributeModifier[] = [];
+
+		// A full, independent recompute of every attribute from the current modifier set.
+		const expectEquivalent = () => {
+			const computed = computeAttributes(withStatics(live));
+			for (let attr = 0; attr <= maxAttributeId; attr++) {
+				expect(battle.getValue(attr)).toBeCloseTo(computed.get(attr)?.total ?? 0, 10);
+			}
+		};
+
+		const apply = (modifier: AttributeModifier) => {
+			battle.addModifier(modifier);
+			live.push(modifier);
+			expectEquivalent();
+		};
+		const revert = (modifier: AttributeModifier) => {
+			expect(battle.removeModifier(modifier)).toBe(true);
+			live.splice(live.indexOf(modifier), 1);
+			expectEquivalent();
+		};
+
+		const strength = additive(EAttribute.Strength, 12, EAttributeModifierSource.Item);
+		const endurance = additive(EAttribute.Endurance, 8, EAttributeModifierSource.PlayerStatPoints);
+		const luck = additive(EAttribute.Luck, 20, EAttributeModifierSource.ItemMod);
+		const directHealth = additive(EAttribute.MaxHealth, 35, EAttributeModifierSource.Item);
+		const multHealth: AttributeModifier = {
+			attribute: EAttribute.MaxHealth,
+			amount: 1.1,
+			type: EModifierType.Multiplicative,
+			source: EAttributeModifierSource.ItemMod
+		};
+
+		expectEquivalent();
+		apply(strength); // cascades Strength → MaxHealth
+		apply(endurance); // cascades Endurance → MaxHealth + Toughness
+		apply(luck); // cascades Luck → CriticalChance + CriticalDamage
+		apply(directHealth); // a non-derived MaxHealth additive alongside its derived contributors
+		apply(multHealth); // a multiplicative on the same attribute, applied after the additives
+		revert(endurance); // drop a shared cascade source mid-stack
+		revert(multHealth);
+		revert(strength);
+		revert(directHealth);
+		revert(luck);
+	});
 });
