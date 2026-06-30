@@ -37,6 +37,17 @@ INSERT INTO "SkillDamageMultipliers" ("SkillId", "AttributeId", "Multiplier") VA
   (2, 2, 1.0)
 ON CONFLICT ("SkillId", "AttributeId") DO NOTHING;
 
+-- Each skill's direct-hit damage portions (#1343). Every skill must carry at least one portion; the
+-- #1384 migration backfills authored skills to a single full-weight Physical portion (DamageType = 0
+-- per EDamageType), but this hand-seeded reference data is inserted directly, so it must declare the
+-- rows itself. The direct-hit pipeline (#1385) splits a hit across these portions — a skill with none
+-- would split across zero and deal no damage, so the boss fight would never resolve.
+INSERT INTO "SkillDamagePortions" ("SkillId", "DamageType", "Weight") VALUES
+  (0, 0, 1.0),
+  (1, 0, 1.0),
+  (2, 0, 1.0)
+ON CONFLICT ("SkillId", "DamageType") DO NOTHING;
+
 -- A starter class (id 0). Character creation requires a class (#1221): the select-screen create form
 -- sends a classId, which the API rejects unless it resolves to a live class, so the suite's
 -- first-character creation needs class 0 to exist. Its kit is the starter skills 0/1/2 (the skills new

@@ -19,6 +19,8 @@ function dealPortionedDamage(
 	portions: ISkillDamagePortion[],
 	critMultiplier: number
 ): number {
+	// Relies on the skill's damagePortions invariant (≥1 positive-weight portion, enforced by authoring
+	// validation + backfill), so totalWeight is never 0 — no zero-division/empty-hit guard is needed.
 	let totalWeight = 0;
 	for (const portion of portions) {
 		totalWeight += portion.weight;

@@ -21,18 +21,21 @@
         /// <summary>
         /// The weighted leaf-type split this skill's direct hits deal (spike #1343). A hit's raw damage is
         /// split across these portions by weight; each portion runs the single-type pipeline under its own
-        /// type. A single-portion skill is byte-for-byte the pre-feature single-typed hit. The split is inert
-        /// until the portion-aware battle pipeline (#1385) reads it; <see cref="PrimaryDamageType"/> feeds the
-        /// display surfaces (and the interim single-type direct-hit call) that still want "the skill's type".
-        /// Every skill carries at least one portion (existing skills backfilled to <c>[{ Physical, 1.0 }]</c>).
+        /// type. A single-portion skill is byte-for-byte the pre-feature single-typed hit. The direct-hit
+        /// pipeline (<see cref="Battle.BattleContext.DamageTarget"/>) reads these portions (#1385);
+        /// <see cref="PrimaryDamageType"/> feeds only the display surfaces (icon/colour). <b>Invariant:</b>
+        /// every skill carries at least one positive-weight portion (authoring validation requires it, and
+        /// existing skills were backfilled to <c>[{ Physical, 1.0 }]</c>), so the split's weight total is
+        /// never zero.
         /// </summary>
         public required IReadOnlyList<SkillDamagePortion> DamagePortions { get; init; }
 
         /// <summary>
-        /// The leaf damage type the display surfaces (icon/colour) and the interim single-type direct-hit call
-        /// read as "the skill's type": the highest-weight portion, the first in authored order on a tie. Falls
-        /// back to <see cref="EDamageType.Physical"/> for a malformed skill carrying no portions, so a display
-        /// or battle read never throws.
+        /// The leaf damage type the display surfaces (icon/colour) read as "the skill's type": the
+        /// highest-weight portion, the first in authored order on a tie. Falls back to
+        /// <see cref="EDamageType.Physical"/> for a malformed skill carrying no portions, so a display read
+        /// never throws. The direct-hit pipeline reads the full <see cref="DamagePortions"/> split, not this
+        /// single primary type.
         /// </summary>
         public EDamageType PrimaryDamageType
         {

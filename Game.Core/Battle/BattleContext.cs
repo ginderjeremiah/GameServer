@@ -147,6 +147,8 @@ namespace Game.Core.Battle
         {
             // Fold the total weight in fixed portion order (a parity contract — float addition is not associative),
             // so each portion takes its raw × weight ÷ Σweights share of the one raw hit. Computing it draws no RNG.
+            // Relies on the Skill.DamagePortions invariant (≥1 positive-weight portion, enforced by authoring
+            // validation + backfill), so totalWeight is never 0 — no zero-division/empty-hit guard is needed here.
             var totalWeight = 0.0;
             for (var i = 0; i < portions.Count; i++)
             {
