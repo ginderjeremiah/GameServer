@@ -28,6 +28,55 @@ namespace Game.Core.Tests.Attributes
             Assert.Equal(expected, DamageTypes.Keys.Select(info => info.Key));
         }
 
+        [Fact]
+        public void WeaponLeaves_AreExactlyTheWeaponTypeLeavesInEnumOrder()
+        {
+            Assert.Equal(
+                new[]
+                {
+                    EDamageType.Sword, EDamageType.Axe, EDamageType.Bow,
+                    EDamageType.Club, EDamageType.Dagger, EDamageType.Unarmed,
+                },
+                DamageTypes.WeaponLeaves);
+        }
+
+        [Theory]
+        [InlineData(EDamageType.Sword)]
+        [InlineData(EDamageType.Axe)]
+        [InlineData(EDamageType.Bow)]
+        [InlineData(EDamageType.Club)]
+        [InlineData(EDamageType.Dagger)]
+        [InlineData(EDamageType.Unarmed)]
+        public void IsWeaponLeaf_IsTrueForWeaponLeaves(EDamageType type)
+        {
+            Assert.True(DamageTypes.IsWeaponLeaf(type));
+        }
+
+        [Theory]
+        [InlineData(EDamageType.Physical)]
+        [InlineData(EDamageType.Fire)]
+        [InlineData(EDamageType.Water)]
+        [InlineData(EDamageType.Earth)]
+        [InlineData(EDamageType.Wind)]
+        [InlineData(EDamageType.Bleed)]
+        [InlineData(EDamageType.Poison)]
+        [InlineData(EDamageType.Burn)]
+        public void IsWeaponLeaf_IsFalseForNonWeaponLeaves(EDamageType type)
+        {
+            // Generic Physical is the shared category key, not a weapon leaf; the elementals and DoT leaves
+            // don't roll up under Physical at all.
+            Assert.False(DamageTypes.IsWeaponLeaf(type));
+        }
+
+        [Fact]
+        public void IsWeaponLeaf_AgreesWithWeaponLeaves_ForEveryLeafType()
+        {
+            foreach (var type in DamageTypes.LeafTypes)
+            {
+                Assert.Equal(DamageTypes.WeaponLeaves.Contains(type), DamageTypes.IsWeaponLeaf(type));
+            }
+        }
+
         // The full taxonomy table (spike #1320 decision 3, extended with the #1340 weapon leaves). The key order
         // is fixed and parity-critical. Each weapon leaf pulls its own key then the shared Physical key.
         public static TheoryData<EDamageType, EDamageTypeKey[]> AppliesCases() => new()

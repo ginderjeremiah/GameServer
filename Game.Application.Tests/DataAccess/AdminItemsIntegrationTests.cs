@@ -481,16 +481,136 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Fact]
+        public void SaveItems_WeaponWithoutWeaponType_ReturnsFailure()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            var result = admin.SaveItems(
+            [
+                new Change<Contracts.Item>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Typeless Blade", itemCategoryId: EItemCategory.Weapon),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("A weapon item must declare a weapon type.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public void SaveItems_WeaponWithNonLeafWeaponType_ReturnsFailure()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            // Anti-tamper: a tampered client could send a non-weapon leaf (e.g. Fire); the save rejects it.
+            var result = admin.SaveItems(
+            [
+                new Change<Contracts.Item>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Fire Blade", itemCategoryId: EItemCategory.Weapon, weaponType: EDamageType.Fire),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("'Fire' is not a valid weapon type.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public void SaveItems_WeaponWithoutGrantedSkill_ReturnsFailure()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            var result = admin.SaveItems(
+            [
+                new Change<Contracts.Item>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Signatureless Sword", itemCategoryId: EItemCategory.Weapon, weaponType: EDamageType.Sword),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("A weapon item must grant a signature skill.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public void SaveItems_NonWeaponWithWeaponType_ReturnsFailure()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+
+            var result = admin.SaveItems(
+            [
+                new Change<Contracts.Item>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Typed Helm", itemCategoryId: EItemCategory.Helm, weaponType: EDamageType.Sword),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Only a weapon item can declare a weapon type.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveItems_ValidWeapon_PersistsWeaponTypeAndGrant()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Slash", acquisition: ESkillAcquisition.Item);
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var changes = new List<Change<Contracts.Item>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Iron Sword", itemCategoryId: EItemCategory.Weapon,
+                        weaponType: EDamageType.Sword, grantedSkillId: skillId),
+                },
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminItems>();
+                Assert.True(admin.SaveItems(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var created = await context.Items.AsNoTracking().SingleAsync(i => i.Name == "Iron Sword", CancellationToken);
+                Assert.Equal((int)EDamageType.Sword, created.WeaponType);
+                Assert.Equal(skillId, created.GrantedSkillId);
+            }
+        }
+
+        // Defaults to a non-weapon (Helm) category so the weapon no-stranding invariant doesn't apply to the
+        // unrelated rarity/category/grant/gate cases; the weapon-invariant tests pass an explicit category +
+        // weapon type.
         private static Contracts.Item NewItem(int id = 0, string name = "Test Item", int? grantedSkillId = null,
-            int? requiredProficiencyId = null, int requiredProficiencyLevel = 0) => new()
+            int? requiredProficiencyId = null, int requiredProficiencyLevel = 0,
+            EItemCategory itemCategoryId = EItemCategory.Helm, EDamageType? weaponType = null) => new()
             {
                 Id = id,
                 Name = name,
                 Description = "",
-                ItemCategoryId = EItemCategory.Weapon,
+                ItemCategoryId = itemCategoryId,
                 RarityId = ERarity.Common,
                 IconPath = "",
                 GrantedSkillId = grantedSkillId,
+                WeaponType = weaponType,
                 RequiredProficiencyId = requiredProficiencyId,
                 RequiredProficiencyLevel = requiredProficiencyLevel,
                 Attributes = [],

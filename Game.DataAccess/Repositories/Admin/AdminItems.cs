@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
+using Game.Core.Attributes;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -37,6 +38,15 @@ namespace Game.DataAccess.Repositories.Admin
                 return categoryRejection;
             }
 
+            // The no-stranding invariant: a weapon must declare both a weapon-leaf WeaponType and a signature
+            // GrantedSkill (its own-type signature guarantees the player always fields ≥1 usable skill even when
+            // every selected skill is dimmed by the weapon-match gate). A non-weapon item may not carry a
+            // WeaponType. Enforced server-side as anti-tamper (a tampered client can't bypass the editor).
+            if (FindWeaponInvariantViolation(changes) is { } weaponRejection)
+            {
+                return weaponRejection;
+            }
+
             // Anti-tamper: a skill an item grants must declare itself Item-acquirable. The flag is the declared
             // intent; this reference is the reality, so the save bridges them (a tampered admin client can't
             // bypass the filtered picker).
@@ -62,6 +72,7 @@ namespace Game.DataAccess.Repositories.Admin
                     RarityId = (int)item.RarityId,
                     IconPath = item.IconPath,
                     GrantedSkillId = item.GrantedSkillId,
+                    WeaponType = (int?)item.WeaponType,
                     RequiredProficiencyId = item.RequiredProficiencyId,
                     RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
                 }),
@@ -76,6 +87,7 @@ namespace Game.DataAccess.Repositories.Admin
                     RarityId = (int)item.RarityId,
                     IconPath = item.IconPath,
                     GrantedSkillId = item.GrantedSkillId,
+                    WeaponType = (int?)item.WeaponType,
                     RequiredProficiencyId = item.RequiredProficiencyId,
                     RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
                     RetiredAt = item.RetiredAt,
@@ -85,6 +97,49 @@ namespace Game.DataAccess.Repositories.Admin
                 // An edit must target an existing item; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _items.LookupItem(item.Id) is not null);
+        }
+
+        /// <summary>
+        /// Returns a rejection for the first added/edited item that breaks the weapon no-stranding invariant,
+        /// or null when every item is valid. A <see cref="EItemCategory.Weapon"/> item must declare a weapon-leaf
+        /// <c>WeaponType</c> (Sword/Axe/Bow/Club/Dagger/Unarmed) and a <c>GrantedSkillId</c> — its own-type
+        /// signature is what keeps the player with ≥1 usable skill once the weapon-match gate dims the rest. A
+        /// non-weapon item may not carry a <c>WeaponType</c> (it is only meaningful on a weapon). Deletes are skipped.
+        /// </summary>
+        private static AdminSaveResult? FindWeaponInvariantViolation(IReadOnlyList<Change<Contracts.Item>> changes)
+        {
+            foreach (var change in changes)
+            {
+                if (change.ChangeType == EChangeType.Delete)
+                {
+                    continue;
+                }
+
+                var item = change.Item;
+                if (item.ItemCategoryId == EItemCategory.Weapon)
+                {
+                    if (item.WeaponType is not { } weaponType)
+                    {
+                        return AdminSaveResult.Failure("A weapon item must declare a weapon type.");
+                    }
+
+                    if (!DamageTypes.IsWeaponLeaf(weaponType))
+                    {
+                        return AdminSaveResult.Failure($"'{weaponType}' is not a valid weapon type.");
+                    }
+
+                    if (item.GrantedSkillId is null)
+                    {
+                        return AdminSaveResult.Failure("A weapon item must grant a signature skill.");
+                    }
+                }
+                else if (item.WeaponType is not null)
+                {
+                    return AdminSaveResult.Failure("Only a weapon item can declare a weapon type.");
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

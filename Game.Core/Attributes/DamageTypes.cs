@@ -132,6 +132,24 @@ namespace Game.Core.Attributes
         /// <summary>The leaf damage types, in enum order.</summary>
         public static IReadOnlyList<EDamageType> LeafTypes { get; } = Enum.GetValues<EDamageType>();
 
+        // The weapon-type leaves (#1340): the non-Physical leaves that roll up under the shared Physical
+        // category key (their applies() set is [<weapon>, Physical]). Derived from the taxonomy table so the
+        // classification can't drift from the append-only enum. The single source of truth for "is this leaf a
+        // weapon type", consumed by Item.WeaponType authoring validation (#1372) and the weapon-match gate (#1373).
+        private static readonly IReadOnlySet<EDamageType> WeaponLeafSet =
+            LeafTypes.Where(t => t != EDamageType.Physical && AppliesMap[t].Contains(Physical)).ToHashSet();
+
+        /// <summary>The weapon-type leaf damage types (Sword / Axe / Bow / Club / Dagger / Unarmed), in enum order.
+        /// The set a weapon's <see cref="Items.Item.WeaponType"/> is constrained to.</summary>
+        public static IReadOnlyList<EDamageType> WeaponLeaves { get; } = LeafTypes.Where(WeaponLeafSet.Contains).ToList();
+
+        /// <summary>Whether <paramref name="type"/> is a weapon-type leaf — a leaf under the Physical category key,
+        /// excluding generic <see cref="EDamageType.Physical"/> itself.</summary>
+        public static bool IsWeaponLeaf(EDamageType type)
+        {
+            return WeaponLeafSet.Contains(type);
+        }
+
         /// <summary>The damage-type keys, in canonical iteration order.</summary>
         public static IReadOnlyList<KeyInfo> Keys => KeyInfos;
 

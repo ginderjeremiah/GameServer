@@ -19,6 +19,12 @@ namespace Game.Abstractions.Contracts
         /// <see cref="ESkillAcquisition.Item"/>-flagged, enforced on save), or null for none.</summary>
         public int? GrantedSkillId { get; set; }
 
+        /// <summary>The weapon-leaf <see cref="EDamageType"/> this weapon deals, or null for a non-weapon item.
+        /// Only meaningful on a <see cref="EItemCategory.Weapon"/> item; the equipped weapon's type is what a
+        /// weapon-typed skill matches against. Constrained to a weapon leaf, and required (alongside
+        /// <see cref="GrantedSkillId"/>) for a weapon, by admin authoring validation.</summary>
+        public EDamageType? WeaponType { get; set; }
+
         /// <summary>The id of the proficiency that gates equipping this item, or null when the item is
         /// ungated. Equipping requires the player to have reached <see cref="RequiredProficiencyLevel"/>
         /// in this proficiency (enforced server-side at equip time as anti-cheat).</summary>

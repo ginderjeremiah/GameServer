@@ -19,6 +19,7 @@ namespace Game.DataAccess.Mapping
                 Category = (EItemCategory)entity.ItemCategoryId,
                 Rarity = (ERarity)entity.RarityId,
                 GrantedSkillId = entity.GrantedSkillId,
+                WeaponType = (EDamageType?)entity.WeaponType,
                 RequiredProficiencyId = entity.RequiredProficiencyId,
                 RequiredProficiencyLevel = entity.RequiredProficiencyLevel,
                 Attributes = entity.ItemAttributes
@@ -71,6 +72,7 @@ namespace Game.DataAccess.Mapping
                 RarityId = (ERarity)entity.RarityId,
                 IconPath = entity.IconPath,
                 GrantedSkillId = entity.GrantedSkillId,
+                WeaponType = (EDamageType?)entity.WeaponType,
                 RequiredProficiencyId = entity.RequiredProficiencyId,
                 RequiredProficiencyLevel = entity.RequiredProficiencyLevel,
                 Attributes = entity.ItemAttributes

@@ -38,6 +38,13 @@ namespace Game.Core.Items
         public int? GrantedSkillId { get; init; }
 
         /// <summary>
+        /// The weapon-leaf <see cref="EDamageType"/> this weapon deals, or null for a non-weapon item. Only
+        /// meaningful on a <see cref="EItemCategory.Weapon"/> item; the weapon-match loadout gate resolves an
+        /// equipped weapon's type as <c>weapon?.WeaponType ?? Unarmed</c> (an empty slot is the virtual fists).
+        /// </summary>
+        public EDamageType? WeaponType { get; init; }
+
+        /// <summary>
         /// The id of the proficiency that gates equipping this item, or null when the item is ungated.
         /// Stored as an id only (not the resolved proficiency) so the item cache stays independent of the
         /// proficiency reference data; the equip gate is evaluated against the player's proficiency levels.

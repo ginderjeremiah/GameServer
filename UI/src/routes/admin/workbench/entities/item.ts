@@ -6,19 +6,28 @@ import { firstFree } from './helpers';
 import { tagsSection } from './tags-section';
 import type { EntityConfig } from './types';
 
-const refresh = async (): Promise<IItem[]> => {
+/**
+ * An item with its optional weapon type widened to a plain number so the select can use a "None" sentinel
+ * (-1) — mirroring how it (and classes) handle their other optional enum/FK fields.
+ */
+export interface WorkbenchItem extends Omit<IItem, 'weaponType'> {
+	weaponType: number;
+}
+
+const refresh = async (): Promise<WorkbenchItem[]> => {
 	const items = await fetchSocketData('GetItems');
 	staticData.items = items;
-	// Normalise the optional FK fields to the select's "None" sentinel (-1) for the editable copy;
-	// staticData.items stays raw (null = none) for the game/other screens.
+	// Normalise the optional FK / weapon-type fields to the select's "None" sentinel (-1) for the editable
+	// copy; staticData.items stays raw (null = none) for the game/other screens.
 	return items.map((item) => ({
 		...item,
 		grantedSkillId: item.grantedSkillId ?? -1,
-		requiredProficiencyId: item.requiredProficiencyId ?? -1
+		requiredProficiencyId: item.requiredProficiencyId ?? -1,
+		weaponType: item.weaponType ?? -1
 	}));
 };
 
-export const itemEntity: EntityConfig<IItem> = {
+export const itemEntity: EntityConfig<WorkbenchItem> = {
 	key: 'items',
 	label: 'Items',
 	singular: 'Item',
@@ -33,6 +42,7 @@ export const itemEntity: EntityConfig<IItem> = {
 		rarityId: ERarity.Common,
 		iconPath: '',
 		grantedSkillId: -1,
+		weaponType: -1,
 		requiredProficiencyId: -1,
 		requiredProficiencyLevel: 1,
 		attributes: [],
@@ -53,6 +63,20 @@ export const itemEntity: EntityConfig<IItem> = {
 			glyph: 'tag',
 			desc: 'Name, category & rarity',
 			kind: 'fields',
+			// The no-stranding invariant (enforced authoritatively on the backend): a weapon must declare a
+			// weapon type and a granted signature skill; only a weapon may carry a weapon type.
+			warn: (it) => {
+				if (it.itemCategoryId === EItemCategory.Weapon) {
+					if (it.weaponType === -1) {
+						return 'Weapon needs a weapon type';
+					}
+					if (it.grantedSkillId === -1) {
+						return 'Weapon needs a granted skill';
+					}
+					return null;
+				}
+				return it.weaponType === -1 ? null : 'Only weapons have a weapon type';
+			},
 			fields: [
 				{
 					key: 'name',
@@ -86,6 +110,13 @@ export const itemEntity: EntityConfig<IItem> = {
 					type: 'select',
 					options: reference.grantedSkillOptions,
 					width: 240
+				},
+				{
+					key: 'weaponType',
+					label: 'Weapon Type',
+					type: 'select',
+					options: reference.weaponTypeOptions,
+					width: 170
 				},
 				{
 					key: 'requiredProficiencyId',
@@ -149,7 +180,7 @@ export const itemEntity: EntityConfig<IItem> = {
 				{ key: 'itemModSlotTypeId', label: 'Slot Type', type: 'select', options: reference.modTypeOptions, min: 200 }
 			]
 		},
-		tagsSection<IItem>()
+		tagsSection<WorkbenchItem>()
 	],
 	refresh,
 	persist: (diff) =>
@@ -160,6 +191,8 @@ export const itemEntity: EntityConfig<IItem> = {
 			toPrimaryDto: (it) => ({
 				...it,
 				grantedSkillId: it.grantedSkillId === -1 ? undefined : it.grantedSkillId,
+				// Map the "None" sentinel (-1) back to no weapon type (only meaningful on a weapon).
+				weaponType: it.weaponType === -1 ? undefined : it.weaponType,
 				// Map the "None" sentinel (-1) back to no gate; the backend ignores the level when ungated.
 				requiredProficiencyId: it.requiredProficiencyId === -1 ? undefined : it.requiredProficiencyId,
 				attributes: [],
