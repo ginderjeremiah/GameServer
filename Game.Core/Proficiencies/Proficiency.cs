@@ -14,8 +14,7 @@ namespace Game.Core.Proficiencies
         public required string Description { get; init; }
 
         /// <summary>The path this proficiency is a tier of, and its 0-based position (tier) within it. The
-        /// battle XP accrual reads these to route a path's contribution to its current frontier tier and to
-        /// scale an off-tier skill's pull by the home-tier falloff.</summary>
+        /// battle XP accrual reads these to route a path's contribution to its current frontier tier.</summary>
         public required int PathId { get; init; }
         public required int PathOrdinal { get; init; }
 
