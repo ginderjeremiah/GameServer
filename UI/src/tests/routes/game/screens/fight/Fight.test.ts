@@ -37,7 +37,8 @@ const {
 		bossUnlockedNextZone: false,
 		challengeBoss: vi.fn(),
 		retreatFromBoss: vi.fn(),
-		setAutoFight: vi.fn()
+		setAutoFight: vi.fn(),
+		navigateToZone: vi.fn()
 	},
 	staticData: { attributes: [] as IAttribute[], zones: [] as IZone[], enemies: [] as IEnemy[] },
 	statistics: { isZoneCleared: vi.fn(() => false) },
@@ -71,6 +72,7 @@ const makeZone = (over: Partial<IZone> = {}): IZone => ({
 	levelMin: 1,
 	levelMax: 10,
 	bossLevel: 1,
+	isHome: false,
 	...over
 });
 
@@ -137,6 +139,22 @@ describe('Fight', () => {
 		render(Fight);
 		expect(screen.queryByTestId('boss-trigger')).toBeNull();
 		expect(screen.queryByTestId('boss-bar')).toBeNull();
+	});
+
+	it('shows the resting panel instead of the combatants in the Home zone', () => {
+		// The no-combat Home sanctuary swaps the battlers/versus badge for a resting panel; the zone nav
+		// stays so the player can head back out.
+		staticData.zones = [makeZone({ name: 'Home', isHome: true })];
+		mockPlayerManager.currentZone = 0;
+
+		render(Fight);
+
+		expect(screen.getByTestId('home-rest')).toBeTruthy();
+		expect(screen.queryByTestId('player-card')).toBeNull();
+		expect(screen.queryByTestId('enemy-card')).toBeNull();
+		expect(screen.queryByTestId('vs-badge')).toBeNull();
+		// The zone nav is still present so the player can navigate back to a combat zone.
+		expect(screen.getByTestId('zone-nav')).toBeTruthy();
 	});
 
 	describe('with a dedicated boss', () => {

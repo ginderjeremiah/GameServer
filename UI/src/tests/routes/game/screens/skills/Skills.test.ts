@@ -117,7 +117,17 @@ const SKILLS: ISkill[] = [
 
 // Zone 0 (idle range [2,8], boss enemy 2 at level 10): one in-zone spawn + the boss pill.
 const ZONES: IZone[] = [
-	{ id: 0, name: 'Vale', description: '', order: 0, levelMin: 2, levelMax: 8, bossEnemyId: 2, bossLevel: 10 }
+	{
+		id: 0,
+		name: 'Vale',
+		description: '',
+		order: 0,
+		levelMin: 2,
+		levelMax: 8,
+		bossEnemyId: 2,
+		bossLevel: 10,
+		isHome: false
+	}
 ];
 
 // amountPerLevel 1 gives each enemy Toughness 2·(1·level), within the preset-derived slider ceiling.

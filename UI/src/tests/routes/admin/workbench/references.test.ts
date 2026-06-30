@@ -25,6 +25,7 @@ const zone = (id: number, name: string, opts: Partial<IZone> = {}): IZone => ({
 	levelMin: 1,
 	levelMax: 10,
 	bossLevel: 1,
+	isHome: false,
 	...opts
 });
 

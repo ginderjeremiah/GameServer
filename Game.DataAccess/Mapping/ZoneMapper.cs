@@ -21,6 +21,7 @@ namespace Game.DataAccess.Mapping
                 BossEnemyId = entity.BossEnemyId,
                 BossLevel = entity.BossLevel,
                 UnlockChallengeId = entity.UnlockChallengeId,
+                IsHome = entity.IsHome,
                 RetiredAt = entity.RetiredAt,
             };
         }

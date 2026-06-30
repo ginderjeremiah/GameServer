@@ -121,6 +121,7 @@ describe('zoneEntity', () => {
 			bossEnemyId: -1,
 			bossLevel: 1,
 			unlockChallengeId: -1,
+			isHome: false,
 			zoneEnemies: [],
 			...over
 		});

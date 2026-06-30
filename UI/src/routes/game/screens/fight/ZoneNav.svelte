@@ -21,7 +21,11 @@
 		</button>
 	</span>
 	<div class="zone-info">
-		<span class="zone-num">Zone · {String(zoneNum).padStart(2, '0')}</span>
+		{#if atHome}
+			<span class="zone-num">Sanctuary</span>
+		{:else}
+			<span class="zone-num">Zone · {String(combatZoneNum).padStart(2, '0')}</span>
+		{/if}
 		<span class="zone-name">{current?.name}</span>
 	</div>
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -60,7 +64,7 @@ import {
 	type TooltipAnchor,
 	type TooltipComponent
 } from '$stores';
-import { playerManager } from '$lib/engine';
+import { enemyManager, playerManager } from '$lib/engine';
 import { isZoneUnlocked, navigableZones } from '$lib/common';
 import { ChallengeTooltip } from '$components';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
@@ -105,7 +109,11 @@ const currentIndex = $derived(orderedZones.findIndex((z) => z.id === playerManag
 // Fall back to the first ordered zone when the current zone is unknown (e.g. before data loads).
 const resolvedIndex = $derived(currentIndex >= 0 ? currentIndex : 0);
 const current = $derived(orderedZones[resolvedIndex]);
-const zoneNum = $derived(resolvedIndex + 1);
+// The no-combat Home sanctuary is a navigable zone but is labelled "Sanctuary", not "Zone · NN".
+const atHome = $derived(current?.isHome === true);
+// Number only the combat (non-Home) zones, so the sanctuary sitting leftmost doesn't push "Zone · 01"
+// off the first real zone. A combat zone's number is its 1-based position among the navigable non-Home zones.
+const combatZoneNum = $derived(orderedZones.slice(0, resolvedIndex + 1).filter((z) => !z.isHome).length);
 
 const prevZone = $derived(resolvedIndex > 0 ? orderedZones[resolvedIndex - 1] : undefined);
 const nextZone = $derived(resolvedIndex < orderedZones.length - 1 ? orderedZones[resolvedIndex + 1] : undefined);
@@ -122,7 +130,7 @@ const rightAbsent = $derived(nextZone == null);
 
 const goToZone = (zone: IZone | undefined) => {
 	if (zone != null && isZoneUnlocked(zone, completed)) {
-		playerManager.currentZone = zone.id;
+		enemyManager.navigateToZone(zone.id);
 	}
 };
 

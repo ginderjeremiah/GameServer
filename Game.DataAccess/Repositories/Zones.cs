@@ -53,6 +53,14 @@ namespace Game.DataAccess.Repositories
                 : throw new ArgumentOutOfRangeException(nameof(zoneId));
         }
 
+        public bool IsHomeZone(int zoneId)
+        {
+            var entities = Snapshot.Entities;
+            return IsValidZoneId(entities, zoneId)
+                ? entities[zoneId].IsHome
+                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+        }
+
         public bool ValidateZoneId(int zoneId)
         {
             return IsValidZoneId(Snapshot.Entities, zoneId);

@@ -129,9 +129,15 @@ ON CONFLICT ("EnemyId", "SkillId") DO NOTHING;
 -- screen's "Challenge Boss" affordance light up. The next zone is gated behind the challenge above
 -- (UnlockChallengeId = 0) and has no boss (BossLevel = 1 is the column's NOT NULL default and is
 -- meaningless without a BossEnemyId).
-INSERT INTO "Zones" ("Id", "Name", "Description", "Order", "LevelMin", "LevelMax", "BossEnemyId", "BossLevel", "UnlockChallengeId") VALUES
-  (0, 'Verdant Hollow', 'A quiet glade where new heroes cut their teeth.', 0, 1, 10, 2, 10, NULL),
-  (1, 'Ashen Wastes', 'A scorched expanse — sealed until Verdant Hollow is cleared.', 1, 8, 18, NULL, 1, 0)
+--
+-- The Home zone (IsHome = true) is a no-combat sanctuary: no enemies spawn there and never will (it
+-- carries no boss and no ZoneEnemies rows). Order = -1 places it leftmost in the zone nav. The backend
+-- refuses a battle zone-change into it, so it never becomes a player's CurrentZoneId — offline rewards
+-- keep crediting their last real combat zone.
+INSERT INTO "Zones" ("Id", "Name", "Description", "Order", "LevelMin", "LevelMax", "BossEnemyId", "BossLevel", "UnlockChallengeId", "IsHome") VALUES
+  (0, 'Verdant Hollow', 'A quiet glade where new heroes cut their teeth.', 0, 1, 10, 2, 10, NULL, false),
+  (1, 'Ashen Wastes', 'A scorched expanse — sealed until Verdant Hollow is cleared.', 1, 8, 18, NULL, 1, 0, false),
+  (2, 'Home', 'A quiet refuge where you can rest without battling. No enemies will find you here.', -1, 1, 1, NULL, 1, NULL, true)
 ON CONFLICT ("Id") DO NOTHING;
 
 -- Place the (non-boss) enemies in the starter zone (equal spawn weight). The boss is excluded — it

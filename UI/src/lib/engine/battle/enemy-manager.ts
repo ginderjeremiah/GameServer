@@ -120,6 +120,47 @@ export class EnemyManager {
 	}
 
 	/**
+	 * Navigate the player to a zone (driven by the zone-nav arrows). Combat zones apply on the next spawn as
+	 * before — the running fight finishes and the following NewEnemy carries the new zone. The no-combat Home
+	 * sanctuary is special: entering it stops the live battle and halts the idle loop (the player rests, no
+	 * enemies spawn), and leaving it resumes the loop in the destination zone. The backend never persists Home
+	 * as the player's current zone (it refuses a battle zone-change into one), so offline rewards keep
+	 * crediting their last real combat zone.
+	 */
+	public navigateToZone(zoneId: number) {
+		const previousZone = playerManager.currentZone;
+		if (zoneId === previousZone) {
+			return;
+		}
+		const leavingHome = this.isHomeZone(previousZone);
+		playerManager.currentZone = zoneId;
+		if (this.isHomeZone(zoneId)) {
+			this.enterHome();
+		} else if (leavingHome) {
+			// Resuming combat from the resting state — spawn the first enemy in the destination zone.
+			void this.getNewEnemy();
+		}
+	}
+
+	/**
+	 * Park the player in the no-combat Home sanctuary: supersede any in-flight fetch, leave the boss loop, drop
+	 * the current enemy, and stop the live battle. No NewEnemy is sent while at Home (the fight loop is halted);
+	 * an in-progress backend battle is left to be resolved as an abandon by the next real battle when the player
+	 * leaves Home (the standard zone-change/abandon machinery).
+	 */
+	private enterHome() {
+		this.interruptFetch();
+		this.returnToIdle();
+		this.currentEnemy = undefined;
+		battleEngine.rest();
+	}
+
+	/** Whether the given zone id is the no-combat Home sanctuary, per the reference data. */
+	private isHomeZone(zoneId: number): boolean {
+		return staticData.zones?.[zoneId]?.isHome === true;
+	}
+
+	/**
 	 * Spawns the next idle enemy, notifying listeners once one is ready. Optionally takes a server-prefetched
 	 * {@link PreparedBattle}: when still valid it is presented immediately with no `NewEnemy` round-trip (its
 	 * latency was hidden under the post-battle cooldown), otherwise a fresh one is fetched. The present runs
@@ -155,6 +196,14 @@ export class EnemyManager {
 		this.fetchingEnemy = true;
 		this.fetchingGeneration = generation;
 		try {
+			// The no-combat Home sanctuary never spawns enemies, so halt the loop rather than sending NewEnemy:
+			// the backend refuses a battle zone-change into Home and would answer with a real-zone enemy, which
+			// would resume fighting while the player is meant to be resting. Clearing the current enemy lets the
+			// fight screen render the resting state.
+			if (this.isHomeZone(playerManager.currentZone)) {
+				this.currentEnemy = undefined;
+				return;
+			}
 			// A still-valid server-prefetched battle is presented without a round-trip. Done here (inside the
 			// fetchingEnemy/generation guard) rather than from the stage handler so it shares the fetch path's
 			// protections: a concurrent getNewEnemy is dropped above, and a stop / superseding transition that

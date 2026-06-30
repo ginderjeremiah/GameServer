@@ -160,6 +160,19 @@ export class BattleEngine {
 		this.setBattleStage(Paused);
 	}
 
+	/**
+	 * Drops the live battle to its Idle baseline without tearing down the loop hooks — used when the player
+	 * parks in the no-combat Home zone (the idle loop is halted separately so no new enemy spawns). The
+	 * in-flight fight simply stops: {@link timeElapsed} is reset to 0 so the next real battle resolves the
+	 * now-orphaned backend battle as an abandon with no outcome (the player forfeits the unfinished fight by
+	 * walking home), and the fight screen shows the resting state.
+	 */
+	public rest() {
+		this.finishLoading?.();
+		this.timeElapsed = 0;
+		this.setBattleStage(Idle);
+	}
+
 	public resume = () => {
 		if (!this.player.isDead && !this.enemy.isDead) {
 			this.setBattleStage(Active);
@@ -300,10 +313,13 @@ export class BattleEngine {
 	}
 
 	private logicalUpdate(timeDelta: number) {
+		// Advance the battle clock only while a battle is actually live. Between battles (the Loading
+		// cooldown, Paused mid-swap, or resting in the no-combat Home zone) it stays frozen, so a value later
+		// read as an abandon's client-fought duration reflects only real combat time — never time parked idle.
 		// Accumulate first so the timeout check below evaluates against this tick's elapsed time: the live
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
-		this.timeElapsed += timeDelta;
 		if (this.stage === Active) {
+			this.timeElapsed += timeDelta;
 			for (const { skill, damage, byPlayer, crit, dodged, reflected } of battleStep(
 				this.player,
 				this.enemy,

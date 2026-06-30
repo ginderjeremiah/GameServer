@@ -133,6 +133,18 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Enemy");
             }
 
+            // Authoring guard: the Home zone is a no-combat sanctuary where no enemies spawn (and never will),
+            // so reject a spawn that targets one. Mirrors the per-zone guard in AdminZones.SetEnemies so neither
+            // authoring direction can populate Home's spawn table.
+            foreach (var spawn in data.Spawns)
+            {
+                if (_zones.LookupZone(spawn.ZoneId) is { IsHome: true } homeZone)
+                {
+                    return AdminSaveResult.Failure(
+                        $"'{enemy.Name}' cannot spawn in the Home zone ('{homeZone.Name}'). Home is a no-combat sanctuary where no enemies spawn.");
+                }
+            }
+
             return ChildCollectionReconciler.Reconcile(
                 existing: enemy.ZoneEnemies,
                 desired: data.Spawns,

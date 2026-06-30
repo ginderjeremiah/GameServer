@@ -44,6 +44,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 		bossEnemyId: -1,
 		bossLevel: 1,
 		unlockChallengeId: -1,
+		isHome: false,
 		zoneEnemies: []
 	}),
 	meta: (z) => [
@@ -100,6 +101,13 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 					grow: true,
 					required: true,
 					reqMsg: 'No description'
+				},
+				{
+					key: 'isHome',
+					label: 'Sanctuary',
+					type: 'toggle',
+					onLabel: 'Home (no combat)',
+					offLabel: 'Combat zone'
 				}
 			]
 		},
@@ -109,7 +117,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			glyph: 'skull',
 			desc: 'Enemies that spawn here & their weights',
 			count: (z) => z.zoneEnemies.length,
-			warn: (z) => (z.zoneEnemies.length ? null : 'No enemies spawn here'),
+			warn: (z) => (z.isHome || z.zoneEnemies.length ? null : 'No enemies spawn here'),
 			kind: 'table',
 			itemsKey: 'zoneEnemies',
 			rowKey: 'enemyId',
@@ -145,6 +153,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				bossEnemyId,
 				bossLevel,
 				unlockChallengeId,
+				isHome,
 				retiredAt
 			}) => ({
 				id,
@@ -158,6 +167,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				bossLevel,
 				// Likewise map the "None" sentinel (-1) back to an absent unlock gate.
 				unlockChallengeId: unlockChallengeId === -1 ? undefined : unlockChallengeId,
+				isHome,
 				retiredAt
 			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditZones', changes),
