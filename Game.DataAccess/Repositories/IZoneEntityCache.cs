@@ -12,5 +12,9 @@ namespace Game.DataAccess.Repositories
     {
         /// <summary>The cached zone entity at <paramref name="zoneId"/> (its zero-based index), or null if out of range.</summary>
         ZoneEntity? LookupZone(int zoneId);
+
+        /// <summary>All cached zone entities, ordered by their zero-based id. Used by the authoring guards
+        /// that reason over the whole catalogue (e.g. the single-Home-zone rule) rather than one record.</summary>
+        IReadOnlyList<ZoneEntity> AllZones();
     }
 }

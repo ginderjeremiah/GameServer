@@ -59,6 +59,15 @@ namespace Game.DataAccess.Repositories.Admin
                 }
             }
 
+            // The design mandates a single authored Home sanctuary, so reject any save whose resulting
+            // catalogue would hold more than one non-retired Home zone (a second Home add, or an existing
+            // combat zone flipped to Home). Backend-enforced like the boss/spawn-table Home guards above.
+            if (WouldExceedSingleHomeZone(changes))
+            {
+                return AdminSaveResult.Failure(
+                    "Only one Home zone is allowed. Another non-retired Home zone already exists; retire it first or make this a combat zone.");
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Zone
                 {
@@ -70,6 +79,7 @@ namespace Game.DataAccess.Repositories.Admin
                     BossEnemyId = item.BossEnemyId,
                     BossLevel = item.BossLevel,
                     UnlockChallengeId = item.UnlockChallengeId,
+                    IsHome = item.IsHome,
                 }),
                 edit: item => _entityStore.Update(new Entities.Zone
                 {
@@ -82,6 +92,7 @@ namespace Game.DataAccess.Repositories.Admin
                     BossEnemyId = item.BossEnemyId,
                     BossLevel = item.BossLevel,
                     UnlockChallengeId = item.UnlockChallengeId,
+                    IsHome = item.IsHome,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,
@@ -89,6 +100,37 @@ namespace Game.DataAccess.Repositories.Admin
                 // An edit must target an existing zone; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _zones.LookupZone(item.Id) is not null);
+        }
+
+        /// <summary>
+        /// True when applying <paramref name="changes"/> would leave more than one non-retired Home zone in
+        /// the catalogue. The full post-save state is checked (cached zones folded with this batch's
+        /// adds/edits/deletes), not just the changed item, so both adding a second Home zone and flipping an
+        /// existing combat zone to Home are caught. Retired Home zones are out of circulation and don't count.
+        /// </summary>
+        private bool WouldExceedSingleHomeZone(IReadOnlyList<Change<Contracts.Zone>> changes)
+        {
+            // Existing zones this batch edits or deletes are superseded by their change; everything else keeps
+            // its current cached Home/retirement state.
+            var supersededIds = changes
+                .Where(change => change.ChangeType != EChangeType.Add)
+                .Select(change => change.Item.Id)
+                .ToHashSet();
+
+            var homeCount = _zones.AllZones()
+                .Count(zone => !supersededIds.Contains(zone.Id) && IsActiveHome(zone.IsHome, zone.RetiredAt));
+
+            // Adds and edits contribute their post-save state (a delete contributes nothing).
+            homeCount += changes
+                .Where(change => change.ChangeType != EChangeType.Delete)
+                .Count(change => IsActiveHome(change.Item.IsHome, change.Item.RetiredAt));
+
+            return homeCount > 1;
+        }
+
+        private static bool IsActiveHome(bool isHome, DateTime? retiredAt)
+        {
+            return isHome && retiredAt is null;
         }
 
         public AdminSaveResult SetEnemies(SetZoneEnemiesData data)
