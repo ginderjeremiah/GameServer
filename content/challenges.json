@@ -1,0 +1,15 @@
+[
+  {
+    "id": 0,
+    "name": "Clear Verdant Hollow",
+    "description": "Clear the starter zone to press onward.",
+    "challengeTypeId": "ZonesCleared",
+    "statisticType": "ZonesCleared",
+    "entityType": "Zone",
+    "targetEntityId": 0,
+    "progressGoal": 1.000,
+    "rewardItemId": null,
+    "rewardItemModId": null,
+    "retiredAt": null
+  }
+]

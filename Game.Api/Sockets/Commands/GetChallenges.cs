@@ -1,7 +1,6 @@
 using Game.Abstractions.Contracts;
 using Game.Abstractions.DataAccess;
-using Game.Core;
-using CoreChallenge = Game.Core.Progress.Challenge;
+using Game.Application.Content;
 
 namespace Game.Api.Sockets.Commands
 {
@@ -19,32 +18,13 @@ namespace Game.Api.Sockets.Commands
             _challenges = challenges;
         }
 
+        // The domain challenge carries the rich ChallengeType; the shared mapper flattens it to the read
+        // contract (the gameplay domain IChallenges.All intentionally serves the domain model — see backend.md).
         protected override IEnumerable<Challenge> GetReferenceData()
         {
-            return _challenges.All().Select(ToContract);
+            return _challenges.All().Select(ChallengeContractMapper.ToContract);
         }
 
         protected override object VersionKey => _challenges.VersionKey;
-
-        // The domain challenge carries the rich ChallengeType; the read contract flattens it to the
-        // type id plus the statistic/entity dimensions the type derives. Kept here because the
-        // gameplay domain (IChallenges.All) intentionally serves the domain model — see backend.md.
-        private static Challenge ToContract(CoreChallenge challenge)
-        {
-            return new Challenge
-            {
-                Id = challenge.Id,
-                Name = challenge.Name,
-                Description = challenge.Description,
-                ChallengeTypeId = challenge.Type.Id,
-                StatisticType = challenge.Type.StatisticType?.Id,
-                EntityType = challenge.Type.StatisticType?.EntityType ?? EEntityType.None,
-                TargetEntityId = challenge.TargetEntityId,
-                ProgressGoal = challenge.ProgressGoal,
-                RewardItemId = challenge.RewardItemId,
-                RewardItemModId = challenge.RewardItemModId,
-                RetiredAt = challenge.RetiredAt,
-            };
-        }
     }
 }

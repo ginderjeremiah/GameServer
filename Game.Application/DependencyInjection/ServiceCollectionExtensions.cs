@@ -1,5 +1,6 @@
 ﻿using Game.Abstractions.Auth;
 using Game.Application.Auth;
+using Game.Application.Content;
 using Game.Application.Events;
 using Game.Application.Services;
 using Game.Core.Battle;
@@ -36,7 +37,9 @@ namespace Game.Application.DependencyInjection
                 .AddScoped<ProficiencyRewardService>()
                 .AddScoped<LoginTrackingService>()
                 .AddScoped<PlayerService>()
-                .AddScoped<SynthesisService>();
+                .AddScoped<SynthesisService>()
+                // Reads the reference caches (scoped repos) to mirror the static content graph to JSON.
+                .AddScoped<IContentExporter, ContentExporter>();
         }
 
         public static void RegisterDomainEventHandlers()

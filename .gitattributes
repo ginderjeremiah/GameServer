@@ -3,6 +3,10 @@
 ###############################################################################
 * text=auto eol=lf
 
+# Source-controlled content export (#1390): the CI drift guard asserts byte-equality against the
+# exporter output, which always emits LF. Pin LF explicitly so a checkout can never rewrite line endings.
+content/*.json text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

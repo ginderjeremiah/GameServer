@@ -1,0 +1,74 @@
+[
+  {
+    "id": 0,
+    "name": "Forest Slime",
+    "isBoss": false,
+    "attributeDistribution": [
+      {
+        "attributeId": "Strength",
+        "baseAmount": 5.000,
+        "amountPerLevel": 1.000
+      },
+      {
+        "attributeId": "Endurance",
+        "baseAmount": 5.000,
+        "amountPerLevel": 1.000
+      }
+    ],
+    "skillPool": [
+      1
+    ],
+    "spawns": [
+      {
+        "zoneId": 0,
+        "weight": 1
+      }
+    ],
+    "retiredAt": null
+  },
+  {
+    "id": 1,
+    "name": "Wild Boar",
+    "isBoss": false,
+    "attributeDistribution": [
+      {
+        "attributeId": "Strength",
+        "baseAmount": 7.000,
+        "amountPerLevel": 1.500
+      },
+      {
+        "attributeId": "Endurance",
+        "baseAmount": 6.000,
+        "amountPerLevel": 1.000
+      }
+    ],
+    "skillPool": [
+      1
+    ],
+    "spawns": [
+      {
+        "zoneId": 0,
+        "weight": 1
+      }
+    ],
+    "retiredAt": null
+  },
+  {
+    "id": 2,
+    "name": "Direboar Alpha",
+    "isBoss": true,
+    "attributeDistribution": [
+      {
+        "attributeId": "Strength",
+        "baseAmount": 1.000,
+        "amountPerLevel": 1.000
+      }
+    ],
+    "skillPool": [
+      1,
+      2
+    ],
+    "spawns": [],
+    "retiredAt": null
+  }
+]

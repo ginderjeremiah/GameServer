@@ -38,6 +38,10 @@ namespace Game.TestInfrastructure.Helpers
                     "Skills",
                     "Zones",
                     "Tags",
+                    -- Classes are referenced by Players (not the reverse), so no truncate above cascades to
+                    -- them; listed explicitly so class content doesn't leak across tests. Their child tables
+                    -- (ClassStarterSkills/ClassAttributeDistributions/ClassStarterEquipment) cascade from here.
+                    "Classes",
                     "Challenges",
                     "Paths",
                     "Proficiencies",
