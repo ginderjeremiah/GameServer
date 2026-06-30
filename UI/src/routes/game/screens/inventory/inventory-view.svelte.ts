@@ -167,18 +167,20 @@ export class InventoryView {
 		return newlyDormantSkills(selected, inventoryManager.equippedWeaponType, nextWeaponType);
 	}
 
-	/** Prompts the player before a weapon equip that would dim part of the saved loadout, naming the affected
-	 *  `dormant` skills. Returns true to proceed (the player accepted), false to abort. The loadout itself is
-	 *  never edited — the skills simply go dormant until a matching weapon is re-equipped. */
-	private confirmWeaponSwap(item: Item, dormant: ISkill[]): Promise<boolean> {
+	/** Prompts the player before a weapon-slot change that would dim part of the saved loadout, naming the
+	 *  affected `dormant` skills. `action` is the sentence lead-in ("Equipping Foo" / "Unequipping your weapon")
+	 *  and `confirmLabel` the proceed button. Returns true to proceed (the player accepted), false to abort. The
+	 *  loadout itself is never edited — the skills simply go dormant until a matching weapon is re-equipped.
+	 *  Shared by the equip and unequip paths so the two warnings can't drift. */
+	private confirmWeaponSwap(action: string, confirmLabel: string, dormant: ISkill[]): Promise<boolean> {
 		const single = dormant.length === 1;
 		const names = dormant.map((s) => s.name).join(', ');
 		return confirmModal({
 			title: 'Some skills will go dormant',
 			body:
-				`Equipping ${item.name} will leave ${single ? 'this skill' : `these ${dormant.length} skills`} ` +
+				`${action} will leave ${single ? 'this skill' : `these ${dormant.length} skills`} ` +
 				`dormant until you re-equip a matching weapon: ${names}. Your loadout stays saved.`,
-			confirmLabel: 'Equip anyway',
+			confirmLabel,
 			cancelLabel: 'Keep current weapon'
 		});
 	}
@@ -198,7 +200,7 @@ export class InventoryView {
 		// The dormant set is computed synchronously, so the no-conflict path never awaits a modal.
 		if (item && slotId === EEquipmentSlot.WeaponSlot) {
 			const dormant = this.weaponSwapDormantSkills(item.weaponType ?? EDamageType.Unarmed);
-			if (dormant.length > 0 && !(await this.confirmWeaponSwap(item, dormant))) {
+			if (dormant.length > 0 && !(await this.confirmWeaponSwap(`Equipping ${item.name}`, 'Equip anyway', dormant))) {
 				return;
 			}
 		}
@@ -208,6 +210,16 @@ export class InventoryView {
 	}
 
 	async unequip(slotId: EEquipmentSlot) {
+		// Weapon-match warning (#1342): unequipping the weapon resets the weapon type to Unarmed, dimming any
+		// off-weapon selected skills — the same silent surprise the equip warning guards against, reached via a
+		// different action. Warn (and let the player back out) before the optimistic apply. The dormant set is
+		// computed synchronously, so the no-conflict path never awaits a modal.
+		if (slotId === EEquipmentSlot.WeaponSlot) {
+			const dormant = this.weaponSwapDormantSkills(EDamageType.Unarmed);
+			if (dormant.length > 0 && !(await this.confirmWeaponSwap('Unequipping your weapon', 'Unequip anyway', dormant))) {
+				return;
+			}
+		}
 		if (!(await inventoryManager.unequipItem(slotId))) {
 			toastError('Your equipment change could not be saved. Please try again.');
 		}
