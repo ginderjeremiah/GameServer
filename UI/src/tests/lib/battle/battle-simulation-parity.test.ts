@@ -31,6 +31,7 @@ import {
 	equipmentFactory,
 	grantedBattlerFactory,
 	makeSkill,
+	makeMultiTypeSkill,
 	makeEffect
 } from './battle-sim-test-utils';
 
@@ -1306,6 +1307,153 @@ const scenarios: ParityScenario[] = [
 				[]
 			),
 		expected: { victory: true, playerDied: false, totalMs: 360 }
+	},
+
+	// ── Multi-typed direct hits: weighted portion split (#1343 / #1385) ──────────
+	// A skill's raw is split across weighted portions (raw × weight ÷ Σweights), each run through the single-type
+	// pipeline under its own type and the nets summed. A single crit multiplies every portion; a single dodge
+	// zeroes the whole hit. Mirrors the backend `multiTypeSplitResistsOneType` … `singlePortionNonUnitWeightIdentity`.
+
+	// 60/40 split with resistance on only one type. A raw-100 hit splits into 60 Physical + 40 Fire; the enemy
+	// resists Fire 0.5 (Physical unresisted), no Toughness: 60 + 40×0.5 = 80/hit. The 250-HP enemy (Str 40) dies on
+	// hit 4 at tick 40 → 1600ms. (Un-resisted 100/hit would kill on hit 3 / 1200ms, so the per-portion resist matters.)
+	{
+		name: 'multiTypeSplitResistsOneType',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Strength, amount: 10 }],
+				[
+					makeMultiTypeSkill(100, 400, [
+						{ type: EDamageType.Physical, weight: 60 },
+						{ type: EDamageType.Fire, weight: 40 }
+					])
+				]
+			),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 40 },
+					{ id: EAttribute.FireResistance, amount: 0.5 }
+				],
+				[]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
+	// A single crit multiplies EVERY portion. Forced crit (CriticalDamage 1.5 + 0.5 = 2) on a [Physical 50, Fire 50]
+	// split of raw 20 → 10 each, ×2 → 20 each = 40/hit (no Toughness). The 100-HP enemy dies on hit 3 at tick 30 →
+	// 1200ms. A crit on one portion only (30/hit) would kill on hit 4 (1600ms); no crit (20/hit) on hit 5 (2000ms).
+	{
+		name: 'multiTypeCritAppliesToAllPortions',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.CriticalChance, amount: 1 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
+				],
+				[
+					makeMultiTypeSkill(20, 400, [
+						{ type: EDamageType.Physical, weight: 50 },
+						{ type: EDamageType.Fire, weight: 50 }
+					])
+				]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
+	// A single dodge zeroes the WHOLE multi-typed hit. The enemy's [Physical 500, Fire 500] split of a 1000-damage
+	// hit would one-shot the 100-HP player, but DodgeChance 1 negates every hit, so the player survives and grinds
+	// the enemy down (20/hit, no Toughness) for the win on hit 5 at tick 50 → 2000ms. (Zeroing only one portion
+	// would leave 500 through and kill the player at tick 10.)
+	{
+		name: 'multiTypeDodgeZeroesWholeHit',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.DodgeChance, amount: 1 }
+				],
+				[makeSkill(20, 400)]
+			),
+		enemy: () =>
+			makeBattler(
+				[{ id: EAttribute.Strength, amount: 10 }],
+				[
+					makeMultiTypeSkill(1000, 400, [
+						{ type: EDamageType.Physical, weight: 500 },
+						{ type: EDamageType.Fire, weight: 500 }
+					])
+				]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
+	},
+
+	// Per-portion vulnerability (res < 0). A [Physical 50, Fire 50] split of raw 40 → 20 each; the enemy's −1.0
+	// FireResistance doubles only the Fire portion (20 → 40), Physical stays 20: 60/hit. The 180-HP enemy (Str 26)
+	// dies on hit 3 at tick 30 → 1200ms. (No vulnerability — 40/hit — would kill on hit 5 / 2000ms.)
+	{
+		name: 'multiTypePerPortionVulnerability',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Strength, amount: 10 }],
+				[
+					makeMultiTypeSkill(40, 400, [
+						{ type: EDamageType.Physical, weight: 50 },
+						{ type: EDamageType.Fire, weight: 50 }
+					])
+				]
+			),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 26 },
+					{ id: EAttribute.FireResistance, amount: -1.0 }
+				],
+				[]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
+	// Per-portion absorption with the order-dependent heal cap. A [Physical 20, Fire 80] split of raw 100 against an
+	// enemy absorbing Fire (FireResistance 2.0) at full health: the Physical portion deals 20 (100 → 80, opening 20
+	// room), then the Fire portion's −80 absorption heal is CAPPED at that 20 room (back to 100). Net 20 + (−20) =
+	// 0/hit, so the enemy never dies — a timeout draw. The fixed Physical-first order is what lets the heal land.
+	{
+		name: 'multiTypePerPortionAbsorptionCap',
+		player: () =>
+			makeBattler(
+				[],
+				[
+					makeMultiTypeSkill(100, 400, [
+						{ type: EDamageType.Physical, weight: 20 },
+						{ type: EDamageType.Fire, weight: 80 }
+					])
+				]
+			),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireResistance, amount: 2.0 }
+				],
+				[]
+			),
+		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
+	},
+
+	// Reduce-to-single-portion identity for a non-unit weight: raw × w ÷ w = raw exactly. A lone Fire portion at
+	// weight 2 with no amp/resist deals 20/hit, so the 100-HP enemy dies on hit 5 → 2000ms — identical to
+	// typedFireNoModifiersUnchanged, proving a single portion (any weight) is the single-type hit.
+	{
+		name: 'singlePortionNonUnitWeightIdentity',
+		player: () =>
+			makeBattler(
+				[{ id: EAttribute.Strength, amount: 10 }],
+				[makeMultiTypeSkill(20, 400, [{ type: EDamageType.Fire, weight: 2 }])]
+			),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	}
 ];
 

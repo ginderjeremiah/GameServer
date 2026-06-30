@@ -1,8 +1,35 @@
 import type { Battler } from './battler';
 import type { Skill } from './skill';
 import type { Mulberry32 } from '$lib/engine/mulberry32';
-import { EAttribute, type ISkillEffect } from '$lib/api';
+import { EAttribute, type ISkillDamagePortion, type ISkillEffect } from '$lib/api';
 import { amplifiedDamage } from './battle-formulas';
+
+/** Resolves one direct hit by splitting `raw` across the skill's weighted `portions` (#1343): each portion
+ *  takes `raw × weight ÷ Σweights` of the single raw hit (the weight total folded in fixed portion order, a
+ *  parity contract) and runs the single-type pipeline — attacker amplification, then `critMultiplier` (the
+ *  attacker's CriticalDamage on a crit, else 1, so one crit decision scales EVERY portion), then the
+ *  defender's resistance + Toughness curve — under its own type; the per-portion nets are summed and returned.
+ *  Each portion's absorption heal is capped at the defender's MaxHealth room AT THAT POINT in the fixed order,
+ *  so the order is a parity contract. A single portion reduces byte-for-byte to the pre-feature single-typed
+ *  hit. Mirrors the backend `BattleContext.DamageTarget` portion loop. */
+function dealPortionedDamage(
+	attacker: Battler,
+	defender: Battler,
+	raw: number,
+	portions: ISkillDamagePortion[],
+	critMultiplier: number
+): number {
+	let totalWeight = 0;
+	for (const portion of portions) {
+		totalWeight += portion.weight;
+	}
+	let totalNet = 0;
+	for (const portion of portions) {
+		const dealt = amplifiedDamage((raw * portion.weight) / totalWeight, portion.type, attacker.attributes);
+		totalNet += defender.takeDamage(dealt * critMultiplier, portion.type, attacker.level);
+	}
+	return totalNet;
+}
 
 /** Deterministic damage reflection (#1330): the `defender` returns its DamageReflection share of a direct
  *  hit's `netDamage` to the `attacker`, BYPASSING the attacker's mitigation. Only a positive net reflects (a
@@ -114,18 +141,15 @@ export function battleStep(
 	// draws from the shared seeded RNG in a fixed, outcome-independent order (1 crit draw per player fire,
 	// 1 dodge draw per enemy fire — Block's second draw was retired, #1330) so both simulators stay in lockstep.
 	player.advanceCooldowns(timeDelta, (skill) => {
-		// Player crit: one draw (always), the raw damage multiplied by CriticalDamage BEFORE mitigation.
+		// Player crit: one draw (always), independent of portion count — a single crit multiplies EVERY portion
+		// by CriticalDamage BEFORE mitigation.
 		const crit = rng.next() < player.attributes.getValue(EAttribute.CriticalChance);
 		const raw = skill.calculateDamage();
-		// Attacker-side amplification, then crit, then the typed mitigation pipeline (resistance, Toughness curve
-		// scaled by the player's level).
-		const dealt = amplifiedDamage(raw, skill.primaryDamageType, player.attributes);
-		const damage = enemy.takeDamage(
-			crit ? dealt * player.attributes.getValue(EAttribute.CriticalDamage) : dealt,
-			skill.primaryDamageType,
-			player.level
-		);
-		// Direct-hit reflection: the enemy (defender) returns its share to the player (attacker).
+		const critMultiplier = crit ? player.attributes.getValue(EAttribute.CriticalDamage) : 1;
+		// Split the raw hit across the skill's weighted portions, each amplified, crit-scaled, then run through
+		// the typed mitigation pipeline (resistance, Toughness curve scaled by the player's level), summing the nets.
+		const damage = dealPortionedDamage(player, enemy, raw, skill.damagePortions, critMultiplier);
+		// Direct-hit reflection: the enemy (defender) returns its share of the summed net to the player (attacker).
 		const reflected = reflectDamage(player, enemy, damage);
 		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, reflected });
 		skill.applyEffects(enemy, onApplied);
@@ -138,14 +162,14 @@ export function battleStep(
 	if (!enemy.isDead && !player.isDead) {
 		enemy.advanceCooldowns(timeDelta, (skill) => {
 			// A single dodge draw — the only player-only roll left on an enemy attack now that Block is gone
-			// (#1330). A dodge zeroes the hit. The draw is taken unconditionally so the stream stays in lockstep.
+			// (#1330). A dodge zeroes the WHOLE multi-typed hit. The draw is taken unconditionally so the stream
+			// stays in lockstep regardless of portion count.
 			const dodged = rng.next() < player.attributes.getValue(EAttribute.DodgeChance);
 			const raw = skill.calculateDamage();
-			// Attacker-side amplification reads the enemy (the attacker here); resistance + the Toughness curve
-			// (scaled by the enemy's level) read the player.
-			const dealt = amplifiedDamage(raw, skill.primaryDamageType, enemy.attributes);
-			const damage = dodged ? 0 : player.takeDamage(dealt, skill.primaryDamageType, enemy.level);
-			// Direct-hit reflection: the player (defender) returns its share to the enemy (attacker).
+			// Split the raw hit across the skill's weighted portions: the enemy (attacker) amplifies each, the
+			// player resists + Toughness-mitigates each (scaled by the enemy's level), and the nets are summed.
+			const damage = dodged ? 0 : dealPortionedDamage(enemy, player, raw, skill.damagePortions, 1);
+			// Direct-hit reflection: the player (defender) returns its share of the summed net to the enemy (attacker).
 			const reflected = reflectDamage(enemy, player, damage);
 			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, reflected });
 			skill.applyEffects(player, onApplied);

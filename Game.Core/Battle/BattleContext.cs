@@ -106,86 +106,127 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Deals one skill hit's <paramref name="rawDamage"/> to the current target, drawing the per-fire
-        /// seeded RNG and applying the player-only crit/dodge rolls (gated on the acting battler). The draw
-        /// order is a pure function of the skill-fire sequence — never of a roll outcome — so the per-tick draw
-        /// count stays <c>playerFires×1 + enemyFires×1</c>:
+        /// Deals one skill hit's <paramref name="rawDamage"/> to the current target by <b>splitting it across the
+        /// skill's weighted <paramref name="portions"/></b> (spike #1343): each portion takes
+        /// <c>raw × weight ÷ Σweights</c> of the single raw hit (the weight total folded in fixed portion order, a
+        /// parity contract — float addition is not associative) and runs the existing single-type pipeline
+        /// (<see cref="Battler.AmplifyDamage"/> → crit → <see cref="Battler.TakeDamage"/>) under its own
+        /// <see cref="EDamageType"/>; the per-portion nets are summed into <c>totalNet</c>. A <b>single</b>
+        /// portion reduces byte-for-byte to the pre-feature single-typed hit (<c>raw × w ÷ w = raw</c>).
+        /// <para>
+        /// The seeded RNG is drawn <b>once per fire regardless of portion count</b>, so the per-tick draw count
+        /// stays <c>playerFires×1 + enemyFires×1</c>:
+        /// </para>
         /// <list type="bullet">
-        /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage). On a crit
-        /// the raw damage is multiplied by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b>
-        /// mitigation, so high crit damage punches through <see cref="EAttribute.Toughness"/>.</item>
+        /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage). A crit
+        /// multiplies <b>every</b> portion by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b>
+        /// mitigation — identical to scaling the whole hit — so high crit damage punches through
+        /// <see cref="EAttribute.Toughness"/>.</item>
         /// <item>When the <b>enemy</b> attacks the player, a <b>single</b> dodge draw is taken (Block was retired
-        /// in spike #1330, so the former second draw is gone). A dodge zeroes the hit.</item>
+        /// in spike #1330). A dodge zeroes the <b>whole</b> multi-typed hit.</item>
         /// </list>
-        /// After a direct hit lands, <b>damage reflection</b> (spike #1330) returns the defender's
-        /// <see cref="EAttribute.DamageReflection"/> share of the net damage to the attacker, bypassing the
-        /// attacker's own mitigation — deterministic (no draw) and applied in <b>both</b> directions. The
-        /// Toughness curve scales by the <b>active (attacking) battler's level</b>, so the mitigation band stays
-        /// stable as content scales. Enemies never crit/dodge: the gating reads the rolls only on the player's
-        /// side, leaving a clean seam for later enemy parity (reflection, being authored-only, already applies
-        /// to either side wherever it is granted).
+        /// The per-portion typed books (<see cref="BattleStats.AddTypedDamageDealt"/> per portion's net,
+        /// <see cref="BattleStats.AddTypedDamageExposure"/> per portion's pre-resist dealt) are the cross-school
+        /// proficiency signal; the whole-hit stats (<see cref="BattleStats.HighestPlayerAttack"/>,
+        /// <see cref="BattleStats.CriticalDamageDealt"/>, and the per-skill total via the return) use
+        /// <c>totalNet</c> — one swing is one attack. Each portion's absorption heal is capped at the
+        /// <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
+        /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
+        /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
+        /// untyped, so once equals per-portion, and once gives a single clean reflection event. The Toughness curve
+        /// scales by the <b>active (attacking) battler's level</b>. Enemies never crit/dodge: the gating reads the
+        /// rolls only on the player's side.
         /// </summary>
         /// <returns>
-        /// The actual damage applied after amplification, crit, resistance, and the Toughness curve — the same
-        /// value booked into the battle stats — so the caller can record a reconciling per-skill total instead
-        /// of the raw pre-mitigation hit. Reflected damage dealt back to the attacker is booked separately and
-        /// is not part of this return.
+        /// The summed net damage applied across all portions (after amplification, crit, resistance, and the
+        /// Toughness curve) — the same value booked into the battle stats — so the caller can record a
+        /// reconciling per-skill total instead of the raw pre-mitigation hit. Reflected damage dealt back to the
+        /// attacker is booked separately and is not part of this return.
         /// </returns>
-        public double DamageTarget(double rawDamage, EDamageType damageType)
+        public double DamageTarget(double rawDamage, IReadOnlyList<SkillDamagePortion> portions)
         {
-            // Attacker-side amplification first (before the crit draw, which it never feeds), so the typed hit
-            // entering the mitigation pipeline is the amplified value. Computing it here doesn't advance the RNG.
-            var dealt = _activeBattler.AmplifyDamage(rawDamage, damageType);
+            // Fold the total weight in fixed portion order (a parity contract — float addition is not associative),
+            // so each portion takes its raw × weight ÷ Σweights share of the one raw hit. Computing it draws no RNG.
+            var totalWeight = 0.0;
+            for (var i = 0; i < portions.Count; i++)
+            {
+                totalWeight += portions[i].Weight;
+            }
 
-            double actualDamage;
+            var totalNet = 0.0;
             if (_isPlayerActive)
             {
+                // ONE crit draw per player fire, before any damage and independent of portion count. A single crit
+                // multiplies every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
                 var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
-                var damage = isCrit ? dealt * _activeBattler.GetAttributeValue(CriticalDamage) : dealt;
-                actualDamage = _targetBattler.TakeDamage(damage, damageType, _activeBattler.Level);
+                var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
+                for (var i = 0; i < portions.Count; i++)
+                {
+                    var type = portions[i].Type;
+                    var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
+                    var net = _targetBattler.TakeDamage(dealt * critMultiplier, type, _activeBattler.Level);
+                    Stats.AddTypedDamageDealt(type, net);
+                    totalNet += net;
+                }
 
-                Stats.PlayerDamageDealt += actualDamage;
-                Stats.AddTypedDamageDealt(damageType, actualDamage);
+                Stats.PlayerDamageDealt += totalNet;
                 if (isCrit)
                 {
                     Stats.CriticalHits++;
-                    Stats.CriticalDamageDealt += actualDamage;
+                    Stats.CriticalDamageDealt += totalNet;
                 }
 
-                if (actualDamage > Stats.HighestPlayerAttack)
+                if (totalNet > Stats.HighestPlayerAttack)
                 {
-                    Stats.HighestPlayerAttack = actualDamage;
+                    Stats.HighestPlayerAttack = totalNet;
                 }
             }
             else
             {
                 // A single dodge draw — the only player-only roll left on an enemy attack now that Block is gone
-                // (spike #1330), so an enemy attack advances the seeded stream by exactly one.
+                // (spike #1330), so an enemy attack advances the seeded stream by exactly one regardless of portions.
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
-
                 if (isDodge)
                 {
-                    // The net damage the hit would have dealt if it landed (resistance then the Toughness curve),
-                    // via the same pipeline Battler.TakeDamage applies — the basis for how much the dodge avoided.
-                    // The curve scales by the attacking (active) battler's level. Computing it draws no RNG.
-                    actualDamage = 0;
+                    // A dodge zeroes the whole hit; the avoided damage is the sum of each portion's net (resistance
+                    // then the Toughness curve, scaled by the attacking battler's level), computed without mutating
+                    // health. A dodge evaded the hit entirely, so no exposure is recorded (it trains evasion instead).
                     Stats.AttacksDodged++;
-                    Stats.DamageDodged += _targetBattler.ComputeNetDamage(dealt, damageType, _activeBattler.Level);
+                    for (var i = 0; i < portions.Count; i++)
+                    {
+                        var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
+                        Stats.DamageDodged += _targetBattler.ComputeNetDamage(dealt, portions[i].Type, _activeBattler.Level);
+                    }
                 }
                 else
                 {
-                    // The hit landed, so the player was exposed to its full pre-mitigation typed damage —
-                    // recorded for the incoming book before resistance/mitigation. A dodge above evaded the hit
-                    // entirely, so it is excluded (its avoided damage trains evasion instead).
-                    Stats.AddTypedDamageExposure(damageType, dealt);
-                    actualDamage = _targetBattler.TakeDamage(dealt, damageType, _activeBattler.Level);
+                    for (var i = 0; i < portions.Count; i++)
+                    {
+                        var type = portions[i].Type;
+                        var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
+                        // The player was exposed to this portion's full pre-mitigation typed damage — recorded for
+                        // the incoming book before resistance/mitigation.
+                        Stats.AddTypedDamageExposure(type, dealt);
+                        totalNet += _targetBattler.TakeDamage(dealt, type, _activeBattler.Level);
+                    }
                 }
 
-                Stats.PlayerDamageTaken += actualDamage;
+                Stats.PlayerDamageTaken += totalNet;
             }
 
-            ReflectDamage(actualDamage);
-            return actualDamage;
+            ReflectDamage(totalNet);
+            return totalNet;
+        }
+
+        /// <summary>
+        /// One portion's attacker-amplified pre-mitigation damage: its weighted share of the single raw hit
+        /// (<c>rawDamage × weight ÷ totalWeight</c>, the fixed-order fold of the weights done by the caller) run
+        /// through the active (attacking) battler's typed amplification. A method call rather than an inline
+        /// expression so the three per-portion loops cannot diverge in their split arithmetic.
+        /// </summary>
+        private double AmplifiedPortion(double rawDamage, double totalWeight, SkillDamagePortion portion)
+        {
+            return _activeBattler.AmplifyDamage(rawDamage * portion.Weight / totalWeight, portion.Type);
         }
 
         /// <summary>
