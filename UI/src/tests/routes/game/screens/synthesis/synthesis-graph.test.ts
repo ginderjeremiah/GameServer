@@ -27,7 +27,7 @@ const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
-	damageType: EDamageType.Physical,
+	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 	acquisition: ESkillAcquisition.Synthesis,
 	...over
 });

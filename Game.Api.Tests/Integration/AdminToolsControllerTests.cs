@@ -841,6 +841,7 @@ namespace Game.Api.Tests.Integration
                         Word = "",
                         Pronunciation = "",
                         Translation = "",
+                        DamagePortions = Array.Empty<object>(),
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },
@@ -886,6 +887,7 @@ namespace Game.Api.Tests.Integration
                         Word = "",
                         Pronunciation = "",
                         Translation = "",
+                        DamagePortions = Array.Empty<object>(),
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },
@@ -905,6 +907,7 @@ namespace Game.Api.Tests.Integration
                         Word = "",
                         Pronunciation = "",
                         Translation = "",
+                        DamagePortions = Array.Empty<object>(),
                         DamageMultipliers = Array.Empty<object>(),
                         Effects = Array.Empty<object>()
                     },

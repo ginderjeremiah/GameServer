@@ -7,7 +7,8 @@ import {
 	resistanceAttributes,
 	keyForAttribute,
 	dotAccumulators,
-	dotTypeForAccumulator
+	dotTypeForAccumulator,
+	primaryDamageType
 } from '$lib/battle/damage-types';
 
 /* Mirror of the backend `DamageTypesTests` (spike #1320). Keep the scenarios row-for-row aligned with
@@ -161,4 +162,34 @@ describe('damage-types DoT accumulators (#1320 Area C)', () => {
 			expect(dotTypeForAccumulator(attribute)).toBeUndefined();
 		}
 	);
+});
+
+/* Mirror of the backend `SkillTests.PrimaryDamageType*` cases (spike #1343) — the two implementations must
+   agree, since both feed the display surfaces and the interim single-type direct-hit call. */
+describe('primaryDamageType', () => {
+	it('returns the single portion type', () => {
+		expect(primaryDamageType([{ type: EDamageType.Fire, weight: 1 }])).toBe(EDamageType.Fire);
+	});
+
+	it('picks the highest-weight portion', () => {
+		expect(
+			primaryDamageType([
+				{ type: EDamageType.Physical, weight: 0.4 },
+				{ type: EDamageType.Fire, weight: 0.6 }
+			])
+		).toBe(EDamageType.Fire);
+	});
+
+	it('on a weight tie picks the first authored portion', () => {
+		expect(
+			primaryDamageType([
+				{ type: EDamageType.Water, weight: 1 },
+				{ type: EDamageType.Fire, weight: 1 }
+			])
+		).toBe(EDamageType.Water);
+	});
+
+	it('falls back to Physical for an empty portion set', () => {
+		expect(primaryDamageType([])).toBe(EDamageType.Physical);
+	});
 });

@@ -195,16 +195,21 @@ export interface ISkill {
 	baseDamage: number;
 	damageMultipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
+	damagePortions: ISkillDamagePortion[];
 	description: string;
 	cooldownMs: number;
 	iconPath: string;
 	rarityId: ERarity;
-	damageType: EDamageType;
 	word: string;
 	pronunciation: string;
 	translation: string;
 	acquisition: ESkillAcquisition;
 	retiredAt?: string;
+}
+
+export interface ISkillDamagePortion {
+	type: EDamageType;
+	weight: number;
 }
 
 export interface ISkillEffect {

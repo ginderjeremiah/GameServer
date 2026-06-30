@@ -68,7 +68,9 @@ function registerSkill(registry: ISkill[], spec: SkillSpec): number {
 		name: `Skill ${id}`,
 		baseDamage: spec.baseDamage,
 		cooldownMs: spec.cooldownMs,
-		damageType: spec.damageType,
+		// The scenario's single type becomes one full-weight portion — its PrimaryDamageType, so behaviour
+		// is identical to the pre-portions single-type hit (#1343).
+		damagePortions: [{ type: spec.damageType, weight: 1 }],
 		damageMultipliers: spec.multipliers,
 		effects: spec.effects,
 		description: '',

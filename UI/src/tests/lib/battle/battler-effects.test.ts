@@ -215,7 +215,7 @@ describe('Battler skill-effect bookkeeping', () => {
 				word: '',
 				pronunciation: '',
 				translation: '',
-				damageType: EDamageType.Physical,
+				damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 				acquisition: ESkillAcquisition.Player
 			},
 			caster
@@ -247,7 +247,7 @@ describe('Battler skill-effect bookkeeping', () => {
 				word: '',
 				pronunciation: '',
 				translation: '',
-				damageType: EDamageType.Physical,
+				damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 				acquisition: ESkillAcquisition.Player
 			},
 			caster
@@ -394,7 +394,7 @@ describe('Skill effect attribute scaling', () => {
 				word: '',
 				pronunciation: '',
 				translation: '',
-				damageType: EDamageType.Physical,
+				damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 				acquisition: ESkillAcquisition.Player
 			},
 			caster

@@ -84,7 +84,7 @@ namespace Game.Core.Tests.Enemies
             Id = id,
             Name = $"Skill {id}",
             Description = "",
-            DamageType = EDamageType.Physical,
+            DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             BaseDamage = 1,
             CooldownMs = 1000,
             DamageMultipliers = [],

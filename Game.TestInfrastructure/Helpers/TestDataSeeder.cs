@@ -94,7 +94,6 @@ namespace Game.TestInfrastructure.Helpers
                 CooldownMs = cooldownMs,
                 IconPath = "",
                 RarityId = (int)rarity,
-                DamageType = (int)damageType,
                 Word = word,
                 Pronunciation = pronunciation,
                 Translation = translation,
@@ -104,6 +103,13 @@ namespace Game.TestInfrastructure.Helpers
             context.Skills.Add(skill);
             await context.SaveChangesAsync();
 
+            // Seed a single full-weight portion of the requested type (the backfilled single-portion shape).
+            context.SkillDamagePortions.Add(new SkillDamagePortion
+            {
+                SkillId = skill.Id,
+                DamageType = (int)damageType,
+                Weight = 1.0m,
+            });
             context.SkillDamageMultipliers.Add(new SkillDamageMultiplier
             {
                 SkillId = skill.Id,
@@ -305,12 +311,20 @@ namespace Game.TestInfrastructure.Helpers
         {
             var proficiency = await context.Proficiencies.FindAsync(proficiencyId)
                 ?? throw new InvalidOperationException($"Proficiency {proficiencyId} has not been seeded.");
-            var skill = await context.Skills.FindAsync(skillId)
-                ?? throw new InvalidOperationException($"Skill {skillId} has not been seeded.");
             var path = await context.Paths.FindAsync(proficiency.PathId)
                 ?? throw new InvalidOperationException($"Path {proficiency.PathId} has not been seeded.");
 
-            var leafKey = Game.Core.Attributes.DamageTypes.Applies((EDamageType)skill.DamageType)[0];
+            // Route the skill's primary (highest-weight) portion type to the path so a won battle's direct-hit
+            // damage trains that path's frontier tier (the effect-based accrual, spike #1318).
+            var portions = await context.SkillDamagePortions
+                .Where(p => p.SkillId == skillId)
+                .ToListAsync();
+            if (portions.Count == 0)
+            {
+                throw new InvalidOperationException($"Skill {skillId} has not been seeded.");
+            }
+            var primaryType = portions.MaxBy(p => p.Weight)?.DamageType ?? (int)EDamageType.Physical;
+            var leafKey = Game.Core.Attributes.DamageTypes.Applies((EDamageType)primaryType)[0];
             path.ActivityKey = (int)Game.Core.Proficiencies.ActivityKeys.ForDamageKey(leafKey);
             await context.SaveChangesAsync();
         }

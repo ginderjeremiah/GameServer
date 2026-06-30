@@ -40,6 +40,7 @@ import type {
 	ISetProficiencyPrerequisitesData,
 	ISetProficiencyRewardsData,
 	ISetSkillEffectsData,
+	ISetSkillPortionsData,
 	ISetSkillRecipeConditionsData,
 	ISetSkillRecipeInputsData,
 	ISetTagsData,
@@ -85,6 +86,7 @@ export type ApiResponseTypes = {
 	'AdminTools/SetProficiencyRewards': undefined;
 	'AdminTools/SetSkillEffects': undefined;
 	'AdminTools/SetSkillMultipliers': undefined;
+	'AdminTools/SetSkillPortions': undefined;
 	'AdminTools/SetSkillRecipeConditions': undefined;
 	'AdminTools/SetSkillRecipeInputs': undefined;
 	'AdminTools/SetTagsForItem': undefined;
@@ -138,6 +140,7 @@ export type ApiRequestTypes = {
 	'AdminTools/SetProficiencyRewards': ISetProficiencyRewardsData;
 	'AdminTools/SetSkillEffects': ISetSkillEffectsData;
 	'AdminTools/SetSkillMultipliers': IAddEditAttributesData;
+	'AdminTools/SetSkillPortions': ISetSkillPortionsData;
 	'AdminTools/SetSkillRecipeConditions': ISetSkillRecipeConditionsData;
 	'AdminTools/SetSkillRecipeInputs': ISetSkillRecipeInputsData;
 	'AdminTools/SetTagsForItem': ISetTagsData;

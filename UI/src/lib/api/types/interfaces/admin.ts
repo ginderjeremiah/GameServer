@@ -10,6 +10,7 @@ import type {
 	IEnemySpawn,
 	IProficiencyLevelModifier,
 	IProficiencyLevelReward,
+	ISkillDamagePortion,
 	ISkillEffect,
 	ISkillRecipeCondition,
 	IZoneEnemy
@@ -96,6 +97,11 @@ export interface ISetProficiencyRewardsData {
 export interface ISetSkillEffectsData {
 	id: number;
 	changes: IChange<ISkillEffect>[];
+}
+
+export interface ISetSkillPortionsData {
+	id: number;
+	changes: IChange<ISkillDamagePortion>[];
 }
 
 export interface ISetSkillRecipeConditionsData {

@@ -89,7 +89,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	word: '',
 	pronunciation: '',
 	translation: '',
-	damageType: EDamageType.Physical,
+	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 	acquisition: ESkillAcquisition.Player,
 	...over
 });

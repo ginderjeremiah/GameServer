@@ -11,7 +11,7 @@ import {
 } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { attributeChanges, persistEntity, skillEffectChanges } from '../save-helpers';
+import { attributeChanges, damagePortionChanges, persistEntity, skillEffectChanges } from '../save-helpers';
 import { firstFree } from './helpers';
 import type { EntityConfig } from './types';
 
@@ -35,14 +35,14 @@ export const skillEntity: EntityConfig<ISkill> = {
 		cooldownMs: 2000,
 		iconPath: '',
 		rarityId: ERarity.Common,
-		// New skills default to Physical; re-type as needed (#1320).
-		damageType: EDamageType.Physical,
 		word: '',
 		pronunciation: '',
 		translation: '',
 		// New skills default to player-acquirable; re-flag Item/Enemy skills as needed.
 		acquisition: ESkillAcquisition.Player,
 		description: '',
+		// New skills deal a single full-weight Physical portion; add/re-type portions as needed (#1343).
+		damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 		damageMultipliers: [],
 		effects: []
 	}),
@@ -74,7 +74,6 @@ export const skillEntity: EntityConfig<ISkill> = {
 				{ key: 'baseDamage', label: 'Base Damage', type: 'number', suffix: 'dmg', width: 150 },
 				{ key: 'cooldownMs', label: 'Cooldown', type: 'number', suffix: 'ms', width: 150 },
 				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },
-				{ key: 'damageType', label: 'Damage Type', type: 'select', options: reference.damageTypeOptions, width: 170 },
 				{ key: 'iconPath', label: 'Icon Path', type: 'text', placeholder: 'skills/icon.png', grow: true },
 				{ key: 'word', label: 'Word of Power', type: 'text', placeholder: 'sijren', width: 200 },
 				{ key: 'pronunciation', label: 'Pronunciation', type: 'text', placeholder: 'sij·ren', width: 200 },
@@ -98,6 +97,48 @@ export const skillEntity: EntityConfig<ISkill> = {
 					required: true,
 					reqMsg: 'No description'
 				}
+			]
+		},
+		{
+			key: 'portions',
+			label: 'Damage Types',
+			glyph: 'bolt',
+			desc: 'The weighted leaf-type split this skill’s direct hits deal',
+			count: (s) => s.damagePortions.length,
+			// Validate authoring intent the backend also guards: at least one portion, all weights positive.
+			warn: (s) =>
+				s.damagePortions.length === 0
+					? 'No damage portions'
+					: s.damagePortions.some((p) => p.weight <= 0)
+						? 'Portion weights must be positive'
+						: null,
+			kind: 'table',
+			itemsKey: 'damagePortions',
+			rowKey: 'type',
+			addLabel: 'Add portion',
+			emptyIcon: 'bolt',
+			emptyTitle: 'No damage portions',
+			emptySub: 'A skill must deal at least one damage type.',
+			newRow: (s) => ({
+				type: firstFree(
+					s.damagePortions.map((p) => p.type),
+					reference.damageTypeOptions()
+				),
+				weight: 1
+			}),
+			// "Even split" equalizes the weights (1 each); fire-time normalization makes that an equal share.
+			actions: [{ label: 'Even split', glyph: 'bars', apply: (rows) => rows.forEach((r) => (r.weight = 1)) }],
+			columns: [
+				{
+					key: 'type',
+					label: 'Damage Type',
+					type: 'select',
+					options: reference.damageTypeOptions,
+					min: 180,
+					unique: true
+				},
+				{ key: 'weight', label: 'Weight', type: 'number', align: 'r', width: 110 },
+				{ key: '__share', label: 'Share', type: 'share', width: 150, weightKey: 'weight' }
 			]
 		},
 		{
@@ -195,10 +236,16 @@ export const skillEntity: EntityConfig<ISkill> = {
 	persist: (diff) =>
 		persistEntity({
 			diff,
-			toPrimaryDto: (s) => ({ ...s, damageMultipliers: [], effects: [] }),
+			toPrimaryDto: (s) => ({ ...s, damagePortions: [], damageMultipliers: [], effects: [] }),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditSkills', changes),
 			refresh,
 			childSavers: [
+				async (id, record, baseline) => {
+					const changes = damagePortionChanges(record.damagePortions, baseline?.damagePortions);
+					if (changes.length) {
+						await ApiRequest.post('AdminTools/SetSkillPortions', { id, changes });
+					}
+				},
 				async (id, record, baseline) => {
 					const changes = attributeChanges(record.damageMultipliers, baseline?.damageMultipliers, 'multiplier');
 					if (changes.length) {

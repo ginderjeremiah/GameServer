@@ -15,7 +15,7 @@ namespace Game.Infrastructure.Entities
 
         /// <summary>
         /// The activity this path trains on — an <see cref="Core.EActivityKey"/> stored as its int value (a
-        /// plain enum-as-int column, like <see cref="Skill.DamageType"/>): a damage-type key, category, or
+        /// plain enum-as-int column, like <see cref="Skill.Acquisition"/>): a damage-type key, category, or
         /// combat event. At battle completion the effect-based accrual sums the battle's activity for this key
         /// and routes it to the path's frontier tier (spike #1318). Existing rows backfill to <c>0</c>
         /// (<see cref="Core.EActivityKey.Physical"/>).

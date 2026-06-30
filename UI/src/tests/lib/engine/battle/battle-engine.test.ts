@@ -169,7 +169,7 @@ describe('BattleEngine', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
-			damageType: EDamageType.Physical,
+			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 			acquisition: ESkillAcquisition.Player
 		};
 
@@ -459,7 +459,7 @@ describe('BattleEngine', () => {
 
 		it('surfaces the damage type and resist outcome for a typed hit on a resistant defender (#1320)', () => {
 			// A fire skill into a fire-resistant enemy: the engine names the type and flags the resist on the line.
-			mockSkills[0].damageType = EDamageType.Fire;
+			mockSkills[0].damagePortions = [{ type: EDamageType.Fire, weight: 1 }];
 			engine.start();
 			enemyLoadedCallbacks[0]({
 				id: 1,
@@ -745,7 +745,7 @@ describe('BattleEngine', () => {
 			});
 
 			it("carries the skill's damage type on a typed hit float (#1320)", () => {
-				mockSkills[0].damageType = EDamageType.Fire;
+				mockSkills[0].damagePortions = [{ type: EDamageType.Fire, weight: 1 }];
 				engine.start();
 				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 

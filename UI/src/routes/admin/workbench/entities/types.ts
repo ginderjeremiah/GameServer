@@ -105,9 +105,20 @@ export interface FieldsSectionConfig<T> extends BaseSection<T> {
 	fields: FieldConfig<T>[];
 }
 
+/** An opt-in bulk action rendered beside a {@link TableSectionConfig}'s Add button (e.g. "Even split"
+ *  equalizing a portion table's weights). `apply` mutates the section's rows in place inside the store
+ *  patch, so the change flows through the same dirty-tracking as a cell edit. */
+export interface TableActionConfig {
+	label: string;
+	glyph?: WorkbenchIconKind;
+	apply: (rows: Record<string, number>[]) => void;
+}
+
 export interface TableSectionConfig<T> extends BaseSection<T> {
 	kind: 'table';
 	itemsKey: keyof T & string;
+	/** Opt-in bulk actions rendered beside Add (shown only while the table has rows). */
+	actions?: TableActionConfig[];
 	/**
 	 * The row field that uniquely identifies a row within the collection — `id` for surrogate-id
 	 * collections (skill effects, item mod slots) and the natural key for attribute/relation tables

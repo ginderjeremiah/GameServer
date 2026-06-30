@@ -37,6 +37,159 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public void SetPortions_UnknownSkill_ReturnsNotFound()
+        {
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminSkills>();
+
+            var result = admin.SetPortions(new SetSkillPortionsData { Id = 99999, Changes = [] });
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Skill not found.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetPortions_NonPositiveWeight_ReturnsFailureWithoutPersisting()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                // CreateSkillAsync seeds a single full-weight Physical portion.
+                skillId = (await TestDataSeeder.CreateSkillAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var data = new SetSkillPortionsData
+            {
+                Id = skillId,
+                Changes =
+                [
+                    new Change<Contracts.SkillDamagePortion>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.SkillDamagePortion { Type = EDamageType.Fire, Weight = 0m },
+                    },
+                ],
+            };
+
+            using var writeScope = CreateScope();
+            var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+            var result = admin.SetPortions(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("A skill damage portion's weight must be positive.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetPortions_AddsEditsAndDeletes()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                // CreateSkillAsync seeds a single full-weight Physical portion; edit it and split in a Fire portion.
+                skillId = (await TestDataSeeder.CreateSkillAsync(context)).Id;
+                // Seed a Water portion to delete.
+                context.SkillDamagePortions.Add(new Entities.SkillDamagePortion
+                {
+                    SkillId = skillId,
+                    DamageType = (int)EDamageType.Water,
+                    Weight = 1m,
+                });
+                await context.SaveChangesAsync();
+            }
+            await ReloadReferenceCachesAsync();
+
+            var data = new SetSkillPortionsData
+            {
+                Id = skillId,
+                Changes =
+                [
+                    new Change<Contracts.SkillDamagePortion>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.SkillDamagePortion { Type = EDamageType.Fire, Weight = 0.4m },
+                    },
+                    new Change<Contracts.SkillDamagePortion>
+                    {
+                        ChangeType = EChangeType.Edit,
+                        Item = new Contracts.SkillDamagePortion { Type = EDamageType.Physical, Weight = 0.6m },
+                    },
+                    new Change<Contracts.SkillDamagePortion>
+                    {
+                        ChangeType = EChangeType.Delete,
+                        Item = new Contracts.SkillDamagePortion { Type = EDamageType.Water, Weight = 1m },
+                    },
+                ],
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                Assert.True(admin.SetPortions(data).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var portions = await context.SkillDamagePortions
+                    .Where(p => p.SkillId == skillId)
+                    .ToListAsync(CancellationToken);
+
+                Assert.Equal(2, portions.Count);
+                Assert.DoesNotContain(portions, p => p.DamageType == (int)EDamageType.Water);
+                Assert.Equal(0.6m, portions.Single(p => p.DamageType == (int)EDamageType.Physical).Weight);
+                Assert.Equal(0.4m, portions.Single(p => p.DamageType == (int)EDamageType.Fire).Weight);
+            }
+        }
+
+        [Fact]
+        public async Task SetPortions_AddOfAlreadyPresentType_Upserts()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await TestDataSeeder.CreateSkillAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // An Add of the Physical portion the skill already has must upsert, not duplicate-insert into a
+            // composite-PK violation at commit.
+            var data = new SetSkillPortionsData
+            {
+                Id = skillId,
+                Changes =
+                [
+                    new Change<Contracts.SkillDamagePortion>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.SkillDamagePortion { Type = EDamageType.Physical, Weight = 3m },
+                    },
+                ],
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                Assert.True(admin.SetPortions(data).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var portion = Assert.Single(await context.SkillDamagePortions
+                    .Where(p => p.SkillId == skillId)
+                    .ToListAsync(CancellationToken));
+                Assert.Equal((int)EDamageType.Physical, portion.DamageType);
+                Assert.Equal(3m, portion.Weight);
+            }
+        }
+
+        [Fact]
         public async Task SetEffects_AddsEditsAndDeletes()
         {
             int skillId, editedEffectId, removedEffectId;
@@ -295,6 +448,7 @@ namespace Game.Application.Tests.DataAccess
                 Translation = "",
                 RarityId = rarity,
                 Acquisition = ESkillAcquisition.Player,
+                DamagePortions = [new Contracts.SkillDamagePortion { Type = EDamageType.Physical, Weight = 1m }],
                 DamageMultipliers = [],
                 Effects = [],
             };

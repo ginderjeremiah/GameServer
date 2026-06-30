@@ -79,7 +79,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
-			damageType: EDamageType.Physical,
+			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 			acquisition: ESkillAcquisition.Player,
 			description: '',
 			damageMultipliers: [],
@@ -157,6 +157,66 @@ describe('skillEntity', () => {
 		expect(effects.count?.(filled)).toBe(2);
 	});
 
+	it('portions newRow picks the first free damage type with a default weight of 1', () => {
+		// Physical (id 0) is already taken by the default portion, so the first free type (Fire, id 1) is chosen.
+		expect(tableSection('portions').newRow(skillEntity.newItem(1))).toEqual({ type: EDamageType.Fire, weight: 1 });
+	});
+
+	it('portions warn flags an empty set and non-positive weights', () => {
+		const portions = tableSection('portions');
+		expect(portions.warn?.({ ...skillEntity.newItem(1), damagePortions: [] })).toBe('No damage portions');
+		expect(
+			portions.warn?.({ ...skillEntity.newItem(1), damagePortions: [{ type: EDamageType.Fire, weight: 0 }] })
+		).toBe('Portion weights must be positive');
+		// A valid single full-weight portion warns nothing.
+		expect(portions.warn?.(skillEntity.newItem(1))).toBeNull();
+	});
+
+	it('portions "Even split" action equalizes every weight to 1', () => {
+		const action = tableSection('portions').actions?.[0];
+		expect(action?.label).toBe('Even split');
+		const rows = [
+			{ type: EDamageType.Physical, weight: 3 },
+			{ type: EDamageType.Fire, weight: 1 }
+		];
+		action?.apply(rows);
+		expect(rows).toEqual([
+			{ type: EDamageType.Physical, weight: 1 },
+			{ type: EDamageType.Fire, weight: 1 }
+		]);
+	});
+
+	it('persist saves the portions when only portions change, against the SetSkillPortions endpoint', async () => {
+		const baseline: ISkill = {
+			...skillEntity.newItem(0),
+			id: 0,
+			name: 'Flame Slash',
+			description: 'desc',
+			damagePortions: [{ type: EDamageType.Physical, weight: 1 }]
+		};
+		// Split the hit 60/40 physical/fire.
+		const record: ISkill = {
+			...baseline,
+			damagePortions: [
+				{ type: EDamageType.Physical, weight: 0.6 },
+				{ type: EDamageType.Fire, weight: 0.4 }
+			]
+		};
+		socket.skills = [record];
+
+		await skillEntity.persist({ added: [], modified: [{ record, baseline }], deleted: [], existingIds: [0] });
+
+		// Identity / multipliers / effects untouched → only the portions endpoint is hit.
+		expect(postBodyTo('AdminTools/AddEditSkills')).toBeUndefined();
+		expect(postBodyTo('AdminTools/SetSkillPortions')).toMatchObject({
+			id: 0,
+			changes: [
+				{ changeType: EChangeType.Edit, item: { type: EDamageType.Physical, weight: 0.6 } },
+				{ changeType: EChangeType.Add, item: { type: EDamageType.Fire, weight: 0.4 } }
+			]
+		});
+	});
+
 	it('persist saves the effects when only effects change, without an identity Edit or a multipliers call', async () => {
 		const baseline: ISkill = {
 			id: 0,
@@ -168,7 +228,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
-			damageType: EDamageType.Physical,
+			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
@@ -199,7 +259,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
-			damageType: EDamageType.Physical,
+			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
@@ -232,7 +292,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
-			damageType: EDamageType.Physical,
+			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 			acquisition: ESkillAcquisition.Player,
 			description: 'Poisons the foe',
 			damageMultipliers: [],

@@ -1,4 +1,4 @@
-import { EChangeType, type IChange, type IItemModSlot, type ISkillEffect } from '$lib/api';
+import { EChangeType, type IChange, type IItemModSlot, type ISkillDamagePortion, type ISkillEffect } from '$lib/api';
 import type { Identified, SaveDiff } from './entities/types';
 
 /**
@@ -171,6 +171,35 @@ export function attributeChanges<K extends string, T extends AttributeRow & Reco
 	for (const row of base) {
 		if (!currentIds.has(row.attributeId)) {
 			changes.push({ changeType: EChangeType.Delete, item: { attributeId: row.attributeId, amount: row[valueKey] } });
+		}
+	}
+	return changes;
+}
+
+/**
+ * Diffs a skill's damage portions (keyed by leaf type, like {@link attributeChanges} is keyed by
+ * attribute) into Add/Edit/Delete changes of `{ type, weight }`.
+ */
+export function damagePortionChanges(
+	current: ISkillDamagePortion[],
+	baseline: ISkillDamagePortion[] | undefined
+): IChange<ISkillDamagePortion>[] {
+	const base = baseline ?? [];
+	const baseByType = new Map(base.map((row) => [row.type, row]));
+	const currentTypes = new Set(current.map((row) => row.type));
+	const changes: IChange<ISkillDamagePortion>[] = [];
+
+	for (const row of current) {
+		const previous = baseByType.get(row.type);
+		if (!previous) {
+			changes.push({ changeType: EChangeType.Add, item: { type: row.type, weight: row.weight } });
+		} else if (previous.weight !== row.weight) {
+			changes.push({ changeType: EChangeType.Edit, item: { type: row.type, weight: row.weight } });
+		}
+	}
+	for (const row of base) {
+		if (!currentTypes.has(row.type)) {
+			changes.push({ changeType: EChangeType.Delete, item: { type: row.type, weight: row.weight } });
 		}
 	}
 	return changes;

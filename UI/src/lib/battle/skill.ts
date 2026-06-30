@@ -3,13 +3,14 @@
 	IAttributeMultiplier,
 	ISkill,
 	ISkillEffect,
+	ISkillDamagePortion,
 	ESkillEffectTarget,
 	ESkillAcquisition,
 	EDamageType
 } from '$lib/api';
 import { Battler } from './battler';
 import { calculateSkillDamage, scaledEffectAmount, amplifiedDamage } from './battle-formulas';
-import { dotTypeForAccumulator } from './damage-types';
+import { dotTypeForAccumulator, primaryDamageType } from './damage-types';
 
 export class Skill implements ISkill {
 	id: number;
@@ -17,11 +18,11 @@ export class Skill implements ISkill {
 	baseDamage: number;
 	damageMultipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
+	// The weighted leaf-type split this skill's direct hits deal (#1343). Inert until the portion-aware
+	// pipeline (#1385) reads it; the interim single-type hit deals `primaryDamageType` below.
+	damagePortions: ISkillDamagePortion[];
 	description: string;
 	cooldownMs: number;
-	// The leaf damage type this skill's direct hits deal (#1320); the battle pipeline resolves it to the
-	// attacker's amplification and defender's resistance attributes via the `applies` map.
-	damageType: EDamageType;
 	iconPath: string;
 	// Carried to satisfy the ISkill contract this display-and-battle model implements; battle logic
 	// never reads provenance (the acquisition flag is authoring intent, not a combat input).
@@ -45,9 +46,9 @@ export class Skill implements ISkill {
 		this.baseDamage = data.baseDamage;
 		this.damageMultipliers = data.damageMultipliers;
 		this.effects = data.effects;
+		this.damagePortions = data.damagePortions;
 		this.description = data.description;
 		this.cooldownMs = data.cooldownMs;
-		this.damageType = data.damageType;
 		this.iconPath = data.iconPath;
 		this.acquisition = data.acquisition;
 		this.rarityId = data.rarityId;
@@ -55,6 +56,13 @@ export class Skill implements ISkill {
 		this.pronunciation = data.pronunciation;
 		this.translation = data.translation;
 		this.owner = owner;
+	}
+
+	/** The leaf type the display surfaces (icon/colour) and the interim single-type direct hit read as
+	 *  "the skill's type": the highest-weight portion, first-authored on a tie. Mirrors the backend
+	 *  `Skill.PrimaryDamageType`; derived (not stored) so it tracks the portion set. */
+	get primaryDamageType(): EDamageType {
+		return primaryDamageType(this.damagePortions);
 	}
 
 	public calculateDamage() {

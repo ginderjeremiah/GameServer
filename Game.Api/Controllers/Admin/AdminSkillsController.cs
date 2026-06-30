@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Game.Api.Controllers.Admin
 {
     /// <summary>
-    /// Admin Workbench endpoints for persisting skills, their damage multipliers, and their effects.
+    /// Admin Workbench endpoints for persisting skills, their damage portions, multipliers, and effects.
     /// A thin HTTP adapter over <see cref="IAdminSkills"/>. The route prefix is shared across every
     /// admin controller so the existing <c>/api/AdminTools/*</c> contract is preserved.
     /// </summary>
@@ -24,6 +24,12 @@ namespace Game.Api.Controllers.Admin
         public ApiResponse AddEditSkills([FromBody] List<Change<Skill>> changes)
         {
             return _adminSkills.SaveSkills(changes);
+        }
+
+        [HttpPost]
+        public ApiResponse SetSkillPortions([FromBody] SetSkillPortionsData changeData)
+        {
+            return _adminSkills.SetPortions(changeData);
         }
 
         [HttpPost]

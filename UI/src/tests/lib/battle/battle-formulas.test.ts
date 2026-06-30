@@ -21,7 +21,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	effects: [],
 	description: 'A basic slash',
 	cooldownMs: 1000,
-	damageType: EDamageType.Physical,
+	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 	iconPath: '/icons/slash.png',
 	rarityId: ERarity.Common,
 	word: '',

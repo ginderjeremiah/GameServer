@@ -11,7 +11,7 @@ const { mockStaticData, mockPlayerProficiencies, mockPlayerManager, mockInventor
 		mockStaticData: {
 			proficiencies: undefined as IProficiency[] | undefined,
 			paths: undefined as IPath[] | undefined,
-			skills: undefined as Record<number, { damageType: EDamageType }> | undefined
+			skills: undefined as Record<number, { damagePortions: { type: EDamageType; weight: number }[] }> | undefined
 		},
 		mockPlayerProficiencies: { all: [] as IPlayerProficiency[], error: false, load: vi.fn() },
 		mockPlayerManager: { selectedSkills: [] as number[] },
@@ -365,7 +365,10 @@ describe('ProficienciesView', () => {
 	beforeEach(() => {
 		mockStaticData.proficiencies = PROFICIENCIES;
 		mockStaticData.paths = PATHS;
-		mockStaticData.skills = { 100: { damageType: EDamageType.Fire }, 200: { damageType: EDamageType.Earth } };
+		mockStaticData.skills = {
+			100: { damagePortions: [{ type: EDamageType.Fire, weight: 1 }] },
+			200: { damagePortions: [{ type: EDamageType.Earth, weight: 1 }] }
+		};
 		mockPlayerProficiencies.all = PROGRESS;
 		mockPlayerProficiencies.error = false;
 		mockPlayerManager.selectedSkills = [100];

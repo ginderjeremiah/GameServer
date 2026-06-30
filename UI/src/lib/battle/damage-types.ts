@@ -12,12 +12,29 @@
    Iteration order is preserved from the generated tables because the damage math folds the amp/resist
    sums — and the DoT types — in that order, and float addition is not associative (a parity contract). */
 
-import { EAttribute, EDamageType, EDamageTypeKey } from '$lib/api';
+import { EAttribute, EDamageType, EDamageTypeKey, type ISkillDamagePortion } from '$lib/api';
 import {
 	DAMAGE_TYPE_APPLIES,
 	DAMAGE_TYPE_KEY_ATTRIBUTES,
 	DAMAGE_TYPE_DOT_ACCUMULATORS
 } from '$lib/api/types/damage-types';
+
+/** The "primary" leaf type of a weighted damage-portion set (spike #1343): the highest-weight portion,
+ *  the first in authored order on a tie. Falls back to `Physical` for a malformed empty set. Feeds the
+ *  display surfaces (icon/colour) and the interim single-type direct-hit call. Mirrors the backend
+ *  `Skill.PrimaryDamageType` — the strict `>` keeps the first portion winning a weight tie. */
+export function primaryDamageType(portions: readonly ISkillDamagePortion[]): EDamageType {
+	if (portions.length === 0) {
+		return EDamageType.Physical;
+	}
+	let primary = portions[0];
+	for (let i = 1; i < portions.length; i++) {
+		if (portions[i].weight > primary.weight) {
+			primary = portions[i];
+		}
+	}
+	return primary.type;
+}
 
 /** The amplification / resistance attribute pair a damage-type key backs. The resistance is `null` for an
  *  amplification-only weapon key (#1340) — a weapon hit mitigates via the shared `Physical` key instead. */

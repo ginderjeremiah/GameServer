@@ -119,7 +119,7 @@ namespace Game.Core.Tests.Battle
                     Id = 0,
                     Name = "Attack",
                     Description = "",
-                    DamageType = EDamageType.Physical,
+                    DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
                     CooldownMs = 1000,
                     BaseDamage = 10,
                     DamageMultipliers = [
@@ -150,7 +150,7 @@ namespace Game.Core.Tests.Battle
                     Id = 0,
                     Name = "Scratch",
                     Description = "",
-                    DamageType = EDamageType.Physical,
+                    DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
                     CooldownMs = 1500,
                     BaseDamage = 5,
                     DamageMultipliers = [],

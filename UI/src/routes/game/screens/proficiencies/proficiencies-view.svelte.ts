@@ -6,7 +6,7 @@
    arrive. The pure derivation lives in the framework-free module so it stays unit-testable without
    rendering. */
 
-import { applies } from '$lib/battle/damage-types';
+import { applies, primaryDamageType } from '$lib/battle/damage-types';
 import { inventoryManager, playerManager } from '$lib/engine';
 import { playerProficiencies, staticData } from '$stores';
 import { buildLexicon, representativeTier, type TierView } from './proficiencies-lexicon';
@@ -30,7 +30,9 @@ export class ProficienciesView {
 		// share numeric values with the activity keys, so they are compared directly against path.activityKey.
 		const firingActivityKeys = [...playerManager.selectedSkills, ...inventoryManager.grantedSkillIds].flatMap((id) => {
 			const skill = staticData.skills?.[id];
-			return skill ? applies(skill.damageType) : [];
+			// The skill's primary (highest-weight) portion type routes the training-state highlight; a
+			// multi-typed skill's secondary portions stay a #1385+ concern.
+			return skill ? applies(primaryDamageType(skill.damagePortions)) : [];
 		});
 		return buildLexicon(
 			staticData.proficiencies ?? [],

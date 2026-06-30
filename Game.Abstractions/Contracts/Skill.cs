@@ -10,14 +10,16 @@ namespace Game.Abstractions.Contracts
         public decimal BaseDamage { get; set; }
         public required IEnumerable<AttributeMultiplier> DamageMultipliers { get; set; }
         public required IEnumerable<SkillEffect> Effects { get; set; }
+
+        /// <summary>The weighted leaf-type split this skill's direct hits deal (spike #1343); see
+        /// <see cref="Core.Skills.Skill.DamagePortions"/>. Every skill carries at least one portion (existing
+        /// skills backfilled to <c>[{ Physical, 1.0 }]</c>).</summary>
+        public required IEnumerable<SkillDamagePortion> DamagePortions { get; set; }
+
         public required string Description { get; set; }
         public int CooldownMs { get; set; }
         public required string IconPath { get; set; }
         public ERarity RarityId { get; set; }
-
-        /// <summary>The leaf damage type this skill's direct hits deal (spike #1320); see
-        /// <see cref="Core.Skills.Skill.DamageType"/>. Backfills to <see cref="EDamageType.Physical"/>.</summary>
-        public EDamageType DamageType { get; set; }
 
         /// <summary>The skill's Aetheric conlang "word of power" (romanization rendered as glyphs, e.g.
         /// <c>sijren</c>), its <see cref="Pronunciation"/>, and its <see cref="Translation"/> — the decipher
