@@ -142,6 +142,60 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetAttributeDistributions_PersistsDamageTypeResistanceAndAmplification()
+        {
+            // Typed enemy combat (spike #1320, area D) is authored entirely through the existing distribution
+            // setter — a resistance/amplification is just another EAttribute row, so a fire-resistant or
+            // elemental-resistant enemy needs no model change, only that these damage-type attributes round-trip.
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var data = new SetEnemyAttributeDistributions
+            {
+                EnemyId = enemyId,
+                AttributeDistributions =
+                [
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.FireResistance, BaseAmount = 0.5m, AmountPerLevel = 0.01m },
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.ElementalResistance, BaseAmount = 0.25m, AmountPerLevel = 0m },
+                    new Contracts.AttributeDistribution { AttributeId = EAttribute.FireAmplification, BaseAmount = 0.2m, AmountPerLevel = 0m },
+                ],
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+                Assert.True(admin.SetAttributeDistributions(data).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var distributions = await context.AttributeDistributions
+                    .Where(ad => ad.EnemyId == enemyId)
+                    .ToListAsync(CancellationToken);
+
+                Assert.Equal(3, distributions.Count);
+
+                var fireResistance = distributions.Single(ad => ad.AttributeId == (int)EAttribute.FireResistance);
+                Assert.Equal(0.5m, fireResistance.BaseAmount);
+                Assert.Equal(0.01m, fireResistance.AmountPerLevel);
+
+                var elementalResistance = distributions.Single(ad => ad.AttributeId == (int)EAttribute.ElementalResistance);
+                Assert.Equal(0.25m, elementalResistance.BaseAmount);
+
+                var fireAmplification = distributions.Single(ad => ad.AttributeId == (int)EAttribute.FireAmplification);
+                Assert.Equal(0.2m, fireAmplification.BaseAmount);
+            }
+        }
+
+        [Fact]
         public async Task SetSkills_DeletesRemovedAndInsertsNew_LeavingUnchangedJoinRows()
         {
             int enemyId, keptSkillId, removedSkillId, addedSkillId;
