@@ -778,6 +778,46 @@ describe('BattleEngine', () => {
 
 				expect(events).toContainEqual({ target: 'player', kind: 'dodge' });
 			});
+
+			it('floats an enemy reflection back over the player, untyped, with the returned amount (#1330)', () => {
+				engine.start();
+				// The enemy reflects 0.5 of the player's hit and is bulky enough to survive it, so the player takes
+				// the returned damage — the float spawns over the player (the original attacker).
+				enemyLoadedCallbacks[0]({
+					id: 1,
+					level: 1,
+					seed: 0,
+					selectedSkills: [0],
+					attributes: [
+						{ attributeId: EAttribute.Endurance, amount: 200 },
+						{ attributeId: EAttribute.DamageReflection, amount: 0.5 }
+					]
+				});
+
+				logicalUpdateCallbacks[0](500);
+
+				const reflect = events.find((event) => event.kind === 'reflect');
+				expect(reflect).toMatchObject({ target: 'player', kind: 'reflect' });
+				expect(reflect?.amount).toBeGreaterThan(0);
+				// Reflected damage is raw/untyped, so the float never carries a damage type.
+				expect(reflect?.damageType).toBeUndefined();
+			});
+
+			it('floats a player reflection back over the enemy when the player reflects an incoming hit (#1330)', () => {
+				mockPlayerManager.attributes = [
+					{ attributeId: EAttribute.DamageReflection, amount: 0.5 },
+					{ attributeId: EAttribute.Endurance, amount: 30 },
+					{ attributeId: EAttribute.Strength, amount: 50 }
+				];
+				engine.start();
+				enemyLoadedCallbacks[0](tankyEnemy);
+
+				logicalUpdateCallbacks[0](500);
+
+				const reflect = events.find((event) => event.kind === 'reflect');
+				expect(reflect).toMatchObject({ target: 'enemy', kind: 'reflect' });
+				expect(reflect?.amount).toBeGreaterThan(0);
+			});
 		});
 	});
 

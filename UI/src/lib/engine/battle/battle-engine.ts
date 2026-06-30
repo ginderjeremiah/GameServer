@@ -43,12 +43,13 @@ export const onBattleStageChanged = battleStageChangedHook.onNotified;
 /** One combat outcome surfaced for the fight screen's floating numbers. `target` is the battler the
  *  float spawns over (the side that was struck / defended); `kind` picks its label, and `amount` is the
  *  damage to show — omitted for a dodge, which has no number; a negative amount is an absorbed hit's net
- *  heal. `damageType` (present for every kind but `dodge`) tints the number and picks its type glyph
- *  (#1320, Area F). Player-only crit/dodge mirror the battle-step roll surface (the enemy never
- *  dodges/crits). */
+ *  heal. `damageType` (present for a damaging `hit`/`crit`) tints the number and picks its type glyph
+ *  (#1320, Area F); a `dodge` has no number and a `reflect` is raw/untyped, so both omit it. A `reflect`
+ *  (#1330) spawns over the original attacker — the side that took the returned damage — and carries no
+ *  type. Player-only crit/dodge mirror the battle-step roll surface (the enemy never dodges/crits). */
 export interface CombatFloatEvent {
 	target: 'player' | 'enemy';
-	kind: 'hit' | 'crit' | 'dodge';
+	kind: 'hit' | 'crit' | 'dodge' | 'reflect';
 	amount?: number;
 	damageType?: EDamageType;
 }
@@ -327,6 +328,9 @@ export class BattleEngine {
 				if (reflected > 0) {
 					const reflectOutcome: ReflectOutcome = byPlayer ? 'enemy-reflect' : 'player-reflect';
 					logMessage(ELogType.Damage, reflectLogMessage(reflectOutcome, reflected, this.enemy.name), reflectOutcome);
+					// Float the returned damage over the original attacker (the side that took it): a player hit
+					// reflected by the enemy lands back on the player, an enemy hit reflected by the player on the enemy.
+					notifyCombatFloat({ target: byPlayer ? 'player' : 'enemy', kind: 'reflect', amount: reflected });
 				}
 			}
 			this.logEffectApplications();
