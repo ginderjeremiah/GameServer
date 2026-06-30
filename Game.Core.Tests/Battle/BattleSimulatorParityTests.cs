@@ -1007,6 +1007,46 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 360),
+
+                // ── Weapon-match gate + virtual-fists punch (#1342) ──────────────────────────
+                // The fielded skill set is filtered by the equipped weapon at battler assembly (setup-time,
+                // never on the tick loop), identically FE/BE. These pin that the gate changes the battle outcome.
+
+                // A Sword is wielded: the selected Axe skill is off-weapon (dormant) and never fires; only the
+                // sword's own-type signature does. Signature 28/hit (no Toughness, cooldown 400) drops the 100-HP
+                // enemy on hit 4 at tick 40 → 1600ms. (Were the Axe skill — 28/hit — not dimmed, the pair would
+                // deal 56/tick and kill on hit 2 at 800ms, so the gate is decisive.)
+                ["weaponGateDimsOffWeaponSelected"] = new ParityScenario(
+                    Player: () => MakeBattlerWithWeapon(
+                        strength: 0, weaponType: EDamageType.Sword, weaponGrantedSkillId: 2,
+                        selectedSkillIds: [1],
+                        skillPool:
+                        [
+                            MakeSkill(1, baseDamage: 28, cooldownMs: 400, damageType: EDamageType.Axe),
+                            MakeSkill(2, baseDamage: 28, cooldownMs: 400, damageType: EDamageType.Sword),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
+                // Bare-handed: the virtual-fists punch (PunchSkillId) is fielded alongside an agnostic selected
+                // skill. Selected Physical 16/hit + punch (Unarmed) 24/hit fire together (cooldown 400) for
+                // 40/tick; the 100-HP enemy dies on the tick-30 volley → 1200ms. (The agnostic skill alone —
+                // 16/tick — would win only on hit 7 at 2800ms, so fielding punch bare-handed is decisive.)
+                ["bareHandsPunchFieldsAlongsideAgnostic"] = new ParityScenario(
+                    Player: () => MakeBattlerBareHanded(
+                        strength: 0,
+                        selectedSkillIds: [1],
+                        skillPool:
+                        [
+                            MakeSkill(1, baseDamage: 16, cooldownMs: 400, damageType: EDamageType.Physical),
+                            MakeSkill(GameConstants.PunchSkillId, baseDamage: 24, cooldownMs: 400, damageType: EDamageType.Unarmed),
+                        ]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
             };
 
         /// <summary>A duration long enough that an effect never expires within a battle (for "permanent" buffs).</summary>
@@ -1263,7 +1303,10 @@ namespace Game.Core.Tests.Battle
             return snapshot.ToBattler(
                 id => itemsById[id],
                 _ => throw new InvalidOperationException("No mods are applied in the granted-skill scenarios."),
-                id => skillsById[id]);
+                // Null (not throw) for an unresolved id so the bare-hands punch the weapon-match gate appends
+                // (these grant items are accessories, never a weapon) is simply dropped — these scenarios pre-date
+                // the punch and seed no punch skill, so they field exactly their selected + granted skills.
+                id => skillsById.GetValueOrDefault(id));
         }
 
         private static Item GrantItem(int id, int grantedSkillId) => new()
@@ -1277,6 +1320,68 @@ namespace Game.Core.Tests.Battle
             Attributes = [],
             ModSlots = [],
         };
+
+        /// <summary>
+        /// Builds a player Battler through the snapshot path with a <see cref="EItemCategory.Weapon"/> equipped
+        /// (its <paramref name="weaponType"/> + <paramref name="weaponGrantedSkillId"/> signature), exercising the
+        /// weapon-match gate (spike #1342): a selected skill whose type is an off-weapon leaf goes dormant, while
+        /// the weapon's own-type signature and any agnostic skills field. The frontend mirrors this by passing the
+        /// same weapon type + the signature in its granted ids.
+        /// </summary>
+        private static Battler MakeBattlerWithWeapon(
+            double strength, EDamageType weaponType, int weaponGrantedSkillId,
+            List<int> selectedSkillIds, List<Skill> skillPool)
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [new StatAllocation { Attribute = EAttribute.Strength, Amount = strength }],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 200, AppliedModIds = [] }],
+                SkillIds = selectedSkillIds,
+            };
+
+            var weapon = new Item
+            {
+                Id = 200,
+                Name = "Weapon",
+                Description = string.Empty,
+                Category = EItemCategory.Weapon,
+                Rarity = ERarity.Common,
+                WeaponType = weaponType,
+                GrantedSkillId = weaponGrantedSkillId,
+                Attributes = [],
+                ModSlots = [],
+            };
+            var skillsById = skillPool.ToDictionary(s => s.Id);
+
+            return snapshot.ToBattler(
+                _ => weapon,
+                _ => throw new InvalidOperationException("No mods are applied in the weapon-gate scenarios."),
+                id => skillsById.GetValueOrDefault(id));
+        }
+
+        /// <summary>
+        /// Builds a player Battler through the snapshot path with no weapon equipped, so the weapon-match gate
+        /// appends the virtual-fists punch (<see cref="GameConstants.PunchSkillId"/>) — resolved from
+        /// <paramref name="skillPool"/> — as the bare-hands signature alongside the (Unarmed/agnostic) selected
+        /// skills. The frontend mirrors this by passing the punch id in its granted ids with an Unarmed weapon type.
+        /// </summary>
+        private static Battler MakeBattlerBareHanded(double strength, List<int> selectedSkillIds, List<Skill> skillPool)
+        {
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [new StatAllocation { Attribute = EAttribute.Strength, Amount = strength }],
+                EquippedItems = [],
+                SkillIds = selectedSkillIds,
+            };
+            var skillsById = skillPool.ToDictionary(s => s.Id);
+
+            return snapshot.ToBattler(
+                _ => throw new InvalidOperationException("No items are equipped in the bare-hands scenarios."),
+                _ => throw new InvalidOperationException("No mods are applied in the bare-hands scenarios."),
+                id => skillsById.GetValueOrDefault(id));
+        }
 
         private static ItemMod MakeMod(int id, EItemModType type, List<AttributeModifier> attributes) => new()
         {

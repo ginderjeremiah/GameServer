@@ -209,10 +209,15 @@ export class BattleEngine {
 		// already covers them; read the slot-ordered ids here so the rebuilt battler fields them. The locked
 		// base composes before the proficiency bonuses (the order the backend BattleSnapshot.GetModifiers uses)
 		// so the additive accumulation — and therefore the result down to the last bit — matches the replay.
-		this.player.reset(playerManager, equipmentStats, inventoryManager.grantedSkillIds, [
-			...lockedBaseModifiers,
-			...proficiencyModifiers
-		]);
+		// equippedWeaponType drives the weapon-match gate (#1342): only the player battler is gated; the enemy
+		// rebuild below passes no weapon type and fields its full authored loadout.
+		this.player.reset(
+			playerManager,
+			equipmentStats,
+			inventoryManager.grantedSkillIds,
+			[...lockedBaseModifiers, ...proficiencyModifiers],
+			inventoryManager.equippedWeaponType
+		);
 		// Compose the class signature passive LAST — after the locked base, proficiency bonuses, and the static
 		// engine modifiers the rebuild just assembled — so an attribute-scaled passive reads the fully-resolved
 		// value of its scaling attribute (snapshot state, like a skill effect reads its caster) and lands in the

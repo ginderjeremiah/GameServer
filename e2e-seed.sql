@@ -24,18 +24,30 @@
 -- never touched by it.
 
 -- Starter skills (ids 0/1/2 are the class kit granted on character creation, LoginController.CreatePlayer).
+-- Skill 3 is the virtual-fists "punch" (GameConstants.PunchSkillId, #1342): the bare-hands signature the
+-- weapon-match loadout gate fields when no weapon is equipped. It is NOT in the class kit (it is not a
+-- selectable/granted-by-item skill) — it comes online only through the gate's empty-weapon-slot path.
 INSERT INTO "Skills" ("Id", "Name", "BaseDamage", "Description", "CooldownMs", "IconPath") VALUES
   (0, 'Strike', 10, 'A basic physical attack.', 1000, ''),
   (1, 'Cleave', 8, 'A sweeping blow that favours raw power.', 1500, ''),
-  (2, 'Focus', 6, 'Channel energy into a sharper, magical hit.', 1200, '')
+  (2, 'Focus', 6, 'Channel energy into a sharper, magical hit.', 1200, ''),
+  (3, 'Punch', 4, 'A bare-handed strike.', 1000, '')
 ON CONFLICT ("Id") DO NOTHING;
 
 -- How each skill scales (Strength = 0, Intellect = 2 per EAttribute).
 INSERT INTO "SkillDamageMultipliers" ("SkillId", "AttributeId", "Multiplier") VALUES
   (0, 0, 1.0),
   (1, 0, 1.0),
-  (2, 2, 1.0)
+  (2, 2, 1.0),
+  (3, 0, 1.0)
 ON CONFLICT ("SkillId", "AttributeId") DO NOTHING;
+
+-- Punch's damage type: a single full-weight Unarmed portion (EDamageType.Unarmed = 13), so the weapon-match
+-- gate reads it as a weapon-leaf Unarmed skill and fields it only bare-handed (or with an Unarmed weapon).
+-- The other starter skills carry no portion row, defaulting to Physical (weapon-agnostic).
+INSERT INTO "SkillDamagePortions" ("SkillId", "DamageType", "Weight") VALUES
+  (3, 13, 1.0)
+ON CONFLICT ("SkillId", "DamageType") DO NOTHING;
 
 -- A starter class (id 0). Character creation requires a class (#1221): the select-screen create form
 -- sends a classId, which the API rejects unless it resolves to a live class, so the suite's

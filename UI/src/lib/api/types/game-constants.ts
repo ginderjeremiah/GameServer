@@ -5,5 +5,6 @@ export const DEFAULT_MAX_BATTLE_MS = 120000;
 export const EXP_PER_LEVEL = 100;
 export const MAX_SELECTED_SKILLS = 4;
 export const MS_PER_TICK = 40;
+export const PUNCH_SKILL_ID = 3;
 export const STAT_POINTS_PER_LEVEL = 2;
 export const TOUGHNESS_MITIGATION_CONSTANT = 20;
