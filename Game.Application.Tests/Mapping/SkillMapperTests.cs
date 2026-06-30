@@ -2,13 +2,15 @@ using Game.Core;
 using Game.DataAccess.Mapping;
 using Xunit;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
+using EntityPortion = Game.Infrastructure.Entities.SkillDamagePortion;
 
 namespace Game.Application.Tests.Mapping
 {
     /// <summary>
-    /// Coverage for <see cref="SkillMapper.ToContract"/>: the acquisition bitmask round-trips from the
-    /// entity's stored int to the contract's <see cref="ESkillAcquisition"/> flags. That field is part of
-    /// the client-visible contract, so it drives the skills reference-data version hash.
+    /// Coverage for <see cref="SkillMapper"/>: the acquisition bitmask and rarity round-trip from the entity's
+    /// stored ints to the contract enums, and the damage portions map to both the contract and the lean core
+    /// model (deriving <see cref="Game.Core.Skills.Skill.PrimaryDamageType"/>). These fields are part of the
+    /// client-visible contract, so they drive the skills reference-data version hash.
     /// </summary>
     public class SkillMapperTests
     {
@@ -41,6 +43,42 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(rarity, contract.RarityId);
         }
 
+        [Fact]
+        public void ToContract_MapsDamagePortions()
+        {
+            var entity = NewSkill(ESkillAcquisition.Player);
+            entity.SkillDamagePortions =
+            [
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Physical, Weight = 0.6m },
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Fire, Weight = 0.4m },
+            ];
+
+            var contract = SkillMapper.ToContract(entity);
+
+            Assert.Collection(contract.DamagePortions,
+                p => { Assert.Equal(EDamageType.Physical, p.Type); Assert.Equal(0.6m, p.Weight); },
+                p => { Assert.Equal(EDamageType.Fire, p.Type); Assert.Equal(0.4m, p.Weight); });
+        }
+
+        [Fact]
+        public void ToCore_MapsDamagePortionsAndDerivesPrimaryType()
+        {
+            var entity = NewSkill(ESkillAcquisition.Player);
+            entity.SkillDamagePortions =
+            [
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Physical, Weight = 0.4m },
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Fire, Weight = 0.6m },
+            ];
+
+            var core = SkillMapper.ToCore(entity);
+
+            Assert.Collection(core.DamagePortions,
+                p => { Assert.Equal(EDamageType.Physical, p.Type); Assert.Equal(0.4, p.Weight); },
+                p => { Assert.Equal(EDamageType.Fire, p.Type); Assert.Equal(0.6, p.Weight); });
+            // The highest-weight portion drives the derived primary type.
+            Assert.Equal(EDamageType.Fire, core.PrimaryDamageType);
+        }
+
         private static EntitySkill NewSkill(ESkillAcquisition acquisition, ERarity rarity = ERarity.Common) => new()
         {
             Id = 0,
@@ -54,6 +92,7 @@ namespace Game.Application.Tests.Mapping
             CooldownMs = 1000,
             RarityId = (int)rarity,
             Acquisition = (int)acquisition,
+            SkillDamagePortions = [],
             SkillDamageMultipliers = [],
             SkillEffects = [],
         };

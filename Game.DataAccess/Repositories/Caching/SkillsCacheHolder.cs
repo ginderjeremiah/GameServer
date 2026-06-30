@@ -27,6 +27,7 @@ namespace Game.DataAccess.Repositories.Caching
         {
             var entities = await context.Skills
                 .AsNoTracking()
+                .Include(s => s.SkillDamagePortions)
                 .Include(s => s.SkillDamageMultipliers)
                 .Include(s => s.SkillEffects)
                 .AsSplitQuery()

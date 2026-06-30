@@ -20,7 +20,7 @@ export const makeSkill = (owner: Battler, over: Partial<ISkill> = {}): Skill =>
 			word: '',
 			pronunciation: '',
 			translation: '',
-			damageType: EDamageType.Physical,
+			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 			acquisition: ESkillAcquisition.Player,
 			...over
 		},

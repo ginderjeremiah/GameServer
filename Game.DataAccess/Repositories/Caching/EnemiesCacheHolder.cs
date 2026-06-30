@@ -47,6 +47,7 @@ namespace Game.DataAccess.Repositories.Caching
             // stale — or not-yet-loaded — skill snapshot.
             var skills = await context.Skills
                 .AsNoTracking()
+                .Include(s => s.SkillDamagePortions)
                 .Include(s => s.SkillDamageMultipliers)
                 .Include(s => s.SkillEffects)
                 .AsSplitQuery()

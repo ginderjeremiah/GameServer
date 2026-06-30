@@ -8,10 +8,10 @@ using Xunit;
 
 namespace Game.Application.Tests.DataAccess
 {
-    public class AttributeChangeSetProcessorTests
+    public class KeyedChangeSetProcessorTests
     {
-        // Stands in for the three real attribute-keyed entities (ItemAttribute / ItemModAttribute /
-        // SkillDamageMultiplier), which differ only in their FK and Amount/Multiplier property name.
+        // Stands in for the real composite-key-keyed child entities (ItemAttribute / ItemModAttribute /
+        // SkillDamageMultiplier / SkillDamagePortion), which differ only in their FK and value property name.
         private sealed record TestEntity(int AttributeId, decimal Amount);
 
         private static Change<BattlerAttribute> Change(EChangeType type, EAttribute attribute, decimal amount) => new()
@@ -25,7 +25,8 @@ namespace Game.Application.Tests.DataAccess
             IReadOnlyCollection<TestEntity> existing,
             RecordingEntityStore store)
         {
-            return AttributeChangeSetProcessor.Apply(changes, existing,
+            return KeyedChangeSetProcessor.Apply(changes, existing,
+                itemKey: a => (int)a.AttributeId,
                 existingKey: e => e.AttributeId,
                 toEntity: a => new TestEntity((int)a.AttributeId, a.Amount),
                 store,

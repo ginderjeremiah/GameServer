@@ -804,7 +804,7 @@ namespace Game.Core.Tests.Battle
             Name = $"Skill {id}",
             BaseDamage = 1,
             Description = string.Empty,
-            DamageType = EDamageType.Physical,
+            DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = 1000,
             DamageMultipliers = [],
             Effects = [],

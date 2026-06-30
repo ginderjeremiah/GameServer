@@ -236,7 +236,7 @@ namespace Game.Core.Tests.Battle
             Id = 1,
             Name = "Test Skill",
             Description = string.Empty,
-            DamageType = EDamageType.Physical,
+            DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = cooldownMs,
             BaseDamage = baseDamage,
             DamageMultipliers = multipliers ?? [],

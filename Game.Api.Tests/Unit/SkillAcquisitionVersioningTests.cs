@@ -29,6 +29,7 @@ namespace Game.Api.Tests.Unit
             BaseDamage = 1m,
             DamageMultipliers = [],
             Effects = [],
+            DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1m }],
             Description = "",
             IconPath = "",
             Word = "",

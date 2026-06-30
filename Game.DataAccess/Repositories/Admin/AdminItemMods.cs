@@ -66,7 +66,8 @@ namespace Game.DataAccess.Repositories.Admin
 
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded ItemMod
             // back-reference would drag the whole graph into the change tracker).
-            return AttributeChangeSetProcessor.Apply(data.Changes, itemMod.ItemModAttributes,
+            return KeyedChangeSetProcessor.Apply(data.Changes, itemMod.ItemModAttributes,
+                itemKey: attribute => (int)attribute.AttributeId,
                 existingKey: att => att.AttributeId,
                 toEntity: attribute => new Entities.ItemModAttribute
                 {

@@ -302,7 +302,7 @@ export class BattleEngine {
 				this.stepLog
 			)) {
 				const outcome = damageLogOutcome(byPlayer, crit, dodged);
-				const damageType = skill.damageType;
+				const damageType = skill.primaryDamageType;
 				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged hit
 				// never resolved, so it can't be resisted). Computed here, not in the parity-critical battleStep,
 				// so the headless simulator stays byte-identical — like the existing crit/dodge log flags.

@@ -19,13 +19,42 @@
         public required int CooldownMs { get; init; }
 
         /// <summary>
-        /// The leaf damage type this skill's direct hits deal (spike #1320). The damage pipeline resolves it
-        /// to the attacker's amplification and defender's resistance attributes through
-        /// <see cref="Attributes.DamageTypes.Applies"/>; an untyped pre-feature skill backfills to
-        /// <see cref="EDamageType.Physical"/>, whose amp/resist attributes default to <c>0</c> (no behaviour
-        /// change until typed content is authored).
+        /// The weighted leaf-type split this skill's direct hits deal (spike #1343). A hit's raw damage is
+        /// split across these portions by weight; each portion runs the single-type pipeline under its own
+        /// type. A single-portion skill is byte-for-byte the pre-feature single-typed hit. The split is inert
+        /// until the portion-aware battle pipeline (#1385) reads it; <see cref="PrimaryDamageType"/> feeds the
+        /// display surfaces (and the interim single-type direct-hit call) that still want "the skill's type".
+        /// Every skill carries at least one portion (existing skills backfilled to <c>[{ Physical, 1.0 }]</c>).
         /// </summary>
-        public required EDamageType DamageType { get; init; }
+        public required IReadOnlyList<SkillDamagePortion> DamagePortions { get; init; }
+
+        /// <summary>
+        /// The leaf damage type the display surfaces (icon/colour) and the interim single-type direct-hit call
+        /// read as "the skill's type": the highest-weight portion, the first in authored order on a tie. Falls
+        /// back to <see cref="EDamageType.Physical"/> for a malformed skill carrying no portions, so a display
+        /// or battle read never throws.
+        /// </summary>
+        public EDamageType PrimaryDamageType
+        {
+            get
+            {
+                // Index loop with a strict '>' so the first portion wins a weight tie (first-authored), and so
+                // the read allocates nothing on the per-fire hot path.
+                if (DamagePortions.Count == 0)
+                {
+                    return EDamageType.Physical;
+                }
+                var primary = DamagePortions[0];
+                for (var i = 1; i < DamagePortions.Count; i++)
+                {
+                    if (DamagePortions[i].Weight > primary.Weight)
+                    {
+                        primary = DamagePortions[i];
+                    }
+                }
+                return primary.Type;
+            }
+        }
 
         public required IReadOnlyList<DamageMultiplier> DamageMultipliers { get; init; }
 

@@ -9,8 +9,8 @@ namespace Game.DataAccess.Mapping
 {
     internal static class SkillMapper
     {
-        /// <summary>Maps an entity <see cref="EntitySkill"/> (with its damage multipliers and effects loaded)
-        /// to the reference-data read <see cref="Contracts.Skill"/> contract.</summary>
+        /// <summary>Maps an entity <see cref="EntitySkill"/> (with its damage portions, damage multipliers and
+        /// effects loaded) to the reference-data read <see cref="Contracts.Skill"/> contract.</summary>
         public static Contracts.Skill ToContract(EntitySkill entity)
         {
             return new Contracts.Skill
@@ -22,11 +22,16 @@ namespace Game.DataAccess.Mapping
                 CooldownMs = entity.CooldownMs,
                 IconPath = entity.IconPath,
                 RarityId = (ERarity)entity.RarityId,
-                DamageType = (EDamageType)entity.DamageType,
                 Word = entity.Word,
                 Pronunciation = entity.Pronunciation,
                 Translation = entity.Translation,
                 Acquisition = (ESkillAcquisition)entity.Acquisition,
+                DamagePortions = entity.SkillDamagePortions
+                    .Select(p => new Contracts.SkillDamagePortion
+                    {
+                        Type = (EDamageType)p.DamageType,
+                        Weight = p.Weight,
+                    }).ToList(),
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new Contracts.AttributeMultiplier
                     {
@@ -50,8 +55,8 @@ namespace Game.DataAccess.Mapping
         }
 
         /// <summary>
-        /// Maps an entity <see cref="EntitySkill"/> (with its damage multipliers and effects loaded) to a
-        /// domain <see cref="Skill"/>.
+        /// Maps an entity <see cref="EntitySkill"/> (with its damage portions, damage multipliers and effects
+        /// loaded) to a domain <see cref="Skill"/>.
         /// </summary>
         public static Skill ToCore(EntitySkill entity)
         {
@@ -62,7 +67,12 @@ namespace Game.DataAccess.Mapping
                 BaseDamage = (double)entity.BaseDamage,
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
-                DamageType = (EDamageType)entity.DamageType,
+                DamagePortions = entity.SkillDamagePortions
+                    .Select(p => new SkillDamagePortion
+                    {
+                        Type = (EDamageType)p.DamageType,
+                        Weight = (double)p.Weight,
+                    }).ToList(),
                 DamageMultipliers = entity.SkillDamageMultipliers
                     .Select(sdm => new DamageMultiplier
                     {

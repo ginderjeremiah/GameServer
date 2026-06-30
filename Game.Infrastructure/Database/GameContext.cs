@@ -53,6 +53,7 @@ namespace Game.Infrastructure.Database
         public DbSet<Rarity> Rarities { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<Skill> Skills { get; set; }
+        public DbSet<SkillDamagePortion> SkillDamagePortions { get; set; }
         public DbSet<SkillDamageMultiplier> SkillDamageMultipliers { get; set; }
         public DbSet<SkillEffect> SkillEffects { get; set; }
         public DbSet<SkillRecipe> SkillRecipes { get; set; }
@@ -463,6 +464,15 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(s => s.Translation)
                     .HasMaxLength(100);
+            });
+
+            modelBuilder.Entity<SkillDamagePortion>(entity =>
+            {
+                // Composite key by (skill, type): a skill carries at most one portion per leaf type.
+                entity.HasKey(p => new { p.SkillId, p.DamageType });
+
+                entity.Property(p => p.Weight)
+                    .HasPrecision(18, 3);
             });
 
             modelBuilder.Entity<SkillDamageMultiplier>(entity =>

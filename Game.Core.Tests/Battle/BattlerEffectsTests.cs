@@ -316,7 +316,7 @@ namespace Game.Core.Tests.Battle
                 Id = 1,
                 Name = "Buff Strike",
                 Description = "",
-                DamageType = EDamageType.Physical,
+                DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
                 CooldownMs = 40,
                 BaseDamage = 0,
                 DamageMultipliers =

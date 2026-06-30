@@ -1115,7 +1115,7 @@ namespace Game.Core.Tests.Battle
                 Id = id,
                 Name = $"Skill {id}",
                 Description = "",
-                DamageType = damageType,
+                DamagePortions = [new SkillDamagePortion { Type = damageType, Weight = 1.0 }],
                 CooldownMs = cooldownMs,
                 BaseDamage = baseDamage,
                 DamageMultipliers = mult is null

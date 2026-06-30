@@ -56,15 +56,22 @@
 				{/each}
 			</tbody>
 		</table>
-		<button
-			type="button"
-			class="btn sm add-row"
-			onclick={add}
-			disabled={noFree}
-			title={noFree ? 'Every option is already assigned' : undefined}
-		>
-			<WorkbenchIcon kind="plus" size={12} />{section.addLabel}
-		</button>
+		<div class="table-actions">
+			<button
+				type="button"
+				class="btn sm"
+				onclick={add}
+				disabled={noFree}
+				title={noFree ? 'Every option is already assigned' : undefined}
+			>
+				<WorkbenchIcon kind="plus" size={12} />{section.addLabel}
+			</button>
+			{#each section.actions ?? [] as action (action.label)}
+				<button type="button" class="btn sm" onclick={() => mutateRows(action.apply)}>
+					{#if action.glyph}<WorkbenchIcon kind={action.glyph} size={12} />{/if}{action.label}
+				</button>
+			{/each}
+		</div>
 	</div>
 {/if}
 
@@ -129,7 +136,10 @@ const setCell = (i: number, key: string, value: number) => mutateRows((list) => 
 </script>
 
 <style lang="scss">
-.add-row {
+.table-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
 	margin-top: 12px;
 }
 </style>

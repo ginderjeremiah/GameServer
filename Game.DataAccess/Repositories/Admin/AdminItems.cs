@@ -220,7 +220,8 @@ namespace Game.DataAccess.Repositories.Admin
 
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded Item
             // back-reference would drag the whole graph into the change tracker).
-            return AttributeChangeSetProcessor.Apply(data.Changes, item.ItemAttributes,
+            return KeyedChangeSetProcessor.Apply(data.Changes, item.ItemAttributes,
+                itemKey: attribute => (int)attribute.AttributeId,
                 existingKey: att => att.AttributeId,
                 toEntity: attribute => new Entities.ItemAttribute
                 {

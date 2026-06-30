@@ -119,10 +119,10 @@ export function battleStep(
 		const raw = skill.calculateDamage();
 		// Attacker-side amplification, then crit, then the typed mitigation pipeline (resistance, Toughness curve
 		// scaled by the player's level).
-		const dealt = amplifiedDamage(raw, skill.damageType, player.attributes);
+		const dealt = amplifiedDamage(raw, skill.primaryDamageType, player.attributes);
 		const damage = enemy.takeDamage(
 			crit ? dealt * player.attributes.getValue(EAttribute.CriticalDamage) : dealt,
-			skill.damageType,
+			skill.primaryDamageType,
 			player.level
 		);
 		// Direct-hit reflection: the enemy (defender) returns its share to the player (attacker).
@@ -143,8 +143,8 @@ export function battleStep(
 			const raw = skill.calculateDamage();
 			// Attacker-side amplification reads the enemy (the attacker here); resistance + the Toughness curve
 			// (scaled by the enemy's level) read the player.
-			const dealt = amplifiedDamage(raw, skill.damageType, enemy.attributes);
-			const damage = dodged ? 0 : player.takeDamage(dealt, skill.damageType, enemy.level);
+			const dealt = amplifiedDamage(raw, skill.primaryDamageType, enemy.attributes);
+			const damage = dodged ? 0 : player.takeDamage(dealt, skill.primaryDamageType, enemy.level);
 			// Direct-hit reflection: the player (defender) returns its share to the enemy (attacker).
 			const reflected = reflectDamage(enemy, player, damage);
 			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, reflected });

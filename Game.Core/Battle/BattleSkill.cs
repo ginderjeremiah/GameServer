@@ -30,7 +30,10 @@ namespace Game.Core.Battle
                 // Record the actual post-crit/post-mitigation/block damage DamageTarget returns, so per-skill
                 // stats reconcile with the global stats (which DamageTarget also books) rather than the raw
                 // pre-mitigation value. Recording therefore has to follow the hit, not precede it.
-                var actualDamage = context.DamageTarget(damage, Skill.DamageType);
+                // Until the portion-aware pipeline (#1385) splits a hit across the skill's portions, the direct
+                // hit deals its single PrimaryDamageType — identical behaviour, since every skill currently has
+                // exactly one (Physical) portion.
+                var actualDamage = context.DamageTarget(damage, Skill.PrimaryDamageType);
                 context.RecordSkillUse(Skill.Id, actualDamage);
                 ApplyEffects(context);
             }
