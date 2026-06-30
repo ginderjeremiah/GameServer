@@ -261,6 +261,36 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveSkillRecipes_UnRetireRecipeIntoCollision_ReturnsFailure()
+        {
+            int r2Id, resultSkillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
+                // R1 is the live producer; R2 produces the same skill but is retired (inert, so allowed to coexist).
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId });
+                var r2 = new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow };
+                context.SkillRecipes.Add(r2);
+                await context.SaveChangesAsync(CancellationToken);
+                r2Id = r2.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminSkillRecipes>();
+
+            // Un-retiring R2 (RetiredAt cleared) brings a second live producer of the result back into circulation.
+            var result = admin.SaveSkillRecipes(
+            [
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Edit, Item = NewRecipe(id: r2Id, resultSkillId: resultSkillId) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("more than one active recipe", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveSkillRecipes_RetireProducerAndAddSameResultInOneBatch_Succeeds()
         {
             int r1Id, resultSkillId;
