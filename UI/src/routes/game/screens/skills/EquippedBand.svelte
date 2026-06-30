@@ -14,6 +14,7 @@
 	{#each slots as id, index (id ?? `empty-${index}`)}
 		{@const metrics = id != null ? view.metric(id) : undefined}
 		{#if id != null && metrics}
+			{@const dormant = view.dormant(metrics.skill)}
 			<!-- Accessible card: a presentational container whose primary action is a full-bleed
 			     OverlayButton (inspect the skill, or resolve a pending swap into this slot), with the
 			     remove button as a higher-z-index sibling and the drag handle on the overlay — native
@@ -24,6 +25,7 @@
 				class:swap-target={swapping}
 				class:dragging={view.dragIndex === index}
 				class:dragover={dragOverIndex === index}
+				class:dormant
 				ondragover={(e) => onDragOver(e, index)}
 				ondrop={(e) => onDrop(e, index)}
 			>
@@ -69,7 +71,12 @@
 					</div>
 				{/if}
 				<span class="en">{metrics.skill.name}</span>
-				<SkillCardStats {view} {metrics} />
+				{#if dormant}
+					<!-- Off-weapon: the skill stays saved but doesn't field until a matching weapon is held (#1342). -->
+					<DormantNote skill={metrics.skill} />
+				{:else}
+					<SkillCardStats {view} {metrics} />
+				{/if}
 			</div>
 		{:else}
 			<button type="button" class="eqcard empty" class:dimmed={swapping} onclick={() => focusAvailable()}>
@@ -83,6 +90,7 @@
 <script lang="ts">
 import OverlayButton from '$components/OverlayButton.svelte';
 import SkillCardStats from './SkillCardStats.svelte';
+import DormantNote from './DormantNote.svelte';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -206,6 +214,14 @@ const onDragEnd = () => {
 	&.dragover {
 		border-color: var(--accent);
 		box-shadow: 0 0 0 1px var(--accent);
+	}
+
+	// Off-weapon (dormant): the saved skill isn't fielded until a matching weapon is held. Dimmed and
+	// border-muted so it reads as inactive, while staying fully interactive (removable / reorderable).
+	&.dormant {
+		opacity: 0.55;
+		border-style: dashed;
+		border-color: var(--border-medium);
 	}
 
 	&.swap-target {
