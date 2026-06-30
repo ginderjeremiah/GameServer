@@ -13,10 +13,29 @@ namespace Game.Api.Tests.Unit
     /// <summary>
     /// Covers the post-admin-write reload gate: on a successful write the filter broadcasts the change and
     /// reloads every cache; a broadcast failure is swallowed so the local read-your-writes reload still runs;
-    /// and a faulted action skips both the broadcast and the reload entirely.
+    /// a faulted action skips both the broadcast and the reload entirely; and a wedged reload is cancelled and
+    /// surfaced as a <see cref="TimeoutException"/> rather than orphaned.
     /// </summary>
     public class AdminCacheReloadFilterTests
     {
+        private static ActionExecutingContext BuildExecutingContext()
+        {
+            var httpContext = new DefaultHttpContext();
+            var actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
+            return new ActionExecutingContext(actionContext, [], new Dictionary<string, object?>(), controller: new object());
+        }
+
+        private static ActionExecutedContext BuildExecutedContext(Exception? exception, bool exceptionHandled)
+        {
+            var httpContext = new DefaultHttpContext();
+            var actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
+            return new ActionExecutedContext(actionContext, [], controller: new object())
+            {
+                Exception = exception!,
+                ExceptionHandled = exceptionHandled,
+            };
+        }
+
         private static async Task<(int notified, int reloaded)> RunAsync(
             Exception? exception, bool exceptionHandled, bool broadcastThrows = false)
         {
@@ -24,16 +43,8 @@ namespace Game.Api.Tests.Unit
             var notifier = new RecordingNotifier(broadcastThrows);
             var filter = new AdminCacheReloadFilter([cache], notifier, NullLogger<AdminCacheReloadFilter>.Instance);
 
-            var httpContext = new DefaultHttpContext();
-            var actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
-            var executing = new ActionExecutingContext(actionContext, [], new Dictionary<string, object?>(), controller: new object());
-            var executed = new ActionExecutedContext(actionContext, [], controller: new object())
-            {
-                Exception = exception!,
-                ExceptionHandled = exceptionHandled,
-            };
-
-            await filter.OnActionExecutionAsync(executing, () => Task.FromResult(executed));
+            var executed = BuildExecutedContext(exception, exceptionHandled);
+            await filter.OnActionExecutionAsync(BuildExecutingContext(), () => Task.FromResult(executed));
 
             return (notifier.NotifyCount, cache.ReloadCount);
         }
@@ -64,14 +75,63 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(0, reloaded);
         }
 
+        [Fact]
+        public async Task PassesACancellableToken_ToEachReload()
+        {
+            // The reload must run under its own timeout-linked token (not CancellationToken.None) so a wedged
+            // query can be cancelled; assert the filter hands the cache a token that can actually be cancelled.
+            var cache = new RecordingCache();
+            var filter = new AdminCacheReloadFilter([cache], new RecordingNotifier(throws: false), NullLogger<AdminCacheReloadFilter>.Instance);
+
+            var executed = BuildExecutedContext(exception: null, exceptionHandled: false);
+            await filter.OnActionExecutionAsync(BuildExecutingContext(), () => Task.FromResult(executed));
+
+            Assert.True(cache.LastToken.CanBeCanceled);
+        }
+
+        [Fact]
+        public async Task ThrowsTimeoutAndCancelsTheReload_WhenAReloadWedges()
+        {
+            // A reload that never completes on its own must be cancelled by the timeout and surface as a
+            // TimeoutException — not hang or leave the query orphaned holding its gate.
+            var cache = new WedgedCache();
+            var filter = new AdminCacheReloadFilter(
+                [cache], new RecordingNotifier(throws: false), NullLogger<AdminCacheReloadFilter>.Instance,
+                reloadTimeout: TimeSpan.FromMilliseconds(50));
+
+            var executed = BuildExecutedContext(exception: null, exceptionHandled: false);
+
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => filter.OnActionExecutionAsync(BuildExecutingContext(), () => Task.FromResult(executed)));
+            // The reload's token must actually be cancelled on timeout (so its query/gate are released) rather
+            // than orphaned; awaiting the cancellation signal confirms it without racing on a plain flag.
+            await cache.Cancelled.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
         private sealed class RecordingCache : IReloadableReferenceCache
         {
             public int ReloadCount { get; private set; }
+            public CancellationToken LastToken { get; private set; }
 
             public Task ReloadAsync(CancellationToken cancellationToken = default)
             {
                 ReloadCount++;
+                LastToken = cancellationToken;
                 return Task.CompletedTask;
+            }
+        }
+
+        private sealed class WedgedCache : IReloadableReferenceCache
+        {
+            private readonly TaskCompletionSource _cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            // Completes when the reload's token is cancelled — i.e. the wedged reload was released, not orphaned.
+            public Task Cancelled => _cancelled.Task;
+
+            public async Task ReloadAsync(CancellationToken cancellationToken = default)
+            {
+                using var registration = cancellationToken.Register(() => _cancelled.TrySetResult());
+                await Task.Delay(Timeout.Infinite, cancellationToken);
             }
         }
 
