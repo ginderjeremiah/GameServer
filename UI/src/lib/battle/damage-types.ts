@@ -38,6 +38,14 @@ export function applies(type: EDamageType): readonly EDamageTypeKey[] {
 	return DAMAGE_TYPE_APPLIES[type];
 }
 
+/** Whether `type` is a weapon-type leaf (Sword/Axe/Bow/Club/Dagger/Unarmed): a non-Physical leaf that rolls
+ *  up under the shared `Physical` category key. Mirrors the backend's `DamageTypes.IsWeaponLeaf`, derived from
+ *  the same generated taxonomy table so the classification can't drift. The set a weapon's `Item.weaponType`
+ *  is constrained to (and what the weapon-match loadout gate keys on). */
+export function isWeaponLeaf(type: EDamageType): boolean {
+	return type !== EDamageType.Physical && applies(type).includes(EDamageTypeKey.Physical);
+}
+
 /** The amplification / resistance attribute pair the given `key` backs. */
 export function attributesForKey(key: EDamageTypeKey): DamageTypeKeyAttributes {
 	return DAMAGE_TYPE_KEY_ATTRIBUTES[key];

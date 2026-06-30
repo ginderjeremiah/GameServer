@@ -67,8 +67,34 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(requiredProficiencyLevel, core.RequiredProficiencyLevel);
         }
 
+        [Theory]
+        [InlineData(null)]
+        [InlineData((int)EDamageType.Sword)]
+        [InlineData((int)EDamageType.Unarmed)]
+        public void ToContract_RoundTripsWeaponType(int? weaponType)
+        {
+            var entity = NewItem(weaponType: weaponType);
+
+            var contract = ItemMapper.ToContract(entity);
+
+            Assert.Equal((EDamageType?)weaponType, contract.WeaponType);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData((int)EDamageType.Sword)]
+        [InlineData((int)EDamageType.Unarmed)]
+        public void ToCore_RoundTripsWeaponType(int? weaponType)
+        {
+            var entity = NewItem(weaponType: weaponType);
+
+            var core = ItemMapper.ToCore(entity);
+
+            Assert.Equal((EDamageType?)weaponType, core.WeaponType);
+        }
+
         private static EntityItem NewItem(int? grantedSkillId = null, int? requiredProficiencyId = null,
-            int requiredProficiencyLevel = 0) => new()
+            int requiredProficiencyLevel = 0, int? weaponType = null) => new()
             {
                 Id = 0,
                 Name = "Test",
@@ -77,6 +103,7 @@ namespace Game.Application.Tests.Mapping
                 ItemCategoryId = (int)EItemCategory.Weapon,
                 RarityId = (int)ERarity.Common,
                 GrantedSkillId = grantedSkillId,
+                WeaponType = weaponType,
                 RequiredProficiencyId = requiredProficiencyId,
                 RequiredProficiencyLevel = requiredProficiencyLevel,
                 ItemAttributes = [],

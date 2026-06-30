@@ -18,6 +18,7 @@ import {
 	type ITagCategory
 } from '$lib/api';
 import { enumPairs, hasFlag, rarityColor as rarityVar, rarityLabel, tagColor } from '$lib/common';
+import { isWeaponLeaf } from '$lib/battle/damage-types';
 import { staticData } from '$stores';
 import type { SelectOption } from './entities/types';
 
@@ -115,6 +116,15 @@ class WorkbenchReference {
 	rarityOptions = (): SelectOption[] => toOptions(enumPairs(ERarity));
 	/** Leaf damage-type picker options (the eight EDamageType leaf types) for the skill editor. */
 	damageTypeOptions = (): SelectOption[] => toOptions(enumPairs(EDamageType));
+	/**
+	 * Item weapon-type picker options: a "None" sentinel (-1) plus the weapon-leaf damage types
+	 * (Sword/Axe/Bow/Club/Dagger/Unarmed). Constrained to weapon leaves — a weapon's WeaponType must be one of
+	 * these and is required (with a granted skill); the backend enforces both on save as anti-tamper.
+	 */
+	weaponTypeOptions = (): SelectOption[] => [
+		{ value: -1, text: 'None' },
+		...toOptions(enumPairs(EDamageType).filter((p) => isWeaponLeaf(p.id as EDamageType)))
+	];
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
 	skillEffectTargetOptions = (): SelectOption[] => toOptions(enumPairs(ESkillEffectTarget));
 	modifierTypeOptions = (): SelectOption[] => toOptions(enumPairs(EModifierType));

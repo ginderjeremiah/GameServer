@@ -13,6 +13,11 @@
         /// persisted link (an optional FK).</summary>
         public int? GrantedSkillId { get; set; }
 
+        /// <summary>The <see cref="Core.EDamageType"/> weapon-leaf type this weapon deals, stored as its enum
+        /// value, or null for a non-weapon item. Only meaningful on a <see cref="Core.EItemCategory.Weapon"/>
+        /// item; the admin save requires a weapon to declare both this and a <see cref="GrantedSkillId"/>.</summary>
+        public int? WeaponType { get; set; }
+
         /// <summary>The proficiency that gates equipping this item, or null when the item is ungated. A
         /// navigation-less optional FK, like the zone unlock challenge. The player must have reached
         /// <see cref="RequiredProficiencyLevel"/> in this proficiency to equip the item.</summary>

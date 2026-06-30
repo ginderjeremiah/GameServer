@@ -1167,11 +1167,13 @@ namespace Game.Api.Tests.Integration
                     Item = new
                     {
                         Id = 0,
-                        Name = "Magic Sword",
-                        Description = "A blade humming with power",
-                        ItemCategoryId = (int)EItemCategory.Weapon,
+                        Name = "Magic Helm",
+                        Description = "A helm humming with power",
+                        // A non-weapon item, so the weapon no-stranding invariant doesn't require a weapon type
+                        // or granted skill — this test only exercises the generic add path.
+                        ItemCategoryId = (int)EItemCategory.Helm,
                         RarityId = (int)ERarity.Common,
-                        IconPath = "items/sword.png",
+                        IconPath = "items/helm.png",
                         Attributes = Array.Empty<object>(),
                         ModSlots = Array.Empty<object>(),
                         Tags = Array.Empty<int>()
@@ -1187,7 +1189,7 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
-            Assert.Contains(GetItems(), i => i.Name == "Magic Sword");
+            Assert.Contains(GetItems(), i => i.Name == "Magic Helm");
         }
 
         [Fact]
@@ -1733,7 +1735,7 @@ namespace Game.Api.Tests.Integration
                         Id = 0,
                         Name = "Ghost Item",
                         Description = "Should never be saved",
-                        ItemCategoryId = (int)EItemCategory.Weapon,
+                        ItemCategoryId = (int)EItemCategory.Helm,
                         RarityId = (int)ERarity.Common,
                         IconPath = "items/ghost.png",
                         Attributes = Array.Empty<object>(),
@@ -1749,7 +1751,7 @@ namespace Game.Api.Tests.Integration
                         Id = 999999,
                         Name = "Phantom",
                         Description = "x",
-                        ItemCategoryId = (int)EItemCategory.Weapon,
+                        ItemCategoryId = (int)EItemCategory.Helm,
                         RarityId = (int)ERarity.Common,
                         IconPath = "items/phantom.png",
                         Attributes = Array.Empty<object>(),

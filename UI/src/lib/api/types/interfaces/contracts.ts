@@ -120,6 +120,7 @@ export interface IItem {
 	modSlots: IItemModSlot[];
 	tags: number[];
 	grantedSkillId?: number;
+	weaponType?: EDamageType;
 	requiredProficiencyId?: number;
 	requiredProficiencyLevel: number;
 	retiredAt?: string;
