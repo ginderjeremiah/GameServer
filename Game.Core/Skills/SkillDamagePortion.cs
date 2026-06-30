@@ -6,7 +6,8 @@ namespace Game.Core.Skills
     /// so the stored weights are raw and authoring one portion never forces rebalancing the others — and each
     /// slice runs the existing single-type pipeline (amplify → crit → resist → Toughness) under its own
     /// <see cref="Type"/>. A single-portion skill reduces byte-for-byte to the pre-feature single-typed hit.
-    /// The split is inert data until the portion-aware battle pipeline (#1385) reads it.
+    /// The direct-hit pipeline (<see cref="Battle.BattleContext.DamageTarget"/>) splits a hit across these
+    /// portions (#1385).
     /// </summary>
     public sealed class SkillDamagePortion
     {

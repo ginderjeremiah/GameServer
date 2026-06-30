@@ -14,6 +14,7 @@ import {
 	type IItem,
 	type IItemMod,
 	type ISkill,
+	type ISkillDamagePortion,
 	type ISkillEffect
 } from '$lib/api';
 
@@ -29,13 +30,14 @@ import {
  * Battler resolves its skills by id exactly as it does in the running game.
  */
 
-/** A skill's raw definition, before it is registered and given an id. */
+/** A skill's raw definition, before it is registered and given an id. The weighted leaf-type split (#1343)
+ *  a direct hit deals; a single full-weight portion behaves identically to the pre-portions single-type hit. */
 export interface SkillSpec {
 	baseDamage: number;
 	cooldownMs: number;
 	multipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
-	damageType: EDamageType;
+	damagePortions: ISkillDamagePortion[];
 }
 
 export const makeSkill = (
@@ -44,7 +46,18 @@ export const makeSkill = (
 	multipliers: IAttributeMultiplier[] = [],
 	effects: ISkillEffect[] = [],
 	damageType: EDamageType = EDamageType.Physical
-): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects, damageType });
+): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects, damagePortions: [{ type: damageType, weight: 1 }] });
+
+/** A skill carrying a multi-typed weighted damage-portion split (#1343). Weights are stored raw and
+ *  normalized at fire time (`raw × weight ÷ Σweights`), so they need not sum to 1. Mirrors the backend
+ *  parity test's MakeMultiTypeSkill helper. */
+export const makeMultiTypeSkill = (
+	baseDamage: number,
+	cooldownMs: number,
+	damagePortions: ISkillDamagePortion[],
+	multipliers: IAttributeMultiplier[] = [],
+	effects: ISkillEffect[] = []
+): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects, damagePortions });
 
 /** A timed skill effect, mirroring the backend parity test's MakeEffect helper. The scaling fields
  *  default to no scaling (a `scalingAmount` of 0), so existing scenarios are unaffected. */
@@ -68,9 +81,9 @@ function registerSkill(registry: ISkill[], spec: SkillSpec): number {
 		name: `Skill ${id}`,
 		baseDamage: spec.baseDamage,
 		cooldownMs: spec.cooldownMs,
-		// The scenario's single type becomes one full-weight portion — its PrimaryDamageType, so behaviour
-		// is identical to the pre-portions single-type hit (#1343).
-		damagePortions: [{ type: spec.damageType, weight: 1 }],
+		// The skill's weighted leaf-type split (#1343); a single full-weight portion is identical to the
+		// pre-portions single-type hit.
+		damagePortions: spec.damagePortions,
 		damageMultipliers: spec.multipliers,
 		effects: spec.effects,
 		description: '',

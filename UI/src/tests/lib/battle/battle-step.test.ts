@@ -13,7 +13,7 @@ vi.mock('$stores', () => ({
 
 import { battleStep, type BattleStepLog } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
-import { battlerFactory, makeSkill, makeEffect } from './battle-sim-test-utils';
+import { battlerFactory, makeSkill, makeMultiTypeSkill, makeEffect } from './battle-sim-test-utils';
 
 const makeBattler = battlerFactory(mockSkills);
 // A throwaway RNG for the steps that exercise no crit/dodge (their chances are 0, so the draws never
@@ -387,6 +387,138 @@ describe('battleStep', () => {
 			reference.next();
 			reference.next();
 			expect(rng.next()).toBe(reference.next());
+		});
+	});
+
+	// Multi-typed direct hits: the raw hit splits across weighted portions, each run through the single-type
+	// pipeline and summed. Mirrors the backend BattleContextTests multi-portion block.
+	describe('multi-typed portion loop (#1343)', () => {
+		it('splits raw by weight and sums each portion’s net', () => {
+			// [Physical 60, Fire 40] of a raw-100 hit → 60 + 40 = 100 split; the enemy resists Fire 0.5 (Physical
+			// unresisted), no Toughness: 60 + 40×0.5 = 80. The enemy (Str 30 → MaxHealth 200) drops to 120.
+			const player = makeBattler(baseStats, [
+				makeMultiTypeSkill(100, 40, [
+					{ type: EDamageType.Physical, weight: 60 },
+					{ type: EDamageType.Fire, weight: 40 }
+				])
+			]);
+			const enemy = makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 30 },
+					{ id: EAttribute.FireResistance, amount: 0.5 }
+				],
+				[]
+			);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[0].damage).toBe(80);
+			expect(enemy.currentHealth).toBe(200 - 80);
+		});
+
+		it('multiplies every portion by a single crit', () => {
+			// CriticalDamage 1.5 + 0.5 = 2. One crit scales BOTH portions of [Physical 50, Fire 50] of raw 20 →
+			// 10 each, ×2 → 20 each = 40 (a per-portion-only crit would give 30).
+			const player = makeBattler(
+				[
+					{ id: EAttribute.CriticalChance, amount: 1 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
+				],
+				[
+					makeMultiTypeSkill(20, 40, [
+						{ type: EDamageType.Physical, weight: 50 },
+						{ type: EDamageType.Fire, weight: 50 }
+					])
+				]
+			);
+			const enemy = makeBattler([{ id: EAttribute.Strength, amount: 10 }], []);
+
+			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+			expect(activations[0].crit).toBe(true);
+			expect(activations[0].damage).toBe(40);
+			expect(enemy.currentHealth).toBe(100 - 40);
+		});
+
+		it('zeroes the whole multi-typed hit on a single dodge', () => {
+			// The enemy's [Physical 50, Fire 50] split of a 1000-damage hit is fully dodged — zeroing BOTH
+			// portions — so the 50-HP player takes nothing (one un-dodged portion would kill it).
+			const player = makeBattler([{ id: EAttribute.DodgeChance, amount: 1 }], []);
+			const enemy = makeBattler(baseStats, [
+				makeMultiTypeSkill(1000, 40, [
+					{ type: EDamageType.Physical, weight: 50 },
+					{ type: EDamageType.Fire, weight: 50 }
+				])
+			]);
+			const before = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+			expect(activations[0].byPlayer).toBe(false);
+			expect(activations[0].dodged).toBe(true);
+			expect(activations[0].damage).toBe(0);
+			expect(player.currentHealth).toBe(before);
+		});
+
+		it('applies per-portion vulnerability to only the matching portion', () => {
+			// [Physical 50, Fire 50] of raw 40 → 20 each; the enemy's −1.0 FireResistance doubles only the Fire
+			// portion (20 → 40), Physical stays 20: 60 total. The enemy (Str 26 → MaxHealth 180) drops to 120.
+			const player = makeBattler(baseStats, [
+				makeMultiTypeSkill(40, 40, [
+					{ type: EDamageType.Physical, weight: 50 },
+					{ type: EDamageType.Fire, weight: 50 }
+				])
+			]);
+			const enemy = makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 26 },
+					{ id: EAttribute.FireResistance, amount: -1.0 }
+				],
+				[]
+			);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[0].damage).toBe(60);
+			expect(enemy.currentHealth).toBe(180 - 60);
+		});
+
+		it('caps an absorbing portion’s heal at the room opened by the earlier portion', () => {
+			// [Physical 20, Fire 80] of raw 100 against an enemy absorbing Fire (FireResistance 2.0) at full HP:
+			// Physical deals 20 (100 → 80, opening 20 room), then the Fire portion's −80 absorption heal is capped
+			// at that 20 room (back to 100). Net 0 — the fixed Physical-first order is what lets the heal land.
+			const player = makeBattler(
+				[],
+				[
+					makeMultiTypeSkill(100, 40, [
+						{ type: EDamageType.Physical, weight: 20 },
+						{ type: EDamageType.Fire, weight: 80 }
+					])
+				]
+			);
+			const enemy = makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.FireResistance, amount: 2.0 }
+				],
+				[]
+			);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[0].damage).toBe(0);
+			expect(enemy.currentHealth).toBe(100); // 100 → 80 (Physical) → 100 (Fire heal capped at 20 room)
+		});
+
+		it('reduces a single non-unit-weight portion to the single-type hit', () => {
+			// raw × w ÷ w = raw exactly: a lone Fire portion at weight 2 of raw 20 deals 20 (no resistance).
+			const player = makeBattler(baseStats, [makeMultiTypeSkill(20, 40, [{ type: EDamageType.Fire, weight: 2 }])]);
+			const enemy = makeBattler([{ id: EAttribute.Strength, amount: 10 }], []);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[0].damage).toBe(20);
+			expect(enemy.currentHealth).toBe(100 - 20);
 		});
 	});
 });

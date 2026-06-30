@@ -27,8 +27,9 @@ namespace Game.Core
         /// A well-known seeded reference id like the starter-kit skills, mirrored to both simulators so they
         /// inject the identical fists' signature. A bare-handed battler only fields punch when this id resolves
         /// to a real skill (it is otherwise skipped), so the gate degrades gracefully if punch is unauthored.
+        /// Punch is the foundational, always-available skill, so it takes the first reference id (0).
         /// </summary>
-        public const int PunchSkillId = 3;
+        public const int PunchSkillId = 0;
 
         /// <summary>
         /// The <c>K</c> in the <see cref="EAttribute.Toughness"/> mitigation curve

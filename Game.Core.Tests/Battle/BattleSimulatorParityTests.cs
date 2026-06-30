@@ -1008,6 +1008,104 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 360),
 
+                // ── Multi-typed direct hits: weighted portion split (#1343 / #1385) ──────────
+                // A skill's raw is split across weighted portions (raw × weight ÷ Σweights), each run through the
+                // single-type pipeline under its own type and the nets summed. A single crit multiplies every
+                // portion; a single dodge zeroes the whole hit. All hand-computable; mirrored in the frontend suite.
+
+                // 60/40 split with resistance on only one type. A raw-100 hit splits into 60 Physical + 40 Fire;
+                // the enemy resists Fire 0.5 (Physical unresisted), no Toughness: 60 + 40×0.5 = 80/hit. The 250-HP
+                // enemy (Str 40) dies on hit 4 at tick 40 → 1600ms. (Un-resisted 100/hit would kill on hit 3 / 1200ms,
+                // so the per-portion Fire resistance is decisive.)
+                ["multiTypeSplitResistsOneType"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeMultiTypeSkill(1, baseDamage: 100, cooldownMs: 400,
+                            [(EDamageType.Physical, 60), (EDamageType.Fire, 40)])]),
+                    Enemy: () => MakeEnemy(
+                        strength: 40, endurance: 0, skills: [],
+                        extra: [(EAttribute.FireResistance, 0.5)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
+                // A single crit multiplies EVERY portion. Forced crit (CriticalDamage 1.5 + 0.5 = 2) on a [Physical
+                // 50, Fire 50] split of raw 20 → 10 each portion, ×2 → 20 each = 40/hit (no Toughness). The 100-HP
+                // enemy dies on hit 3 at tick 30 → 1200ms. A crit applied to only one portion (30/hit) would kill on
+                // hit 4 (1600ms), and no crit (20/hit) on hit 5 (2000ms) — so 1200ms pins the crit hitting both.
+                ["multiTypeCritAppliesToAllPortions"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills: [MakeMultiTypeSkill(1, baseDamage: 20, cooldownMs: 400,
+                            [(EDamageType.Physical, 50), (EDamageType.Fire, 50)])],
+                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
+                // A single dodge zeroes the WHOLE multi-typed hit. The enemy's [Physical 500, Fire 500] split of a
+                // 1000-damage hit would one-shot the 100-HP player, but the player's DodgeChance 1 negates every
+                // hit, so it survives and grinds the enemy down (20/hit, no Toughness) for the win on hit 5 at tick
+                // 50 → 2000ms. (Zeroing only one portion would leave 500 through and kill the player at tick 10.)
+                ["multiTypeDodgeZeroesWholeHit"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)],
+                        extra: [(EAttribute.DodgeChance, 1.0)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0,
+                        skills: [MakeMultiTypeSkill(2, baseDamage: 1000, cooldownMs: 400,
+                            [(EDamageType.Physical, 500), (EDamageType.Fire, 500)])]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
+                // Per-portion vulnerability (res < 0). A [Physical 50, Fire 50] split of raw 40 → 20 each; the enemy's
+                // −1.0 FireResistance doubles only the Fire portion (20 → 40), Physical stays 20: 60/hit. The 180-HP
+                // enemy (Str 26) dies on hit 3 at tick 30 → 1200ms. (No vulnerability — 40/hit — would kill on hit 5 /
+                // 2000ms, so the per-portion vulnerability is decisive.)
+                ["multiTypePerPortionVulnerability"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeMultiTypeSkill(1, baseDamage: 40, cooldownMs: 400,
+                            [(EDamageType.Physical, 50), (EDamageType.Fire, 50)])]),
+                    Enemy: () => MakeEnemy(
+                        strength: 26, endurance: 0, skills: [],
+                        extra: [(EAttribute.FireResistance, -1.0)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
+                // Per-portion absorption with the order-dependent heal cap. A [Physical 20, Fire 80] split of raw 100
+                // against an enemy absorbing Fire (FireResistance 2.0) at full health: the Physical portion deals 20
+                // (100 → 80, opening 20 room), then the Fire portion's −80 absorption heal is CAPPED at that 20 room
+                // (back to 100). Net 20 + (−20) = 0/hit, so the enemy never loses health and never dies — a timeout
+                // draw. The fixed Physical-first order is what lets the heal land; the cap binds (heal 80 vs room 20).
+                ["multiTypePerPortionAbsorptionCap"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0,
+                        skills: [MakeMultiTypeSkill(1, baseDamage: 100, cooldownMs: 400,
+                            [(EDamageType.Physical, 20), (EDamageType.Fire, 80)])]),
+                    Enemy: () => MakeEnemy(
+                        strength: 10, endurance: 0, skills: [],
+                        extra: [(EAttribute.FireResistance, 2.0)]),
+                    ExpectedVictory: false,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: GameConstants.DefaultMaxBattleMs),
+
+                // Reduce-to-single-portion identity for a non-unit weight: raw × w ÷ w = raw exactly. A lone Fire
+                // portion at weight 2 with no amp/resist deals 20/hit, so the 100-HP enemy dies on hit 5 → 2000ms —
+                // identical to typedFireNoModifiersUnchanged, proving a single portion (any weight) is the single-type hit.
+                ["singlePortionNonUnitWeightIdentity"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeMultiTypeSkill(1, baseDamage: 20, cooldownMs: 400, [(EDamageType.Fire, 2.0)])]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2000),
+
                 // ── Weapon-match gate + virtual-fists punch (#1342) ──────────────────────────
                 // The fielded skill set is filtered by the equipped weapon at battler assembly (setup-time,
                 // never on the tick loop), identically FE/BE. These pin that the gate changes the battle outcome.
@@ -1169,6 +1267,23 @@ namespace Game.Core.Tests.Battle
                         }
                     ],
                 Effects = effects ?? [],
+            };
+
+        /// <summary>
+        /// A skill carrying a multi-typed weighted damage-portion split (#1343). Weights are stored raw and
+        /// normalized at fire time (<c>raw × weight ÷ Σweights</c>), so they need not sum to 1.
+        /// </summary>
+        private static Skill MakeMultiTypeSkill(
+            int id, double baseDamage, int cooldownMs, (EDamageType Type, double Weight)[] portions) => new()
+            {
+                Id = id,
+                Name = $"Skill {id}",
+                Description = "",
+                DamagePortions = portions.Select(p => new SkillDamagePortion { Type = p.Type, Weight = p.Weight }).ToList(),
+                CooldownMs = cooldownMs,
+                BaseDamage = baseDamage,
+                DamageMultipliers = [],
+                Effects = [],
             };
 
         private static SkillEffect MakeEffect(

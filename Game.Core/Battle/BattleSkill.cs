@@ -27,13 +27,11 @@ namespace Game.Core.Battle
                 // applied — so a self damage-buff never boosts the hit that carries it, and an earlier
                 // loadout slot's effect does influence a later slot firing on the same tick.
                 var damage = CalculateDamage(context);
-                // Record the actual post-crit/post-mitigation/block damage DamageTarget returns, so per-skill
-                // stats reconcile with the global stats (which DamageTarget also books) rather than the raw
-                // pre-mitigation value. Recording therefore has to follow the hit, not precede it.
-                // Until the portion-aware pipeline (#1385) splits a hit across the skill's portions, the direct
-                // hit deals its single PrimaryDamageType — identical behaviour, since every skill currently has
-                // exactly one (Physical) portion.
-                var actualDamage = context.DamageTarget(damage, Skill.PrimaryDamageType);
+                // Record the actual post-crit/post-mitigation damage DamageTarget returns (the sum across the
+                // skill's weighted damage portions, #1343), so per-skill stats reconcile with the global stats
+                // (which DamageTarget also books) rather than the raw pre-mitigation value. Recording therefore
+                // has to follow the hit, not precede it.
+                var actualDamage = context.DamageTarget(damage, Skill.DamagePortions);
                 context.RecordSkillUse(Skill.Id, actualDamage);
                 ApplyEffects(context);
             }
