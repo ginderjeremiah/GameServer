@@ -147,9 +147,11 @@ namespace Game.Application.Services
             opened.Add(new ProficiencyOpened(proficiencyId));
         }
 
-        // Whether every prerequisite of the gated proficiency is at its cap on the player's current progress.
-        // A gateway opens only once all its themed prerequisites are maxed (the just-maxed one included, since
-        // its new level is already written through the progress aggregate before this runs).
+        // Whether every prerequisite of the gated proficiency is at its cap on the player's current progress —
+        // the shared "is this gateway unlocked" test. The open trigger uses it to decide a maxed proficiency
+        // newly satisfies a gateway (the just-maxed one's new level is already written through the progress
+        // aggregate before this runs), and the activity routing uses it to skip a still-locked gateway frontier.
+        // A proficiency with no prerequisites (a root or within-path tier) is trivially unlocked.
         private bool AllPrerequisitesMaxed(int gatedId, PlayerProgress progress)
         {
             foreach (var prerequisiteId in _proficiencies.GetProficiency(gatedId).PrerequisiteIds)
@@ -205,13 +207,18 @@ namespace Game.Application.Services
             AddEvent(EActivityKey.Heal, stats.PlayerDamageHealed);
             AddEvent(EActivityKey.Reflect, stats.PlayerReflectedDamageDealt);
 
-            // Route each key's activity to the frontier tier of every path bound to it.
+            // Route each key's activity to the frontier tier of every path bound to it — but only to a frontier
+            // the player has actually unlocked. Within-path tiers open implicitly as the prior tier maxes (the
+            // frontier scan already reflects that), but a path's first tier may be a cross-path gateway whose
+            // prerequisites must all be maxed first. Until then the path — an umbrella like Elemental, gated
+            // behind its leaf damage types — is locked, so the leaf-type activity rolling up into it (a fire hit
+            // routes to both Fire and Elemental) must not bank XP onto it; a locked frontier is skipped (#1411).
             var activities = new List<PathActivity>();
             foreach (var (activityKey, activity) in activityByKey)
             {
                 foreach (var path in _proficiencies.PathsForActivityKey(activityKey))
                 {
-                    if (path.Frontier(LevelOf) is { } frontier)
+                    if (path.Frontier(LevelOf) is { } frontier && AllPrerequisitesMaxed(frontier.ProficiencyId, progress))
                     {
                         activities.Add(new PathActivity(frontier.ProficiencyId, activity));
                     }
