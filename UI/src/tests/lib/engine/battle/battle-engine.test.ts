@@ -51,7 +51,11 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],
-			grantedSkillIds: [] as number[]
+			grantedSkillIds: [] as number[],
+			// The weapon-match gate's equipped weapon type (#1342), threaded to the player battler rebuild.
+			// Literal EDamageType.Unarmed (13) rather than the enum: this object lives in a hoisted vi.mock
+			// factory, where referencing the imported enum value at runtime throws (used before initialization).
+			equippedWeaponType: 13 as EDamageType
 		};
 		// The player's proficiency battle modifiers — a stable reference (the real store memoises via a
 		// `$derived`) the battle engine compares by identity, so reassigning it simulates a proficiency change.
@@ -487,12 +491,40 @@ describe('BattleEngine', () => {
 			expect(logMessage).not.toHaveBeenCalledWith(ELogType.Damage, expect.any(String));
 		});
 
-		it('accumulates timeElapsed', () => {
+		it('accumulates timeElapsed while a battle is active', () => {
 			engine.start();
+			// The battle clock advances only while a battle is live, so load an enemy to enter the Active
+			// stage. Slash charges for 500ms, so within these 300ms it never fires — the enemy stays alive
+			// and the engine stays Active.
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 			logicalUpdateCallbacks[0](100);
 			logicalUpdateCallbacks[0](200);
 
 			expect(engine.timeElapsed).toBe(300);
+		});
+
+		it('does not advance timeElapsed while idle (between battles / resting at Home)', () => {
+			engine.start();
+			// No enemy loaded, so the engine stays Idle. The clock must stay frozen — a value later read as
+			// an abandon's client-fought duration must reflect only real combat time, not time parked idle
+			// (e.g. resting in the no-combat Home zone, where the clock would otherwise drift up).
+			logicalUpdateCallbacks[0](100);
+			logicalUpdateCallbacks[0](200);
+
+			expect(engine.timeElapsed).toBe(0);
+		});
+
+		it('rest() stops the live battle: drops to Idle and clears the battle clock', () => {
+			engine.start();
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			logicalUpdateCallbacks[0](100);
+			expect(engine.timeElapsed).toBe(100);
+
+			// Parking in the no-combat Home zone stops the live fight outright.
+			engine.rest();
+
+			expect(engine.stage).toBe(BattleStage.Idle);
+			expect(engine.timeElapsed).toBe(0);
 		});
 
 		it('logs a skill-effect line when a skill applies a new effect', () => {
@@ -755,6 +787,25 @@ describe('BattleEngine', () => {
 				expect(hit?.damageType).toBe(EDamageType.Fire);
 			});
 
+			it("carries the skill's weighted split and its PrimaryDamageType on a multi-typed hit float (#1343)", () => {
+				mockSkills[0].damagePortions = [
+					{ type: EDamageType.Physical, weight: 60 },
+					{ type: EDamageType.Fire, weight: 40 }
+				];
+				engine.start();
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+				logicalUpdateCallbacks[0](500);
+
+				const hit = events.find((event) => event.target === 'enemy');
+				// The number reads as the highest-weight portion; the floater draws the bar from the full split.
+				expect(hit?.damageType).toBe(EDamageType.Physical);
+				expect(hit?.portions).toEqual([
+					{ type: EDamageType.Physical, weight: 60 },
+					{ type: EDamageType.Fire, weight: 40 }
+				]);
+			});
+
 			it('emits an enemy-targeted crit when the player crits', () => {
 				forcePlayerChance(EAttribute.CriticalChance);
 				engine.start();
@@ -773,6 +824,46 @@ describe('BattleEngine', () => {
 				logicalUpdateCallbacks[0](500);
 
 				expect(events).toContainEqual({ target: 'player', kind: 'dodge' });
+			});
+
+			it('floats an enemy reflection back over the player, untyped, with the returned amount (#1330)', () => {
+				engine.start();
+				// The enemy reflects 0.5 of the player's hit and is bulky enough to survive it, so the player takes
+				// the returned damage — the float spawns over the player (the original attacker).
+				enemyLoadedCallbacks[0]({
+					id: 1,
+					level: 1,
+					seed: 0,
+					selectedSkills: [0],
+					attributes: [
+						{ attributeId: EAttribute.Endurance, amount: 200 },
+						{ attributeId: EAttribute.DamageReflection, amount: 0.5 }
+					]
+				});
+
+				logicalUpdateCallbacks[0](500);
+
+				const reflect = events.find((event) => event.kind === 'reflect');
+				expect(reflect).toMatchObject({ target: 'player', kind: 'reflect' });
+				expect(reflect?.amount).toBeGreaterThan(0);
+				// Reflected damage is raw/untyped, so the float never carries a damage type.
+				expect(reflect?.damageType).toBeUndefined();
+			});
+
+			it('floats a player reflection back over the enemy when the player reflects an incoming hit (#1330)', () => {
+				mockPlayerManager.attributes = [
+					{ attributeId: EAttribute.DamageReflection, amount: 0.5 },
+					{ attributeId: EAttribute.Endurance, amount: 30 },
+					{ attributeId: EAttribute.Strength, amount: 50 }
+				];
+				engine.start();
+				enemyLoadedCallbacks[0](tankyEnemy);
+
+				logicalUpdateCallbacks[0](500);
+
+				const reflect = events.find((event) => event.kind === 'reflect');
+				expect(reflect).toMatchObject({ target: 'enemy', kind: 'reflect' });
+				expect(reflect?.amount).toBeGreaterThan(0);
 			});
 		});
 	});
@@ -878,7 +969,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				newStats,
 				mockInventoryManager.grantedSkillIds,
-				mockPlayerProficiencies.battleModifiers
+				mockPlayerProficiencies.battleModifiers,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -893,7 +985,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				mockPlayerProficiencies.battleModifiers
+				mockPlayerProficiencies.battleModifiers,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -912,7 +1005,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				newModifiers
+				newModifiers,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -940,7 +1034,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				newLockedBase
+				newLockedBase,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -984,7 +1079,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				[...lockedBase, ...proficiency]
+				[...lockedBase, ...proficiency],
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 	});

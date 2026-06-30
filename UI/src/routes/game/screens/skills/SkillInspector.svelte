@@ -30,6 +30,11 @@
 		</div>
 		<div class="rawnote">{rawNote}</div>
 
+		<div class="d-sec">
+			<div class="label">Damage types</div>
+			<div class="dt-host"><SkillDamageTypes portions={metrics.skill.damagePortions} /></div>
+		</div>
+
 		<SkillDamageBreakdown {view} {metrics} />
 
 		{#if effects.length}
@@ -73,6 +78,7 @@ import { staticData } from '$stores';
 import SkillIcon from './SkillIcon.svelte';
 import SkillCta from './SkillCta.svelte';
 import SkillDamageBreakdown from './SkillDamageBreakdown.svelte';
+import SkillDamageTypes from '$components/SkillDamageTypes.svelte';
 import RarityTagBox from '$components/RarityTagBox.svelte';
 import type { SkillMetrics, SkillsView } from './skills-view.svelte';
 
@@ -260,6 +266,10 @@ const rawNote = $derived.by(() => {
 	letter-spacing: 1.6px;
 	text-transform: uppercase;
 	color: var(--text-muted);
+}
+
+.dt-host {
+	margin-top: 8px;
 }
 
 .effect-row {

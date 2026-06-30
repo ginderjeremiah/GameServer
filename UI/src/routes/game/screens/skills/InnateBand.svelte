@@ -10,11 +10,15 @@
 	<div class="band" style:--cap={view.cap}>
 		{#each view.innateSkills as innate, index (`${innate.skill.id}-${index}`)}
 			{@const metrics = view.metric(innate.skill.id)}
-			<div class="eqcard" class:dupe={innate.duplicate} data-testid="innate-card">
+			{@const dormant = !innate.duplicate && view.dormant(innate.skill)}
+			<div class="eqcard" class:dupe={innate.duplicate} class:dormant data-testid="innate-card">
 				<span class="src" title="Granted by {innate.sourceItemName}">⟡ {innate.sourceItemName}</span>
 				<span class="en">{innate.skill.name}</span>
 				{#if innate.duplicate}
 					<span class="dupe-note">already in your loadout</span>
+				{:else if dormant}
+					<!-- A granted weapon-typed skill is gated like a selected one (#1342). -->
+					<DormantNote skill={innate.skill} />
 				{:else if metrics}
 					<SkillCardStats {view} {metrics} />
 				{/if}
@@ -25,6 +29,7 @@
 
 <script lang="ts">
 import SkillCardStats from './SkillCardStats.svelte';
+import DormantNote from './DormantNote.svelte';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -72,6 +77,11 @@ const { view }: Props = $props();
 
 	&.dupe {
 		opacity: 0.7;
+	}
+
+	// Off-weapon (dormant): a granted weapon-typed skill the held weapon doesn't field.
+	&.dormant {
+		opacity: 0.55;
 	}
 }
 

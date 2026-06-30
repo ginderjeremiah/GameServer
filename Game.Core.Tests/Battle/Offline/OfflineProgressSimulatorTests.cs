@@ -474,7 +474,10 @@ namespace Game.Core.Tests.Battle.Offline
             public required Func<int, Enemy> ResolveEnemy { get; init; }
             public Func<int, Item> ResolveItem { get; init; } = ThrowItem;
             public Func<int, ItemMod> ResolveMod { get; init; } = ThrowMod;
-            public Func<int, Skill> ResolveSkill { get; init; } = id => PlayerAttackSkill();
+            // Resolve only the snapshot's actual selected skill (id 0); null for any other id so the weapon-match
+            // gate's bare-hands punch probe (these weaponless snapshots field a punch only if one resolves) finds
+            // nothing and is dropped, leaving these pre-punch scenarios' balance unchanged.
+            public Func<int, Skill?> ResolveSkill { get; init; } = id => id == 0 ? PlayerAttackSkill() : null;
         }
 
         private static OfflineSimulationParameters IdleParameters(long awayMs, Scenario scenario, long capMs = TenHoursMs) =>
@@ -568,7 +571,7 @@ namespace Game.Core.Tests.Battle.Offline
             Snapshot = PlayerSnapshot(strength: 50, endurance: 10, dexterity: 100, luck: 100),
             // A long cooldown → only ~4 fires across the 120s cap, so crit count (and thus the outcome)
             // swings battle to battle.
-            ResolveSkill = _ => SlowHeavySkill(),
+            ResolveSkill = id => id == 0 ? SlowHeavySkill() : null,
             ResolveEnemy = level => CoinFlipBoss(level),
         };
 

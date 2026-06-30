@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, EItemCategory, ERarity } from '$lib/api';
+import { EAttribute, EDamageType, EItemCategory, ERarity } from '$lib/api';
 import type { Item } from '$lib/battle';
-import type { IBattlerAttribute } from '$lib/api';
+import type { IBattlerAttribute, ISkill } from '$lib/api';
 
 // Light mock of the engine so importing the view-model doesn't pull the real
 // game engine. EEquipmentSlot mirrors the real enum's indices. `vi.hoisted`
@@ -15,13 +15,16 @@ const {
 	applyMod,
 	removeMod,
 	toastError,
+	confirmModal,
 	unlockedMods,
 	unlockedItems,
 	sampleItems,
 	sampleSlots,
 	sampleStats,
 	staticData,
-	proficiencyLevels
+	proficiencyLevels,
+	playerState,
+	weaponState
 } = vi.hoisted(() => ({
 	equipItem: vi.fn(),
 	unequipItem: vi.fn(),
@@ -29,6 +32,7 @@ const {
 	applyMod: vi.fn(),
 	removeMod: vi.fn(),
 	toastError: vi.fn(),
+	confirmModal: vi.fn(),
 	unlockedMods: new Set<number>(),
 	// The player's per-proficiency levels the equip gate is evaluated against (kept simple: a plain map).
 	proficiencyLevels: new Map<number, number>(),
@@ -38,8 +42,12 @@ const {
 	sampleItems: [] as Item[],
 	sampleSlots: new Array(6).fill(undefined) as (Item | undefined)[],
 	sampleStats: [] as IBattlerAttribute[],
+	// The player's selected-skill ids the weapon-match warning reads (#1342).
+	playerState: { selectedSkills: [] as number[] },
+	// The currently-equipped weapon type the swap warning diffs against (reset to Unarmed in beforeEach).
+	weaponState: { equippedWeaponType: 0 as number },
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	staticData: { itemMods: [] as any[] | undefined }
+	staticData: { itemMods: [] as any[] | undefined, skills: [] as ISkill[] }
 }));
 
 vi.mock('$lib/engine', () => ({
@@ -52,6 +60,11 @@ vi.mock('$lib/engine', () => ({
 		AccessorySlot: 5
 	},
 	getEquipmentSlotForCategory: (cat: number) => cat - 1,
+	playerManager: {
+		get selectedSkills() {
+			return playerState.selectedSkills;
+		}
+	},
 	inventoryManager: {
 		get unlockedItemList() {
 			return sampleItems;
@@ -61,6 +74,9 @@ vi.mock('$lib/engine', () => ({
 		},
 		get equipmentStats() {
 			return sampleStats;
+		},
+		get equippedWeaponType() {
+			return weaponState.equippedWeaponType;
 		},
 		unlockedItems,
 		unlockedMods,
@@ -75,6 +91,7 @@ vi.mock('$lib/engine', () => ({
 vi.mock('$stores', () => ({
 	staticData,
 	toastError,
+	confirmModal,
 	playerProficiencies: { levelOf: (id: number) => proficiencyLevels.get(id) ?? 0 }
 }));
 
@@ -107,10 +124,15 @@ beforeEach(() => {
 	removeMod.mockReset().mockResolvedValue(true);
 	setFavorite.mockClear();
 	toastError.mockClear();
+	// Default the weapon-swap warning to "confirmed" so equip proceeds; conflict tests override per-test.
+	confirmModal.mockReset().mockResolvedValue(true);
 	unlockedMods.clear();
 	unlockedItems.clear();
 	proficiencyLevels.clear();
+	playerState.selectedSkills = [];
+	weaponState.equippedWeaponType = EDamageType.Unarmed;
 	staticData.itemMods = [];
+	staticData.skills = [];
 	sampleSlots.fill(undefined);
 	sampleStats.length = 0;
 	sampleItems.length = 0;
@@ -456,5 +478,131 @@ describe('InventoryView.compatibleMods', () => {
 		staticData.itemMods = undefined;
 		const item = makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary);
 		expect(new InventoryView().compatibleMods(2, item)).toEqual([]);
+	});
+});
+
+/* The weapon-match pre-swap warning (#1342): equipping a weapon that would dim part of the saved loadout
+   prompts before applying, naming the skills that go dormant. The dormant derivation reuses the shared gate,
+   so it can't disagree with what the battle fields. */
+describe('InventoryView weapon-swap warning', () => {
+	const makeSkill = (id: number, name: string, type: EDamageType): ISkill =>
+		({ id, name, damagePortions: [{ type, weight: 1 }] }) as unknown as ISkill;
+
+	const weapon = (itemId: number, name: string, weaponType: EDamageType) =>
+		makeItem(itemId, name, EItemCategory.Weapon, ERarity.Rare, { weaponType });
+
+	it('warns before equipping a weapon that dims a fielded selected skill, naming it', async () => {
+		// Wielding a Sword (a Sword skill is fielded); equipping an Axe leaves that Sword skill dormant.
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		playerState.selectedSkills = [0];
+		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
+
+		await new InventoryView().equip(7, 4);
+
+		expect(confirmModal).toHaveBeenCalledTimes(1);
+		const opts = confirmModal.mock.calls[0][0] as { title: string; body: string };
+		expect(opts.title).toMatch(/dormant/i);
+		expect(opts.body).toContain('Slash');
+		expect(opts.body).toContain('War Axe');
+		expect(equipItem).toHaveBeenCalledWith(7, 4);
+	});
+
+	it('warns when arming from bare hands dims a fielded Unarmed skill', async () => {
+		// Bare-handed, an Unarmed (punch-style) skill is fielded; equipping a Sword dims it.
+		weaponState.equippedWeaponType = EDamageType.Unarmed;
+		staticData.skills = [makeSkill(0, 'Jab', EDamageType.Unarmed)];
+		playerState.selectedSkills = [0];
+		unlockedItems.set(7, weapon(7, 'Iron Sword', EDamageType.Sword));
+
+		await new InventoryView().equip(7, 4);
+
+		expect(confirmModal).toHaveBeenCalledTimes(1);
+		expect((confirmModal.mock.calls[0][0] as { body: string }).body).toContain('Jab');
+		expect(equipItem).toHaveBeenCalledWith(7, 4);
+	});
+
+	it('aborts the equip when the player declines the warning', async () => {
+		confirmModal.mockResolvedValue(false);
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		playerState.selectedSkills = [0];
+		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
+
+		await new InventoryView().equip(7, 4);
+
+		expect(confirmModal).toHaveBeenCalledTimes(1);
+		expect(equipItem).not.toHaveBeenCalled();
+	});
+
+	it('does not warn when every selected skill is weapon-agnostic', async () => {
+		// Physical / elemental skills are never gated, so a weapon swap dims nothing.
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Strike', EDamageType.Physical), makeSkill(1, 'Ember', EDamageType.Fire)];
+		playerState.selectedSkills = [0, 1];
+		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
+
+		await new InventoryView().equip(7, 4);
+
+		expect(confirmModal).not.toHaveBeenCalled();
+		expect(equipItem).toHaveBeenCalledWith(7, 4);
+	});
+
+	it('does not warn when the selected weapon-skill matches the incoming weapon', async () => {
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Cleave', EDamageType.Axe)];
+		playerState.selectedSkills = [0];
+		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
+
+		await new InventoryView().equip(7, 4);
+
+		expect(confirmModal).not.toHaveBeenCalled();
+		expect(equipItem).toHaveBeenCalledWith(7, 4);
+	});
+
+	it('does not warn when a skill was already dormant under the current weapon', async () => {
+		// Wielding a Sword, a Bow skill is already dormant; swapping to an Axe dims nothing new.
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Snipe', EDamageType.Bow)];
+		playerState.selectedSkills = [0];
+		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
+
+		await new InventoryView().equip(7, 4);
+
+		expect(confirmModal).not.toHaveBeenCalled();
+		expect(equipItem).toHaveBeenCalledWith(7, 4);
+	});
+
+	it('uses singular phrasing for one skill and a count for several', async () => {
+		// Two fielded Sword skills dim when swapping to an Axe; the agnostic skill never does.
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [
+			makeSkill(0, 'Slash', EDamageType.Sword),
+			makeSkill(1, 'Parry', EDamageType.Sword),
+			makeSkill(2, 'Strike', EDamageType.Physical)
+		];
+		playerState.selectedSkills = [0, 1, 2];
+		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
+
+		await new InventoryView().equip(7, 4);
+
+		const opts = confirmModal.mock.calls[0][0] as { body: string };
+		expect(opts.body).toContain('these 2 skills');
+		expect(opts.body).toContain('Slash');
+		expect(opts.body).toContain('Parry');
+		expect(opts.body).not.toContain('Strike'); // agnostic skill is never dormant
+	});
+
+	it('does not run the weapon warning when equipping into a non-weapon slot', async () => {
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		playerState.selectedSkills = [0];
+		const helm = makeItem(8, 'Iron Helm', EItemCategory.Helm, ERarity.Common);
+		unlockedItems.set(8, helm);
+
+		await new InventoryView().equip(8, 0); // HelmSlot
+
+		expect(confirmModal).not.toHaveBeenCalled();
+		expect(equipItem).toHaveBeenCalledWith(8, 0);
 	});
 });

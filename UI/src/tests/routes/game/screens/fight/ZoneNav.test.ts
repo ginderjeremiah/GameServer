@@ -7,26 +7,35 @@ import { EChallengeType, type IChallenge, type IZone } from '$lib/api';
 // the navigation + lock state directly. The real `$lib/common` zone-progression helpers are used.
 // The lock tooltip is registered through the store; the registration is stubbed and the child
 // ChallengeTooltip resolves the gating challenge from the same mocked reference data.
-const { mockPlayerManager, staticData, playerChallenges, registerTooltipComponent } = vi.hoisted(() => ({
-	mockPlayerManager: { currentZone: 0 },
-	staticData: {
-		zones: [] as IZone[],
-		challenges: [] as IChallenge[],
-		challengeTypes: [] as unknown[],
-		items: [] as unknown[],
-		itemMods: [] as unknown[],
-		skills: [] as unknown[]
-	},
-	playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
-	registerTooltipComponent: vi.fn(() => ({
-		describedById: 'tooltip-zone',
-		setTooltipPosition: vi.fn(),
-		showTooltip: vi.fn(),
-		hideTooltip: vi.fn()
-	}))
-}));
+const { mockPlayerManager, mockEnemyManager, staticData, playerChallenges, registerTooltipComponent } = vi.hoisted(
+	() => ({
+		mockPlayerManager: { currentZone: 0 },
+		// Navigation routes through enemyManager.navigateToZone (so Home can halt the loop); the mock just
+		// applies the zone the way the real method does, so the existing click assertions still hold.
+		mockEnemyManager: {
+			navigateToZone: vi.fn((zoneId: number) => {
+				mockPlayerManager.currentZone = zoneId;
+			})
+		},
+		staticData: {
+			zones: [] as IZone[],
+			challenges: [] as IChallenge[],
+			challengeTypes: [] as unknown[],
+			items: [] as unknown[],
+			itemMods: [] as unknown[],
+			skills: [] as unknown[]
+		},
+		playerChallenges: { isChallengeCompleted: vi.fn(() => false) },
+		registerTooltipComponent: vi.fn(() => ({
+			describedById: 'tooltip-zone',
+			setTooltipPosition: vi.fn(),
+			showTooltip: vi.fn(),
+			hideTooltip: vi.fn()
+		}))
+	})
+);
 
-vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
+vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, enemyManager: mockEnemyManager }));
 vi.mock('$stores', () => ({
 	staticData,
 	playerChallenges,
@@ -43,7 +52,14 @@ import ZoneNav from '$routes/game/screens/fight/ZoneNav.svelte';
 const challenge = (id: number, name: string, description: string): IChallenge =>
 	({ id, name, description, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 }) as IChallenge;
 
-const zone = (id: number, order: number, name: string, unlockChallengeId?: number, retiredAt?: string): IZone => ({
+const zone = (
+	id: number,
+	order: number,
+	name: string,
+	unlockChallengeId?: number,
+	retiredAt?: string,
+	isHome = false
+): IZone => ({
 	id,
 	name,
 	description: '',
@@ -52,12 +68,14 @@ const zone = (id: number, order: number, name: string, unlockChallengeId?: numbe
 	levelMax: 10,
 	bossLevel: 1,
 	unlockChallengeId,
+	isHome,
 	retiredAt
 });
 
 beforeEach(() => {
 	playerChallenges.isChallengeCompleted.mockReset();
 	playerChallenges.isChallengeCompleted.mockReturnValue(false);
+	mockEnemyManager.navigateToZone.mockClear();
 	staticData.challenges = [];
 	// Deliberately out of array order to prove the component orders by `order`, not index.
 	staticData.zones = [zone(30, 3, 'Frozen Summit'), zone(10, 1, 'Verdant Hollow'), zone(20, 2, 'Ashen Wastes')];
@@ -271,5 +289,54 @@ describe('ZoneNav', () => {
 
 		// The right arrow is open (no gate), so hovering it shows nothing.
 		expect(screen.queryByText('Cull the Swarm')).toBeNull();
+	});
+
+	it('labels the Home sanctuary "Sanctuary" (not "Zone · NN") and shows its name', () => {
+		// Home (order -1) sits leftmost; the two combat zones follow.
+		staticData.zones = [
+			zone(5, -1, 'Home', undefined, undefined, true),
+			zone(10, 1, 'Verdant Hollow'),
+			zone(20, 2, 'Ashen Wastes')
+		];
+		mockPlayerManager.currentZone = 5;
+
+		render(ZoneNav);
+		const nav = screen.getByTestId('zone-nav');
+		expect(nav.textContent).toContain('Sanctuary');
+		expect(nav.textContent).toContain('Home');
+		// The combat-zone numbering ("Zone · NN") is not shown for the sanctuary.
+		expect(nav.textContent).not.toContain('Zone · ');
+	});
+
+	it('numbers combat zones from 1 regardless of the leftmost Home sanctuary', () => {
+		staticData.zones = [
+			zone(5, -1, 'Home', undefined, undefined, true),
+			zone(10, 1, 'Verdant Hollow'),
+			zone(20, 2, 'Ashen Wastes')
+		];
+		// The first combat zone is "Zone · 01" even though Home sits left of it in the nav.
+		mockPlayerManager.currentZone = 10;
+		render(ZoneNav);
+		expect(screen.getByTestId('zone-nav').textContent).toContain('Zone · 01');
+		cleanup();
+
+		mockPlayerManager.currentZone = 20;
+		render(ZoneNav);
+		expect(screen.getByTestId('zone-nav').textContent).toContain('Zone · 02');
+	});
+
+	it('navigates into the Home sanctuary via the left arrow', async () => {
+		staticData.zones = [zone(5, -1, 'Home', undefined, undefined, true), zone(10, 1, 'Verdant Hollow')];
+		mockPlayerManager.currentZone = 10;
+
+		render(ZoneNav);
+		const [left] = screen.getAllByRole('button') as HTMLButtonElement[];
+		// Home is always open (no unlock gate), so the left arrow is navigable.
+		expect(left.disabled).toBe(false);
+		expect(left.getAttribute('aria-disabled')).toBeNull();
+
+		await fireEvent.click(left);
+		expect(mockEnemyManager.navigateToZone).toHaveBeenCalledWith(5);
+		expect(mockPlayerManager.currentZone).toBe(5);
 	});
 });

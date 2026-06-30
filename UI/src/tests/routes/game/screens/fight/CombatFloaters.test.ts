@@ -87,6 +87,32 @@ describe('CombatFloaters', () => {
 		expect(floater.getAttribute('style')).toContain('var(--enemy-accent)');
 	});
 
+	describe('reflected damage (#1330)', () => {
+		it('floats a player reflection over the enemy with the reflect glyph, label, and amount', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'reflect', amount: 33 });
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('33');
+			expect(floater.querySelector('.floater-label')?.textContent).toBe('REFLECT');
+			// The shared combat-log reflect glyph is an inline SVG, not a PNG outcome icon.
+			expect(floater.querySelector('.floater-glyph svg')).not.toBeNull();
+			expect(floater.querySelector('img.floater-icon')).toBeNull();
+			// A player-side reflect lands on the enemy in the brand accent (mirrors the log line's hue).
+			expect(floater.getAttribute('style')).toContain('var(--accent)');
+		});
+
+		it('floats an enemy reflection over the player in the enemy hue', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'player', testId: 'player-floaters' } });
+			emit({ target: 'player', kind: 'reflect', amount: 12 });
+
+			const floater = getByTestId('player-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('12');
+			expect(floater.querySelector('.floater-glyph svg')).not.toBeNull();
+			expect(floater.getAttribute('style')).toContain('var(--enemy-accent)');
+		});
+	});
+
 	describe('typed damage (#1320)', () => {
 		it('tints a typed plain hit by its damage type and shows the type icon', () => {
 			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
@@ -125,6 +151,91 @@ describe('CombatFloaters', () => {
 			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
 			expect(floater.textContent).toContain('+20');
 			expect(floater.getAttribute('style')).toContain('var(--health-remaining-color)');
+		});
+	});
+
+	describe('multi-typed split bar (#1343)', () => {
+		it('draws a segmented ratio bar beneath a multi-typed hit, tinted per portion', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({
+				target: 'enemy',
+				kind: 'hit',
+				amount: 50,
+				// The number reads as its PrimaryDamageType; the bar carries the exact split.
+				damageType: EDamageType.Physical,
+				portions: [
+					{ type: EDamageType.Physical, weight: 60 },
+					{ type: EDamageType.Fire, weight: 40 }
+				]
+			});
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('50');
+			// The number stays coloured by the primary type, like a single-typed hit.
+			expect(floater.getAttribute('style')).toContain('var(--dmg-physical)');
+			const segments = floater.querySelectorAll('.floater-ratio .seg');
+			expect(segments).toHaveLength(2);
+			expect(segments[0].getAttribute('style')).toContain('var(--dmg-physical)');
+			expect(segments[1].getAttribute('style')).toContain('var(--dmg-fire)');
+		});
+
+		it('keeps a single-typed hit clean — no ratio bar', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({
+				target: 'enemy',
+				kind: 'hit',
+				amount: 12,
+				damageType: EDamageType.Fire,
+				portions: [{ type: EDamageType.Fire, weight: 1 }]
+			});
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.querySelector('.floater-ratio')).toBeNull();
+		});
+
+		it('omits the bar entirely when an event carries no portions (a reflect/dodge)', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'hit', amount: 30, damageType: EDamageType.Water });
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.querySelector('.floater-ratio')).toBeNull();
+		});
+
+		it('scales the bar to a three-portion split', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({
+				target: 'enemy',
+				kind: 'hit',
+				amount: 70,
+				damageType: EDamageType.Physical,
+				portions: [
+					{ type: EDamageType.Physical, weight: 1 },
+					{ type: EDamageType.Fire, weight: 1 },
+					{ type: EDamageType.Wind, weight: 1 }
+				]
+			});
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.querySelectorAll('.floater-ratio .seg')).toHaveLength(3);
+		});
+
+		it('still draws the split (and crit styling) on a multi-typed crit', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({
+				target: 'enemy',
+				kind: 'crit',
+				amount: 120,
+				damageType: EDamageType.Fire,
+				portions: [
+					{ type: EDamageType.Fire, weight: 70 },
+					{ type: EDamageType.Water, weight: 30 }
+				]
+			});
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.classList.contains('crit')).toBe(true);
+			expect(floater.querySelector('.floater-label')?.textContent).toBe('CRIT');
+			expect(floater.querySelectorAll('.floater-ratio .seg')).toHaveLength(2);
 		});
 	});
 

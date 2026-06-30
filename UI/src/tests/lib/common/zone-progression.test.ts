@@ -11,6 +11,7 @@ const zone = (id: number, order: number, unlockChallengeId?: number, retiredAt?:
 	levelMax: 10,
 	bossLevel: 1,
 	unlockChallengeId,
+	isHome: false,
 	retiredAt
 });
 

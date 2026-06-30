@@ -18,8 +18,8 @@ export class Skill implements ISkill {
 	baseDamage: number;
 	damageMultipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
-	// The weighted leaf-type split this skill's direct hits deal (#1343). Inert until the portion-aware
-	// pipeline (#1385) reads it; the interim single-type hit deals `primaryDamageType` below.
+	// The weighted leaf-type split this skill's direct hits deal (#1343), read by the portion-aware
+	// battle pipeline (`battleStep`); `primaryDamageType` below is display-only.
 	damagePortions: ISkillDamagePortion[];
 	description: string;
 	cooldownMs: number;
@@ -58,9 +58,9 @@ export class Skill implements ISkill {
 		this.owner = owner;
 	}
 
-	/** The leaf type the display surfaces (icon/colour) and the interim single-type direct hit read as
-	 *  "the skill's type": the highest-weight portion, first-authored on a tie. Mirrors the backend
-	 *  `Skill.PrimaryDamageType`; derived (not stored) so it tracks the portion set. */
+	/** The leaf type the display surfaces (icon/colour) read as "the skill's type": the highest-weight
+	 *  portion, first-authored on a tie. Mirrors the backend `Skill.PrimaryDamageType`; derived (not
+	 *  stored) so it tracks the portion set. The direct hit reads the full `damagePortions` split. */
 	get primaryDamageType(): EDamageType {
 		return primaryDamageType(this.damagePortions);
 	}

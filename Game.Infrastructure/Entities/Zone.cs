@@ -22,6 +22,15 @@
         /// optional FK, like <see cref="BossEnemyId"/>.</summary>
         public int? UnlockChallengeId { get; set; }
 
+        /// <summary>Whether this is the special <em>Home</em> zone — a no-combat sanctuary the player can
+        /// idle in without battling. A Home zone never spawns enemies (authoring guards reject a boss or a
+        /// spawn-table membership on it) and is never set as a player's persisted <c>CurrentZoneId</c> (the
+        /// battle-start zone-change anti-cheat refuses a move into one), so offline rewards keep crediting the
+        /// player's last real combat zone. Authoring/orchestration metadata the battle simulation never reads,
+        /// so it stays off the lean gameplay <see cref="Game.Core.Zones.Zone"/> (resolved via
+        /// <see cref="Game.Abstractions.DataAccess.IZones.IsHomeZone"/>, like retirement).</summary>
+        public bool IsHome { get; set; }
+
         /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
         public DateTime? RetiredAt { get; set; }
 

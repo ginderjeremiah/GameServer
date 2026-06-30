@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EAttribute, EItemCategory, EItemModType, ELogType, ERarity } from '$lib/api';
-import type { IInventoryData, IItem, IItemMod } from '$lib/api';
+import { EAttribute, EDamageType, EItemCategory, EItemModType, ELogType, ERarity } from '$lib/api';
+import type { IInventoryData, IItem, IItemMod, ISkill } from '$lib/api';
+import { PUNCH_SKILL_ID } from '$lib/api/types/game-constants';
 
 const mockInventoryData: IInventoryData = {
 	unlockedItems: [],
@@ -17,6 +18,7 @@ vi.mock('$lib/engine', () => ({
 
 const mockItems: IItem[] = [];
 const mockItemMods: IItemMod[] = [];
+const mockSkills: ISkill[] = [];
 
 vi.mock('$stores', () => ({
 	staticData: {
@@ -25,6 +27,9 @@ vi.mock('$stores', () => ({
 		},
 		get itemMods() {
 			return mockItemMods;
+		},
+		get skills() {
+			return mockSkills;
 		}
 	}
 }));
@@ -56,7 +61,12 @@ import { InventoryManager, EEquipmentSlot, getEquipmentSlotForCategory } from '$
 import { logMessage } from '$lib/engine/log';
 import type { IInventoryItem } from '$lib/api';
 
-const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon, grantedSkillId?: number): IItem => ({
+const makeItem = (
+	id: number,
+	category: EItemCategory = EItemCategory.Weapon,
+	grantedSkillId?: number,
+	weaponType?: EDamageType
+): IItem => ({
 	id,
 	name: `Item ${id}`,
 	description: `Description ${id}`,
@@ -64,6 +74,7 @@ const makeItem = (id: number, category: EItemCategory = EItemCategory.Weapon, gr
 	rarityId: ERarity.Common,
 	iconPath: `/icons/${id}.png`,
 	grantedSkillId,
+	weaponType,
 	requiredProficiencyLevel: 0,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
 	modSlots: [],
@@ -104,6 +115,7 @@ describe('InventoryManager', () => {
 
 		mockItems.length = 0;
 		mockItemMods.length = 0;
+		mockSkills.length = 0;
 		mockInventoryData.unlockedItems = [];
 		mockInventoryData.unlockedMods = [];
 	});
@@ -308,6 +320,79 @@ describe('InventoryManager', () => {
 
 			expect(manager.grantedSkillIds).not.toBe(before);
 			expect(manager.grantedSkillIds).toEqual([9]);
+		});
+	});
+
+	// The virtual-fists punch (#1342): bare-handed, the weapon slot's signature is the configured punch skill,
+	// appended to the granted ids only when it resolves. A real weapon (any type) replaces the fists.
+	describe('virtual-fists punch + equippedWeaponType (#1342)', () => {
+		const seedPunchSkill = () => {
+			mockSkills[PUNCH_SKILL_ID] = {
+				id: PUNCH_SKILL_ID,
+				name: 'Punch',
+				baseDamage: 4,
+				damageMultipliers: [],
+				effects: [],
+				description: '',
+				cooldownMs: 1000,
+				damagePortions: [{ type: EDamageType.Unarmed, weight: 1 }],
+				iconPath: '',
+				rarityId: ERarity.Common,
+				word: '',
+				pronunciation: '',
+				translation: '',
+				acquisition: 0
+			};
+		};
+
+		it('appends the punch signature when bare-handed and the punch skill resolves', () => {
+			seedPunchSkill();
+			mockItems[1] = makeItem(1, EItemCategory.Helm, 4);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.HelmSlot })
+			];
+
+			manager.initialize();
+
+			// The helm's grant, then punch appended (no weapon equipped).
+			expect(manager.grantedSkillIds).toEqual([4, PUNCH_SKILL_ID]);
+		});
+
+		it('does not append punch when the punch skill is unauthored (does not resolve)', () => {
+			// No punch seeded into staticData.skills.
+			mockInventoryData.unlockedItems = [];
+
+			manager.initialize();
+
+			expect(manager.grantedSkillIds).toEqual([]);
+		});
+
+		it('does not append punch when a weapon is equipped (it fields its own signature instead)', () => {
+			seedPunchSkill();
+			mockItems[1] = makeItem(1, EItemCategory.Weapon, 9, EDamageType.Sword);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+
+			manager.initialize();
+
+			expect(manager.grantedSkillIds).toEqual([9]);
+		});
+
+		it('reads equippedWeaponType as Unarmed when bare-handed', () => {
+			manager.initialize();
+			expect(manager.equippedWeaponType).toBe(EDamageType.Unarmed);
+		});
+
+		it('reads equippedWeaponType from the equipped weapon', () => {
+			mockItems[1] = makeItem(1, EItemCategory.Weapon, 9, EDamageType.Sword);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+
+			manager.initialize();
+
+			expect(manager.equippedWeaponType).toBe(EDamageType.Sword);
 		});
 	});
 

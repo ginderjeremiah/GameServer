@@ -157,7 +157,8 @@ describe('EnemyManager boss mode', () => {
 		levelMin: 1,
 		levelMax: 10,
 		bossLevel: 1,
-		unlockChallengeId
+		unlockChallengeId,
+		isHome: false
 	});
 
 	// bossUnlockedNextZone is reset by returnToIdle/challengeBoss once the (mocked-immediate) overlay

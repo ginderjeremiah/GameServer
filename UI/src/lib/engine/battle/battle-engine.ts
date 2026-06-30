@@ -1,7 +1,7 @@
 import { Battler, battleStep, resistanceTotal, type BattleStepLog, type AttributeModifier } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData, playerProficiencies } from '$stores';
-import { ELogType, EDamageType, IBattlerAttribute, IEnemyInstance } from '$lib/api';
+import { ELogType, EDamageType, IBattlerAttribute, IEnemyInstance, ISkillDamagePortion } from '$lib/api';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 import { logMessage } from '../log';
 import {
@@ -43,14 +43,19 @@ export const onBattleStageChanged = battleStageChangedHook.onNotified;
 /** One combat outcome surfaced for the fight screen's floating numbers. `target` is the battler the
  *  float spawns over (the side that was struck / defended); `kind` picks its label, and `amount` is the
  *  damage to show — omitted for a dodge, which has no number; a negative amount is an absorbed hit's net
- *  heal. `damageType` (present for every kind but `dodge`) tints the number and picks its type glyph
- *  (#1320, Area F). Player-only crit/dodge mirror the battle-step roll surface (the enemy never
- *  dodges/crits). */
+ *  heal. `damageType` (present for a damaging `hit`/`crit`) tints the number and picks its type glyph
+ *  (#1320, Area F); a `dodge` has no number and a `reflect` is raw/untyped, so both omit it. A `reflect`
+ *  (#1330) spawns over the original attacker — the side that took the returned damage — and carries no
+ *  type. Player-only crit/dodge mirror the battle-step roll surface (the enemy never dodges/crits). */
 export interface CombatFloatEvent {
 	target: 'player' | 'enemy';
-	kind: 'hit' | 'crit' | 'dodge';
+	kind: 'hit' | 'crit' | 'dodge' | 'reflect';
 	amount?: number;
 	damageType?: EDamageType;
+	/** The hit's weighted leaf-type split (#1343), present for a damaging `hit`/`crit` so the floater
+	 *  can draw the segmented ratio bar; `damageType` above is its `PrimaryDamageType` (number colour /
+	 *  icon). A single-portion hit needs no bar, so consumers render it only for a multi-typed split. */
+	portions?: readonly ISkillDamagePortion[];
 }
 
 const combatFloatHook = createHook<[CombatFloatEvent]>();
@@ -155,6 +160,19 @@ export class BattleEngine {
 		this.setBattleStage(Paused);
 	}
 
+	/**
+	 * Drops the live battle to its Idle baseline without tearing down the loop hooks — used when the player
+	 * parks in the no-combat Home zone (the idle loop is halted separately so no new enemy spawns). The
+	 * in-flight fight simply stops: {@link timeElapsed} is reset to 0 so the next real battle resolves the
+	 * now-orphaned backend battle as an abandon with no outcome (the player forfeits the unfinished fight by
+	 * walking home), and the fight screen shows the resting state.
+	 */
+	public rest() {
+		this.finishLoading?.();
+		this.timeElapsed = 0;
+		this.setBattleStage(Idle);
+	}
+
 	public resume = () => {
 		if (!this.player.isDead && !this.enemy.isDead) {
 			this.setBattleStage(Active);
@@ -209,10 +227,15 @@ export class BattleEngine {
 		// already covers them; read the slot-ordered ids here so the rebuilt battler fields them. The locked
 		// base composes before the proficiency bonuses (the order the backend BattleSnapshot.GetModifiers uses)
 		// so the additive accumulation — and therefore the result down to the last bit — matches the replay.
-		this.player.reset(playerManager, equipmentStats, inventoryManager.grantedSkillIds, [
-			...lockedBaseModifiers,
-			...proficiencyModifiers
-		]);
+		// equippedWeaponType drives the weapon-match gate (#1342): only the player battler is gated; the enemy
+		// rebuild below passes no weapon type and fields its full authored loadout.
+		this.player.reset(
+			playerManager,
+			equipmentStats,
+			inventoryManager.grantedSkillIds,
+			[...lockedBaseModifiers, ...proficiencyModifiers],
+			inventoryManager.equippedWeaponType
+		);
 		// Compose the class signature passive LAST — after the locked base, proficiency bonuses, and the static
 		// engine modifiers the rebuild just assembled — so an attribute-scaled passive reads the fully-resolved
 		// value of its scaling attribute (snapshot state, like a skill effect reads its caster) and lands in the
@@ -290,10 +313,13 @@ export class BattleEngine {
 	}
 
 	private logicalUpdate(timeDelta: number) {
+		// Advance the battle clock only while a battle is actually live. Between battles (the Loading
+		// cooldown, Paused mid-swap, or resting in the no-combat Home zone) it stays frozen, so a value later
+		// read as an abandon's client-fought duration reflects only real combat time — never time parked idle.
 		// Accumulate first so the timeout check below evaluates against this tick's elapsed time: the live
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
-		this.timeElapsed += timeDelta;
 		if (this.stage === Active) {
+			this.timeElapsed += timeDelta;
 			for (const { skill, damage, byPlayer, crit, dodged, reflected } of battleStep(
 				this.player,
 				this.enemy,
@@ -315,13 +341,16 @@ export class BattleEngine {
 					outcome,
 					resist === 'normal' ? undefined : resist
 				);
-				notifyCombatFloat(combatFloatEvent(outcome, damage, damageType));
+				notifyCombatFloat(combatFloatEvent(outcome, damage, damageType, skill.damagePortions));
 				// Deterministic reflection (#1330): the defender returned part of this hit to the attacker. The
 				// reflector is the opposite side of the activation — a player hit is reflected by the enemy, and an
 				// enemy hit by the player — and it deals raw, untyped damage, so the line carries no resist note.
 				if (reflected > 0) {
 					const reflectOutcome: ReflectOutcome = byPlayer ? 'enemy-reflect' : 'player-reflect';
 					logMessage(ELogType.Damage, reflectLogMessage(reflectOutcome, reflected, this.enemy.name), reflectOutcome);
+					// Float the returned damage over the original attacker (the side that took it): a player hit
+					// reflected by the enemy lands back on the player, an enemy hit reflected by the player on the enemy.
+					notifyCombatFloat({ target: byPlayer ? 'player' : 'enemy', kind: 'reflect', amount: reflected });
 				}
 			}
 			this.logEffectApplications();
@@ -429,16 +458,22 @@ function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): Di
  *  the combat-log line are both driven by the single {@link damageLogOutcome} classifier rather than a
  *  parallel copy of the flag branching. A player hit/crit floats over the enemy; an incoming enemy hit
  *  floats over the player as a dodge (no number) or a plain hit. `damageType` rides every damaging
- *  kind (not a dodge) so the floater can tint by type (#1320, Area F). */
-function combatFloatEvent(outcome: DirectHitOutcome, damage: number, damageType: EDamageType): CombatFloatEvent {
+ *  kind (not a dodge) so the floater can tint by type (#1320, Area F); `portions` rides the same
+ *  damaging kinds so it can draw the multi-typed ratio bar (#1343). */
+function combatFloatEvent(
+	outcome: DirectHitOutcome,
+	damage: number,
+	damageType: EDamageType,
+	portions: readonly ISkillDamagePortion[]
+): CombatFloatEvent {
 	switch (outcome) {
 		case 'player-crit':
-			return { target: 'enemy', kind: 'crit', amount: damage, damageType };
+			return { target: 'enemy', kind: 'crit', amount: damage, damageType, portions };
 		case 'player-hit':
-			return { target: 'enemy', kind: 'hit', amount: damage, damageType };
+			return { target: 'enemy', kind: 'hit', amount: damage, damageType, portions };
 		case 'player-dodge':
 			return { target: 'player', kind: 'dodge' };
 		case 'enemy-hit':
-			return { target: 'player', kind: 'hit', amount: damage, damageType };
+			return { target: 'player', kind: 'hit', amount: damage, damageType, portions };
 	}
 }

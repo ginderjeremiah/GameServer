@@ -77,14 +77,19 @@ namespace Game.Application.Services
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
             }
 
-            // A real zone change is gated on the target being unlocked and in circulation (anti-cheat). A
-            // legitimate client never navigates into a locked or retired zone — the UI gates both — so such a
-            // target is ignored and the battle simply proceeds in the player's current zone. Same-zone
+            // A real zone change is gated on the target being unlocked, in circulation, and a combat zone
+            // (anti-cheat). A legitimate client never navigates a battle into a locked, retired, or Home zone —
+            // the UI gates all three (and never spawns a battle in Home at all) — so such a target is ignored
+            // and the battle simply proceeds in the player's current zone. Refusing the Home target keeps the
+            // "fake zone" invariant the offline path relies on: a player's persisted CurrentZoneId is never the
+            // no-combat Home sanctuary, so offline rewards always replay their last real combat zone. Same-zone
             // re-requests skip the check (and the redundant save) entirely.
             if (newZoneId.HasValue && newZoneId.Value != player.CurrentZoneId)
             {
                 var targetZone = _zones.GetDomainZone(newZoneId.Value);
-                if (!_zones.IsZoneRetired(newZoneId.Value) && await IsZoneUnlocked(player.Id, targetZone, cancellationToken))
+                if (!_zones.IsZoneRetired(newZoneId.Value)
+                    && !_zones.IsHomeZone(newZoneId.Value)
+                    && await IsZoneUnlocked(player.Id, targetZone, cancellationToken))
                 {
                     player.ChangeZone(newZoneId.Value);
                     zoneId = newZoneId.Value;
@@ -429,15 +434,22 @@ namespace Game.Application.Services
             // (here) rather than being re-abandoned by the first live StartBattle after the gate.
             await ResolveStaleBattle(player, state, cancellationToken);
 
-            var (mode, zone) = await ResolveOfflineLoop(player, cancellationToken);
-            var proficiencyLevels = await CaptureProficiencyLevels(player.Id, cancellationToken);
+            // Load the progress aggregate once for the whole offline pass. Its completed challenges (loop/zone
+            // gating), proficiency levels (battle snapshot), and statistics (reward application) all read the
+            // same Progress_{playerId} cache key, so threading one aggregate down replaces 3-4 serial round-trips.
+            // Loaded after ResolveStaleBattle so it reflects the settled stale battle's progress mutation.
+            var progress = await _progressRepo.Load(player, cancellationToken);
+            var completedChallengeIds = progress.CompletedChallengeIds();
+
+            var (mode, zone) = await ResolveOfflineLoop(player, completedChallengeIds, cancellationToken);
+            var proficiencyLevels = ToProficiencyLevels(progress.Proficiencies);
             var parameters = BuildSimulationParameters(player, mode, zone, awayMs, proficiencyLevels);
 
             var result = _offlineSimulator.Simulate(parameters, cancellationToken);
 
             var levelBefore = player.Level;
             var statPointsBefore = player.StatPoints.StatPointsGained;
-            var rewards = await ApplyOfflineRewards(player, result, cancellationToken);
+            var rewards = await ApplyOfflineRewards(player, progress, result, cancellationToken);
 
             // Re-anchor the away clock and persist the player (exp/levels/unlocks) in one save. The exp batch
             // already raised its own single core update in ApplyOfflineRewards; this re-anchor raises one more.
@@ -467,7 +479,8 @@ namespace Game.Application.Services
         // when the persisted flag is set and the current zone still has a challengeable boss (in circulation,
         // unlocked, boss authored); otherwise the loop falls back to idle in the nearest viable zone (the same
         // lazy-relocation the live idle loop uses, so a retired/empty current zone never stalls the sim).
-        private async Task<(OfflineLoopMode Mode, CoreZone Zone)> ResolveOfflineLoop(Player player, CancellationToken cancellationToken)
+        private async Task<(OfflineLoopMode Mode, CoreZone Zone)> ResolveOfflineLoop(
+            Player player, IReadOnlySet<int> completedChallengeIds, CancellationToken cancellationToken)
         {
             var currentZoneId = player.CurrentZoneId;
             if (player.AutoChallengeBoss
@@ -475,13 +488,13 @@ namespace Game.Application.Services
                 && !_zones.IsZoneRetired(currentZoneId))
             {
                 var bossZone = _zones.GetDomainZone(currentZoneId);
-                if (bossZone.BossEnemyId is not null && await IsZoneUnlocked(player.Id, bossZone, cancellationToken))
+                if (bossZone.BossEnemyId is not null && bossZone.IsUnlocked(completedChallengeIds))
                 {
                     return (OfflineLoopMode.Boss, bossZone);
                 }
             }
 
-            var idleZoneId = await EnsureViableZone(player, currentZoneId, cancellationToken);
+            var idleZoneId = await EnsureViableZone(player, currentZoneId, completedChallengeIds, cancellationToken);
             return (OfflineLoopMode.Idle, _zones.GetDomainZone(idleZoneId));
         }
 
@@ -511,7 +524,7 @@ namespace Game.Application.Services
                 ResolveEnemy = resolveEnemy,
                 ResolveItem = _items.GetItem,
                 ResolveMod = _itemMods.GetItemMod,
-                ResolveSkill = _skills.GetSkill,
+                ResolveSkill = _skills.TryGetSkill,
                 ResolveProficiency = _proficiencies.GetProficiency,
                 ResolveClass = ResolveClass,
                 SeedSource = CreateBattleSeed,
@@ -537,14 +550,13 @@ namespace Game.Application.Services
         // and the affected challenges are evaluated once at the end with the live per-challenge push suppressed
         // (the summary is the notification). Returns the completed challenges and the folded proficiency gains
         // (spike #982 decision 9 — the offline accrual's notification rides the summary, not a per-battle push).
-        private async Task<OfflineRewards> ApplyOfflineRewards(Player player, OfflineProgressResult result, CancellationToken cancellationToken)
+        private async Task<OfflineRewards> ApplyOfflineRewards(
+            Player player, PlayerProgress progress, OfflineProgressResult result, CancellationToken cancellationToken)
         {
             if (result.BattlesSimulated == 0)
             {
                 return OfflineRewards.Empty;
             }
-
-            var progress = await _progressRepo.Load(player, cancellationToken);
 
             var victoryExpRewards = new List<int>();
             var proficiencyGains = new ProficiencyGainAccumulator();
@@ -697,10 +709,8 @@ namespace Game.Application.Services
                 && _enemies.HasSpawnableEnemies(zoneId);
         }
 
-        // Relocates the player when their resolved zone is no longer viable, returning the zone the battle
-        // should run in. "Nearest" is the lowest-Order zone the player has unlocked that is viable, falling
-        // back to the starting zone. A no-op (no save) when the current zone is already viable, so the idle
-        // hot path pays only the cheap viability check; the completion lookup and scan run only on a relocate.
+        // Live-path overload: defers reading the completed-challenge set until a relocation is actually needed
+        // (the viability check short-circuits first), so the idle hot path never pays the read.
         private async Task<int> EnsureViableZone(Player player, int zoneId, CancellationToken cancellationToken)
         {
             // An out-of-range zone id is corruption/tampering, not a relocation case: leave it for the
@@ -711,6 +721,22 @@ namespace Game.Application.Services
             }
 
             var completedChallengeIds = await _progressRepo.GetCompletedChallengeIds(player.Id, cancellationToken);
+            return await EnsureViableZone(player, zoneId, completedChallengeIds, cancellationToken);
+        }
+
+        // Relocates the player when their resolved zone is no longer viable, returning the zone the battle
+        // should run in. "Nearest" is the lowest-Order zone the player has unlocked that is viable, falling
+        // back to the starting zone. A no-op (no save) when the current zone is already viable. Takes the
+        // completed-challenge set so a caller holding a loaded progress aggregate (the offline pass) gates
+        // without re-reading the progress cache key.
+        private async Task<int> EnsureViableZone(
+            Player player, int zoneId, IReadOnlySet<int> completedChallengeIds, CancellationToken cancellationToken)
+        {
+            if (!_zones.ValidateZoneId(zoneId) || IsZoneViable(zoneId))
+            {
+                return zoneId;
+            }
+
             // Filter to viable candidates before ordering, then resolve each domain zone once (lazily, so the
             // resolve stops at the first unlocked match) rather than re-resolving it inside the predicate.
             var destination = _zones.All()
@@ -758,10 +784,16 @@ namespace Game.Application.Services
         private async Task<List<ProficiencyLevelSnapshot>> CaptureProficiencyLevels(int playerId, CancellationToken cancellationToken)
         {
             var proficiencies = await _progressRepo.GetProficiencies(playerId, cancellationToken);
-            return proficiencies
+            return ToProficiencyLevels(proficiencies);
+        }
+
+        // Projects proficiency progress to the battle-snapshot's level-only view, shared by the live capture
+        // (which reads through the lean accessor) and the offline pass (which derives it from the progress
+        // aggregate it already loaded), so the two cannot drift.
+        private static List<ProficiencyLevelSnapshot> ToProficiencyLevels(IEnumerable<PlayerProficiency> proficiencies) =>
+            proficiencies
                 .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level })
                 .ToList();
-        }
 
         // Shared anti-cheat preamble for the three battle-end paths: guards that a battle is active, resolves
         // the snapshotted enemy, and replays the fight once. Returns false (with no outputs) when there is no
@@ -804,7 +836,7 @@ namespace Game.Application.Services
             enemy.SetBattleSkills(enemySkillIds);
 
             var playerBattler = snapshot.ToBattler(
-                _items.GetItem, _itemMods.GetItemMod, _skills.GetSkill, _proficiencies.GetProficiency, ResolveClass);
+                _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()),
                 enemy.BattleSkills,

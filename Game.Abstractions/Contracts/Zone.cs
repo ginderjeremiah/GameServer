@@ -22,6 +22,11 @@ namespace Game.Abstractions.Contracts
         /// zone unlocks once the player completes this challenge.</summary>
         public int? UnlockChallengeId { get; set; }
 
+        /// <summary>Whether this is the special <em>Home</em> zone — a no-combat sanctuary the player can idle
+        /// in without battling. A Home zone never spawns enemies and never becomes the player's persisted
+        /// current zone (offline rewards keep crediting their last real combat zone). Defaults to false.</summary>
+        public bool IsHome { get; set; }
+
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
         /// Null while active.</summary>
         public DateTime? RetiredAt { get; set; }

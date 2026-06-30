@@ -18,6 +18,11 @@ namespace Game.Abstractions.DataAccess
         /// Throws if the id is out of range.</summary>
         public bool IsZoneRetired(int zoneId);
 
+        /// <summary>Whether the zone is the special no-combat <em>Home</em> sanctuary. Reads the catalogue's
+        /// Home flag — like retirement, an authoring/orchestration concern not carried on the lean gameplay
+        /// <see cref="CoreZone"/>. Throws if the id is out of range.</summary>
+        public bool IsHomeZone(int zoneId);
+
         public bool ValidateZoneId(int zoneId);
 
         /// <inheritdoc cref="IItems.VersionKey"/>

@@ -258,6 +258,7 @@ export interface IZone {
 	bossEnemyId?: number;
 	bossLevel: number;
 	unlockChallengeId?: number;
+	isHome: boolean;
 	retiredAt?: string;
 }
 

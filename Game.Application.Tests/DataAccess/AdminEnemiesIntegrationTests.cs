@@ -379,6 +379,39 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetSpawns_TargetingHomeZone_ReturnsFailure()
+        {
+            int enemyId, homeZoneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Goblin");
+                var home = await TestDataSeeder.CreateZoneAsync(context, "Home", isHome: true);
+                enemyId = enemy.Id;
+                homeZoneId = home.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The Home zone is a no-combat sanctuary, so an enemy spawn that targets it is rejected — neither
+            // authoring direction (enemy→zones here, zone→enemies in AdminZones) can populate Home's table.
+            var data = new SetEnemySpawnsData
+            {
+                EnemyId = enemyId,
+                Spawns = [new Contracts.EnemySpawn { ZoneId = homeZoneId, Weight = 1 }],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SetSpawns(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "'Goblin' cannot spawn in the Home zone ('Home'). Home is a no-combat sanctuary where no enemies spawn.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveEnemies_RetiringLastActiveEnemyOfLiveZone_ReturnsFailure()
         {
             int enemyId;

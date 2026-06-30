@@ -2,8 +2,9 @@
      combat events and, for the events striking this card's side, spawns a short-lived number/label
      that pops and drifts up. The number is tinted by its damage type (a typed, non-physical plain hit
      also shows the type glyph); crit/dodge keep their own outcome icon, and an absorbed hit shows
-     its net heal in the regen hue (#1320, Area F). Purely presentational (aria-hidden) — the combat log
-     is the accessible record of the same events. -->
+     its net heal in the regen hue (#1320, Area F). A reflect (#1330) floats over the original attacker
+     with the shared combat-log reflect glyph and the side's hue — raw/untyped, never tinted by type.
+     Purely presentational (aria-hidden) — the combat log is the accessible record of the same events. -->
 <div class="floaters" aria-hidden="true" data-testid={testId} style:--float-duration="{DURATION_MS}ms">
 	{#each floaters as floater (floater.id)}
 		<div
@@ -13,11 +14,22 @@
 			style:color={floater.color}
 			style:font-size="{floater.size}px"
 		>
-			{#if floater.icon}
-				<img class="floater-icon" src={floater.icon} alt="" />
+			<span class="floater-main">
+				{#if floater.glyph}
+					<span class="floater-glyph"
+						><LogGlyph glyph={floater.glyph} color={floater.color} size={Math.round(floater.size * 0.85)} /></span
+					>
+				{:else if floater.icon}
+					<img class="floater-icon" src={floater.icon} alt="" />
+				{/if}
+				{#if floater.amount}<span>{floater.amount}</span>{/if}
+				{#if floater.label}<span class="floater-label">{floater.label}</span>{/if}
+			</span>
+			<!-- A multi-typed hit (#1343) shows the exact split as a thin ratio bar under the primary-coloured
+			     number; a single-typed hit stays a clean number, exactly as before. -->
+			{#if floater.portions.length > 1}
+				<div class="floater-ratio"><DamageRatioBar portions={floater.portions} height={3} /></div>
 			{/if}
-			{#if floater.amount}<span>{floater.amount}</span>{/if}
-			{#if floater.label}<span class="floater-label">{floater.label}</span>{/if}
 		</div>
 	{/each}
 </div>
@@ -26,7 +38,10 @@
 import { onMount } from 'svelte';
 import { formatNum, damageTypeColor, damageTypeIcon } from '$lib/common';
 import { onCombatFloat, type CombatFloatEvent } from '$lib/engine';
-import { EDamageType } from '$lib/api';
+import { EDamageType, type ISkillDamagePortion } from '$lib/api';
+import LogGlyph from '$components/log-panel/LogGlyph.svelte';
+import DamageRatioBar from '$components/DamageRatioBar.svelte';
+import type { GlyphKind } from '$components/log-panel/log-kind';
 
 type Props = {
 	/** Which card this layer sits over; only events targeting this side spawn here. */
@@ -45,8 +60,13 @@ interface Floater {
 	/** Per-outcome art for a crit/dodge, or a typed (non-physical) plain hit's damage-type icon; empty
 	 *  for a plain physical hit. */
 	icon: string;
+	/** The shared combat-log glyph for a reflect (#1330); empty for every other kind, which use {@link icon}. */
+	glyph: GlyphKind | '';
 	amount: string;
 	label: string;
+	/** The hit's weighted leaf-type split (#1343); rendered as a ratio bar only for a multi-typed hit
+	 *  (2+ portions), empty otherwise so a single-typed hit stays a clean number. */
+	portions: readonly ISkillDamagePortion[];
 }
 
 /** Clean per-outcome icon art (in `static/img`) for the crit/dodge floaters; a plain hit shows its
@@ -81,7 +101,8 @@ const colorFor = (event: CombatFloatEvent): string => {
 		case 'dodge':
 			return 'var(--text-secondary)';
 		default:
-			// A player hit lands on the enemy (brand accent); an incoming enemy hit on the player (enemy hue).
+			// A player hit/reflect lands on the enemy (brand accent); an incoming enemy hit, or a reflect the
+			// enemy returned, lands on the player (enemy hue). The reflect hue thus mirrors the combat-log line's.
 			return event.target === 'enemy' ? 'var(--accent)' : 'var(--enemy-accent)';
 	}
 };
@@ -107,6 +128,10 @@ const iconOf = (event: CombatFloatEvent): string => {
 		: '';
 };
 
+/** The shared combat-log reflect glyph for a reflect float (#1330), so the returned-damage popup reads
+ *  with the same symbol as its log line; empty for every other kind (which use a PNG {@link iconOf}). */
+const glyphOf = (event: CombatFloatEvent): GlyphKind | '' => (event.kind === 'reflect' ? 'reflect' : '');
+
 /** The number shown: an absorbed heal as `+N`, a dodge/no-amount event as nothing, else the damage. */
 const amountOf = (event: CombatFloatEvent): string => {
 	if (event.amount === undefined) {
@@ -121,6 +146,8 @@ const labelFor = (kind: CombatFloatEvent['kind']): string => {
 			return 'CRIT';
 		case 'dodge':
 			return 'DODGE';
+		case 'reflect':
+			return 'REFLECT';
 		default:
 			return '';
 	}
@@ -139,8 +166,10 @@ const spawn = (event: CombatFloatEvent) => {
 		size: crit ? 30 : 21,
 		crit,
 		icon: iconOf(event),
+		glyph: glyphOf(event),
 		amount: amountOf(event),
-		label: labelFor(event.kind)
+		label: labelFor(event.kind),
+		portions: event.portions ?? []
 	});
 	const timer = setTimeout(() => {
 		removalTimers.delete(timer);
@@ -175,6 +204,9 @@ onMount(() => {
 .floater {
 	position: absolute;
 	top: 54%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
 	font-family: var(--mono);
 	font-weight: 700;
 	white-space: nowrap;
@@ -188,6 +220,19 @@ onMount(() => {
 	}
 }
 
+// The number line (icon/glyph + amount + label) on its own row, so the ratio bar can stack beneath it.
+// Kept a plain inline-content block (not flex) so the icon/glyph `vertical-align` baseline tweaks hold.
+.floater-main {
+	display: block;
+}
+
+// The multi-typed split bar, sized to roughly the number's width and centred beneath it.
+.floater-ratio {
+	width: 80%;
+	min-width: 24px;
+	margin-top: 2px;
+}
+
 // Per-outcome / damage-type combat icon; sized in em so it tracks the floater's font-size.
 .floater-icon {
 	width: 1.15em;
@@ -195,6 +240,14 @@ onMount(() => {
 	margin-right: -0.22em;
 	vertical-align: -0.22em;
 	object-fit: contain;
+}
+
+// Inline wrapper for the reflect glyph (a stroke SVG, not a PNG): aligns it to the number's baseline
+// the same way .floater-icon does for the bitmap icons.
+.floater-glyph {
+	display: inline-flex;
+	margin-right: 0.1em;
+	vertical-align: -0.18em;
 }
 
 .floater-label {

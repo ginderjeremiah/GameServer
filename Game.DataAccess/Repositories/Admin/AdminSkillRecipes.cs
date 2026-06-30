@@ -43,6 +43,14 @@ namespace Game.DataAccess.Repositories.Admin
                 return cycleRejection;
             }
 
+            // One skill = one producing (non-retired) recipe (#1362): the synthesis graph keys revealed results
+            // by skill id, so two live recipes producing the same skill would collapse to one node. Reject before
+            // anything commits.
+            if (FindDuplicateResultViolation(changes) is { } duplicateRejection)
+            {
+                return duplicateRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.SkillRecipe
                 {
@@ -196,6 +204,50 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return null;
+        }
+
+        /// <summary>Returns a rejection if the batch would leave two non-retired recipes producing the same
+        /// result skill (one skill = one producing recipe, #1362), else null. Builds the prospective live-result
+        /// map — live recipes with each Edit re-pointing/retiring its recipe and each Add contributing a new
+        /// producer — then flags a result claimed more than once.</summary>
+        private AdminSaveResult? FindDuplicateResultViolation(IReadOnlyList<Change<Contracts.SkillRecipe>> changes)
+        {
+            var resultByRecipe = _recipes.AllSkillRecipeEntities()
+                .Where(r => r.RetiredAt is null)
+                .ToDictionary(r => r.Id, r => r.ResultSkillId);
+
+            // An Add's real id is store-generated and unknown here, so a descending sentinel keeps each new
+            // producer distinct from every real recipe id and from the other Adds in the batch.
+            var addKey = 0;
+            foreach (var change in changes)
+            {
+                if (change.ChangeType == EChangeType.Add)
+                {
+                    resultByRecipe[--addKey] = change.Item.ResultSkillId;
+                }
+                else if (change.ChangeType == EChangeType.Edit)
+                {
+                    if (change.Item.RetiredAt is not null)
+                    {
+                        resultByRecipe.Remove(change.Item.Id);
+                    }
+                    else if (_recipes.LookupSkillRecipe(change.Item.Id) is not null)
+                    {
+                        // Re-points a live recipe's result, or brings an un-retired one back into circulation.
+                        resultByRecipe[change.Item.Id] = change.Item.ResultSkillId;
+                    }
+                }
+            }
+
+            var duplicate = resultByRecipe.Values.GroupBy(id => id).FirstOrDefault(g => g.Count() > 1);
+            if (duplicate is null)
+            {
+                return null;
+            }
+
+            var skill = _skills.LookupSkill(duplicate.Key);
+            return AdminSaveResult.Failure(
+                $"Skill '{skill?.Name ?? duplicate.Key.ToString()}' would be produced by more than one active recipe; each skill may have only one producing recipe.");
         }
 
         /// <summary>The live recipe graph as (result, inputs) pairs keyed by recipe id — the base every
