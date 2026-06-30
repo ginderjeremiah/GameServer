@@ -1,8 +1,8 @@
-import { EItemCategory } from '$lib/api';
-import { EEquipmentSlot, getEquipmentSlotForCategory, inventoryManager } from '$lib/engine';
-import { BattleAttributes, type AttributeEntry, type Item, type ItemMod } from '$lib/battle';
+import { EDamageType, EItemCategory, type ISkill } from '$lib/api';
+import { EEquipmentSlot, getEquipmentSlotForCategory, inventoryManager, playerManager } from '$lib/engine';
+import { BattleAttributes, newlyDormantSkills, type AttributeEntry, type Item, type ItemMod } from '$lib/battle';
 import { meetsItemProficiencyRequirement } from '$lib/common';
-import { playerProficiencies, staticData, toastError } from '$stores';
+import { confirmModal, playerProficiencies, staticData, toastError } from '$stores';
 
 /* ─── Static config ─────────────────────────────────────────────────────
    Equipment slots are declared here (extensible): adding a second weapon
@@ -154,6 +154,31 @@ export class InventoryView {
 		return meetsItemProficiencyRequirement(item, (id) => playerProficiencies.levelOf(id));
 	}
 
+	/** Selected skills that would go dormant if the weapon slot's type became `nextWeaponType` — fielded under
+	 *  the currently-equipped weapon, dimmed after the swap. Derived from the same weapon-match gate the battle
+	 *  and Skills screen use (#1342), so it can't claim a skill dims that the battle would still field. */
+	weaponSwapDormantSkills(nextWeaponType: EDamageType): ISkill[] {
+		const skills = staticData.skills ?? [];
+		const selected = playerManager.selectedSkills.map((id) => skills[id]).filter((s): s is ISkill => s != null);
+		return newlyDormantSkills(selected, inventoryManager.equippedWeaponType, nextWeaponType);
+	}
+
+	/** Prompts the player before a weapon equip that would dim part of the saved loadout, naming the affected
+	 *  `dormant` skills. Returns true to proceed (the player accepted), false to abort. The loadout itself is
+	 *  never edited — the skills simply go dormant until a matching weapon is re-equipped. */
+	private confirmWeaponSwap(item: Item, dormant: ISkill[]): Promise<boolean> {
+		const single = dormant.length === 1;
+		const names = dormant.map((s) => s.name).join(', ');
+		return confirmModal({
+			title: 'Some skills will go dormant',
+			body:
+				`Equipping ${item.name} will leave ${single ? 'this skill' : `these ${dormant.length} skills`} ` +
+				`dormant until you re-equip a matching weapon: ${names}. Your loadout stays saved.`,
+			confirmLabel: 'Equip anyway',
+			cancelLabel: 'Keep current weapon'
+		});
+	}
+
 	// Inventory mutations apply optimistically and roll back on a persist error; await the manager's
 	// boolean and surface a toast on failure so the silent revert is reported, not swallowed.
 	async equip(itemId: number, slotId: EEquipmentSlot) {
@@ -163,6 +188,15 @@ export class InventoryView {
 		if (item && !this.canEquip(item)) {
 			toastError('You have not met the proficiency requirement to equip this item.');
 			return;
+		}
+		// Weapon-match warning (#1342): equipping a weapon can dim off-weapon selected skills. Warn (and let
+		// the player back out) before the optimistic apply so a silently-dormant loadout isn't a surprise.
+		// The dormant set is computed synchronously, so the no-conflict path never awaits a modal.
+		if (item && slotId === EEquipmentSlot.WeaponSlot) {
+			const dormant = this.weaponSwapDormantSkills(item.weaponType ?? EDamageType.Unarmed);
+			if (dormant.length > 0 && !(await this.confirmWeaponSwap(item, dormant))) {
+				return;
+			}
 		}
 		if (!(await inventoryManager.equipItem(itemId, slotId))) {
 			toastError('Your equipment change could not be saved. Please try again.');

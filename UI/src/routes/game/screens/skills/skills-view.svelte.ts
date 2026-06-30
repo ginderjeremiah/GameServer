@@ -22,6 +22,7 @@ import {
 	calculateSkillDamage,
 	cooldownMultiplier,
 	expectedCritMultiplier,
+	isSkillDormant,
 	skillContributions,
 	type SkillContribution
 } from '$lib/battle';
@@ -177,6 +178,10 @@ export class SkillsView {
 	 *  skills?" is answered by the Codex, not here. */
 	readonly catalogue = $derived((staticData.skills ?? []).filter((s) => this.unlockedIds.has(s.id)));
 
+	/** The equipped weapon's type, driving the weapon-match grey-out (#1342). An empty weapon slot resolves to
+	 *  the virtual-fists `Unarmed`, exactly as the battle assembly keys the gate. */
+	readonly equippedWeaponType = $derived(inventoryManager.equippedWeaponType);
+
 	/** The player's resolved battle attributes (allocation + equipped item/mod stats),
 	 *  the same composition the battle uses. */
 	readonly battleAttributes = $derived(
@@ -329,6 +334,13 @@ export class SkillsView {
 
 	isEquipped(id: number): boolean {
 		return this.equipped.includes(id);
+	}
+
+	/** Whether a skill is dormant under the equipped weapon — a weapon-leaf-typed skill whose type doesn't
+	 *  match the held weapon (weapon-agnostic skills never dim). Derived from the same `isFielded` rule the
+	 *  battle assembly applies, so the greyed cards can't diverge from the skills actually fielded (#1342). */
+	dormant(skill: ISkill): boolean {
+		return isSkillDormant(skill, this.equippedWeaponType);
 	}
 
 	/** 1-based loadout slot of an equipped skill (0 when not equipped). */

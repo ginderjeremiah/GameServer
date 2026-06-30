@@ -14,6 +14,7 @@
 	{#each slots as id, index (id ?? `empty-${index}`)}
 		{@const metrics = id != null ? view.metric(id) : undefined}
 		{#if id != null && metrics}
+			{@const dormant = view.dormant(metrics.skill)}
 			<!-- Accessible card: a presentational container whose primary action is a full-bleed
 			     OverlayButton (inspect the skill, or resolve a pending swap into this slot), with the
 			     remove button as a higher-z-index sibling and the drag handle on the overlay — native
@@ -24,6 +25,7 @@
 				class:swap-target={swapping}
 				class:dragging={view.dragIndex === index}
 				class:dragover={dragOverIndex === index}
+				class:dormant
 				ondragover={(e) => onDragOver(e, index)}
 				ondrop={(e) => onDrop(e, index)}
 			>
@@ -69,7 +71,17 @@
 					</div>
 				{/if}
 				<span class="en">{metrics.skill.name}</span>
-				<SkillCardStats {view} {metrics} />
+				{#if dormant}
+					<!-- Off-weapon: the skill stays saved but doesn't field until a matching weapon is held (#1342). -->
+					<span
+						class="dormant-note"
+						title="Off-weapon — dormant until you equip a {requiredWeapon(metrics.skill)} weapon"
+					>
+						⊘ dormant · needs {requiredWeapon(metrics.skill)}
+					</span>
+				{:else}
+					<SkillCardStats {view} {metrics} />
+				{/if}
 			</div>
 		{:else}
 			<button type="button" class="eqcard empty" class:dimmed={swapping} onclick={() => focusAvailable()}>
@@ -83,6 +95,9 @@
 <script lang="ts">
 import OverlayButton from '$components/OverlayButton.svelte';
 import SkillCardStats from './SkillCardStats.svelte';
+import type { ISkill } from '$lib/api';
+import { primaryDamageType } from '$lib/battle';
+import { damageTypeName } from '$lib/common';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -90,6 +105,9 @@ type Props = {
 };
 
 const { view }: Props = $props();
+
+/** The weapon type a dormant (off-weapon) skill needs equipped to field — its primary leaf type's name. */
+const requiredWeapon = (skill: ISkill): string => damageTypeName(primaryDamageType(skill.damagePortions));
 
 let dragOverIndex = $state<number | null>(null);
 
@@ -206,6 +224,14 @@ const onDragEnd = () => {
 	&.dragover {
 		border-color: var(--accent);
 		box-shadow: 0 0 0 1px var(--accent);
+	}
+
+	// Off-weapon (dormant): the saved skill isn't fielded until a matching weapon is held. Dimmed and
+	// border-muted so it reads as inactive, while staying fully interactive (removable / reorderable).
+	&.dormant {
+		opacity: 0.55;
+		border-style: dashed;
+		border-color: var(--border-medium);
 	}
 
 	&.swap-target {
@@ -325,6 +351,15 @@ const onDragEnd = () => {
 		font-size: 13.5px;
 		font-weight: 500;
 		line-height: 1.1;
+	}
+
+	.dormant-note {
+		font-family: var(--mono);
+		font-size: 8.5px;
+		letter-spacing: 0.8px;
+		text-transform: uppercase;
+		// Neutral muted tone (matching the innate dupe-note); --warning is reserved for validation.
+		color: var(--text-tertiary);
 	}
 }
 </style>

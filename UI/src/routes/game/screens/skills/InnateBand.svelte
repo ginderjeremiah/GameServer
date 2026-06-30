@@ -10,11 +10,20 @@
 	<div class="band" style:--cap={view.cap}>
 		{#each view.innateSkills as innate, index (`${innate.skill.id}-${index}`)}
 			{@const metrics = view.metric(innate.skill.id)}
-			<div class="eqcard" class:dupe={innate.duplicate} data-testid="innate-card">
+			{@const dormant = !innate.duplicate && view.dormant(innate.skill)}
+			<div class="eqcard" class:dupe={innate.duplicate} class:dormant data-testid="innate-card">
 				<span class="src" title="Granted by {innate.sourceItemName}">⟡ {innate.sourceItemName}</span>
 				<span class="en">{innate.skill.name}</span>
 				{#if innate.duplicate}
 					<span class="dupe-note">already in your loadout</span>
+				{:else if dormant}
+					<!-- A granted weapon-typed skill is gated like a selected one (#1342). -->
+					<span
+						class="dormant-note"
+						title="Off-weapon — dormant until you equip a {requiredWeapon(innate.skill)} weapon"
+					>
+						⊘ dormant · needs {requiredWeapon(innate.skill)}
+					</span>
 				{:else if metrics}
 					<SkillCardStats {view} {metrics} />
 				{/if}
@@ -25,6 +34,9 @@
 
 <script lang="ts">
 import SkillCardStats from './SkillCardStats.svelte';
+import type { ISkill } from '$lib/api';
+import { primaryDamageType } from '$lib/battle';
+import { damageTypeName } from '$lib/common';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -32,6 +44,9 @@ type Props = {
 };
 
 const { view }: Props = $props();
+
+/** The weapon type a dormant (off-weapon) granted skill needs equipped to field — its primary leaf type. */
+const requiredWeapon = (skill: ISkill): string => damageTypeName(primaryDamageType(skill.damagePortions));
 </script>
 
 <style lang="scss">
@@ -73,6 +88,20 @@ const { view }: Props = $props();
 	&.dupe {
 		opacity: 0.7;
 	}
+
+	// Off-weapon (dormant): a granted weapon-typed skill the held weapon doesn't field.
+	&.dormant {
+		opacity: 0.55;
+	}
+}
+
+.dormant-note {
+	font-family: var(--mono);
+	font-size: 8.5px;
+	letter-spacing: 0.8px;
+	text-transform: uppercase;
+	// Neutral muted tone (matching the dupe-note); --warning is reserved for validation.
+	color: var(--text-tertiary);
 }
 
 .src {

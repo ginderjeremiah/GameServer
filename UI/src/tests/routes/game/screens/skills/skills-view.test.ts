@@ -39,7 +39,10 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 		mockPlayerManager: playerManager,
 		mockInventoryManager: {
 			equipmentStats: [] as { attributeId: number; amount: number }[],
-			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[]
+			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[],
+			// The equipped weapon type driving the weapon-match grey-out (#1342); reset to Unarmed in beforeEach.
+			// A numeric literal because this hoisted factory runs before the EDamageType import is evaluated.
+			equippedWeaponType: 13 as EDamageType
 		},
 		sendSocketCommand: vi.fn(),
 		toastError: vi.fn(),
@@ -200,6 +203,7 @@ beforeEach(() => {
 	mockPlayerManager.attributes = [];
 	mockInventoryManager.equipmentStats = [];
 	mockInventoryManager.equippedSlots = [];
+	mockInventoryManager.equippedWeaponType = EDamageType.Unarmed;
 	view = new SkillsView();
 });
 
@@ -614,5 +618,35 @@ describe('SkillsView — critical hits fold into effective damage', () => {
 		// The ceiling is the hardest current target's Toughness (Ogre King boss = 60), independent of the
 		// crit multiplier — the curve has no "block everything" point to scale toward.
 		expect(view.maxToughness).toBe(60);
+	});
+});
+
+/* The weapon-match grey-out (#1342): a weapon-leaf-typed skill is dormant unless the matching weapon is
+   equipped. `dormant()` derives from the same `isFielded` rule the battle assembly applies. */
+describe('SkillsView — weapon-match grey-out', () => {
+	const typed = (type: EDamageType): ISkill => skill({ id: 99, damagePortions: [{ type, weight: 1 }] });
+
+	/** A fresh view that reads `weaponType` as the equipped weapon (the derived caches on construction). */
+	const viewWithWeapon = (weaponType: EDamageType): SkillsView => {
+		mockInventoryManager.equippedWeaponType = weaponType;
+		return new SkillsView();
+	};
+
+	it('dims a weapon-leaf skill that does not match the equipped weapon', () => {
+		const v = viewWithWeapon(EDamageType.Sword);
+		expect(v.dormant(typed(EDamageType.Axe))).toBe(true);
+		expect(v.dormant(typed(EDamageType.Sword))).toBe(false);
+	});
+
+	it('bare-handed (Unarmed) fields only Unarmed weapon-leaf skills', () => {
+		const v = viewWithWeapon(EDamageType.Unarmed);
+		expect(v.dormant(typed(EDamageType.Unarmed))).toBe(false);
+		expect(v.dormant(typed(EDamageType.Sword))).toBe(true);
+	});
+
+	it('never dims weapon-agnostic skills', () => {
+		const v = viewWithWeapon(EDamageType.Sword);
+		expect(v.dormant(typed(EDamageType.Physical))).toBe(false);
+		expect(v.dormant(typed(EDamageType.Fire))).toBe(false);
 	});
 });

@@ -1,7 +1,8 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
 import { mitigateDamage, resistanceTotal, cooldownMultiplier } from './battle-formulas';
-import { dotAccumulators, isWeaponLeaf } from './damage-types';
+import { dotAccumulators } from './damage-types';
+import { isFielded } from './loadout';
 import { IBattlerAttribute, ISkillEffect, EAttribute, EDamageType, EModifierType } from '$lib/api';
 import { EAttributeModifierSource, type AttributeModifier } from './attribute-modifier';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
@@ -389,9 +390,7 @@ export class Battler {
 		const seen = new Set<number>();
 		const skills: (Skill | undefined)[] = [];
 		const fielded = (skill: Skill): boolean =>
-			equippedWeaponType === undefined ||
-			!isWeaponLeaf(skill.primaryDamageType) ||
-			skill.primaryDamageType === equippedWeaponType;
+			equippedWeaponType === undefined || isFielded(skill.primaryDamageType, equippedWeaponType);
 		// De-dupe by id (first occurrence wins, like the backend's Distinct) BEFORE the gate, so a dimmed
 		// selected skill that an item also grants stays dropped rather than slipping in via the grant.
 		const addSkill = (skillId: number): void => {
