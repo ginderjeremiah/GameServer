@@ -606,3 +606,95 @@ describe('InventoryView weapon-swap warning', () => {
 		expect(equipItem).toHaveBeenCalledWith(8, 0);
 	});
 });
+
+/* Unequipping the weapon resets the weapon type to Unarmed, which dims every weapon-leaf selected skill that
+   isn't Unarmed — the same silent surprise the equip warning guards against, reached via a different action.
+   The unequip path runs the same gate against `nextWeaponType = Unarmed`. */
+describe('InventoryView weapon-unequip warning', () => {
+	const makeSkill = (id: number, name: string, type: EDamageType): ISkill =>
+		({ id, name, damagePortions: [{ type, weight: 1 }] }) as unknown as ISkill;
+
+	it('warns before unequipping a weapon that dims a fielded selected skill, naming it', async () => {
+		// Wielding a Sword (a Sword skill is fielded); unequipping leaves that Sword skill dormant.
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		playerState.selectedSkills = [0];
+
+		await new InventoryView().unequip(4); // WeaponSlot
+
+		expect(confirmModal).toHaveBeenCalledTimes(1);
+		const opts = confirmModal.mock.calls[0][0] as { title: string; body: string };
+		expect(opts.title).toMatch(/dormant/i);
+		expect(opts.body).toContain('Slash');
+		expect(opts.body).toMatch(/unequip/i);
+		expect(unequipItem).toHaveBeenCalledWith(4);
+	});
+
+	it('aborts the unequip when the player declines the warning', async () => {
+		confirmModal.mockResolvedValue(false);
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		playerState.selectedSkills = [0];
+
+		await new InventoryView().unequip(4);
+
+		expect(confirmModal).toHaveBeenCalledTimes(1);
+		expect(unequipItem).not.toHaveBeenCalled();
+	});
+
+	it('uses singular phrasing for one skill and a count for several', async () => {
+		// Two fielded Sword skills dim when unequipping; the agnostic skill never does.
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [
+			makeSkill(0, 'Slash', EDamageType.Sword),
+			makeSkill(1, 'Parry', EDamageType.Sword),
+			makeSkill(2, 'Strike', EDamageType.Physical)
+		];
+		playerState.selectedSkills = [0, 1, 2];
+
+		await new InventoryView().unequip(4);
+
+		const opts = confirmModal.mock.calls[0][0] as { body: string };
+		expect(opts.body).toContain('these 2 skills');
+		expect(opts.body).toContain('Slash');
+		expect(opts.body).toContain('Parry');
+		expect(opts.body).not.toContain('Strike'); // agnostic skill is never dormant
+	});
+
+	it('does not warn when every selected skill is weapon-agnostic', async () => {
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Strike', EDamageType.Physical), makeSkill(1, 'Ember', EDamageType.Fire)];
+		playerState.selectedSkills = [0, 1];
+
+		await new InventoryView().unequip(4);
+
+		expect(confirmModal).not.toHaveBeenCalled();
+		expect(unequipItem).toHaveBeenCalledWith(4);
+	});
+
+	it('does not run the weapon warning when unequipping a non-weapon slot', async () => {
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		playerState.selectedSkills = [0];
+
+		await new InventoryView().unequip(0); // HelmSlot
+
+		expect(confirmModal).not.toHaveBeenCalled();
+		expect(unequipItem).toHaveBeenCalledWith(0);
+	});
+
+	it('warns through toggleEquip when unequipping an equipped weapon dims a fielded skill', async () => {
+		weaponState.equippedWeaponType = EDamageType.Sword;
+		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		playerState.selectedSkills = [0];
+		const equippedWeapon = makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary, {
+			equipped: true,
+			equipmentSlotId: 4
+		});
+
+		await new InventoryView().toggleEquip(equippedWeapon);
+
+		expect(confirmModal).toHaveBeenCalledTimes(1);
+		expect(unequipItem).toHaveBeenCalledWith(4);
+	});
+});
