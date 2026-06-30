@@ -92,7 +92,8 @@ namespace Game.Application.Content
             {
                 enemy.AttributeDistribution = enemy.AttributeDistribution.OrderBy(a => a.AttributeId).ToList();
                 enemy.SkillPool = enemy.SkillPool.OrderBy(s => s).ToList();
-                enemy.Spawns = enemy.Spawns.OrderBy(s => s.ZoneId).ToList();
+                // ZoneId is unique per spawn today; ThenBy(Weight) makes the order provably total regardless.
+                enemy.Spawns = enemy.Spawns.OrderBy(s => s.ZoneId).ThenBy(s => s.Weight).ToList();
             }
             return ordered;
         }
@@ -113,7 +114,8 @@ namespace Game.Application.Content
             foreach (var cls in ordered)
             {
                 cls.StarterSkillIds = cls.StarterSkillIds.OrderBy(s => s).ToList();
-                cls.StarterEquipment = cls.StarterEquipment.OrderBy(e => e.EquipmentSlot).ToList();
+                // EquipmentSlot is unique per starter item today; ThenBy(ItemId) makes the order provably total.
+                cls.StarterEquipment = cls.StarterEquipment.OrderBy(e => e.EquipmentSlot).ThenBy(e => e.ItemId).ToList();
                 cls.AttributeDistributions = cls.AttributeDistributions.OrderBy(a => a.AttributeId).ToList();
             }
             return ordered;
@@ -154,10 +156,12 @@ namespace Game.Application.Content
         /// form never depends on the reader's locale or the value's <see cref="DateTimeKind"/>. An Unspecified
         /// kind (the shape a bare <c>timestamp</c> column reads back as) is taken to already be UTC.
         /// </summary>
-        private sealed class UtcIsoDateTimeConverter : JsonConverter<DateTime>
+        internal sealed class UtcIsoDateTimeConverter : JsonConverter<DateTime>
         {
             private const string Format = "yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'";
 
+            // Read is the inverse of the canonical Write — the export only writes, but a round-trip parse keeps
+            // the converter symmetric and is what the JSON-driven seeder (#1419) will deserialize through.
             public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
                 var value = reader.GetString();
