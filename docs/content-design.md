@@ -144,7 +144,7 @@ The damage-type taxonomy ([leaves, categories, weapon leaves](./game-design.md#d
 
 A class is a [character-creation preset with a persistent identity hook](./game-design.md#classes) — the *first* content a new player touches.
 
-**Kit model:** each class starts with **one weapon** (carrying its signature skill via `GrantedSkillId`) and **one secondary off-skill**. The path-less **"punch" is no longer an always-on slot** — it is usable **only when the weapon is unequipped** (the unarmed fallback that guarantees you're never skill-less without a weapon). So a class kit = **weapon + 1 secondary**.
+**Kit model:** each class starts with **one weapon** (carrying its signature skill via `GrantedSkillId`) and **one secondary off-skill**. **Punch** is not a kit slot but the **virtual fists' `Unarmed` signature** — fielded only when no weapon is equipped (the [weapon-match gate](./game-design.md#weapon-match-gate)'s bare-handed case) and training the `Unarmed`/`Martial` mastery like any other weapon signature. So a class kit = **weapon + 1 secondary**.
 
 **Early zones are class-agnostic by design.** A zone provides and teaches the tools to beat it (Zone 2 introduces its own counters), so no class is locked out of early progression regardless of its kit — clearing Zones 1–2 never depends on a class-specific tool. Class shapes a character's *starting roots and identity*, not its *access*; the schedule's per-class variance is in starting roots only.
 
