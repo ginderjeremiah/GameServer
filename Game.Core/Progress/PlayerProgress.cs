@@ -191,6 +191,14 @@ namespace Game.Core.Progress
             return completed;
         }
 
+        /// <summary>
+        /// The ids of the challenges the player has completed — the in-aggregate equivalent of
+        /// <c>IPlayerProgressRepository.GetCompletedChallengeIds</c>, for callers that already hold a loaded
+        /// aggregate (e.g. the offline pass) so they need not re-read the progress cache key just to gate on it.
+        /// </summary>
+        public HashSet<int> CompletedChallengeIds() =>
+            [.. _challenges.Values.Where(c => c.Completed).Select(c => c.Challenge.Id)];
+
         public decimal GetStatisticValue(EStatisticType type, int? entityId)
         {
             TryGetStatisticValue(type, entityId, out var value);
