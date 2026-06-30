@@ -87,6 +87,32 @@ describe('CombatFloaters', () => {
 		expect(floater.getAttribute('style')).toContain('var(--enemy-accent)');
 	});
 
+	describe('reflected damage (#1330)', () => {
+		it('floats a player reflection over the enemy with the reflect glyph, label, and amount', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'reflect', amount: 33 });
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('33');
+			expect(floater.querySelector('.floater-label')?.textContent).toBe('REFLECT');
+			// The shared combat-log reflect glyph is an inline SVG, not a PNG outcome icon.
+			expect(floater.querySelector('.floater-glyph svg')).not.toBeNull();
+			expect(floater.querySelector('img.floater-icon')).toBeNull();
+			// A player-side reflect lands on the enemy in the brand accent (mirrors the log line's hue).
+			expect(floater.getAttribute('style')).toContain('var(--accent)');
+		});
+
+		it('floats an enemy reflection over the player in the enemy hue', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'player', testId: 'player-floaters' } });
+			emit({ target: 'player', kind: 'reflect', amount: 12 });
+
+			const floater = getByTestId('player-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('12');
+			expect(floater.querySelector('.floater-glyph svg')).not.toBeNull();
+			expect(floater.getAttribute('style')).toContain('var(--enemy-accent)');
+		});
+	});
+
 	describe('typed damage (#1320)', () => {
 		it('tints a typed plain hit by its damage type and shows the type icon', () => {
 			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
