@@ -46,8 +46,8 @@ namespace Game.Application.Tests.Services
             // Offense paths for the two schools the Flaming Sword spans. No Elemental umbrella is seeded, so the
             // Fire portion routes only to the Fire path here (applies(Fire) = [Fire, Elemental] would also feed an
             // Elemental path — covered by the umbrella tests).
-            var physical = await CreateOffenseTierAsync(context, EActivityKey.Physical, "Swordsmanship");
-            var fire = await CreateOffenseTierAsync(context, EActivityKey.Fire, "Fire Magic");
+            var physical = await CreateKeyedTierAsync(context, EActivityKey.Physical, "Swordsmanship");
+            var fire = await CreateKeyedTierAsync(context, EActivityKey.Fire, "Fire Magic");
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
@@ -72,8 +72,8 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            var physical = await CreateOffenseTierAsync(context, EActivityKey.Physical, "Swordsmanship");
-            var fire = await CreateOffenseTierAsync(context, EActivityKey.Fire, "Fire Magic");
+            var physical = await CreateKeyedTierAsync(context, EActivityKey.Physical, "Swordsmanship");
+            var fire = await CreateKeyedTierAsync(context, EActivityKey.Fire, "Fire Magic");
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
@@ -100,9 +100,9 @@ namespace Game.Application.Tests.Services
 
             // The even-split Storm Blade exercises a 3-portion hit. Each leaf gets a third of the raw damage, so
             // each of its three paths trains equally — an even split is just equal weights.
-            var wind = await CreateOffenseTierAsync(context, EActivityKey.Wind, "Aeromancy");
-            var water = await CreateOffenseTierAsync(context, EActivityKey.Water, "Hydromancy");
-            var physical = await CreateOffenseTierAsync(context, EActivityKey.Physical, "Swordsmanship");
+            var wind = await CreateKeyedTierAsync(context, EActivityKey.Wind, "Aeromancy");
+            var water = await CreateKeyedTierAsync(context, EActivityKey.Water, "Hydromancy");
+            var physical = await CreateKeyedTierAsync(context, EActivityKey.Physical, "Swordsmanship");
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
@@ -128,8 +128,8 @@ namespace Game.Application.Tests.Services
 
             // Enemies field the same skills, so multi-typed enemy combat comes free: an enemy Flaming Sword hit
             // exposes the player to each portion's pre-mitigation typed damage, training the matching resist paths.
-            var physicalResist = await CreateOffenseTierAsync(context, EActivityKey.PhysicalResist, "Physical Warding");
-            var fireResist = await CreateOffenseTierAsync(context, EActivityKey.FireResist, "Fire Warding");
+            var physicalResist = await CreateKeyedTierAsync(context, EActivityKey.PhysicalResist, "Physical Warding");
+            var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, "Fire Warding");
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
@@ -221,7 +221,7 @@ namespace Game.Application.Tests.Services
 
         // A single-tier path bound to an activity key (offense or resist). A generous curve keeps the small per-
         // battle gains banked at level 0, so XpGained reads as the raw claim under test.
-        private static async Task<Game.Infrastructure.Entities.Proficiency> CreateOffenseTierAsync(
+        private static async Task<Game.Infrastructure.Entities.Proficiency> CreateKeyedTierAsync(
             GameContext context, EActivityKey activityKey, string name)
         {
             var path = await TestDataSeeder.CreatePathAsync(context, name: name, activityKey: activityKey);
