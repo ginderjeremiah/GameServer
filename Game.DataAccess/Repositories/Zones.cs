@@ -45,6 +45,11 @@ namespace Game.DataAccess.Repositories
             return IsValidZoneId(entities, zoneId) ? entities[zoneId] : null;
         }
 
+        public IReadOnlyList<Zone> AllZones()
+        {
+            return Snapshot.Entities;
+        }
+
         public bool IsZoneRetired(int zoneId)
         {
             var entities = Snapshot.Entities;

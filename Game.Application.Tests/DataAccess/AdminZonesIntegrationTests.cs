@@ -199,6 +199,167 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveZones_AddsFirstHomeZone_PersistsIsHome()
+        {
+            // No Home zone exists yet, so authoring the first one is allowed — and IsHome must round-trip to
+            // the entity (the authoring path persists the sanctuary flag, not just the read contract).
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminZones>();
+                var result = admin.SaveZones(
+                [
+                    new Change<Contracts.Zone>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.Zone
+                        {
+                            Name = "Home",
+                            Description = "A quiet refuge.",
+                            LevelMin = 1,
+                            LevelMax = 1,
+                            BossLevel = 1,
+                            IsHome = true,
+                        },
+                    },
+                ]);
+
+                Assert.True(result.Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var zone = await context.Set<Entities.Zone>().SingleAsync(CancellationToken);
+                Assert.True(zone.IsHome);
+            }
+        }
+
+        [Fact]
+        public async Task SaveZones_SecondHomeZone_ReturnsFailure()
+        {
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateZoneAsync(context, "Home", isHome: true);
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A Home zone already exists, so adding a second one would leave two non-retired sanctuaries —
+            // rejected outright by the single-Home authoring guard.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SaveZones(
+            [
+                new Change<Contracts.Zone>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = new Contracts.Zone
+                    {
+                        Name = "Second Home",
+                        Description = "",
+                        LevelMin = 1,
+                        LevelMax = 1,
+                        BossLevel = 1,
+                        IsHome = true,
+                    },
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "Only one Home zone is allowed. Another non-retired Home zone already exists; retire it first or make this a combat zone.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveZones_FlipExistingCombatZoneToHome_WhenHomeExists_ReturnsFailure()
+        {
+            int combatZoneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateZoneAsync(context, "Home", isHome: true);
+                combatZoneId = (await TestDataSeeder.CreateZoneAsync(context, "Wilds")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Flipping an existing combat zone to Home is the second way to end up with two sanctuaries; the
+            // guard reasons over the full post-save catalogue, so it catches the edit too.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SaveZones(
+            [
+                new Change<Contracts.Zone>
+                {
+                    ChangeType = EChangeType.Edit,
+                    Item = new Contracts.Zone
+                    {
+                        Id = combatZoneId,
+                        Name = "Wilds",
+                        Description = "",
+                        LevelMin = 1,
+                        LevelMax = 10,
+                        BossLevel = 1,
+                        IsHome = true,
+                    },
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "Only one Home zone is allowed. Another non-retired Home zone already exists; retire it first or make this a combat zone.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveZones_RetiredHomeZone_DoesNotBlockNewHome()
+        {
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateZoneAsync(context, "Old Home", isHome: true, retiredAt: DateTime.UtcNow);
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A retired Home zone is out of circulation, so it doesn't count toward the single-Home limit —
+            // authoring a fresh sanctuary is allowed.
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminZones>();
+                var result = admin.SaveZones(
+                [
+                    new Change<Contracts.Zone>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.Zone
+                        {
+                            Name = "New Home",
+                            Description = "",
+                            LevelMin = 1,
+                            LevelMax = 1,
+                            BossLevel = 1,
+                            IsHome = true,
+                        },
+                    },
+                ]);
+
+                Assert.True(result.Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var activeHomeCount = await context.Set<Entities.Zone>()
+                    .CountAsync(z => z.IsHome && z.RetiredAt == null, CancellationToken);
+                Assert.Equal(1, activeHomeCount);
+            }
+        }
+
+        [Fact]
         public void SaveZones_EditUnknownZone_ReturnsNotFound()
         {
             // An Edit of a non-existent zone (no boss/unlock references, so the FK pre-pass passes) must be
