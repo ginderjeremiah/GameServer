@@ -882,6 +882,31 @@ namespace Game.Core.Tests.Progress
             Assert.DoesNotContain(progress.DirtyProficiencies, p => p.ProficiencyId == 4);
         }
 
+        // ── CompletedChallengeIds ────────────────────────────────────────────
+
+        [Fact]
+        public void CompletedChallengeIds_ReturnsOnlyCompletedChallenges()
+        {
+            var completed = new PlayerChallenge(
+                MakeChallenge(id: 7, EChallengeType.EnemiesKilled, goal: 3m), progress: 3m, completed: true,
+                completedAt: DateTime.UtcNow);
+            var inProgress = new PlayerChallenge(
+                MakeChallenge(id: 9, EChallengeType.EnemiesKilled, goal: 5m), progress: 2m, completed: false);
+            var progress = MakeProgress(challenges: [completed, inProgress]);
+
+            var ids = progress.CompletedChallengeIds();
+
+            Assert.Equal(7, Assert.Single(ids));
+        }
+
+        [Fact]
+        public void CompletedChallengeIds_NoChallenges_ReturnsEmpty()
+        {
+            var progress = MakeProgress();
+
+            Assert.Empty(progress.CompletedChallengeIds());
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static PlayerProgress MakeProgress(
