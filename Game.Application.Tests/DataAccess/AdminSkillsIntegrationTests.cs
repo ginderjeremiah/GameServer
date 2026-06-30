@@ -82,6 +82,51 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetPortions_DeletingTheLastPortion_ReturnsFailureWithoutPersisting()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                // CreateSkillAsync seeds a single Physical portion — the only one.
+                skillId = (await TestDataSeeder.CreateSkillAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Deleting the sole portion would leave the skill with zero portions (Σweights == 0) — rejected.
+            var data = new SetSkillPortionsData
+            {
+                Id = skillId,
+                Changes =
+                [
+                    new Change<Contracts.SkillDamagePortion>
+                    {
+                        ChangeType = EChangeType.Delete,
+                        Item = new Contracts.SkillDamagePortion { Type = EDamageType.Physical, Weight = 1m },
+                    },
+                ],
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                var result = admin.SetPortions(data);
+                Assert.False(result.Succeeded);
+                Assert.Equal("A skill must have at least one damage portion.", result.ErrorMessage);
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                // The sole portion is untouched — nothing was persisted.
+                var portion = Assert.Single(await context.SkillDamagePortions
+                    .Where(p => p.SkillId == skillId)
+                    .ToListAsync(CancellationToken));
+                Assert.Equal((int)EDamageType.Physical, portion.DamageType);
+            }
+        }
+
+        [Fact]
         public async Task SetPortions_AddsEditsAndDeletes()
         {
             int skillId;

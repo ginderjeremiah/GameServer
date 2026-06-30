@@ -99,6 +99,29 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.Failure("A skill damage portion's weight must be positive.");
             }
 
+            // Anti-tamper: a skill must keep at least one portion. Zero portions means Σweights == 0 — the same
+            // fire-time-normalization landmine (#1385) — and an undefined PrimaryDamageType. The editor warns on
+            // this but the warning is advisory, so the invariant is enforced here. Replay the change set's
+            // membership effect (Add inserts/keeps a type, Delete removes it, Edit leaves it) against the skill's
+            // current portion types; a duplicate key across change types is already rejected by the processor.
+            var resultingTypes = skill.SkillDamagePortions.Select(p => p.DamageType).ToHashSet();
+            foreach (var change in data.Changes)
+            {
+                switch (change.ChangeType)
+                {
+                    case EChangeType.Add:
+                        resultingTypes.Add((int)change.Item.Type);
+                        break;
+                    case EChangeType.Delete:
+                        resultingTypes.Remove((int)change.Item.Type);
+                        break;
+                }
+            }
+            if (resultingTypes.Count == 0)
+            {
+                return AdminSaveResult.Failure("A skill must have at least one damage portion.");
+            }
+
             // Build a fresh, navigation-free entity per change (not the cached one, whose loaded Skill
             // back-reference would drag the whole graph into the change tracker). Portions are keyed by their
             // leaf damage type — a skill carries at most one portion per type — so the change set reconciles
