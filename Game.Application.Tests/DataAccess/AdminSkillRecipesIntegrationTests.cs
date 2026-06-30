@@ -157,6 +157,140 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveSkillRecipes_ResultAlreadyProducedByLiveRecipe_ReturnsFailure()
+        {
+            int resultSkillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminSkillRecipes>();
+
+            var result = admin.SaveSkillRecipes(
+            [
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Add, Item = NewRecipe(resultSkillId: resultSkillId) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("more than one active recipe", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveSkillRecipes_DuplicateResultWithinBatch_ReturnsFailure()
+        {
+            int resultSkillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminSkillRecipes>();
+
+            var result = admin.SaveSkillRecipes(
+            [
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Add, Item = NewRecipe(resultSkillId: resultSkillId) },
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Add, Item = NewRecipe(resultSkillId: resultSkillId) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("more than one active recipe", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveSkillRecipes_EditResultToOneAnotherLiveRecipeProduces_ReturnsFailure()
+        {
+            int r2Id, skillX;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillX = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
+                var skillY = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = skillX });
+                var r2 = new Entities.SkillRecipe { ResultSkillId = skillY };
+                context.SkillRecipes.Add(r2);
+                await context.SaveChangesAsync(CancellationToken);
+                r2Id = r2.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminSkillRecipes>();
+
+            // Re-pointing R2's result to X (already produced by R1) collides.
+            var result = admin.SaveSkillRecipes(
+            [
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Edit, Item = NewRecipe(id: r2Id, resultSkillId: skillX) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("more than one active recipe", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveSkillRecipes_DuplicateResultButExistingProducerRetired_Succeeds()
+        {
+            int resultSkillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
+                // A retired recipe is inert, so its result is free to be produced by a live recipe.
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var writeScope = CreateScope();
+            var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkillRecipes>();
+
+            var result = admin.SaveSkillRecipes(
+            [
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Add, Item = NewRecipe(resultSkillId: resultSkillId) },
+            ]);
+
+            Assert.True(result.Succeeded);
+        }
+
+        [Fact]
+        public async Task SaveSkillRecipes_RetireProducerAndAddSameResultInOneBatch_Succeeds()
+        {
+            int r1Id, resultSkillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
+                var r1 = new Entities.SkillRecipe { ResultSkillId = resultSkillId };
+                context.SkillRecipes.Add(r1);
+                await context.SaveChangesAsync(CancellationToken);
+                r1Id = r1.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var writeScope = CreateScope();
+            var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkillRecipes>();
+
+            // Retiring R1 frees the result for the new recipe in the same batch.
+            var retired = NewRecipe(id: r1Id, resultSkillId: resultSkillId);
+            retired.RetiredAt = DateTime.UtcNow;
+            var result = admin.SaveSkillRecipes(
+            [
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Edit, Item = retired },
+                new Change<Contracts.SkillRecipe> { ChangeType = EChangeType.Add, Item = NewRecipe(resultSkillId: resultSkillId) },
+            ]);
+
+            Assert.True(result.Succeeded);
+        }
+
+        [Fact]
         public async Task SetInputs_EmptySet_ReturnsFailure()
         {
             int recipeId;
