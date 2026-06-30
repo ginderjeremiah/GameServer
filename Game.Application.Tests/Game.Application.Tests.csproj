@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Game.Application\Game.Application.csproj" />
     <ProjectReference Include="..\Game.Core\Game.Core.csproj" />
+    <ProjectReference Include="..\Game.Core.TestInfrastructure\Game.Core.TestInfrastructure.csproj" />
     <ProjectReference Include="..\Game.Abstractions\Game.Abstractions.csproj" />
     <ProjectReference Include="..\Game.DataAccess\Game.DataAccess.csproj" />
     <ProjectReference Include="..\Game.TestInfrastructure\Game.TestInfrastructure.csproj" />
