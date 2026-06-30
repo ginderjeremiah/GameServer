@@ -511,7 +511,7 @@ namespace Game.Application.Services
                 ResolveEnemy = resolveEnemy,
                 ResolveItem = _items.GetItem,
                 ResolveMod = _itemMods.GetItemMod,
-                ResolveSkill = _skills.GetSkill,
+                ResolveSkill = _skills.TryGetSkill,
                 ResolveProficiency = _proficiencies.GetProficiency,
                 ResolveClass = ResolveClass,
                 SeedSource = CreateBattleSeed,
@@ -804,7 +804,7 @@ namespace Game.Application.Services
             enemy.SetBattleSkills(enemySkillIds);
 
             var playerBattler = snapshot.ToBattler(
-                _items.GetItem, _itemMods.GetItemMod, _skills.GetSkill, _proficiencies.GetProficiency, ResolveClass);
+                _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
             var enemyBattler = new Battler(
                 new AttributeCollection(enemy.GetAttributeModifiers()),
                 enemy.BattleSkills,

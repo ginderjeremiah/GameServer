@@ -113,7 +113,7 @@ namespace Game.Core.Battle
         /// mirroring <see cref="BattleFactory"/>'s enemy resolver.
         /// </summary>
         public Battler ToBattler(
-            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill,
+            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill?> resolveSkill,
             Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
         {
             var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass));
@@ -121,7 +121,13 @@ namespace Game.Core.Battle
             {
                 attributes.AddModifier(passive);
             }
-            var skills = GetBattleSkillIds(resolveItem).Select(resolveSkill);
+            // The weapon-match gate reads each fielded id's type via the same resolver; an id that resolves to
+            // no skill (a leftover/unauthored grant such as an unseeded punch) yields a null type and is dropped
+            // by OrderSkillIds, so the following Select only ever sees ids that resolve (OfType filters the
+            // never-null nullable away without a null-forgiving operator).
+            var skills = GetBattleSkillIds(resolveItem, id => resolveSkill(id)?.PrimaryDamageType)
+                .Select(resolveSkill)
+                .OfType<Skill>();
 
             return new Battler(attributes, skills, Level);
         }
@@ -176,17 +182,37 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// The ordered, de-duplicated ids of the skills this snapshot's battler fights with: the captured
-        /// selected skills first, then the skills granted by the equipped items in
+        /// The ordered, de-duplicated, weapon-gated ids of the skills this snapshot's battler fights with: the
+        /// captured selected skills first, then the skills granted by the equipped items in
         /// <see cref="EEquipmentSlot"/> order (the order <see cref="FromPlayer"/> captured them in). The
-        /// granted ids are derived here from the already-captured <see cref="EquippedItems"/> — no extra
-        /// snapshot field — exactly as the item attributes are. Ordering and de-duplication are delegated to
-        /// <see cref="BattleLoadout.OrderSkillIds"/>, the single rule the frontend mirrors for battle parity.
+        /// granted ids — and the equipped weapon's type — are derived here from the already-captured
+        /// <see cref="EquippedItems"/> (no extra snapshot field), exactly as the item attributes are.
+        /// <para>
+        /// The equipped weapon is the equipped <see cref="EItemCategory.Weapon"/> item; its type resolves as
+        /// <c>weapon?.WeaponType ?? Unarmed</c> (an empty slot is the virtual <c>Unarmed</c> "fists"). With no
+        /// weapon equipped, the fists' granted signature — the configured <see cref="GameConstants.PunchSkillId"/>
+        /// — is appended, so punch is fielded only bare-handed (a real <c>Unarmed</c> weapon fields its own
+        /// signature instead, no free bonus skill). Ordering, de-duplication, and the weapon-match gate are
+        /// delegated to <see cref="BattleLoadout.OrderSkillIds"/>, the single rule the frontend mirrors for parity.
+        /// </para>
         /// </summary>
-        public IEnumerable<int> GetBattleSkillIds(Func<int, Item> resolveItem)
+        public IEnumerable<int> GetBattleSkillIds(Func<int, Item> resolveItem, Func<int, EDamageType?> resolveSkillType)
         {
-            var grantedSkillIds = EquippedItems.SelectNotNull(equipped => resolveItem(equipped.ItemId).GrantedSkillId);
-            return BattleLoadout.OrderSkillIds(SkillIds, grantedSkillIds);
+            var equippedItems = EquippedItems.Select(equipped => resolveItem(equipped.ItemId)).ToList();
+            var weapon = equippedItems.FirstOrDefault(item => item.Category == EItemCategory.Weapon);
+            var equippedWeaponType = weapon?.WeaponType ?? EDamageType.Unarmed;
+
+            var grantedSkillIds = equippedItems.SelectNotNull(item => item.GrantedSkillId);
+            // Bare hands are the virtual Unarmed "fists" weapon whose signature is punch (spike #1342): with no
+            // weapon equipped, the weapon slot's granted signature is the configured punch skill. It rides the
+            // ordinary grant list, so the uniform weapon-match gate fields it (Unarmed-typed, bare hands read
+            // Unarmed) and the no-stranding invariant holds even when every selected skill is dimmed.
+            if (weapon is null)
+            {
+                grantedSkillIds = grantedSkillIds.Append(GameConstants.PunchSkillId);
+            }
+
+            return BattleLoadout.OrderSkillIds(SkillIds, grantedSkillIds, equippedWeaponType, resolveSkillType);
         }
 
         /// <summary>

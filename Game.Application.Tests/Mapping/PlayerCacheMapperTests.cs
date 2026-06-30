@@ -445,6 +445,9 @@ namespace Game.Application.Tests.Mapping
                 };
             }
 
+            public CoreSkill? TryGetSkill(int skillId) =>
+                _missingSkillIds is not null && _missingSkillIds.Contains(skillId) ? null : GetSkill(skillId);
+
             public bool ValidateItemModId(int itemModId) => true;
 
             // ToCore never reads the full contract lists or the version key, only the per-id resolvers above.

@@ -1,7 +1,7 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
 import { mitigateDamage, resistanceTotal, cooldownMultiplier } from './battle-formulas';
-import { dotAccumulators } from './damage-types';
+import { dotAccumulators, isWeaponLeaf } from './damage-types';
 import { IBattlerAttribute, ISkillEffect, EAttribute, EDamageType, EModifierType } from '$lib/api';
 import { EAttributeModifierSource, type AttributeModifier } from './attribute-modifier';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
@@ -113,9 +113,10 @@ export class Battler {
 		battlerData?: BattlerData,
 		additionalAtttributes?: IBattlerAttribute[],
 		grantedSkillIds?: number[],
-		additionalModifiers?: AttributeModifier[]
+		additionalModifiers?: AttributeModifier[],
+		equippedWeaponType?: EDamageType
 	) {
-		this.reset(battlerData, additionalAtttributes, grantedSkillIds, additionalModifiers);
+		this.reset(battlerData, additionalAtttributes, grantedSkillIds, additionalModifiers, equippedWeaponType);
 	}
 
 	/** Advances each skill's charge by `timeDelta * cdMultiplier` **in loadout order**, invoking `onFire`
@@ -333,7 +334,8 @@ export class Battler {
 		battlerData?: BattlerData,
 		additionalAtttributes?: IBattlerAttribute[],
 		grantedSkillIds?: number[],
-		additionalModifiers?: AttributeModifier[]
+		additionalModifiers?: AttributeModifier[],
+		equippedWeaponType?: EDamageType
 	) {
 		// Remove the active effects' modifiers, not just the bookkeeping — a data-less reset keeps the
 		// existing attribute set, so leaving the modifiers would carry the previous battle's buffs over.
@@ -356,7 +358,7 @@ export class Battler {
 			this.attributes.setData(atts, true, additionalModifiers ?? []);
 			this.level = battlerData.level;
 			this.name = battlerData.name;
-			this.skills = this.fillSkills(battlerData, grantedSkillIds ?? []);
+			this.skills = this.fillSkills(battlerData, grantedSkillIds ?? [], equippedWeaponType);
 		}
 
 		// Re-arm every skill to the battle-start baseline. The data path's fillSkills already
@@ -374,29 +376,46 @@ export class Battler {
 	}
 
 	/** Assembles the battler's loadout: the player-selected skills first (in their chosen order, padded to
-	 *  the loadout cap so the fight screen keeps its fixed slots), then the item-granted skills (already
-	 *  gathered in EEquipmentSlot order) — the whole sequence de-duplicated by id, first occurrence wins.
-	 *  Mirrors the backend `BattleSnapshot.ToBattler` / `BattleLoadout.OrderSkillIds` assembly (a single
-	 *  `Distinct()` over selected + granted) so the two simulators field the same skills (battle parity). */
-	private fillSkills(battlerData: BattlerData, grantedSkillIds: number[]) {
+	 *  the loadout cap so the fight screen keeps its fixed slots), then the granted skills (the equipped items'
+	 *  signatures — including the virtual-fists punch when bare-handed — already gathered in EEquipmentSlot
+	 *  order by InventoryManager) — the whole sequence de-duplicated by id, first occurrence wins, then put
+	 *  through the weapon-match gate. A weapon-leaf-typed skill (#1342) is fielded only when it matches
+	 *  `equippedWeaponType`; weapon-agnostic types always pass. `equippedWeaponType` is undefined for an
+	 *  ungated battler (an enemy fields its full authored loadout), making the gate a no-op there. An id that
+	 *  resolves to no skill is skipped. Mirrors the backend `BattleSnapshot.GetBattleSkillIds` /
+	 *  `BattleLoadout.OrderSkillIds` (`Distinct()` then the gate) so the two simulators field the same skills. */
+	private fillSkills(battlerData: BattlerData, grantedSkillIds: number[], equippedWeaponType?: EDamageType) {
 		const skillData = staticData.skills ?? [];
 		const seen = new Set<number>();
 		const skills: (Skill | undefined)[] = [];
-		for (const skillId of battlerData.selectedSkills) {
-			if (!seen.has(skillId)) {
-				seen.add(skillId);
-				skills.push(new Skill(skillData[skillId], this));
+		const fielded = (skill: Skill): boolean =>
+			equippedWeaponType === undefined ||
+			!isWeaponLeaf(skill.primaryDamageType) ||
+			skill.primaryDamageType === equippedWeaponType;
+		// De-dupe by id (first occurrence wins, like the backend's Distinct) BEFORE the gate, so a dimmed
+		// selected skill that an item also grants stays dropped rather than slipping in via the grant.
+		const addSkill = (skillId: number): void => {
+			if (seen.has(skillId)) {
+				return;
 			}
+			seen.add(skillId);
+			const data = skillData[skillId];
+			if (data) {
+				const skill = new Skill(data, this);
+				if (fielded(skill)) {
+					skills.push(skill);
+				}
+			}
+		};
+		for (const skillId of battlerData.selectedSkills) {
+			addSkill(skillId);
 		}
 		while (skills.length < MAX_SELECTED_SKILLS) {
 			skills.push(undefined);
 		}
 
 		for (const skillId of grantedSkillIds) {
-			if (!seen.has(skillId)) {
-				seen.add(skillId);
-				skills.push(new Skill(skillData[skillId], this));
-			}
+			addSkill(skillId);
 		}
 		return skills;
 	}

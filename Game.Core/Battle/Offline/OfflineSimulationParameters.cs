@@ -59,8 +59,9 @@ namespace Game.Core.Battle.Offline
         /// <summary>Resolves an applied item mod by id when reconstructing the player from the snapshot.</summary>
         public required Func<int, ItemMod> ResolveMod { get; init; }
 
-        /// <summary>Resolves a selected skill by id when reconstructing the player from the snapshot.</summary>
-        public required Func<int, Skill> ResolveSkill { get; init; }
+        /// <summary>Resolves a selected/granted skill by id when reconstructing the player from the snapshot, or
+        /// <c>null</c> for an id with no skill (the weapon-match gate drops it — e.g. an unseeded bare-hands punch).</summary>
+        public required Func<int, Skill?> ResolveSkill { get; init; }
 
         /// <summary>Resolves a proficiency definition by id when composing the snapshot's per-level/milestone
         /// bonuses (used only when the snapshot captured proficiency levels).</summary>

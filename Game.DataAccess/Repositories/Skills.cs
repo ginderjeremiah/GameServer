@@ -31,5 +31,12 @@ namespace Game.DataAccess.Repositories
             // only reads from it — so sharing is safe.
             return holder.Current.CoreSkills.GetById(skillId, "skill");
         }
+
+        public CoreSkill? TryGetSkill(int skillId)
+        {
+            // The nullable Lookup shape: the zero-based core-skill list is contiguous, so an id at or beyond
+            // its count (e.g. an unseeded punch) yields null rather than throwing.
+            return holder.Current.CoreSkills.Lookup(skillId);
+        }
     }
 }
