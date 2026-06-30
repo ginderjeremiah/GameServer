@@ -759,6 +759,25 @@ describe('BattleEngine', () => {
 				expect(hit?.damageType).toBe(EDamageType.Fire);
 			});
 
+			it("carries the skill's weighted split and its PrimaryDamageType on a multi-typed hit float (#1343)", () => {
+				mockSkills[0].damagePortions = [
+					{ type: EDamageType.Physical, weight: 60 },
+					{ type: EDamageType.Fire, weight: 40 }
+				];
+				engine.start();
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+				logicalUpdateCallbacks[0](500);
+
+				const hit = events.find((event) => event.target === 'enemy');
+				// The number reads as the highest-weight portion; the floater draws the bar from the full split.
+				expect(hit?.damageType).toBe(EDamageType.Physical);
+				expect(hit?.portions).toEqual([
+					{ type: EDamageType.Physical, weight: 60 },
+					{ type: EDamageType.Fire, weight: 40 }
+				]);
+			});
+
 			it('emits an enemy-targeted crit when the player crits', () => {
 				forcePlayerChance(EAttribute.CriticalChance);
 				engine.start();

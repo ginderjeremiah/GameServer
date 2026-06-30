@@ -1,7 +1,7 @@
 import { Battler, battleStep, resistanceTotal, type BattleStepLog, type AttributeModifier } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData, playerProficiencies } from '$stores';
-import { ELogType, EDamageType, IBattlerAttribute, IEnemyInstance } from '$lib/api';
+import { ELogType, EDamageType, IBattlerAttribute, IEnemyInstance, ISkillDamagePortion } from '$lib/api';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 import { logMessage } from '../log';
 import {
@@ -52,6 +52,10 @@ export interface CombatFloatEvent {
 	kind: 'hit' | 'crit' | 'dodge' | 'reflect';
 	amount?: number;
 	damageType?: EDamageType;
+	/** The hit's weighted leaf-type split (#1343), present for a damaging `hit`/`crit` so the floater
+	 *  can draw the segmented ratio bar; `damageType` above is its `PrimaryDamageType` (number colour /
+	 *  icon). A single-portion hit needs no bar, so consumers render it only for a multi-typed split. */
+	portions?: readonly ISkillDamagePortion[];
 }
 
 const combatFloatHook = createHook<[CombatFloatEvent]>();
@@ -321,7 +325,7 @@ export class BattleEngine {
 					outcome,
 					resist === 'normal' ? undefined : resist
 				);
-				notifyCombatFloat(combatFloatEvent(outcome, damage, damageType));
+				notifyCombatFloat(combatFloatEvent(outcome, damage, damageType, skill.damagePortions));
 				// Deterministic reflection (#1330): the defender returned part of this hit to the attacker. The
 				// reflector is the opposite side of the activation — a player hit is reflected by the enemy, and an
 				// enemy hit by the player — and it deals raw, untyped damage, so the line carries no resist note.
@@ -438,16 +442,22 @@ function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): Di
  *  the combat-log line are both driven by the single {@link damageLogOutcome} classifier rather than a
  *  parallel copy of the flag branching. A player hit/crit floats over the enemy; an incoming enemy hit
  *  floats over the player as a dodge (no number) or a plain hit. `damageType` rides every damaging
- *  kind (not a dodge) so the floater can tint by type (#1320, Area F). */
-function combatFloatEvent(outcome: DirectHitOutcome, damage: number, damageType: EDamageType): CombatFloatEvent {
+ *  kind (not a dodge) so the floater can tint by type (#1320, Area F); `portions` rides the same
+ *  damaging kinds so it can draw the multi-typed ratio bar (#1343). */
+function combatFloatEvent(
+	outcome: DirectHitOutcome,
+	damage: number,
+	damageType: EDamageType,
+	portions: readonly ISkillDamagePortion[]
+): CombatFloatEvent {
 	switch (outcome) {
 		case 'player-crit':
-			return { target: 'enemy', kind: 'crit', amount: damage, damageType };
+			return { target: 'enemy', kind: 'crit', amount: damage, damageType, portions };
 		case 'player-hit':
-			return { target: 'enemy', kind: 'hit', amount: damage, damageType };
+			return { target: 'enemy', kind: 'hit', amount: damage, damageType, portions };
 		case 'player-dodge':
 			return { target: 'player', kind: 'dodge' };
 		case 'enemy-hit':
-			return { target: 'player', kind: 'hit', amount: damage, damageType };
+			return { target: 'player', kind: 'hit', amount: damage, damageType, portions };
 	}
 }
