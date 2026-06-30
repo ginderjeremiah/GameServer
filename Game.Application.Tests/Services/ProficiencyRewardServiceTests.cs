@@ -193,6 +193,60 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task LockedUmbrella_AccruesNoLeafActivity_UntilItsPrerequisitesAreMaxed()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A leaf Fire path and an "Elemental" umbrella path whose root tier is a cross-path gateway. A fired
+            // Fire skill rolls up into both the Fire and the Elemental offense keys (applies(Fire) =
+            // [Fire, Elemental]), but the umbrella's gateway is still locked (its prerequisite is un-maxed), so
+            // the leaf activity trains only the Fire path — it must not bank XP onto the locked umbrella (#1411).
+            var fireTier = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
+            var prereq = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Adv Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
+            var elementalTier = await CreateKeyedTierAsync(context, EActivityKey.Elemental, name: "Elemental");
+            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, elementalTier.Id, prereq.Id);
+
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats();
+            stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Contains(accrual.Results, r => r.ProficiencyId == fireTier.Id);
+            Assert.DoesNotContain(accrual.Results, r => r.ProficiencyId == elementalTier.Id);
+        }
+
+        [Fact]
+        public async Task UnlockedUmbrella_AccruesFromLeafActivity_OnceItsPrerequisitesAreMaxed()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The same leaf-rolls-into-umbrella setup, but the umbrella's prerequisite is already maxed, so the
+            // gateway is unlocked. The identical Fire activity now trains the Fire path and the Elemental umbrella
+            // in parallel — the leaf-type contribution flows once the umbrella is reachable (#1411).
+            var fireTier = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
+            var prereq = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Adv Fire", maxLevel: 1, baseXp: 1m, xpGrowth: 1m);
+            var elementalTier = await CreateKeyedTierAsync(context, EActivityKey.Elemental, name: "Elemental");
+            await TestDataSeeder.AddProficiencyPrerequisiteAsync(context, elementalTier.Id, prereq.Id);
+
+            var playerId = await SeedPlayerAsync(context);
+            await TestDataSeeder.AddPlayerProficiencyAsync(context, playerId, prereq.Id, level: 1);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats();
+            stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Contains(accrual.Results, r => r.ProficiencyId == fireTier.Id);
+            Assert.Contains(accrual.Results, r => r.ProficiencyId == elementalTier.Id);
+        }
+
+        [Fact]
         public async Task LivePath_RaisesTheEventCarryingGrantedSkillsAndOpenedTiers()
         {
             using var scope = CreateScope();
