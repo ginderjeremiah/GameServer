@@ -20,6 +20,17 @@ namespace Game.Core
         public const int MaxSelectedSkills = 4;
 
         /// <summary>
+        /// The reference-data id of the <em>punch</em> skill — the signature of the virtual <c>Unarmed</c>
+        /// "fists" weapon a player fields bare-handed (spike #1342). The weapon-match loadout gate resolves an
+        /// empty weapon slot's granted signature as <c>weapon?.GrantedSkillId ?? PunchSkillId</c>, so punch is
+        /// fielded only bare-handed; a real <c>Unarmed</c> weapon replaces the fists with its own signature.
+        /// A well-known seeded reference id like the starter-kit skills, mirrored to both simulators so they
+        /// inject the identical fists' signature. A bare-handed battler only fields punch when this id resolves
+        /// to a real skill (it is otherwise skipped), so the gate degrades gracefully if punch is unauthored.
+        /// </summary>
+        public const int PunchSkillId = 3;
+
+        /// <summary>
         /// The <c>K</c> in the <see cref="EAttribute.Toughness"/> mitigation curve
         /// <c>Toughness / (Toughness + K·attackerLevel)</c>. Scaling the denominator by the <em>attacker's</em>
         /// level keeps a level-appropriate Toughness investment in a stable mitigation band as both Toughness and

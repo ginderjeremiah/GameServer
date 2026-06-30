@@ -1,8 +1,18 @@
-import { IInventoryItem, IBattlerAttribute, ELogType, EItemCategory, EEquipmentSlot, apiSocket } from '$lib/api';
+import {
+	IInventoryItem,
+	IBattlerAttribute,
+	ELogType,
+	EItemCategory,
+	EEquipmentSlot,
+	EDamageType,
+	apiSocket
+} from '$lib/api';
+import { PUNCH_SKILL_ID } from '$lib/api/types/game-constants';
 import { playerManager } from '$lib/engine';
 import { BattleAttributes, Item, newItem, newItemMod } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
 import { SerializedQueue } from '$lib/common';
+import { staticData } from '$stores';
 
 // Re-exported from the generated client so the established `$lib/engine` import sites keep resolving
 // it here while the single source of truth is the codegen'd enum.
@@ -114,9 +124,18 @@ export class InventoryManager {
 
 	/** Ids of the skills the equipped items grant, in EEquipmentSlot order (memoised — recomputed only by
 	 *  {@link refreshEquipmentStats} on an equip/unequip/mod change). The battle build appends these to the
-	 *  player's loadout, de-duplicated against the selected skills. */
+	 *  player's loadout, de-duplicated against the selected skills. Includes the virtual-fists punch
+	 *  ({@link PUNCH_SKILL_ID}) when no weapon is equipped — the bare-hands signature (#1342). */
 	public get grantedSkillIds(): number[] {
 		return this.grantedSkillIdsCache;
+	}
+
+	/** The type the weapon-match gate keys on (#1342): the equipped weapon's `weaponType`, or `Unarmed` for
+	 *  the virtual fists when the weapon slot is empty. Always defined for the player battler (a player is
+	 *  always either armed or bare-handed); an enemy battler passes no type and is ungated. A weapon is
+	 *  authored with a weapon-leaf type, so the `?? Unarmed` is a defensive fallback. */
+	public get equippedWeaponType(): EDamageType {
+		return this.equippedSlots[EEquipmentSlot.WeaponSlot]?.weaponType ?? EDamageType.Unarmed;
 	}
 
 	/** Rebuilds the memoised {@link equipmentStats} and {@link grantedSkillIds} from the currently equipped
@@ -135,6 +154,14 @@ export class InventoryManager {
 					grantedSkillIds.push(item.grantedSkillId);
 				}
 			}
+		}
+		// Virtual-fists punch (#1342): with no weapon equipped, the weapon slot's signature is the configured
+		// punch skill, appended after the item grants (mirroring the backend BattleSnapshot.GetBattleSkillIds).
+		// Guarded on the skill resolving — like the backend's nullable lookup — so an unauthored punch is
+		// skipped rather than fielding a phantom slot. A real Unarmed weapon (brass knuckles) fields its own
+		// signature instead and gets no punch.
+		if (this.equippedSlots[EEquipmentSlot.WeaponSlot] == null && staticData.skills?.[PUNCH_SKILL_ID] != null) {
+			grantedSkillIds.push(PUNCH_SKILL_ID);
 		}
 		this.equipmentStatsCache = stats;
 		this.grantedSkillIdsCache = grantedSkillIds;

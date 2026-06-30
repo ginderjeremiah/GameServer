@@ -34,6 +34,11 @@ const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISki
 	acquisition: ESkillAcquisition.Player
 });
 
+const makeTypedSkillData = (id: number, type: EDamageType): ISkill => ({
+	...makeSkillData(id, 10, 1000),
+	damagePortions: [{ type, weight: 1 }]
+});
+
 const makeBattlerData = (overrides: Partial<Parameters<Battler['reset']>[0] & {}> = {}) => ({
 	name: 'TestBattler',
 	level: 5,
@@ -115,6 +120,86 @@ describe('Battler', () => {
 			expect(battler.skills).toHaveLength(4);
 			expect(battler.skills[0]).toBeDefined();
 			expect(battler.skills[1]).toBeUndefined();
+		});
+
+		// The weapon-match gate (#1342), mirroring the backend BattleSnapshotTests gate cases. The punch
+		// injection itself lives in InventoryManager (covered there); here the assembled grantedSkillIds —
+		// punch included — are passed in directly, exactly as the battle engine does.
+		describe('weapon-match gate (#1342)', () => {
+			beforeEach(() => {
+				mockSkills.length = 0;
+				mockSkills[0] = makeTypedSkillData(0, EDamageType.Physical); // weapon-agnostic
+				mockSkills[1] = makeTypedSkillData(1, EDamageType.Sword);
+				mockSkills[2] = makeTypedSkillData(2, EDamageType.Axe);
+				mockSkills[3] = makeTypedSkillData(3, EDamageType.Unarmed); // punch-typed
+				mockSkills[4] = makeTypedSkillData(4, EDamageType.Fire); // weapon-agnostic
+			});
+
+			const fieldedIds = (battler: Battler) =>
+				battler.skills.filter((s): s is Skill => s !== undefined).map((s) => s.id);
+
+			it('fields every skill when ungated (no equipped weapon type — an enemy battler)', () => {
+				const battler = new Battler(makeBattlerData({ selectedSkills: [1, 2, 0] }));
+				expect(fieldedIds(battler)).toEqual([1, 2, 0]);
+			});
+
+			it('dims off-weapon selected skills and keeps the matching + agnostic ones', () => {
+				const battler = new Battler(
+					makeBattlerData({ selectedSkills: [1, 2, 4] }),
+					undefined,
+					undefined,
+					undefined,
+					EDamageType.Sword
+				);
+				// Sword(1) matches, Axe(2) dimmed, Fire(4) is weapon-agnostic.
+				expect(fieldedIds(battler)).toEqual([1, 4]);
+			});
+
+			it('fields the Unarmed (punch-typed) skill bare-handed but dims a Sword skill', () => {
+				const battler = new Battler(
+					makeBattlerData({ selectedSkills: [3, 1] }),
+					undefined,
+					undefined,
+					undefined,
+					EDamageType.Unarmed
+				);
+				expect(fieldedIds(battler)).toEqual([3]);
+			});
+
+			it('gates granted skills uniformly (an off-weapon granted skill is dormant)', () => {
+				// Selected Physical(0) kept; an Axe(2) granted while a Sword is wielded is dormant.
+				const battler = new Battler(
+					makeBattlerData({ selectedSkills: [0] }),
+					undefined,
+					[2],
+					undefined,
+					EDamageType.Sword
+				);
+				expect(fieldedIds(battler)).toEqual([0]);
+			});
+
+			it('still fields a matching granted signature when every selected skill is dimmed (no-stranding)', () => {
+				// Selected Axe(2) is off-weapon (dimmed) while a Sword is wielded; the granted Sword(1) signature stays.
+				const battler = new Battler(
+					makeBattlerData({ selectedSkills: [2] }),
+					undefined,
+					[1],
+					undefined,
+					EDamageType.Sword
+				);
+				expect(fieldedIds(battler)).toEqual([1]);
+			});
+
+			it('skips a granted id that resolves to no skill (e.g. an unauthored punch)', () => {
+				const battler = new Battler(
+					makeBattlerData({ selectedSkills: [0] }),
+					undefined,
+					[99],
+					undefined,
+					EDamageType.Unarmed
+				);
+				expect(fieldedIds(battler)).toEqual([0]);
+			});
 		});
 
 		it('merges additional attributes', () => {

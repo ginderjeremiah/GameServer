@@ -125,10 +125,15 @@ export function battlerFactory(registry: ISkill[]) {
 export function grantedBattlerFactory(registry: ISkill[]) {
 	return {
 		register: (spec: SkillSpec): number => registerSkill(registry, spec),
+		// `equippedWeaponType` drives the weapon-match gate (#1342): a weapon-leaf-typed skill is fielded only
+		// when it matches it; weapon-agnostic skills always field. Undefined leaves the battler ungated (an
+		// enemy). The bare-hands punch / the weapon's signature ride `grantedSkillIds` exactly as the live
+		// InventoryManager appends them, so the harness exercises the same fielded set the engine builds.
 		build: (
 			attrs: { id: EAttribute; amount: number }[],
 			selectedSkillIds: number[],
-			grantedSkillIds: number[]
+			grantedSkillIds: number[],
+			equippedWeaponType?: EDamageType
 		): Battler =>
 			new Battler(
 				{
@@ -138,7 +143,9 @@ export function grantedBattlerFactory(registry: ISkill[]) {
 					attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
 				},
 				undefined,
-				grantedSkillIds
+				grantedSkillIds,
+				undefined,
+				equippedWeaponType
 			)
 	};
 }

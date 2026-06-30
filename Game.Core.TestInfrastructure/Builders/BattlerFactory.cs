@@ -17,31 +17,44 @@ namespace Game.Core.TestInfrastructure.Builders
         /// Builds a battler from the live player. Selected skills come straight off the aggregate; the
         /// skills granted by equipped items (<see cref="Items.Item.GrantedSkillId"/>) are resolved against
         /// the supplied <paramref name="resolveSkill"/> — the live item carries only the id, mirroring the
-        /// snapshot — and the two sets are ordered and de-duplicated by the shared
+        /// snapshot — and the two sets are ordered, de-duplicated, and weapon-gated by the shared
         /// <see cref="BattleLoadout.OrderSkillIds"/> rule so this matches <see cref="BattleSnapshot.ToBattler"/>.
-        /// A resolver is required only when an equipped item actually grants a skill.
+        /// A resolver is required only when an equipped item actually grants a skill; the bare-hands punch
+        /// (spike #1342) is resolver-gated, so the resolver-less shortcut a weaponless test battler uses fields
+        /// no phantom punch and the gate is otherwise a no-op over weapon-agnostic skills.
         /// </summary>
-        public static Battler FromPlayer(Player player, Func<int, Skill>? resolveSkill = null)
+        public static Battler FromPlayer(Player player, Func<int, Skill?>? resolveSkill = null)
         {
-            var grantedSkillIds = player.Inventory.EquipmentSlots
-                .SelectNotNull(slot => slot.Item?.GrantedSkillId)
-                .ToList();
+            var equippedItems = player.Inventory.EquipmentSlots.SelectNotNull(slot => slot.Item).ToList();
+            var weapon = equippedItems.FirstOrDefault(item => item.Category == EItemCategory.Weapon);
+            var equippedWeaponType = weapon?.WeaponType ?? EDamageType.Unarmed;
 
-            if (grantedSkillIds.Count == 0)
+            var grantedSkillIds = equippedItems.SelectNotNull(item => item.GrantedSkillId).ToList();
+            // Mirror the snapshot's virtual-fists punch (BattleSnapshot.GetBattleSkillIds): with no weapon
+            // equipped the weapon slot's signature is punch. Resolver-gated so the shortcut weaponless battler
+            // (no resolver) doesn't field it.
+            if (weapon is null && resolveSkill is not null)
             {
-                return new Battler(player.GetAttributes(), player.SelectedSkills, player.Level);
+                grantedSkillIds.Add(GameConstants.PunchSkillId);
             }
 
-            if (resolveSkill is null)
+            if (grantedSkillIds.Count > 0 && resolveSkill is null)
             {
                 throw new InvalidOperationException(
                     "A skill resolver is required to build a battler from a player whose equipped items grant skills.");
             }
 
             var selectedById = player.SelectedSkills.ToDictionary(skill => skill.Id);
+            EDamageType? ResolveSkillType(int id) =>
+                selectedById.TryGetValue(id, out var selected)
+                    ? selected.PrimaryDamageType
+                    : resolveSkill?.Invoke(id)?.PrimaryDamageType;
+
             var skills = BattleLoadout
-                .OrderSkillIds(player.SelectedSkills.Select(skill => skill.Id), grantedSkillIds)
-                .Select(id => selectedById.TryGetValue(id, out var selected) ? selected : resolveSkill(id));
+                .OrderSkillIds(player.SelectedSkills.Select(skill => skill.Id), grantedSkillIds, equippedWeaponType, ResolveSkillType)
+                .Select(id => selectedById.TryGetValue(id, out var selected)
+                    ? selected
+                    : resolveSkill?.Invoke(id) ?? throw new InvalidOperationException($"Skill {id} could not be resolved."));
 
             return new Battler(player.GetAttributes(), skills, player.Level);
         }

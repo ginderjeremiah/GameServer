@@ -1306,6 +1306,40 @@ const scenarios: ParityScenario[] = [
 				[]
 			),
 		expected: { victory: true, playerDied: false, totalMs: 360 }
+	},
+
+	// ── Weapon-match gate + virtual-fists punch (#1342) ──────────────────────────
+	// Mirrors the backend `weaponGateDimsOffWeaponSelected` / `bareHandsPunchFieldsAlongsideAgnostic`. The
+	// fielded set is filtered by the equipped weapon at assembly (setup-time, never per tick), identically
+	// FE/BE. The weapon's signature / the bare-hands punch ride grantedSkillIds as InventoryManager appends
+	// them; equippedWeaponType drives the gate.
+
+	// A Sword is wielded: the selected Axe skill is off-weapon (dormant) and never fires; only the sword's
+	// own-type signature (28/hit, cooldown 400, no Toughness) does, dropping the 100-HP enemy on hit 4 at
+	// tick 40 → 1600ms. (Un-dimmed, the Axe + signature pair — 56/tick — would kill on hit 2 at 800ms.)
+	{
+		name: 'weaponGateDimsOffWeaponSelected',
+		player: () => {
+			const axe = granted.register(makeSkill(28, 400, [], [], EDamageType.Axe));
+			const swordSignature = granted.register(makeSkill(28, 400, [], [], EDamageType.Sword));
+			return granted.build([{ id: EAttribute.Strength, amount: 0 }], [axe], [swordSignature], EDamageType.Sword);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
+	// Bare-handed: the virtual-fists punch is fielded alongside an agnostic selected skill. Selected Physical
+	// 16/hit + punch (Unarmed) 24/hit fire together (cooldown 400) for 40/tick; the 100-HP enemy dies on the
+	// tick-30 volley → 1200ms. (The agnostic skill alone — 16/tick — would win only on hit 7 at 2800ms.)
+	{
+		name: 'bareHandsPunchFieldsAlongsideAgnostic',
+		player: () => {
+			const physical = granted.register(makeSkill(16, 400, [], [], EDamageType.Physical));
+			const punch = granted.register(makeSkill(24, 400, [], [], EDamageType.Unarmed));
+			return granted.build([{ id: EAttribute.Strength, amount: 0 }], [physical], [punch], EDamageType.Unarmed);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
 	}
 ];
 

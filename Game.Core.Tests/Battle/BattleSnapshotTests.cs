@@ -132,7 +132,7 @@ namespace Game.Core.Tests.Battle
                 SkillIds = [],
             };
 
-            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill);
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, NoSkill);
 
             Assert.Equal(8, battler.GetAttributeValue(EAttribute.Strength));
         }
@@ -148,7 +148,7 @@ namespace Game.Core.Tests.Battle
                 SkillIds = [],
             };
 
-            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill);
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, NoSkill);
 
             Assert.Empty(battler.Skills);
         }
@@ -169,7 +169,7 @@ namespace Game.Core.Tests.Battle
                 ModResolver(
                     MakeMod(10, EItemModType.Prefix, [MakeModifier(EAttribute.Strength, 3)]),
                     MakeMod(11, EItemModType.Suffix, [MakeModifier(EAttribute.Strength, 4)])),
-                ThrowSkill);
+                NoSkill);
 
             // Strength = 2 (item) + 3 (mod 10) + 4 (mod 11) = 9
             Assert.Equal(9, battler.GetAttributeValue(EAttribute.Strength));
@@ -211,7 +211,7 @@ namespace Game.Core.Tests.Battle
             };
 
             // A proficiency granting +3 Strength at level 1 and +6 at level 2; the player is level 2, so both apply.
-            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, NoSkill,
                 ProficiencyResolver(MakeProficiency(5,
                     (1, [ProfMod(EAttribute.Strength, 3)]),
                     (2, [ProfMod(EAttribute.Strength, 6)]))));
@@ -261,7 +261,7 @@ namespace Game.Core.Tests.Battle
                 SkillIds = [],
             };
 
-            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, NoSkill,
                 resolveClass: ClassResolver(MakeClass(2,
                     Distribution(EAttribute.Strength, 10m, amountPerLevel: 2m),
                     Distribution(EAttribute.Endurance, 3m))));
@@ -291,7 +291,7 @@ namespace Game.Core.Tests.Battle
                 ScalingAmount = 0m,
                 ModifierType = EModifierType.Additive,
             };
-            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, NoSkill,
                 resolveClass: ClassResolver(MakeClassWithPassive(3, passive)));
 
             // Strength = 6 (free pool) + 4 (flat signature passive) = 10.
@@ -321,7 +321,7 @@ namespace Game.Core.Tests.Battle
                 ScalingAmount = 0.5m,
                 ModifierType = EModifierType.Additive,
             };
-            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, ThrowSkill,
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, NoSkill,
                 resolveClass: ClassResolver(MakeClassWithPassive(3, passive, Distribution(EAttribute.Endurance, 4m, amountPerLevel: 3m))));
 
             // Endurance = 5 (free pool) + (4 + 3 × 2) locked base = 15.
@@ -539,6 +539,138 @@ namespace Game.Core.Tests.Battle
             Assert.Equal([9], battler.Skills.Select(s => s.Skill.Id));
         }
 
+        // ── Weapon-match gate + virtual-fists punch (#1342) ──────────────────
+
+        [Fact]
+        public void ToBattler_BareHanded_FieldsPunchAsTheVirtualFistsSignature()
+        {
+            // No weapon equipped: the weapon slot's granted signature is the configured punch skill.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [],
+                SkillIds = [2],
+            };
+
+            var battler = snapshot.ToBattler(
+                ThrowItem, ThrowMod,
+                SkillResolver(MakeSkill(2), MakeSkill(GameConstants.PunchSkillId, EDamageType.Unarmed)));
+
+            // The selected skill, then punch (the bare-hands signature) appended as a grant.
+            Assert.Equal([2, GameConstants.PunchSkillId], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_BareHanded_PunchUnauthored_FieldsOnlySelected()
+        {
+            // The configured punch id resolves to no skill (none seeded): bare hands then field no free
+            // signature — the gate degrades gracefully rather than fielding a phantom.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [],
+                SkillIds = [2],
+            };
+
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, SkillResolver(MakeSkill(2)));
+
+            Assert.Equal([2], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_UnarmedWeaponEquipped_FieldsItsOwnSignature_NotPunch()
+        {
+            // Brass knuckles: a real Unarmed weapon replaces the virtual fists and fields ITS signature; the
+            // weapon is equipped, so punch is never appended (no free bonus skill, symmetric with a sword).
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] }],
+                SkillIds = [],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, category: EItemCategory.Weapon, weaponType: EDamageType.Unarmed, grantedSkillId: 5)),
+                ThrowMod,
+                SkillResolver(MakeSkill(5, EDamageType.Unarmed), MakeSkill(GameConstants.PunchSkillId, EDamageType.Unarmed)));
+
+            Assert.Equal([5], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_WeaponEquipped_DimsOffWeaponSelected_KeepsMatchingAndAgnostic()
+        {
+            // A sword fields its own (Sword) signature; a selected Sword skill matches and a selected Fire skill
+            // is weapon-agnostic — both fielded; a selected Axe skill is off-weapon and goes dormant.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] }],
+                SkillIds = [6, 7],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, category: EItemCategory.Weapon, weaponType: EDamageType.Sword, grantedSkillId: 5)),
+                ThrowMod,
+                SkillResolver(
+                    MakeSkill(5, EDamageType.Sword),
+                    MakeSkill(6, EDamageType.Axe),
+                    MakeSkill(7, EDamageType.Fire)));
+
+            // Selected: Axe(6) dimmed, Fire(7) kept; then the Sword signature(5). No punch (a weapon is held).
+            Assert.Equal([7, 5], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void ToBattler_AllSelectedDimmed_StillFieldsTheWeaponSignature()
+        {
+            // Every selected skill is off-weapon (dormant), but the weapon's own-type signature guarantees the
+            // player still fields ≥1 usable skill — the no-stranding invariant.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] }],
+                SkillIds = [6, 7],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, category: EItemCategory.Weapon, weaponType: EDamageType.Sword, grantedSkillId: 5)),
+                ThrowMod,
+                SkillResolver(
+                    MakeSkill(5, EDamageType.Sword),
+                    MakeSkill(6, EDamageType.Axe),
+                    MakeSkill(7, EDamageType.Dagger)));
+
+            Assert.Equal([5], battler.Skills.Select(s => s.Skill.Id));
+        }
+
+        [Fact]
+        public void RoundTrip_WeaponGate_DimsOffWeaponSelectedSkill_MatchesLivePlayerBattler()
+        {
+            // The live and snapshot battler paths apply the weapon-match gate identically: a Sword wielded, an
+            // off-weapon Axe selected skill dimmed, a weapon-agnostic Fire selected skill kept, plus the sword's
+            // own signature — pinning that the gate is part of the shared assembly both paths run.
+            var sword = MakeItem(1, category: EItemCategory.Weapon, weaponType: EDamageType.Sword, grantedSkillId: 5);
+            var swordSignature = MakeSkill(5, EDamageType.Sword);
+            var axeSkill = MakeSkill(6, EDamageType.Axe);
+            var fireSkill = MakeSkill(7, EDamageType.Fire);
+
+            var player = MakePlayer(level: 4, allocations: [Alloc(EAttribute.Strength, 3)], selectedSkills: [axeSkill, fireSkill]);
+            EquipInSlot(player, sword, EEquipmentSlot.WeaponSlot);
+
+            AssertBattlerParity(player, ItemResolver(sword), ThrowMod, SkillResolver(swordSignature, axeSkill, fireSkill));
+
+            var battler = BattleSnapshot.FromPlayer(player)
+                .ToBattler(ItemResolver(sword), ThrowMod, SkillResolver(swordSignature, axeSkill, fireSkill),
+                    resolveClass: ClassResolver(MakeClass(player.ClassId)));
+            Assert.Equal([7, 5], battler.Skills.Select(s => s.Skill.Id));
+        }
+
         // ── Round-trip parity with the live Player battler ───────────────────
         // The snapshot path must reconstruct exactly the same attributes the live Player aggregate
         // composes — this is the frontend/backend battle-parity (anti-cheat) guarantee.
@@ -594,7 +726,7 @@ namespace Game.Core.Tests.Battle
             player.TryApplyMod(item.Id, prefix.Id, 0, prefix);
             player.TryApplyMod(item.Id, suffix.Id, 1, suffix);
 
-            AssertBattlerParity(player, ItemResolver(item), ModResolver(prefix, suffix), ThrowSkill);
+            AssertBattlerParity(player, ItemResolver(item), ModResolver(prefix, suffix), NoSkill);
         }
 
         [Fact]
@@ -628,7 +760,7 @@ namespace Game.Core.Tests.Battle
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static void AssertBattlerParity(Player player,
-            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill> resolveSkill)
+            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill?> resolveSkill)
         {
             // The live battler (Player.GetAllModifiers) composes only stat allocations + gear — the class locked
             // base is a snapshot-only contributor, like proficiency bonuses — so this stat/gear/skill round-trip
@@ -695,18 +827,22 @@ namespace Game.Core.Tests.Battle
             return id => map[id];
         }
 
-        private static Func<int, Skill> SkillResolver(params Skill[] skills)
+        // Null (not throw) for an unresolved id: the weapon-match gate probes the bare-hands punch id on every
+        // weaponless assembly, so a throwing skill resolver would fire on a battler that fields no real skill.
+        // A missing id resolves to null and OrderSkillIds drops it (these tests seed no punch skill).
+        private static Func<int, Skill?> SkillResolver(params Skill[] skills)
         {
             var map = skills.ToDictionary(s => s.Id);
-            return id => map[id];
+            return id => map.GetValueOrDefault(id);
         }
 
         private static readonly Func<int, Item> ThrowItem =
             id => throw new InvalidOperationException($"Unexpected item resolve for {id}");
         private static readonly Func<int, ItemMod> ThrowMod =
             id => throw new InvalidOperationException($"Unexpected mod resolve for {id}");
-        private static readonly Func<int, Skill> ThrowSkill =
-            id => throw new InvalidOperationException($"Unexpected skill resolve for {id}");
+        // The "no skills" resolver: returns null for every id, so a weaponless assembly's punch probe resolves
+        // to nothing and is dropped, while a test that does expect a skill resolution uses SkillResolver instead.
+        private static readonly Func<int, Skill?> NoSkill = _ => null;
 
         private static Func<int, Proficiency> ProficiencyResolver(params Proficiency[] proficiencies)
         {
@@ -776,7 +912,7 @@ namespace Game.Core.Tests.Battle
 
         private static Item MakeItem(int id, EItemCategory category = EItemCategory.Accessory,
             List<AttributeModifier>? attributes = null, List<ItemModSlot>? modSlots = null,
-            int? grantedSkillId = null) => new()
+            int? grantedSkillId = null, EDamageType? weaponType = null) => new()
             {
                 Id = id,
                 Name = $"Item {id}",
@@ -784,6 +920,7 @@ namespace Game.Core.Tests.Battle
                 Category = category,
                 Rarity = ERarity.Common,
                 GrantedSkillId = grantedSkillId,
+                WeaponType = weaponType,
                 Attributes = attributes ?? [],
                 ModSlots = modSlots ?? [],
             };
@@ -798,13 +935,13 @@ namespace Game.Core.Tests.Battle
             Attributes = attributes ?? [],
         };
 
-        private static Skill MakeSkill(int id) => new()
+        private static Skill MakeSkill(int id, EDamageType damageType = EDamageType.Physical) => new()
         {
             Id = id,
             Name = $"Skill {id}",
             BaseDamage = 1,
             Description = string.Empty,
-            DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
+            DamagePortions = [new SkillDamagePortion { Type = damageType, Weight = 1.0 }],
             CooldownMs = 1000,
             DamageMultipliers = [],
             Effects = [],

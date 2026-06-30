@@ -51,7 +51,11 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],
-			grantedSkillIds: [] as number[]
+			grantedSkillIds: [] as number[],
+			// The weapon-match gate's equipped weapon type (#1342), threaded to the player battler rebuild.
+			// Literal EDamageType.Unarmed (13) rather than the enum: this object lives in a hoisted vi.mock
+			// factory, where referencing the imported enum value at runtime throws (used before initialization).
+			equippedWeaponType: 13 as EDamageType
 		};
 		// The player's proficiency battle modifiers — a stable reference (the real store memoises via a
 		// `$derived`) the battle engine compares by identity, so reassigning it simulates a proficiency change.
@@ -878,7 +882,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				newStats,
 				mockInventoryManager.grantedSkillIds,
-				mockPlayerProficiencies.battleModifiers
+				mockPlayerProficiencies.battleModifiers,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -893,7 +898,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				mockPlayerProficiencies.battleModifiers
+				mockPlayerProficiencies.battleModifiers,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -912,7 +918,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				newModifiers
+				newModifiers,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -940,7 +947,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				newLockedBase
+				newLockedBase,
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 
@@ -984,7 +992,8 @@ describe('BattleEngine', () => {
 				mockPlayerManager,
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
-				[...lockedBase, ...proficiency]
+				[...lockedBase, ...proficiency],
+				mockInventoryManager.equippedWeaponType
 			);
 		});
 	});

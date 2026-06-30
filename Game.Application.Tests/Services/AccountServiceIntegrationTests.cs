@@ -156,8 +156,13 @@ namespace Game.Application.Tests.Services
             Assert.Equal(weapon.Id, weaponSlot.ItemId);
 
             // The weapon's innate skill comes online in the assembled battler, additive to the starter skills.
+            // The granted "Fireball" and the starter skills are all weapon-agnostic (Physical), so the
+            // weapon-match gate fields them all regardless of the weapon's type.
             var items = verifyProvider.GetRequiredService<IItems>();
-            var battleSkillIds = BattleSnapshot.FromPlayer(player).GetBattleSkillIds(items.GetItem).ToList();
+            var skills = verifyProvider.GetRequiredService<ISkills>();
+            var battleSkillIds = BattleSnapshot.FromPlayer(player)
+                .GetBattleSkillIds(items.GetItem, id => skills.TryGetSkill(id)?.PrimaryDamageType)
+                .ToList();
             Assert.Contains(grantedSkill.Id, battleSkillIds);
             Assert.Equal(starterSkills, battleSkillIds.Where(id => starterSkills.Contains(id)));
         }
