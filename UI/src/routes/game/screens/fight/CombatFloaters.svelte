@@ -14,15 +14,22 @@
 			style:color={floater.color}
 			style:font-size="{floater.size}px"
 		>
-			{#if floater.glyph}
-				<span class="floater-glyph"
-					><LogGlyph glyph={floater.glyph} color={floater.color} size={Math.round(floater.size * 0.85)} /></span
-				>
-			{:else if floater.icon}
-				<img class="floater-icon" src={floater.icon} alt="" />
+			<span class="floater-main">
+				{#if floater.glyph}
+					<span class="floater-glyph"
+						><LogGlyph glyph={floater.glyph} color={floater.color} size={Math.round(floater.size * 0.85)} /></span
+					>
+				{:else if floater.icon}
+					<img class="floater-icon" src={floater.icon} alt="" />
+				{/if}
+				{#if floater.amount}<span>{floater.amount}</span>{/if}
+				{#if floater.label}<span class="floater-label">{floater.label}</span>{/if}
+			</span>
+			<!-- A multi-typed hit (#1343) shows the exact split as a thin ratio bar under the primary-coloured
+			     number; a single-typed hit stays a clean number, exactly as before. -->
+			{#if floater.portions.length > 1}
+				<div class="floater-ratio"><DamageRatioBar portions={floater.portions} height={3} /></div>
 			{/if}
-			{#if floater.amount}<span>{floater.amount}</span>{/if}
-			{#if floater.label}<span class="floater-label">{floater.label}</span>{/if}
 		</div>
 	{/each}
 </div>
@@ -31,8 +38,9 @@
 import { onMount } from 'svelte';
 import { formatNum, damageTypeColor, damageTypeIcon } from '$lib/common';
 import { onCombatFloat, type CombatFloatEvent } from '$lib/engine';
-import { EDamageType } from '$lib/api';
+import { EDamageType, type ISkillDamagePortion } from '$lib/api';
 import LogGlyph from '$components/log-panel/LogGlyph.svelte';
+import DamageRatioBar from '$components/DamageRatioBar.svelte';
 import type { GlyphKind } from '$components/log-panel/log-kind';
 
 type Props = {
@@ -56,6 +64,9 @@ interface Floater {
 	glyph: GlyphKind | '';
 	amount: string;
 	label: string;
+	/** The hit's weighted leaf-type split (#1343); rendered as a ratio bar only for a multi-typed hit
+	 *  (2+ portions), empty otherwise so a single-typed hit stays a clean number. */
+	portions: readonly ISkillDamagePortion[];
 }
 
 /** Clean per-outcome icon art (in `static/img`) for the crit/dodge floaters; a plain hit shows its
@@ -157,7 +168,8 @@ const spawn = (event: CombatFloatEvent) => {
 		icon: iconOf(event),
 		glyph: glyphOf(event),
 		amount: amountOf(event),
-		label: labelFor(event.kind)
+		label: labelFor(event.kind),
+		portions: event.portions ?? []
 	});
 	const timer = setTimeout(() => {
 		removalTimers.delete(timer);
@@ -192,6 +204,9 @@ onMount(() => {
 .floater {
 	position: absolute;
 	top: 54%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
 	font-family: var(--mono);
 	font-weight: 700;
 	white-space: nowrap;
@@ -203,6 +218,19 @@ onMount(() => {
 			0 1px 4px color-mix(in srgb, var(--black) 85%, transparent),
 			0 0 6px currentColor;
 	}
+}
+
+// The number line (icon/glyph + amount + label) on its own row, so the ratio bar can stack beneath it.
+// Kept a plain inline-content block (not flex) so the icon/glyph `vertical-align` baseline tweaks hold.
+.floater-main {
+	display: block;
+}
+
+// The multi-typed split bar, sized to roughly the number's width and centred beneath it.
+.floater-ratio {
+	width: 80%;
+	min-width: 24px;
+	margin-top: 2px;
 }
 
 // Per-outcome / damage-type combat icon; sized in em so it tracks the floater's font-size.

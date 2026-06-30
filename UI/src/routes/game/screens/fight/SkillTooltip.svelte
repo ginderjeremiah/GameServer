@@ -11,6 +11,10 @@
 		<DamageBreakdown base={baseDamage} {multipliers} {crit} mitigated={opponent ? mitigated : undefined} {total} />
 	</TooltipSection>
 
+	<TooltipSection label="Damage types">
+		<SkillDamageTypes {portions} />
+	</TooltipSection>
+
 	<TooltipSection label="Tempo" last={effectLines.length === 0}>
 		<TempoMetrics cooldown={adjustedCd} dps={damagePerSecond(total, adjustedCd)} />
 	</TooltipSection>
@@ -44,6 +48,7 @@ import { staticData } from '$stores';
 import TooltipShell from '$components/tooltip/TooltipShell.svelte';
 import TooltipSection from '$components/tooltip/TooltipSection.svelte';
 import TooltipTitle from '$components/tooltip/TooltipTitle.svelte';
+import SkillDamageTypes from '$components/SkillDamageTypes.svelte';
 import CooldownPill from './skill-tooltip/CooldownPill.svelte';
 import DamageBreakdown from './skill-tooltip/DamageBreakdown.svelte';
 import EffectLines from './skill-tooltip/EffectLines.svelte';
@@ -68,6 +73,8 @@ const opponent = $derived(skill?.owner ? battleEngine.getOpponent(skill.owner) :
 const rarityAccent = $derived(skill ? rarityColor(skill.rarityId) : 'var(--accent)');
 
 const baseDamage = $derived(skill?.baseDamage ?? 0);
+// The skill's weighted leaf-type split, surfaced as the portion-mix section (#1343).
+const portions = $derived(skill?.damagePortions ?? []);
 const multipliers = $derived(
 	(skill ? skillContributions(skill, skill.owner.attributes) : []).map((contribution) => ({
 		attributeId: contribution.attributeId,
