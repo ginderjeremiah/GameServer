@@ -5,6 +5,7 @@ import {
 	attributesForKey,
 	amplificationAttributes,
 	resistanceAttributes,
+	isWeaponLeaf,
 	keyForAttribute,
 	dotAccumulators,
 	dotTypeForAccumulator
@@ -42,6 +43,46 @@ describe('damage-types applies()', () => {
 		// alignment (append-only), so the original types' coincidental ordinal match no longer holds.
 		expect(EDamageTypeKey[expected[0] as number]).toBe(EDamageType[type as number]);
 		expect(applies(type)[0]).toBe(expected[0]);
+	});
+});
+
+// Mirror of the backend `DamageTypesTests` weapon-leaf cases (IsWeaponLeaf_*). The full set of leaf types is
+// the keys of the appliesCases table above (every EDamageType).
+const weaponLeafTypes = [
+	EDamageType.Sword,
+	EDamageType.Axe,
+	EDamageType.Bow,
+	EDamageType.Club,
+	EDamageType.Dagger,
+	EDamageType.Unarmed
+];
+const nonWeaponLeafTypes = [
+	EDamageType.Physical,
+	EDamageType.Fire,
+	EDamageType.Water,
+	EDamageType.Earth,
+	EDamageType.Wind,
+	EDamageType.Bleed,
+	EDamageType.Poison,
+	EDamageType.Burn
+];
+
+describe('damage-types isWeaponLeaf()', () => {
+	it.each(weaponLeafTypes)('is true for weapon leaf %s', (type) => {
+		expect(isWeaponLeaf(type)).toBe(true);
+	});
+
+	it.each(nonWeaponLeafTypes)('is false for non-weapon leaf %s', (type) => {
+		// Generic Physical is the shared category key, not a weapon leaf; the elementals and DoT leaves don't
+		// roll up under Physical at all — notably Burn ([Burn, Fire, Elemental, Dot]) excludes Physical.
+		expect(isWeaponLeaf(type)).toBe(false);
+	});
+
+	it('agrees with the weapon-leaf set for every leaf type', () => {
+		const weaponLeaves = new Set(weaponLeafTypes);
+		for (const [type] of appliesCases) {
+			expect(isWeaponLeaf(type)).toBe(weaponLeaves.has(type));
+		}
 	});
 });
 
