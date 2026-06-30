@@ -156,7 +156,11 @@ export class InventoryView {
 
 	/** Selected skills that would go dormant if the weapon slot's type became `nextWeaponType` — fielded under
 	 *  the currently-equipped weapon, dimmed after the swap. Derived from the same weapon-match gate the battle
-	 *  and Skills screen use (#1342), so it can't claim a skill dims that the battle would still field. */
+	 *  and Skills screen use (#1342), so it can't claim a skill dims that the battle would still field.
+	 *
+	 *  Intentionally covers the player's *selected* skills only, not item-granted ones: the warning is about the
+	 *  saved loadout the player composed ("Your loadout stays saved"), and a granted skill dimming is a side
+	 *  effect of an equipment change the player is already making. The grey-out still dims granted skills. */
 	weaponSwapDormantSkills(nextWeaponType: EDamageType): ISkill[] {
 		const skills = staticData.skills ?? [];
 		const selected = playerManager.selectedSkills.map((id) => skills[id]).filter((s): s is ISkill => s != null);

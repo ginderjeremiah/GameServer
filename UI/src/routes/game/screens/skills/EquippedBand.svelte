@@ -73,12 +73,7 @@
 				<span class="en">{metrics.skill.name}</span>
 				{#if dormant}
 					<!-- Off-weapon: the skill stays saved but doesn't field until a matching weapon is held (#1342). -->
-					<span
-						class="dormant-note"
-						title="Off-weapon — dormant until you equip a {requiredWeapon(metrics.skill)} weapon"
-					>
-						⊘ dormant · needs {requiredWeapon(metrics.skill)}
-					</span>
+					<DormantNote skill={metrics.skill} />
 				{:else}
 					<SkillCardStats {view} {metrics} />
 				{/if}
@@ -95,9 +90,7 @@
 <script lang="ts">
 import OverlayButton from '$components/OverlayButton.svelte';
 import SkillCardStats from './SkillCardStats.svelte';
-import type { ISkill } from '$lib/api';
-import { primaryDamageType } from '$lib/battle';
-import { damageTypeName } from '$lib/common';
+import DormantNote from './DormantNote.svelte';
 import type { SkillsView } from './skills-view.svelte';
 
 type Props = {
@@ -105,9 +98,6 @@ type Props = {
 };
 
 const { view }: Props = $props();
-
-/** The weapon type a dormant (off-weapon) skill needs equipped to field — its primary leaf type's name. */
-const requiredWeapon = (skill: ISkill): string => damageTypeName(primaryDamageType(skill.damagePortions));
 
 let dragOverIndex = $state<number | null>(null);
 
@@ -351,15 +341,6 @@ const onDragEnd = () => {
 		font-size: 13.5px;
 		font-weight: 500;
 		line-height: 1.1;
-	}
-
-	.dormant-note {
-		font-family: var(--mono);
-		font-size: 8.5px;
-		letter-spacing: 0.8px;
-		text-transform: uppercase;
-		// Neutral muted tone (matching the innate dupe-note); --warning is reserved for validation.
-		color: var(--text-tertiary);
 	}
 }
 </style>
