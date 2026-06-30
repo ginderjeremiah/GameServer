@@ -14,7 +14,7 @@ This game is an idle incremental RPG where players can progress through various 
 
 This game is not publicly available and is still in development. You do not have to be concerned about making changes backwards compatible or grandfathering for new features.
 
-VERY IMPORTANT: if you are working on game features or mechanics, you MUST read the [Game Design Document](./docs/game-design.md).
+VERY IMPORTANT: if you are working on game features or mechanics, you MUST read the [Game Design Document](./docs/game-design.md). When planning or authoring game **content** (zones, enemies, items, item mods, skills, proficiency paths, classes, challenges), also read the [Content Design](./docs/content-design.md) plan — it owns the progression arc and design intent, while exact values live in the admin Workbench.
 
 # General Coding Guidelines
 
