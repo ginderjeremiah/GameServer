@@ -41,11 +41,10 @@ namespace Game.Core.Attributes.Modifiers
             new() { Attribute = MaxHealth, Amount = 20.0, Source = Derived, DerivedSource = Endurance, Type = Additive },
             new() { Attribute = MaxHealth, Amount = 5.0, Source = Derived, DerivedSource = Strength, Type = Additive },
 
-            // Dodge derives from Agility so the mechanic is live from raw allocations (the value is also
-            // grantable by gear/item-mods/skill-effects through the normal modifier path); it uses the decimal
-            // convention — a chance is compared directly against the [0,1) battle RNG draw — and the coefficient
-            // is a conservative strawman expected to be tuned during balancing. Two attributes are deliberately
-            // NOT derived from a core attribute here:
+            // The remaining chance-based combat attributes. All use the decimal convention — a chance is
+            // compared directly against the [0,1) battle RNG draw — and the coefficients are a conservative
+            // strawman expected to be tuned during balancing. Two of them are deliberately NOT derived from a
+            // core attribute here:
             //   • CriticalChance is opt-in (crit rework #1425): no base and no derivation, so an un-enabled build
             //     sits at exactly 0, and a multiplicative Precision-path bonus stays inert (0 × mult = 0). Flat
             //     crit chance is sourced only from items/skills, making crit a committed build identity rather
@@ -54,6 +53,8 @@ namespace Game.Core.Attributes.Modifiers
             //     enabler is equipped.
             //   • DamageReflection (spike #1330) is authored-only — granted by gear/mod/proficiency/class rather
             //     than derived from a core attribute — so it too has no entry here (base 0 everywhere).
+            // DodgeChance, by contrast, stays Agility-derived (its entry is last, below), so evasion is live
+            // from raw allocations; the value is also grantable by gear/item-mods/skill-effects.
 
             // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
             // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.
