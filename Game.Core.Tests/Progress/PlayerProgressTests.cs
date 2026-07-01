@@ -41,6 +41,9 @@ namespace Game.Core.Tests.Progress
             {
                 CriticalHits = 3,
                 CriticalDamageDealt = 88.5,
+                // The Precision training signal is a separate field (#1448); it must not leak into the
+                // player-facing CriticalDamageDealt statistic, which stays the actual crit damage dealt.
+                CriticalBonusDealt = 42.0,
                 AttacksDodged = 2,
                 DamageDodged = 14.25,
             };

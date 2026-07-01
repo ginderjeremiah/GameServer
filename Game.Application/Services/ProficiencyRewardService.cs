@@ -23,8 +23,9 @@ namespace Game.Application.Services
     /// (<see cref="DamageTypes.Applies"/>): the <b>offense</b> book trains offense keys on the typed damage the
     /// player dealt — direct hits and DoT alike (<see cref="BattleStats.TypedDamageDealt"/>) — the
     /// <b>incoming</b> book trains resist keys on the player's pre-mitigation typed exposure
-    /// (<see cref="BattleStats.TypedDamageExposure"/>), and the event-keyed combat magnitudes — crit damage
-    /// (Precision), dodged damage (Evasion), healing done (Restoration), and reflected damage dealt
+    /// (<see cref="BattleStats.TypedDamageExposure"/>), and the event-keyed combat magnitudes — the normalized
+    /// marginal crit bonus (Precision, <see cref="BattleStats.CriticalBonusDealt"/>), dodged damage (Evasion),
+    /// healing done (Restoration), and reflected damage dealt
     /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363) — are damage-type-neutral
     /// and map straight to a single activity key. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
@@ -177,9 +178,9 @@ namespace Game.Application.Services
         //   • Resist (incoming book): the player's pre-mitigation typed exposure
         //     (BattleStats.TypedDamageExposure), routed to the resist keys, so a resist never throttles its own
         //     training signal.
-        //   • Events: crit damage, dodged damage, healing done, and reflected damage dealt — damage-type-neutral
-        //     magnitudes that map straight to a single activity key (Crit / Dodge / Heal / Reflect) without
-        //     applies() routing.
+        //   • Events: the normalized marginal crit bonus (not the full crit hit — #1448), dodged damage, healing
+        //     done, and reflected damage dealt — damage-type-neutral magnitudes that map straight to a single
+        //     activity key (Crit / Dodge / Heal / Reflect) without applies() routing.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
@@ -202,7 +203,7 @@ namespace Game.Application.Services
                 }
             }
 
-            AddEvent(EActivityKey.Crit, stats.CriticalDamageDealt);
+            AddEvent(EActivityKey.Crit, stats.CriticalBonusDealt);
             AddEvent(EActivityKey.Dodge, stats.DamageDodged);
             AddEvent(EActivityKey.Heal, stats.PlayerDamageHealed);
             AddEvent(EActivityKey.Reflect, stats.PlayerReflectedDamageDealt);

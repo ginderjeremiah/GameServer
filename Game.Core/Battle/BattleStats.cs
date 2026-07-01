@@ -17,6 +17,18 @@ namespace Game.Core.Battle
         public double DamageDodged { get; set; }
 
         /// <summary>
+        /// The Precision (<c>Crit</c> activity key) training signal — distinct from the player-facing
+        /// <see cref="CriticalDamageDealt"/> statistic. It is the <b>normalized marginal</b> crit bonus: for each
+        /// crit, the extra post-mitigation damage over the vanilla (non-crit) hit — measured against that fixed
+        /// baseline, <c>N(crit) − N₀ = baseline × (m − 1)</c> — with the concave-saturating normalization
+        /// <c>φ(a) = a / (1 + a)</c> applied to the crit-damage investment <c>(m − 1)</c>, so a bigger crit trains
+        /// Precision more but a single crit is bounded at one baseline hit (spike #1398 → the delivery-archetype
+        /// normalized-marginal tally, reference implementation #1448). This makes the training signal proportional
+        /// to crit-damage investment, which the full-hit <see cref="CriticalDamageDealt"/> is not.
+        /// </summary>
+        public double CriticalBonusDealt { get; set; }
+
+        /// <summary>
         /// The reflected damage the player returned to the enemy this battle — the proficiency Retribution
         /// event signal (the <c>Reflect</c> activity key). This is the player-as-defender reflection booked
         /// when the enemy attacks; it is also folded into <see cref="PlayerDamageDealt"/> (reflected damage is

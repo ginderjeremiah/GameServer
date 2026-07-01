@@ -129,7 +129,9 @@ namespace Game.Core.Battle
         /// <see cref="BattleStats.AddTypedDamageExposure"/> per portion's pre-resist dealt) are the cross-school
         /// proficiency signal; the whole-hit stats (<see cref="BattleStats.HighestPlayerAttack"/>,
         /// <see cref="BattleStats.CriticalDamageDealt"/>, and the per-skill total via the return) use
-        /// <c>totalNet</c> — one swing is one attack. Each portion's absorption heal is capped at the
+        /// <c>totalNet</c> — one swing is one attack. The Precision signal is instead the normalized marginal crit
+        /// bonus (<see cref="BattleStats.CriticalBonusDealt"/>, #1448), booked from the vanilla-hit baseline rather
+        /// than the full crit net. Each portion's absorption heal is capped at the
         /// <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
@@ -162,6 +164,7 @@ namespace Game.Core.Battle
                 // multiplies every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
                 var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
                 var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
+                var baselineNet = 0.0;
                 for (var i = 0; i < portions.Count; i++)
                 {
                     var type = portions[i].Type;
@@ -169,13 +172,26 @@ namespace Game.Core.Battle
                     var net = _targetBattler.TakeDamage(dealt * critMultiplier, type, _activeBattler.Level);
                     Stats.AddTypedDamageDealt(type, net);
                     totalNet += net;
+                    if (isCrit)
+                    {
+                        // The vanilla (non-crit) net of this portion — the fixed baseline the crit bonus is
+                        // measured against. ComputeNetDamage is non-mutating and health-independent, so summing it
+                        // here (alongside the mutating crit TakeDamage) is order-independent and reduces to the same
+                        // linear mitigation the crit hit went through: N(crit) − N₀ = baseline × (m − 1) exactly.
+                        baselineNet += _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level);
+                    }
                 }
 
                 Stats.PlayerDamageDealt += totalNet;
                 if (isCrit)
                 {
                     Stats.CriticalHits++;
+                    // The actual crit damage dealt — the player-facing CriticalDamageDealt statistic.
                     Stats.CriticalDamageDealt += totalNet;
+                    // The Precision training signal (#1448): the normalized marginal crit bonus — the extra over the
+                    // vanilla hit — with φ applied to the crit-damage investment so it stays proportional to
+                    // investment yet bounded at one baseline hit. Kept separate from the statistic above.
+                    Stats.CriticalBonusDealt += baselineNet * NormalizeCritInvestment(critMultiplier - 1.0);
                 }
 
                 if (totalNet > Stats.HighestPlayerAttack)
@@ -229,6 +245,18 @@ namespace Game.Core.Battle
         private double AmplifiedPortion(double rawDamage, double totalWeight, SkillDamagePortion portion)
         {
             return _activeBattler.AmplifyDamage(rawDamage * portion.Weight / totalWeight, portion.Type);
+        }
+
+        /// <summary>
+        /// The concave-saturating normalization <c>φ(a) = a / (1 + a)</c> applied to a crit's damage investment
+        /// <c>a = m − 1</c> (the crit multiplier above the non-crit baseline) when booking its marginal bonus to
+        /// the Precision signal (#1448). It is ~linear in the investment at the low end (so a token crit trains
+        /// little and a committed one trains more — strength-proportionality) and asymptotes to <c>1</c> as the
+        /// investment grows, bounding a single crit's contribution at one baseline hit.
+        /// </summary>
+        private static double NormalizeCritInvestment(double investment)
+        {
+            return investment / (1.0 + investment);
         }
 
         /// <summary>
