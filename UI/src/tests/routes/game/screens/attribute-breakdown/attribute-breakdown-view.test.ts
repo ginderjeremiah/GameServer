@@ -291,13 +291,13 @@ describe('AttributeBreakdownView', () => {
 		const secondary = view.groups.find((g) => g.type === EAttributeType.Secondary);
 		// Only the allocated core attributes self-select into Primary.
 		expect(primary?.attrs.map((a) => a.meta.id)).toEqual([EAttribute.Strength, EAttribute.Endurance]);
-		// The engine base/derived aggregates always contribute, so they stay in Secondary — including the
-		// crit/dodge set, which now derives from the core attributes (#799).
+		// The engine base/derived aggregates always contribute, so they stay in Secondary. CriticalChance is
+		// opt-in (crit rework #1425): it has no attribute derivation, so with no crit enabler equipped it has
+		// no contributor and drops out. CriticalDamage (base 1.5) and DodgeChance (Agility-derived) remain.
 		expect(secondary?.attrs.map((a) => a.meta.id)).toEqual([
 			EAttribute.MaxHealth,
 			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
-			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
 			EAttribute.DodgeChance
 		]);
@@ -309,16 +309,16 @@ describe('AttributeBreakdownView', () => {
 
 	it('self-selects only attributes with a real (non-combat) contributor', () => {
 		// No allocations or gear: only the engine base/derived formulas contribute. The Secondary aggregates
-		// surface — MaxHealth/Toughness/CooldownRecovery plus the crit/dodge set, which now derives from
-		// the core attributes (#799). The obsolete attribute and the combat-only Status channels have no
-		// contributors and drop out, and no Primary group is shown.
+		// surface — MaxHealth/Toughness/CooldownRecovery, plus CriticalDamage (base 1.5) and DodgeChance
+		// (Agility-derived). CriticalChance is opt-in (crit rework #1425) with no attribute derivation, so
+		// without a crit enabler it has no contributor and drops out — alongside the obsolete attribute and
+		// the combat-only Status channels. No Primary group is shown.
 		const view = new AttributeBreakdownView();
 		const ids = view.groups.flatMap((g) => g.attrs.map((a) => a.meta.id));
 		expect(ids).toEqual([
 			EAttribute.MaxHealth,
 			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
-			EAttribute.CriticalChance,
 			EAttribute.CriticalDamage,
 			EAttribute.DodgeChance
 		]);

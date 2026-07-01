@@ -41,16 +41,19 @@ namespace Game.Core.Attributes.Modifiers
             new() { Attribute = MaxHealth, Amount = 20.0, Source = Derived, DerivedSource = Endurance, Type = Additive },
             new() { Attribute = MaxHealth, Amount = 5.0, Source = Derived, DerivedSource = Strength, Type = Additive },
 
-            // The crit/dodge derivations make the mechanic live from raw allocations (the values are also
-            // grantable by gear/item-mods/skill-effects through the normal modifier path). All use the decimal
-            // convention — a chance is compared directly against the [0,1) battle RNG draw — and the
-            // coefficients are a conservative strawman expected to be tuned during balancing. DamageReflection
-            // (spike #1330) is intentionally absent: it is authored-only, granted by gear/mod/proficiency/class
-            // rather than derived from a core attribute, so it has no entry here (base 0 everywhere).
-
-            // CriticalChance = 0.002·Dexterity + 0.001·Luck (no base, so 0 until something feeds it).
-            new() { Attribute = CriticalChance, Amount = 0.002, Source = Derived, DerivedSource = Dexterity, Type = Additive },
-            new() { Attribute = CriticalChance, Amount = 0.001, Source = Derived, DerivedSource = Luck, Type = Additive },
+            // Dodge derives from Agility so the mechanic is live from raw allocations (the value is also
+            // grantable by gear/item-mods/skill-effects through the normal modifier path); it uses the decimal
+            // convention — a chance is compared directly against the [0,1) battle RNG draw — and the coefficient
+            // is a conservative strawman expected to be tuned during balancing. Two attributes are deliberately
+            // NOT derived from a core attribute here:
+            //   • CriticalChance is opt-in (crit rework #1425): no base and no derivation, so an un-enabled build
+            //     sits at exactly 0, and a multiplicative Precision-path bonus stays inert (0 × mult = 0). Flat
+            //     crit chance is sourced only from items/skills, making crit a committed build identity rather
+            //     than a stat every Dexterity/Luck build accrues for free. CriticalDamage keeps its Luck
+            //     derivation + base below: inert without chance, it stays opt-in-gated and pays off the moment an
+            //     enabler is equipped.
+            //   • DamageReflection (spike #1330) is authored-only — granted by gear/mod/proficiency/class rather
+            //     than derived from a core attribute — so it too has no entry here (base 0 everywhere).
 
             // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
             // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.

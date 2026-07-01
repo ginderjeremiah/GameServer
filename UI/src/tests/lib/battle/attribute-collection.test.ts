@@ -90,6 +90,43 @@ describe('computeAttributes', () => {
 		expect(str.lines.at(-1)!.factor).toBe(1.5);
 	});
 
+	// Crit is opt-in (crit rework #1425): CriticalChance has no attribute derivation, so it is 0 until an
+	// item/skill enabler feeds it. These two mirror Game.Core.Tests AttributeCollectionTests.
+	it('leaves CriticalChance at 0 for an uncommitted build, even with heavy DEX/LUK and a Precision multiplier', () => {
+		// The attributes that used to feed crit (Dexterity/Luck) no longer do; with no enabler the multiplicative
+		// Precision bonus stays inert (0 × mult = 0).
+		const computed = computeAttributes(
+			withStatics([
+				additive(EAttribute.Dexterity, 100),
+				additive(EAttribute.Luck, 100),
+				{
+					attribute: EAttribute.CriticalChance,
+					amount: 1.5,
+					type: EModifierType.Multiplicative,
+					source: EAttributeModifierSource.ItemMod
+				}
+			])
+		);
+		expect(computed.get(EAttribute.CriticalChance)?.total ?? 0).toBe(0);
+	});
+
+	it('multiplies a flat crit enabler by the Precision path bonus (opt-in-multiplicative)', () => {
+		// A flat item/skill enabler is the only base; Additive applies before Multiplicative, so the final
+		// chance is enabler × bonus — meaningful only because the enabler opted the build in. 0.1 × 1.5 = 0.15.
+		const computed = computeAttributes(
+			withStatics([
+				additive(EAttribute.CriticalChance, 0.1, EAttributeModifierSource.Item),
+				{
+					attribute: EAttribute.CriticalChance,
+					amount: 1.5,
+					type: EModifierType.Multiplicative,
+					source: EAttributeModifierSource.ItemMod
+				}
+			])
+		);
+		expect(computed.get(EAttribute.CriticalChance)!.total).toBeCloseTo(0.15, 10);
+	});
+
 	it('returns a zero total with no lines for an attribute with no modifiers', () => {
 		const computed = computeAttributes([additive(EAttribute.Strength, 5)]);
 		// Intellect was never referenced, so it is simply absent.
@@ -283,7 +320,7 @@ describe('parity with BattleAttributes', () => {
 		expectEquivalent();
 		apply(strength); // cascades Strength → MaxHealth
 		apply(endurance); // cascades Endurance → MaxHealth + Toughness
-		apply(luck); // cascades Luck → CriticalChance + CriticalDamage
+		apply(luck); // cascades Luck → CriticalDamage (crit chance is opt-in, no attribute derivation — #1425)
 		apply(directHealth); // a non-derived MaxHealth additive alongside its derived contributors
 		apply(multHealth); // a multiplicative on the same attribute, applied after the additives
 		revert(endurance); // drop a shared cascade source mid-stack

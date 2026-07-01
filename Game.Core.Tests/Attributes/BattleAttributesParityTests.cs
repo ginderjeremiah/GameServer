@@ -51,7 +51,10 @@ namespace Game.Core.Tests.Attributes
                     [(EAttribute.Agility, 20), (EAttribute.Dexterity, 10)],
                     [EAttribute.CooldownRecovery]),
 
-                // CriticalChance = 0.002·Dexterity + 0.001·Luck (no base)
+                // CriticalChance is opt-in (crit rework #1425): no base and no attribute derivation, so even a
+                // heavy Dexterity/Luck build sits at exactly 0 — DEX/LUK no longer feed crit. Flat crit chance
+                // comes from item/skill enablers only (the opt-in-multiplicative math is covered by
+                // AttributeCollectionTests / attribute-collection.test.ts).
                 ["criticalChance"] = new DerivedStatScenario(
                     [(EAttribute.Dexterity, 20), (EAttribute.Luck, 10)],
                     [EAttribute.CriticalChance]),

@@ -88,6 +88,57 @@ namespace Game.Core.Tests.Attributes
             Assert.Equal(1.06, collection[EAttribute.CooldownRecovery], 10);
         }
 
+        // Crit is opt-in (crit rework #1425): CriticalChance has no attribute derivation, so it is 0 until an
+        // item/skill enabler feeds it. These two mirror UI/src/tests/lib/battle/attribute-collection.test.ts.
+        [Fact]
+        public void Indexer_CriticalChance_UncommittedBuild_IsZeroEvenWithHeavyAllocations()
+        {
+            // A build stacking the attributes that used to feed crit (Dexterity/Luck) still crits for nothing:
+            // no enabler, no chance. A multiplicative Precision bonus on top stays inert (0 × mult = 0).
+            var collection = new AttributeCollection(
+            [
+                Additive(EAttribute.Dexterity, 100),
+                Additive(EAttribute.Luck, 100),
+                new()
+                {
+                    Attribute = EAttribute.CriticalChance,
+                    Amount = 1.5,
+                    Type = EModifierType.Multiplicative,
+                    Source = EAttributeModifierSource.ItemMod,
+                },
+            ]);
+
+            Assert.Equal(0, collection[EAttribute.CriticalChance]);
+        }
+
+        [Fact]
+        public void Indexer_CriticalChance_EnablerThenMultiplicativePrecision_MultipliesTheEnablerBase()
+        {
+            // The opt-in-multiplicative template: a flat item/skill enabler is the only base, and the Precision
+            // path scales it multiplicatively. Additive (the enabler) applies before Multiplicative (Precision),
+            // so the final chance is enabler × bonus — meaningful only because the enabler opted the build in.
+            var collection = new AttributeCollection(
+            [
+                new()
+                {
+                    Attribute = EAttribute.CriticalChance,
+                    Amount = 0.1,
+                    Type = EModifierType.Additive,
+                    Source = EAttributeModifierSource.Item,
+                },
+                new()
+                {
+                    Attribute = EAttribute.CriticalChance,
+                    Amount = 1.5,
+                    Type = EModifierType.Multiplicative,
+                    Source = EAttributeModifierSource.ItemMod,
+                },
+            ]);
+
+            // 0.1 (enabler) × 1.5 (Precision) = 0.15.
+            Assert.Equal(0.15, collection[EAttribute.CriticalChance], 10);
+        }
+
         [Fact]
         public void Constructor_DuplicateDerivedModifierSameSourceTarget_Throws()
         {
