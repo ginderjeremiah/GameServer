@@ -174,7 +174,11 @@ namespace Game.Core.Battle
         /// same concave saturation the crit bonus applies to its investment (<c>marginal / (1 + investment)</c>,
         /// so a token debuff trains little and a committed one saturates toward one baseline hit). Because the
         /// marginal is <c>dealt × v × toughnessFactor</c>, it is flat in this battler's <b>base</b> resistance —
-        /// Hex trains the same against a soft or a resistant enemy (no resist-farming). Measured against the
+        /// Hex trains the same against a soft or a resistant enemy (no resist-farming). (That flatness is scoped to
+        /// the non-absorbing region: if the <em>innate</em> resistance exceeds <c>1</c>, the un-hexed hit is a net
+        /// heal and the marginal folds in the avoided heal — correctly crediting the vulnerability for turning a
+        /// heal into a hit, but no longer flat in base resistance. No content authors enemy absorption today.)
+        /// Measured against the
         /// vanilla (pre-crit) hit so it composes with crit without either overlay inflating the other. Returns
         /// <c>0</c> when no vulnerability is applied. A backend-only side channel — it never mutates health.
         /// </summary>

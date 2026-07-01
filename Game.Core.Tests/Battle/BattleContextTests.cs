@@ -776,6 +776,25 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void DamageTarget_VulnerabilityCrossesAbsorptionToDamage_CreditsTheWholeSwing()
+        {
+            // The crossover edge: the enemy innately absorbs Fire (FireResistance 1.5 > 1 → the un-hexed hit is a
+            // −15 net heal). The player's −0.8 debuff brings live resistance to 0.7, so the hit deals +9. The
+            // vulnerability turned a 15 heal into a 9 hit — a 24 swing — credited (÷ (1 + 0.8)) as the enabled
+            // marginal. Here the flat-in-base-resistance property intentionally does NOT hold (the innate
+            // absorption folds into the marginal); pinned so the crossover behaviour cannot silently drift.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 1.5));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // live FireResistance 0.7, v = 0.8
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − 0.7) = 9 dealt
+
+            Assert.Equal(9, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal((9.0 - (-15.0)) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 = 13.33
+        }
+
+        [Fact]
         public void DamageTarget_EnemyAttacking_BooksNoHexBonus()
         {
             // Hex is a player-offense signal. Even if the player is somehow vulnerable, an enemy hit never trains
