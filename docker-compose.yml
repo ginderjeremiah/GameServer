@@ -14,13 +14,12 @@
 # Ports default to dedicated values to avoid colliding with the integration-test backing services
 # (5499 / 6399) and any native PostgreSQL/Redis. Override via the environment if needed.
 #
-# Seeding: the API migrates on startup but migrations only carry the intrinsic enum-backed reference
-# data. The static content the e2e suite needs (Skills/Enemies/Zones) must be applied separately once
-# the API is up, then the API must be restarted so it reloads its reference-data caches (which it
-# eagerly loads at startup, #357) from the now-seeded database, e.g.:
-#   docker compose exec -T postgres psql -U game -d game -p 5544 -f - < e2e-seed.sql
-#   docker compose restart api
-# See e2e-seed.sql and docs/backend.md "Dockerized API stack for end-to-end (Playwright) runs".
+# Seeding: the API migrates on startup (intrinsic enum-backed reference data only) and then seeds the
+# static content (Skills/Enemies/Zones/…) from the source-controlled export (content/*.json) before it
+# loads its reference-data caches — driven by DataAccessOptions__SeedContentOnStartup below, so the
+# stack comes up fully playable with no post-boot seed or API restart. The e2e admin-role fixture
+# (granting the Admin role to 'e2eadmin…' accounts) is not content, so it is applied separately by the
+# CI workflow from e2e-admin-provision.sql. See docs/backend.md "Content export (source-controlled snapshot)".
 
 services:
   postgres:
@@ -79,8 +78,10 @@ services:
       DataAccessOptions__DatabaseSystem: "1"
       DataAccessOptions__CacheSystem: "0"
       DataAccessOptions__PubSubSystem: "0"
-      # Apply EF migrations (which carry the seed reference data) on startup outside Development.
+      # Apply EF migrations (which carry the intrinsic reference data) on startup outside Development, then
+      # seed the static content from the source-controlled export so the stack is playable on first boot.
       DataAccessOptions__MigrateOnStartup: "true"
+      DataAccessOptions__SeedContentOnStartup: "true"
       DataAccessOptions__DbConnectionString: "Host=localhost;Port=${POSTGRES_PORT:-5544};Database=${POSTGRES_DB:-game};Username=${POSTGRES_USER:-game};Password=${POSTGRES_PASSWORD:-game}"
       DataAccessOptions__CacheConnectionString: "localhost:${REDIS_PORT:-6544}"
       DataAccessOptions__PubSubConnectionString: "localhost:${REDIS_PORT:-6544}"

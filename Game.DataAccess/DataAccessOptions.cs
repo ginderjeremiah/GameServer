@@ -14,5 +14,14 @@ namespace Game.DataAccess
         /// Development-only tooling. Defaults to <see langword="false"/>.
         /// </summary>
         public bool MigrateOnStartup { get; set; }
+
+        /// <summary>
+        /// When <see langword="true"/>, the API seeds the static reference-data content from the source-controlled
+        /// export (<c>content/*.json</c>) on startup, after migrating, if the database has no content yet — giving
+        /// a fresh dev / CI / recovery database a real content baseline. Idempotent (skips a populated database).
+        /// Development always seeds; other environments opt in via this flag. Defaults to <see langword="false"/>,
+        /// so production is never seeded this way unless explicitly enabled for a recovery.
+        /// </summary>
+        public bool SeedContentOnStartup { get; set; }
     }
 }

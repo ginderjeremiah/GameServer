@@ -1,4 +1,5 @@
 using Game.Abstractions.Auth;
+using Game.Abstractions.Content;
 using Game.Abstractions.DataAccess;
 using Game.Api.Auth;
 using Game.Api.CodeGen;
@@ -170,6 +171,13 @@ namespace Game.Api
             var migrateOnStartup = builder.Configuration.GetValue<bool>(
                 $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.MigrateOnStartup)}");
 
+            // Seed the static content from the source-controlled export after migrating a fresh database
+            // (dev / CI / recovery), so it has a real content baseline. Idempotent (skips a populated DB).
+            // Development always seeds; other environments opt in. Seeding needs a migrated schema, so it is
+            // gated on migration running too.
+            var seedContentOnStartup = builder.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>(
+                $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.SeedContentOnStartup)}");
+
             if (builder.Environment.IsDevelopment() || migrateOnStartup)
             {
                 builder.Services.AddDatabaseMigrator();
@@ -199,10 +207,31 @@ namespace Game.Api
 
             if (app.Environment.IsDevelopment() || migrateOnStartup)
             {
-                // GameContext is Scoped, so the migrator must be resolved from a scope.
+                // GameContext is Scoped, so the migrator and seeder must be resolved from a scope.
                 using var migrationScope = app.Services.CreateScope();
                 var migrator = migrationScope.ServiceProvider.GetRequiredService<IDatabaseMigrator>();
                 await migrator.Migrate();
+
+                // Seed the static content into a freshly-migrated database (no-op when it already has content),
+                // before the reference caches load below so their eager build picks the seed up.
+                if (seedContentOnStartup)
+                {
+                    var reader = migrationScope.ServiceProvider.GetRequiredService<IContentImportReader>();
+                    var seeder = migrationScope.ServiceProvider.GetRequiredService<IContentSeeder>();
+                    await seeder.SeedAsync(reader.ReadDefault());
+                }
+            }
+            else if (seedContentOnStartup)
+            {
+                // Seeding runs only inside the migration block (it needs a migrated schema). Surface the
+                // misconfiguration so a recovery operator who enabled only SeedContentOnStartup isn't left
+                // wondering why nothing was seeded, instead of failing silently.
+                app.Logger.LogWarning(
+                    "{SeedFlag} is enabled but {MigrateFlag} is off (and the environment is not Development), so " +
+                    "content seeding is skipped — it only runs alongside startup migrations. Enable {MigrateFlag} too.",
+                    $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.SeedContentOnStartup)}",
+                    $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.MigrateOnStartup)}",
+                    $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.MigrateOnStartup)}");
             }
 
             var corsOptions = app.Services.GetRequiredService<IOptions<CorsOptions>>().Value;

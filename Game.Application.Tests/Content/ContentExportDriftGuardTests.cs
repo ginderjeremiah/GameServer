@@ -1,9 +1,8 @@
+using Game.Abstractions.Content;
 using Game.Application.Content;
-using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -14,10 +13,9 @@ namespace Game.Application.Tests.Content
     /// freshly-migrated-and-seeded database and asserts byte-equality with the committed <c>content/*.json</c>
     /// files. A hand-edit to a committed file, or a content change that wasn't re-exported, fails the build.
     ///
-    /// The DB is seeded from the existing <c>e2e-seed.sql</c> content slice — the only source-controlled
-    /// content today — so the committed snapshot is the export of that slice. (#1419 reverses the direction:
-    /// the seeder loads <c>content/*.json</c> and <c>e2e-seed.sql</c> is retired; this guard then becomes a
-    /// pure round-trip check and its seed source switches accordingly.)
+    /// The DB is seeded from the committed <c>content/*.json</c> export through the JSON-driven content seeder
+    /// (#1419), so this is a round-trip: seed the export → re-derive it → assert byte-equality. It catches a
+    /// hand-edit to a committed file, a content change that wasn't re-exported, or a seeder/exporter asymmetry.
     ///
     /// To (re)generate the committed files after an intentional content change, run this test with the
     /// <c>CONTENT_EXPORT_REGEN=1</c> environment variable set, then commit the diff.
@@ -33,7 +31,7 @@ namespace Game.Application.Tests.Content
         [Fact]
         public async Task ExportAll_MatchesCommittedContentFiles()
         {
-            await SeedContentFromE2eScriptAsync();
+            await SeedContentFromExportAsync();
             await ReloadReferenceCachesAsync();
 
             using var scope = CreateScope();
@@ -67,20 +65,15 @@ namespace Game.Application.Tests.Content
         }
 
         /// <summary>
-        /// Applies the content portion of <c>e2e-seed.sql</c> (everything before the e2e-only admin
-        /// provisioning trigger) to the freshly-migrated database. The trigger is deliberately excluded so it
-        /// does not leak into the shared integration database.
+        /// Seeds the freshly-migrated database from the committed <c>content/*.json</c> export through the
+        /// JSON-driven content seeder — the same path the app uses on startup.
         /// </summary>
-        private async Task SeedContentFromE2eScriptAsync()
+        private async Task SeedContentFromExportAsync()
         {
-            var script = await File.ReadAllTextAsync(RepoPaths.E2eSeedScript(), CancellationToken);
-            const string provisioningMarker = "-- e2e admin provisioning.";
-            var markerIndex = script.IndexOf(provisioningMarker, StringComparison.Ordinal);
-            var contentSql = markerIndex >= 0 ? script[..markerIndex] : script;
-
             using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            await context.Database.ExecuteSqlRawAsync(contentSql, CancellationToken);
+            var reader = scope.ServiceProvider.GetRequiredService<IContentImportReader>();
+            var seeder = scope.ServiceProvider.GetRequiredService<IContentSeeder>();
+            await seeder.SeedAsync(reader.Read(RepoPaths.ContentDirectory()), CancellationToken);
         }
     }
 }

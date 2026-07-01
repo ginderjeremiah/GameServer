@@ -2,6 +2,8 @@ using Contracts = Game.Abstractions.Contracts;
 using CoreRecipeCondition = Game.Core.Skills.RecipeCondition;
 using CoreSkillRecipe = Game.Core.Skills.SkillRecipe;
 using EntitySkillRecipe = Game.Infrastructure.Entities.SkillRecipe;
+using EntitySkillRecipeInput = Game.Infrastructure.Entities.SkillRecipeInput;
+using EntitySkillRecipeCondition = Game.Infrastructure.Entities.SkillRecipeCondition;
 
 namespace Game.DataAccess.Mapping
 {
@@ -28,6 +30,32 @@ namespace Game.DataAccess.Mapping
                     {
                         ProficiencyId = c.ProficiencyId,
                         MinLevel = c.MinLevel,
+                    }).ToList(),
+            };
+        }
+
+        /// <summary>Maps a read/authoring <see cref="Contracts.SkillRecipe"/> back to its entity graph (input
+        /// skills and proficiency-level conditions) for the content seeder.</summary>
+        public static EntitySkillRecipe ToEntity(Contracts.SkillRecipe contract)
+        {
+            return new EntitySkillRecipe
+            {
+                Id = contract.Id,
+                ResultSkillId = contract.ResultSkillId,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+                Inputs = contract.InputSkillIds
+                    .Select(skillId => new EntitySkillRecipeInput
+                    {
+                        RecipeId = contract.Id,
+                        SkillId = skillId,
+                    }).ToList(),
+                Conditions = contract.Conditions
+                    .Select(condition => new EntitySkillRecipeCondition
+                    {
+                        RecipeId = contract.Id,
+                        ProficiencyId = condition.ProficiencyId,
+                        MinLevel = condition.MinLevel,
                     }).ToList(),
             };
         }

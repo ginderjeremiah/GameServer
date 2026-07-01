@@ -5,6 +5,9 @@ using Contracts = Game.Abstractions.Contracts;
 using CoreSkill = Game.Core.Skills.Skill;
 using EntityEnemy = Game.Infrastructure.Entities.Enemy;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
+using EntityAttributeDistribution = Game.Infrastructure.Entities.AttributeDistribution;
+using EntityEnemySkill = Game.Infrastructure.Entities.EnemySkill;
+using EntityZoneEnemy = Game.Infrastructure.Entities.ZoneEnemy;
 
 namespace Game.DataAccess.Mapping
 {
@@ -35,6 +38,43 @@ namespace Game.DataAccess.Mapping
                         Weight = ze.Weight,
                     }).ToList(),
                 RetiredAt = entity.RetiredAt,
+            };
+        }
+
+        /// <summary>Maps a reference-data read <see cref="Contracts.Enemy"/> back to its entity graph (attribute
+        /// distributions, skill-pool joins, and spawn-table joins) for the content seeder. The spawn rows are
+        /// <c>ZoneEnemy</c> joins carried on the enemy; the seeder inserts them after both zones and enemies
+        /// exist so the composite FK resolves.</summary>
+        public static EntityEnemy ToEntity(Contracts.Enemy contract)
+        {
+            return new EntityEnemy
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                IsBoss = contract.IsBoss,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+                AttributeDistributions = contract.AttributeDistribution
+                    .Select(ad => new EntityAttributeDistribution
+                    {
+                        EnemyId = contract.Id,
+                        AttributeId = (int)ad.AttributeId,
+                        BaseAmount = ad.BaseAmount,
+                        AmountPerLevel = ad.AmountPerLevel,
+                    }).ToList(),
+                EnemySkills = contract.SkillPool
+                    .Select(skillId => new EntityEnemySkill
+                    {
+                        EnemyId = contract.Id,
+                        SkillId = skillId,
+                    }).ToList(),
+                ZoneEnemies = contract.Spawns
+                    .Select(spawn => new EntityZoneEnemy
+                    {
+                        ZoneId = spawn.ZoneId,
+                        EnemyId = contract.Id,
+                        Weight = spawn.Weight,
+                    }).ToList(),
             };
         }
 

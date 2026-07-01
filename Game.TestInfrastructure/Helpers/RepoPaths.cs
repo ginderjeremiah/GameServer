@@ -25,8 +25,5 @@ namespace Game.TestInfrastructure.Helpers
 
         /// <summary>The <c>content/</c> directory holding the source-controlled reference-data export.</summary>
         public static string ContentDirectory() => Path.Combine(RepoRoot(), "content");
-
-        /// <summary>The end-to-end content seed script at the repo root.</summary>
-        public static string E2eSeedScript() => Path.Combine(RepoRoot(), "e2e-seed.sql");
     }
 }

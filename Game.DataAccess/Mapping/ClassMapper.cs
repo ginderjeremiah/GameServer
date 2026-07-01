@@ -5,6 +5,9 @@ using CoreClass = Game.Core.Classes.Class;
 using CoreSignaturePassive = Game.Core.Classes.ClassSignaturePassive;
 using CoreStarterEquipment = Game.Core.Classes.ClassStarterEquipment;
 using EntityClass = Game.Infrastructure.Entities.Class;
+using EntityClassStarterSkill = Game.Infrastructure.Entities.ClassStarterSkill;
+using EntityClassStarterEquipment = Game.Infrastructure.Entities.ClassStarterEquipment;
+using EntityClassAttributeDistribution = Game.Infrastructure.Entities.ClassAttributeDistribution;
 
 namespace Game.DataAccess.Mapping
 {
@@ -41,6 +44,47 @@ namespace Game.DataAccess.Mapping
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
                 RetiredAt = entity.RetiredAt,
+            };
+        }
+
+        /// <summary>Maps a reference-data read <see cref="Contracts.Class"/> back to its entity graph (starter
+        /// skills, starter equipment, and attribute distributions) for the content seeder.</summary>
+        public static EntityClass ToEntity(Contracts.Class contract)
+        {
+            return new EntityClass
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                Description = contract.Description,
+                Word = contract.Word,
+                PassiveAttributeId = (int)contract.PassiveAttributeId,
+                PassiveAmount = contract.PassiveAmount,
+                PassiveScalingAttributeId = (int?)contract.PassiveScalingAttributeId,
+                PassiveScalingAmount = contract.PassiveScalingAmount,
+                PassiveModifierType = (int)contract.PassiveModifierType,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+                StarterSkills = contract.StarterSkillIds
+                    .Select(skillId => new EntityClassStarterSkill
+                    {
+                        ClassId = contract.Id,
+                        SkillId = skillId,
+                    }).ToList(),
+                StarterEquipment = contract.StarterEquipment
+                    .Select(e => new EntityClassStarterEquipment
+                    {
+                        ClassId = contract.Id,
+                        EquipmentSlotId = (int)e.EquipmentSlot,
+                        ItemId = e.ItemId,
+                    }).ToList(),
+                AttributeDistributions = contract.AttributeDistributions
+                    .Select(ad => new EntityClassAttributeDistribution
+                    {
+                        ClassId = contract.Id,
+                        AttributeId = (int)ad.AttributeId,
+                        BaseAmount = ad.BaseAmount,
+                        AmountPerLevel = ad.AmountPerLevel,
+                    }).ToList(),
             };
         }
 
