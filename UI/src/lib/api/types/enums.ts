@@ -123,6 +123,11 @@ export enum EChangeType {
 	Delete = 2,
 }
 
+export enum EContentHealthSeverity {
+	Warning = 0,
+	Error = 1,
+}
+
 export enum EDamageType {
 	Physical = 0,
 	Fire = 1,

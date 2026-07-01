@@ -9,6 +9,7 @@ import type {
 	IChallenge,
 	IChange,
 	IClass,
+	IContentHealthReport,
 	ICreatableClass,
 	ICreateAccountRequest,
 	ICreatePlayerRequest,
@@ -71,6 +72,7 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditZones': undefined;
 	'AdminTools/ArchiveUser': undefined;
 	'AdminTools/BanUser': undefined;
+	'AdminTools/GetContentHealth': IContentHealthReport;
 	'AdminTools/GetPlayerUpdateDeadLetters': IDeadLetterInspection;
 	'AdminTools/GetRoles': IRole[];
 	'AdminTools/GetUsers': IAdminUserSearchResults;

@@ -41,6 +41,8 @@ namespace Game.Application.DependencyInjection
                 .AddScoped<SynthesisService>()
                 // Reads the reference caches (scoped repos) to mirror the static content graph to JSON.
                 .AddScoped<IContentExporter, ContentExporter>()
+                // Runs the whole-graph lint over the live reference caches for the admin Content Health view.
+                .AddScoped<IContentHealthService, ContentHealthService>()
                 // Reads the source-controlled content export back in for the seeder; stateless.
                 .AddSingleton<IContentImportReader, ContentImportReader>()
                 // Pure whole-graph reachability lint over the content contracts; no state, so shared.

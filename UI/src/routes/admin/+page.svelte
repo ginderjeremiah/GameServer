@@ -5,6 +5,12 @@
 		<div class="admin-workspace">
 			{#if active === DEAD_LETTERS_TOOL_KEY}
 				<DeadLetterConsole />
+			{:else if active === CONTENT_HEALTH_TOOL_KEY}
+				{#if reference.loaded}
+					<ContentHealthConsole />
+				{:else}
+					<Loading loading={true} delay={50} />
+				{/if}
 			{:else if active === PROGRESSION_TOOL_KEY}
 				{#if reference.loaded}
 					<Progression />
@@ -39,9 +45,16 @@ import { Loading } from '$components';
 import AdminSidebar from './AdminSidebar.svelte';
 import Workbench from './workbench/Workbench.svelte';
 import DeadLetterConsole from './ops/DeadLetterConsole.svelte';
+import ContentHealthConsole from './ops/ContentHealthConsole.svelte';
 import Progression from './workbench/progression/Progression.svelte';
 import { entityByKey, groupLabelFor } from './workbench/entities';
-import { adminGroups, adminTools, DEAD_LETTERS_TOOL_KEY, PROGRESSION_TOOL_KEY } from './workbench/nav';
+import {
+	adminGroups,
+	adminTools,
+	CONTENT_HEALTH_TOOL_KEY,
+	DEAD_LETTERS_TOOL_KEY,
+	PROGRESSION_TOOL_KEY
+} from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
 import { ensureAdminAccess } from './admin-access';
 import { toastError } from '$stores';
