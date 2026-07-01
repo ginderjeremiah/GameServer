@@ -138,6 +138,17 @@ The damage-type taxonomy ([leaves, categories, weapon leaves](./game-design.md#d
 | _(Restoration)_ | heal | Technique / event | Z2 (if healing) | … | … | trains from healing |
 | _(Evasion / Precision)_ | dodge / crit | Technique / event | blurb-taught; opens on first proc | … | … | not zone-gated |
 
+### Delivery archetypes & the commitment rule (the utility question)
+
+> Resolves the former "utility has no proficiency home" question — full reasoning in spike [#1398](./spikes/1398-utility-in-proficiency-system.md).
+
+The families above (Martial / Elemental / Affliction / …) are *damage-type* niches. Layered orthogonally on them are **delivery archetypes** — the *style* damage is dealt in — and this is the other axis of build differentiation (differentiation scales as **leaves × archetypes**, both extensible). A path is earned by a **committed** archetype, and identities are authored to be commitments, never universal free value:
+
+- **The commitment rule.** A delivery archetype earns a proficiency path only if it is *committed* — reached through an **opt-in enabler** (gear/skill) with a real opportunity cost, measured as **excess over a floor that is naturally `0` when uncommitted**. *Universal* effects that benefit every build for free (a raw STR/CDR buff, all-damage%, raw EHP) get **no** path — their payoff is the paths they amplify (and, for cadence, farm throughput). So a "utility" buff is in or out based on **commitment, not on being a buff**; author the universal residue as conditional or tradeoff effects, never as free value.
+- **The opt-in-multiplicative template.** Every archetype follows one pattern: a **flat enabler** in items/skills with **no attribute base** (`0` until opted in) + a **multiplicative** Technique path (`0 × mult = 0`, inert for the uncommitted) + a **tallied magnitude** the path trains on. Crit is instance #1 (reworked to this shape — see spike); DoT and Reflection already fit.
+- **Candidate roster** (built through the Workbench as the arc reaches them): **Momentum** (in-battle escalation), **Hex** (vulnerability/debuff), **Sunder** (anti-mitigation) — all expressible on today's effect system — and **Cull** (execute), which needs a new damage-calc conditional.
+- **Attribute-concentration is content, not a path.** "All-in STR → STR synergies" is served by opt-in **attribute-scaling** skills/items (orthogonal to damage type, so it distinguishes STR from a DEX physical build and does not fight magic-school spread), *not* by a proficiency track — the taxonomy stays type/delivery-based.
+
 ---
 
 ## 5. Classes
@@ -168,7 +179,7 @@ Four classes, each anchored on a different core attribute and weapon family:
 
 - Covers four of the six core attributes (STR / DEX / INT / END); **AGI and LUK** are deliberately left to the Technique paths (dodge / crit), not class identities.
 - Each secondary should open a *second* path, so a character starts with **two roots** (weapon family + secondary) — seeding the depth-vs-breadth choice from level 1.
-- **The TBD secondaries are blocked on the utility-skill problem** (parking lot): a natural pick like a *STR buff* or *CDR buff* currently trains no proficiency, so those classes' second root is undecided until that's resolved.
+- **The TBD secondaries open their second root via a *committed* effect, not a universal buff** ([#1398](./spikes/1398-utility-in-proficiency-system.md), §4): a raw STR/CDR buff trains nothing (it is a universal amplifier), so a secondary meant to open a root must carry a *committed* hook — a small damage/event portion or an opt-in archetype enabler. A class *may* instead take a pure-utility secondary and deliberately start single-rooted.
 - **Minor open content question:** the **staff** has no weapon-leaf in the current taxonomy (`Sword/Axe/Bow/Club/Dagger/Unarmed`) — decide whether the Wizard's staff is a new `Staff` leaf or reuses an existing one; its *signature* is Fire-typed regardless.
 
 ---
@@ -273,12 +284,12 @@ Zone 3 is less a zone to author in isolation than a **content horizon**: it's th
   - Only a build with **no** win condition (an uncommitted spread, or pure passive bulk with no reflection) stalls to a draw. *That* is the lesson.
 - **Content that must exist by this horizon** (plan across §4 / §6 / §7 / §8 first):
   - [ ] **Proficiency depth** — leaf paths reachable to a tier where compounding is actually *felt* at the Z3 band (§4 rollout).
-  - [ ] **First synthesis recipe** — combines two *owned* (non-item-granted) early skills into a Z3-relevant ability (§6). Depends on which early skills exist → partly blocked on the class secondaries ([#1398](https://github.com/ginderjeremiah/GameServer/issues/1398)).
+  - [ ] **First synthesis recipe** — combines two *owned* (non-item-granted) early skills into a Z3-relevant ability (§6). Depends on which early skills exist → follows from the class secondaries (§5; the utility-secondary rule is settled in [#1398](./spikes/1398-utility-in-proficiency-system.md)).
   - [ ] **`RequiredProficiency` weapon(s)** — an uncommon weapon gated behind a leaf proficiency level: the depth route's reward (§7).
   - [ ] **A reflection source** — gear / mod / an early Retribution-path reward granting `DamageReflection`, so the reflection route can bootstrap (it's authored-only, never derived from a core attribute) (§7).
   - [ ] **Feats** — timed / under-leveled challenges on the Z3 boss, rewarding the committed builds (§8).
   - [ ] **Archetypes to validate** — at least one depth build and one breadth build that each clear the wall, proving both routes viable.
-- **Resolve-first dependencies:** the class secondaries (§5, partly on #1398) and the synthesis catalog (§6) feed this horizon directly — it firms up as those settle.
+- **Resolve-first dependencies:** the class secondaries (§5; the utility-secondary rule settled in [#1398](./spikes/1398-utility-in-proficiency-system.md)) and the synthesis catalog (§6) feed this horizon directly — it firms up as those settle.
 
 ---
 
@@ -286,7 +297,7 @@ Zone 3 is less a zone to author in isolation than a **content horizon**: it's th
 
 - **Tutorials** — the arc leans on **tutorial blurbs** as a teaching lane (§2); the feature is scoped in spike **[#1392](https://github.com/ginderjeremiah/GameServer/issues/1392)** (cross-referenced there, including whether blurb content is reference data or hardcoded).
 - **Classes shape starting roots, not zone access.** Early zones are class-agnostic (they provide their own counters — §5), so the class roster is *not* a hard prerequisite for the zone arc; per-class variance lives only in which paths a character *starts* training. The strawman roster is drafted in §5.
-- **⚠ Utility skills have no proficiency home — blocks class secondaries (§5) & the skill catalog (§6).** The proficiency activity keys are all damage-type / resist / combat-event, so a pure **utility** skill (buff STR, buff CDR, other non-damage effects) deals no damage and triggers no event — it trains *nothing*. Directions to weigh: **(a)** add a support **event/key** (buff-application → an "Enhancement"-style path, parallel to Restoration); **(b)** utility trains nothing *by design* (its cost is forgoing mastery); **(c)** utility needs no track because its payoff is *already captured* — a STR/CDR buff amplifies your damage and cadence, so you train your existing paths *harder* (fits the effect-based accrual philosophy). Lean: **(c)**, with **(a)** as fallback if a dedicated support identity is wanted. This is a proficiency-*system* question — tracked in spike **[#1398](https://github.com/ginderjeremiah/GameServer/issues/1398)** — and it gates the §5 TBDs.
+- **✓ Utility & the proficiency system — resolved** ([spike #1398](./spikes/1398-utility-in-proficiency-system.md); see §4 *Delivery archetypes & the commitment rule*). "Utility" was the wrong unit: a proficiency path is earned by a **committed** delivery archetype (opt-in enabler, measured as excess over a `0` floor), not by an effect being a buff. Universal amplifiers — including the filed CDR-buff example — get **no** path; their payoff is the paths they amplify. Attribute-concentration synergy is attribute-scaling *content*, not a track. Crit is reworked to the opt-in-multiplicative template as the worked example; the `Dexterity`/`Luck`/`Agility` identity-sourcing ripple is spun off as a follow-on spike.
 - **Zone 3 build wall — synthesis and/or depth-gate.** Gateways (proficiency cross-family) are far too deep this early; the realistic Zone-3 levers are the **first skill-synthesis recipe** (opportune to introduce here) and/or **`RequiredProficiency`-gated weapons** (e.g. an uncommon weapon needing a proficiency level) — depth-gating that forces prior investment. Decide whether Z3 uses one, the other, or both.
 - **Umbrella accrual vs. gating** (mechanics) — if umbrellas are capstones gated behind their leaves, the auto-firing category key would open them prematurely (see §4 principle 2). Needs a proficiency-system answer before capstone umbrellas can be authored.
 - Long-horizon pacing past the 10-hour offline window — what is the **endgame** the arc is climbing toward?
