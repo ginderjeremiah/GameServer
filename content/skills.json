@@ -50,7 +50,7 @@
     "word": "",
     "pronunciation": "",
     "translation": "",
-    "acquisition": "Player",
+    "acquisition": "Player, Enemy",
     "retiredAt": null
   },
   {
@@ -77,7 +77,7 @@
     "word": "",
     "pronunciation": "",
     "translation": "",
-    "acquisition": "Player",
+    "acquisition": "Player, Enemy",
     "retiredAt": null
   },
   {

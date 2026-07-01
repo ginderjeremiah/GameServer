@@ -70,5 +70,59 @@
     ],
     "spawns": [],
     "retiredAt": null
+  },
+  {
+    "id": 3,
+    "name": "Cinder Hound",
+    "isBoss": false,
+    "attributeDistribution": [
+      {
+        "attributeId": "Strength",
+        "baseAmount": 12.000,
+        "amountPerLevel": 2.000
+      },
+      {
+        "attributeId": "Endurance",
+        "baseAmount": 8.000,
+        "amountPerLevel": 1.500
+      }
+    ],
+    "skillPool": [
+      1
+    ],
+    "spawns": [
+      {
+        "zoneId": 1,
+        "weight": 1
+      }
+    ],
+    "retiredAt": null
+  },
+  {
+    "id": 4,
+    "name": "Ashen Revenant",
+    "isBoss": false,
+    "attributeDistribution": [
+      {
+        "attributeId": "Strength",
+        "baseAmount": 10.000,
+        "amountPerLevel": 2.000
+      },
+      {
+        "attributeId": "Endurance",
+        "baseAmount": 10.000,
+        "amountPerLevel": 1.500
+      }
+    ],
+    "skillPool": [
+      1
+    ],
+    "spawns": [
+      {
+        "zoneId": 1,
+        "weight": 1
+      }
+    ],
+    "retiredAt": null
   }
 ]
