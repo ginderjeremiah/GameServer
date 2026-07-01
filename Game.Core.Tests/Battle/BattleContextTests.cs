@@ -151,7 +151,11 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(20, Single(EDamageType.Physical)); // 20×2 = 40, no Toughness ⇒ 40 dealt
 
             Assert.Equal(1, context.Stats.CriticalHits);
+            // The player-facing statistic is the actual full crit damage dealt.
             Assert.Equal(40, context.Stats.CriticalDamageDealt, 0.001);
+            // The Precision signal is the normalized marginal bonus: baseline 20, investment m−1 = 1, φ(1) = 0.5
+            // ⇒ 20 × 0.5 = 10 (the crit added 20 over the vanilla hit, discounted to 10 by the saturation).
+            Assert.Equal(10, context.Stats.CriticalBonusDealt, 0.001);
         }
 
         [Fact]
@@ -165,6 +169,39 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(0, context.Stats.CriticalHits);
             Assert.Equal(0, context.Stats.CriticalDamageDealt, 0.001);
+            // A build that never crits trains Precision on nothing.
+            Assert.Equal(0, context.Stats.CriticalBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_MinimallyInvestedCrit_BooksASmallMarginalBonus()
+        {
+            // Base CriticalDamage only (1.5, no invested bonus): m = 1.5, investment m−1 = 0.5, φ(0.5) = 1/3.
+            // baseline 20 ⇒ bonus ≈ 6.667 — a token crit trains Precision far less than a committed one.
+            var player = MakeBattlerWith((CriticalChance, 1)); // CriticalDamage 1.5 (base)
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical)); // 20 × 1.5 = 30 dealt
+
+            Assert.Equal(30, context.Stats.CriticalDamageDealt, 0.001);
+            Assert.Equal(20.0 * 0.5 / 1.5, context.Stats.CriticalBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_HeavilyInvestedCrit_SaturatesTowardOneBaselineHit()
+        {
+            // Heavy crit-damage investment: CriticalDamage 1.5 + 98.5 = 100, investment 99, φ(99) = 99/100 = 0.99.
+            // baseline 20 ⇒ bonus 19.8, approaching one baseline hit (20) — the saturation ceiling — even though
+            // the full crit dealt 2000. The signal is bounded so a monster crit cannot dwarf every other axis.
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 98.5));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical)); // 20 × 100 = 2000 dealt
+
+            Assert.Equal(2000, context.Stats.CriticalDamageDealt, 0.001);
+            Assert.Equal(19.8, context.Stats.CriticalBonusDealt, 0.001);
         }
 
         [Fact]
@@ -522,6 +559,9 @@ namespace Game.Core.Tests.Battle
             // A crit is one hit; the crit damage stat uses the whole-hit summed net.
             Assert.Equal(1, context.Stats.CriticalHits);
             Assert.Equal(40, context.Stats.CriticalDamageDealt, 0.001);
+            // The marginal bonus sums each portion's vanilla-hit baseline (10 + 10 = 20) before φ: investment
+            // m−1 = 1, φ(1) = 0.5 ⇒ 20 × 0.5 = 10, so a multi-typed crit trains Precision as one marginal event.
+            Assert.Equal(10, context.Stats.CriticalBonusDealt, 0.001);
         }
 
         [Fact]

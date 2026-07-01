@@ -330,15 +330,16 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // A path keyed on the Crit event trains from the battle's crit damage — no skill contribution and no
-            // damage-type routing involved (Precision is a single global, type-neutral track; spike #1318).
+            // A path keyed on the Crit event trains from the battle's normalized marginal crit bonus (#1448) — no
+            // skill contribution and no damage-type routing involved (Precision is a single global, type-neutral
+            // track; spike #1318).
             var path = await TestDataSeeder.CreatePathAsync(context, name: "Precision", activityKey: EActivityKey.Crit);
             var tier = await TestDataSeeder.CreateProficiencyAsync(
                 context, name: "Precision", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
-            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CriticalDamageDealt = FiredDamage });
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CriticalBonusDealt = FiredDamage });
 
             var result = Assert.Single(accrual.Results);
             Assert.Equal(tier.Id, result.ProficiencyId);
@@ -424,7 +425,7 @@ namespace Game.Application.Tests.Services
 
             var stats = new BattleStats
             {
-                CriticalDamageDealt = FiredDamage,
+                CriticalBonusDealt = FiredDamage,
                 DamageDodged = FiredDamage,
                 PlayerDamageHealed = FiredDamage,
             };
@@ -448,7 +449,7 @@ namespace Game.Application.Tests.Services
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
-            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CriticalDamageDealt = 0 });
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CriticalBonusDealt = 0 });
 
             Assert.Empty(accrual.Results);
         }
@@ -472,8 +473,8 @@ namespace Game.Application.Tests.Services
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
-            // Full-power fire damage and full-power crit damage in the same battle.
-            var stats = new BattleStats { CriticalDamageDealt = FiredDamage };
+            // Full-power fire damage and a full-power crit bonus in the same battle.
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage };
             stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
             var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
 
