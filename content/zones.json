@@ -1,0 +1,41 @@
+[
+  {
+    "id": 0,
+    "name": "Verdant Hollow",
+    "description": "A quiet glade where new heroes cut their teeth.",
+    "order": 0,
+    "levelMin": 1,
+    "levelMax": 10,
+    "bossEnemyId": 2,
+    "bossLevel": 10,
+    "unlockChallengeId": null,
+    "isHome": false,
+    "retiredAt": null
+  },
+  {
+    "id": 1,
+    "name": "Ashen Wastes",
+    "description": "A scorched expanse — sealed until Verdant Hollow is cleared.",
+    "order": 1,
+    "levelMin": 8,
+    "levelMax": 18,
+    "bossEnemyId": null,
+    "bossLevel": 1,
+    "unlockChallengeId": 0,
+    "isHome": false,
+    "retiredAt": null
+  },
+  {
+    "id": 2,
+    "name": "Home",
+    "description": "A quiet refuge where you can rest without battling. No enemies will find you here.",
+    "order": -1,
+    "levelMin": 1,
+    "levelMax": 1,
+    "bossEnemyId": null,
+    "bossLevel": 1,
+    "unlockChallengeId": null,
+    "isHome": true,
+    "retiredAt": null
+  }
+]

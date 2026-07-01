@@ -1,0 +1,52 @@
+[
+  {
+    "id": 0,
+    "name": "Adventurer",
+    "description": "A versatile starting archetype.",
+    "word": "aenkor",
+    "passiveAttributeId": "Strength",
+    "passiveAmount": 0.000,
+    "passiveScalingAttributeId": null,
+    "passiveScalingAmount": 0.000,
+    "passiveModifierType": "Additive",
+    "starterSkillIds": [
+      1,
+      2,
+      3
+    ],
+    "starterEquipment": [],
+    "attributeDistributions": [
+      {
+        "attributeId": "Strength",
+        "baseAmount": 5.000,
+        "amountPerLevel": 0.000
+      },
+      {
+        "attributeId": "Endurance",
+        "baseAmount": 5.000,
+        "amountPerLevel": 0.000
+      },
+      {
+        "attributeId": "Intellect",
+        "baseAmount": 5.000,
+        "amountPerLevel": 0.000
+      },
+      {
+        "attributeId": "Agility",
+        "baseAmount": 5.000,
+        "amountPerLevel": 0.000
+      },
+      {
+        "attributeId": "Dexterity",
+        "baseAmount": 5.000,
+        "amountPerLevel": 0.000
+      },
+      {
+        "attributeId": "Luck",
+        "baseAmount": 5.000,
+        "amountPerLevel": 0.000
+      }
+    ],
+    "retiredAt": null
+  }
+]
