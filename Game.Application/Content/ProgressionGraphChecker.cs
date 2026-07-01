@@ -207,6 +207,8 @@ namespace Game.Application.Content
                         {
                             Warn("ItemGrant", "Item", item.Id, $"grants skill {grantedSkillId}, which is not Item-acquirable.");
                         }
+
+                        CheckWeaponSignatureType(item, grantedSkillId);
                     }
 
                     if (item.RequiredProficiencyId is int requiredProficiencyId)
@@ -236,6 +238,49 @@ namespace Game.Application.Content
                 {
                     Error("WeaponStranding", "Item", item.Id, "is not a weapon but declares a WeaponType.");
                 }
+            }
+
+            private void CheckWeaponSignatureType(Contracts.Item item, int grantedSkillId)
+            {
+                // A weapon's signature must actually fire with that weapon. The weapon-match gate dims a skill
+                // whose type is a weapon leaf other than the equipped weapon's, so a weapon granting a signature
+                // of a different weapon leaf strands the player exactly as a missing signature would — and the
+                // type lives on the granted Skill record, out of a per-item save's reach.
+                if (item.ItemCategoryId != EItemCategory.Weapon
+                    || item.WeaponType is not EDamageType weaponType
+                    || !DamageTypes.IsWeaponLeaf(weaponType)
+                    || !_skills.TryGetValue(grantedSkillId, out var skill)
+                    || skill.RetiredAt is not null)
+                {
+                    return;
+                }
+
+                var signatureType = PrimaryDamageType(skill);
+                if (DamageTypes.IsWeaponLeaf(signatureType) && signatureType != weaponType)
+                {
+                    Error("WeaponStranding", "Item", item.Id, $"grants signature skill {grantedSkillId} of weapon type {signatureType}, which the equipped {weaponType} weapon dims — the weapon fields no usable signature.");
+                }
+            }
+
+            // Mirrors Game.Core.Skills.Skill.PrimaryDamageType over the read contract: highest-weight portion,
+            // first-authored on a tie, Physical for an empty split.
+            private static EDamageType PrimaryDamageType(Contracts.Skill skill)
+            {
+                var portions = skill.DamagePortions.ToList();
+                if (portions.Count == 0)
+                {
+                    return EDamageType.Physical;
+                }
+
+                var primary = portions[0];
+                foreach (var portion in portions)
+                {
+                    if (portion.Weight > primary.Weight)
+                    {
+                        primary = portion;
+                    }
+                }
+                return primary.Type;
             }
 
             private void CheckProficiencyGate(Contracts.Item item, int proficiencyId)

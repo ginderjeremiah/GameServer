@@ -378,6 +378,244 @@ namespace Game.Application.Tests.Content
             Assert.DoesNotContain(_checker.Check(graph), f => f.EntityId == 9);
         }
 
+        [Fact]
+        public void Challenge_TargetingMissingSkill_IsError()
+        {
+            var graph = HealthyGraph() with { Challenges = [Challenge(0, entityType: EEntityType.Skill, targetEntityId: 99)] };
+            AssertHasFinding(graph, "ChallengeTarget", ContentGraphSeverity.Error, "Challenge", 0);
+        }
+
+        [Fact]
+        public void Challenge_WithNoneEntityTargetId_ChecksNothing()
+        {
+            // A None-typed challenge with a stray target id resolves against no set; it must raise nothing.
+            var graph = HealthyGraph() with { Challenges = [Challenge(0, entityType: EEntityType.None, targetEntityId: 99)] };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "ChallengeTarget");
+        }
+
+        [Fact]
+        public void Challenge_RewardingMissingItemMod_IsError()
+        {
+            var graph = HealthyGraph() with { Challenges = [Challenge(0, rewardItemModId: 99)] };
+            AssertHasFinding(graph, "ChallengeReward", ContentGraphSeverity.Error, "Challenge", 0);
+        }
+
+        [Fact]
+        public void Enemy_SpawningInMissingZone_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1), (99, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemySpawn", ContentGraphSeverity.Error, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Class_StarterEquipmentReferencingMissingItem_IsError()
+        {
+            var graph = HealthyGraph() with { Classes = [Class(0, starterSkills: [1], starterEquipmentItemIds: [99])] };
+            AssertHasFinding(graph, "ClassStarterItem", ContentGraphSeverity.Error, "Class", 0);
+        }
+
+        [Fact]
+        public void Item_WeaponWithNonLeafWeaponType_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                // Fire is a damage type but not a weapon leaf.
+                Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 3, weaponType: EDamageType.Fire)],
+            };
+            AssertHasFinding(graph, "WeaponStranding", ContentGraphSeverity.Error, "Item", 0);
+        }
+
+        [Fact]
+        public void Item_WeaponSignatureOfDifferentWeaponLeaf_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Item, primaryType: EDamageType.Axe)).ToList(),
+                // An Axe-typed signature never matches a Sword weapon — the gate dims it, stranding the weapon.
+                Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 6, weaponType: EDamageType.Sword)],
+            };
+            AssertHasFinding(graph, "WeaponStranding", ContentGraphSeverity.Error, "Item", 0);
+        }
+
+        [Fact]
+        public void Item_WeaponSignatureMatchingWeaponType_IsSilent()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Item, primaryType: EDamageType.Sword)).ToList(),
+                Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 6, weaponType: EDamageType.Sword)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.EntityKind == "Item" && f.EntityId == 0);
+        }
+
+        [Fact]
+        public void Proficiency_RewardingNonPlayerFlaggedSkill_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                // Skill 3 is Item-only, not Player-flagged.
+                Proficiencies = [Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(5, 3)])],
+            };
+            AssertHasFinding(graph, "ProficiencyReward", ContentGraphSeverity.Warning, "Proficiency", 0);
+        }
+
+        [Fact]
+        public void Proficiency_RewardBelowLevelOne_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Proficiencies = [Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(0, 5)])],
+            };
+            AssertHasFinding(graph, "ProficiencyReward", ContentGraphSeverity.Warning, "Proficiency", 0);
+        }
+
+        [Fact]
+        public void Proficiency_PrerequisiteMissing_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                Proficiencies = [Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(5, 5)], prerequisiteIds: [99])],
+            };
+            AssertHasFinding(graph, "ProficiencyPrerequisite", ContentGraphSeverity.Error, "Proficiency", 0);
+        }
+
+        [Fact]
+        public void Recipe_ResultSkillMissing_IsError()
+        {
+            var graph = HealthyGraph() with { SkillRecipes = [Recipe(0, resultSkillId: 99, inputs: [1])] };
+            AssertHasFinding(graph, "RecipeResult", ContentGraphSeverity.Error, "SkillRecipe", 0);
+        }
+
+        [Fact]
+        public void Recipe_InputSkillMissing_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Synthesis)).ToList(),
+                SkillRecipes = [Recipe(0, resultSkillId: 6, inputs: [1, 99])],
+            };
+            AssertHasFinding(graph, "RecipeInput", ContentGraphSeverity.Error, "SkillRecipe", 0);
+        }
+
+        [Fact]
+        public void Recipe_ConditionOnMissingProficiency_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Synthesis)).ToList(),
+                SkillRecipes = [Recipe(0, resultSkillId: 6, inputs: [1], conditions: [(99, 1)])],
+            };
+            AssertHasFinding(graph, "RecipeCondition", ContentGraphSeverity.Error, "SkillRecipe", 0);
+        }
+
+        [Fact]
+        public void Recipe_ConditionOnRetiredProficiency_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Synthesis)).ToList(),
+                Proficiencies = [Proficiency(0, pathId: 0, maxLevel: 10, retiredAt: Retired)],
+                SkillRecipes = [Recipe(0, resultSkillId: 6, inputs: [1], conditions: [(0, 1)])],
+            };
+            AssertHasFinding(graph, "RecipeCondition", ContentGraphSeverity.Warning, "SkillRecipe", 0);
+        }
+
+        [Fact]
+        public void Recipe_ConditionAboveProficiencyMaxLevel_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Synthesis)).ToList(),
+                SkillRecipes = [Recipe(0, resultSkillId: 6, inputs: [1], conditions: [(0, 999)])],
+            };
+            AssertHasFinding(graph, "RecipeCondition", ContentGraphSeverity.Warning, "SkillRecipe", 0);
+        }
+
+        [Fact]
+        public void OrphanSkill_SynthesisFlaggedWithNoRecipe_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Synthesis)).ToList(),
+            };
+            AssertHasFinding(graph, "OrphanSkill", ContentGraphSeverity.Warning, "Skill", 6);
+        }
+
+        [Fact]
+        public void OrphanSkill_EnemyFlaggedInNoPool_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                // Skill 2 is Enemy-flagged; drop it from every enemy pool.
+                Enemies = [Enemy(0, skillPool: [], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "OrphanSkill", ContentGraphSeverity.Warning, "Skill", 2);
+        }
+
+        [Fact]
+        public void OrphanSkill_PlayerFlaggedGrantedByNothing_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Player)).ToList(),
+            };
+            AssertHasFinding(graph, "OrphanSkill", ContentGraphSeverity.Warning, "Skill", 6);
+        }
+
+        [Fact]
+        public void Zone_GatedByReachableEnemyTargetChallenge_IsReachable()
+        {
+            // Zone 1 gated by killing enemy 0, which spawns in the reachable start zone 0.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                Challenges = [Challenge(0, entityType: EEntityType.Enemy, targetEntityId: 0)],
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "ZoneReachability");
+        }
+
+        [Fact]
+        public void Zone_GatedByReachableBossTargetChallenge_IsReachable()
+        {
+            // Zone 1 gated by defeating enemy 1, the boss of the reachable start zone 0.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0, bossEnemyId: 1), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                Challenges = [Challenge(0, entityType: EEntityType.Enemy, targetEntityId: 1)],
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "ZoneReachability");
+        }
+
+        [Fact]
+        public void Zone_GatedByUnreachableEnemyTargetChallenge_IsWarning()
+        {
+            // Zone 1 gated by killing enemy 3, which only spawns in the (unreachable) gated zone 1 itself.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                Challenges = [Challenge(0, entityType: EEntityType.Enemy, targetEntityId: 3)],
+                Enemies =
+                [
+                    Enemy(0, skillPool: [2], spawns: [(0, 1)]),
+                    Enemy(1, isBoss: true),
+                    Enemy(3, skillPool: [2], spawns: [(1, 1)]),
+                ],
+            };
+            AssertHasFinding(graph, "ZoneReachability", ContentGraphSeverity.Warning, "Zone", 1);
+        }
+
+        [Fact]
+        public void Finding_ToString_IsHumanReadable()
+        {
+            var finding = new ContentGraphFinding(ContentGraphSeverity.Error, "ZoneBoss", "Zone", 3, "references enemy 9, which does not exist.");
+            Assert.Equal("[Error] Zone 3 (ZoneBoss): references enemy 9, which does not exist.", finding.ToString());
+        }
+
         // === Fixtures =================================================================================
 
         private static readonly DateTime Retired = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -412,14 +650,14 @@ namespace Game.Application.Tests.Content
                 SkillRecipes: []);
         }
 
-        private static Contracts.Skill Skill(int id, ESkillAcquisition acquisition, DateTime? retiredAt = null) => new()
+        private static Contracts.Skill Skill(int id, ESkillAcquisition acquisition, DateTime? retiredAt = null, EDamageType primaryType = EDamageType.Physical) => new()
         {
             Id = id,
             Name = $"Skill {id}",
             BaseDamage = 1,
             DamageMultipliers = [],
             Effects = [],
-            DamagePortions = [new Contracts.SkillDamagePortion { Type = EDamageType.Physical, Weight = 1 }],
+            DamagePortions = [new Contracts.SkillDamagePortion { Type = primaryType, Weight = 1 }],
             Description = "",
             CooldownMs = 1000,
             IconPath = "",
