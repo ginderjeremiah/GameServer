@@ -221,6 +221,18 @@ namespace Game.Api
                     await seeder.SeedAsync(reader.ReadDefault());
                 }
             }
+            else if (seedContentOnStartup)
+            {
+                // Seeding runs only inside the migration block (it needs a migrated schema). Surface the
+                // misconfiguration so a recovery operator who enabled only SeedContentOnStartup isn't left
+                // wondering why nothing was seeded, instead of failing silently.
+                app.Logger.LogWarning(
+                    "{SeedFlag} is enabled but {MigrateFlag} is off (and the environment is not Development), so " +
+                    "content seeding is skipped — it only runs alongside startup migrations. Enable {MigrateFlag} too.",
+                    $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.SeedContentOnStartup)}",
+                    $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.MigrateOnStartup)}",
+                    $"{nameof(DataAccessOptions)}:{nameof(DataAccessOptions.MigrateOnStartup)}");
+            }
 
             var corsOptions = app.Services.GetRequiredService<IOptions<CorsOptions>>().Value;
 

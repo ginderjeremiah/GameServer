@@ -5,17 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using EntityItemTag = Game.Infrastructure.Entities.ItemTag;
 using EntityItemModTag = Game.Infrastructure.Entities.ItemModTag;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
-using EntitySkillEffect = Game.Infrastructure.Entities.SkillEffect;
-using EntityItem = Game.Infrastructure.Entities.Item;
-using EntityItemModSlot = Game.Infrastructure.Entities.ItemModSlot;
-using EntityItemMod = Game.Infrastructure.Entities.ItemMod;
-using EntityEnemy = Game.Infrastructure.Entities.Enemy;
-using EntityChallenge = Game.Infrastructure.Entities.Challenge;
-using EntityZone = Game.Infrastructure.Entities.Zone;
-using EntityClass = Game.Infrastructure.Entities.Class;
-using EntityPath = Game.Infrastructure.Entities.Path;
-using EntityProficiency = Game.Infrastructure.Entities.Proficiency;
-using EntitySkillRecipe = Game.Infrastructure.Entities.SkillRecipe;
 
 namespace Game.DataAccess.Content
 {
@@ -60,6 +49,11 @@ namespace Game.DataAccess.Content
             var itemModTags = content.ItemMods
                 .SelectMany(mod => mod.Tags.Select(tagId => new EntityItemModTag { ItemModId = mod.Id, TagId = tagId }))
                 .ToList();
+
+            // Every entity type the inserts touch, so sequence advancement is derived from what was actually
+            // seeded rather than a hand-maintained parallel list (AdvanceIdentitySequencesAsync filters the
+            // composite-key join tables out).
+            var insertedTypes = new HashSet<Type>();
 
             await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
@@ -109,20 +103,18 @@ namespace Game.DataAccess.Content
             await Insert(recipes.SelectMany(r => r.Inputs).ToList());
             await Insert(recipes.SelectMany(r => r.Conditions).ToList());
 
-            // Advance every seeded identity table's sequence past its highest explicit id.
-            await EntityRowInserter.AdvanceIdentitySequencesAsync(
-                _context,
-                [
-                    typeof(EntityPath), typeof(EntitySkill), typeof(EntitySkillEffect), typeof(EntityProficiency),
-                    typeof(EntityItemMod), typeof(EntityItem), typeof(EntityItemModSlot), typeof(EntityEnemy),
-                    typeof(EntityChallenge), typeof(EntityZone), typeof(EntityClass), typeof(EntitySkillRecipe),
-                ],
-                cancellationToken);
+            // Advance every seeded identity table's sequence past its highest explicit id (the guard filters
+            // the composite-key join tables out, so passing every inserted type is safe and stays in sync).
+            await EntityRowInserter.AdvanceIdentitySequencesAsync(_context, insertedTypes, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return true;
 
-            Task Insert<T>(IReadOnlyList<T> rows) => EntityRowInserter.InsertAsync(_context, rows, cancellationToken);
+            Task Insert<T>(IReadOnlyList<T> rows)
+            {
+                insertedTypes.Add(typeof(T));
+                return EntityRowInserter.InsertAsync(_context, rows, cancellationToken);
+            }
         }
     }
 }
