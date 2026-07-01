@@ -383,7 +383,12 @@ namespace Game.Infrastructure.Tests
             }
 
             releaseFirstRun.SetResult();
-            WaitUntil(() => !worker.IsRunning && Volatile.Read(ref active) == 0);
+            // The mid-run signals must produce at least one trailing run — coalesced into the in-flight run, or
+            // dispatched as a fresh run once it exits — and the worker must then settle for good. Wait for a *stable*
+            // non-running terminal state with that trailing run observed: sampling once could otherwise land in the
+            // brief gap after the first run exits but before the coalesced/leftover pass runs, reading totalRuns == 1
+            // or a transient IsRunning.
+            WaitUntilStablyNotRunning(worker, () => Volatile.Read(ref active) == 0 && Volatile.Read(ref totalRuns) >= 2);
 
             // Two loopAction calls never ran at once.
             Assert.Equal(1, Volatile.Read(ref maxActive));
@@ -465,6 +470,35 @@ namespace Game.Infrastructure.Tests
             }
 
             Assert.True(condition(), "The expected condition was not met within the timeout.");
+        }
+
+        // Waits until the worker is not running and <paramref name="alsoRequire"/> holds, and that combined state
+        // stays stable across several consecutive polls. The async loop re-arms its wait mid-run, so the burst of
+        // signals can leave the AutoResetEvent with a leftover pass that dispatches a moment after the worker first
+        // looks idle; requiring a run of stable observations rules out sampling that transient between-runs gap.
+        private static void WaitUntilStablyNotRunning(BackgroundWorker worker, Func<bool> alsoRequire)
+        {
+            const int requiredStablePolls = 10;
+            var deadline = DateTime.UtcNow + WaitTimeout;
+            var stablePolls = 0;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (!worker.IsRunning && alsoRequire())
+                {
+                    if (++stablePolls >= requiredStablePolls)
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    stablePolls = 0;
+                }
+
+                Thread.Sleep(5);
+            }
+
+            Assert.Fail("The worker did not settle into a stable non-running state with the coalesced trailing run executed.");
         }
 
         /// <summary>
