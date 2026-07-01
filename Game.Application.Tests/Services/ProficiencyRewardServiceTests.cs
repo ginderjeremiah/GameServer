@@ -410,6 +410,47 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task HexBonus_TrainsTheHexPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Hex trains from the vulnerability-enabled marginal damage (#1427) — an output-book event, type-neutral
+            // like the other overlays (routed straight to the single Hex activity key with no applies() split).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Hex", activityKey: EActivityKey.Hex);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Hex", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { HexBonusDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoHexBonus_TrainsNoHex()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with other events but no vulnerability-enabled damage routes
+            // no Hex activity, so a Hex-keyed path is never reached.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Hex", activityKey: EActivityKey.Hex);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Hex", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage, PlayerDamageHealed = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
         public async Task NoReflectedDamage_TrainsNoRetribution()
         {
             using var scope = CreateScope();

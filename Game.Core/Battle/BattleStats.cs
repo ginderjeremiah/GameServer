@@ -39,6 +39,18 @@ namespace Game.Core.Battle
         /// </summary>
         public double PlayerReflectedDamageDealt { get; set; }
 
+        /// <summary>
+        /// The Hex (<c>Hex</c> activity key) training signal — the normalized-marginal damage the player's
+        /// applied vulnerability enabled this battle (spike #1398 → the overlay tally shape, reference #1448).
+        /// A vulnerability debuff lowers the opponent's resistance below its innate baseline; for each hit and
+        /// DoT tick the extra damage that reduction let through — <c>D × v</c> against a fixed baseline — is
+        /// booked with the same <c>/(1 + v)</c> saturation the crit bonus uses, on the debuff strength <c>v</c>.
+        /// Because the enabled damage is the pre-resistance amount, it is flat in the enemy's <b>base</b>
+        /// resistance (no resist-farming), and the saturation makes it proportional to how hard the player
+        /// invested in the debuff. Like the crit bonus this is a backend-only side channel with no parity mirror.
+        /// </summary>
+        public double HexBonusDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>
@@ -79,6 +91,14 @@ namespace Game.Core.Battle
         {
             TypedDamageExposure.TryGetValue(type, out var existing);
             TypedDamageExposure[type] = existing + amount;
+        }
+
+        /// <summary>Accumulates a normalized-marginal vulnerability-enabled <paramref name="amount"/> into the
+        /// type-neutral Hex signal (#1427). Cached as a method group by <see cref="BattleContext"/> so the
+        /// per-tick DoT phase can record the enemy's Hex bonus without allocating.</summary>
+        public void AddHexBonus(double amount)
+        {
+            HexBonusDealt += amount;
         }
     }
 

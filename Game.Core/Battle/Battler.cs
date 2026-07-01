@@ -13,6 +13,16 @@ namespace Game.Core.Battle
         private readonly AttributeCollection _attributes;
 
         /// <summary>
+        /// This battler's innate (pre-effect) resistance per resistance attribute, snapshotted once at
+        /// construction before any timed skill effect can lower it. A vulnerability debuff applied mid-battle
+        /// drops the live resistance below this baseline; the gap is the <b>opponent-applied</b> vulnerability
+        /// the Hex overlay tally credits (#1427), isolated from this battler's own durable resistance. Keyed by
+        /// the fixed <see cref="DamageTypes.ResistanceAttributesAll"/> set, so a type's innate resistance sum is
+        /// the same fold as its live sum. Backend-only (the Hex tally has no parity surface).
+        /// </summary>
+        private readonly IReadOnlyDictionary<EAttribute, double> _innateResistance;
+
+        /// <summary>
         /// The active timed skill effects, folded to one <see cref="AttributeEffectStack"/> per affected
         /// attribute rather than one record per application. Every application on an attribute shares a single
         /// expiry, so the stack collapses its magnitudes into a single combined modifier per modifier type
@@ -45,6 +55,23 @@ namespace Game.Core.Battle
             CurrentHealth = _attributes[MaxHealth];
             Skills = skills.Select(s => new BattleSkill(s)).ToList();
             Level = level;
+            _innateResistance = SnapshotInnateResistance(attributes);
+        }
+
+        // Captures each resistance attribute's composed value once, before any timed effect can lower it — the
+        // baseline the Hex tally measures an applied vulnerability against (#1427). Durable resistance (base,
+        // gear, mods, proficiency, class) is already composed at this point; only in-battle skill effects move
+        // resistance afterward, so a live value below its snapshot is exactly the opponent-applied vulnerability.
+        private static IReadOnlyDictionary<EAttribute, double> SnapshotInnateResistance(AttributeCollection attributes)
+        {
+            var resistanceAttributes = DamageTypes.ResistanceAttributesAll;
+            var snapshot = new Dictionary<EAttribute, double>(resistanceAttributes.Count);
+            for (var i = 0; i < resistanceAttributes.Count; i++)
+            {
+                snapshot[resistanceAttributes[i]] = attributes[resistanceAttributes[i]];
+            }
+
+            return snapshot;
         }
 
         public void Update(BattleContext context)
@@ -110,6 +137,14 @@ namespace Game.Core.Battle
                 resistance += _attributes[resistanceAttributes[i]];
             }
 
+            return NetDamageAfterResistance(dealt, resistance, attackerLevel);
+        }
+
+        // The mitigation tail shared by the live hit and the Hex counterfactual: percentage resistance then the
+        // Toughness curve. Factored out (byte-identical to the former inline body) so the Hex tally can measure
+        // the same hit against a different resistance — the innate baseline — without duplicating the curve.
+        private double NetDamageAfterResistance(double dealt, double resistance, int attackerLevel)
+        {
             var mitigated = dealt * (1 - resistance);
             if (mitigated <= 0)
             {
@@ -127,6 +162,42 @@ namespace Game.Core.Battle
             var toughnessReduction = toughness / (toughness + scaled);
 
             return mitigated * (1 - toughnessReduction);
+        }
+
+        /// <summary>
+        /// The normalized-marginal Hex bonus for a direct hit of <paramref name="dealt"/> (attacker-amplified,
+        /// pre-crit) of <paramref name="damageType"/> against this (defending) battler — the extra damage the
+        /// <b>opponent-applied</b> vulnerability let through, booked to the attacker's Hex signal (#1427). The
+        /// vulnerability <c>v</c> is how far this battler's live resistance for the type sits below its innate
+        /// baseline (<c>0</c> when nothing lowered it); the raw marginal is the live net minus the net the hit
+        /// <em>would</em> have dealt at the innate resistance, and it is discounted by <c>1/(1 + v)</c> — the
+        /// same concave saturation the crit bonus applies to its investment (<c>marginal / (1 + investment)</c>,
+        /// so a token debuff trains little and a committed one saturates toward one baseline hit). Because the
+        /// marginal is <c>dealt × v × toughnessFactor</c>, it is flat in this battler's <b>base</b> resistance —
+        /// Hex trains the same against a soft or a resistant enemy (no resist-farming). Measured against the
+        /// vanilla (pre-crit) hit so it composes with crit without either overlay inflating the other. Returns
+        /// <c>0</c> when no vulnerability is applied. A backend-only side channel — it never mutates health.
+        /// </summary>
+        public double HexBonusForHit(double dealt, EDamageType damageType, int attackerLevel)
+        {
+            var liveResistance = 0.0;
+            var innateResistance = 0.0;
+            var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
+            for (var i = 0; i < resistanceAttributes.Count; i++)
+            {
+                liveResistance += _attributes[resistanceAttributes[i]];
+                innateResistance += _innateResistance[resistanceAttributes[i]];
+            }
+
+            var vulnerability = innateResistance - liveResistance;
+            if (vulnerability <= 0)
+            {
+                return 0;
+            }
+
+            var marginal = NetDamageAfterResistance(dealt, liveResistance, attackerLevel)
+                - NetDamageAfterResistance(dealt, innateResistance, attackerLevel);
+            return marginal > 0 ? marginal / (1 + vulnerability) : 0;
         }
 
         /// <summary>
@@ -205,10 +276,17 @@ namespace Game.Core.Battle
         /// direct hit's post-mitigation actual damage; <c>null</c> leaves the loop unchanged. Like
         /// <paramref name="recordExposure"/> it is a backend-only side channel that adds no parity surface.
         /// </param>
+        /// <param name="recordHexBonus">
+        /// Optional recorder for the attacker's Hex signal (#1427) — invoked per DoT type with the
+        /// normalized-marginal damage the opponent-applied vulnerability enabled this tick (type-neutral, so it
+        /// takes just the amount). Supplied only when this battler is the victim of the player's DoT (the enemy);
+        /// <c>null</c> skips the innate-baseline sum entirely. A backend-only side channel like the others.
+        /// </param>
         public double ApplyDamageOverTime(
             int ms,
             Action<EDamageType, double>? recordExposure = null,
-            Action<EDamageType, double>? recordDamageDealt = null)
+            Action<EDamageType, double>? recordDamageDealt = null,
+            Action<double>? recordHexBonus = null)
         {
             var dot = 0.0;
             var accumulators = DamageTypes.DotAccumulators;
@@ -227,16 +305,35 @@ namespace Game.Core.Battle
                 recordExposure?.Invoke(accumulators[i].Type, preMitigation);
 
                 var resistance = 0.0;
+                var innateResistance = 0.0;
                 var resistanceAttributes = DamageTypes.ResistanceAttributes(accumulators[i].Type);
                 for (var j = 0; j < resistanceAttributes.Count; j++)
                 {
                     resistance += _attributes[resistanceAttributes[j]];
+                    if (recordHexBonus is not null)
+                    {
+                        innateResistance += _innateResistance[resistanceAttributes[j]];
+                    }
                 }
 
                 // The post-resistance tick is both what the health loses and what the attacker dealt of this
                 // type; compute it once so the recorded damage-dealt and the health math cannot drift.
                 var tickDamage = preMitigation * (1 - resistance);
                 recordDamageDealt?.Invoke(accumulators[i].Type, tickDamage);
+
+                // The attacker's Hex bonus for this tick: the opponent-applied vulnerability (live resistance
+                // below the innate baseline) let through preMitigation × v, discounted by the same 1/(1 + v)
+                // saturation the direct-hit and crit bonuses use. DoT bypasses the Toughness curve, so the
+                // enabled damage is just preMitigation × v — flat in this battler's base resistance.
+                if (recordHexBonus is not null)
+                {
+                    var vulnerability = innateResistance - resistance;
+                    if (vulnerability > 0)
+                    {
+                        recordHexBonus(preMitigation * vulnerability / (1 + vulnerability));
+                    }
+                }
+
                 dot += tickDamage;
             }
 

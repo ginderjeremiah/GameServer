@@ -25,8 +25,9 @@ namespace Game.Application.Services
     /// <b>incoming</b> book trains resist keys on the player's pre-mitigation typed exposure
     /// (<see cref="BattleStats.TypedDamageExposure"/>), and the event-keyed combat magnitudes — the normalized
     /// marginal crit bonus (Precision, <see cref="BattleStats.CriticalBonusDealt"/>), dodged damage (Evasion),
-    /// healing done (Restoration), and reflected damage dealt
-    /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363) — are damage-type-neutral
+    /// healing done (Restoration), reflected damage dealt
+    /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363), and the vulnerability-enabled
+    /// Hex bonus (<see cref="BattleStats.HexBonusDealt"/> — #1427) — are damage-type-neutral
     /// and map straight to a single activity key. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
@@ -179,8 +180,9 @@ namespace Game.Application.Services
         //     (BattleStats.TypedDamageExposure), routed to the resist keys, so a resist never throttles its own
         //     training signal.
         //   • Events: the normalized marginal crit bonus (not the full crit hit — #1448), dodged damage, healing
-        //     done, and reflected damage dealt — damage-type-neutral magnitudes that map straight to a single
-        //     activity key (Crit / Dodge / Heal / Reflect) without applies() routing.
+        //     done, reflected damage dealt, and the vulnerability-enabled Hex bonus (#1427) — damage-type-neutral
+        //     magnitudes that map straight to a single activity key (Crit / Dodge / Heal / Reflect / Hex) without
+        //     applies() routing.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
@@ -207,6 +209,7 @@ namespace Game.Application.Services
             AddEvent(EActivityKey.Dodge, stats.DamageDodged);
             AddEvent(EActivityKey.Heal, stats.PlayerDamageHealed);
             AddEvent(EActivityKey.Reflect, stats.PlayerReflectedDamageDealt);
+            AddEvent(EActivityKey.Hex, stats.HexBonusDealt);
 
             // Route each key's activity to the frontier tier of every path bound to it — but only to a frontier
             // the player has actually unlocked. Within-path tiers open implicitly as the prior tier maxes (the

@@ -129,8 +129,18 @@ namespace Game.Core.Attributes
         private static readonly IReadOnlyDictionary<EDamageType, IReadOnlyList<EAttribute>> ResistanceByType =
             AppliesMap.ToDictionary(e => e.Key, e => (IReadOnlyList<EAttribute>)e.Value.Select(k => InfoByKey[k].Resistance).OfType<EAttribute>().ToArray());
 
+        // Every distinct defender-side resistance attribute (the non-weapon keys' Resistance), in canonical key
+        // order. The single source for snapshotting a battler's innate resistance baseline once at construction
+        // (Hex vulnerability isolation, #1427); the amplification-only weapon keys drop out (null Resistance).
+        private static readonly IReadOnlyList<EAttribute> ResistanceAttributeList =
+            KeyInfos.Select(info => info.Resistance).OfType<EAttribute>().ToArray();
+
         /// <summary>The leaf damage types, in enum order.</summary>
         public static IReadOnlyList<EDamageType> LeafTypes { get; } = Enum.GetValues<EDamageType>();
+
+        /// <summary>Every distinct resistance attribute (one per non-weapon key), in canonical key order — the set
+        /// a battler snapshots at construction for the Hex innate-resistance baseline (#1427).</summary>
+        public static IReadOnlyList<EAttribute> ResistanceAttributesAll => ResistanceAttributeList;
 
         // The weapon-type leaves (#1340): the non-Physical leaves that roll up under the shared Physical
         // category key (their applies() set is [<weapon>, Physical]). Derived from the taxonomy table so the

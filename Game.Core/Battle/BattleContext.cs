@@ -19,6 +19,10 @@ namespace Game.Core.Battle
         private readonly Action<EDamageType, double> _recordPlayerExposure;
         private readonly Action<EDamageType, double> _recordPlayerDotDealt;
 
+        // The player's Hex-signal recorder for the enemy's DoT phase, cached once so the per-tick DoT loop hands
+        // the enemy its vulnerability-enabled marginal without allocating on the replay hot path (#1427).
+        private readonly Action<double> _recordPlayerHexBonus;
+
         public int TimeDelta { get; set; }
         public BattleStats Stats { get; } = new();
 
@@ -33,6 +37,7 @@ namespace Game.Core.Battle
             TimeDelta = timeDelta;
             _recordPlayerExposure = Stats.AddTypedDamageExposure;
             _recordPlayerDotDealt = Stats.AddTypedDamageDealt;
+            _recordPlayerHexBonus = Stats.AddHexBonus;
         }
 
         public void SwapActiveAndTargetBattlers()
@@ -94,7 +99,8 @@ namespace Game.Core.Battle
             // The enemy's DoT is the player's DoT damage dealt: record its post-mitigation per-type amount into
             // the typed offense book (#1338) — not as exposure, which is the player's incoming concern. The
             // player's own incoming DoT records its pre-mitigation exposure into the incoming book instead.
-            Stats.PlayerDamageDealt += _enemyBattler.ApplyDamageOverTime(TimeDelta, recordDamageDealt: _recordPlayerDotDealt);
+            Stats.PlayerDamageDealt += _enemyBattler.ApplyDamageOverTime(
+                TimeDelta, recordDamageDealt: _recordPlayerDotDealt, recordHexBonus: _recordPlayerHexBonus);
             _enemyBattler.ApplyHealOverTime(TimeDelta);
             if (_enemyBattler.IsDead)
             {
@@ -131,7 +137,9 @@ namespace Game.Core.Battle
         /// <see cref="BattleStats.CriticalDamageDealt"/>, and the per-skill total via the return) use
         /// <c>totalNet</c> — one swing is one attack. The Precision signal is instead the normalized marginal crit
         /// bonus (<see cref="BattleStats.CriticalBonusDealt"/>, #1448), booked from the vanilla-hit baseline rather
-        /// than the full crit net. Each portion's absorption heal is capped at the
+        /// than the full crit net; the Hex signal (<see cref="BattleStats.HexBonusDealt"/>, #1427) is booked
+        /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled.
+        /// Each portion's absorption heal is capped at the
         /// <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
@@ -172,6 +180,11 @@ namespace Game.Core.Battle
                     var net = _targetBattler.TakeDamage(dealt * critMultiplier, type, _activeBattler.Level);
                     Stats.AddTypedDamageDealt(type, net);
                     totalNet += net;
+                    // The Hex overlay tally (#1427): the marginal damage the player's applied vulnerability let
+                    // through, measured on the vanilla (pre-crit) portion so it composes with crit without either
+                    // overlay inflating the other. Zero unless a vulnerability debuff lowered the target's
+                    // resistance below its innate baseline. A backend-only side channel — no health mutation.
+                    Stats.HexBonusDealt += _targetBattler.HexBonusForHit(dealt, type, _activeBattler.Level);
                     if (isCrit)
                     {
                         // The vanilla (non-crit) net of this portion — the fixed baseline the crit bonus is
