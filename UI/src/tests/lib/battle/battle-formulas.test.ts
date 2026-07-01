@@ -24,6 +24,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 	iconPath: '/icons/slash.png',
 	rarityId: ERarity.Common,
+	designerNotes: '',
 	word: '',
 	pronunciation: '',
 	translation: '',

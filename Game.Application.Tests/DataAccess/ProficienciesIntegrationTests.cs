@@ -28,7 +28,7 @@ namespace Game.Application.Tests.DataAccess
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
 
-                var path = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
+                var path = new Entities.Path { Name = "Fire", Description = "d", DesignerNotes = "", ActivityKey = (int)EActivityKey.Fire };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
                 pathId = path.Id;
@@ -37,6 +37,7 @@ namespace Game.Application.Tests.DataAccess
                 {
                     Name = "Blades",
                     Description = "d",
+                    DesignerNotes = "",
                     IconPath = "i",
                     Word = "aenkor",
                     Pronunciation = "AYN-kor",
@@ -110,7 +111,7 @@ namespace Game.Application.Tests.DataAccess
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                var path = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
+                var path = new Entities.Path { Name = "Fire", Description = "d", DesignerNotes = "", ActivityKey = (int)EActivityKey.Fire };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
             }
@@ -130,7 +131,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
 
-                var path = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
+                var path = new Entities.Path { Name = "Fire", Description = "d", DesignerNotes = "", ActivityKey = (int)EActivityKey.Fire };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
                 pathId = path.Id;
@@ -167,6 +168,7 @@ namespace Game.Application.Tests.DataAccess
                 {
                     Name = "Fire",
                     Description = "d",
+                    DesignerNotes = "",
                     ActivityKey = (int)EActivityKey.Fire,
                     RetiredAt = DateTime.UtcNow,
                 };
@@ -192,7 +194,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
 
-                var pathEntity = new Entities.Path { Name = "Fire", Description = "d", ActivityKey = (int)EActivityKey.Fire };
+                var pathEntity = new Entities.Path { Name = "Fire", Description = "d", DesignerNotes = "", ActivityKey = (int)EActivityKey.Fire };
                 context.Paths.Add(pathEntity);
                 await context.SaveChangesAsync(CancellationToken);
                 pathId = pathEntity.Id;
@@ -225,6 +227,7 @@ namespace Game.Application.Tests.DataAccess
         {
             Name = name,
             Description = "d",
+            DesignerNotes = "",
             IconPath = "i",
             Word = "w",
             Pronunciation = "p",
@@ -245,6 +248,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = "Slash",
                 Description = "",
+                DesignerNotes = "",
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",

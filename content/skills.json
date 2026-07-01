@@ -24,6 +24,7 @@
     "pronunciation": "",
     "translation": "",
     "acquisition": "Player",
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -51,6 +52,7 @@
     "pronunciation": "",
     "translation": "",
     "acquisition": "Player, Enemy",
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -78,6 +80,7 @@
     "pronunciation": "",
     "translation": "",
     "acquisition": "Player, Enemy",
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -105,6 +108,7 @@
     "pronunciation": "",
     "translation": "",
     "acquisition": "Player",
+    "designerNotes": "",
     "retiredAt": null
   }
 ]

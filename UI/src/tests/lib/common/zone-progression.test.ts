@@ -6,6 +6,7 @@ const zone = (id: number, order: number, unlockChallengeId?: number, retiredAt?:
 	id,
 	name: `Zone ${id}`,
 	description: '',
+	designerNotes: '',
 	order,
 	levelMin: 1,
 	levelMax: 10,

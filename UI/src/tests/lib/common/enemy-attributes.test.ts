@@ -20,6 +20,7 @@ const makeEnemy = (): IEnemy =>
 	({
 		id: 0,
 		name: 'Marauder',
+		designerNotes: '',
 		isBoss: false,
 		attributeDistribution: distribution,
 		skillPool: [],

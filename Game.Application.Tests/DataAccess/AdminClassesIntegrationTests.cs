@@ -334,6 +334,7 @@ namespace Game.Application.Tests.DataAccess
             Id = id,
             Name = name,
             Description = "",
+            DesignerNotes = "",
             Word = "aenkor",
             PassiveAttributeId = EAttribute.Endurance,
             PassiveAmount = 2m,

@@ -27,6 +27,7 @@ const bossZone: IZone = {
 	id: 3,
 	name: 'Forgotten Catacombs',
 	description: '',
+	designerNotes: '',
 	order: 3,
 	levelMin: 8,
 	levelMax: 11,
@@ -38,6 +39,7 @@ const bosslessZone: IZone = {
 	id: 1,
 	name: 'Verdant Hollow',
 	description: '',
+	designerNotes: '',
 	order: 1,
 	levelMin: 1,
 	levelMax: 10,
@@ -47,6 +49,7 @@ const bosslessZone: IZone = {
 const boss: IEnemy = {
 	id: 0,
 	name: 'Catacomb Lich',
+	designerNotes: '',
 	isBoss: true,
 	attributeDistribution: [],
 	skillPool: [],

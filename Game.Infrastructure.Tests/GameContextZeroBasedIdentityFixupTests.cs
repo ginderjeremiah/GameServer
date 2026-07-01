@@ -84,7 +84,7 @@ namespace Game.Infrastructure.Tests
             // record-0 edit still targets the correct row. End-to-end coverage is in the admin integration tests
             // (AdminEnemiesIntegrationTests.SaveEnemies_EditsRecordZero_UpdatesTheCorrectRow); the PK branch is
             // retained as a defensive guard rather than because it fires here.
-            var enemy = new Enemy { Id = 0, Name = "First enemy" };
+            var enemy = new Enemy { Id = 0, Name = "First enemy", DesignerNotes = "" };
             context.Entry(enemy).State = EntityState.Modified;
 
             var keyEntry = context.Entry(enemy).Property(nameof(Enemy.Id));
@@ -103,7 +103,7 @@ namespace Game.Infrastructure.Tests
 
             // A brand-new record's id must still be store-generated, so the Added-row key is deliberately left
             // temporary (only the Modified record-0 case is forced).
-            var enemy = new Enemy { Id = 0, Name = "New enemy" };
+            var enemy = new Enemy { Id = 0, Name = "New enemy", DesignerNotes = "" };
             context.Add(enemy);
 
             var keyEntry = context.Entry(enemy).Property(nameof(Enemy.Id));

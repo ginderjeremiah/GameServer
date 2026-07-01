@@ -79,6 +79,17 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(EDamageType.Fire, core.PrimaryDamageType);
         }
 
+        [Fact]
+        public void ToContract_RoundTripsDesignerNotes()
+        {
+            var entity = NewSkill(ESkillAcquisition.Player);
+            entity.DesignerNotes = "why this skill exists";
+
+            // Authoring-only metadata rides the client-visible contract (like the word of power); the lean
+            // Core.Skills.Skill deliberately has no such field, so its absence there is a compile-time guarantee.
+            Assert.Equal("why this skill exists", SkillMapper.ToContract(entity).DesignerNotes);
+        }
+
         private static EntitySkill NewSkill(ESkillAcquisition acquisition, ERarity rarity = ERarity.Common) => new()
         {
             Id = 0,
@@ -88,6 +99,7 @@ namespace Game.Application.Tests.Mapping
             Word = "",
             Pronunciation = "",
             Translation = "",
+            DesignerNotes = "designer intent",
             BaseDamage = 1m,
             CooldownMs = 1000,
             RarityId = (int)rarity,

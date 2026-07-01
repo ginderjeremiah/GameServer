@@ -94,6 +94,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
 	effects: [],
 	description: 'A skill.',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
@@ -121,6 +122,7 @@ const ZONES: IZone[] = [
 		id: 0,
 		name: 'Vale',
 		description: '',
+		designerNotes: '',
 		order: 0,
 		levelMin: 2,
 		levelMax: 8,
@@ -133,6 +135,7 @@ const ZONES: IZone[] = [
 // amountPerLevel 1 gives each enemy Toughness 2·(1·level), within the preset-derived slider ceiling.
 const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
 	name: `Enemy ${over.id}`,
+	designerNotes: '',
 	isBoss: false,
 	attributeDistribution: [{ attributeId: EAttribute.Endurance, baseAmount: 0, amountPerLevel: 1 }],
 	skillPool: [],

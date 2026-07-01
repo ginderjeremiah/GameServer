@@ -39,6 +39,7 @@ const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
@@ -65,6 +66,7 @@ const PROFICIENCIES: IProficiency[] = [
 		id: 0,
 		name: 'Geomancy',
 		description: '',
+		designerNotes: '',
 		iconPath: '',
 		word: '',
 		pronunciation: '',
@@ -81,10 +83,16 @@ const PROFICIENCIES: IProficiency[] = [
 ];
 
 const RECIPES: ISkillRecipe[] = [
-	{ id: 0, resultSkillId: 3, inputSkillIds: [0, 1], conditions: [] }, // ready (owns 0,1)
-	{ id: 1, resultSkillId: 4, inputSkillIds: [0, 2], conditions: [{ proficiencyId: 0, minLevel: 5 }] }, // gated (level 3)
-	{ id: 2, resultSkillId: 6, inputSkillIds: [0, 9], conditions: [] }, // hinted (owns 0, not 9)
-	{ id: 3, resultSkillId: 5, inputSkillIds: [0, 1], conditions: [] } // done (owns result 5)
+	{ id: 0, resultSkillId: 3, inputSkillIds: [0, 1], conditions: [], designerNotes: '' }, // ready (owns 0,1)
+	{
+		id: 1,
+		resultSkillId: 4,
+		inputSkillIds: [0, 2],
+		conditions: [{ proficiencyId: 0, minLevel: 5 }],
+		designerNotes: ''
+	}, // gated (level 3)
+	{ id: 2, resultSkillId: 6, inputSkillIds: [0, 9], conditions: [], designerNotes: '' }, // hinted (owns 0, not 9)
+	{ id: 3, resultSkillId: 5, inputSkillIds: [0, 1], conditions: [], designerNotes: '' } // done (owns result 5)
 ];
 
 beforeEach(() => {

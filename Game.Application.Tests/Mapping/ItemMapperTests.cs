@@ -160,6 +160,7 @@ namespace Game.Application.Tests.Mapping
                 Description = "Adds an edge.",
                 ItemModTypeId = (int)type,
                 RarityId = (int)rarity,
+                DesignerNotes = "designer intent",
                 RetiredAt = retiredAt,
                 ItemModAttributes = (attributes ?? []).Select(a => new Entities.ItemModAttribute
                 {
@@ -170,6 +171,26 @@ namespace Game.Application.Tests.Mapping
                 Tags = (tagIds ?? []).Select(id => new Entities.Tag { Id = id, Name = "tag" }).ToList(),
                 UnlockedMods = [],
             };
+
+        [Fact]
+        public void ToContract_RoundTripsDesignerNotes()
+        {
+            var entity = NewItem();
+            entity.DesignerNotes = "why this item exists";
+
+            // Authoring-only metadata rides the contract only; the lean Core.Items.Item has no such field.
+            Assert.Equal("why this item exists", ItemMapper.ToContract(entity).DesignerNotes);
+        }
+
+        [Fact]
+        public void ModToContract_RoundTripsDesignerNotes()
+        {
+            var entity = NewItemMod();
+            entity.DesignerNotes = "why this mod exists";
+
+            // Authoring-only metadata rides the ItemMod contract only; the lean Core.Items.ItemMod has no such field.
+            Assert.Equal("why this mod exists", ItemMapper.ModToContract(entity).DesignerNotes);
+        }
 
         private static EntityItem NewItem(int? grantedSkillId = null, int? requiredProficiencyId = null,
             int requiredProficiencyLevel = 0, int? weaponType = null) => new()
@@ -184,6 +205,7 @@ namespace Game.Application.Tests.Mapping
                 WeaponType = weaponType,
                 RequiredProficiencyId = requiredProficiencyId,
                 RequiredProficiencyLevel = requiredProficiencyLevel,
+                DesignerNotes = "designer intent",
                 ItemAttributes = [],
                 ItemModSlots = [],
                 Tags = [],

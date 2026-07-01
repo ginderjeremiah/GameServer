@@ -34,6 +34,10 @@ namespace Game.Infrastructure.Entities
         /// <summary>How the signature passive is applied (an <see cref="Core.EModifierType"/>).</summary>
         public int PassiveModifierType { get; set; }
 
+        /// <summary>Authoring-only design rationale (why this piece exists) — surfaced in the Workbench and
+        /// version-controlled via the content export. The battle never reads it and the client never renders it.</summary>
+        public required string DesignerNotes { get; set; }
+
         /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>). A retired
         /// class is out of circulation for new character creation but still resolves by id for existing
         /// characters that chose it.</summary>

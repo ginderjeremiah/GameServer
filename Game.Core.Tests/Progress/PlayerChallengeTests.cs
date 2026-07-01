@@ -136,6 +136,7 @@ namespace Game.Core.Tests.Progress
                 Id = 0,
                 Name = "Test Challenge",
                 Description = string.Empty,
+                DesignerNotes = string.Empty,
                 Type = new ChallengeType(type),
                 ProgressGoal = goal,
             };

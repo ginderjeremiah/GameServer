@@ -17,6 +17,7 @@ const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
@@ -34,12 +35,13 @@ const recipe = (
 	inputSkillIds: number[],
 	conditions: { proficiencyId: number; minLevel: number }[] = [],
 	over: Partial<ISkillRecipe> = {}
-): ISkillRecipe => ({ id, resultSkillId, inputSkillIds, conditions, ...over });
+): ISkillRecipe => ({ id, resultSkillId, inputSkillIds, conditions, designerNotes: '', ...over });
 
 const prof = (id: number, name: string): IProficiency => ({
 	id,
 	name,
 	description: '',
+	designerNotes: '',
 	iconPath: '',
 	word: '',
 	pronunciation: '',

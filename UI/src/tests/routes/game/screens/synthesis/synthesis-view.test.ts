@@ -40,6 +40,7 @@ const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
@@ -86,7 +87,7 @@ describe('SynthesisView — derivation from stores', () => {
 			skill(2, { name: 'Frostfire' })
 		];
 		staticData.proficiencies = [];
-		staticData.skillRecipes = [{ id: 0, resultSkillId: 2, inputSkillIds: [0, 1], conditions: [] }];
+		staticData.skillRecipes = [{ id: 0, resultSkillId: 2, inputSkillIds: [0, 1], conditions: [], designerNotes: '' }];
 	});
 
 	it('derives recipes, counts and the default selection from the owned skills', () => {

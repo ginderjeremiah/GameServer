@@ -20,6 +20,7 @@ mockItemMods[7] = {
 	id: 7,
 	name: 'Flaming',
 	description: 'Burns the wielder a little too',
+	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: ERarity.Legendary,
 	attributes: [

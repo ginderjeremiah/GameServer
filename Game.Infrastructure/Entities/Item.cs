@@ -27,6 +27,10 @@
         /// equip this item. Only meaningful when <see cref="RequiredProficiencyId"/> is set.</summary>
         public int RequiredProficiencyLevel { get; set; }
 
+        /// <summary>Authoring-only design rationale (why this piece exists) — surfaced in the Workbench and
+        /// version-controlled via the content export. The battle never reads it and the client never renders it.</summary>
+        public required string DesignerNotes { get; set; }
+
         /// <summary>When set, the record is <em>retired</em>: out of circulation for new acquisition but
         /// kept at its slot and resolvable by id so existing references stay valid. Null while active.</summary>
         public DateTime? RetiredAt { get; set; }

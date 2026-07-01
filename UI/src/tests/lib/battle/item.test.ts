@@ -24,6 +24,7 @@ mockItems[1] = {
 	id: 1,
 	name: 'Sword',
 	description: '',
+	designerNotes: '',
 	itemCategoryId: EItemCategory.Weapon,
 	rarityId: ERarity.Epic,
 	iconPath: '',
@@ -36,6 +37,7 @@ mockItemMods[7] = {
 	id: 7,
 	name: 'Flaming',
 	description: '',
+	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: ERarity.Legendary,
 	attributes: [

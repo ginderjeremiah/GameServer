@@ -38,6 +38,7 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 		passiveScalingAttributeId: -1,
 		passiveScalingAmount: 0,
 		passiveModifierType: EModifierType.Additive,
+		designerNotes: '',
 		starterSkillIds: [],
 		starterEquipment: [],
 		attributeDistributions: []
@@ -82,6 +83,13 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 					grow: true,
 					required: true,
 					reqMsg: 'No description'
+				},
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this class exists — authoring notes (never shown to players)…',
+					grow: true
 				}
 			]
 		},
@@ -222,6 +230,7 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 				passiveScalingAttributeId: c.passiveScalingAttributeId === -1 ? undefined : c.passiveScalingAttributeId,
 				passiveScalingAmount: c.passiveScalingAmount,
 				passiveModifierType: c.passiveModifierType,
+				designerNotes: c.designerNotes,
 				starterSkillIds: [],
 				starterEquipment: [],
 				attributeDistributions: [],

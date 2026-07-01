@@ -7,6 +7,7 @@ const item = (requiredProficiencyId?: number, requiredProficiencyLevel = 0): IIt
 		id: 1,
 		name: 'Item',
 		description: '',
+		designerNotes: '',
 		itemCategoryId: EItemCategory.Accessory,
 		rarityId: ERarity.Common,
 		iconPath: '',

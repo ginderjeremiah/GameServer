@@ -127,6 +127,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(c => c.ProgressGoal)
                     .HasPrecision(36, 3);
+
+                entity.Property(c => c.DesignerNotes)
+                    .HasMaxLength(2000);
             });
 
             modelBuilder.Entity<ChallengeType>(entity =>
@@ -167,6 +170,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(c => c.PassiveScalingAmount)
                     .HasPrecision(18, 3);
+
+                entity.Property(c => c.DesignerNotes)
+                    .HasMaxLength(2000);
             });
 
             modelBuilder.Entity<ClassAttributeDistribution>(entity =>
@@ -222,6 +228,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(e => e.Name)
                     .HasMaxLength(50);
+
+                entity.Property(e => e.DesignerNotes)
+                    .HasMaxLength(2000);
             });
 
             modelBuilder.Entity<EnemySkill>()
@@ -254,6 +263,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(i => i.Name)
                     .HasMaxLength(50);
+
+                entity.Property(i => i.DesignerNotes)
+                    .HasMaxLength(2000);
 
                 // The proficiency gate is an optional reference to a proficiency. Navigation-less FK (like the
                 // zone unlock challenge): deleting the referenced proficiency clears the gate (SetNull),
@@ -307,6 +319,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(im => im.Name)
                     .HasMaxLength(50);
+
+                entity.Property(im => im.DesignerNotes)
+                    .HasMaxLength(2000);
 
                 // Explicit join entity (ItemModTag) backs the ItemMod.Tags skip navigation; see the Item.Tags
                 // configuration above for the rationale and the load-bearing cascade.
@@ -464,6 +479,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(s => s.Translation)
                     .HasMaxLength(100);
+
+                entity.Property(s => s.DesignerNotes)
+                    .HasMaxLength(2000);
             });
 
             modelBuilder.Entity<SkillDamagePortion>(entity =>
@@ -506,6 +524,9 @@ namespace Game.Infrastructure.Database
             {
                 entity.Property(r => r.Id)
                     .HasIdentityOptions(0, 1, 0);
+
+                entity.Property(r => r.DesignerNotes)
+                    .HasMaxLength(2000);
 
                 // The result skill is retired, never deleted, so Restrict (it is also referenced by the recipe's
                 // own input rows). The recipe is itself retired, never deleted.
@@ -556,6 +577,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(p => p.Description)
                     .HasMaxLength(500);
+
+                entity.Property(p => p.DesignerNotes)
+                    .HasMaxLength(2000);
             });
 
             modelBuilder.Entity<Proficiency>(entity =>
@@ -580,6 +604,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(p => p.Translation)
                     .HasMaxLength(100);
+
+                entity.Property(p => p.DesignerNotes)
+                    .HasMaxLength(2000);
 
                 entity.Property(p => p.BaseXp)
                     .HasPrecision(18, 3);
@@ -794,6 +821,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(z => z.Name)
                     .HasMaxLength(50);
+
+                entity.Property(z => z.DesignerNotes)
+                    .HasMaxLength(2000);
 
                 entity.Property(z => z.BossLevel)
                     .HasDefaultValue(1);

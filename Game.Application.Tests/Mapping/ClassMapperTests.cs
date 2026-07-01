@@ -25,6 +25,7 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(0, contract.Id);
             Assert.Equal("Warrior", contract.Name);
             Assert.Equal("aenkor", contract.Word);
+            Assert.Equal("designer intent", contract.DesignerNotes);
             Assert.Equal(EAttribute.Endurance, contract.PassiveAttributeId);
             Assert.Equal(2m, contract.PassiveAmount);
             Assert.Equal(EAttribute.Strength, contract.PassiveScalingAttributeId);
@@ -91,6 +92,7 @@ namespace Game.Application.Tests.Mapping
                 PassiveScalingAttributeId = (int)EAttribute.Strength,
                 PassiveScalingAmount = 0.5m,
                 PassiveModifierType = (int)EModifierType.Multiplicative,
+                DesignerNotes = "designer intent",
                 StarterSkills = (starterSkillIds ?? []).Select(id => new Entities.ClassStarterSkill { ClassId = 0, SkillId = id }).ToList(),
                 StarterEquipment = (equipment ?? []).Select(e => new Entities.ClassStarterEquipment
                 {

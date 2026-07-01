@@ -304,6 +304,7 @@ namespace Game.Application.Tests.DataAccess
                 Id = id,
                 Name = name,
                 Description = "",
+                DesignerNotes = "",
                 ItemModTypeId = type,
                 RarityId = rarity,
                 Attributes = [],

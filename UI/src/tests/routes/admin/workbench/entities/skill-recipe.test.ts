@@ -56,6 +56,7 @@ const skill = (id: number, name: string, opts: { synth?: boolean; retired?: bool
 const recipe = (over: Partial<ISkillRecipe> = {}): ISkillRecipe => ({
 	id: 0,
 	resultSkillId: 3,
+	designerNotes: '',
 	inputSkillIds: [0, 1],
 	conditions: [],
 	...over
@@ -85,7 +86,7 @@ beforeEach(() => {
 
 describe('skillRecipeEntity', () => {
 	it('newItem defaults to the first Synthesis result with empty input/condition collections', () => {
-		expect(skillRecipeEntity.newItem(7)).toEqual({ id: 7, resultSkillId: 3, inputSkillIds: [], conditions: [] });
+		expect(skillRecipeEntity.newItem(7)).toEqual({ id: 7, resultSkillId: 3, designerNotes: '', inputSkillIds: [], conditions: [] });
 	});
 
 	it('newItem falls back to -1 when no Synthesis-flagged skill is authorable', () => {
@@ -191,7 +192,7 @@ describe('skillRecipeEntity', () => {
 
 		const edit = postBodyTo('AdminTools/AddEditSkillRecipes');
 		expect(edit[0].changeType).toBe(EChangeType.Edit);
-		expect(edit[0].item).toEqual({ id: 0, resultSkillId: 5, retiredAt: undefined, inputSkillIds: [], conditions: [] });
+		expect(edit[0].item).toEqual({ id: 0, resultSkillId: 5, designerNotes: '', retiredAt: undefined, inputSkillIds: [], conditions: [] });
 		// Inputs/conditions didn't change, so their setters are skipped.
 		expect(postBodyTo('AdminTools/SetSkillRecipeInputs')).toBeUndefined();
 		expect(postBodyTo('AdminTools/SetSkillRecipeConditions')).toBeUndefined();

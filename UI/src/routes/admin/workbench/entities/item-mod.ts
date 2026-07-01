@@ -26,6 +26,7 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 		itemModTypeId: EItemModType.Component,
 		rarityId: ERarity.Common,
 		attributes: [],
+		designerNotes: '',
 		tags: []
 	}),
 	listBadge: (m) => reference.rarityName(m.rarityId),
@@ -62,6 +63,13 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 					grow: true,
 					required: true,
 					reqMsg: 'No description'
+				},
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this mod exists — authoring notes (never shown to players)…',
+					grow: true
 				}
 			]
 		},

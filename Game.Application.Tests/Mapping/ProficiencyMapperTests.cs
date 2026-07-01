@@ -76,6 +76,7 @@ namespace Game.Application.Tests.Mapping
             var contract = ProficiencyMapper.ToContract(entity);
 
             Assert.Equal("Blades", contract.Name);
+            Assert.Equal("designer intent", contract.DesignerNotes);
             Assert.Equal("aenkor", contract.Word);
             Assert.Equal("AYN-kor", contract.Pronunciation);
             Assert.Equal("The First Flame", contract.Translation);
@@ -98,12 +99,14 @@ namespace Game.Application.Tests.Mapping
                 Name = "Fire",
                 Description = "The fire line.",
                 ActivityKey = (int)EActivityKey.Fire,
+                DesignerNotes = "designer intent",
             };
 
             var contract = PathMapper.ToContract(path);
 
             Assert.Equal("Fire", contract.Name);
             Assert.Equal(EActivityKey.Fire, contract.ActivityKey);
+            Assert.Equal("designer intent", contract.DesignerNotes);
         }
 
         private static Entities.ProficiencyLevelModifier Modifier(int level, EAttribute attribute, decimal amount) => new()
@@ -138,6 +141,7 @@ namespace Game.Application.Tests.Mapping
                 MaxLevel = 10,
                 BaseXp = 100m,
                 XpGrowth = 1.5m,
+                DesignerNotes = "designer intent",
                 LevelModifiers = modifiers ?? [],
                 LevelRewards = rewards ?? [],
                 Prerequisites = [],

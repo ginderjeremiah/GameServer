@@ -15,6 +15,10 @@ namespace Game.Infrastructure.Entities
         /// <summary>The skill this recipe produces (authored <see cref="Core.ESkillAcquisition.Synthesis"/>-flagged).</summary>
         public int ResultSkillId { get; set; }
 
+        /// <summary>Authoring-only design rationale (why this recipe exists) — surfaced in the Workbench and
+        /// version-controlled via the content export. The battle never reads it and the client never renders it.</summary>
+        public required string DesignerNotes { get; set; }
+
         /// <summary>When set, the record is <em>retired</em> (see <see cref="Item.RetiredAt"/>).</summary>
         public DateTime? RetiredAt { get; set; }
 

@@ -59,6 +59,7 @@ const item = (id: number, name: string, rarity: ERarity, cat: EItemCategory, ext
 	id,
 	name,
 	description: `${name} description`,
+	designerNotes: '',
 	itemCategoryId: cat,
 	rarityId: rarity,
 	iconPath: '',
@@ -73,6 +74,7 @@ const mod = (id: number, name: string, rarity: ERarity): IItemMod => ({
 	id,
 	name,
 	description: `${name} description`,
+	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: rarity,
 	attributes: [{ attributeId: EAttribute.Agility, amount: 3 }],
@@ -81,6 +83,7 @@ const mod = (id: number, name: string, rarity: ERarity): IItemMod => ({
 
 const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge => ({
 	description: `${over.name} description`,
+	designerNotes: '',
 	entityType: EEntityType.None,
 	progressGoal: 10,
 	...over

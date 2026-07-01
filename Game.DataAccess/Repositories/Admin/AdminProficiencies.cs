@@ -53,6 +53,7 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 edit: item => _entityStore.Update(new Entities.Proficiency
                 {
@@ -68,6 +69,7 @@ namespace Game.DataAccess.Repositories.Admin
                     MaxLevel = item.MaxLevel,
                     BaseXp = item.BaseXp,
                     XpGrowth = item.XpGrowth,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

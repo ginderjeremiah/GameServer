@@ -10,6 +10,7 @@ import {
 const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => ({
 	id,
 	name,
+	designerNotes: '',
 	isBoss: false,
 	attributeDistribution: [],
 	skillPool: [],
@@ -21,6 +22,7 @@ const zone = (id: number, name: string, opts: Partial<IZone> = {}): IZone => ({
 	id,
 	name,
 	description: '',
+	designerNotes: '',
 	order: 0,
 	levelMin: 1,
 	levelMax: 10,
@@ -33,6 +35,7 @@ const challenge = (id: number, name: string, opts: Partial<IChallenge> = {}): IC
 	id,
 	name,
 	description: '',
+	designerNotes: '',
 	challengeTypeId: EChallengeType.EnemiesKilled,
 	entityType: EEntityType.None,
 	progressGoal: 10,

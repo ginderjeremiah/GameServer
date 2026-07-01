@@ -37,12 +37,14 @@ namespace Game.DataAccess.Repositories.Admin
                 {
                     Name = item.Name,
                     IsBoss = item.IsBoss,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 edit: item => _entityStore.Update(new Entities.Enemy
                 {
                     Id = item.Id,
                     Name = item.Name,
                     IsBoss = item.IsBoss,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

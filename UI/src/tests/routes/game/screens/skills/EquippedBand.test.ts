@@ -62,6 +62,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,

@@ -24,6 +24,7 @@
         "weight": 1
       }
     ],
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -51,6 +52,7 @@
         "weight": 1
       }
     ],
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -69,6 +71,7 @@
       2
     ],
     "spawns": [],
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -96,6 +99,7 @@
         "weight": 1
       }
     ],
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -123,6 +127,7 @@
         "weight": 1
       }
     ],
+    "designerNotes": "",
     "retiredAt": null
   }
 ]

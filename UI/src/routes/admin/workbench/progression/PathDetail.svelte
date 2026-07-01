@@ -48,6 +48,15 @@
 						onChange={(v) => store.patchPath(path.id, (d) => (d.description = v))}
 					/>
 				</div>
+				<div class="mt16">
+					<ProgInput
+						label="Designer notes"
+						value={path.designerNotes}
+						textarea
+						fullWidth
+						onChange={(v) => store.patchPath(path.id, (d) => (d.designerNotes = v))}
+					/>
+				</div>
 			{:else if store.pathTab === 'tiers'}
 				<div class="sec-title">
 					Tiers<span class="sub">— ordered proficiencies · reorder with ↑ ↓ · open ›</span><span class="ln"></span>

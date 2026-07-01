@@ -98,6 +98,7 @@ namespace Game.TestInfrastructure.Helpers
                 Pronunciation = pronunciation,
                 Translation = translation,
                 Acquisition = (int)acquisition,
+                DesignerNotes = "",
             };
 
             context.Skills.Add(skill);
@@ -131,7 +132,7 @@ namespace Game.TestInfrastructure.Helpers
             IEnumerable<int> inputSkillIds,
             IEnumerable<(int ProficiencyId, int MinLevel)>? conditions = null)
         {
-            var recipe = new SkillRecipe { ResultSkillId = resultSkillId };
+            var recipe = new SkillRecipe { ResultSkillId = resultSkillId, DesignerNotes = "" };
             context.SkillRecipes.Add(recipe);
             await context.SaveChangesAsync();
 
@@ -164,6 +165,7 @@ namespace Game.TestInfrastructure.Helpers
                 GrantedSkillId = grantedSkillId,
                 RequiredProficiencyId = requiredProficiencyId,
                 RequiredProficiencyLevel = requiredProficiencyLevel,
+                DesignerNotes = "",
             };
 
             context.Items.Add(item);
@@ -193,6 +195,7 @@ namespace Game.TestInfrastructure.Helpers
                 Description = "",
                 ItemModTypeId = (int)EItemModType.Prefix,
                 RarityId = (int)rarityId,
+                DesignerNotes = "",
             };
 
             context.ItemMods.Add(itemMod);
@@ -231,7 +234,7 @@ namespace Game.TestInfrastructure.Helpers
             decimal endurancePerLevel = 1m,
             bool isBoss = false)
         {
-            var enemy = new Enemy { Name = name, IsBoss = isBoss };
+            var enemy = new Enemy { Name = name, IsBoss = isBoss, DesignerNotes = "" };
             context.Enemies.Add(enemy);
             await context.SaveChangesAsync();
 
@@ -279,6 +282,7 @@ namespace Game.TestInfrastructure.Helpers
                 UnlockChallengeId = unlockChallengeId,
                 IsHome = isHome,
                 RetiredAt = retiredAt,
+                DesignerNotes = "",
             };
 
             context.Zones.Add(zone);
@@ -424,6 +428,7 @@ namespace Game.TestInfrastructure.Helpers
                 TargetEntityId = targetEntityId,
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
+                DesignerNotes = "",
                 RetiredAt = retiredAt,
             };
 
@@ -489,6 +494,7 @@ namespace Game.TestInfrastructure.Helpers
                 PassiveScalingAttributeId = (int?)passiveScalingAttribute,
                 PassiveScalingAmount = passiveScalingAmount,
                 PassiveModifierType = (int)passiveModifierType,
+                DesignerNotes = "",
                 RetiredAt = retiredAt,
             };
 
@@ -588,6 +594,7 @@ namespace Game.TestInfrastructure.Helpers
                 Description = "",
                 ActivityKey = (int)activityKey,
                 RetiredAt = retiredAt,
+                DesignerNotes = "",
             };
 
             context.Paths.Add(path);
@@ -624,6 +631,7 @@ namespace Game.TestInfrastructure.Helpers
                 MaxLevel = maxLevel,
                 BaseXp = baseXp,
                 XpGrowth = xpGrowth,
+                DesignerNotes = "",
                 LevelModifiers = [],
                 LevelRewards = [],
                 Prerequisites = [],

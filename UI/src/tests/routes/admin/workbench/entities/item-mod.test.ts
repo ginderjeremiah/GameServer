@@ -53,6 +53,7 @@ describe('itemModEntity', () => {
 			description: '',
 			itemModTypeId: EItemModType.Component,
 			rarityId: ERarity.Common,
+			designerNotes: '',
 			attributes: [],
 			tags: []
 		});
@@ -77,6 +78,7 @@ describe('itemModEntity', () => {
 			id: 0,
 			name: 'Sharp',
 			description: 'desc',
+			designerNotes: '',
 			itemModTypeId: EItemModType.Prefix,
 			rarityId: ERarity.Rare,
 			attributes: [{ attributeId: 0, amount: 1 }],
@@ -98,6 +100,7 @@ describe('itemModEntity', () => {
 			id: 0,
 			name: 'Sharp',
 			description: '',
+			designerNotes: '',
 			itemModTypeId: EItemModType.Prefix,
 			rarityId: ERarity.Rare,
 			attributes: [{ attributeId: 0, amount: 1 }],
@@ -126,6 +129,7 @@ describe('itemModEntity', () => {
 			id: -1,
 			name: 'Keen',
 			description: 'Sharper edge',
+			designerNotes: '',
 			itemModTypeId: EItemModType.Prefix,
 			rarityId: ERarity.Rare,
 			attributes: [{ attributeId: 0, amount: 3 }],
@@ -144,6 +148,7 @@ describe('itemModEntity', () => {
 			description: 'Sharper edge',
 			itemModTypeId: EItemModType.Prefix,
 			rarityId: ERarity.Rare,
+			designerNotes: '',
 			attributes: [],
 			tags: []
 		});

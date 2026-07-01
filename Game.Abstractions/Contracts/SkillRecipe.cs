@@ -10,6 +10,10 @@ namespace Game.Abstractions.Contracts
         /// <summary>The skill this recipe produces (authoring intent: <see cref="ESkillAcquisition.Synthesis"/>-flagged).</summary>
         public int ResultSkillId { get; set; }
 
+        /// <summary>Authoring-only design rationale (why this recipe exists) — surfaced in the Workbench and
+        /// version-controlled via the content export. The battle never reads it and the client never renders it.</summary>
+        public required string DesignerNotes { get; set; }
+
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).</summary>
         public DateTime? RetiredAt { get; set; }
 

@@ -146,6 +146,7 @@ namespace Game.Application.Tests.DataAccess
                 Id = id,
                 Name = name,
                 Description = "",
+                DesignerNotes = "",
                 ChallengeTypeId = EChallengeType.EnemiesKilled,
                 ProgressGoal = progressGoal,
             };

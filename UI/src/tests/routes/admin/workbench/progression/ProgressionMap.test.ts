@@ -20,6 +20,7 @@ const path = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath => (
 	id,
 	name: `Path ${id}`,
 	description: '',
+	designerNotes: '',
 	activityKey: EActivityKey.Physical,
 	...over
 });
@@ -33,6 +34,7 @@ const tier = (
 	id,
 	name: `Tier ${id}`,
 	description: '',
+	designerNotes: '',
 	iconPath: '',
 	word: '',
 	pronunciation: '',

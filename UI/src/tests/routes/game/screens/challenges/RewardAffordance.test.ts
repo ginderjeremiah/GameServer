@@ -10,6 +10,7 @@ const sampleMod: IItemMod = {
 	id: 213,
 	name: 'Honed',
 	description: 'Honed',
+	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: ERarity.Rare,
 	attributes: [],

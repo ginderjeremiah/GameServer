@@ -153,6 +153,7 @@ describe('EnemyManager boss mode', () => {
 		id,
 		name: `Zone ${id}`,
 		description: '',
+		designerNotes: '',
 		order,
 		levelMin: 1,
 		levelMax: 10,

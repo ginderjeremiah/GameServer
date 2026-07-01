@@ -30,6 +30,7 @@ const proficiency = (id: number, levelModifiers: IProficiency['levelModifiers'])
 	id,
 	name: `Proficiency ${id}`,
 	description: '',
+	designerNotes: '',
 	iconPath: '',
 	word: '',
 	pronunciation: '',

@@ -36,6 +36,7 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 		id,
 		name: '',
 		isBoss: false,
+		designerNotes: '',
 		attributeDistribution: [],
 		skillPool: [],
 		spawns: [],
@@ -74,7 +75,14 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 					required: true,
 					reqMsg: 'Missing name'
 				},
-				{ key: 'isBoss', label: 'Classification', type: 'toggle', onLabel: 'Boss enemy', offLabel: 'Standard enemy' }
+				{ key: 'isBoss', label: 'Classification', type: 'toggle', onLabel: 'Boss enemy', offLabel: 'Standard enemy' },
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this enemy exists — authoring notes (never shown to players)…',
+					grow: true
+				}
 			]
 		},
 		{
@@ -174,10 +182,11 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 		persistEntity({
 			diff,
 			// Strip the child collections and the derived (read-only) bossZones off the identity DTO.
-			toPrimaryDto: ({ id, name, isBoss, retiredAt }) => ({
+			toPrimaryDto: ({ id, name, isBoss, designerNotes, retiredAt }) => ({
 				id,
 				name,
 				isBoss,
+				designerNotes,
 				attributeDistribution: [],
 				skillPool: [],
 				spawns: [],

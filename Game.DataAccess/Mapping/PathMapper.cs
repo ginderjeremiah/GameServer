@@ -15,6 +15,7 @@ namespace Game.DataAccess.Mapping
                 Name = entity.Name,
                 Description = entity.Description,
                 ActivityKey = (EActivityKey)entity.ActivityKey,
+                DesignerNotes = entity.DesignerNotes,
                 RetiredAt = entity.RetiredAt,
             };
         }

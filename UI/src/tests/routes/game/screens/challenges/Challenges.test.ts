@@ -32,6 +32,7 @@ import Challenges from '$routes/game/screens/challenges/Challenges.svelte';
 
 const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge => ({
 	description: `${over.name} description`,
+	designerNotes: '',
 	entityType: EEntityType.None,
 	progressGoal: 10,
 	...over
