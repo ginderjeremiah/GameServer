@@ -13,7 +13,8 @@
 -- those Skill rows it fails with an FK violation (FK_PlayerSkills_Skills_SkillId) and the whole e2e suite
 -- cannot reach the game. This script seeds the minimal, coherent slice of static reference data the suite needs:
 --   * Skills 0-3            – the punch fallback (0) + the class kit (1/2/3), required by new-character creation
---   * one Zone with enemies – so the Enemies admin catalogue has rows and the fight screen is playable
+--   * two combat zones      – a starter zone and a gated second zone, each with a spawn table, so both are
+--                             playable once reached and the Enemies admin catalogue has rows
 --   * a dedicated zone boss – so the "Challenge Boss" flow can be exercised end-to-end (#220)
 --
 -- Rows are inserted in dependency order (Enemies before the Zones that reference them as bosses).
@@ -28,11 +29,18 @@
 -- skill, so it takes id 0. It is NOT in the class kit (not selectable/granted-by-item); it comes online only
 -- through the gate's empty-weapon-slot path. Skills 1/2/3 are the class kit granted on character creation
 -- (NewPlayerFactory, persisted by LoginController.CreatePlayer).
-INSERT INTO "Skills" ("Id", "Name", "BaseDamage", "Description", "CooldownMs", "IconPath") VALUES
-  (0, 'Punch', 4, 'A bare-handed strike.', 1000, ''),
-  (1, 'Strike', 10, 'A basic physical attack.', 1000, ''),
-  (2, 'Cleave', 8, 'A sweeping blow that favours raw power.', 1500, ''),
-  (3, 'Focus', 6, 'Channel energy into a sharper, magical hit.', 1200, '')
+--
+-- Acquisition (ESkillAcquisition bitmask) is authoring intent, and it must match how each skill is actually
+-- granted or the progression-graph lint (#1420) warns. Strike (1) and Cleave (2) are both class-kit skills
+-- AND the seeded enemies' pool skills, so they carry Player|Enemy (1|4 = 5); the enemy skill-set save rejects
+-- any pool skill that isn't Enemy-flagged, so this is exactly what the Workbench would author. Punch (0) and
+-- Focus (3) stay Player-only (1) — no enemy uses them. (The column defaults to Player=1, but we set it
+-- explicitly here so the dual flags are visible in the seed and survive the content export.)
+INSERT INTO "Skills" ("Id", "Name", "BaseDamage", "Description", "CooldownMs", "IconPath", "Acquisition") VALUES
+  (0, 'Punch', 4, 'A bare-handed strike.', 1000, '', 1),
+  (1, 'Strike', 10, 'A basic physical attack.', 1000, '', 5),
+  (2, 'Cleave', 8, 'A sweeping blow that favours raw power.', 1500, '', 5),
+  (3, 'Focus', 6, 'Channel energy into a sharper, magical hit.', 1200, '', 1)
 ON CONFLICT ("Id") DO NOTHING;
 
 -- How each skill scales (Strength = 0, Intellect = 2 per EAttribute). Focus is the lone Intellect skill.
@@ -92,14 +100,18 @@ INSERT INTO "Challenges" ("Id", "Name", "Description", "ChallengeTypeId", "Targe
   (0, 'Clear Verdant Hollow', 'Clear the starter zone to press onward.', 3, 0, 1)
 ON CONFLICT ("Id") DO NOTHING;
 
--- A couple of low-level enemies to populate the zone (and the Enemies admin catalogue), plus a
+-- A couple of low-level enemies to populate the starter zone (and the Enemies admin catalogue), plus a
 -- dedicated zone boss (IsBoss). The boss is NOT part of the random ZoneEnemies spawn table — it is
 -- fought only via the zone's BossEnemyId (set below) through the deterministic "Challenge Boss"
--- action. Inserted before the Zones so the FK_Zones_Enemies_BossEnemyId reference resolves.
+-- action. Enemies 3/4 populate the gated second zone (Ashen Wastes) so it is a real combat zone rather
+-- than an empty one a player would be relocated out of. Inserted before the Zones so the
+-- FK_Zones_Enemies_BossEnemyId reference resolves.
 INSERT INTO "Enemies" ("Id", "Name", "IsBoss") VALUES
   (0, 'Forest Slime', false),
   (1, 'Wild Boar', false),
-  (2, 'Direboar Alpha', true)
+  (2, 'Direboar Alpha', true),
+  (3, 'Cinder Hound', false),
+  (4, 'Ashen Revenant', false)
 ON CONFLICT ("Id") DO NOTHING;
 
 -- Enemy attribute distributions (Strength = 0, Endurance = 1 per EAttribute). The boss (2) is a
@@ -107,28 +119,39 @@ ON CONFLICT ("Id") DO NOTHING;
 -- modest health. That keeps the real-time e2e boss fight short while a fresh level-1 player still
 -- wins it deterministically (the boss never out-damages the player's health pool). These numbers
 -- are e2e scaffolding tuned for a quick, winnable fight, not gameplay balance.
+-- Ashen Wastes enemies (3/4) sit in a higher level band (8-18), so their base/per-level are scaled up from
+-- the starter zone's. These are e2e scaffolding numbers (a coherent, populated second zone), not tuned balance.
 INSERT INTO "AttributeDistributions" ("EnemyId", "AttributeId", "BaseAmount", "AmountPerLevel") VALUES
   (0, 0, 5, 1.0),
   (0, 1, 5, 1.0),
   (1, 0, 7, 1.5),
   (1, 1, 6, 1.0),
-  (2, 0, 1, 1.0)
+  (2, 0, 1, 1.0),
+  (3, 0, 12, 2.0),
+  (3, 1, 8, 1.5),
+  (4, 0, 10, 2.0),
+  (4, 1, 10, 1.5)
 ON CONFLICT ("EnemyId", "AttributeId") DO NOTHING;
 
--- Give the enemies a skill so battles resolve. The boss brings its full authored loadout (Strike id 1 +
--- Cleave id 2), which the deterministic "Challenge Boss" path fights it with in full (SelectAllBattleSkills).
+-- Give the enemies a skill so battles resolve. Strike (1) and Cleave (2) are Enemy-flagged (see the Skills
+-- insert), so an enemy pool may hold them. The boss brings its full authored loadout (Strike id 1 + Cleave
+-- id 2), which the deterministic "Challenge Boss" path fights it with in full (SelectAllBattleSkills); the
+-- Ashen Wastes enemies (3/4) each swing Strike.
 INSERT INTO "EnemySkills" ("EnemyId", "SkillId") VALUES
   (0, 1),
   (1, 1),
   (2, 1),
-  (2, 2)
+  (2, 2),
+  (3, 1),
+  (4, 1)
 ON CONFLICT ("EnemyId", "SkillId") DO NOTHING;
 
 -- The starter zone (Player.CurrentZoneId defaults to 0) is always open and hosts a dedicated boss
 -- (enemy 2, fought at the zone's top level via BossLevel), so a brand-new player sees the fight
 -- screen's "Challenge Boss" affordance light up. The next zone is gated behind the challenge above
 -- (UnlockChallengeId = 0) and has no boss (BossLevel = 1 is the column's NOT NULL default and is
--- meaningless without a BossEnemyId).
+-- meaningless without a BossEnemyId), but it does carry its own spawn table (enemies 3/4) so it is a
+-- real combat zone once unlocked rather than an empty one the player is immediately relocated out of.
 --
 -- The Home zone (IsHome = true) is a no-combat sanctuary: no enemies spawn there and never will (it
 -- carries no boss and no ZoneEnemies rows). Order = -1 places it leftmost in the zone nav. The backend
@@ -140,11 +163,14 @@ INSERT INTO "Zones" ("Id", "Name", "Description", "Order", "LevelMin", "LevelMax
   (2, 'Home', 'A quiet refuge where you can rest without battling. No enemies will find you here.', -1, 1, 1, NULL, 1, NULL, true)
 ON CONFLICT ("Id") DO NOTHING;
 
--- Place the (non-boss) enemies in the starter zone (equal spawn weight). The boss is excluded — it
--- is challenged explicitly, not rolled into the random idle encounter table.
+-- Place the (non-boss) enemies in their zones (equal spawn weight per zone): Forest Slime/Wild Boar in the
+-- starter zone, Cinder Hound/Ashen Revenant in Ashen Wastes. The boss is excluded — it is challenged
+-- explicitly, not rolled into the random idle encounter table.
 INSERT INTO "ZoneEnemies" ("ZoneId", "EnemyId", "Weight") VALUES
   (0, 0, 1),
-  (0, 1, 1)
+  (0, 1, 1),
+  (1, 3, 1),
+  (1, 4, 1)
 ON CONFLICT ("ZoneId", "EnemyId") DO NOTHING;
 
 -- The base tables use GENERATED BY DEFAULT identity columns seeded above with explicit ids, which
