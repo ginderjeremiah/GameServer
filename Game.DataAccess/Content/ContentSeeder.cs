@@ -31,6 +31,7 @@ namespace Game.DataAccess.Content
             // Map every set to its entity graph up front; the parents carry their child rows so each set is
             // inserted then flattened, and the enemy graph carries its spawn-table joins for a later step.
             var skills = content.Skills.Select(SkillMapper.ToEntity).ToList();
+            var tags = content.Tags.Select(TagMapper.ToEntity).ToList();
             var itemMods = content.ItemMods.Select(ItemMapper.ModToEntity).ToList();
             var items = content.Items.Select(ItemMapper.ToEntity).ToList();
             var enemies = content.Enemies.Select(EnemyMapper.ToEntity).ToList();
@@ -41,8 +42,8 @@ namespace Game.DataAccess.Content
             var proficiencies = content.Proficiencies.Select(ProficiencyMapper.ToEntity).ToList();
             var recipes = content.SkillRecipes.Select(SkillRecipeMapper.ToEntity).ToList();
 
-            // Tag assignments are join rows over the (pre-existing) Tag catalogue rather than child entities of
-            // the item/mod graph, so they are built straight from the contracts here.
+            // Tag assignments are join rows over the Tag catalogue (seeded below, ahead of the join rows) rather
+            // than child entities of the item/mod graph, so they are built straight from the contracts here.
             var itemTags = content.Items
                 .SelectMany(item => item.Tags.Select(tagId => new EntityItemTag { ItemId = item.Id, TagId = tagId }))
                 .ToList();
@@ -73,6 +74,11 @@ namespace Game.DataAccess.Content
             await Insert(proficiencies.SelectMany(p => p.LevelModifiers).ToList());
             await Insert(proficiencies.SelectMany(p => p.LevelRewards).ToList());
             await Insert(proficiencies.SelectMany(p => p.Prerequisites).ToList());
+
+            // Tags carry their own (non-zero-based) identity and are referenced by the item/mod tag-join rows,
+            // so the Tag catalogue is seeded before those rows land. The referenced TagCategory is intrinsic
+            // (migration-seeded), so it already exists on a fresh database.
+            await Insert(tags);
 
             await Insert(itemMods);
             await Insert(itemMods.SelectMany(m => m.ItemModAttributes).ToList());

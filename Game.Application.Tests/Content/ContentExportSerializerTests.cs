@@ -355,5 +355,19 @@ namespace Game.Application.Tests.Content
             Assert.Equal([0, 1], zones.Select(z => z.Id));
             Assert.Equal([0, 1], challenges.Select(c => c.Id));
         }
+
+        [Fact]
+        public void Canonicalize_Tags_OrderTopLevelById()
+        {
+            // Tags carry a non-zero-based identity (resolved by lookup, not index), so id order is still the
+            // stable order the committed file is pinned to.
+            var tags = ContentExportSerializer.Canonicalize(new[]
+            {
+                new Contracts.Tag { Id = 3, Name = "b", TagCategoryId = 1 },
+                new Contracts.Tag { Id = 1, Name = "a", TagCategoryId = 1 },
+            });
+
+            Assert.Equal([1, 3], tags.Select(t => t.Id));
+        }
     }
 }

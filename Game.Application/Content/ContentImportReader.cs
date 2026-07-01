@@ -18,6 +18,7 @@ namespace Game.Application.Content
             return new ContentImport
             {
                 Skills = ReadSet<Contracts.Skill>(directory, "skills.json"),
+                Tags = ReadSet<Contracts.Tag>(directory, "tags.json"),
                 ItemMods = ReadSet<Contracts.ItemMod>(directory, "item-mods.json"),
                 Items = ReadSet<Contracts.Item>(directory, "items.json"),
                 Enemies = ReadSet<Contracts.Enemy>(directory, "enemies.json"),

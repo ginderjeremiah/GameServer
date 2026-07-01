@@ -72,6 +72,13 @@ namespace Game.Application.Content
             return ordered;
         }
 
+        public static IReadOnlyList<Contracts.Tag> Canonicalize(IEnumerable<Contracts.Tag> tags)
+        {
+            // Tags carry their own non-zero-based identity (resolved by lookup, not by index), but id order is
+            // still a total, stable order for the committed file.
+            return tags.OrderBy(t => t.Id).ToList();
+        }
+
         public static IReadOnlyList<Contracts.Item> Canonicalize(IEnumerable<Contracts.Item> items)
         {
             var ordered = items.OrderBy(i => i.Id).ToList();

@@ -11,6 +11,7 @@ namespace Game.Abstractions.Content
     public sealed record ContentImport
     {
         public required IReadOnlyList<Contracts.Skill> Skills { get; init; }
+        public required IReadOnlyList<Contracts.Tag> Tags { get; init; }
         public required IReadOnlyList<Contracts.ItemMod> ItemMods { get; init; }
         public required IReadOnlyList<Contracts.Item> Items { get; init; }
         public required IReadOnlyList<Contracts.Enemy> Enemies { get; init; }

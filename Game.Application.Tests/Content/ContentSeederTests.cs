@@ -1,5 +1,6 @@
 using Game.Abstractions.Content;
 using Game.Abstractions.DataAccess;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -7,6 +8,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using Contracts = Game.Abstractions.Contracts;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
 
 namespace Game.Application.Tests.Content
@@ -88,12 +90,73 @@ namespace Game.Application.Tests.Content
             Assert.Equal(skillCountAfterFirstSeed, await context.Set<EntitySkill>().CountAsync(CancellationToken));
         }
 
+        [Fact]
+        public async Task SeedAsync_TaggedItemMod_SeedsTagCatalogueAndResolvesJoin()
+        {
+            // Tags are not one of the intrinsic (migration-seeded) sets, so a fresh DB has none. Seeding a tagged
+            // item/mod must therefore seed the referenced Tag first; before that fix the join row referenced a
+            // non-existent Tag and the insert FK-failed.
+            const int tagId = 1;
+            var import = EmptyImport() with
+            {
+                Tags = [new Contracts.Tag { Id = tagId, Name = "Test Tag", TagCategoryId = (int)ETagCategory.Accessory }],
+                ItemMods =
+                [
+                    new Contracts.ItemMod
+                    {
+                        Id = 0,
+                        Name = "Tagged Mod",
+                        Description = "A mod that carries a tag.",
+                        ItemModTypeId = EItemModType.Prefix,
+                        RarityId = ERarity.Common,
+                        Attributes = [],
+                        Tags = [tagId],
+                        DesignerNotes = string.Empty,
+                        RetiredAt = null,
+                    },
+                ],
+            };
+
+            using var scope = CreateScope();
+            var seeder = scope.ServiceProvider.GetRequiredService<IContentSeeder>();
+            var seeded = await seeder.SeedAsync(import, CancellationToken);
+            Assert.True(seeded, "The fresh database should have been seeded.");
+
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var tagIds = await context.Tags.Select(tag => tag.Id).ToListAsync(CancellationToken);
+            Assert.Equal([tagId], tagIds);
+
+            var join = await context.ItemModTags.SingleAsync(CancellationToken);
+            Assert.Equal(0, join.ItemModId);
+            Assert.Equal(tagId, join.TagId);
+        }
+
         private async Task<bool> SeedFromExportAsync()
         {
             using var scope = CreateScope();
             var reader = scope.ServiceProvider.GetRequiredService<IContentImportReader>();
             var seeder = scope.ServiceProvider.GetRequiredService<IContentSeeder>();
             return await seeder.SeedAsync(reader.Read(RepoPaths.ContentDirectory()), CancellationToken);
+        }
+
+        /// <summary>An otherwise-empty content graph, so a test can seed just the sets it exercises via a
+        /// <c>with</c> expression.</summary>
+        private static ContentImport EmptyImport()
+        {
+            return new ContentImport
+            {
+                Skills = [],
+                Tags = [],
+                ItemMods = [],
+                Items = [],
+                Enemies = [],
+                Challenges = [],
+                Zones = [],
+                Classes = [],
+                Paths = [],
+                Proficiencies = [],
+                SkillRecipes = [],
+            };
         }
     }
 }
