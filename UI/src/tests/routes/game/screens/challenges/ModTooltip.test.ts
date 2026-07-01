@@ -10,6 +10,7 @@ const makeMod = (overrides: Partial<IItemMod> = {}): IItemMod => ({
 	id: 1,
 	name: 'Flaming',
 	description: 'Wreathed in flame.',
+	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: ERarity.Legendary,
 	attributes: [

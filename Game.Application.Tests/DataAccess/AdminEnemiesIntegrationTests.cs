@@ -59,6 +59,7 @@ namespace Game.Application.Tests.DataAccess
                     {
                         Id = recordZeroId,
                         Name = "Edited Zero",
+                        DesignerNotes = "",
                         IsBoss = true,
                         AttributeDistribution = [],
                         SkillPool = [],
@@ -344,6 +345,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Id = enemyId,
                 Name = name,
+                DesignerNotes = "",
                 IsBoss = false,
                 AttributeDistribution = [],
                 SkillPool = [],
@@ -686,6 +688,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Id = enemyId,
                 Name = name,
+                DesignerNotes = "",
                 IsBoss = false,
                 RetiredAt = retiredAt,
                 AttributeDistribution = [],

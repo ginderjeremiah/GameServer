@@ -11,7 +11,7 @@ const recipe = (
 	inputSkillIds: number[],
 	conditions: { proficiencyId: number; minLevel: number }[] = [],
 	over: Partial<ISkillRecipe> = {}
-): ISkillRecipe => ({ id, resultSkillId, inputSkillIds, conditions, ...over });
+): ISkillRecipe => ({ id, resultSkillId, designerNotes: '', inputSkillIds, conditions, ...over });
 
 const owned = (...ids: number[]) => new Set(ids);
 const levels = (entries: [number, number][] = []) => new Map(entries);

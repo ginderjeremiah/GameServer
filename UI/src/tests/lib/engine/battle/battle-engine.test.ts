@@ -170,6 +170,7 @@ describe('BattleEngine', () => {
 			cooldownMs: 500,
 			iconPath: '',
 			rarityId: ERarity.Common,
+			designerNotes: '',
 			word: '',
 			pronunciation: '',
 			translation: '',
@@ -178,7 +179,15 @@ describe('BattleEngine', () => {
 		};
 
 		mockEnemies.length = 0;
-		mockEnemies[1] = { id: 1, name: 'Goblin', isBoss: false, attributeDistribution: [], skillPool: [0], spawns: [] };
+		mockEnemies[1] = {
+			id: 1,
+			name: 'Goblin',
+			designerNotes: '',
+			isBoss: false,
+			attributeDistribution: [],
+			skillPool: [0],
+			spawns: []
+		};
 
 		engine = new BattleEngine();
 	});

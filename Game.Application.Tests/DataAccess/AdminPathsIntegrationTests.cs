@@ -164,6 +164,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = name,
                 Description = "",
+                DesignerNotes = "",
                 RetiredAt = retired ? DateTime.UtcNow : null,
             };
             context.Paths.Add(path);
@@ -177,6 +178,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = name,
                 Description = "",
+                DesignerNotes = "",
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",
@@ -213,6 +215,7 @@ namespace Game.Application.Tests.DataAccess
                 Id = id,
                 Name = name,
                 Description = "",
+                DesignerNotes = "",
                 RetiredAt = DateTime.UtcNow,
             },
         };
@@ -222,6 +225,7 @@ namespace Game.Application.Tests.DataAccess
             Id = id,
             Name = name,
             Description = "",
+            DesignerNotes = "",
             ActivityKey = activityKey,
         };
     }

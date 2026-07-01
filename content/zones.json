@@ -10,6 +10,7 @@
     "bossLevel": 10,
     "unlockChallengeId": null,
     "isHome": false,
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -23,6 +24,7 @@
     "bossLevel": 1,
     "unlockChallengeId": 0,
     "isHome": false,
+    "designerNotes": "",
     "retiredAt": null
   },
   {
@@ -36,6 +38,7 @@
     "bossLevel": 1,
     "unlockChallengeId": null,
     "isHome": true,
+    "designerNotes": "",
     "retiredAt": null
   }
 ]

@@ -26,6 +26,7 @@ namespace Game.Api.Tests.Unit
             Id = 0,
             Name = "Test",
             Description = "",
+            DesignerNotes = "",
             IconPath = "",
             WeaponType = weaponType,
             Attributes = [],

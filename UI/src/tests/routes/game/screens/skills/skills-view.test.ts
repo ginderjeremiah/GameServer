@@ -86,6 +86,7 @@ const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,
@@ -144,6 +145,7 @@ const SKILLS: ISkill[] = [
    clean expected value: with only per-level Endurance, Toughness = 2·amountPerLevel·level. */
 const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
 	name: `Enemy ${over.id}`,
+	designerNotes: '',
 	isBoss: false,
 	attributeDistribution: [],
 	skillPool: [],
@@ -161,6 +163,7 @@ const ZONES: IZone[] = [
 		id: 0,
 		name: 'Vale',
 		description: '',
+		designerNotes: '',
 		order: 0,
 		levelMin: 2,
 		levelMax: 8,

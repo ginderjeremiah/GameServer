@@ -63,6 +63,7 @@ describe('enemyEntity', () => {
 	const baseline: WorkbenchEnemy = {
 		id: 0,
 		name: 'Bat',
+		designerNotes: '',
 		isBoss: false,
 		attributeDistribution: [{ attributeId: 0, baseAmount: 1, amountPerLevel: 0 }],
 		skillPool: [1],
@@ -75,6 +76,7 @@ describe('enemyEntity', () => {
 			id: 5,
 			name: '',
 			isBoss: false,
+			designerNotes: '',
 			attributeDistribution: [],
 			skillPool: [],
 			spawns: [],
@@ -129,6 +131,7 @@ describe('enemyEntity', () => {
 			id: 0,
 			name: 'Cave Bat',
 			isBoss: false,
+			designerNotes: '',
 			attributeDistribution: [],
 			skillPool: [],
 			spawns: []
@@ -145,6 +148,7 @@ describe('enemyEntity', () => {
 		const added: WorkbenchEnemy = {
 			id: -1,
 			name: 'New Enemy',
+			designerNotes: '',
 			isBoss: true,
 			attributeDistribution: [{ attributeId: 0, baseAmount: 3, amountPerLevel: 1 }],
 			skillPool: [2],
@@ -162,6 +166,7 @@ describe('enemyEntity', () => {
 			id: -1,
 			name: 'New Enemy',
 			isBoss: true,
+			designerNotes: '',
 			attributeDistribution: [],
 			skillPool: [],
 			spawns: []

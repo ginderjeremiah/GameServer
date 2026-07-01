@@ -61,6 +61,7 @@ namespace Game.Api.Tests.Unit
             DamageMultipliers = [],
             Effects = [],
             Description = "",
+            DesignerNotes = "",
             IconPath = "",
             RarityId = ERarity.Common,
             Word = "",

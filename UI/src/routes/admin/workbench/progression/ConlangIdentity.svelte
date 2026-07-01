@@ -74,6 +74,16 @@
 	</div>
 </div>
 
+<div class="notes">
+	<ProgInput
+		label="Designer notes"
+		value={tier.designerNotes}
+		textarea
+		fullWidth
+		onChange={(v) => store.patchProf(tier.id, (d) => (d.designerNotes = v))}
+	/>
+</div>
+
 <script lang="ts">
 import WordOfPower from '$components/WordOfPower.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
@@ -100,6 +110,9 @@ const thresholds = $derived(decipherThresholds(tier.maxLevel));
 }
 .gap12 {
 	gap: 12px;
+}
+.notes {
+	margin-top: 18px;
 }
 .ro {
 	display: flex;

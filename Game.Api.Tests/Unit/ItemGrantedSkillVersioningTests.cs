@@ -25,6 +25,7 @@ namespace Game.Api.Tests.Unit
             Id = 0,
             Name = "Test",
             Description = "",
+            DesignerNotes = "",
             IconPath = "",
             GrantedSkillId = grantedSkillId,
             Attributes = [],

@@ -502,7 +502,7 @@ namespace Game.Application.Tests.DataAccess
         private async Task<Entities.Path> SeedPathAsync(IServiceScope scope)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var path = new Entities.Path { Name = "Fire", Description = "" };
+            var path = new Entities.Path { Name = "Fire", Description = "", DesignerNotes = "" };
             context.Paths.Add(path);
             await context.SaveChangesAsync(CancellationToken);
             return path;
@@ -521,6 +521,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = name,
                 Description = "",
+                DesignerNotes = "",
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",
@@ -545,6 +546,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = "Slash",
                 Description = "",
+                DesignerNotes = "",
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",
@@ -574,6 +576,7 @@ namespace Game.Application.Tests.DataAccess
             Id = id,
             Name = name,
             Description = "",
+            DesignerNotes = "",
             IconPath = "",
             Word = "",
             Pronunciation = "",

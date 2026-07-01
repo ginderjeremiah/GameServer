@@ -79,6 +79,7 @@ describe('skillEntity', () => {
 			word: '',
 			pronunciation: '',
 			translation: '',
+			designerNotes: '',
 			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 			acquisition: ESkillAcquisition.Player,
 			description: '',
@@ -221,6 +222,7 @@ describe('skillEntity', () => {
 		const baseline: ISkill = {
 			id: 0,
 			name: 'Poison Sting',
+			designerNotes: '',
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
@@ -252,6 +254,7 @@ describe('skillEntity', () => {
 		const baseline: ISkill = {
 			id: 0,
 			name: 'Slash',
+			designerNotes: '',
 			baseDamage: 10,
 			cooldownMs: 2000,
 			iconPath: '',
@@ -285,6 +288,7 @@ describe('skillEntity', () => {
 		const added: ISkill = {
 			id: -1,
 			name: 'Venom',
+			designerNotes: '',
 			baseDamage: 5,
 			cooldownMs: 1000,
 			iconPath: '',

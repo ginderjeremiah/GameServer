@@ -666,6 +666,7 @@ namespace Game.Application.Tests.Content
             Pronunciation = "",
             Translation = "",
             Acquisition = acquisition,
+            DesignerNotes = "",
             RetiredAt = retiredAt,
         };
 
@@ -691,6 +692,7 @@ namespace Game.Application.Tests.Content
                 WeaponType = weaponType,
                 RequiredProficiencyId = requiredProficiencyId,
                 RequiredProficiencyLevel = requiredProficiencyLevel,
+                DesignerNotes = "",
                 RetiredAt = retiredAt,
             };
 
@@ -707,6 +709,7 @@ namespace Game.Application.Tests.Content
                 AttributeDistribution = [],
                 SkillPool = skillPool ?? [],
                 Spawns = (spawns ?? []).Select(s => new Contracts.EnemySpawn { ZoneId = s.zoneId, Weight = s.weight }).ToList(),
+                DesignerNotes = "",
                 RetiredAt = retiredAt,
             };
 
@@ -727,6 +730,7 @@ namespace Game.Application.Tests.Content
                 BossLevel = 1,
                 UnlockChallengeId = unlockChallengeId,
                 IsHome = isHome,
+                DesignerNotes = "",
                 RetiredAt = retiredAt,
             };
 
@@ -748,6 +752,7 @@ namespace Game.Application.Tests.Content
                 ProgressGoal = 1,
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
+                DesignerNotes = "",
                 RetiredAt = retiredAt,
             };
 
@@ -765,6 +770,7 @@ namespace Game.Application.Tests.Content
             StarterSkillIds = starterSkills ?? [],
             StarterEquipment = (starterEquipmentItemIds ?? []).Select((itemId, i) => new Contracts.ClassStarterEquipment { ItemId = itemId, EquipmentSlot = (EEquipmentSlot)i }).ToList(),
             AttributeDistributions = [],
+            DesignerNotes = "",
             RetiredAt = retiredAt,
         };
 
@@ -774,6 +780,7 @@ namespace Game.Application.Tests.Content
             Name = $"Path {id}",
             Description = "",
             ActivityKey = default,
+            DesignerNotes = "",
             RetiredAt = retiredAt,
         };
 
@@ -797,6 +804,7 @@ namespace Game.Application.Tests.Content
                 MaxLevel = maxLevel,
                 BaseXp = 1,
                 XpGrowth = 1,
+                DesignerNotes = "",
                 RetiredAt = retiredAt,
                 LevelModifiers = [],
                 LevelRewards = (rewards ?? []).Select(r => new Contracts.ProficiencyLevelReward { Level = r.level, RewardSkillId = r.rewardSkillId }).ToList(),
@@ -807,6 +815,7 @@ namespace Game.Application.Tests.Content
         {
             Id = id,
             ResultSkillId = resultSkillId,
+            DesignerNotes = "",
             RetiredAt = retiredAt,
             InputSkillIds = inputs ?? [],
             Conditions = (conditions ?? []).Select(c => new Contracts.SkillRecipeCondition { ProficiencyId = c.proficiencyId, MinLevel = c.minLevel }).ToList(),

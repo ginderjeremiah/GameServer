@@ -32,7 +32,7 @@ namespace Game.Application.Tests.DataAccess
                 inputB = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
                 proficiencyId = (await SeedProficiencyAsync(context)).Id;
 
-                var recipe = new Entities.SkillRecipe { ResultSkillId = resultSkillId };
+                var recipe = new Entities.SkillRecipe { ResultSkillId = resultSkillId, DesignerNotes = "" };
                 context.SkillRecipes.Add(recipe);
                 await context.SaveChangesAsync(CancellationToken);
                 recipeId = recipe.Id;
@@ -83,7 +83,7 @@ namespace Game.Application.Tests.DataAccess
                 resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
                 inputSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
 
-                var recipe = new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow };
+                var recipe = new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow, DesignerNotes = "" };
                 context.SkillRecipes.Add(recipe);
                 await context.SaveChangesAsync(CancellationToken);
                 recipeId = recipe.Id;
@@ -110,6 +110,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = "Skill",
                 Description = "",
+                DesignerNotes = "",
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",
@@ -128,7 +129,7 @@ namespace Game.Application.Tests.DataAccess
 
         private async Task<Entities.Proficiency> SeedProficiencyAsync(GameContext context)
         {
-            var path = new Entities.Path { Name = "Fire", Description = "d" };
+            var path = new Entities.Path { Name = "Fire", Description = "d", DesignerNotes = "" };
             context.Paths.Add(path);
             await context.SaveChangesAsync(CancellationToken);
 
@@ -136,6 +137,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = "Blades",
                 Description = "d",
+                DesignerNotes = "",
                 IconPath = "i",
                 Word = "w",
                 Pronunciation = "p",

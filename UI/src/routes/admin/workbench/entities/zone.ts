@@ -45,6 +45,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 		bossLevel: 1,
 		unlockChallengeId: -1,
 		isHome: false,
+		designerNotes: '',
 		zoneEnemies: []
 	}),
 	meta: (z) => [
@@ -108,6 +109,13 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 					type: 'toggle',
 					onLabel: 'Home (no combat)',
 					offLabel: 'Combat zone'
+				},
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this zone exists — authoring notes (never shown to players)…',
+					grow: true
 				}
 			]
 		},
@@ -154,6 +162,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				bossLevel,
 				unlockChallengeId,
 				isHome,
+				designerNotes,
 				retiredAt
 			}) => ({
 				id,
@@ -168,6 +177,7 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 				// Likewise map the "None" sentinel (-1) back to an absent unlock gate.
 				unlockChallengeId: unlockChallengeId === -1 ? undefined : unlockChallengeId,
 				isHome,
+				designerNotes,
 				retiredAt
 			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditZones', changes),

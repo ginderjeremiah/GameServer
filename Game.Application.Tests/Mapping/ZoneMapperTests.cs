@@ -31,6 +31,8 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(7, contract.BossLevel);
             Assert.Equal(2, contract.UnlockChallengeId);
             Assert.False(contract.IsHome);
+            // Authoring-only metadata rides the contract only; ZoneMapper.ToCore omits it from the lean model.
+            Assert.Equal("designer intent", contract.DesignerNotes);
             Assert.Equal(retiredAt, contract.RetiredAt);
         }
 
@@ -87,6 +89,7 @@ namespace Game.Application.Tests.Mapping
                 BossLevel = 7,
                 UnlockChallengeId = unlockChallengeId,
                 IsHome = isHome,
+                DesignerNotes = "designer intent",
                 RetiredAt = retiredAt,
                 ZoneEnemies = [],
             };

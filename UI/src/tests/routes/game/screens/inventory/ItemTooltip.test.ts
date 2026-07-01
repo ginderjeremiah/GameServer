@@ -74,6 +74,7 @@ const skill = (id: number, name: string): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,

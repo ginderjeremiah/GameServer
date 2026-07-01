@@ -38,6 +38,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Pronunciation = item.Pronunciation,
                     Translation = item.Translation,
                     Acquisition = (int)item.Acquisition,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 edit: item => _entityStore.Update(new Entities.Skill
                 {
@@ -52,6 +53,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Pronunciation = item.Pronunciation,
                     Translation = item.Translation,
                     Acquisition = (int)item.Acquisition,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

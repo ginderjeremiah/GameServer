@@ -26,6 +26,7 @@ namespace Game.DataAccess.Mapping
                 MaxLevel = entity.MaxLevel,
                 BaseXp = entity.BaseXp,
                 XpGrowth = entity.XpGrowth,
+                DesignerNotes = entity.DesignerNotes,
                 RetiredAt = entity.RetiredAt,
                 LevelModifiers = entity.LevelModifiers
                     .Select(m => new Contracts.ProficiencyLevelModifier

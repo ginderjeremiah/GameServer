@@ -29,6 +29,7 @@ namespace Game.DataAccess.Repositories.Admin
                     ProgressGoal = item.ProgressGoal,
                     RewardItemId = item.RewardItemId,
                     RewardItemModId = item.RewardItemModId,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 edit: item => _entityStore.Update(new Entities.Challenge
                 {
@@ -40,6 +41,7 @@ namespace Game.DataAccess.Repositories.Admin
                     ProgressGoal = item.ProgressGoal,
                     RewardItemId = item.RewardItemId,
                     RewardItemModId = item.RewardItemModId,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

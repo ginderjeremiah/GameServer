@@ -68,6 +68,7 @@ const makeZone = (over: Partial<IZone> = {}): IZone => ({
 	id: 0,
 	name: 'Verdant Hollow',
 	description: '',
+	designerNotes: '',
 	order: 1,
 	levelMin: 1,
 	levelMax: 10,
@@ -161,7 +162,15 @@ describe('Fight', () => {
 		beforeEach(() => {
 			staticData.zones = [makeZone({ bossEnemyId: 0, bossLevel: 18 })];
 			staticData.enemies = [
-				{ id: 0, name: 'Catacomb Lich', isBoss: true, attributeDistribution: [], skillPool: [], spawns: [] }
+				{
+					id: 0,
+					name: 'Catacomb Lich',
+					designerNotes: '',
+					isBoss: true,
+					attributeDistribution: [],
+					skillPool: [],
+					spawns: []
+				}
 			];
 		});
 

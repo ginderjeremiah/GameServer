@@ -11,7 +11,8 @@ export const newPath = (id: number): WorkbenchPath => ({
 	id,
 	name: '',
 	description: '',
-	activityKey: EActivityKey.Physical
+	activityKey: EActivityKey.Physical,
+	designerNotes: ''
 });
 
 // ── Activity-key picker (path identity) ──
@@ -89,6 +90,7 @@ export const newProficiency = (id: number, pathId: number, pathOrdinal: number):
 	maxLevel: 10,
 	baseXp: 100,
 	xpGrowth: 1.4,
+	designerNotes: '',
 	levelModifiers: [],
 	levelRewards: [],
 	prerequisiteIds: []
@@ -226,6 +228,7 @@ export const pathIdentityDto = (path: WorkbenchPath) => ({
 	name: path.name,
 	description: path.description,
 	activityKey: path.activityKey,
+	designerNotes: path.designerNotes,
 	retiredAt: path.retiredAt
 });
 
@@ -242,6 +245,7 @@ export const profIdentityDto = (prof: WorkbenchProficiency) => ({
 	maxLevel: prof.maxLevel,
 	baseXp: prof.baseXp,
 	xpGrowth: prof.xpGrowth,
+	designerNotes: prof.designerNotes,
 	levelModifiers: [] as IProficiencyLevelModifier[],
 	levelRewards: [] as IProficiencyLevelReward[],
 	prerequisiteIds: [] as number[],

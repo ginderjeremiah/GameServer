@@ -23,6 +23,7 @@ namespace Game.Application.Tests.Mapping
 
             Assert.Equal(0, contract.Id);
             Assert.Equal(7, contract.ResultSkillId);
+            Assert.Equal("designer intent", contract.DesignerNotes);
             Assert.Null(contract.RetiredAt);
             // Inputs ordered by skill id for a stable version hash.
             Assert.Equal([1, 3], contract.InputSkillIds);
@@ -66,6 +67,7 @@ namespace Game.Application.Tests.Mapping
             {
                 Id = 0,
                 ResultSkillId = resultSkillId,
+                DesignerNotes = "designer intent",
                 Inputs = [.. inputs.Select(id => new Entities.SkillRecipeInput { RecipeId = 0, SkillId = id })],
                 Conditions = [.. conditions.Select(c => new Entities.SkillRecipeCondition
                 {

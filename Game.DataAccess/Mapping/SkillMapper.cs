@@ -26,6 +26,7 @@ namespace Game.DataAccess.Mapping
                 Pronunciation = entity.Pronunciation,
                 Translation = entity.Translation,
                 Acquisition = (ESkillAcquisition)entity.Acquisition,
+                DesignerNotes = entity.DesignerNotes,
                 DamagePortions = entity.SkillDamagePortions
                     .Select(p => new Contracts.SkillDamagePortion
                     {

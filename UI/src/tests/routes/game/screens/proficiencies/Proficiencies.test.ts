@@ -30,6 +30,7 @@ import { playerProficiencies } from '$stores';
 const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdinal: number }): IProficiency => ({
 	name: `Prof ${o.id}`,
 	description: '',
+	designerNotes: '',
 	iconPath: '',
 	word: `w${o.id}`,
 	pronunciation: '',
@@ -49,8 +50,8 @@ const PROFICIENCIES: IProficiency[] = [
 	prof({ id: 2, pathId: 1, pathOrdinal: 0, name: 'Earth' })
 ];
 const PATHS: IPath[] = [
-	{ id: 0, name: 'Pyromancy', description: '', activityKey: EActivityKey.Fire },
-	{ id: 1, name: 'Geomancy', description: '', activityKey: EActivityKey.Earth }
+	{ id: 0, name: 'Pyromancy', description: '', designerNotes: '', activityKey: EActivityKey.Fire },
+	{ id: 1, name: 'Geomancy', description: '', designerNotes: '', activityKey: EActivityKey.Earth }
 ];
 
 beforeEach(() => {

@@ -106,6 +106,7 @@ const make = (over: Partial<IChallenge>): IChallenge => {
 		id: 1,
 		name: 'Test',
 		description: '',
+		designerNotes: '',
 		challengeTypeId: type,
 		statisticType: stat?.id,
 		entityType: stat?.entityType ?? EEntityType.None,

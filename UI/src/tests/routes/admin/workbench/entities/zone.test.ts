@@ -115,6 +115,7 @@ describe('zoneEntity', () => {
 			id: -1,
 			name: '',
 			description: '',
+			designerNotes: '',
 			order: 0,
 			levelMin: 1,
 			levelMax: 10,

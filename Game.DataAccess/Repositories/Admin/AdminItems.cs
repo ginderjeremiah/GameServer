@@ -75,6 +75,7 @@ namespace Game.DataAccess.Repositories.Admin
                     WeaponType = (int?)item.WeaponType,
                     RequiredProficiencyId = item.RequiredProficiencyId,
                     RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 // Build a fresh, navigation-free entity rather than mutating the cached one, whose loaded
                 // graph would otherwise be dragged into the change tracker.
@@ -90,6 +91,7 @@ namespace Game.DataAccess.Repositories.Admin
                     WeaponType = (int?)item.WeaponType,
                     RequiredProficiencyId = item.RequiredProficiencyId,
                     RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

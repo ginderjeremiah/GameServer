@@ -91,6 +91,7 @@ namespace Game.Core.Tests.Progress
             Id = id,
             Name = "Test Challenge",
             Description = string.Empty,
+            DesignerNotes = string.Empty,
             Type = new ChallengeType(type),
             TargetEntityId = targetEntityId,
             ProgressGoal = 1m,

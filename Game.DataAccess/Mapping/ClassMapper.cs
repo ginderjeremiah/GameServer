@@ -25,6 +25,7 @@ namespace Game.DataAccess.Mapping
                 PassiveScalingAttributeId = (EAttribute?)entity.PassiveScalingAttributeId,
                 PassiveScalingAmount = entity.PassiveScalingAmount,
                 PassiveModifierType = (EModifierType)entity.PassiveModifierType,
+                DesignerNotes = entity.DesignerNotes,
                 StarterSkillIds = entity.StarterSkills.Select(s => s.SkillId).ToList(),
                 StarterEquipment = entity.StarterEquipment
                     .Select(e => new Contracts.ClassStarterEquipment

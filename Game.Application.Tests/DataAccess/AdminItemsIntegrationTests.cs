@@ -606,6 +606,7 @@ namespace Game.Application.Tests.DataAccess
                 Id = id,
                 Name = name,
                 Description = "",
+                DesignerNotes = "",
                 ItemCategoryId = itemCategoryId,
                 RarityId = ERarity.Common,
                 IconPath = "",

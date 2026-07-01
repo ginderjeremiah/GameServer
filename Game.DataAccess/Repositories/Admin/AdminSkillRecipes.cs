@@ -55,11 +55,13 @@ namespace Game.DataAccess.Repositories.Admin
                 add: item => _entityStore.Insert(new Entities.SkillRecipe
                 {
                     ResultSkillId = item.ResultSkillId,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 edit: item => _entityStore.Update(new Entities.SkillRecipe
                 {
                     Id = item.Id,
                     ResultSkillId = item.ResultSkillId,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

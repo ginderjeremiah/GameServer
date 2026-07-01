@@ -51,6 +51,7 @@ namespace Game.Api.Tests.Unit
                 Id = 5,
                 Name = "Slayer",
                 Description = "Kill enemies",
+                DesignerNotes = "",
                 Type = new ChallengeType(EChallengeType.EnemiesKilled),
                 ProgressGoal = 100m,
             };

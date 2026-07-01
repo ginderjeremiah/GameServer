@@ -28,6 +28,7 @@ const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISki
 	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
 	iconPath: '',
 	rarityId: ERarity.Common,
+	designerNotes: '',
 	word: '',
 	pronunciation: '',
 	translation: '',

@@ -32,6 +32,7 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 		id,
 		// Default to the first authorable Synthesis result; -1 (no valid option yet) surfaces as a warning.
 		resultSkillId: reference.synthesisResultSkillOptions()[0]?.value ?? -1,
+		designerNotes: '',
 		inputSkillIds: [],
 		conditions: []
 	}),
@@ -63,6 +64,13 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 					type: 'select',
 					options: reference.synthesisResultSkillOptions,
 					width: 260
+				},
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this recipe exists — authoring notes (never shown to players)…',
+					grow: true
 				}
 			]
 		},
@@ -134,6 +142,7 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			toPrimaryDto: (r) => ({
 				id: r.id,
 				resultSkillId: r.resultSkillId,
+				designerNotes: r.designerNotes,
 				retiredAt: r.retiredAt,
 				inputSkillIds: [],
 				conditions: []

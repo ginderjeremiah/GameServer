@@ -183,6 +183,7 @@ namespace Game.Application.Tests.DataAccess
                     {
                         Name = "Home",
                         Description = "",
+                        DesignerNotes = "",
                         LevelMin = 1,
                         LevelMax = 1,
                         BossLevel = 1,
@@ -215,6 +216,7 @@ namespace Game.Application.Tests.DataAccess
                         {
                             Name = "Home",
                             Description = "A quiet refuge.",
+                            DesignerNotes = "",
                             LevelMin = 1,
                             LevelMax = 1,
                             BossLevel = 1,
@@ -259,6 +261,7 @@ namespace Game.Application.Tests.DataAccess
                     {
                         Name = "Second Home",
                         Description = "",
+                        DesignerNotes = "",
                         LevelMin = 1,
                         LevelMax = 1,
                         BossLevel = 1,
@@ -300,6 +303,7 @@ namespace Game.Application.Tests.DataAccess
                         Id = combatZoneId,
                         Name = "Wilds",
                         Description = "",
+                        DesignerNotes = "",
                         LevelMin = 1,
                         LevelMax = 10,
                         BossLevel = 1,
@@ -338,6 +342,7 @@ namespace Game.Application.Tests.DataAccess
                         {
                             Name = "New Home",
                             Description = "",
+                            DesignerNotes = "",
                             LevelMin = 1,
                             LevelMax = 1,
                             BossLevel = 1,
@@ -372,7 +377,7 @@ namespace Game.Application.Tests.DataAccess
                 new Change<Contracts.Zone>
                 {
                     ChangeType = EChangeType.Edit,
-                    Item = new Contracts.Zone { Id = 99999, Name = "Ghost", Description = "" },
+                    Item = new Contracts.Zone { Id = 99999, Name = "Ghost", Description = "", DesignerNotes = "" },
                 },
             ]);
 

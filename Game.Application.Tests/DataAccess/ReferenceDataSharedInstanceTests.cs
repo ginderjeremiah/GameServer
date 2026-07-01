@@ -101,7 +101,7 @@ namespace Game.Application.Tests.DataAccess
             using (var seedScope = CreateScope())
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
-                var path = new Entities.Path { Name = "Shared Path", Description = "" };
+                var path = new Entities.Path { Name = "Shared Path", Description = "", DesignerNotes = "" };
                 context.Paths.Add(path);
                 await context.SaveChangesAsync(CancellationToken);
 
@@ -109,6 +109,7 @@ namespace Game.Application.Tests.DataAccess
                 {
                     Name = "Shared Proficiency",
                     Description = "",
+                    DesignerNotes = "",
                     IconPath = "",
                     Word = "",
                     Pronunciation = "",

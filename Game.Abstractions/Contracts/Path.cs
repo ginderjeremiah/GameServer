@@ -15,6 +15,10 @@ namespace Game.Abstractions.Contracts
         /// entity). A battle quantity whose key resolves to this trains the path's frontier tier.</summary>
         public EActivityKey ActivityKey { get; set; }
 
+        /// <summary>Authoring-only design rationale (why this piece exists) — surfaced in the Workbench and
+        /// version-controlled via the content export. The battle never reads it and the client never renders it.</summary>
+        public required string DesignerNotes { get; set; }
+
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).</summary>
         public DateTime? RetiredAt { get; set; }
     }

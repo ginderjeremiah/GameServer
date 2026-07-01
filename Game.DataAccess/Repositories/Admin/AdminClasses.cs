@@ -37,6 +37,7 @@ namespace Game.DataAccess.Repositories.Admin
                     PassiveScalingAttributeId = (int?)item.PassiveScalingAttributeId,
                     PassiveScalingAmount = item.PassiveScalingAmount,
                     PassiveModifierType = (int)item.PassiveModifierType,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 edit: item => _entityStore.Update(new Entities.Class
                 {
@@ -49,6 +50,7 @@ namespace Game.DataAccess.Repositories.Admin
                     PassiveScalingAttributeId = (int?)item.PassiveScalingAttributeId,
                     PassiveScalingAmount = item.PassiveScalingAmount,
                     PassiveModifierType = (int)item.PassiveModifierType,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

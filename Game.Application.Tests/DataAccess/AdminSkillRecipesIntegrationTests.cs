@@ -164,7 +164,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
-                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId });
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId, DesignerNotes = "" });
                 await context.SaveChangesAsync(CancellationToken);
             }
             await ReloadReferenceCachesAsync();
@@ -214,8 +214,8 @@ namespace Game.Application.Tests.DataAccess
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 skillX = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
                 var skillY = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
-                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = skillX });
-                var r2 = new Entities.SkillRecipe { ResultSkillId = skillY };
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = skillX, DesignerNotes = "" });
+                var r2 = new Entities.SkillRecipe { ResultSkillId = skillY, DesignerNotes = "" };
                 context.SkillRecipes.Add(r2);
                 await context.SaveChangesAsync(CancellationToken);
                 r2Id = r2.Id;
@@ -244,7 +244,7 @@ namespace Game.Application.Tests.DataAccess
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
                 // A retired recipe is inert, so its result is free to be produced by a live recipe.
-                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow });
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow, DesignerNotes = "" });
                 await context.SaveChangesAsync(CancellationToken);
             }
             await ReloadReferenceCachesAsync();
@@ -269,8 +269,8 @@ namespace Game.Application.Tests.DataAccess
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
                 // R1 is the live producer; R2 produces the same skill but is retired (inert, so allowed to coexist).
-                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId });
-                var r2 = new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow };
+                context.SkillRecipes.Add(new Entities.SkillRecipe { ResultSkillId = resultSkillId, DesignerNotes = "" });
+                var r2 = new Entities.SkillRecipe { ResultSkillId = resultSkillId, RetiredAt = DateTime.UtcNow, DesignerNotes = "" };
                 context.SkillRecipes.Add(r2);
                 await context.SaveChangesAsync(CancellationToken);
                 r2Id = r2.Id;
@@ -298,7 +298,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
                 resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
-                var r1 = new Entities.SkillRecipe { ResultSkillId = resultSkillId };
+                var r1 = new Entities.SkillRecipe { ResultSkillId = resultSkillId, DesignerNotes = "" };
                 context.SkillRecipes.Add(r1);
                 await context.SaveChangesAsync(CancellationToken);
                 r1Id = r1.Id;
@@ -419,8 +419,8 @@ namespace Game.Application.Tests.DataAccess
                 var skillA = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
                 skillC = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
 
-                var r1 = new Entities.SkillRecipe { ResultSkillId = skillC };
-                var r2 = new Entities.SkillRecipe { ResultSkillId = skillA };
+                var r1 = new Entities.SkillRecipe { ResultSkillId = skillC, DesignerNotes = "" };
+                var r2 = new Entities.SkillRecipe { ResultSkillId = skillA, DesignerNotes = "" };
                 context.SkillRecipes.AddRange(r1, r2);
                 await context.SaveChangesAsync(CancellationToken);
                 r2Id = r2.Id;
@@ -519,7 +519,7 @@ namespace Game.Application.Tests.DataAccess
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var resultSkillId = (await SeedSkillAsync(context, ESkillAcquisition.Synthesis)).Id;
-            var recipe = new Entities.SkillRecipe { ResultSkillId = resultSkillId };
+            var recipe = new Entities.SkillRecipe { ResultSkillId = resultSkillId, DesignerNotes = "" };
             context.SkillRecipes.Add(recipe);
             await context.SaveChangesAsync(CancellationToken);
             return recipe;
@@ -528,7 +528,7 @@ namespace Game.Application.Tests.DataAccess
         private async Task<Entities.Proficiency> SeedProficiencyAsync(IServiceScope scope)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var path = new Entities.Path { Name = "Fire", Description = "d" };
+            var path = new Entities.Path { Name = "Fire", Description = "d", DesignerNotes = "" };
             context.Paths.Add(path);
             await context.SaveChangesAsync(CancellationToken);
 
@@ -536,6 +536,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = "Blades",
                 Description = "d",
+                DesignerNotes = "",
                 IconPath = "i",
                 Word = "w",
                 Pronunciation = "p",
@@ -560,6 +561,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 Name = "Skill",
                 Description = "",
+                DesignerNotes = "",
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",
@@ -581,6 +583,7 @@ namespace Game.Application.Tests.DataAccess
         {
             Id = id,
             ResultSkillId = resultSkillId,
+            DesignerNotes = "",
             InputSkillIds = [],
             Conditions = [],
         };

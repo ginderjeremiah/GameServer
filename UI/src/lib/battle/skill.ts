@@ -36,6 +36,8 @@ export class Skill implements ISkill {
 	word: string;
 	pronunciation: string;
 	translation: string;
+	// Authoring-only metadata carried solely to satisfy the contract; never a combat input.
+	designerNotes: string;
 	chargeTime = 0;
 	renderChargeTime = 0;
 	owner: Battler;
@@ -55,6 +57,7 @@ export class Skill implements ISkill {
 		this.word = data.word;
 		this.pronunciation = data.pronunciation;
 		this.translation = data.translation;
+		this.designerNotes = data.designerNotes;
 		this.owner = owner;
 	}
 

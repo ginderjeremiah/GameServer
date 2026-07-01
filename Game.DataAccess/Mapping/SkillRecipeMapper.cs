@@ -16,6 +16,7 @@ namespace Game.DataAccess.Mapping
             {
                 Id = entity.Id,
                 ResultSkillId = entity.ResultSkillId,
+                DesignerNotes = entity.DesignerNotes,
                 RetiredAt = entity.RetiredAt,
                 InputSkillIds = entity.Inputs
                     .Select(i => i.SkillId)

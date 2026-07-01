@@ -80,6 +80,7 @@ namespace Game.DataAccess.Repositories.Admin
                     BossLevel = item.BossLevel,
                     UnlockChallengeId = item.UnlockChallengeId,
                     IsHome = item.IsHome,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 edit: item => _entityStore.Update(new Entities.Zone
                 {
@@ -93,6 +94,7 @@ namespace Game.DataAccess.Repositories.Admin
                     BossLevel = item.BossLevel,
                     UnlockChallengeId = item.UnlockChallengeId,
                     IsHome = item.IsHome,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

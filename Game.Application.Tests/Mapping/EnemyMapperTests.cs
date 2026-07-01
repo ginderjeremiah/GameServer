@@ -26,6 +26,8 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(0, contract.Id);
             Assert.Equal("Goblin", contract.Name);
             Assert.Equal(isBoss, contract.IsBoss);
+            // Authoring-only metadata rides the contract only; the lean Core enemy model has no such field.
+            Assert.Equal("designer intent", contract.DesignerNotes);
             Assert.Equal(retiredAt, contract.RetiredAt);
         }
 
@@ -66,6 +68,7 @@ namespace Game.Application.Tests.Mapping
                 Id = 0,
                 Name = "Goblin",
                 IsBoss = isBoss,
+                DesignerNotes = "designer intent",
                 RetiredAt = retiredAt,
                 AttributeDistributions = (distributions ?? []).Select(d => new Entities.AttributeDistribution
                 {

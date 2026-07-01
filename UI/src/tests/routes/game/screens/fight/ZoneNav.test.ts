@@ -63,6 +63,7 @@ const zone = (
 	id,
 	name,
 	description: '',
+	designerNotes: '',
 	order,
 	levelMin: 1,
 	levelMax: 10,

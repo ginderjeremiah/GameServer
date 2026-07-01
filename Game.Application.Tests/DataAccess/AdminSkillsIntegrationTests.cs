@@ -486,6 +486,7 @@ namespace Game.Application.Tests.DataAccess
                 Name = name,
                 BaseDamage = 5m,
                 Description = "",
+                DesignerNotes = "",
                 CooldownMs = 1000,
                 IconPath = "",
                 Word = "",

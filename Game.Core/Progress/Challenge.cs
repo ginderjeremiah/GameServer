@@ -16,6 +16,11 @@ namespace Game.Core.Progress
         public int? RewardItemId { get; init; }
         public int? RewardItemModId { get; init; }
 
+        /// <summary>Authoring-only design rationale (why this challenge exists). Unlike the other reference sets
+        /// the challenge read contract is projected from this domain model, so the field is carried here to reach
+        /// the export/Workbench; the battle never reads it and the client never renders it.</summary>
+        public required string DesignerNotes { get; init; }
+
         /// <summary>When set, the challenge is retired: out of circulation for new authoring but kept
         /// resolvable by id so existing references (and completions) stay valid. Null while active.</summary>
         public DateTime? RetiredAt { get; init; }

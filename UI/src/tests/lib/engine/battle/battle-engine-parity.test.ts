@@ -233,6 +233,7 @@ describe('BattleEngine parity with the headless BattleSimulator', () => {
 			mockEnemies[1] = {
 				id: 1,
 				name: 'Enemy',
+				designerNotes: '',
 				isBoss: false,
 				attributeDistribution: [],
 				skillPool: enemySkillIds,

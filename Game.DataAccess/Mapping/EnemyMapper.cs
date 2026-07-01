@@ -19,6 +19,7 @@ namespace Game.DataAccess.Mapping
                 Id = entity.Id,
                 Name = entity.Name,
                 IsBoss = entity.IsBoss,
+                DesignerNotes = entity.DesignerNotes,
                 AttributeDistribution = entity.AttributeDistributions
                     .Select(ad => new Contracts.AttributeDistribution
                     {

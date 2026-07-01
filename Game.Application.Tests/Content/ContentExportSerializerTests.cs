@@ -31,6 +31,7 @@ namespace Game.Application.Tests.Content
                 Pronunciation = "",
                 Translation = "",
                 Acquisition = ESkillAcquisition.Player,
+                DesignerNotes = "",
                 DamageMultipliers = multipliers ?? [],
                 DamagePortions = portions ?? [new Contracts.SkillDamagePortion { Type = EDamageType.Physical, Weight = 1m }],
                 Effects = effects ?? [],
@@ -155,6 +156,7 @@ namespace Game.Application.Tests.Content
                 ItemCategoryId = EItemCategory.Weapon,
                 RarityId = ERarity.Common,
                 IconPath = "",
+                DesignerNotes = "",
                 Attributes =
                 [
                     new Contracts.BattlerAttribute { AttributeId = EAttribute.Intellect, Amount = 1m },
@@ -185,6 +187,7 @@ namespace Game.Application.Tests.Content
                 Description = "d",
                 ItemModTypeId = EItemModType.Prefix,
                 RarityId = ERarity.Common,
+                DesignerNotes = "",
                 Attributes =
                 [
                     new Contracts.BattlerAttribute { AttributeId = EAttribute.Luck, Amount = 1m },
@@ -207,6 +210,7 @@ namespace Game.Application.Tests.Content
                 Id = 0,
                 Name = "Enemy",
                 IsBoss = false,
+                DesignerNotes = "",
                 AttributeDistribution =
                 [
                     new Contracts.AttributeDistribution { AttributeId = EAttribute.Endurance, BaseAmount = 1m, AmountPerLevel = 0m },
@@ -243,6 +247,7 @@ namespace Game.Application.Tests.Content
                 PassiveScalingAttributeId = null,
                 PassiveScalingAmount = 0m,
                 PassiveModifierType = EModifierType.Additive,
+                DesignerNotes = "",
                 StarterSkillIds = [3, 1, 2],
                 // Same slot twice exercises the ThenBy(ItemId) total-order tie-break.
                 StarterEquipment =
@@ -284,6 +289,7 @@ namespace Game.Application.Tests.Content
                 MaxLevel = 10,
                 BaseXp = 1m,
                 XpGrowth = 1m,
+                DesignerNotes = "",
                 LevelModifiers =
                 [
                     new Contracts.ProficiencyLevelModifier { Level = 2, AttributeId = EAttribute.Strength, ModifierTypeId = EModifierType.Additive, Amount = 1m },
@@ -311,6 +317,7 @@ namespace Game.Application.Tests.Content
             {
                 Id = 0,
                 ResultSkillId = 9,
+                DesignerNotes = "",
                 InputSkillIds = [5, 2],
                 Conditions =
                 [
@@ -330,18 +337,18 @@ namespace Game.Application.Tests.Content
         {
             var paths = ContentExportSerializer.Canonicalize(new[]
             {
-                new Contracts.Path { Id = 1, Name = "b", Description = "d", ActivityKey = EActivityKey.Physical },
-                new Contracts.Path { Id = 0, Name = "a", Description = "d", ActivityKey = EActivityKey.Physical },
+                new Contracts.Path { Id = 1, Name = "b", Description = "d", ActivityKey = EActivityKey.Physical, DesignerNotes = "" },
+                new Contracts.Path { Id = 0, Name = "a", Description = "d", ActivityKey = EActivityKey.Physical, DesignerNotes = "" },
             });
             var zones = ContentExportSerializer.Canonicalize(new[]
             {
-                new Contracts.Zone { Id = 1, Name = "b", Description = "d" },
-                new Contracts.Zone { Id = 0, Name = "a", Description = "d" },
+                new Contracts.Zone { Id = 1, Name = "b", Description = "d", DesignerNotes = "" },
+                new Contracts.Zone { Id = 0, Name = "a", Description = "d", DesignerNotes = "" },
             });
             var challenges = ContentExportSerializer.Canonicalize(new[]
             {
-                new Contracts.Challenge { Id = 1, Name = "b", Description = "d" },
-                new Contracts.Challenge { Id = 0, Name = "a", Description = "d" },
+                new Contracts.Challenge { Id = 1, Name = "b", Description = "d", DesignerNotes = "" },
+                new Contracts.Challenge { Id = 0, Name = "a", Description = "d", DesignerNotes = "" },
             });
 
             Assert.Equal([0, 1], paths.Select(p => p.Id));

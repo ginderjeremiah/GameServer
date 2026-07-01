@@ -41,6 +41,7 @@ import { ProficienciesView } from '$routes/game/screens/proficiencies/proficienc
 const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdinal: number }): IProficiency => ({
 	name: `Prof ${o.id}`,
 	description: '',
+	designerNotes: '',
 	iconPath: `icon-${o.id}`,
 	word: `w${o.id}`,
 	pronunciation: `p${o.id}`,
@@ -57,6 +58,7 @@ const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdin
 const path = (o: Partial<IPath> & { id: number }): IPath => ({
 	name: `Path ${o.id}`,
 	description: '',
+	designerNotes: '',
 	activityKey: EActivityKey.Physical,
 	...o
 });

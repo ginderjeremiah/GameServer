@@ -27,6 +27,7 @@ namespace Game.Application.Content
                 ProgressGoal = challenge.ProgressGoal,
                 RewardItemId = challenge.RewardItemId,
                 RewardItemModId = challenge.RewardItemModId,
+                DesignerNotes = challenge.DesignerNotes,
                 RetiredAt = challenge.RetiredAt,
             };
         }

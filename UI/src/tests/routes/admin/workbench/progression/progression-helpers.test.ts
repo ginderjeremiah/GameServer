@@ -195,6 +195,7 @@ describe('DTO builders', () => {
 			id: 1,
 			name: 'Fire',
 			description: 'd',
+			designerNotes: '',
 			activityKey: EActivityKey.Fire
 		});
 		expect(dto.activityKey).toBe(EActivityKey.Fire);

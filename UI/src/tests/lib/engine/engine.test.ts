@@ -510,7 +510,7 @@ describe('handleProficiencyXpGained — new-recipe-available toast', () => {
 		resultSkillId: number,
 		inputSkillIds: number[],
 		conditions: { proficiencyId: number; minLevel: number }[] = []
-	): ISkillRecipe => ({ id, resultSkillId, inputSkillIds, conditions });
+	): ISkillRecipe => ({ id, resultSkillId, designerNotes: '', inputSkillIds, conditions });
 
 	beforeEach(() => {
 		// A small world: skills 0/1/2 are inputs, skill 4 the synthesis result; proficiency 0 grants skill 1

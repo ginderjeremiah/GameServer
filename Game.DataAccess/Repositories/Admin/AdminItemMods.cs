@@ -37,6 +37,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Description = item.Description,
                     ItemModTypeId = (int)item.ItemModTypeId,
                     RarityId = (int)item.RarityId,
+                    DesignerNotes = item.DesignerNotes,
                 }),
                 // Build a fresh, navigation-free entity rather than mutating the cached one, whose loaded
                 // graph would otherwise be dragged into the change tracker.
@@ -47,6 +48,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Description = item.Description,
                     ItemModTypeId = (int)item.ItemModTypeId,
                     RarityId = (int)item.RarityId,
+                    DesignerNotes = item.DesignerNotes,
                     RetiredAt = item.RetiredAt,
                 }),
                 key: item => item.Id,

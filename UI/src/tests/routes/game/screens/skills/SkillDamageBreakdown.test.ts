@@ -24,6 +24,7 @@ const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	damageMultipliers: [],
 	effects: [],
 	description: '',
+	designerNotes: '',
 	cooldownMs: 1000,
 	iconPath: '',
 	rarityId: ERarity.Common,

@@ -30,6 +30,7 @@ const previewMod = (): IItemMod => ({
 	id: 1,
 	name: 'Blazing',
 	description: 'Hot.',
+	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: ERarity.Epic,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 4 }],

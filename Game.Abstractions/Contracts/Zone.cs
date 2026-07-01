@@ -27,6 +27,10 @@ namespace Game.Abstractions.Contracts
         /// current zone (offline rewards keep crediting their last real combat zone). Defaults to false.</summary>
         public bool IsHome { get; set; }
 
+        /// <summary>Authoring-only design rationale (why this piece exists) — surfaced in the Workbench and
+        /// version-controlled via the content export. The battle never reads it and the client never renders it.</summary>
+        public required string DesignerNotes { get; set; }
+
         /// <summary>When set, the record is retired (out of circulation but kept resolvable by id).
         /// Null while active.</summary>
         public DateTime? RetiredAt { get; set; }

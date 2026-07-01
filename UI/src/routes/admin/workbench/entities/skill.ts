@@ -38,6 +38,7 @@ export const skillEntity: EntityConfig<ISkill> = {
 		word: '',
 		pronunciation: '',
 		translation: '',
+		designerNotes: '',
 		// New skills default to player-acquirable; re-flag Item/Enemy skills as needed.
 		acquisition: ESkillAcquisition.Player,
 		description: '',
@@ -96,6 +97,13 @@ export const skillEntity: EntityConfig<ISkill> = {
 					grow: true,
 					required: true,
 					reqMsg: 'No description'
+				},
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this skill exists — authoring notes (never shown to players)…',
+					grow: true
 				}
 			]
 		},

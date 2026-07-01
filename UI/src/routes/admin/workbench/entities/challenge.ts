@@ -29,7 +29,8 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 			description: '',
 			challengeTypeId: EChallengeType.EnemiesKilled,
 			entityType: EEntityType.None,
-			progressGoal: 10
+			progressGoal: 10,
+			designerNotes: ''
 		};
 		// Derive the type's statistic + entity dimension so the condition tab is consistent.
 		deriveFromType(challenge, reference.challengeTypes, EChallengeType.EnemiesKilled);
@@ -68,6 +69,13 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 					grow: true,
 					required: true,
 					reqMsg: 'No description'
+				},
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this challenge exists — authoring notes (never shown to players)…',
+					grow: true
 				}
 			]
 		},

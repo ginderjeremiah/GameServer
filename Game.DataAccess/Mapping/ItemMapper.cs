@@ -75,6 +75,7 @@ namespace Game.DataAccess.Mapping
                 WeaponType = (EDamageType?)entity.WeaponType,
                 RequiredProficiencyId = entity.RequiredProficiencyId,
                 RequiredProficiencyLevel = entity.RequiredProficiencyLevel,
+                DesignerNotes = entity.DesignerNotes,
                 Attributes = entity.ItemAttributes
                     .Select(ia => new Contracts.BattlerAttribute
                     {
@@ -104,6 +105,7 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 ItemModTypeId = (EItemModType)entity.ItemModTypeId,
                 RarityId = (ERarity)entity.RarityId,
+                DesignerNotes = entity.DesignerNotes,
                 Attributes = entity.ItemModAttributes
                     .Select(ima => new Contracts.BattlerAttribute
                     {

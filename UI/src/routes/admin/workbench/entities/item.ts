@@ -45,6 +45,7 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 		weaponType: -1,
 		requiredProficiencyId: -1,
 		requiredProficiencyLevel: 1,
+		designerNotes: '',
 		attributes: [],
 		modSlots: [],
 		tags: []
@@ -126,7 +127,14 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 					width: 240
 				},
 				{ key: 'requiredProficiencyLevel', label: 'Required Level', type: 'number', width: 150 },
-				{ key: 'description', label: 'Description', type: 'textarea', placeholder: 'Flavor text…', grow: true }
+				{ key: 'description', label: 'Description', type: 'textarea', placeholder: 'Flavor text…', grow: true },
+				{
+					key: 'designerNotes',
+					label: 'Designer Notes',
+					type: 'textarea',
+					placeholder: 'Why this item exists — authoring notes (never shown to players)…',
+					grow: true
+				}
 			]
 		},
 		{

@@ -44,6 +44,7 @@ export interface IChallenge {
 	progressGoal: number;
 	rewardItemId?: number;
 	rewardItemModId?: number;
+	designerNotes: string;
 	retiredAt?: string;
 }
 
@@ -60,6 +61,7 @@ export interface IClass {
 	starterSkillIds: number[];
 	starterEquipment: IClassStarterEquipment[];
 	attributeDistributions: IAttributeDistribution[];
+	designerNotes: string;
 	retiredAt?: string;
 }
 
@@ -101,6 +103,7 @@ export interface IEnemy {
 	attributeDistribution: IAttributeDistribution[];
 	skillPool: number[];
 	spawns: IEnemySpawn[];
+	designerNotes: string;
 	retiredAt?: string;
 }
 
@@ -123,6 +126,7 @@ export interface IItem {
 	weaponType?: EDamageType;
 	requiredProficiencyId?: number;
 	requiredProficiencyLevel: number;
+	designerNotes: string;
 	retiredAt?: string;
 }
 
@@ -134,6 +138,7 @@ export interface IItemMod {
 	rarityId: ERarity;
 	attributes: IBattlerAttribute[];
 	tags: number[];
+	designerNotes: string;
 	retiredAt?: string;
 }
 
@@ -148,6 +153,7 @@ export interface IPath {
 	name: string;
 	description: string;
 	activityKey: EActivityKey;
+	designerNotes: string;
 	retiredAt?: string;
 }
 
@@ -164,6 +170,7 @@ export interface IProficiency {
 	maxLevel: number;
 	baseXp: number;
 	xpGrowth: number;
+	designerNotes: string;
 	retiredAt?: string;
 	levelModifiers: IProficiencyLevelModifier[];
 	levelRewards: IProficiencyLevelReward[];
@@ -205,6 +212,7 @@ export interface ISkill {
 	pronunciation: string;
 	translation: string;
 	acquisition: ESkillAcquisition;
+	designerNotes: string;
 	retiredAt?: string;
 }
 
@@ -227,6 +235,7 @@ export interface ISkillEffect {
 export interface ISkillRecipe {
 	id: number;
 	resultSkillId: number;
+	designerNotes: string;
 	retiredAt?: string;
 	inputSkillIds: number[];
 	conditions: ISkillRecipeCondition[];
@@ -259,6 +268,7 @@ export interface IZone {
 	bossLevel: number;
 	unlockChallengeId?: number;
 	isHome: boolean;
+	designerNotes: string;
 	retiredAt?: string;
 }
 
