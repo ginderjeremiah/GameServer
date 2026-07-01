@@ -142,10 +142,11 @@ namespace Game.Core.Tests.Battle.Performance
         // Effects rotate across the core attributes that actually have derived dependents, so a churn
         // invalidation cascades into the attributes read on the hot path: Strength→MaxHealth,
         // Endurance→MaxHealth/Toughness, Agility→CooldownRecovery/DodgeChance,
-        // Dexterity→CooldownRecovery/CriticalChance. A 4-skill loadout therefore churns every derived
-        // attribute read each tick (MaxHealth for the death check, CooldownRecovery for charge, the crit/dodge
-        // chances on each fire). Intellect/Luck are omitted because nothing the hot path reads derives from
-        // them. The buffs are additive and Self-targeted, so they only ever raise those stats — and the skills
+        // Dexterity→CooldownRecovery. A 4-skill loadout therefore churns every derived attribute read each
+        // tick (MaxHealth for the death check, CooldownRecovery for charge, the dodge chance on each fire).
+        // CriticalChance is no longer attribute-derived (opt-in, crit rework #1425), so it never churns here.
+        // Intellect/Luck are omitted because nothing the hot path reads derives from them. The buffs are
+        // additive and Self-targeted, so they only ever raise those stats — and the skills
         // deal no damage regardless, so the combatant stays immortal and the battle runs to the tick cap.
         private static readonly EAttribute[] BuffableCoreAttributes = [Strength, Endurance, Agility, Dexterity];
 

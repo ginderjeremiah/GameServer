@@ -106,7 +106,9 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.CooldownRecovery]
 			},
 
-			// CriticalChance = 0.002*Dexterity + 0.001*Luck (no base)
+			// CriticalChance is opt-in (crit rework #1425): no base and no attribute derivation, so even a heavy
+			// Dexterity/Luck build sits at exactly 0 — DEX/LUK no longer feed crit. Flat crit chance comes from
+			// item/skill enablers only (opt-in-multiplicative math covered in attribute-collection.test.ts).
 			criticalChance: {
 				allocations: [
 					[EAttribute.Dexterity, 20],

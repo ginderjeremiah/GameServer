@@ -85,21 +85,8 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Strength
 			},
-			// CriticalChance = 0.002·DEX + 0.001·LUK
-			{
-				attribute: EAttribute.CriticalChance,
-				amount: 0.002,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Dexterity
-			},
-			{
-				attribute: EAttribute.CriticalChance,
-				amount: 0.001,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Luck
-			},
+			// CriticalChance is opt-in (crit rework #1425): no base, no derivation — sourced from items/skills
+			// only — so it has no static modifier at all (like DamageReflection).
 			// CriticalDamage = base 1.5 + 0.0025·LUK
 			{
 				attribute: EAttribute.CriticalDamage,

@@ -27,9 +27,8 @@ namespace Game.Core.Tests.Attributes
                 (EAttribute.MaxHealth, 50.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.MaxHealth, 20.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
                 (EAttribute.MaxHealth, 5.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Strength),
-                // CriticalChance = 0.002·Dexterity + 0.001·Luck
-                (EAttribute.CriticalChance, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Dexterity),
-                (EAttribute.CriticalChance, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
+                // CriticalChance is opt-in (crit rework #1425): no base, no derivation — sourced from items/skills
+                // only — so it has no static modifier at all (like DamageReflection).
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
