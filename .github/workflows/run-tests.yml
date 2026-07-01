@@ -55,7 +55,8 @@ jobs:
             - 'docker-compose.yml'
             - 'docker-compose.local.yml'
             - 'Game.Api/Dockerfile'
-            - 'e2e-seed.sql'
+            - 'content/**'
+            - 'e2e-admin-provision.sql'
             - '.dockerignore'
             - '.github/workflows/**'
             - 'UI/src/lib/api/types/**'
@@ -272,20 +273,16 @@ jobs:
       # runners, so the plain compose build is both simpler and faster here.)
       run: docker compose up -d --build
 
-    - name: Seed static reference data and load the API caches
-      # The API's migrations only seed the intrinsic enum-backed reference data; the static content
-      # (Skills, Enemies, Zones, …) is normally authored through the admin tools and is absent from a
-      # freshly-migrated database. Without at least the starter skills, the first account signup fails
-      # (FK_PlayerSkills_Skills_SkillId) and the whole suite can't log in.
-      #
-      # The API eagerly loads its in-memory reference-data caches at startup (#357), so the seed —
-      # which lands after that first boot — would otherwise be invisible to the cached reads. Restart
-      # the API after seeding so it reloads the caches from the now-seeded database. (In production
-      # this content exists before the app starts, or is authored through the admin tools, which
-      # invalidate the caches; the e2e stack is the only place it is injected directly post-boot.)
+    - name: Apply the e2e admin-role fixture
+      # The API seeds the static content (Skills, Enemies, Zones, …) itself on startup from the
+      # source-controlled export (DataAccessOptions__SeedContentOnStartup in docker-compose.yml), before
+      # it loads its reference-data caches — so the stack is fully playable on first boot with no post-boot
+      # content seed or API restart. The only thing left to apply is the e2e-only admin-role fixture (a
+      # trigger that grants the Admin role to 'e2eadmin…' accounts); it is test-harness infrastructure, not
+      # content, and only affects users created afterwards, so no restart is needed.
       run: |
-        # Any HTTP response (even 401) means the server is up and has finished its startup migration
-        # and reference-cache load, both of which run before Kestrel begins listening.
+        # Any HTTP response (even 401) means the server is up and has finished its startup migration,
+        # content seed and reference-cache load, all of which run before Kestrel begins listening.
         # `|| true` keeps `bash -e` from aborting on curl's non-zero exit while it's still starting.
         wait_for_api() {
           for i in $(seq 1 90); do
@@ -303,9 +300,7 @@ jobs:
 
         wait_for_api
         # Runs inside the Postgres container so it needs no client tooling on the runner; idempotent.
-        docker compose exec -T postgres psql -U game -d game -p 5544 -v ON_ERROR_STOP=1 -f - < e2e-seed.sql
-        docker compose restart api
-        wait_for_api
+        docker compose exec -T postgres psql -U game -d game -p 5544 -v ON_ERROR_STOP=1 -f - < e2e-admin-provision.sql
 
     - name: Set up Node
       uses: actions/setup-node@v6

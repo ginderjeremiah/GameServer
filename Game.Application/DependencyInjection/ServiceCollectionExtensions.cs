@@ -1,4 +1,5 @@
 ﻿using Game.Abstractions.Auth;
+using Game.Abstractions.Content;
 using Game.Application.Auth;
 using Game.Application.Content;
 using Game.Application.Events;
@@ -40,6 +41,8 @@ namespace Game.Application.DependencyInjection
                 .AddScoped<SynthesisService>()
                 // Reads the reference caches (scoped repos) to mirror the static content graph to JSON.
                 .AddScoped<IContentExporter, ContentExporter>()
+                // Reads the source-controlled content export back in for the seeder; stateless.
+                .AddSingleton<IContentImportReader, ContentImportReader>()
                 // Pure whole-graph reachability lint over the content contracts; no state, so shared.
                 .AddSingleton<IProgressionGraphChecker, ProgressionGraphChecker>();
         }

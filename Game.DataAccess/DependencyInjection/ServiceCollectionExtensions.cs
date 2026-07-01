@@ -1,6 +1,8 @@
-﻿using Game.Abstractions.DataAccess;
+﻿using Game.Abstractions.Content;
+using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Application;
+using Game.DataAccess.Content;
 using Game.Core.Events;
 using Game.Core.Players.Events;
 using Game.DataAccess.PlayerUpdates;
@@ -51,6 +53,8 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<PlayerUpdateBatch>()
                 // Entity store (admin tools)
                 .AddScoped<IEntityStore, EntityStore>()
+                // Bulk content seeder: reconstructs the static content graph on a fresh DB from the export.
+                .AddScoped<IContentSeeder, ContentSeeder>()
                 // UnitOfWork (stats/challenges persistence)
                 .AddScoped<IUnitOfWork, UnitOfWork>()
                 // Player progress repo (UnitOfWork saves; also serves read-only API queries)

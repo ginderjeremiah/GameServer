@@ -119,8 +119,8 @@ End-to-end tests (Playwright) — requires the backend stack running via Docker 
 
 ```sh
 docker compose -f docker-compose.local.yml up -d --build
-# apply the e2e seed data once the API is ready:
-docker compose -f docker-compose.local.yml exec -T postgres psql -U game -d game -f - < e2e-seed.sql
+# the API seeds the static content on boot; apply the e2e admin-role fixture once it's ready:
+docker compose -f docker-compose.local.yml exec -T postgres psql -U game -d game -f - < e2e-admin-provision.sql
 cd UI
 npm run test:e2e
 ```
@@ -129,8 +129,8 @@ npm run test:e2e
 
 ```sh
 docker compose up -d --build
-# apply the e2e seed data once the API is ready:
-docker compose exec -T postgres psql -U game -d game -p 5544 -f - < e2e-seed.sql
+# the API seeds the static content on boot; apply the e2e admin-role fixture once it's ready:
+docker compose exec -T postgres psql -U game -d game -p 5544 -f - < e2e-admin-provision.sql
 cd UI
 npm run test:e2e
 ```
@@ -183,7 +183,8 @@ GameServer/
 │   └── spikes/               # Research spikes for large scale efforts
 ├── docker-compose.local.yml  # Local dev stack (Docker Desktop, bridge networking)
 ├── docker-compose.yml        # CI / constrained-environment stack (host networking)
-├── e2e-seed.sql              # Minimal seed data for Playwright runs
+├── content/                  # Source-controlled static content export (seeded on startup)
+├── e2e-admin-provision.sql   # e2e-only admin-role fixture for Playwright runs
 └── Game.sln                  # .NET solution file
 ```
 

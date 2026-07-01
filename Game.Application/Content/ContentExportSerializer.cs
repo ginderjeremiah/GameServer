@@ -46,10 +46,14 @@ namespace Game.Application.Content
         }
 
         /// <summary>Deserializes an exported set back into its read contracts, through the same canonical options
-        /// (enum names, UTC ISO-8601 instants) the export was written with. The inverse of <see cref="Serialize"/>,
-        /// used by the progression-graph lint (#1420) to load the committed <c>content/*.json</c> snapshot.</summary>
+        /// (enum names, UTC ISO-8601 instants) the export was written with — the inverse of <see cref="Serialize"/>.
+        /// Used by the progression-graph lint (#1420) to load the committed <c>content/*.json</c> snapshot and by
+        /// the content seeder (#1419) to reconstruct a fresh database from it.</summary>
         public static IReadOnlyList<T> Deserialize<T>(string json)
-            => JsonSerializer.Deserialize<List<T>>(json, _options) ?? [];
+        {
+            return JsonSerializer.Deserialize<List<T>>(json, _options)
+                ?? throw new InvalidOperationException($"Content export for '{typeof(T).Name}' deserialized to null.");
+        }
 
         // --- Per-set canonical ordering -------------------------------------------------------------------
         // Top-level lists are ordered by id (== cache index); child collections get a declared, total order so

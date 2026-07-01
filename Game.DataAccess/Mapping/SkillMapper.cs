@@ -3,6 +3,9 @@ using Game.Core.Attributes;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
+using EntitySkillDamagePortion = Game.Infrastructure.Entities.SkillDamagePortion;
+using EntitySkillDamageMultiplier = Game.Infrastructure.Entities.SkillDamageMultiplier;
+using EntitySkillEffect = Game.Infrastructure.Entities.SkillEffect;
 using CoreSkillEffect = Game.Core.Skills.SkillEffect;
 
 namespace Game.DataAccess.Mapping
@@ -52,6 +55,57 @@ namespace Game.DataAccess.Mapping
                         ScalingAmount = se.ScalingAmount,
                     }).ToList(),
                 RetiredAt = entity.RetiredAt,
+            };
+        }
+
+        /// <summary>Maps a reference-data read <see cref="Contracts.Skill"/> back to its entity graph (with its
+        /// damage portions, damage multipliers and effects), for the content seeder that reconstructs the static
+        /// content from the source-controlled export. The child rows carry the parent id explicitly so the
+        /// bulk seeder can insert them without change-tracking fixups.</summary>
+        public static EntitySkill ToEntity(Contracts.Skill contract)
+        {
+            return new EntitySkill
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                BaseDamage = contract.BaseDamage,
+                Description = contract.Description,
+                CooldownMs = contract.CooldownMs,
+                IconPath = contract.IconPath,
+                RarityId = (int)contract.RarityId,
+                Word = contract.Word,
+                Pronunciation = contract.Pronunciation,
+                Translation = contract.Translation,
+                Acquisition = (int)contract.Acquisition,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+                SkillDamagePortions = contract.DamagePortions
+                    .Select(p => new EntitySkillDamagePortion
+                    {
+                        SkillId = contract.Id,
+                        DamageType = (int)p.Type,
+                        Weight = p.Weight,
+                    }).ToList(),
+                SkillDamageMultipliers = contract.DamageMultipliers
+                    .Select(m => new EntitySkillDamageMultiplier
+                    {
+                        SkillId = contract.Id,
+                        AttributeId = (int)m.AttributeId,
+                        Multiplier = m.Multiplier,
+                    }).ToList(),
+                SkillEffects = contract.Effects
+                    .Select(e => new EntitySkillEffect
+                    {
+                        Id = e.Id,
+                        SkillId = contract.Id,
+                        Target = (int)e.Target,
+                        AttributeId = (int)e.AttributeId,
+                        ModifierType = (int)e.ModifierTypeId,
+                        Amount = e.Amount,
+                        DurationMs = e.DurationMs,
+                        ScalingAttributeId = (int)e.ScalingAttributeId,
+                        ScalingAmount = e.ScalingAmount,
+                    }).ToList(),
             };
         }
 

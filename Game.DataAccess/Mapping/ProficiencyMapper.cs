@@ -2,6 +2,9 @@ using Game.Core;
 using Game.Core.Proficiencies;
 using Contracts = Game.Abstractions.Contracts;
 using EntityProficiency = Game.Infrastructure.Entities.Proficiency;
+using EntityProficiencyLevelModifier = Game.Infrastructure.Entities.ProficiencyLevelModifier;
+using EntityProficiencyLevelReward = Game.Infrastructure.Entities.ProficiencyLevelReward;
+using EntityProficiencyPrerequisite = Game.Infrastructure.Entities.ProficiencyPrerequisite;
 using CoreProficiency = Game.Core.Proficiencies.Proficiency;
 
 namespace Game.DataAccess.Mapping
@@ -44,6 +47,51 @@ namespace Game.DataAccess.Mapping
                     }).ToList(),
                 PrerequisiteIds = entity.Prerequisites
                     .Select(p => p.PrerequisiteProficiencyId).ToList(),
+            };
+        }
+
+        /// <summary>Maps a read/authoring <see cref="Contracts.Proficiency"/> back to its entity graph (level
+        /// modifiers, level rewards, and cross-path prerequisite edges) for the content seeder.</summary>
+        public static EntityProficiency ToEntity(Contracts.Proficiency contract)
+        {
+            return new EntityProficiency
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                Description = contract.Description,
+                IconPath = contract.IconPath,
+                Word = contract.Word,
+                Pronunciation = contract.Pronunciation,
+                Translation = contract.Translation,
+                PathId = contract.PathId,
+                PathOrdinal = contract.PathOrdinal,
+                MaxLevel = contract.MaxLevel,
+                BaseXp = contract.BaseXp,
+                XpGrowth = contract.XpGrowth,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+                LevelModifiers = contract.LevelModifiers
+                    .Select(m => new EntityProficiencyLevelModifier
+                    {
+                        ProficiencyId = contract.Id,
+                        Level = m.Level,
+                        AttributeId = (int)m.AttributeId,
+                        ModifierType = (int)m.ModifierTypeId,
+                        Amount = m.Amount,
+                    }).ToList(),
+                LevelRewards = contract.LevelRewards
+                    .Select(r => new EntityProficiencyLevelReward
+                    {
+                        ProficiencyId = contract.Id,
+                        Level = r.Level,
+                        RewardSkillId = r.RewardSkillId,
+                    }).ToList(),
+                Prerequisites = contract.PrerequisiteIds
+                    .Select(prerequisiteId => new EntityProficiencyPrerequisite
+                    {
+                        ProficiencyId = contract.Id,
+                        PrerequisiteProficiencyId = prerequisiteId,
+                    }).ToList(),
             };
         }
 

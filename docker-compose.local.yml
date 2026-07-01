@@ -9,8 +9,8 @@
 #
 # Usage:
 #   docker compose -f docker-compose.local.yml up -d --build
-#   # After the API is up, apply the reference data seed:
-#   docker compose -f docker-compose.local.yml exec -T postgres psql -U game -d game -f - < e2e-seed.sql
+#   # The API seeds the static content from the source-controlled export on first boot
+#   # (DataAccessOptions__SeedContentOnStartup below), so no manual seed step is needed.
 #
 # Networking: services communicate over a Docker bridge network using Docker's built-in DNS
 # (service names as hostnames). Container ports are also published to localhost so the SvelteKit
@@ -19,7 +19,7 @@
 #   - Redis:      localhost:${REDIS_PORT:-6379}
 #   - API:        localhost:${API_PORT:-5008}  (the target the Vite dev-server proxy uses)
 #
-# Seeding: see docker-compose.yml for an explanation of the seeding requirement and e2e-seed.sql.
+# Seeding: see docker-compose.yml for an explanation of the startup content seeding.
 #
 # Secrets: HashPepper and Jwt__SigningKey use placeholder values suitable for local development
 # only. Replace them with your own values if running the stack in a shared environment.
@@ -73,8 +73,10 @@ services:
       DataAccessOptions__DatabaseSystem: "1"
       DataAccessOptions__CacheSystem: "0"
       DataAccessOptions__PubSubSystem: "0"
-      # Apply EF migrations (which carry the seed reference data) on startup outside Development.
+      # Apply EF migrations (intrinsic reference data) on startup outside Development, then seed the
+      # static content from the source-controlled export so the stack is playable on first boot.
       DataAccessOptions__MigrateOnStartup: "true"
+      DataAccessOptions__SeedContentOnStartup: "true"
       # Use Docker service names for inter-container communication (bridge networking).
       DataAccessOptions__DbConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-game};Username=${POSTGRES_USER:-game};Password=${POSTGRES_PASSWORD:-game}"
       DataAccessOptions__CacheConnectionString: "redis:6379"

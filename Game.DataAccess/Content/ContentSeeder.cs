@@ -1,0 +1,128 @@
+using Game.Abstractions.Content;
+using Game.DataAccess.Mapping;
+using Game.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
+using EntityItemTag = Game.Infrastructure.Entities.ItemTag;
+using EntityItemModTag = Game.Infrastructure.Entities.ItemModTag;
+using EntitySkill = Game.Infrastructure.Entities.Skill;
+using EntitySkillEffect = Game.Infrastructure.Entities.SkillEffect;
+using EntityItem = Game.Infrastructure.Entities.Item;
+using EntityItemModSlot = Game.Infrastructure.Entities.ItemModSlot;
+using EntityItemMod = Game.Infrastructure.Entities.ItemMod;
+using EntityEnemy = Game.Infrastructure.Entities.Enemy;
+using EntityChallenge = Game.Infrastructure.Entities.Challenge;
+using EntityZone = Game.Infrastructure.Entities.Zone;
+using EntityClass = Game.Infrastructure.Entities.Class;
+using EntityPath = Game.Infrastructure.Entities.Path;
+using EntityProficiency = Game.Infrastructure.Entities.Proficiency;
+using EntitySkillRecipe = Game.Infrastructure.Entities.SkillRecipe;
+
+namespace Game.DataAccess.Content
+{
+    /// <inheritdoc cref="IContentSeeder"/>
+    internal sealed class ContentSeeder : IContentSeeder
+    {
+        private readonly GameContext _context;
+
+        public ContentSeeder(GameContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<bool> SeedAsync(ContentImport content, CancellationToken cancellationToken = default)
+        {
+            // Skills are the foundational set (the punch fallback, class kit, enemy/proficiency skills all
+            // reference them), so their presence marks an already-populated database. Fresh DB only: never
+            // overwrite an authored dev database or double-seed.
+            if (await _context.Set<EntitySkill>().AnyAsync(cancellationToken))
+            {
+                return false;
+            }
+
+            // Map every set to its entity graph up front; the parents carry their child rows so each set is
+            // inserted then flattened, and the enemy graph carries its spawn-table joins for a later step.
+            var skills = content.Skills.Select(SkillMapper.ToEntity).ToList();
+            var itemMods = content.ItemMods.Select(ItemMapper.ModToEntity).ToList();
+            var items = content.Items.Select(ItemMapper.ToEntity).ToList();
+            var enemies = content.Enemies.Select(EnemyMapper.ToEntity).ToList();
+            var challenges = content.Challenges.Select(ChallengeMapper.ToEntity).ToList();
+            var zones = content.Zones.Select(ZoneMapper.ToEntity).ToList();
+            var classes = content.Classes.Select(ClassMapper.ToEntity).ToList();
+            var paths = content.Paths.Select(PathMapper.ToEntity).ToList();
+            var proficiencies = content.Proficiencies.Select(ProficiencyMapper.ToEntity).ToList();
+            var recipes = content.SkillRecipes.Select(SkillRecipeMapper.ToEntity).ToList();
+
+            // Tag assignments are join rows over the (pre-existing) Tag catalogue rather than child entities of
+            // the item/mod graph, so they are built straight from the contracts here.
+            var itemTags = content.Items
+                .SelectMany(item => item.Tags.Select(tagId => new EntityItemTag { ItemId = item.Id, TagId = tagId }))
+                .ToList();
+            var itemModTags = content.ItemMods
+                .SelectMany(mod => mod.Tags.Select(tagId => new EntityItemModTag { ItemModId = mod.Id, TagId = tagId }))
+                .ToList();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+            // Insert referenced sets before referencing ones, and parents before their children. Paths and
+            // skills have no static-content dependencies; proficiencies reward skills; items gate on
+            // proficiencies and grant skills; challenges reward items/mods; zones point at boss enemies and
+            // unlock challenges; the enemy spawn table needs both zones and enemies; classes reference skills
+            // and items; recipes reference skills and proficiencies.
+            await Insert(paths);
+
+            await Insert(skills);
+            await Insert(skills.SelectMany(s => s.SkillDamagePortions).ToList());
+            await Insert(skills.SelectMany(s => s.SkillDamageMultipliers).ToList());
+            await Insert(skills.SelectMany(s => s.SkillEffects).ToList());
+
+            await Insert(proficiencies);
+            await Insert(proficiencies.SelectMany(p => p.LevelModifiers).ToList());
+            await Insert(proficiencies.SelectMany(p => p.LevelRewards).ToList());
+            await Insert(proficiencies.SelectMany(p => p.Prerequisites).ToList());
+
+            await Insert(itemMods);
+            await Insert(itemMods.SelectMany(m => m.ItemModAttributes).ToList());
+            await Insert(itemModTags);
+
+            await Insert(items);
+            await Insert(items.SelectMany(i => i.ItemAttributes).ToList());
+            await Insert(items.SelectMany(i => i.ItemModSlots).ToList());
+            await Insert(itemTags);
+
+            await Insert(enemies);
+            await Insert(enemies.SelectMany(e => e.AttributeDistributions).ToList());
+            await Insert(enemies.SelectMany(e => e.EnemySkills).ToList());
+
+            await Insert(challenges);
+
+            await Insert(zones);
+
+            // Spawn-table joins reference both a zone and an enemy, so they land after both sets exist.
+            await Insert(enemies.SelectMany(e => e.ZoneEnemies).ToList());
+
+            await Insert(classes);
+            await Insert(classes.SelectMany(c => c.StarterSkills).ToList());
+            await Insert(classes.SelectMany(c => c.StarterEquipment).ToList());
+            await Insert(classes.SelectMany(c => c.AttributeDistributions).ToList());
+
+            await Insert(recipes);
+            await Insert(recipes.SelectMany(r => r.Inputs).ToList());
+            await Insert(recipes.SelectMany(r => r.Conditions).ToList());
+
+            // Advance every seeded identity table's sequence past its highest explicit id.
+            await EntityRowInserter.AdvanceIdentitySequencesAsync(
+                _context,
+                [
+                    typeof(EntityPath), typeof(EntitySkill), typeof(EntitySkillEffect), typeof(EntityProficiency),
+                    typeof(EntityItemMod), typeof(EntityItem), typeof(EntityItemModSlot), typeof(EntityEnemy),
+                    typeof(EntityChallenge), typeof(EntityZone), typeof(EntityClass), typeof(EntitySkillRecipe),
+                ],
+                cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+
+            Task Insert<T>(IReadOnlyList<T> rows) => EntityRowInserter.InsertAsync(_context, rows, cancellationToken);
+        }
+    }
+}

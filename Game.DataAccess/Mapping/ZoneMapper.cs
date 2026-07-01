@@ -27,6 +27,28 @@ namespace Game.DataAccess.Mapping
             };
         }
 
+        /// <summary>Maps a reference-data read <see cref="Contracts.Zone"/> back to its entity for the content
+        /// seeder. The random spawn table (<c>ZoneEnemy</c>) is carried on the enemy side of the graph, so a
+        /// zone has no child rows here.</summary>
+        public static EntityZone ToEntity(Contracts.Zone contract)
+        {
+            return new EntityZone
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                Description = contract.Description,
+                Order = contract.Order,
+                LevelMin = contract.LevelMin,
+                LevelMax = contract.LevelMax,
+                BossEnemyId = contract.BossEnemyId,
+                BossLevel = contract.BossLevel,
+                UnlockChallengeId = contract.UnlockChallengeId,
+                IsHome = contract.IsHome,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+            };
+        }
+
         /// <summary>Maps an entity <see cref="EntityZone"/> to the lean gameplay <see cref="CoreZone"/>
         /// domain model used for battle setup. Display-only fields (name, description, order) stay on the
         /// read contract; the domain model carries only what the encounter rules need.</summary>

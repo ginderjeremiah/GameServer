@@ -19,5 +19,20 @@ namespace Game.DataAccess.Mapping
                 RetiredAt = entity.RetiredAt,
             };
         }
+
+        /// <summary>Maps a read/authoring <see cref="Contracts.Path"/> back to its entity for the content
+        /// seeder. Its tiers (proficiencies) carry the path id and are seeded from their own set.</summary>
+        public static EntityPath ToEntity(Contracts.Path contract)
+        {
+            return new EntityPath
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                Description = contract.Description,
+                ActivityKey = (int)contract.ActivityKey,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+            };
+        }
     }
 }

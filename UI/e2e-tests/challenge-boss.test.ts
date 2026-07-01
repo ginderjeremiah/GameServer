@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { createAccountAndStartGame } from './helpers';
 
-// The dedicated zone boss seeded into the starter zone (Verdant Hollow) by `e2e-seed.sql`. It is
-// tuned to be deterministically beatable by a brand-new player, so this flow always resolves in a
-// victory. Mirror the name authored there.
+// The dedicated zone boss in the starter zone (Verdant Hollow), seeded on startup from the
+// source-controlled content export (content/enemies.json). It is tuned to be deterministically
+// beatable by a brand-new player, so this flow always resolves in a victory. Mirror the name authored there.
 const BOSS_NAME = 'Direboar Alpha';
 
 test.describe('Challenge Boss', () => {

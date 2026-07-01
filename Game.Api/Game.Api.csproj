@@ -37,6 +37,15 @@
     </Content>
   </ItemGroup>
 
+  <!-- Ship the source-controlled content export next to the app so the startup content seeder resolves it
+       from AppContext.BaseDirectory/content in both a local run and the published/containerized app. -->
+  <ItemGroup>
+    <Content Include="..\content\*.json" Link="content\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Game.Abstractions\Game.Abstractions.csproj" />
     <ProjectReference Include="..\Game.Core\Game.Core.csproj" />

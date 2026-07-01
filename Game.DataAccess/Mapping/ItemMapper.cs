@@ -4,6 +4,9 @@ using Game.Core.Items;
 using Contracts = Game.Abstractions.Contracts;
 using EntityItem = Game.Infrastructure.Entities.Item;
 using EntityItemMod = Game.Infrastructure.Entities.ItemMod;
+using EntityItemAttribute = Game.Infrastructure.Entities.ItemAttribute;
+using EntityItemModSlot = Game.Infrastructure.Entities.ItemModSlot;
+using EntityItemModAttribute = Game.Infrastructure.Entities.ItemModAttribute;
 
 namespace Game.DataAccess.Mapping
 {
@@ -55,6 +58,65 @@ namespace Game.DataAccess.Mapping
                         Amount = (double)ima.Amount,
                         Type = EModifierType.Additive,
                         Source = EAttributeModifierSource.ItemMod,
+                    }).ToList(),
+            };
+        }
+
+        /// <summary>Maps a reference-data read <see cref="Contracts.Item"/> back to its entity graph (attributes
+        /// and mod slots) for the content seeder. Tag assignments are join rows the seeder builds separately
+        /// (the entity's <c>Tags</c> is a skip navigation over <c>Tag</c> entities, not the join table).</summary>
+        public static EntityItem ToEntity(Contracts.Item contract)
+        {
+            return new EntityItem
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                Description = contract.Description,
+                ItemCategoryId = (int)contract.ItemCategoryId,
+                IconPath = contract.IconPath,
+                RarityId = (int)contract.RarityId,
+                GrantedSkillId = contract.GrantedSkillId,
+                WeaponType = (int?)contract.WeaponType,
+                RequiredProficiencyId = contract.RequiredProficiencyId,
+                RequiredProficiencyLevel = contract.RequiredProficiencyLevel,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+                ItemAttributes = contract.Attributes
+                    .Select(a => new EntityItemAttribute
+                    {
+                        ItemId = contract.Id,
+                        AttributeId = (int)a.AttributeId,
+                        Amount = a.Amount,
+                    }).ToList(),
+                ItemModSlots = contract.ModSlots
+                    .Select(s => new EntityItemModSlot
+                    {
+                        Id = s.Id,
+                        ItemId = contract.Id,
+                        ItemModSlotTypeId = (int)s.ItemModSlotTypeId,
+                    }).ToList(),
+            };
+        }
+
+        /// <summary>Maps a reference-data read <see cref="Contracts.ItemMod"/> back to its entity graph
+        /// (attributes) for the content seeder. Tag assignments are join rows the seeder builds separately.</summary>
+        public static EntityItemMod ModToEntity(Contracts.ItemMod contract)
+        {
+            return new EntityItemMod
+            {
+                Id = contract.Id,
+                Name = contract.Name,
+                Description = contract.Description,
+                ItemModTypeId = (int)contract.ItemModTypeId,
+                RarityId = (int)contract.RarityId,
+                DesignerNotes = contract.DesignerNotes,
+                RetiredAt = contract.RetiredAt,
+                ItemModAttributes = contract.Attributes
+                    .Select(a => new EntityItemModAttribute
+                    {
+                        ItemModId = contract.Id,
+                        AttributeId = (int)a.AttributeId,
+                        Amount = a.Amount,
                     }).ToList(),
             };
         }
