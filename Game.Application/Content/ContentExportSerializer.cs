@@ -45,6 +45,12 @@ namespace Game.Application.Content
             return json + "\n";
         }
 
+        /// <summary>Deserializes an exported set back into its read contracts, through the same canonical options
+        /// (enum names, UTC ISO-8601 instants) the export was written with. The inverse of <see cref="Serialize"/>,
+        /// used by the progression-graph lint (#1420) to load the committed <c>content/*.json</c> snapshot.</summary>
+        public static IReadOnlyList<T> Deserialize<T>(string json)
+            => JsonSerializer.Deserialize<List<T>>(json, _options) ?? [];
+
         // --- Per-set canonical ordering -------------------------------------------------------------------
         // Top-level lists are ordered by id (== cache index); child collections get a declared, total order so
         // the bytes are stable regardless of the order the cache happened to materialize them in. The contracts

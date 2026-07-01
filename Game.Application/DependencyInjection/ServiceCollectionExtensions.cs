@@ -39,7 +39,9 @@ namespace Game.Application.DependencyInjection
                 .AddScoped<PlayerService>()
                 .AddScoped<SynthesisService>()
                 // Reads the reference caches (scoped repos) to mirror the static content graph to JSON.
-                .AddScoped<IContentExporter, ContentExporter>();
+                .AddScoped<IContentExporter, ContentExporter>()
+                // Pure whole-graph reachability lint over the content contracts; no state, so shared.
+                .AddSingleton<IProgressionGraphChecker, ProgressionGraphChecker>();
         }
 
         public static void RegisterDomainEventHandlers()
