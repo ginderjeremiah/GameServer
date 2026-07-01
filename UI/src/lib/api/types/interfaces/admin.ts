@@ -3,6 +3,7 @@
 
 import type {
 	EChangeType,
+	EContentHealthSeverity,
 	EDeadLetterReason,
 	IAttributeDistribution,
 	IBattlerAttribute,
@@ -24,6 +25,20 @@ export interface IAddEditAttributesData {
 export interface IChange<T> {
 	item: T;
 	changeType: EChangeType;
+}
+
+export interface IContentHealthFinding {
+	severity: EContentHealthSeverity;
+	check: string;
+	entityKind: string;
+	entityId: number;
+	message: string;
+}
+
+export interface IContentHealthReport {
+	errorCount: number;
+	warningCount: number;
+	findings: IContentHealthFinding[];
 }
 
 export interface IDeadLetterEntry {

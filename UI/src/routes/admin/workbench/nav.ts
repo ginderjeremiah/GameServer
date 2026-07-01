@@ -13,9 +13,10 @@ export interface AdminToolDef {
 	glyph: AdminGlyphKind;
 }
 
-/** Nav key for the operations group and its dead-letter ops tool (not an entity Workbench surface). */
+/** Nav keys for the operations group and its ops tools (not entity Workbench surfaces). */
 export const OPS_GROUP_KEY = 'ops';
 export const DEAD_LETTERS_TOOL_KEY = 'dead-letters';
+export const CONTENT_HEALTH_TOOL_KEY = 'content-health';
 
 /**
  * Nav key for the bespoke Paths/Proficiencies progression editor. Like the Ops tools it renders its
@@ -51,7 +52,8 @@ const progressionToolDefs: AdminToolDef[] = [
  */
 const opsGroupDefs: AdminGroupDef[] = [{ key: OPS_GROUP_KEY, label: 'Ops' }];
 const opsToolDefs: AdminToolDef[] = [
-	{ key: DEAD_LETTERS_TOOL_KEY, label: 'Dead Letters', group: OPS_GROUP_KEY, glyph: 'inbox' }
+	{ key: DEAD_LETTERS_TOOL_KEY, label: 'Dead Letters', group: OPS_GROUP_KEY, glyph: 'inbox' },
+	{ key: CONTENT_HEALTH_TOOL_KEY, label: 'Content Health', group: OPS_GROUP_KEY, glyph: 'map' }
 ];
 
 export const adminGroups: AdminGroupDef[] = [...workbenchGroupDefs, ...opsGroupDefs];
