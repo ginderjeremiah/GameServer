@@ -108,10 +108,8 @@ const nameSources = $derived<EntityNameSources>({
 	challenges: staticData.challenges,
 	enemies: staticData.enemies,
 	items: staticData.items,
-	itemMods: staticData.itemMods,
 	skills: staticData.skills,
-	proficiencies: staticData.proficiencies,
-	paths: staticData.paths
+	proficiencies: staticData.proficiencies
 });
 
 onMount(() => {

@@ -22,13 +22,15 @@ export interface EntityNameSources {
 	challenges?: { name: string }[];
 	enemies?: { name: string }[];
 	items?: { name: string }[];
-	itemMods?: { name: string }[];
 	skills?: { name: string }[];
 	proficiencies?: { name: string }[];
-	paths?: { name: string }[];
 }
 
-/** Maps a finding's {@link IContentHealthFinding.entityKind} to the reference set that names it. */
+/**
+ * Maps a finding's {@link IContentHealthFinding.entityKind} to the reference set that names it. Covers the
+ * kinds the checker both emits and the admin caches hold; the other two kinds it emits (Class / SkillRecipe)
+ * aren't in the admin reference cache, so they fall through to the `#id` fallback in {@link entityDisplayName}.
+ */
 const sourceForKind = (kind: string, sources: EntityNameSources): { name: string }[] | undefined => {
 	switch (kind) {
 		case 'Zone':
@@ -39,14 +41,10 @@ const sourceForKind = (kind: string, sources: EntityNameSources): { name: string
 			return sources.enemies;
 		case 'Item':
 			return sources.items;
-		case 'ItemMod':
-			return sources.itemMods;
 		case 'Skill':
 			return sources.skills;
 		case 'Proficiency':
 			return sources.proficiencies;
-		case 'Path':
-			return sources.paths;
 		default:
 			return undefined;
 	}
