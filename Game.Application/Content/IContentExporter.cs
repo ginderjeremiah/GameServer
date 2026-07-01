@@ -11,8 +11,9 @@ namespace Game.Application.Content
         /// <summary>
         /// Exports every static reference set, in a stable file order, as canonical JSON. Reads the in-memory
         /// reference caches (the same published projection the client and Workbench receive), so callers must
-        /// ensure the caches reflect the intended database state first.
+        /// ensure the caches reflect the intended database state first. Async because tags are read straight
+        /// from the database (they are not held in an in-memory reference cache).
         /// </summary>
-        IReadOnlyList<ContentExportFile> ExportAll();
+        Task<IReadOnlyList<ContentExportFile>> ExportAllAsync(CancellationToken cancellationToken = default);
     }
 }

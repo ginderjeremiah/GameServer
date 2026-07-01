@@ -36,7 +36,7 @@ namespace Game.Application.Tests.Content
 
             using var scope = CreateScope();
             var exporter = scope.ServiceProvider.GetRequiredService<IContentExporter>();
-            var files = exporter.ExportAll();
+            var files = await exporter.ExportAllAsync(CancellationToken);
 
             var contentDirectory = RepoPaths.ContentDirectory();
             var regenerate = Environment.GetEnvironmentVariable("CONTENT_EXPORT_REGEN") == "1";

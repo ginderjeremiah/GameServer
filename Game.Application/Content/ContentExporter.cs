@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Application.Content
 {
@@ -6,6 +7,7 @@ namespace Game.Application.Content
     internal sealed class ContentExporter : IContentExporter
     {
         private readonly ISkills _skills;
+        private readonly ITags _tags;
         private readonly IItems _items;
         private readonly IItemMods _itemMods;
         private readonly IEnemies _enemies;
@@ -17,6 +19,7 @@ namespace Game.Application.Content
 
         public ContentExporter(
             ISkills skills,
+            ITags tags,
             IItems items,
             IItemMods itemMods,
             IEnemies enemies,
@@ -27,6 +30,7 @@ namespace Game.Application.Content
             ISkillRecipes skillRecipes)
         {
             _skills = skills;
+            _tags = tags;
             _items = items;
             _itemMods = itemMods;
             _enemies = enemies;
@@ -37,13 +41,23 @@ namespace Game.Application.Content
             _skillRecipes = skillRecipes;
         }
 
-        public IReadOnlyList<ContentExportFile> ExportAll()
+        public async Task<IReadOnlyList<ContentExportFile>> ExportAllAsync(CancellationToken cancellationToken = default)
         {
-            // One file per static set, in dependency-ish order (referenced sets first). Path and Proficiency
-            // are distinct reference sets with their own ids, so each gets its own file.
+            // Tags are the one set not held in an in-memory reference cache, so materialize them from the
+            // database read stream before assembling the (otherwise synchronous) export.
+            var tags = new List<Contracts.Tag>();
+            await foreach (var tag in _tags.All().WithCancellation(cancellationToken))
+            {
+                tags.Add(tag);
+            }
+
+            // One file per static set, in dependency-ish order (referenced sets first). Tags are referenced by
+            // items/mods, so they precede them. Path and Proficiency are distinct reference sets with their own
+            // ids, so each gets its own file.
             return
             [
                 File("skills.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_skills.AllSkills()))),
+                File("tags.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(tags))),
                 File("item-mods.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_itemMods.All()))),
                 File("items.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_items.All()))),
                 File("enemies.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_enemies.All()))),
