@@ -166,10 +166,12 @@ namespace Game.Core.Battle
             // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
             // K·attackerLevel keeps the band stable across content scaling. The curve is floored at Toughness = 0
             // (a debuff can strip mitigation to 0%, never past its pole at -K·attackerLevel into amplification or a
-            // net heal — #1461). Both simulators must compute this expression identically for battle parity.
-            var toughness = Math.Max(_attributes[Toughness], 0);
+            // net heal — #1461) — floored on whichever Toughness value the caller passed in, so the Sunder
+            // counterfactual's baseline (pre-debuff) Toughness is floored identically to the live value. Both
+            // simulators must compute this expression identically for battle parity.
+            var flooredToughness = Math.Max(toughness, 0);
             var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            var toughnessReduction = toughness / (toughness + scaled);
+            var toughnessReduction = flooredToughness / (flooredToughness + scaled);
 
             return mitigated * (1 - toughnessReduction);
         }
