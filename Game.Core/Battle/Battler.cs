@@ -136,14 +136,19 @@ namespace Game.Core.Battle
                 return mitigated;
             }
 
-            // Toughness mitigation: Toughness / (Toughness + K·attackerLevel) as a multiplier, so EHP is linear in
-            // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
-            // K·attackerLevel keeps the band stable across content scaling. Both simulators must compute this
-            // expression identically for battle parity.
-            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            var toughnessReduction = toughness / (toughness + scaled);
+            return mitigated * (1 - ToughnessReduction(toughness, attackerLevel));
+        }
 
-            return mitigated * (1 - toughnessReduction);
+        // Toughness / (Toughness + K·attackerLevel) as a multiplier, so EHP is linear in Toughness and the
+        // reduction asymptotes below 100% (a positive hit can never go negative through it). K·attackerLevel
+        // keeps the band stable across content scaling. Both simulators must compute this expression identically
+        // for battle parity. The Sunder tally's investment measurement (SunderBonusForHit) reads this same helper
+        // rather than re-deriving the curve, so the two halves of the tally can't diverge (and a future fix to
+        // the curve's unclamped domain below 0, #1461, lands in one place).
+        private static double ToughnessReduction(double toughness, int attackerLevel)
+        {
+            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
+            return toughness / (toughness + scaled);
         }
 
         /// <summary>
@@ -272,8 +277,7 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            var investment = baselineToughness / (baselineToughness + scaled) - liveToughness / (liveToughness + scaled);
+            var investment = ToughnessReduction(baselineToughness, attackerLevel) - ToughnessReduction(liveToughness, attackerLevel);
             return investment > 0 ? marginal / (1 + investment) : 0;
         }
 
