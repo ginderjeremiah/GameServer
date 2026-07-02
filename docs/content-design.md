@@ -45,6 +45,8 @@ Content here is a **graph, not a list**: a zone is gated by a challenge, the cha
 
 The **spine** is the zone order. Each zone should introduce **one new thing to learn** and gate the next zone behind clearing its boss.
 
+One authored zone sits deliberately *outside* the spine: **[Home](./game-design.md#home-zone--a-no-combat-sanctuary)** — the no-combat sanctuary. Leftmost in the nav, always open, it never gates anything, is never gated, and teaches nothing; it occupies a `Zone.Order` slot but no place in the teaching sequence below.
+
 ### Two ways to teach: zones vs. tutorial blurbs
 
 Not every lesson earns a whole zone. Teaching is delivered two ways, and choosing the cheaper one keeps the early arc punchy:
@@ -80,8 +82,10 @@ A zone is only as good as the **toolkit the player brings into it**, and that to
 |------|--------------------------------|---------------------|------------------------------|------------------------|
 | 1 | Physical + weapon leaves | Martial (weapon leaf + `Physical`) | gate; basic kill-mastery | starter kit only |
 | 1 boss → | + **Fire** (first elemental) | + Fire-resist (player); Fire-offense (enemy-side) | + "survive the boss" feat | resist training begins |
-| 2 | + **Poison** (DoT) | + Poison/DoT-resist; Restoration (if healing) | + **sustain mastery** → unlocks sustain gear/mods | resist tier 1; basic regen access |
-| 3 | _(no new type — a depth test)_ | _(deepen existing leaves)_ | + **feats** (timed / under-leveled); `RequiredProficiency`-weapon gates | compounding bonuses; first **synthesis** recipe in reach |
+| 2 | + **Poison** (DoT) | + Poison-resist; Restoration (if healing); **Venom** offense (candidate: venom-coating unlock) | + **sustain mastery** → unlocks sustain gear/mods (a venom-coating mod is a candidate) | resist tier 1; basic regen access |
+| 3 | _(no new type — a depth test)_ | _(deepen existing leaves; class-route introductions — authored-crit skills, archetype hooks — arrive per §5)_ | + **feats** (timed / under-leveled); `RequiredProficiency`-weapon gates | compounding bonuses; first **synthesis** recipe in reach |
+
+This table tracks the **zone lane** only — the class progression routes (§5) run their own parallel introduction lanes (§4 principle 5), so a class's row-by-row toolkit is the floor above **plus** wherever its route has reached.
 
 ---
 
@@ -118,27 +122,51 @@ The damage-type taxonomy ([leaves, categories, weapon leaves](./game-design.md#d
 
 2. **Three structural roles encode the depth/breadth pillar — leaf, umbrella, gateway.**
    - **Leaf** paths (Fire, Sword, Poison) max fastest for a *focused* build (spread dilutes each leaf) and give steep, type-specific compounding — **depth**.
-   - **Umbrella** paths (Elemental, DoT, Physical) are a **design choice**, not automatically open. Two models: an *open baseline* trained continuously from any family member (the category key fires on every member's hit), **or** a **late-game capstone** unlocked by advancing the leaves beneath it (e.g. an Elemental-resist umbrella earned by leveling the individual element resistances) — a reward for **breadth within a family**. Current lean: **capstone, not open at start** (especially the resist umbrellas).
+   - **Umbrella** paths (Elemental, DoT, Physical) are a **design choice**, not automatically open. Two models: an *open baseline* trained continuously from any family member (the category key fires on every member's hit), **or** a **late-game capstone** unlocked by advancing **all** the leaves beneath it (an Elemental-resist umbrella requires *every* individual element resistance advanced, `Physical` requires *every* weapon leaf) — a reward for **full breadth within a family**. Current lean: **capstone, not open at start** — and because the prerequisite is the *whole* family, **assume umbrellas are unreachable throughout the early content arc**.
    - **Cross-family gateways** (lava = adv. Fire + adv. Earth) require multiple advanced leaf tiers maxed — **breadth across families**, the rarest fusion a mono-build can't reach.
+   - **Gateways are invisible until their prerequisites are met** — the player never sees that the lava path *exists* until advanced Fire + advanced Earth are maxed. This invisibility **is** the "hidden synergies" pillar in mechanical form: breadth builds literally uncover proficiencies other builds never know are there. (Umbrella capstones, being gateways, inherit the same reveal.)
    - Author the bonuses to match: leaf = steep compounding; umbrella capstone = a family-wide reward worth the spread; gateway = a unique fusion ability.
-   - **Open mechanics question:** a capstone umbrella bound to the auto-firing category key would accrue XP — and therefore *open* — on the first family hit, defeating the gating. A true capstone needs either a non-auto activity key or a gateway rule that suppresses accrual until prerequisites are met. Flag for the proficiency-system owner (parking lot).
+   - **Mechanics settled ([#1411](https://github.com/ginderjeremiah/GameServer/issues/1411)):** a gateway tier — umbrella capstones included — **accrues no XP until every prerequisite is maxed**; routing skips a locked gateway frontier, so leaf activity never banks onto (or prematurely opens) a locked umbrella ([opening tiers](./game-design.md#opening-tiers-and-milestones)). An umbrella *becomes* a capstone simply by authoring leaf prerequisites on it (and an open-baseline umbrella by authoring none), so the choice above is pure content authoring.
 
 3. **Tier depth: ~5+ per leaf, loosely tracking the rarity ladder.** A leaf path runs ~5+ tiers with a Common→Mythic *feel* (a **loose**, not strict, correspondence to `ERarity`), authored **incrementally** as the arc reaches them — not all up front. A shared leveling-curve template keeps balance comparable; reserve bespoke depth for a few "hero" paths.
 
 4. **The fusion-gateway graph is sparse and deliberate.** Don't author every cross-combination — curate a small set of high-identity gateways (lava = adv. Fire + adv. Earth, steam = Fire + Water, …) as the breadth→fusion payoff. Each is a discovery; rarity is what makes it special.
 
-5. **Rollout is derived from the zone arc.** A path opens by being *trained* (openness is derived from progress — [opening tiers](./game-design.md#opening-tiers-and-milestones)), so a path is meaningfully available only once the zone arc introduces its activity as content. The proficiency rollout **is** the introduction schedule (§2) — don't introduce Wind paths before Wind appears.
+5. **Rollout is derived from the progression arc — zones are only one introduction vector.** A path opens by being *trained* (openness is derived from progress — [opening tiers](./game-design.md#opening-tiers-and-milestones)), so a path is meaningfully available once *any* vector delivers content that trains it. There are far too many things to introduce to hang them all on zones; the vectors are:
+   - **the zone arc** — shared pressure everyone meets (an elemental boss, a DoT zone);
+   - **class progression routes** (§5) — kit skills, milestone rewards, and synthesis lines that carry a specific identity forward;
+   - **class-tailored challenges** — keyed to a class's natural activity (*"kill 20 enemies with fire magic" → a staff that inflicts Burn*), so they surface organically for the class they serve while staying open to any build doing the same activity.
 
-> Rollout table — one row per path. `Intro` = where the content that trains it first appears.
+   The introduction schedule (§2) tracks the zone lane; the class routes run their own parallel lanes, introducing lines to different archetypes at different times.
 
-| Path | Activity key | Family / book | Intro | Tier arc | Milestone skills | Notes |
-|------|--------------|---------------|-------|----------|------------------|-------|
-| _(Swordsmanship → …)_ | Sword | Martial / offense | Z1 | … | … | weapon leaf; also trains `Physical` umbrella |
-| _(Fire Magic → Inferno)_ | Fire | Elemental / offense | Z1 boss (enemy-side) | Fire Magic → Inferno → … | _(skill at tier-N max)_ | umbrella `Elemental`; gateway lava = adv. Fire + adv. Earth |
-| _(Fire-resist)_ | Fire | Warding / resist | Z1 boss | … | … | trains from *taking* Fire |
-| _(Poison)_ / _(Poison-resist)_ | Poison | Affliction / Warding | Z2 | … | … | DoT leaf; umbrella `DoT` |
-| _(Restoration)_ | heal | Technique / event | Z2 (if healing) | … | … | trains from healing |
-| _(Evasion / Precision)_ | dodge / crit | Technique / event | blurb-taught; opens on first proc | … | … | not zone-gated |
+### Launch rollout — the paths that exist for the Z1–Z3 arc  [STRAWMAN]
+
+> `Intro` = where the content that trains it first appears. `Depth by Z3` = tiers authored before the wall (counts are strawman; extend incrementally per principle 3). **Depth target:** the Z3 wall assumes a focused build has reached **~tier 2–3 of one offense leaf** — author **3 tiers** on the offense leaves and **2 elsewhere**, then grow with the arc. Tier names / words of power TBD per path (§6 register).
+
+| Path | Activity key | Family / book | Intro | Depth by Z3 | Notes |
+|------|--------------|---------------|-------|-------------|-------|
+| _(Swordsmanship)_ | Sword | Martial / offense | Z1 (Swordsman kit) | 3 | tier-max milestone seeds the next tier's native; feeds the Z3 `RequiredProficiency` weapon |
+| _(Archery)_ | Bow | Martial / offense | Z1 (Bowman kit) | 3 | same template as Swordsmanship |
+| _(Bludgeoning)_ | Club | Martial / offense | Z1 (Knight kit) | 3 | same template |
+| _(Unarmed)_ | Unarmed | Martial / offense | Z1 — punch trains it bare-handed | 1–2 | never advertised — a quiet discovery for anyone who fights weaponless; cheap to author (distinct from the *hidden-synergy* gateways, which are the real hidden layer) |
+| _(Fire Magic)_ | Fire | Elemental / offense | Z1 (Wizard kit); the Z1 boss makes Fire live as content | 3 | the Wizard's depth line; lava/steam gateways far later |
+| _(Wind)_ | Wind | Elemental / offense | Z1 (Bowman secondary) | 2 | exists for the Bowman's second root; Wind as *enemy* pressure comes later |
+| _(Fire-resist)_ | Fire | Warding / resist | Z1 boss | 2 | trains from taking Fire |
+| _(Poison-resist)_ | Poison | Warding / resist | Z2 | 2 | Z2's survival track |
+| _(Physical-resist)_ | Physical | Warding / resist | Z1 (every weapon hit taken) | 2 | trains passively for everyone — the resist paths are deliberately a "free" defensive baseline (a commitment scaler is a parked consideration) |
+| _(Venom)_ | Poison | Affliction / offense | candidate: a Z2 mastery unlock (venom-coating mod); finalize with the class routes (§5) | 2 | first Affliction line; some kits will lean into DoT natively, so don't over-plan its "introduction" before the routes are drawn |
+| _(Restoration)_ | heal | Technique / event | Z1 (Knight *and* Wizard kits); later for others (first heal acquired) | 2 | trains from healing done — two native profiles: burst (Wizard) vs uptime regen (Knight) |
+| _(Evasion)_ | dodge | Technique / event | today: attribute-sourced (`Agility`) — opens on first dodge | 2 | [#1426](https://github.com/ginderjeremiah/GameServer/issues/1426) seed direction: dodge goes **opt-in** (flat chance from items, `Agility` becomes a multiplier) — the intro then follows the first dodge item |
+| _(Precision)_ | crit | Technique / event | the first **authored-crit skill** in the toolkit | 1–2 | crit chance is **authored on skills** — no enabler item to schedule; attributes/items contribute crit-damage / crit-chance **multipliers**. Placement rides the class routes (§5) |
+| _(Frequency)_ | cadence (CDR) | Technique / event | pending [#1426](https://github.com/ginderjeremiah/GameServer/issues/1426) (severs CDR's attribute sourcing) — **planned for the initial content version** | 1–2 | a representational (build-state) signal, so it needs explicit difficulty scaling (#1426) |
+| _(Retribution)_ | reflect | Technique / event | Z1 — the **Knight kit carries the first reflection source** directly | 1–2 | authored-only reflection; the tank's win-condition route, live from creation |
+| _(Riposte)_ | parry | Technique / event | Z1 (Swordsman kit parry stance) — **mechanic pending [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)** | 1–2 | opt-in `ParryChance` (own 0-based attribute, no derivation) + counterattack; direct tally (counter damage), like Retribution |
+
+**Deliberately *not* at launch:**
+
+- **Umbrella paths** (Elemental, DoT, Physical, the resist umbrellas) — capstones requiring **every** leaf in the family advanced, so they are unreachable until a family's full leaf set exists *and* runs deep. Assume unreachable for the whole early arc; as gateways they stay invisible until earned (the hidden-synergy reveal). Mechanics ready per #1411.
+- **Water / Earth offense and the remaining weapon leaves** (Axe, Dagger) — nothing in the launch arc trains them; they arrive with the classes, challenges, or zones that do.
+- **The remaining delivery archetypes** (Hex #1427 — already expressible on today's effect system, Momentum #1428, Sunder #1429, Cull #1430 — needs a damage-calc conditional) are **not zone-scheduled**: each is introduced through class-tailored challenges/milestones as the class routes (§5) call for it.
 
 ### Delivery archetypes & the commitment rule (the utility question)
 
@@ -149,7 +177,7 @@ The families above (Martial / Elemental / Affliction / …) are *damage-type* ni
 - **The commitment rule.** A delivery archetype earns a proficiency path only if it is *committed* — reached through an **opt-in enabler** (gear/skill) with a real opportunity cost, measured as **excess over a floor that is naturally `0` when uncommitted**. *Universal* effects that benefit every build for free (a raw STR/CDR buff, all-damage%, raw EHP) get **no** path — their payoff is the paths they amplify (and, for cadence, farm throughput). So a "utility" buff is in or out based on **commitment, not on being a buff**; author the universal residue as conditional or tradeoff effects, never as free value.
 - **The opt-in-multiplicative template.** Every archetype follows one pattern: a **flat enabler** in items/skills with **no attribute base** (`0` until opted in) + a **multiplicative** Technique path (`0 × mult = 0`, inert for the uncommitted) + a **tallied magnitude** the path trains on. Crit is instance #1 (reworked to this shape — see spike); DoT and Reflection already fit.
 - **The tally is a normalized _marginal_, not the full hit** (settled in the [spike](./spikes/1398-utility-in-proficiency-system.md#follow-on-refinement--the-overlay-tally-shape-normalized-marginal)). An **overlay** archetype (crit, Hex, Sunder, Momentum, Cull — ones that ride a hit that would have landed anyway) tallies the **extra damage it enabled**, measured **add-one-in** against a fixed baseline (so stacked overlays don't inflate each other) and as the **absolute** damage enabled (so a mitigation debuff doesn't train faster against high-resist enemies), passed through a concave normalization so magnitude investment rewards without a runaway. This is applied to **crit too** ([#1448](https://github.com/ginderjeremiah/GameServer/issues/1448) is the worked reference); Reflection/DoT are not overlays and keep their current tallies. _Tuning watch-point:_ a mitigation debuff's *value* is hyperbolic in enemy resistance, so author enabler strengths so a debuff can't erase a resist-gated boss.
-- **Roster — committed, implementable archetypes** (not deferred content): **Momentum** (in-battle escalation), **Hex** (vulnerability/debuff), **Sunder** (anti-mitigation) — all expressible on today's effect system — and **Cull** (execute), which additionally needs a new damage-calc conditional. The **engine** for each (path + enabler + tally) is ready to build now, following the crit reference; only each one's **content placement** — which zone/challenge introduces its enabler — follows the arc, and that authoring step never gates the mechanic.
+- **Roster — committed, implementable archetypes** (not deferred content): **Momentum** (in-battle escalation), **Hex** (vulnerability/debuff), **Sunder** (anti-mitigation) — all expressible on today's effect system — plus **Cull** (execute) and **Parry/Riposte** (avoid + counterattack, [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)), which each need new battle-sim mechanics. The **engine** for each (path + enabler + tally) follows the crit reference; each one's **content placement** — which kit/challenge/milestone introduces its enabler — follows the class routes and arc, and that authoring step never gates the mechanic.
 - **Attribute-concentration is content, not a path.** "All-in STR → STR synergies" is served by opt-in **attribute-scaling** skills/items (orthogonal to damage type, so it distinguishes STR from a DEX physical build and does not fight magic-school spread), *not* by a proficiency track — the taxonomy stays type/delivery-based.
 
 ---
@@ -175,15 +203,54 @@ Four classes, each anchored on a different core attribute and weapon family:
 
 | Class | Weapon (→ signature) | Secondary | Attribute | Opens (starting roots) |
 |-------|----------------------|-----------|-----------|------------------------|
-| **Swordsman** | Sword | _TBD_ | STR | Swordsmanship (+ `Physical`) |
+| **Swordsman** | Sword | **Parry stance** (riposte — mechanic pending [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)) | STR | Swordsmanship + Riposte |
 | **Bowman** | Bow | Wind skill | DEX | Archery + Wind |
-| **Wizard** | Fire staff (→ Fireball) | _TBD_ | INT | Fire (elemental) |
-| **Knight** | Blunt / Club | Regen (heal) | END | Club mastery + Restoration |
+| **Wizard** | Fire staff (→ Fireball) | **Healing spell** (burst heal) | INT | Fire + Restoration |
+| **Knight** | Blunt / Club | **Regen** (sustained HoT — regen specifically, not a burst) | END | Bludgeoning + Restoration (+ **Retribution** — the kit itself carries the first reflection source) |
 
 - Covers four of the six core attributes (STR / DEX / INT / END); **AGI and LUK** are deliberately left to the Technique paths (dodge / crit), not class identities.
 - Each secondary should open a *second* path, so a character starts with **two roots** (weapon family + secondary) — seeding the depth-vs-breadth choice from level 1.
-- **The TBD secondaries open their second root via a *committed* effect, not a universal buff** ([#1398](./spikes/1398-utility-in-proficiency-system.md), §4): a raw STR/CDR buff trains nothing (it is a universal amplifier), so a secondary meant to open a root must carry a *committed* hook — a small damage/event portion or an opt-in archetype enabler. A class *may* instead take a pure-utility secondary and deliberately start single-rooted.
-- **Minor open content question:** the **staff** has no weapon-leaf in the current taxonomy (`Sword/Axe/Bow/Club/Dagger/Unarmed`) — decide whether the Wizard's staff is a new `Staff` leaf or reuses an existing one; its *signature* is Fire-typed regardless.
+- **Every secondary carries a *committed* hook, per the commitment rule** ([#1398](./spikes/1398-utility-in-proficiency-system.md), §4) — none is a universal buff. The two heals share the Restoration root but split by **shape**: the Wizard's is a **burst** (a panic button between volleys — the glass cannon buying a casting window), the Knight's is **uptime regen** (attrition sustain compounding with Toughness + reflection).
+- **The Wizard's "healing spell" is authorable today with no engine work**: direct/instant heals don't exist yet (a listed *future* skill expansion in [game-design](./game-design.md#skills)), so V1 authors it as a short, strong `HealthRegenPerSecond` burst (large amount, ~2s) — at 40ms ticks that plays like a burst heal. A true instant-heal mechanic is later polish, not a kit blocker.
+- **Resolved — caster weapons declare their *element* as their `WeaponType`.** The Wizard's staff is a **Fire** weapon: `WeaponType` is not restricted to the martial leaves (any damage-type leaf is valid — no `Staff` leaf needed), so the own-type signature rule covers casters uniformly (a Fire staff grants *Fireball*). An elemental weapon fields **no** martial-leaf skills (everything mismatches the gate) — a caster weapon is a hard identity commitment — while elemental skills stay ungated as ever, so hybrid kits are untouched. Validation relaxation + the signature no-stranding check: [#1456](https://github.com/ginderjeremiah/GameServer/issues/1456).
+
+### Class progression routes  [STRAWMAN]
+
+Zones supply the *shared* pressure; each class gets its own **progression route** — the sequence of paths, class-tailored challenges, and archetype hooks that carry *that* identity from creation through the Z3 wall and beyond (§4 principle 5: routes are their own introduction lanes). A tailored challenge keys on the class's natural activity, so it surfaces organically for the class it serves while staying open to any build committing to the same activity — challenges are class-*flavored*, never class-locked.
+
+Template per class: **roots → first tailored unlock → archetype hooks → Z3 win condition → mid-game direction (incl. its hidden-gateway target)**.
+
+> ⚠ The tailored-challenge examples assume a **kills-by-damage-type statistic** that does not exist yet — tracked in [#1455](https://github.com/ginderjeremiah/GameServer/issues/1455).
+
+**Swordsman — the relentless edge (depth + riposte)**
+- **Roots:** Swordsmanship + **Riposte** (the kit's parry stance — mechanic pending [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)).
+- **First tailored unlock:** *"kill N enemies with sword skills"* → the first `RequiredProficiency` sword step (the depth ladder starts immediately).
+- **Archetype hooks:** **Parry/Riposte** is its native archetype from the kit; **Momentum** (#1428 — escalating flurry) arrives on mid-tier sword skills/milestones; **Sunder** (#1429) later as the anti-armor answer.
+- **Z3 win condition:** **depth** — tier-2/3 Swordsmanship compounding + the gated sword, with the parry counter as supplemental offense.
+- **Mid-game:** cross-train a second physical leaf (Axe or Dagger). Hidden-gateway target: **adv. Swordsmanship × adv. Riposte → a "Duelist" line.** (The `Physical` umbrella needs *all* weapon leaves advanced — a far-endgame collector goal, not a mid-game target.)
+
+**Bowman — the keen eye (variance & cadence)**
+- **Roots:** Archery + Wind.
+- **First tailored unlock:** *"kill N enemies with wind skills"* → wind-tipped arrows (a Bow-primary Bow/Wind hybrid — the §6 multi-typed lever in class form).
+- **Archetype hooks:** **Precision** — the authored-crit skills concentrate here (aimed shots); **Frequency** (#1426) once CDR is severed — rapid-fire cadence is the on-theme second commitment.
+- **Z3 win condition:** **breadth** — the first synthesis (an Archery + Wind skill → a gale-shot) — or a crit-committed line for the focused variant.
+- **Mid-game:** adv. Archery + adv. Wind gateway (a tempest line) as its hidden-gateway target.
+
+**Wizard — the burning mind (focused caster)**
+- **Roots:** Fire + Restoration (the burst-heal secondary).
+- **First tailored unlock:** *"kill 20 enemies with fire magic"* → **a staff that inflicts Burn** — the on-theme Affliction on-ramp, and a self-reinforcing one: a Burn DoT trains Burn *and* Fire *and* Elemental *and* DoT (`applies(Burn)`), so the Wizard's first DoT deepens its Fire identity instead of diluting it.
+- **Archetype hooks:** **Hex** (#1427 — curses/vulnerability; already expressible on the effect system) as the caster's second archetype.
+- **Z3 win condition:** **depth** — Inferno-tier Fire + Burn stacking.
+- **Mid-game:** hidden-gateway target: **adv. Fire × adv. Restoration → a "Phoenix" line** (fire + rebirth — thematically inevitable, and it falls straight out of the kit's two roots). The elemental gateways (steam / lava, once a second element is picked up) are the later options.
+
+**Knight — the immovable (bulwark)**
+- **Roots:** Bludgeoning + Restoration (**regen specifically** — sustained HoT, the over-time half of the sustain identity) + **Retribution from creation** (the kit itself carries the first reflection source).
+- **First tailored unlock:** survival-flavored mastery (*"win after weathering N damage"*) → heavier armor / a reflection mod.
+- **Archetype hooks:** **Retribution** is the core identity; **Sunder** (#1429 — crushing blows through armor) complements the mace.
+- **Z3 win condition:** the **reflection route** — the wall's hard-hitting boss is exactly what reflection feasts on.
+- **Mid-game:** Physical-resist depth; an adv. Restoration + adv. Retribution gateway (a paladin-flavored line) as its hidden-gateway target. (The resist umbrellas need *every* resist leaf advanced — far-endgame, not a route waypoint.)
+
+_Validation hook: each route should read coherently against the introduction schedule (§2) at every zone row, and each is a candidate scripted build for the Zone 3 "archetypes to validate" item._
 
 ---
 
@@ -192,6 +259,7 @@ Four classes, each anchored on a different core attribute and weapon family:
 > Plan skills **by school/path**, not as a flat dump. For each: its school, acquisition channel(s), the role it plays (opener / sustain / burst / utility), and — for synthesized skills — its recipe. Stats (damage portions, multipliers, effects, cooldown) live in the Workbench; capture **intent and identity** here.
 
 - **Acquisition channels** ([details](./game-design.md#skills)): starter kit · item grant (`GrantedSkillId`, must be `Item`-flagged) · proficiency milestone · synthesis recipe. Every skill's authored `Acquisition` flags must match a real grant (the lint/authoring validation enforces this).
+- **Multi-typed skills are a deliberate authoring lever** ([mechanics](./game-design.md#damage-types)): weighted portions split one hit across schools and train each school's path in proportion (the split *is* the cross-school contribution weight), while the **primary** (highest-weight) portion drives display colour and the [weapon-match gate](./game-design.md#weapon-match-gate) — a sword-primary flaming slash is sword-locked, a fire-primary flame lash stays live across weapon swaps. Use hybrids to bridge schools (e.g. a class secondary opening a second root without breaking weapon coherence, §5) and as the natural shape of **synthesis results** (fusing skills from two schools yields a split-typed ability).
 - **The synthesis web:** _(which owned skills combine into which result, and the proficiency-level conditions that gate the recipe — this is the discovery layer, see [skill synthesis](./game-design.md#opening-tiers-and-milestones))_
 - **Words of power register:** _(keep the romanized `Word` / `Pronunciation` / `Translation` here so the invented script stays internally consistent across skills and paths)_
 
@@ -274,7 +342,7 @@ Challenges are the **unlock layer** and the **zone gates**, and the primary vehi
 - **Boss:** a heavy DoT-dealer; the build-check is *"do you have a sustain answer — resist and/or regen — and did you bring it?"* A glass cannon can still race it down; a Toughness-only tank stalls out and times out.   ·   **Clear challenge:** _Defeat the Zone 2 boss._
 - **Unlocks on clear:** a standard gear-ladder step (a slot upgrade) and **Zone 3**. Deliberately **not** a sustain-specific reward — per the *capability-is-earned* pillar, sustain tools are unlocked by *investing* in what the zone trains (the resist/Restoration proficiencies and any sustain challenges), not handed out at the boss. The player who leaned into sustain already has more of it by the time the boss falls; the player who brute-forced it gets a normal upgrade and moves on.
 - **Proficiency relevance:** this is the zone's real reward vector. Surviving the DoT trains **Poison/DoT-resist** (incoming book) just by being hit; running a heal trains **Restoration**. The sustain *tools* a player earns here flow through those tracks and matching challenges — the embodiment of the capability-is-earned pillar.
-- **Designer notes:** the trap to avoid is **walling** — a baseline sustain answer must be *acquirable before* entering (Z1 rewards, an early mod, or the resist path that began training at the Z1 boss), so Z2 teaches the player to *lean into* sustain rather than springing an unsolvable problem. Balance watch-point: tune Poison stacks so an unprepared player *notices* the attrition and adapts, instead of dying with no idea why. Keep **depth→compounding out of this zone** — that's Zone 3's job (the build wall); Zone 2 only has to teach that sustain exists and matters.
+- **Designer notes:** the trap to avoid is **walling** — a baseline sustain answer must be *acquirable before* entering (Z1 rewards, an early mod, or the resist path that began training at the Z1 boss), so Z2 teaches the player to *lean into* sustain rather than springing an unsolvable problem. Balance watch-point: tune Poison stacks so an unprepared player *notices* the attrition and adapts, instead of dying with no idea why. **Class texture:** the Knight (regen) and Wizard (burst heal) arrive with native sustain; the Swordsman and Bowman must *earn* theirs — the zone teaches hardest exactly where the kit is thinnest, which is the capability-is-earned pillar working as intended. Keep **depth→compounding out of this zone** — that's Zone 3's job (the build wall); Zone 2 only has to teach that sustain exists and matters.
 
 ### Zone 3 — _(first build wall)_  [PLANNING — content horizon]
 
@@ -289,7 +357,8 @@ Zone 3 is less a zone to author in isolation than a **content horizon**: it's th
   - [ ] **Proficiency depth** — leaf paths reachable to a tier where compounding is actually *felt* at the Z3 band (§4 rollout).
   - [ ] **First synthesis recipe** — combines two *owned* (non-item-granted) early skills into a Z3-relevant ability (§6). Depends on which early skills exist → follows from the class secondaries (§5; the utility-secondary rule is settled in [#1398](./spikes/1398-utility-in-proficiency-system.md)).
   - [ ] **`RequiredProficiency` weapon(s)** — an uncommon weapon gated behind a leaf proficiency level: the depth route's reward (§7).
-  - [ ] **A reflection source** — gear / mod / an early Retribution-path reward granting `DamageReflection`, so the reflection route can bootstrap (it's authored-only, never derived from a core attribute) (§7).
+  - [x] **A reflection source** — carried by the **Knight's class kit from creation** (§5), so the reflection route needs no Z3 content; other classes reach reflection later through gear/mods (§7).
+  - [ ] **Authored-crit skill(s)** — crit chance is authored **on skills** (attributes/items contribute multipliers), so at least one crit-carrying skill should be reachable by the wall for a crit-committed build to be fieldable — placement rides the class routes (§5).
   - [ ] **Feats** — timed / under-leveled challenges on the Z3 boss, rewarding the committed builds (§8).
   - [ ] **Archetypes to validate** — at least one depth build and one breadth build that each clear the wall, proving both routes viable.
 - **Resolve-first dependencies:** the class secondaries (§5; the utility-secondary rule settled in [#1398](./spikes/1398-utility-in-proficiency-system.md)) and the synthesis catalog (§6) feed this horizon directly — it firms up as those settle.
@@ -302,5 +371,7 @@ Zone 3 is less a zone to author in isolation than a **content horizon**: it's th
 - **Classes shape starting roots, not zone access.** Early zones are class-agnostic (they provide their own counters — §5), so the class roster is *not* a hard prerequisite for the zone arc; per-class variance lives only in which paths a character *starts* training. The strawman roster is drafted in §5.
 - **✓ Utility & the proficiency system — resolved** ([spike #1398](./spikes/1398-utility-in-proficiency-system.md); see §4 *Delivery archetypes & the commitment rule*). "Utility" was the wrong unit: a proficiency path is earned by a **committed** delivery archetype (opt-in enabler, measured as excess over a `0` floor), not by an effect being a buff. Universal amplifiers — including the filed CDR-buff example — get **no** path; their payoff is the paths they amplify. Attribute-concentration synergy is attribute-scaling *content*, not a track. Crit is reworked to the opt-in-multiplicative template as the worked example; the `Dexterity`/`Luck`/`Agility` identity-sourcing ripple is spun off as a follow-on spike.
 - **Zone 3 build wall — synthesis and/or depth-gate.** Gateways (proficiency cross-family) are far too deep this early; the realistic Zone-3 levers are the **first skill-synthesis recipe** (opportune to introduce here) and/or **`RequiredProficiency`-gated weapons** (e.g. an uncommon weapon needing a proficiency level) — depth-gating that forces prior investment. Decide whether Z3 uses one, the other, or both.
-- **Umbrella accrual vs. gating** (mechanics) — if umbrellas are capstones gated behind their leaves, the auto-firing category key would open them prematurely (see §4 principle 2). Needs a proficiency-system answer before capstone umbrellas can be authored.
+- **✓ Umbrella accrual vs. gating — resolved** ([#1411](https://github.com/ginderjeremiah/GameServer/issues/1411)): a gateway tier (umbrella capstones included) accrues no XP until every prerequisite tier is maxed, so capstone umbrellas are authorable exactly as §4 designs them.
+- **Resist-training commitment scaler** (consideration): the resist paths deliberately train "free" from exposure, and that's accepted — but training could *scale with the bearer's resist investment* (field more resist → train it faster) to add a commitment lever. Note the tension with the existing "resistance trains on **pre-mitigation** exposure so a resist never throttles its own signal" rule — this would be a bonus on top, not a replacement.
+- **#1426 — attribute identity-sourcing** feeds two rollout rows: **Frequency** (CDR severed from attributes → a committed cadence path, planned for the initial content version) and **Evasion** (seed direction: dodge goes opt-in — flat from items, `Agility` multiplicative). Firm those rows up as #1426's sub-issues land.
 - Long-horizon pacing past the 10-hour offline window — what is the **endgame** the arc is climbing toward?
