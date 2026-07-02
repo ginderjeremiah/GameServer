@@ -112,6 +112,7 @@ namespace Game.Core.Attributes
                 CriticalDamage => "The additional percentage of damage dealt when a critical hit occurs.",
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
                 DamageReflection => "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
+                ExecuteBonus => "The maximum percentage of bonus damage dealt against a target, scaled by how much health it is missing.",
                 BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
                 PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
                 BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
@@ -157,6 +158,9 @@ namespace Game.Core.Attributes
                 // DamageReflection (spike #1330) takes the defensive-secondary slot Block vacated, so it groups
                 // with the other combat-secondary stats on the breakdown screen. Authored-only, decimal-percentage.
                 DamageReflection => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "REF", 12, 0),
+                // ExecuteBonus (spike #1398, #1430) is the Cull archetype's enabler — authored-only like
+                // DamageReflection, grouped with the other combat-secondary stats.
+                ExecuteBonus => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "EXE", 13, 0),
                 BleedDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "BLD DOT", 14, 0),
                 HealthRegenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: false, "REG", 15, 0),
                 // Obsolete: never displayed, so it gets neutral display metadata and sorts last.

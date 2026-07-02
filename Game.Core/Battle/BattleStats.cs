@@ -68,6 +68,23 @@ namespace Game.Core.Battle
         /// </summary>
         public double MomentumBonusDealt { get; set; }
 
+        /// <summary>
+        /// The Cull (<c>Cull</c> activity key) training signal — the normalized-marginal execute bonus an
+        /// authored <see cref="EAttribute.ExecuteBonus"/> enabled this battle (spike #1398 → the overlay tally
+        /// shape, reference #1448; #1430). Cull is the one delivery archetype whose enabler is a genuinely new
+        /// damage-calc conditional rather than an existing resistance/amplification attribute: the target's
+        /// missing-health fraction at the moment of the hit scales <c>ExecuteBonus</c> into that fire's
+        /// multiplier above 1 (the investment), applied to the raw damage identically to <c>CriticalDamage</c>
+        /// before mitigation. For each portion the extra damage that investment enabled — the live post-execute
+        /// hit minus the same hit without it, both carried through the defender's mitigation — is booked with
+        /// the same <c>/(1 + investment)</c> saturation the crit/Hex/Momentum bonuses use, on the investment's
+        /// own magnitude, measured off the pre-crit portion so it composes with crit without either overlay
+        /// inflating the other. A target at full health enables nothing; a target near death saturates the
+        /// multiplier toward the full <c>ExecuteBonus</c>. Backend-only like the other overlay tallies — DoT has
+        /// no counterpart (there is no per-tick "hit" to execute).
+        /// </summary>
+        public double CullBonusDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>
