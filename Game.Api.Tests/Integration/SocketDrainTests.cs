@@ -95,7 +95,7 @@ namespace Game.Api.Tests.Integration
             var registry = Factory.Services.GetRequiredService<SocketConnectionRegistry>();
 
             var socket = new DrainableWebSocket(echoServerClose: true);
-            var context = await socketManager.RegisterSocket(socket, session);
+            var context = await socketManager.RegisterSocket(socket, session, isAdmin: false);
             await socket.ReceiveStarted.WaitAsync(WaitTimeout, CancellationToken);
 
             await registry.DrainAsync().WaitAsync(WaitTimeout, CancellationToken);
@@ -169,7 +169,7 @@ namespace Game.Api.Tests.Integration
             var scopeFactory = scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
 
             var socket = new DrainableWebSocket(echoServerClose);
-            var context = new SocketContext(socket, playerId: 1, session, contextLogger);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, contextLogger);
             var handler = new SocketHandler(context, commandFactory, scopeFactory, handlerLogger, () => { });
             return (socket, handler);
         }

@@ -1,6 +1,7 @@
 using Game.Api.Models.Common;
 using Game.Api.Services;
 using Game.Application.Services;
+using Game.Core;
 
 namespace Game.Api.Middleware
 {
@@ -42,8 +43,12 @@ namespace Game.Api.Middleware
             }
             else
             {
+                // Read from the handshake's validated ClaimsPrincipal (the same source
+                // AdminRoleAuthorizationFilter reads for HTTP admin endpoints), not the volatile session
+                // cache, so it derives from the token alone.
+                var isAdmin = context.User.IsInRole(nameof(ERole.Admin));
                 using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                var socketContext = await socketManager.RegisterSocket(webSocket, sessionService);
+                var socketContext = await socketManager.RegisterSocket(webSocket, sessionService, isAdmin);
                 await socketContext.WaitSocketClosed();
                 await socketManager.UnRegisterSocket(socketContext);
             }

@@ -37,11 +37,12 @@ namespace Game.TestInfrastructure.Helpers
         /// The WebSocketClient from TestServer handles the in-memory transport. The handshake reads the
         /// selected player from the token claim, so a post-selection token is minted carrying
         /// <paramref name="playerId"/> (defaulting to <paramref name="userId"/>, which the single-seed
-        /// integration tests share after an identity reset).
+        /// integration tests share after an identity reset). <paramref name="roles"/> lets a test connect
+        /// as an admin (e.g. to exercise <c>SocketContext.IsAdmin</c>-gated behavior).
         /// </summary>
-        public async Task ConnectAsync(Microsoft.AspNetCore.TestHost.WebSocketClient wsClient, int userId, int? playerId = null)
+        public async Task ConnectAsync(Microsoft.AspNetCore.TestHost.WebSocketClient wsClient, int userId, int? playerId = null, params string[] roles)
         {
-            var tokenString = TestAuthHelper.CreateAccessToken(userId, playerId ?? userId);
+            var tokenString = TestAuthHelper.CreateAccessToken(userId, playerId ?? userId, roles);
 
             var wsUri = new Uri($"ws://localhost/socket?access_token={Uri.EscapeDataString(tokenString)}");
             _socket = await wsClient.ConnectAsync(wsUri, _cts.Token);

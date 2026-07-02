@@ -1,3 +1,4 @@
+using Game.Abstractions.Contracts;
 using Game.Api.Models.Common;
 
 namespace Game.Api.Sockets.Commands
@@ -18,15 +19,41 @@ namespace Game.Api.Sockets.Commands
         // projecting the set once per snapshot here would optimize a path that isn't hot.
         public override Task<ApiSocketResponse<IEnumerable<TModel>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
-            return Task.FromResult(Success(GetReferenceData()));
+            return Task.FromResult(Success(RedactAuthoringOnlyFields(GetReferenceData(), context.IsAdmin)));
         }
 
         /// <summary>
-        /// Hashes this set's current data so the frontend can detect a stale cache. Computed from
-        /// the same models <see cref="HandleExecuteAsync"/> returns, so the version tracks exactly what
-        /// a client would download. The hash is memoized against <see cref="VersionKey"/> so it is computed
-        /// once per cache swap rather than re-serialized on every connect (this is the first command the
-        /// loading screen issues, for every player).
+        /// Blanks <see cref="IHasDesignerNotes.DesignerNotes"/> for a non-admin connection — the Workbench
+        /// (an admin-role connection) still authors it over this same command, so an admin gets it unredacted.
+        /// <see cref="ComputeVersion"/> hashes a separate, unredacted <see cref="GetReferenceData"/> call, so
+        /// authoring a note still bumps the set's version hash once for every client, admin or not — only the
+        /// wire payload differs. Each set's mapper returns fresh model instances per call (never a shared
+        /// cached instance), so mutating them here is safe.
+        /// </summary>
+        private static IEnumerable<TModel> RedactAuthoringOnlyFields(IEnumerable<TModel> models, bool isAdmin)
+        {
+            if (isAdmin)
+            {
+                return models;
+            }
+
+            return models.Select(model =>
+            {
+                if (model is IHasDesignerNotes hasDesignerNotes)
+                {
+                    hasDesignerNotes.DesignerNotes = "";
+                }
+                return model;
+            });
+        }
+
+        /// <summary>
+        /// Hashes this set's current, genuine data (via <see cref="GetReferenceData"/> directly, deliberately
+        /// bypassing <see cref="HandleExecuteAsync"/>'s admin-only redaction) so the version tracks the
+        /// underlying content regardless of who's asking — an authoring edit bumps it once for every client.
+        /// The hash is memoized against <see cref="VersionKey"/> so it is computed once per cache swap rather
+        /// than re-serialized on every connect (this is the first command the loading screen issues, for
+        /// every player).
         /// </summary>
         public string ComputeVersion()
         {

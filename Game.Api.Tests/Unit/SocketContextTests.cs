@@ -200,10 +200,10 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(WebSocketCloseStatus.MessageTooBig, socket.CloseStatusUsed);
         }
 
-        private static SocketContext CreateContext(WebSocket socket)
+        private static SocketContext CreateContext(WebSocket socket, bool isAdmin = false)
         {
             var session = new SessionService(new NoOpSessionStore());
-            return new SocketContext(socket, playerId: 1, session, NullLogger<SocketContext>.Instance);
+            return new SocketContext(socket, playerId: 1, session, isAdmin, NullLogger<SocketContext>.Instance);
         }
 
         /// <summary>

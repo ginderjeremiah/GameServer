@@ -1,7 +1,7 @@
 namespace Game.Abstractions.Contracts
 {
     /// <summary>Read contract for a zone in the reference-data catalogue.</summary>
-    public class Zone : IModel
+    public class Zone : IModel, IHasDesignerNotes
     {
         public int Id { get; set; }
         public required string Name { get; set; }

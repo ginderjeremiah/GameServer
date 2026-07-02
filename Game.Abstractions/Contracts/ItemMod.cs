@@ -3,7 +3,7 @@ using Game.Core;
 namespace Game.Abstractions.Contracts
 {
     /// <summary>Read contract for an item modifier in the reference-data catalogue.</summary>
-    public class ItemMod : IModel
+    public class ItemMod : IModel, IHasDesignerNotes
     {
         public int Id { get; set; }
         public required string Name { get; set; }

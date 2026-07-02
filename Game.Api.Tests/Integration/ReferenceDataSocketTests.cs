@@ -58,11 +58,11 @@ namespace Game.Api.Tests.Integration
             return user.Id;
         }
 
-        private async Task<TestSocketClient> ConnectAsync(int userId)
+        private async Task<TestSocketClient> ConnectAsync(int userId, params string[] roles)
         {
             var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();
-            await socketClient.ConnectAsync(wsClient, userId);
+            await socketClient.ConnectAsync(wsClient, userId, playerId: null, roles);
             Assert.Equal(WebSocketState.Open, socketClient.State);
             return socketClient;
         }
@@ -104,6 +104,96 @@ namespace Game.Api.Tests.Integration
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
             Assert.Contains(response.Data, s => s.Name == "RefFireball");
+        }
+
+        [Fact]
+        public async Task GetSkills_RedactsDesignerNotesForNonAdminConnection()
+        {
+            int userId, skillId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await TestDataSeeder.CreateSkillAsync(context, "RefNotedSkill", designerNotes: "Why this skill exists.")).Id;
+
+                var user = await TestDataSeeder.CreateUserAsync(context, "notesplayeruser", "notespass");
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                userId = user.Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+            await LoginAsync("notesplayeruser", "notespass");
+
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<Skill>>("GetSkills");
+
+            Assert.Null(response.Error);
+            var skill = Assert.Single(response.Data, s => s.Id == skillId);
+            Assert.Equal("", skill.DesignerNotes);
+        }
+
+        [Fact]
+        public async Task GetSkills_IncludesDesignerNotesForAdminConnection()
+        {
+            int userId, skillId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await TestDataSeeder.CreateSkillAsync(context, "RefNotedSkillAdmin", designerNotes: "Why this skill exists.")).Id;
+
+                var user = await TestDataSeeder.CreateUserAsync(context, "notesadminuser", "notespass");
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                userId = user.Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+            await LoginAsync("notesadminuser", "notespass");
+
+            // The admin role is minted straight onto the socket handshake token (mirroring how the
+            // Workbench's own connection carries it); it doesn't require a DB-persisted role grant.
+            await using var socketClient = await ConnectAsync(userId, nameof(ERole.Admin));
+
+            var response = await socketClient.SendCommandAsync<List<Skill>>("GetSkills");
+
+            Assert.Null(response.Error);
+            var skill = Assert.Single(response.Data, s => s.Id == skillId);
+            Assert.Equal("Why this skill exists.", skill.DesignerNotes);
+        }
+
+        [Fact]
+        public async Task GetReferenceDataVersions_SkillsVersionMatchesForAdminAndNonAdminConnections()
+        {
+            int playerUserId, adminUserId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateSkillAsync(context, "RefVersionParitySkill", designerNotes: "Internal rationale.");
+
+                var player = await TestDataSeeder.CreateUserAsync(context, "versionparityplayer", "versionparitypass");
+                await TestDataSeeder.CreatePlayerAsync(context, player.Id);
+                playerUserId = player.Id;
+
+                var admin = await TestDataSeeder.CreateUserAsync(context, "versionparityadmin", "versionparitypass");
+                await TestDataSeeder.CreatePlayerAsync(context, admin.Id);
+                adminUserId = admin.Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+            await LoginAsync("versionparityplayer", "versionparitypass");
+            await LoginAsync("versionparityadmin", "versionparitypass");
+
+            await using var playerSocket = await ConnectAsync(playerUserId);
+            await using var adminSocket = await ConnectAsync(adminUserId, nameof(ERole.Admin));
+
+            var playerVersions = await playerSocket.SendCommandAsync<List<ReferenceDataVersion>>("GetReferenceDataVersions");
+            var adminVersions = await adminSocket.SendCommandAsync<List<ReferenceDataVersion>>("GetReferenceDataVersions");
+
+            var playerSkillsVersion = Assert.Single(playerVersions.Data, v => v.Command == "GetSkills").Version;
+            var adminSkillsVersion = Assert.Single(adminVersions.Data, v => v.Command == "GetSkills").Version;
+
+            // The version hash is computed from the full (unredacted) contract regardless of who's asking, so
+            // authoring a note bumps it once for every client — only the wire payload differs by role.
+            Assert.Equal(adminSkillsVersion, playerSkillsVersion);
         }
 
         [Fact]
