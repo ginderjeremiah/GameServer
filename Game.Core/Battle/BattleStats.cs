@@ -98,11 +98,23 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// Per-leaf-type incoming damage the player was exposed to this battle — the proficiency "incoming book"
-        /// (spike #1318) — captured <b>before</b> the player's type-resistance and Defense, so a resist never
-        /// throttles its own training signal. Covers both direct hits and typed DoT; a fully dodged hit is
-        /// excluded (it was evaded, not mitigated — dodged damage trains evasion instead).
+        /// (spike #1318) — captured <b>before</b> the player's type-resistance and Toughness. Covers both direct
+        /// hits and typed DoT; a fully dodged hit is excluded (it was evaded, not mitigated — dodged damage
+        /// trains evasion instead). Paired with <see cref="TypedDamageResistanceMitigated"/>: the accrual
+        /// (<c>ProficiencyRewardService</c>) splits this pre-mitigation total into its resistance-blocked and
+        /// still-landed components and weights them separately (#1454), so a resist trains faster the more of
+        /// this exposure it actually blocks rather than the two being indistinguishable here.
         /// </summary>
         public Dictionary<EDamageType, double> TypedDamageExposure { get; set; } = [];
+
+        /// <summary>
+        /// Per-leaf-type portion of <see cref="TypedDamageExposure"/> this battler's own type-resistance blocked
+        /// this battle — <see cref="Battle.Battler.TypeResistanceMitigated"/> per direct hit, and the
+        /// resistance-only tick reduction per DoT tick. Deliberately excludes the Toughness curve (a generic,
+        /// non-typed stat) so only the type-specific resistance investment a resist path actually represents
+        /// accelerates that path's training (#1454).
+        /// </summary>
+        public Dictionary<EDamageType, double> TypedDamageResistanceMitigated { get; set; } = [];
 
         /// <summary>
         /// The player's power for this battle — the sum of core additive attribute modifiers, the same measure
@@ -125,6 +137,13 @@ namespace Game.Core.Battle
         {
             TypedDamageExposure.TryGetValue(type, out var existing);
             TypedDamageExposure[type] = existing + amount;
+        }
+
+        /// <summary>Accumulates a resistance-blocked <paramref name="amount"/> into the typed resist-mitigated book.</summary>
+        public void AddTypedDamageResistanceMitigated(EDamageType type, double amount)
+        {
+            TypedDamageResistanceMitigated.TryGetValue(type, out var existing);
+            TypedDamageResistanceMitigated[type] = existing + amount;
         }
 
         /// <summary>Accumulates a normalized-marginal vulnerability-enabled <paramref name="amount"/> into the

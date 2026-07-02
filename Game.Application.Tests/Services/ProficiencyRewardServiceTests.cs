@@ -614,10 +614,10 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // The incoming book: a battle exposing the player to FiredDamage of pre-mitigation Fire trains the
-            // Fire-resist path and the Elemental-resist path (applies(Fire) = [Fire, Elemental] on the incoming
-            // side), each claiming the full pie. The Fire *offense* path keyed on the same type is untouched —
-            // exposure trains resist keys only.
+            // The incoming book: a battle exposing the player to FiredDamage of pre-mitigation Fire (with no
+            // resistance recorded, so it trains at the unmitigated rate, #1454) trains the Fire-resist path and
+            // the Elemental-resist path (applies(Fire) = [Fire, Elemental] on the incoming side). The Fire
+            // *offense* path keyed on the same type is untouched — exposure trains resist keys only.
             var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, name: "Fire Ward");
             var elementalResist = await CreateKeyedTierAsync(context, EActivityKey.ElementalResist, name: "Elemental Ward");
             var fireOffense = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
@@ -640,8 +640,8 @@ namespace Game.Application.Tests.Services
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             // The two books are independent axes (no shared pie): a battle where the player both dealt Fire and
-            // was exposed to Fire trains the Fire *offense* path and the Fire *resist* path in parallel, each
-            // claiming its own full pie from its own book.
+            // was exposed to (fully resistance-mitigated) Fire trains the Fire *offense* path and the Fire
+            // *resist* path in parallel, each claiming its own full pie from its own book.
             var fireOffense = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
             var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, name: "Fire Ward");
             var playerId = await SeedPlayerAsync(context);
@@ -650,6 +650,10 @@ namespace Game.Application.Tests.Services
             var stats = new BattleStats();
             stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
             stats.AddTypedDamageExposure(EDamageType.Fire, FiredDamage);
+            // Fully resistance-mitigated (#1454), so the resist book trains at the full ResistMitigatedTrainingRate
+            // — the same full-pie claim the offense book makes — keeping this test's "both books claim a full
+            // pie, independently" assertion meaningful under the new split.
+            stats.AddTypedDamageResistanceMitigated(EDamageType.Fire, FiredDamage);
             var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
 
             var offense = Assert.Single(accrual.Results, r => r.ProficiencyId == fireOffense.Id);

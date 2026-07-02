@@ -13,10 +13,12 @@ namespace Game.Core.Battle
         private Battler _targetBattler;
         private bool _isPlayerActive;
 
-        // The player's typed-exposure recorder (incoming book) and the player's typed DoT-damage-dealt recorder
-        // (offense book), each cached once — a method group converts to a fresh delegate on every use — so the
-        // per-tick DoT phase can hand them to ApplyDamageOverTime without allocating on the replay hot path.
+        // The player's typed-exposure recorder (incoming book), the player's typed resist-mitigated recorder
+        // (the resist-training split, #1454), and the player's typed DoT-damage-dealt recorder (offense book),
+        // each cached once — a method group converts to a fresh delegate on every use — so the per-tick DoT
+        // phase can hand them to ApplyDamageOverTime without allocating on the replay hot path.
         private readonly Action<EDamageType, double> _recordPlayerExposure;
+        private readonly Action<EDamageType, double> _recordPlayerMitigated;
         private readonly Action<EDamageType, double> _recordPlayerDotDealt;
 
         // The player's Hex-signal recorder for the enemy's DoT phase, cached once so the per-tick DoT loop hands
@@ -36,6 +38,7 @@ namespace Game.Core.Battle
             _isPlayerActive = true;
             TimeDelta = timeDelta;
             _recordPlayerExposure = Stats.AddTypedDamageExposure;
+            _recordPlayerMitigated = Stats.AddTypedDamageResistanceMitigated;
             _recordPlayerDotDealt = Stats.AddTypedDamageDealt;
             _recordPlayerHexBonus = Stats.AddHexBonus;
         }
@@ -121,7 +124,8 @@ namespace Game.Core.Battle
                 return;
             }
 
-            Stats.PlayerDamageTaken += _playerBattler.ApplyDamageOverTime(TimeDelta, _recordPlayerExposure);
+            Stats.PlayerDamageTaken += _playerBattler.ApplyDamageOverTime(
+                TimeDelta, recordExposure: _recordPlayerExposure, recordMitigated: _recordPlayerMitigated);
             Stats.PlayerDamageHealed += _playerBattler.ApplyHealOverTime(TimeDelta);
         }
 
@@ -297,8 +301,11 @@ namespace Game.Core.Battle
                         var type = portions[i].Type;
                         var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
                         // The player was exposed to this portion's full pre-mitigation typed damage — recorded for
-                        // the incoming book before resistance/mitigation.
+                        // the incoming book before resistance/mitigation — and separately the resistance-only
+                        // (Toughness-excluded) slice of it the player's own type-resistance blocked, feeding the
+                        // resist-training split (#1454).
                         Stats.AddTypedDamageExposure(type, dealt);
+                        Stats.AddTypedDamageResistanceMitigated(type, _targetBattler.TypeResistanceMitigated(dealt, type));
                         totalNet += _targetBattler.TakeDamage(dealt, type, _activeBattler.Level);
                     }
                 }
