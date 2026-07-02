@@ -175,6 +175,12 @@ describe('battle-formulas', () => {
 			// Toughness 20: vs level 3 → 20/(20+60) = 0.25 reduction → 40 × 0.75 = 30.
 			expect(toughnessMitigatedDamage(40, 20, 3)).toBeCloseTo(30, 10);
 		});
+
+		it('amplifies the hit for a negative Toughness within the pole (#1478)', () => {
+			// A debuff-driven negative Toughness inverts the curve rather than flooring at 0% mitigation:
+			// -10/(-10+20) = -1 reduction → 40 × (1 − (−1)) = 80.
+			expect(toughnessMitigatedDamage(40, -10, 1)).toBeCloseTo(80, 10);
+		});
 	});
 
 	// Damage typing (#1320): mirrors the backend `Battler.AmplifyDamage` / `Battler.ComputeNetDamage` math.

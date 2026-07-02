@@ -256,6 +256,16 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(12.5, battler.TakeDamage(50, EDamageType.Fire, attackerLevel: 1), 0.001);
         }
 
+        [Fact]
+        public void TakeDamage_NegativeToughnessWithinThePole_AmplifiesTheHit()
+        {
+            // A debuff-driven negative Toughness (2·Endurance(-5) = -10) inverts the curve rather than
+            // flooring at 0% mitigation (#1478): -10/(-10+20) = -1 reduction → 40 × (1 − (−1)) = 80.
+            var battler = MakeBattler((EAttribute.Endurance, -5));
+
+            Assert.Equal(80, battler.TakeDamage(40, EDamageType.Physical, attackerLevel: 1), 0.001);
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
