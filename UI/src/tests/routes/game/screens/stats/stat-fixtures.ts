@@ -39,5 +39,11 @@ export const SERVER_STAT_TYPES: IStatisticType[] = [
 		name: 'Critical Damage Dealt'
 	},
 	{ id: EStatisticType.AttacksDodged, entityType: EEntityType.None, bossOnly: false, name: 'Attacks Dodged' },
-	{ id: EStatisticType.DamageDodged, entityType: EEntityType.None, bossOnly: false, name: 'Damage Dodged' }
+	{ id: EStatisticType.DamageDodged, entityType: EEntityType.None, bossOnly: false, name: 'Damage Dodged' },
+	{
+		id: EStatisticType.KillsByDamageType,
+		entityType: EEntityType.DamageType,
+		bossOnly: false,
+		name: 'Kills By Damage Type'
+	}
 ];

@@ -1,12 +1,14 @@
 /* statistics-display.ts — presentation helpers for the Statistics screen:
-   value formatting per unit, and the category / entity-kind accent hues.
+   value formatting per unit, and the category / breakdown-kind accent hues.
 
    Colours reference the existing themeable `var(--…)` tokens rather than
    hard-coding hex, so the screen restyles with the theme. The four stat
-   categories and three entity kinds reuse the shared accent palette (the same
-   hues the attribute/log tokens use), so no new variables are introduced. */
+   categories and the entity-kind breakdowns reuse the shared accent palette
+   (the same hues the attribute/log tokens use), so no new variables are
+   introduced. The damage-type breakdown's per-row colour instead comes from
+   the `--dmg-*` tokens via `damageTypeKeyColor` (see DamageTypeStatRow). */
 
-import type { StatCategory, StatEntityKind, StatUnit } from './statistics-view.svelte';
+import type { StatBreakdownKind, StatCategory, StatUnit } from './statistics-view.svelte';
 
 /* ── value formatting ─────────────────────────────────────────────────────── */
 
@@ -56,24 +58,29 @@ const CATEGORY_LABEL: Record<StatCategory, string> = {
 export const statCategoryColor = (cat: StatCategory): string => CATEGORY_COLOR[cat];
 export const statCategoryLabel = (cat: StatCategory): string => CATEGORY_LABEL[cat];
 
-const KIND_COLOR: Record<StatEntityKind, string> = {
+const KIND_COLOR: Record<StatBreakdownKind, string> = {
 	enemy: 'var(--log-enemy)',
 	zone: 'var(--success)',
-	skill: 'var(--accent)'
+	skill: 'var(--accent)',
+	// The card-head "kind" badge needs one representative hue; individual damage-type rows are
+	// tinted per-type via `damageTypeKeyColor` instead (see DamageTypeStatRow).
+	damageType: 'var(--dmg-elemental)'
 };
 
-const KIND_LABEL: Record<StatEntityKind, string> = {
+const KIND_LABEL: Record<StatBreakdownKind, string> = {
 	enemy: 'Enemy',
 	zone: 'Zone',
-	skill: 'Skill'
+	skill: 'Skill',
+	damageType: 'Damage Type'
 };
 
-const KIND_PLURAL: Record<StatEntityKind, string> = {
+const KIND_PLURAL: Record<StatBreakdownKind, string> = {
 	enemy: 'Enemies',
 	zone: 'Zones',
-	skill: 'Skills'
+	skill: 'Skills',
+	damageType: 'Damage Types'
 };
 
-export const statKindColor = (kind: StatEntityKind): string => KIND_COLOR[kind];
-export const statKindLabel = (kind: StatEntityKind): string => KIND_LABEL[kind];
-export const statKindPlural = (kind: StatEntityKind): string => KIND_PLURAL[kind];
+export const statKindColor = (kind: StatBreakdownKind): string => KIND_COLOR[kind];
+export const statKindLabel = (kind: StatBreakdownKind): string => KIND_LABEL[kind];
+export const statKindPlural = (kind: StatBreakdownKind): string => KIND_PLURAL[kind];
