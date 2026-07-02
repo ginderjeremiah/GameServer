@@ -1033,6 +1033,115 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
         }
 
+        // ── DamageTarget: Cull execute tally (#1430) ──────────────────────────
+
+        [Fact]
+        public void DamageTarget_NoExecuteBonus_DealsUnmultipliedDamageAndBooksNoCullBonus()
+        {
+            // A damaged target (40% missing) enables nothing without an authored ExecuteBonus — the real damage
+            // stays unmultiplied and Cull trains on nothing.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            enemy.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical));
+
+            Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_ExecuteBonusAtFullHealth_DealsUnmultipliedDamageAndBooksNoCullBonus()
+        {
+            // ExecuteBonus is authored, but the target is at full health, so the missing-HP fraction is 0 and
+            // the multiplier is exactly 1 — no bonus, no training.
+            var player = MakeBattlerWith((Endurance, 0), (ExecuteBonus, 1.0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // full health
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical));
+
+            Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_ExecuteBonusAgainstDamagedTarget_MultipliesRealDamageAndBooksNormalizedMarginalBonus()
+        {
+            // The target is missing 40% of its health (20/50), so a full (100%) ExecuteBonus scales this fire's
+            // multiplier to 1 + 1.0×0.4 = 1.4: 10 raw × 1.4 = 14 dealt (vs 10 unmultiplied). The Cull tally is the
+            // marginal (14 − 10 = 4) discounted by the same 1/(1 + investment) saturation crit/Hex/Momentum use:
+            // 4 / 1.4 ≈ 2.857.
+            var player = MakeBattlerWith((Endurance, 0), (ExecuteBonus, 1.0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            enemy.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical));
+
+            Assert.Equal(50 - 20 - 14, enemy.CurrentHealth, 0.001);
+            Assert.Equal(14, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(10.0 * 0.4 / 1.4, context.Stats.CullBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_HeavilyInvestedExecuteAgainstNearDeadTarget_SaturatesTowardOneBaselineHit()
+        {
+            // A target at 2% health (1/50) with a towering ExecuteBonus (50 = 5000%) drives the multiplier to
+            // 1 + 50×0.98 = 50: 20 raw × 50 = 1000 dealt. But the 1/(1 + investment) saturation bounds the Cull
+            // tally at one baseline hit: (1000 − 20) / (1 + 49) = 19.6, approaching but never reaching the 20
+            // baseline — a monster investment cannot dwarf every other training axis.
+            var player = MakeBattlerWith((Endurance, 0), (ExecuteBonus, 50.0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            enemy.TakeReflectedDamage(49); // CurrentHealth 1 (98% missing)
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical));
+
+            Assert.Equal(1000, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(19.6, context.Stats.CullBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_CritAndCull_BookIndependentBonuses()
+        {
+            // Crit and Cull are separate overlays. Cull is measured on the pre-crit hit, so a crit does not
+            // inflate it: investment 0.4 on raw 10 still banks 10×0.4/1.4 ≈ 2.857 — identical to the isolated
+            // case above. Crit books its own marginal off the (execute-untouched) non-crit baseline 10:
+            // investment m−1 = 1, φ(1) = 0.5 ⇒ 10×0.5 = 5. The real damage composes both multipliers:
+            // 10 × 2 (crit) × 1.4 (execute) = 28.
+            var player = MakeBattlerWith(
+                (Endurance, 0), (CriticalChance, 1), (CriticalDamage, 0.5), (ExecuteBonus, 1.0)); // CriticalDamage 2
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            enemy.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical));
+
+            Assert.Equal(28, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(10.0 * 0.4 / 1.4, context.Stats.CullBonusDealt, 0.001); // unaffected by the crit
+            Assert.Equal(10.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // unaffected by execute
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyAttacking_IgnoresEnemyExecuteBonusAndBooksNoCullBonus()
+        {
+            // Cull is a player-offense signal, like Hex/Momentum. Even if the enemy carries ExecuteBonus and the
+            // player is itself damaged, an enemy hit is never multiplied by it — the whole mechanic is gated on
+            // the player-active branch — so the player takes exactly the raw 10 and Cull trains on nothing.
+            var player = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            player.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
+            var enemy = MakeBattlerWith((Endurance, 0), (ExecuteBonus, 1.0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers(); // enemy attacks
+
+            context.DamageTarget(10, Single(EDamageType.Physical));
+
+            Assert.Equal(30 - 10, player.CurrentHealth, 0.001);
+            Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static IReadOnlyList<SkillDamagePortion> Single(EDamageType type) =>

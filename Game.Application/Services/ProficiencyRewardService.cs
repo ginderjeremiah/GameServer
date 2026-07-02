@@ -27,8 +27,9 @@ namespace Game.Application.Services
     /// marginal crit bonus (Precision, <see cref="BattleStats.CriticalBonusDealt"/>), dodged damage (Evasion),
     /// healing done (Restoration), reflected damage dealt
     /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363), the vulnerability-enabled
-    /// Hex bonus (<see cref="BattleStats.HexBonusDealt"/> — #1427), and the ramp-enabled Momentum bonus
-    /// (<see cref="BattleStats.MomentumBonusDealt"/> — #1428) — are damage-type-neutral
+    /// Hex bonus (<see cref="BattleStats.HexBonusDealt"/> — #1427), the ramp-enabled Momentum bonus
+    /// (<see cref="BattleStats.MomentumBonusDealt"/> — #1428), and the execute-enabled Cull bonus
+    /// (<see cref="BattleStats.CullBonusDealt"/> — #1430) — are damage-type-neutral
     /// and map straight to a single activity key. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
@@ -181,9 +182,10 @@ namespace Game.Application.Services
         //     (BattleStats.TypedDamageExposure), routed to the resist keys, so a resist never throttles its own
         //     training signal.
         //   • Events: the normalized marginal crit bonus (not the full crit hit — #1448), dodged damage, healing
-        //     done, reflected damage dealt, the vulnerability-enabled Hex bonus (#1427), and the ramp-enabled
-        //     Momentum bonus (#1428) — damage-type-neutral magnitudes that map straight to a single activity key
-        //     (Crit / Dodge / Heal / Reflect / Hex / Momentum) without applies() routing.
+        //     done, reflected damage dealt, the vulnerability-enabled Hex bonus (#1427), the ramp-enabled
+        //     Momentum bonus (#1428), and the execute-enabled Cull bonus (#1430) — damage-type-neutral
+        //     magnitudes that map straight to a single activity key
+        //     (Crit / Dodge / Heal / Reflect / Hex / Momentum / Cull) without applies() routing.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
@@ -212,6 +214,7 @@ namespace Game.Application.Services
             AddEvent(EActivityKey.Reflect, stats.PlayerReflectedDamageDealt);
             AddEvent(EActivityKey.Hex, stats.HexBonusDealt);
             AddEvent(EActivityKey.Momentum, stats.MomentumBonusDealt);
+            AddEvent(EActivityKey.Cull, stats.CullBonusDealt);
 
             // Route each key's activity to the frontier tier of every path bound to it — but only to a frontier
             // the player has actually unlocked. Within-path tiers open implicitly as the prior tier maxes (the

@@ -7,17 +7,19 @@ import { amplifiedDamage } from './battle-formulas';
 /** Resolves one direct hit by splitting `raw` across the skill's weighted `portions` (#1343): each portion
  *  takes `raw × weight ÷ Σweights` of the single raw hit (the weight total folded in fixed portion order, a
  *  parity contract) and runs the single-type pipeline — attacker amplification, then `critMultiplier` (the
- *  attacker's CriticalDamage on a crit, else 1, so one crit decision scales EVERY portion), then the
- *  defender's resistance + Toughness curve — under its own type; the per-portion nets are summed and returned.
- *  Each portion's absorption heal is capped at the defender's MaxHealth room AT THAT POINT in the fixed order,
- *  so the order is a parity contract. A single portion reduces byte-for-byte to the pre-feature single-typed
- *  hit. Mirrors the backend `BattleContext.DamageTarget` portion loop. */
+ *  attacker's CriticalDamage on a crit, else 1, so one crit decision scales EVERY portion) and
+ *  `executeMultiplier` (the Cull execute overlay, #1430 — 1 when unauthored or the target is at full health),
+ *  then the defender's resistance + Toughness curve — under its own type; the per-portion nets are summed and
+ *  returned. Each portion's absorption heal is capped at the defender's MaxHealth room AT THAT POINT in the
+ *  fixed order, so the order is a parity contract. A single portion reduces byte-for-byte to the pre-feature
+ *  single-typed hit. Mirrors the backend `BattleContext.DamageTarget` portion loop. */
 function dealPortionedDamage(
 	attacker: Battler,
 	defender: Battler,
 	raw: number,
 	portions: ISkillDamagePortion[],
-	critMultiplier: number
+	critMultiplier: number,
+	executeMultiplier: number = 1
 ): number {
 	// Relies on the skill's damagePortions invariant (≥1 positive-weight portion, enforced by authoring
 	// validation + backfill), so totalWeight is never 0 — no zero-division/empty-hit guard is needed.
@@ -28,7 +30,7 @@ function dealPortionedDamage(
 	let totalNet = 0;
 	for (const portion of portions) {
 		const dealt = amplifiedDamage((raw * portion.weight) / totalWeight, portion.type, attacker.attributes);
-		totalNet += defender.takeDamage(dealt * critMultiplier, portion.type, attacker.level);
+		totalNet += defender.takeDamage(dealt * critMultiplier * executeMultiplier, portion.type, attacker.level);
 	}
 	return totalNet;
 }
@@ -148,9 +150,18 @@ export function battleStep(
 		const crit = rng.next() < player.attributes.getValue(EAttribute.CriticalChance);
 		const raw = skill.calculateDamage();
 		const critMultiplier = crit ? player.attributes.getValue(EAttribute.CriticalDamage) : 1;
-		// Split the raw hit across the skill's weighted portions, each amplified, crit-scaled, then run through
-		// the typed mitigation pipeline (resistance, Toughness curve scaled by the player's level), summing the nets.
-		const damage = dealPortionedDamage(player, enemy, raw, skill.damagePortions, critMultiplier);
+		// The Cull execute overlay (#1430): the enemy's missing-health fraction AT THE START of this fire
+		// (sampled once, like the crit draw) scales ExecuteBonus into this fire's multiplier above 1, applied
+		// identically to critMultiplier before mitigation. Unlike Hex/Momentum/Sunder — backend-only training
+		// signals that ride the existing resistance/amplification pipeline — this changes real damage, so it is
+		// parity-critical and mirrors the backend BattleContext.DamageTarget.
+		const maxHealth = enemy.attributes.getValue(EAttribute.MaxHealth);
+		const missingHpFraction = Math.min(1, Math.max(0, (maxHealth - enemy.currentHealth) / maxHealth));
+		const executeMultiplier = 1 + player.attributes.getValue(EAttribute.ExecuteBonus) * missingHpFraction;
+		// Split the raw hit across the skill's weighted portions, each amplified, crit- and execute-scaled, then
+		// run through the typed mitigation pipeline (resistance, Toughness curve scaled by the player's level),
+		// summing the nets.
+		const damage = dealPortionedDamage(player, enemy, raw, skill.damagePortions, critMultiplier, executeMultiplier);
 		// Direct-hit reflection: the enemy (defender) returns its share of the summed net to the player (attacker).
 		const reflected = reflectDamage(player, enemy, damage);
 		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, reflected });
