@@ -203,27 +203,12 @@ namespace Game.Core.Battle
             var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
             for (var i = 0; i < resistanceAttributes.Count; i++)
             {
-                contribution += StackVulnerabilityContribution(resistanceAttributes[i]);
+                contribution += StackContribution(resistanceAttributes[i], stack => stack.VulnerabilityContribution);
             }
 
             // Contributions are the signed resistance deltas the opponent applied (negative for a debuff); the
             // vulnerability is their reduction, so negate and clamp — an opponent that only raised resistance is 0.
             return contribution < 0 ? -contribution : 0;
-        }
-
-        // The vulnerability-tracked resistance delta the opponent has applied to one attribute, or 0 when no
-        // effect stack for it is active. A linear scan over the affected-attribute count, like GetOrCreateStack.
-        private double StackVulnerabilityContribution(EAttribute attribute)
-        {
-            foreach (var stack in _attributeStacks!)
-            {
-                if (stack.Attribute == attribute)
-                {
-                    return stack.VulnerabilityContribution;
-                }
-            }
-
-            return 0;
         }
 
         /// <summary>
@@ -245,21 +230,28 @@ namespace Game.Core.Battle
             var amplificationAttributes = DamageTypes.AmplificationAttributes(damageType);
             for (var i = 0; i < amplificationAttributes.Count; i++)
             {
-                contribution += StackMomentumContribution(amplificationAttributes[i]);
+                contribution += StackContribution(amplificationAttributes[i], stack => stack.MomentumContribution);
             }
 
             return contribution > 0 ? contribution : 0;
         }
 
-        // The ramp-tracked amplification this battler has applied to one of its own attributes, or 0 when no
-        // effect stack for it is active. A linear scan over the affected-attribute count, like GetOrCreateStack.
-        private double StackMomentumContribution(EAttribute attribute)
+        // The tracked contribution (selected via <paramref name="selector"/>) an active effect stack has
+        // accrued for one attribute, or 0 when no stack for it exists yet. A linear scan over the
+        // affected-attribute count, like GetOrCreateStack. Shared by the per-overlay applied-* readers
+        // (AppliedVulnerability, AppliedMomentum, ...) so each just supplies its own contribution field.
+        private double StackContribution(EAttribute attribute, Func<AttributeEffectStack, double> selector)
         {
-            foreach (var stack in _attributeStacks!)
+            if (_attributeStacks is null)
+            {
+                return 0;
+            }
+
+            foreach (var stack in _attributeStacks)
             {
                 if (stack.Attribute == attribute)
                 {
-                    return stack.MomentumContribution;
+                    return selector(stack);
                 }
             }
 
@@ -449,7 +441,6 @@ namespace Game.Core.Battle
         public void ApplyEffect(
             SkillEffect effect, double amount, bool tracksVulnerability = false, bool tracksMomentum = false)
         {
-            _attributeStacks ??= [];
             var stack = GetOrCreateStack(effect.AttributeId);
 
             // Re-applying any effect on this attribute resets the whole stack's shared expiry to the new
@@ -546,11 +537,13 @@ namespace Game.Core.Battle
             }
         }
 
-        // Returns the stack for the given attribute, creating it on first use. The scan is over the
-        // affected-attribute count (≤ the attribute count), never the application count, so it stays cheap.
+        // Returns the stack for the given attribute, creating it (and the backing list) on first use. The scan
+        // is over the affected-attribute count (≤ the attribute count), never the application count, so it
+        // stays cheap.
         private AttributeEffectStack GetOrCreateStack(EAttribute attribute)
         {
-            foreach (var stack in _attributeStacks!)
+            _attributeStacks ??= [];
+            foreach (var stack in _attributeStacks)
             {
                 if (stack.Attribute == attribute)
                 {
