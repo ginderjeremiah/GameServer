@@ -470,6 +470,15 @@ namespace Game.Core
         /// Appended after the weapon-mastery keys (the enum grows append-only).
         /// </summary>
         Hex = 30,
+
+        /// <summary>
+        /// Ramp damage enabled (the Momentum mastery — spike #1398, #1428). The normalized-marginal extra damage
+        /// a player-applied ramp (a stacking self-buff to a typed amplification attribute) enabled, booked as an
+        /// overlay tally like <see cref="Crit"/> and <see cref="Hex"/>. A combat-event key — type-neutral, routed
+        /// straight to a single activity key with no <see cref="Attributes.DamageTypes.Applies"/> routing.
+        /// Appended after Hex (the enum grows append-only).
+        /// </summary>
+        Momentum = 31,
     }
 
     /// <summary>
