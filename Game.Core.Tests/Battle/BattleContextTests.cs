@@ -1293,95 +1293,99 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_InnateLowToughness_TrainsNoSunder()
+        public void DamageTarget_AppliedSunder_BooksDealtScaledByInvestment()
         {
-            // The enemy is innately squishy (Toughness 0 from the start), but nothing the player applied lowered
-            // it — Sunder credits only player-applied debuffs, so this trains nothing even though no mitigation
-            // curve applies to the hit.
+            // Sunder books dealt × φ(investment) — not a literal before/after marginal (the nonlinear Toughness
+            // curve has no marginal that is actually flat in the target's own stats the way Hex's resistance
+            // does), so this is a designed proxy rather than a measured difference. Attacker (player) level 1 ⇒
+            // K·level = 20; a −20 debuff (s = 20) gives investment 20/20 = 1.0, φ(1.0) = 0.5, so raw 30 dealt
+            // banks 30 × 0.5 = 15. The enemy's own Toughness (20, fully stripped to 0 by the debuff) drives the
+            // ACTUAL damage dealt but is never read by the tally itself.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
-            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-
-            context.DamageTarget(30, Single(EDamageType.Physical), 0);
-
-            Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(0, context.Stats.SunderBonusDealt, 0.001);
-        }
-
-        [Fact]
-        public void DamageTarget_AppliedSunder_BooksNormalizedMarginalBonus()
-        {
-            // Enemy Endurance 10 ⇒ baseline Toughness 20; attacker (player) level 1 ⇒ K·level = 20, so the
-            // baseline curve reduces 20/(20+20) = 50%. The player fully strips Toughness with a −20 debuff (live
-            // Toughness 0, no curve at all). Raw 30 (no resistance): baseline net 15, live net 30 — the debuff
-            // enabled 15. The investment normalized by φ is the raw Toughness points removed divided by K·level
-            // (20/20 = 1.0) — independent of the enemy's own baseline Toughness — so the tally saturates the
-            // marginal by 1/(1 + 1.0): 15/2 = 7.5.
-            var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 10));
+            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(SunderDebuff(-20));
 
             context.DamageTarget(30, Single(EDamageType.Physical), 0); // Toughness 0 ⇒ no curve ⇒ 30 dealt
 
             Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(15.0 / 2.0, context.Stats.SunderBonusDealt, 0.001); // 7.5
+            Assert.Equal(15, context.Stats.SunderBonusDealt, 0.001);
         }
 
         [Fact]
         public void DamageTarget_PartialSunder_BooksSmallerProportionalBonus()
         {
-            // A lighter debuff (−10, half of the full-strip case above) leaves live Toughness at 10: reduction
-            // 10/30 = 1/3, so raw 30 nets 20 (vs the 15 baseline) — a smaller marginal (5) at a smaller investment
-            // (10/20 = 0.5), giving a smaller tally (5/1.5) than the full-strip case — strength-proportionality.
+            // A lighter debuff (−10, half of the previous case) gives half the investment (10/20 = 0.5),
+            // φ(0.5) = 1/3, so the same raw 30 dealt now banks only 30/3 = 10 — smaller for a smaller
+            // investment (strength-proportionality).
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20, baseline reduction 0.5
+            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(SunderDebuff(-10)); // live Toughness 10, live reduction 1/3
 
             context.DamageTarget(30, Single(EDamageType.Physical), 0); // 30 × (1 − 1/3) = 20 dealt
 
             Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(5.0 / 1.5, context.Stats.SunderBonusDealt, 0.001);
+            Assert.Equal(10, context.Stats.SunderBonusDealt, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_SunderBonus_IsIndependentOfEnemyBaseline()
+        public void DamageTarget_HeavilyInvestedSunder_SaturatesTowardDealt()
         {
-            // The same −10 debuff against a TOUGHER enemy (Endurance 30 ⇒ baseline Toughness 60, reduction 0.75)
-            // still normalizes on investment 10/20 = 0.5 — identical to the softer enemy above — because the
-            // investment reads only the player's own applied magnitude, never the defender's baseline Toughness
-            // (mirroring Hex's v / Momentum's r, which are likewise the raw applied delta). Only the raw marginal
-            // itself differs (a tougher enemy's curve responds differently to the same point removal), not the
-            // saturation the marginal is discounted by.
+            // A towering debuff (s = 180) drives the investment to 180/20 = 9, φ(9) = 0.9, so the tally
+            // approaches (but never reaches) the full dealt amount: 30 × 0.9 = 27 — the same saturating ceiling
+            // shape the crit/Hex/Momentum bonuses use, here bounding a single hit's credit at one dealt's worth.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 30)); // Toughness 60, baseline reduction 60/80 = 0.75
+            var enemy = MakeBattlerWith((Endurance, 10));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.ApplySkillEffect(SunderDebuff(-10)); // live Toughness 50, live reduction 50/70 = 5/7
+            context.ApplySkillEffect(SunderDebuff(-180));
 
-            context.DamageTarget(30, Single(EDamageType.Physical), 0); // 30 × (1 − 5/7) = 60/7 dealt
+            context.DamageTarget(30, Single(EDamageType.Physical), 0);
 
-            var baselineNet = 30.0 * (1 - 0.75); // 7.5
-            var liveNet = 30.0 * (1 - 5.0 / 7.0); // 60/7
-            var marginal = liveNet - baselineNet;
-            Assert.Equal(marginal / 1.5, context.Stats.SunderBonusDealt, 0.001); // investment still 10/20 = 0.5
+            Assert.Equal(27, context.Stats.SunderBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_SunderBonus_IsIndependentOfEnemyStats()
+        {
+            // The tally reads neither the target's Toughness nor its resistance — only the player's own applied
+            // debuff and level — so the same investment trains identically against a soft, undefended enemy and
+            // a heavily-invested, resistant one, even though the REAL damage dealt differs sharply between them.
+            var softPlayer = MakeBattlerWith((Endurance, 0));
+            var softEnemy = MakeBattlerWith((Endurance, 10)); // Toughness 20, no resistance
+            var softContext = new BattleContext(softPlayer, softEnemy, timeDelta: 0, new Mulberry32(0));
+            softContext.ApplySkillEffect(SunderDebuff(-10));
+
+            var toughPlayer = MakeBattlerWith((Endurance, 0));
+            var toughEnemy = MakeBattlerWith((Endurance, 200), (PhysicalResistance, 0.5)); // Toughness 400, 50% resist
+            var toughContext = new BattleContext(toughPlayer, toughEnemy, timeDelta: 0, new Mulberry32(0));
+            toughContext.ApplySkillEffect(SunderDebuff(-10));
+
+            softContext.DamageTarget(30, Single(EDamageType.Physical), 0);
+            toughContext.DamageTarget(30, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(10, softContext.Stats.SunderBonusDealt, 0.001);
+            Assert.Equal(softContext.Stats.SunderBonusDealt, toughContext.Stats.SunderBonusDealt, 0.001);
+            Assert.NotEqual(softContext.Stats.PlayerDamageDealt, toughContext.Stats.PlayerDamageDealt);
         }
 
         [Fact]
         public void DamageTarget_CritAndSunder_BookIndependentBonuses()
         {
-            // Crit and Sunder are separate overlays. Sunder is measured on the pre-crit hit, so a crit does not
-            // inflate it: the debuff still banks 7.5 (the full-strip case). Crit books its own marginal off the
-            // (sundered) non-crit baseline 30: investment m−1 = 1, φ(1) = 0.5 ⇒ 30 × 0.5 = 15.
+            // Crit and Sunder are separate overlays. Sunder is measured on the pre-crit dealt, so a crit does not
+            // inflate it: it still banks 15 (the same as the isolated case above). Crit books its own marginal
+            // off the non-crit baseline net (30, unaffected by Sunder's own tally formula): investment m−1 = 1,
+            // φ(1) = 0.5 ⇒ 30 × 0.5 = 15.
             var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
             var enemy = MakeBattlerWith((Endurance, 10));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(SunderDebuff(-20));
 
-            context.DamageTarget(30, Single(EDamageType.Physical), 1); // sundered non-crit 30, crit ×2 = 60 dealt
+            context.DamageTarget(30, Single(EDamageType.Physical), 1); // sundered Toughness 0, crit ×2 = 60 dealt
 
-            Assert.Equal(15.0 / 2.0, context.Stats.SunderBonusDealt, 0.001); // 7.5, unaffected by the crit
-            Assert.Equal(30.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 15
+            Assert.Equal(60, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(15, context.Stats.SunderBonusDealt, 0.001); // unaffected by the crit
+            Assert.Equal(15, context.Stats.CriticalBonusDealt, 0.001); // unaffected by Sunder
         }
 
         [Fact]

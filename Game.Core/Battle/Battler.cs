@@ -141,18 +141,9 @@ namespace Game.Core.Battle
         }
 
         // The mitigation tail shared by the live hit and the Hex counterfactual: percentage resistance then the
-        // Toughness curve (read live off this battler). Factored out (byte-identical to the former inline body)
-        // so the Hex tally can measure the same hit against a different resistance — the innate baseline —
-        // without duplicating the curve.
+        // Toughness curve. Factored out (byte-identical to the former inline body) so the Hex tally can measure
+        // the same hit against a different resistance — the innate baseline — without duplicating the curve.
         private double NetDamageAfterResistance(double dealt, double resistance, int attackerLevel)
-        {
-            return NetDamageAfterMitigation(dealt, resistance, _attributes[Toughness], attackerLevel);
-        }
-
-        // The full mitigation tail parameterized on both resistance and Toughness, so the Sunder counterfactual
-        // can measure the same hit against a different Toughness (the pre-debuff baseline) without duplicating
-        // the curve. NetDamageAfterResistance is the live-Toughness instance of this.
-        private double NetDamageAfterMitigation(double dealt, double resistance, double toughness, int attackerLevel)
         {
             var mitigated = dealt * (1 - resistance);
             if (mitigated <= 0)
@@ -166,12 +157,10 @@ namespace Game.Core.Battle
             // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
             // K·attackerLevel keeps the band stable across content scaling. The curve is floored at Toughness = 0
             // (a debuff can strip mitigation to 0%, never past its pole at -K·attackerLevel into amplification or a
-            // net heal — #1461) — floored on whichever Toughness value the caller passed in, so the Sunder
-            // counterfactual's baseline (pre-debuff) Toughness is floored identically to the live value. Both
-            // simulators must compute this expression identically for battle parity.
-            var flooredToughness = Math.Max(toughness, 0);
+            // net heal — #1461). Both simulators must compute this expression identically for battle parity.
+            var toughness = Math.Max(_attributes[Toughness], 0);
             var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            var toughnessReduction = flooredToughness / (flooredToughness + scaled);
+            var toughnessReduction = toughness / (toughness + scaled);
 
             return mitigated * (1 - toughnessReduction);
         }
@@ -241,22 +230,31 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// The normalized-marginal Sunder bonus for a direct hit of <paramref name="dealt"/> (attacker-amplified,
-        /// pre-crit) of <paramref name="damageType"/> against this (defending) battler — the extra damage the
-        /// <b>opponent-applied</b> Toughness debuff let through the mitigation curve, booked to the attacker's
-        /// Sunder signal (#1429). The debuff strength <c>s</c> is this battler's opponent-applied Toughness
-        /// reduction (<see cref="AppliedSunder"/>), raw points removed. The investment normalized by <c>φ</c> is
-        /// <c>s</c> scaled by the curve's own characteristic magnitude <c>K·attackerLevel</c>
-        /// (<see cref="GameConstants.ToughnessMitigationConstant"/>) — the same constant the curve itself divides
-        /// by, so a fixed debuff trains the <b>same regardless of which enemy it lands on</b> (the normalization
-        /// reads only the player's own applied magnitude, mirroring how Hex's <c>v</c> and Momentum's <c>r</c> are
-        /// also the raw applied delta, never a value derived from the defender's own stat). The raw marginal is
-        /// still the live net minus the net the hit <em>would</em> have dealt at the baseline (pre-debuff)
-        /// Toughness, discounted by <c>1/(1 + investment)</c>. Returns <c>0</c> when no Sunder debuff is applied.
-        /// A backend-only side channel — it never mutates health. Direct-hit only: DoT bypasses the Toughness
-        /// curve entirely (a Toughness debuff cannot affect it), so there is no DoT counterpart to this method.
+        /// <summary>
+        /// The Sunder bonus for a direct hit of <paramref name="dealt"/> (attacker-amplified, pre-crit,
+        /// pre-mitigation) against this (defending) battler — the attacker's Sunder signal (#1429), booked as
+        /// <c>dealt × φ(investment)</c>, <c>φ(a) = a / (1 + a)</c>, where the investment is the opponent-applied
+        /// Toughness reduction (<see cref="AppliedSunder"/>) scaled by the curve's own characteristic magnitude
+        /// <c>K·attackerLevel</c> (<see cref="GameConstants.ToughnessMitigationConstant"/>) — the same constant
+        /// the live mitigation curve itself divides by.
+        /// <para>
+        /// Unlike Hex, this is <b>not</b> a literal before/after marginal through <see cref="ComputeNetDamage"/>.
+        /// An earlier version computed one (the live net minus the net at the pre-debuff Toughness), but that
+        /// marginal reduces algebraically to <c>dealt × (1 − resistance) × [curve(baseline) − curve(live)]</c> —
+        /// still scaled by the target's own resistance, and still running the nonlinear Toughness curve at two
+        /// different baselines that are themselves target-dependent. Because the Toughness curve is nonlinear
+        /// (unlike Hex's flat resistance percentage, where the base resistance term cancels out of the marginal
+        /// algebraically), there is no way to compute a literal marginal through it that is actually flat in the
+        /// target's stats. So Sunder instead uses <paramref name="dealt"/> directly as a designed, saturating
+        /// proxy — the fraction of the hit's own magnitude credited to the debuff — which is genuinely
+        /// enemy-independent for a fixed investment (it reads neither the target's Toughness nor its resistance)
+        /// and costs nothing beyond the investment ratio itself (no counterfactual curve evaluation at all).
+        /// </para>
+        /// Returns <c>0</c> when no Sunder debuff is applied. A backend-only side channel — it never mutates
+        /// health. Direct-hit only: DoT bypasses the Toughness curve entirely (a Toughness debuff cannot affect
+        /// it), so there is no DoT counterpart to this method.
         /// </summary>
-        public double SunderBonusForHit(double dealt, EDamageType damageType, int attackerLevel)
+        public double SunderBonusForHit(double dealt, int attackerLevel)
         {
             var sunder = AppliedSunder();
             if (sunder <= 0)
@@ -264,17 +262,8 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            var liveToughness = _attributes[Toughness];
-            var liveResistance = SumTypeResistance(damageType);
-            var marginal = NetDamageAfterMitigation(dealt, liveResistance, liveToughness, attackerLevel)
-                - NetDamageAfterMitigation(dealt, liveResistance, liveToughness + sunder, attackerLevel);
-            if (marginal <= 0)
-            {
-                return 0;
-            }
-
-            var investment = sunder / (GameConstants.ToughnessMitigationConstant * attackerLevel);
-            return marginal / (1 + investment);
+            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
+            return dealt * sunder / (sunder + scaled);
         }
 
         /// <summary>
