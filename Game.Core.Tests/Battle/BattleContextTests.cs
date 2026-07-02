@@ -814,24 +814,42 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_EnemySelfBuffThenPlayerDebuff_CreditsOnlyTheNetReductionBelowInnate()
+        public void DamageTarget_EnemySelfBuffThenPlayerDebuff_CreditsThePlayersGrossContribution()
         {
-            // Both move the same resistance: the enemy self-buffs +0.5, the player debuffs −0.8, so live sits 0.3
-            // BELOW the innate baseline. Hex credits that net 0.3 (the extra damage that actually landed vs. the
-            // innate hit), not the player's gross 0.8 — the enemy's buff first had to be overcome. Pinned so the
-            // interaction is intentional: the tally is "damage enabled vs. the innate baseline", not gross debuff.
+            // Both move the same resistance: the enemy self-buffs +0.5 (untracked), the player debuffs −0.8
+            // (tracked as v = 0.8). Hex credits the player's GROSS debuff — the resistance its debuff removed —
+            // not the net reduction, so the enemy hardening itself does not rob the player of training for the
+            // work their debuff did. The marginal is measured against the without-debuff hit (resistance raised
+            // back by 0.8 to the enemy-buffed 0.5): N(−0.3) − N(0.5) = 39 − 15 = 24, ÷ (1 + 0.8).
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
             context.ApplySkillEffect(SelfResistanceBuff(FireResistance, 0.5)); // enemy: FireResistance 0 → 0.5
             context.SwapActiveAndTargetBattlers();
-            context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // player: 0.5 → −0.3, net v = 0.3
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // player: 0.5 → −0.3, gross v = 0.8
 
             context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − (−0.3)) = 39 dealt
 
             Assert.Equal(39, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(30.0 * 0.3 / 1.3, context.Stats.HexBonusDealt, 0.001); // (39 − 30) / (1 + 0.3) ≈ 6.92
+            Assert.Equal((39.0 - 15.0) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 ≈ 13.33
+        }
+
+        [Fact]
+        public void DamageTarget_VulnerabilityExpired_BooksNoHexBonus()
+        {
+            // The tracked vulnerability rides the effect stack's shared expiry: once the debuff lapses the stack
+            // (and its contribution) is gone, so a later hit trains no Hex and lands at full resistance again.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.5)); // DurationMs 10_000
+            enemy.AdvanceEffects(10_001); // past expiry → the FireResistance stack and its contribution are removed
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // resistance back to 0 ⇒ 30 dealt, no vulnerability
+
+            Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
         }
 
         [Fact]

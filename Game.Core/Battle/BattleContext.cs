@@ -76,8 +76,15 @@ namespace Game.Core.Battle
                 amount = _activeBattler.AmplifyDamage(amount, dotType);
             }
 
+            // An opponent-targeted additive resistance debuff is the Hex vulnerability enabler (#1427): track its
+            // signed delta on the target so the attacker's Hex signal credits the resistance its debuff removed,
+            // independently of the target's base resistance or its own resistance buffs.
+            var tracksVulnerability = effect.Target is ESkillEffectTarget.Opponent
+                && effect.ModifierType is EModifierType.Additive
+                && DamageTypes.IsResistanceAttribute(effect.AttributeId);
+
             var battler = effect.Target is ESkillEffectTarget.Self ? _activeBattler : _targetBattler;
-            battler.ApplyEffect(effect, amount);
+            battler.ApplyEffect(effect, amount, tracksVulnerability);
         }
 
         /// <summary>
