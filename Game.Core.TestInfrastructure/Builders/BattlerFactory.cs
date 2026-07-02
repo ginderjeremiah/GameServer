@@ -56,7 +56,11 @@ namespace Game.Core.TestInfrastructure.Builders
                     ? selected
                     : resolveSkill?.Invoke(id) ?? throw new InvalidOperationException($"Skill {id} could not be resolved."));
 
-            return new Battler(player.GetAttributes(), skills, player.Level);
+            // Mirror the snapshot's parry-counter resolution (#1457): the equipped weapon's signature, or punch
+            // bare-handed — resolver-gated like the punch grant above, so the resolver-less shortcut carries none.
+            var counterSkill = resolveSkill?.Invoke(weapon?.GrantedSkillId ?? GameConstants.PunchSkillId);
+
+            return new Battler(player.GetAttributes(), skills, player.Level, counterSkill);
         }
     }
 }

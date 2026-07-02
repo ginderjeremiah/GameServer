@@ -79,6 +79,9 @@ const STAT_UNIT: Record<EStatisticType, string> = {
 	[EStatisticType.CriticalDamageDealt]: 'damage',
 	[EStatisticType.AttacksDodged]: 'dodges',
 	[EStatisticType.DamageDodged]: 'damage',
+	[EStatisticType.AttacksParried]: 'parries',
+	[EStatisticType.DamageParried]: 'damage',
+	[EStatisticType.CounterDamageDealt]: 'damage',
 	[EStatisticType.KillsByDamageType]: 'kills'
 };
 

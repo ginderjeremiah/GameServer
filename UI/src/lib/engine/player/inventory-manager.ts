@@ -138,6 +138,15 @@ export class InventoryManager {
 		return this.equippedSlots[EEquipmentSlot.WeaponSlot]?.weaponType ?? EDamageType.Unarmed;
 	}
 
+	/** The id of the skill the player ripostes with on a parry (#1457): the equipped weapon's signature, or
+	 *  the virtual fists' punch bare-handed — the same resolution rule the granted-signature append uses,
+	 *  mirroring the backend `BattleSnapshot.ToBattler`. `undefined` when the id resolves to no authored
+	 *  skill (an unseeded punch), so the battler carries no counter and a parry negates without a riposte. */
+	public get counterSkillId(): number | undefined {
+		const id = this.equippedSlots[EEquipmentSlot.WeaponSlot]?.grantedSkillId ?? PUNCH_SKILL_ID;
+		return staticData.skills?.[id] != null ? id : undefined;
+	}
+
 	/** Rebuilds the memoised {@link equipmentStats} and {@link grantedSkillIds} from the currently equipped
 	 *  items + their mods. Called after every mutation that can change them (and after a rollback restores
 	 *  the prior state). Reassigns both caches so the battle reset's by-reference change detection fires. */

@@ -857,7 +857,7 @@ const scenarios: ParityScenario[] = [
 	// ── Deterministic damage reflection (#1330) ──────────────────────────────────
 	// Reflection returns the defender's DamageReflection share of a direct hit's net damage to the attacker,
 	// bypassing the attacker's mitigation. Authored-only, deterministic (no draw), scoped to direct hits.
-	// Mirrors the backend `reflectionKillsAttacker` / `reflectionIgnoresDot` / `drawOrderDodgeOnlyAlignsCrit`.
+	// Mirrors the backend `reflectionKillsAttacker` / `reflectionIgnoresDot` / `drawOrderEnemyFireAlignsCrit`.
 
 	// Reflection as a kill condition: a pure tank (no skills, no Toughness — MaxHealth 550 from Strength)
 	// returns 100% of every 25 it takes, so the 100-HP enemy dies to its own reflected damage on its 4th attack
@@ -896,16 +896,17 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: true, totalMs: 4000 }
 	},
 
-	// Simplified draw order — an enemy attack now draws ONE dodge value (not dodge + block), so the player's
-	// fractional crit draws interleave at EVEN stream positions (the enemy's single dodge draw sits between
-	// consecutive player crit draws). With a real CriticalChance 0.5 against PARITY_SEED the crit draws at
-	// stream indices 0, 2, 4, 6 are crit, no, crit, crit; CriticalDamage base 1.5 + 0.5 = 2.0, so the player
-	// deals 24, 12, 24, 24 (no Toughness) for a cumulative 24, 36, 60, 84. The 80-HP enemy (Str 6) dies on the
-	// tick-40 fire → 1600ms. Had the enemy still drawn TWICE (the old dodge + block), the crit draws would land
-	// at indices 0, 3, 6, 9 — crit, no, crit, no → 24, 12, 24, 12 — pushing the kill to tick 50 (2000ms). So this
-	// row pins the one-draw enemy attack. The enemy chips 5/tick (DodgeChance 0), leaving the 100-HP player at 85.
+	// Draw-position alignment with a fractional crit — an enemy attack draws THREE values (parry, dodge,
+	// counter-crit — #1457), so the player's fractional crit draws land at stream indices 0, 4, 8, 12 (the
+	// enemy's three draws sit between consecutive player crit draws). With a real CriticalChance 0.5 against
+	// PARITY_SEED those draws are crit, crit, crit, no; CriticalDamage base 1.5 + 0.5 = 2.0, so the player
+	// deals 24, 24, 24, 12 (no Toughness) for a cumulative 24, 48, 72, 84. The 80-HP enemy (Str 6) dies on the
+	// tick-40 fire → 1600ms. This row pins the two sims interleaving the per-fire draws identically against
+	// real fractional draws (the sharp pin on the three-draw enemy fire itself is `fractionalParryChance`).
+	// The enemy chips 5/tick (all three of its draws roll against the player's 0 chances), leaving the 100-HP
+	// player at 85.
 	{
-		name: 'drawOrderDodgeOnlyAlignsCrit',
+		name: 'drawOrderEnemyFireAlignsCrit',
 		player: () =>
 			makeBattler(
 				[
@@ -931,6 +932,84 @@ const scenarios: ParityScenario[] = [
 			makeBattler([{ id: EAttribute.CriticalDamage, amount: 0.5 }], [makeSkill(12, 400, [], [], undefined, 0.5)]),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2400 }
+	},
+
+	// ── Parry / riposte (#1457) ──────────────────────────────────────────────────
+	// An enemy fire takes three unconditional draws — parry, dodge, counter-crit — and a parry negates the
+	// whole hit then fires the defender's counter skill (the equipped weapon's signature, resolved by the
+	// live InventoryManager.counterSkillId) as a first-class player hit. The signature's huge cooldown keeps
+	// it from ever firing as a normal skill, so the counters are isolated. Mirrors the backend
+	// `forcedParryRiposte` / `parryCounterCrits` / `fractionalParryChance`.
+
+	// A forced parry (ParryChance 1) negates every enemy hit and ripostes: the enemy's 1000-damage hits would
+	// one-shot the 100-HP player, but each is parried and answered with the signature's 30 (no Toughness
+	// either side) at ticks 10/20/30 — the 80-HP enemy dies on the tick-30 counter → 1200ms, player untouched.
+	{
+		name: 'forcedParryRiposte',
+		player: () => {
+			const signature = granted.register(makeSkill(30, 100_000, [], [], EDamageType.Sword));
+			return granted.build(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.ParryChance, amount: 1.0 }
+				],
+				[],
+				[signature],
+				EDamageType.Sword,
+				signature
+			);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(1000, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
+	// The counter crits through the standard opt-in template: the signature's own authored CriticalChance 1 ×
+	// CriticalChanceMultiplier (base 1), its damage multiplied by CriticalDamage (base 1.5 + 0.5 = 2.0) —
+	// 30 × 2 = 60 per counter, so the 80-HP enemy dies on the second parry (tick 20) → 800ms.
+	{
+		name: 'parryCounterCrits',
+		player: () => {
+			const signature = granted.register(makeSkill(30, 100_000, [], [], EDamageType.Sword, 1));
+			return granted.build(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.ParryChance, amount: 1.0 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
+				],
+				[],
+				[signature],
+				EDamageType.Sword,
+				signature
+			);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(1000, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 800 }
+	},
+
+	// Fractional ParryChance 0.5 against the shared seed — the sharp pin on the three-draw enemy fire. With
+	// no player fires the stream is enemy draws only, three per fire, the parry draw first (indices
+	// 0, 3, 6, 9, 12, 15, 18 → parry, no, parry, no, no, parry, parry against PARITY_SEED). Each parry
+	// negates the 10-damage hit and counters 20 (the signature), so the 80-HP enemy dies on the 7th fire's
+	// counter (cumulative 80, tick 70) → 2800ms, the 100-HP player taking the three un-parried hits → 70 HP.
+	// A parried fire skipping its dodge or counter-crit draw would shift every later parry draw and change
+	// the outcome, so this row pins that all three draws are consumed unconditionally.
+	{
+		name: 'fractionalParryChance',
+		player: () => {
+			const signature = granted.register(makeSkill(20, 100_000, [], [], EDamageType.Sword));
+			return granted.build(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.ParryChance, amount: 0.5 }
+				],
+				[],
+				[signature],
+				EDamageType.Sword,
+				signature
+			);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(10, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 2800 }
 	},
 
 	// ── Item-granted skills (append + order + dedupe) ────────────────────────────

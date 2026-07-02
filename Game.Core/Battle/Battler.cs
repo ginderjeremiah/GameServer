@@ -40,12 +40,21 @@ namespace Game.Core.Battle
 
         public bool IsDead => CurrentHealth <= 0;
 
-        public Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level)
+        /// <summary>
+        /// The skill this battler ripostes with when it parries an incoming hit (#1457) — the equipped
+        /// weapon's signature (the virtual fists' punch bare-handed), resolved once at battler assembly like
+        /// the weapon-match gate. <c>null</c> when no counter is resolvable (an unauthored punch, or an enemy
+        /// battler — enemies never parry), in which case a parry negates without a riposte.
+        /// </summary>
+        public Skill? CounterSkill { get; }
+
+        public Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level, Skill? counterSkill = null)
         {
             _attributes = attributes;
             CurrentHealth = _attributes[MaxHealth];
             Skills = skills.Select(s => new BattleSkill(s)).ToList();
             Level = level;
+            CounterSkill = counterSkill;
         }
 
         public void Update(BattleContext context)

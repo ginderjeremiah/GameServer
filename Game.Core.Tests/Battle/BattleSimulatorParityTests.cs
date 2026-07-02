@@ -671,17 +671,17 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: true,
                     ExpectedTotalMs: 4000),
 
-                // Simplified draw order — an enemy attack now draws ONE dodge value (not dodge + block), so the
-                // player's fractional crit draws interleave at EVEN stream positions (the enemy's single dodge
-                // draw sits between consecutive player crit draws). With a real CriticalChance 0.5 against
-                // ParitySeed the crit draws at stream indices 0, 2, 4, 6 are crit, no, crit, crit; CriticalDamage
-                // base 1.5 + 0.5 = 2.0, so the player deals 24, 12, 24, 24 (no Toughness) for a cumulative
-                // 24, 36, 60, 84. The 80-HP enemy (Str 6) dies on the tick-40 fire → 1600ms. Had the enemy still
-                // drawn TWICE (the old dodge + block), the crit draws would land at indices 0, 3, 6, 9 —
-                // crit, no, crit, no → 24, 12, 24, 12 (cumulative 24, 36, 60, 72) — pushing the kill to tick 50
-                // (2000ms). So this row pins the one-draw enemy attack. The enemy chips 5/tick (DodgeChance 0, so
-                // its dodge draw is taken but never succeeds), leaving the 100-HP player at 85.
-                ["drawOrderDodgeOnlyAlignsCrit"] = new ParityScenario(
+                // Draw-position alignment with a fractional crit — an enemy attack draws THREE values (parry,
+                // dodge, counter-crit — #1457), so the player's fractional crit draws land at stream indices
+                // 0, 4, 8, 12 (the enemy's three draws sit between consecutive player crit draws). With a real
+                // CriticalChance 0.5 against ParitySeed those draws are crit, crit, crit, no; CriticalDamage
+                // base 1.5 + 0.5 = 2.0, so the player deals 24, 24, 24, 12 (no Toughness) for a cumulative
+                // 24, 48, 72, 84. The 80-HP enemy (Str 6) dies on the tick-40 fire → 1600ms. This row pins the
+                // two sims interleaving the per-fire draws identically against real fractional draws (the sharp
+                // pin on the three-draw enemy fire itself is the fractionalParryChance row below). The enemy
+                // chips 5/tick (all three of its draws roll against the player's 0 chances), leaving the 100-HP
+                // player at 85.
+                ["drawOrderEnemyFireAlignsCrit"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
                         skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400, criticalChance: 0.5)],
@@ -712,6 +712,67 @@ namespace Game.Core.Tests.Battle
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2400),
+
+                // ── Parry / riposte (#1457) ───────────────────────────────────────────────────
+                // An enemy fire takes three unconditional draws — parry, dodge, counter-crit — and a parry
+                // negates the whole hit then fires the defender's counter skill (the equipped weapon's
+                // signature, resolved by the snapshot path) as a first-class player hit. The signature's
+                // huge cooldown keeps it from ever firing as a normal skill, so the counters are isolated.
+
+                // A forced parry (ParryChance 1) negates every enemy hit and ripostes: the enemy's 1000-damage
+                // hits would one-shot the 100-HP player, but each is parried and answered with the signature's
+                // 30 (no Toughness either side) at ticks 10/20/30 — the 80-HP enemy dies on the tick-30 counter
+                // → 1200ms with the player untouched.
+                ["forcedParryRiposte"] = new ParityScenario(
+                    Player: () => MakeBattlerWithWeapon(
+                        strength: 10, weaponType: EDamageType.Sword, weaponGrantedSkillId: 5,
+                        selectedSkillIds: [],
+                        skillPool: [MakeSkill(5, baseDamage: 30, cooldownMs: 100_000, damageType: EDamageType.Sword)],
+                        extra: [(EAttribute.ParryChance, 1.0)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 6, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 1000, cooldownMs: 400)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
+                // The counter crits through the standard opt-in template: the signature's own authored
+                // CriticalChance 1 × CriticalChanceMultiplier (base 1), its damage multiplied by CriticalDamage
+                // (base 1.5 + 0.5 allocation = 2.0) — 30 × 2 = 60 per counter, so the 80-HP enemy dies on the
+                // second parry (tick 20) → 800ms.
+                ["parryCounterCrits"] = new ParityScenario(
+                    Player: () => MakeBattlerWithWeapon(
+                        strength: 10, weaponType: EDamageType.Sword, weaponGrantedSkillId: 5,
+                        selectedSkillIds: [],
+                        skillPool: [MakeSkill(5, baseDamage: 30, cooldownMs: 100_000, damageType: EDamageType.Sword, criticalChance: 1)],
+                        extra: [(EAttribute.ParryChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 6, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 1000, cooldownMs: 400)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 800),
+
+                // Fractional ParryChance 0.5 against the shared seed — the sharp pin on the three-draw enemy
+                // fire. With no player fires the stream is enemy draws only, three per fire, the parry draw
+                // first (indices 0, 3, 6, 9, 12, 15, 18 → parry, no, parry, no, no, parry, parry against
+                // ParitySeed). Each parry negates the 10-damage hit and counters 20 (the signature), so the
+                // 80-HP enemy dies on the 7th fire's counter (cumulative 80, tick 70) → 2800ms, the 100-HP
+                // player taking the three un-parried hits → 70 HP. A parried fire skipping its dodge or
+                // counter-crit draw would shift every later parry draw and change the outcome, so this row
+                // pins that all three draws are consumed unconditionally.
+                ["fractionalParryChance"] = new ParityScenario(
+                    Player: () => MakeBattlerWithWeapon(
+                        strength: 10, weaponType: EDamageType.Sword, weaponGrantedSkillId: 5,
+                        selectedSkillIds: [],
+                        skillPool: [MakeSkill(5, baseDamage: 20, cooldownMs: 100_000, damageType: EDamageType.Sword)],
+                        extra: [(EAttribute.ParryChance, 0.5)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 6, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 10, cooldownMs: 400)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 2800),
 
                 // ── Item-granted skills (append + order + dedupe) ─────────────────────────────
                 // The player's battler fields its selected skills plus the skills its equipped items grant
@@ -1469,12 +1530,27 @@ namespace Game.Core.Tests.Battle
         /// </summary>
         private static Battler MakeBattlerWithWeapon(
             double strength, EDamageType weaponType, int weaponGrantedSkillId,
-            List<int> selectedSkillIds, List<Skill> skillPool)
+            List<int> selectedSkillIds, List<Skill> skillPool,
+            (EAttribute Attribute, double Amount)[]? extra = null)
         {
+            var statAllocations = new List<StatAllocation>
+            {
+                new() { Attribute = EAttribute.Strength, Amount = strength },
+            };
+            // Extra non-core attributes (e.g. a forced ParryChance) ride in as additive allocations, exactly
+            // like MakePlayer's extra parameter.
+            if (extra is not null)
+            {
+                foreach (var (attribute, amount) in extra)
+                {
+                    statAllocations.Add(new StatAllocation { Attribute = attribute, Amount = amount });
+                }
+            }
+
             var snapshot = new BattleSnapshot
             {
                 Level = 1,
-                StatAllocations = [new StatAllocation { Attribute = EAttribute.Strength, Amount = strength }],
+                StatAllocations = statAllocations,
                 EquippedItems = [new EquippedItemSnapshot { ItemId = 200, AppliedModIds = [] }],
                 SkillIds = selectedSkillIds,
             };

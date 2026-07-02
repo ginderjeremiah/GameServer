@@ -58,6 +58,11 @@ const damageKinds: Record<LogOutcome, LogKind> = {
 	'player-hit': { color: PLAYER, glyph: 'hit', label: 'Hit' },
 	'player-crit': { color: PLAYER, glyph: 'crit', label: 'Crit' },
 	'player-dodge': { color: ENEMY, glyph: 'dodge', label: 'Dodge' },
+	// A parry (#1457) is an avoidance like a dodge (shared glyph, its own label); the riposte that
+	// follows is a genuine player hit/crit under a 'Riposte' label.
+	'player-parry': { color: ENEMY, glyph: 'dodge', label: 'Parry' },
+	'player-counter': { color: PLAYER, glyph: 'hit', label: 'Riposte' },
+	'player-counter-crit': { color: PLAYER, glyph: 'crit', label: 'Riposte' },
 	'enemy-hit': { color: ENEMY, glyph: 'enemy', label: 'Hurt' },
 	'player-reflect': { color: PLAYER, glyph: 'reflect', label: 'Reflect' },
 	'enemy-reflect': { color: ENEMY, glyph: 'reflect', label: 'Reflect' }
