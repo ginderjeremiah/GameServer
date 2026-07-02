@@ -533,6 +533,48 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SunderBonus_TrainsTheSunderPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Sunder trains from the Toughness-debuff-enabled marginal damage (#1429) — an output-book event,
+            // type-neutral like the other overlays (routed straight to the single Sunder activity key with no
+            // applies() split).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Sunder", activityKey: EActivityKey.Sunder);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Sunder", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { SunderBonusDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoSunderBonus_TrainsNoSunder()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with other events but no Toughness-debuff-enabled damage
+            // routes no Sunder activity, so a Sunder-keyed path is never reached.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Sunder", activityKey: EActivityKey.Sunder);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Sunder", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage, PlayerDamageHealed = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
         public async Task NoReflectedDamage_TrainsNoRetribution()
         {
             using var scope = CreateScope();
