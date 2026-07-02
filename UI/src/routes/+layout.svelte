@@ -250,6 +250,7 @@ $effect(() => {
 	--challenge-damage-dealt: #{colors.$challenge-damage-dealt};
 	--challenge-battles-won: #{colors.$challenge-battles-won};
 	--challenge-skills-used: #{colors.$challenge-skills-used};
+	--challenge-kills-by-damage-type: #{colors.$challenge-kills-by-damage-type};
 
 	// Rarity palette + per-tier glow intensity (0–1, unitless). Consumed by the
 	// inventory and admin rarity UI via the shared helpers in $lib/common/rarity.

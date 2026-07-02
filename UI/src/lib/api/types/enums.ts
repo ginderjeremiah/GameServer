@@ -119,6 +119,7 @@ export enum EChallengeType {
 	DamageDealt = 6,
 	BattlesWon = 7,
 	SkillsUsed = 8,
+	KillsByDamageType = 9,
 }
 
 export enum EChangeType {
@@ -179,6 +180,7 @@ export enum EEntityType {
 	Enemy = 1,
 	Zone = 2,
 	Skill = 3,
+	DamageType = 4,
 }
 
 export enum EEquipmentSlot {
@@ -263,4 +265,5 @@ export enum EStatisticType {
 	CriticalDamageDealt = 17,
 	AttacksDodged = 18,
 	DamageDodged = 19,
+	KillsByDamageType = 22,
 }

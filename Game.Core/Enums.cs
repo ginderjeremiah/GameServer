@@ -749,6 +749,9 @@ namespace Game.Core
         DamageDealt = 6,
         BattlesWon = 7,
         SkillsUsed = 8,
+
+        /// <summary>Kills attributed to a damage-type key — see <see cref="EStatisticType.KillsByDamageType"/> (#1455).</summary>
+        KillsByDamageType = 9,
     }
 
     /// <summary>
@@ -822,6 +825,16 @@ namespace Game.Core
         DamageDodged = 19,
         // 20 and 21 are retired (the former AttacksBlocked / DamageBlocked, removed with the Block mechanic in
         // spike #1330). The enum is intrinsic, DB-backed reference data, so the ordinals are left as a gap.
+
+        /// <summary>
+        /// Kills attributed to a damage-type key (#1455). Recorded per <see cref="EDamageTypeKey"/> the
+        /// battle's majority-dealt <see cref="EDamageType"/> rolls up to via
+        /// <see cref="Attributes.DamageTypes.Applies"/> — a Burn-majority kill books rows for Burn, Fire,
+        /// Elemental, and Dot alike, mirroring how proficiency training rolls up a typed hit. Its declared
+        /// <see cref="EEntityType.DamageType"/> breakdown backs "kill N with &lt;type&gt;" challenges (and,
+        /// since weapon leaves are damage-type leaves, "kill N with a weapon type" too).
+        /// </summary>
+        KillsByDamageType = 22,
     }
 
     /// <summary>
@@ -833,6 +846,14 @@ namespace Game.Core
         Enemy = 1,
         Zone = 2,
         Skill = 3,
+
+        /// <summary>
+        /// A damage-type key (<see cref="EDamageTypeKey"/>), keyed by its ordinal. Unlike the other entity
+        /// types this is not a live/retireable DB reference table — the taxonomy is a fixed intrinsic enum
+        /// (like <see cref="Items.Item.WeaponType"/>), so a target of this type is validated by enum
+        /// membership rather than a retirement lookup (#1455).
+        /// </summary>
+        DamageType = 4,
     }
 
     /// <summary>

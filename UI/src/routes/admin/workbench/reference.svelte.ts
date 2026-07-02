@@ -2,6 +2,7 @@ import {
 	ApiRequest,
 	EAttribute,
 	EDamageType,
+	EDamageTypeKey,
 	EEntityType,
 	EEquipmentSlot,
 	EItemCategory,
@@ -27,6 +28,10 @@ const toOptions = (pairs: { id: number; name: string }[]): SelectOption[] =>
 
 /** A zero-based-id reference record that can be retired (kept at its slot, resolvable by id). */
 type RetireableRef = { id: number; name: string; retiredAt?: string | null };
+
+/** Synthetic, never-retired refs for the fixed EDamageTypeKey enum — the EEntityType.DamageType
+ *  dimension has no DB reference table to load, so its "records" are just the enum itself. */
+const damageTypeKeyRefs: RetireableRef[] = enumPairs(EDamageTypeKey);
 
 /**
  * Loads and exposes the reference data the workbench's select options, tag UI,
@@ -125,6 +130,10 @@ class WorkbenchReference {
 		{ value: -1, text: 'None' },
 		...toOptions(enumPairs(EDamageType).filter((p) => isWeaponLeaf(p.id as EDamageType)))
 	];
+	/** Damage-type-key picker options (the ten leaf types plus the Elemental/Dot categories and the six weapon
+	 *  leaves) for the KillsByDamageType challenge target — mirrors `weaponTypeOptions`' enum-derived shape,
+	 *  since EDamageTypeKey is a fixed intrinsic enum with no DB reference table. */
+	damageTypeKeyOptions = (): SelectOption[] => toOptions(enumPairs(EDamageTypeKey));
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
 	skillEffectTargetOptions = (): SelectOption[] => toOptions(enumPairs(ESkillEffectTarget));
 	modifierTypeOptions = (): SelectOption[] => toOptions(enumPairs(EModifierType));
@@ -226,6 +235,8 @@ class WorkbenchReference {
 				return staticData.zones;
 			case EEntityType.Skill:
 				return staticData.skills;
+			case EEntityType.DamageType:
+				return damageTypeKeyRefs;
 			default:
 				return undefined;
 		}

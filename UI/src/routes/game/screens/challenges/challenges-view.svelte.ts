@@ -1,6 +1,7 @@
 import {
 	EChallengeGoalComparison,
 	EChallengeType,
+	EDamageTypeKey,
 	EEntityType,
 	type ERarity,
 	type IChallenge,
@@ -113,6 +114,9 @@ function targetName(ch: IChallenge): string | null {
 			return staticData.zones?.[ch.targetEntityId]?.name ?? null;
 		case EEntityType.Skill:
 			return staticData.skills?.[ch.targetEntityId]?.name ?? null;
+		case EEntityType.DamageType:
+			// Not a DB reference table — a fixed intrinsic enum, so the name is the enum member itself.
+			return EDamageTypeKey[ch.targetEntityId] ?? null;
 		default:
 			return null;
 	}

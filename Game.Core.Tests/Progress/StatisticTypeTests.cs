@@ -18,6 +18,7 @@ namespace Game.Core.Tests.Progress
         [InlineData(EStatisticType.DamageDealt, EEntityType.Skill)]
         [InlineData(EStatisticType.HighestSingleAttackDamage, EEntityType.Skill)]
         [InlineData(EStatisticType.SkillsUsed, EEntityType.Skill)]
+        [InlineData(EStatisticType.KillsByDamageType, EEntityType.DamageType)]
         public void EntityScopedStatistics_MapToExpectedEntityType(EStatisticType type, EEntityType expected)
         {
             var statisticType = new StatisticType(type);

@@ -92,6 +92,46 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ChallengeReward", ContentGraphSeverity.Error, "Challenge", 0);
         }
 
+        [Fact]
+        public void Challenge_KillsByDamageTypeWithNoTarget_IsError()
+        {
+            // KillsByDamageType writes only per-damage-type-key statistic rows, no global row — a challenge
+            // with no target can never track progress (#1455).
+            var graph = HealthyGraph() with
+            {
+                Challenges = [Challenge(0, challengeTypeId: EChallengeType.KillsByDamageType, targetEntityId: null)],
+            };
+            AssertHasFinding(graph, "ChallengeTarget", ContentGraphSeverity.Error, "Challenge", 0);
+        }
+
+        [Fact]
+        public void Challenge_KillsByDamageTypeWithValidTarget_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Challenges =
+                [
+                    Challenge(0, challengeTypeId: EChallengeType.KillsByDamageType,
+                        entityType: EEntityType.DamageType, targetEntityId: (int)EDamageTypeKey.Fire),
+                ],
+            };
+            Assert.Empty(_checker.Check(graph));
+        }
+
+        [Fact]
+        public void Challenge_TargetingUndefinedDamageTypeKey_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                Challenges =
+                [
+                    Challenge(0, challengeTypeId: EChallengeType.KillsByDamageType,
+                        entityType: EEntityType.DamageType, targetEntityId: 999),
+                ],
+            };
+            AssertHasFinding(graph, "ChallengeTarget", ContentGraphSeverity.Error, "Challenge", 0);
+        }
+
         // --- Enemies ----------------------------------------------------------------------------------
 
         [Fact]
@@ -740,12 +780,13 @@ namespace Game.Application.Tests.Content
             int? targetEntityId = null,
             int? rewardItemId = null,
             int? rewardItemModId = null,
-            DateTime? retiredAt = null) => new()
+            DateTime? retiredAt = null,
+            EChallengeType challengeTypeId = EChallengeType.ZonesCleared) => new()
             {
                 Id = id,
                 Name = $"Challenge {id}",
                 Description = "",
-                ChallengeTypeId = EChallengeType.ZonesCleared,
+                ChallengeTypeId = challengeTypeId,
                 StatisticType = EStatisticType.ZonesCleared,
                 EntityType = entityType,
                 TargetEntityId = targetEntityId,

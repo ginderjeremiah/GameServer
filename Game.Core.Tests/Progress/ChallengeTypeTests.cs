@@ -14,6 +14,7 @@ namespace Game.Core.Tests.Progress
         [InlineData(EChallengeType.DamageDealt, EStatisticType.DamageDealt)]
         [InlineData(EChallengeType.BattlesWon, EStatisticType.BattlesWon)]
         [InlineData(EChallengeType.SkillsUsed, EStatisticType.SkillsUsed)]
+        [InlineData(EChallengeType.KillsByDamageType, EStatisticType.KillsByDamageType)]
         public void StatisticBackedTypes_MapToExpectedStatisticType(EChallengeType type, EStatisticType expected)
         {
             var challengeType = new ChallengeType(type);
@@ -48,6 +49,7 @@ namespace Game.Core.Tests.Progress
         [InlineData(EChallengeType.DamageDealt)]
         [InlineData(EChallengeType.BattlesWon)]
         [InlineData(EChallengeType.SkillsUsed)]
+        [InlineData(EChallengeType.KillsByDamageType)]
         public void AccumulatingTypes_UseAtLeastGoalComparison(EChallengeType type)
         {
             var challengeType = new ChallengeType(type);
@@ -106,6 +108,7 @@ namespace Game.Core.Tests.Progress
                 [EChallengeType.DamageDealt] = EChallengeGoalComparison.AtLeast,
                 [EChallengeType.BattlesWon] = EChallengeGoalComparison.AtLeast,
                 [EChallengeType.SkillsUsed] = EChallengeGoalComparison.AtLeast,
+                [EChallengeType.KillsByDamageType] = EChallengeGoalComparison.AtLeast,
             };
 
             // A newly-added challenge type must declare its intended direction above before this passes.
