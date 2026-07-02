@@ -105,7 +105,7 @@ const crit = $derived(
 			}
 		: undefined
 );
-const total = $derived(toughnessMitigatedDamage(totalDamage + critBonus, enemyToughness, skill?.owner.level ?? 1));
+const total = $derived(toughnessMitigatedDamage(totalDamage + critBonus, enemyToughness));
 // Damage the Toughness curve removed (pre-mitigation hit − net), for the breakdown's mitigation row.
 const mitigated = $derived(totalDamage + critBonus - total);
 const cdMultiplier = $derived(skill?.owner.cdMultiplier ?? 1);

@@ -98,15 +98,9 @@ export interface ComparePreset {
  *  DPS/Damage rank by *effective* value (mitigation-aware), descending. Each skill's own
  *  `critMultiplier` scales its raw damage before mitigation (mirroring {@link SkillsView.effective}) —
  *  per-skill because the crit enabler is now the skill's own base chance (#1453), not a build-wide
- *  stat — so the ranking matches the crit-inclusive numbers the rows display; the player is the
- *  attacker, so `attackerLevel` scales the curve. Defaults for unit-test convenience (level 1). */
-export function sortMetrics(
-	sort: SkillSort,
-	toughness: number,
-	attackerLevel = 1
-): (a: SkillMetrics, b: SkillMetrics) => number {
-	const mitigated = (m: SkillMetrics) =>
-		toughnessMitigatedDamage(m.rawDamage * m.critMultiplier, toughness, attackerLevel);
+ *  stat — so the ranking matches the crit-inclusive numbers the rows display. */
+export function sortMetrics(sort: SkillSort, toughness: number): (a: SkillMetrics, b: SkillMetrics) => number {
+	const mitigated = (m: SkillMetrics) => toughnessMitigatedDamage(m.rawDamage * m.critMultiplier, toughness);
 	switch (sort) {
 		case 'name':
 			return (a, b) => a.skill.name.localeCompare(b.skill.name);
@@ -293,7 +287,7 @@ export class SkillsView {
 				}
 				return true;
 			});
-		return list.sort(sortMetrics(this.sort, this.toughness, playerManager.level));
+		return list.sort(sortMetrics(this.sort, this.toughness));
 	});
 
 	/** Equipped rail rows, ordered by loadout slot (not by the active sort). Built from
@@ -367,11 +361,10 @@ export class SkillsView {
 	}
 
 	/** Effective single-hit damage: raw damage scaled by the skill's own expected crit multiplier (a crit
-	 *  applies before mitigation, so it scales first), then run through the Compare-vs Toughness curve at
-	 *  the player's level. */
+	 *  applies before mitigation, so it scales first), then run through the Compare-vs Toughness curve. */
 	effective(id: number): number {
 		const critMultiplier = this.metricsById[id]?.critMultiplier ?? 1;
-		return toughnessMitigatedDamage(this.rawDamage(id) * critMultiplier, this.toughness, playerManager.level);
+		return toughnessMitigatedDamage(this.rawDamage(id) * critMultiplier, this.toughness);
 	}
 
 	effectiveDps(id: number): number {

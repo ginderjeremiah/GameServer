@@ -231,7 +231,7 @@ describe('pure helpers', () => {
 		expect([a, b].sort(sortMetrics('cd', 0)).map((m) => m.skill.id)).toEqual([1, 0]);
 		// dps with no toughness: a=100/2=50, b=30/1=30 → a first.
 		expect([b, a].sort(sortMetrics('dps', 0)).map((m) => m.skill.id)).toEqual([0, 1]);
-		// dps with toughness 80 (factor 20/100=0.2): a=100·0.2/2=10, b=30·0.2/1=6 → a first; damage a=20, b=6.
+		// damage with toughness 80 (factor 200/280≈0.714): a=100·0.714≈71.4, b=30·0.714≈21.4 → a first.
 		expect([b, a].sort(sortMetrics('dmg', 80)).map((m) => m.skill.id)).toEqual([0, 1]);
 	});
 
@@ -247,15 +247,14 @@ describe('pure helpers', () => {
 		// flipping it.
 		const a = metric({ skill: skill({ id: 0 }), rawDamage: 30, cooldown: 3 });
 		const b = metric({ skill: skill({ id: 1 }), rawDamage: 22, cooldown: 2 });
-		// toughness 10 (level 1 → factor 20/30), no crit: A=30·(2/3)/3≈6.67 < B=22·(2/3)/2≈7.33 → B first.
-		expect([b, a].sort(sortMetrics('dps', 10)).map((m) => m.skill.id)).toEqual([1, 0]);
-		// crit ×2 (attackerLevel 1) on both rows: both effective values double, so the order is unchanged
-		// → B still first.
+		// toughness 100 (factor 200/300 = 2/3), no crit: A=30·(2/3)/3≈6.67 < B=22·(2/3)/2≈7.33 → B first.
+		expect([b, a].sort(sortMetrics('dps', 100)).map((m) => m.skill.id)).toEqual([1, 0]);
+		// crit ×2 on both rows: both effective values double, so the order is unchanged → B still first.
 		const aCrit = metric({ skill: skill({ id: 0 }), rawDamage: 30, cooldown: 3, critMultiplier: 2 });
 		const bCrit = metric({ skill: skill({ id: 1 }), rawDamage: 22, cooldown: 2, critMultiplier: 2 });
-		expect([aCrit, bCrit].sort(sortMetrics('dps', 10, 1)).map((m) => m.skill.id)).toEqual([1, 0]);
-		// dmg sort, toughness 25 (factor 20/45), crit ×2: A=60·(20/45)≈26.7 > B=44·(20/45)≈19.6 → A first.
-		expect([aCrit, bCrit].sort(sortMetrics('dmg', 25, 1)).map((m) => m.skill.id)).toEqual([0, 1]);
+		expect([aCrit, bCrit].sort(sortMetrics('dps', 100)).map((m) => m.skill.id)).toEqual([1, 0]);
+		// dmg sort, toughness 250 (factor 200/450≈0.44), crit ×2: A=60·0.44≈26.7 > B=44·0.44≈19.6 → A first.
+		expect([aCrit, bCrit].sort(sortMetrics('dmg', 250)).map((m) => m.skill.id)).toEqual([0, 1]);
 	});
 });
 
@@ -365,7 +364,7 @@ describe('SkillsView — rail filtering & sorting', () => {
 		view.setSort('dps');
 		// no toughness: dps = base/cd → Delta(50) > Bravo(20) > Alpha(12) > Charlie(10)
 		expect(view.railList.map((m) => m.skill.id)).toEqual([3, 1, 0, 2]);
-		// toughness 15 scales every hit by the same factor (20/35), so the dps order is unchanged.
+		// toughness 15 scales every hit by the same factor (200/215), so the dps order is unchanged.
 		view.setToughness(15);
 		expect(view.railList.map((m) => m.skill.id)).toEqual([3, 1, 0, 2]);
 	});
@@ -606,12 +605,12 @@ describe('SkillsView — critical hits fold into effective damage', () => {
 
 	it('scales raw damage by each skill’s own crit multiplier before the toughness curve in effective/dps/burst', () => {
 		const k = view.metric(0)!.critMultiplier;
-		view.setToughness(10);
-		// Toughness 10 at the player's level 1 → curve factor 20/(10+20) = 2/3.
-		const curve = 20 / (10 + 20);
+		view.setToughness(50);
+		// Toughness 50 (within the preset-capped slider range) → curve factor 200/(50+200) = 0.8.
+		const curve = 200 / (50 + 200);
 		// Alpha (id 0): baseDamage 12, no Strength allocated → rawDamage 12.
 		expect(view.rawDamage(0)).toBe(12);
-		expect(view.effective(0)).toBeCloseTo(12 * k * curve, 10); // 12·1.5·(2/3) = 12
+		expect(view.effective(0)).toBeCloseTo(12 * k * curve, 10); // 12·1.5·0.8 = 14.4
 		expect(view.effectiveDps(0)).toBeCloseTo(view.effective(0) / view.cooldown(0), 10);
 		// Combined burst sums each loadout skill's own crit-scaled, curve-mitigated hit (uniform crit here,
 		// so it reduces to the same k for every id).

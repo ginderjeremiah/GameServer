@@ -45,17 +45,17 @@ export function skillContributions(skill: ISkill, attributes: BattleAttributes):
 }
 
 /** Damage dealt after the defender's {@link EAttribute.Toughness} mitigation curve. The curve reduces a hit by
- *  `Toughness / (Toughness + K·attackerLevel)` (K = {@link TOUGHNESS_MITIGATION_CONSTANT}): effective HP is
- *  linear in Toughness while the reduction asymptotes below 100% (no immunity), and the attacker's level scales
- *  the denominator so the band stays stable as content scales (#1330). With no Toughness the factor is an exact
- *  1.0 and the hit is unchanged. Block's flat reduction was removed (#1330), so the stack is now purely
- *  multiplicative and never needs a floor — `rawDamage` is already positive here (the absorption branch in
- *  {@link mitigateDamage} handles the non-positive case). Mirrors the backend `Battler.ComputeNetDamage` — the
- *  expression must match bit-for-bit for battle parity, including the unreachable 0/0 reduction (Toughness AND
- *  attackerLevel both 0 → NaN, since battler Level ≥ 1) which both ports propagate identically with no clamp. */
-export function toughnessMitigatedDamage(rawDamage: number, toughness: number, attackerLevel: number): number {
-	const scaled = TOUGHNESS_MITIGATION_CONSTANT * attackerLevel;
-	const toughnessReduction = toughness / (toughness + scaled);
+ *  `Toughness / (Toughness + C)` (C = {@link TOUGHNESS_MITIGATION_CONSTANT}): effective HP is linear in
+ *  Toughness while the reduction asymptotes below 100% (no immunity), and the constant denominator means an
+ *  investment retains its mitigation % across all of progression (#1487, revising #1330's level normalization).
+ *  With no Toughness the factor is an exact 1.0 and the hit is unchanged. Block's flat reduction was removed
+ *  (#1330), so the stack is purely multiplicative and never needs a floor — `rawDamage` is already positive here
+ *  (the absorption branch in {@link mitigateDamage} handles the non-positive case). The curve is unclamped below
+ *  0 — a debuff-driven negative Toughness amplifies the hit (#1483), with the pole at `Toughness = −C` left
+ *  unguarded per #1478 (unreachable by authored content). Mirrors the backend `Battler.ComputeNetDamage` — the
+ *  expression must match bit-for-bit for battle parity. */
+export function toughnessMitigatedDamage(rawDamage: number, toughness: number): number {
+	const toughnessReduction = toughness / (toughness + TOUGHNESS_MITIGATION_CONSTANT);
 	return rawDamage * (1 - toughnessReduction);
 }
 
@@ -92,23 +92,18 @@ export function resistanceTotal(damageType: EDamageType, defenderAttributes: Bat
 /** The net damage an incoming `dealt` hit (already amplified and crit-multiplied) of `damageType` deals to a
  *  defender: percentage resistance first (`dealt × (1 − Σ applies(type).resistance)`, UNCLAMPED — a negative
  *  total amplifies as vulnerability, a total above 1 drives the result negative as absorption), then — only
- *  while the post-resistance damage is still positive — the {@link EAttribute.Toughness} mitigation curve
- *  (scaled by `attackerLevel`), so mitigation can neither heal nor deepen an absorption heal. The resistance sum
+ *  while the post-resistance damage is still positive — the {@link EAttribute.Toughness} mitigation curve,
+ *  so mitigation can neither heal nor deepen an absorption heal. The resistance sum
  *  is folded in the fixed {@link resistanceAttributes} order for parity; with no resistance and no Toughness the
  *  positive branch reduces to `dealt`. A negative result heals the defender. With Block's flat reduction removed
  *  (#1330) the whole stack is multiplicative. Mirrors the backend `Battler.ComputeNetDamage`. */
-export function mitigateDamage(
-	dealt: number,
-	damageType: EDamageType,
-	defenderAttributes: BattleAttributes,
-	attackerLevel: number
-): number {
+export function mitigateDamage(dealt: number, damageType: EDamageType, defenderAttributes: BattleAttributes): number {
 	const mitigated = dealt * (1 - resistanceTotal(damageType, defenderAttributes));
 	if (mitigated <= 0) {
 		// Absorption (or a zero hit): the defender takes a net heal and mitigation never applies.
 		return mitigated;
 	}
-	return toughnessMitigatedDamage(mitigated, defenderAttributes.getValue(EAttribute.Toughness), attackerLevel);
+	return toughnessMitigatedDamage(mitigated, defenderAttributes.getValue(EAttribute.Toughness));
 }
 
 /** The cooldown multiplier — the CooldownRecovery attribute read directly. It is a base-1 multiplier

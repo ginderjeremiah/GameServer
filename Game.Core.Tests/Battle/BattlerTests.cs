@@ -58,69 +58,66 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void TakeDamage_AppliesToughnessMitigationCurve()
         {
-            // Toughness = 2·Endurance(10) = 20. Against a level-1 attacker the curve reduces by
-            // 20 / (20 + 20·1) = 0.5, so a 50 hit deals 25. MaxHealth = base(50) + Endurance(10)*20 = 250.
-            var battler = MakeBattler((EAttribute.Endurance, 10));
+            // Toughness = 2·Endurance(25) = 50. The curve reduces by 50 / (50 + 200) = 0.2, so a 50 hit
+            // deals 40. MaxHealth = base(50) + Endurance(25)*20 = 550.
+            var battler = MakeBattler((EAttribute.Endurance, 25));
             var initialHealth = battler.CurrentHealth;
 
-            var finalDamage = battler.TakeDamage(50, EDamageType.Physical, attackerLevel: 1);
+            var finalDamage = battler.TakeDamage(50, EDamageType.Physical);
 
-            Assert.Equal(25, finalDamage, 0.001);
-            Assert.Equal(initialHealth - 25, battler.CurrentHealth, 0.001);
+            Assert.Equal(40, finalDamage, 0.001);
+            Assert.Equal(initialHealth - 40, battler.CurrentHealth, 0.001);
+        }
+
+        [Fact]
+        public void TakeDamage_ToughnessAtTheConstant_MitigatesExactlyHalf()
+        {
+            // The constant is the curve's half-point (#1487): Toughness = 2·Endurance(100) = 200 = C reduces
+            // by exactly 200 / (200 + 200) = 0.5, so a 50 hit deals 25 — the per-item legibility anchor.
+            var battler = MakeBattler((EAttribute.Endurance, 100));
+
+            Assert.Equal(25, battler.TakeDamage(50, EDamageType.Physical), 0.001);
         }
 
         [Fact]
         public void TakeDamage_NoToughness_LeavesHitUnreduced()
         {
             // The reduce-to-nothing identity: with no Endurance, Toughness is 0, so the curve's reduction is
-            // 0 / (0 + K·level) = 0 and the hit lands in full.
+            // 0 / (0 + C) = 0 and the hit lands in full.
             var battler = MakeBattler();
 
-            Assert.Equal(40, battler.TakeDamage(40, EDamageType.Physical, attackerLevel: 1), 0.001);
+            Assert.Equal(40, battler.TakeDamage(40, EDamageType.Physical), 0.001);
         }
 
         [Fact]
         public void TakeDamage_ToughnessNeverFullyMitigates()
         {
             // The curve asymptotes below 100% (no immunity, no breakpoint): even overwhelming Toughness
-            // (Endurance 100 → Toughness 200) against a level-1 attacker leaves a positive sliver,
-            // 5 × 20 / (200 + 20) = 0.4545…, never zero.
-            var battler = MakeBattler((EAttribute.Endurance, 100));
+            // (Endurance 1000 → Toughness 2000) leaves a positive sliver,
+            // 5 × 200 / (2000 + 200) = 0.4545…, never zero.
+            var battler = MakeBattler((EAttribute.Endurance, 1000));
 
-            var net = battler.TakeDamage(5, EDamageType.Physical, attackerLevel: 1);
+            var net = battler.TakeDamage(5, EDamageType.Physical);
 
             Assert.True(net > 0);
-            Assert.Equal(5.0 * 20 / 220, net, 0.001);
-        }
-
-        [Fact]
-        public void TakeDamage_AttackerLevelScalesTheCurve()
-        {
-            // K·attackerLevel scales the denominator, so the same Toughness mitigates less against a
-            // higher-level attacker. Toughness 20: vs level 1 → 20/(20+20)=0.5 (40→20); vs level 3 →
-            // 20/(20+60)=0.25 (40→30).
-            var lowLevel = MakeBattler((EAttribute.Endurance, 10));
-            var highLevel = MakeBattler((EAttribute.Endurance, 10));
-
-            Assert.Equal(20, lowLevel.TakeDamage(40, EDamageType.Physical, attackerLevel: 1), 0.001);
-            Assert.Equal(30, highLevel.TakeDamage(40, EDamageType.Physical, attackerLevel: 3), 0.001);
+            Assert.Equal(5.0 * 200 / 2200, net, 0.001);
         }
 
         [Fact]
         public void TakeDamage_EffectiveHpIsLinearInToughness()
         {
-            // EHP linearity: the effective-HP multiplier (raw / net = (Toughness + K·L) / (K·L)) rises by a
-            // CONSTANT amount per point of Toughness, even though the % reduction itself diminishes. Against a
-            // level-1 attacker (K·L = 20): Toughness 0 → ×1 EHP, 20 → ×2, 40 → ×3 — equal +1 steps per 20
-            // Toughness, so each point is worth the same slice of EHP and is never useless.
-            var ehp0 = 40 / MakeBattler().TakeDamage(40, EDamageType.Physical, attackerLevel: 1);
-            var ehp20 = 40 / MakeBattler((EAttribute.Endurance, 10)).TakeDamage(40, EDamageType.Physical, attackerLevel: 1);
-            var ehp40 = 40 / MakeBattler((EAttribute.Endurance, 20)).TakeDamage(40, EDamageType.Physical, attackerLevel: 1);
+            // EHP linearity: the effective-HP multiplier (raw / net = (Toughness + C) / C) rises by a
+            // CONSTANT amount per point of Toughness, even though the % reduction itself diminishes.
+            // Toughness 0 → ×1 EHP, 200 → ×2, 400 → ×3 — equal +1 steps per 200 Toughness, so each point
+            // is worth the same slice of EHP and is never useless.
+            var ehp0 = 40 / MakeBattler().TakeDamage(40, EDamageType.Physical);
+            var ehp200 = 40 / MakeBattler((EAttribute.Endurance, 100)).TakeDamage(40, EDamageType.Physical);
+            var ehp400 = 40 / MakeBattler((EAttribute.Endurance, 200)).TakeDamage(40, EDamageType.Physical);
 
             Assert.Equal(1.0, ehp0, 0.001);
-            Assert.Equal(2.0, ehp20, 0.001);
-            Assert.Equal(3.0, ehp40, 0.001);
-            Assert.Equal(ehp20 - ehp0, ehp40 - ehp20, 0.001); // equal steps ⇒ linear in Toughness
+            Assert.Equal(2.0, ehp200, 0.001);
+            Assert.Equal(3.0, ehp400, 0.001);
+            Assert.Equal(ehp200 - ehp0, ehp400 - ehp200, 0.001); // equal steps ⇒ linear in Toughness
         }
 
         [Fact]
@@ -130,7 +127,7 @@ namespace Game.Core.Tests.Battle
             var battler = MakeBattler();
             var lethalRawDamage = battler.CurrentHealth;
 
-            battler.TakeDamage(lethalRawDamage, EDamageType.Physical, attackerLevel: 1);
+            battler.TakeDamage(lethalRawDamage, EDamageType.Physical);
 
             Assert.Equal(0, battler.CurrentHealth);
             Assert.True(battler.IsDead);
@@ -141,7 +138,7 @@ namespace Game.Core.Tests.Battle
         {
             var battler = MakeBattler();
 
-            battler.TakeDamage(99999, EDamageType.Physical, attackerLevel: 1);
+            battler.TakeDamage(99999, EDamageType.Physical);
 
             Assert.True(battler.CurrentHealth < 0);
             Assert.True(battler.IsDead);
@@ -185,11 +182,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void TakeDamage_AppliesPercentageResistanceBeforeToughness()
         {
-            // FireResistance 0.5 halves the 40-damage hit to 20, then the Toughness curve (Toughness 20 vs a
-            // level-1 attacker → 0.5 reduction) halves that to 10 net.
-            var battler = MakeBattler((EAttribute.Endurance, 10), (EAttribute.FireResistance, 0.5)); // Toughness 20
+            // FireResistance 0.5 halves the 40-damage hit to 20, then the Toughness curve (Toughness 200 =
+            // the half-point → 0.5 reduction) halves that to 10 net.
+            var battler = MakeBattler((EAttribute.Endurance, 100), (EAttribute.FireResistance, 0.5)); // Toughness 200
 
-            var net = battler.TakeDamage(40, EDamageType.Fire, attackerLevel: 1);
+            var net = battler.TakeDamage(40, EDamageType.Fire);
 
             Assert.Equal(10, net, 0.001);
         }
@@ -201,7 +198,7 @@ namespace Game.Core.Tests.Battle
             // Toughness is 0 and the curve leaves it unchanged: 20 net.
             var battler = MakeBattler((EAttribute.FireResistance, 0.25), (EAttribute.ElementalResistance, 0.25));
 
-            var net = battler.TakeDamage(40, EDamageType.Fire, attackerLevel: 1);
+            var net = battler.TakeDamage(40, EDamageType.Fire);
 
             Assert.Equal(20, net, 0.001);
         }
@@ -213,7 +210,7 @@ namespace Game.Core.Tests.Battle
             // 0 (no Endurance) leaves the curve a no-op, so the full 30 lands.
             var battler = MakeBattler((EAttribute.FireResistance, -0.5)); // Toughness 0
 
-            var net = battler.TakeDamage(20, EDamageType.Fire, attackerLevel: 1);
+            var net = battler.TakeDamage(20, EDamageType.Fire);
 
             Assert.Equal(30, net, 0.001);
         }
@@ -224,9 +221,9 @@ namespace Game.Core.Tests.Battle
             // FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with the Toughness curve NOT applied (it can
             // neither heal nor deepen an absorption). Bring the battler below MaxHealth first so the whole heal lands.
             var battler = MakeBattler((EAttribute.Endurance, 0), (EAttribute.FireResistance, 2.0)); // Toughness 0, MaxHealth 50
-            battler.TakeDamage(30, EDamageType.Physical, attackerLevel: 1); // 30 damage (no Toughness) → CurrentHealth 20
+            battler.TakeDamage(30, EDamageType.Physical); // 30 damage (no Toughness) → CurrentHealth 20
 
-            var net = battler.TakeDamage(20, EDamageType.Fire, attackerLevel: 1);
+            var net = battler.TakeDamage(20, EDamageType.Fire);
 
             Assert.Equal(-20, net, 0.001);
             Assert.Equal(40, battler.CurrentHealth, 0.001);
@@ -238,9 +235,9 @@ namespace Game.Core.Tests.Battle
             // The absorption heal never overheals past MaxHealth (consistent with ApplyHealOverTime). Only 5 of
             // room remains, so a −20 absorption restores 5 and the net reported is the capped −5, not −20.
             var battler = MakeBattler((EAttribute.Endurance, 0), (EAttribute.FireResistance, 2.0)); // Toughness 0, MaxHealth 50
-            battler.TakeDamage(5, EDamageType.Physical, attackerLevel: 1); // 5 damage (no Toughness) → CurrentHealth 45
+            battler.TakeDamage(5, EDamageType.Physical); // 5 damage (no Toughness) → CurrentHealth 45
 
-            var net = battler.TakeDamage(20, EDamageType.Fire, attackerLevel: 1);
+            var net = battler.TakeDamage(20, EDamageType.Fire);
 
             Assert.Equal(-5, net, 0.001);
             Assert.Equal(50, battler.CurrentHealth, 0.001);
@@ -250,20 +247,20 @@ namespace Game.Core.Tests.Battle
         public void TakeDamage_TypedWithResistanceThenToughness_ComposesBothSteps()
         {
             // Resistance and the Toughness curve are separate multiplicative steps. FireResistance 0.5 halves a
-            // 50 hit to 25, then Toughness 20 (vs a level-1 attacker → 0.5) halves it to 12.5.
-            var battler = MakeBattler((EAttribute.Endurance, 10), (EAttribute.FireResistance, 0.5)); // Toughness 20
+            // 50 hit to 25, then Toughness 200 (the half-point → 0.5) halves it to 12.5.
+            var battler = MakeBattler((EAttribute.Endurance, 100), (EAttribute.FireResistance, 0.5)); // Toughness 200
 
-            Assert.Equal(12.5, battler.TakeDamage(50, EDamageType.Fire, attackerLevel: 1), 0.001);
+            Assert.Equal(12.5, battler.TakeDamage(50, EDamageType.Fire), 0.001);
         }
 
         [Fact]
         public void TakeDamage_NegativeToughnessWithinThePole_AmplifiesTheHit()
         {
-            // A debuff-driven negative Toughness (2·Endurance(-5) = -10) inverts the curve rather than
-            // flooring at 0% mitigation (#1478): -10/(-10+20) = -1 reduction → 40 × (1 − (−1)) = 80.
-            var battler = MakeBattler((EAttribute.Endurance, -5));
+            // A debuff-driven negative Toughness (2·Endurance(-50) = -100) inverts the curve rather than
+            // flooring at 0% mitigation (#1478): -100/(-100+200) = -1 reduction → 40 × (1 − (−1)) = 80.
+            var battler = MakeBattler((EAttribute.Endurance, -50));
 
-            Assert.Equal(80, battler.TakeDamage(40, EDamageType.Physical, attackerLevel: 1), 0.001);
+            Assert.Equal(80, battler.TakeDamage(40, EDamageType.Physical), 0.001);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────

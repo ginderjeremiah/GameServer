@@ -156,11 +156,11 @@ export class Battler {
 	}
 
 	/** Applies an incoming `dealt` hit (already amplified and crit-multiplied) of `damageType` via
-	 *  {@link mitigateDamage} — percentage resistance then the Toughness mitigation curve (scaled by
-	 *  `attackerLevel`). Returns the net damage dealt; a negative result (absorption) heals this battler, CAPPED
+	 *  {@link mitigateDamage} — percentage resistance then the Toughness mitigation curve.
+	 *  Returns the net damage dealt; a negative result (absorption) heals this battler, CAPPED
 	 *  at MaxHealth (no overheal — matching {@link applyHealOverTime}). */
-	public takeDamage(dealt: number, damageType: EDamageType, attackerLevel: number) {
-		const net = mitigateDamage(dealt, damageType, this.attributes, attackerLevel);
+	public takeDamage(dealt: number, damageType: EDamageType) {
+		const net = mitigateDamage(dealt, damageType, this.attributes);
 		if (net < 0) {
 			// Absorption: cap the heal at the remaining room to MaxHealth, and report the actual healed amount.
 			const room = this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth;

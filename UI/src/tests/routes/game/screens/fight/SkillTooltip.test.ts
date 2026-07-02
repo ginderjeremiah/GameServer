@@ -30,8 +30,8 @@ beforeEach(() => {
 			{ attributeId: EAttribute.CooldownRecovery, amount: 1 }
 		]
 	});
-	// Toughness 60 vs the level-12 attacker → 60/(60 + 20·12) = 0.2 reduction (a clean ×0.8 on the hit).
-	opponent = makeBattler({ name: 'Dire Wolf', attributes: [{ attributeId: EAttribute.Toughness, amount: 60 }] });
+	// Toughness 50 → 50/(50 + 200) = 0.2 reduction (a clean ×0.8 on the hit).
+	opponent = makeBattler({ name: 'Dire Wolf', attributes: [{ attributeId: EAttribute.Toughness, amount: 50 }] });
 	mockBattleEngine.getOpponent.mockReturnValue(opponent);
 	staticData.attributes = [];
 });
@@ -69,7 +69,7 @@ describe('SkillTooltip', () => {
 
 		expect(getByText('Cleave')).toBeTruthy();
 		const list = container.querySelector('.tt-dmg-list') as HTMLElement;
-		// base 10, STR(20) x2 = +40 → raw 50; Toughness 60 vs the level-12 attacker removes 50 × 0.2 = 10 → total 40.
+		// base 10, STR(20) x2 = +40 → raw 50; Toughness 50 removes 50 × 0.2 = 10 → total 40.
 		expect(list.textContent).toContain('Strength');
 		expect(list.textContent).toContain('10');
 		expect(list.textContent).toContain('+40');

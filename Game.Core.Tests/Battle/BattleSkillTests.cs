@@ -211,13 +211,13 @@ namespace Game.Core.Tests.Battle
         public void Update_EnemyToughnessMitigation_RecordsActualDamagePerSkill_ReconcilingWithGlobal()
         {
             // Enemy Toughness makes the raw value overstate the real hit (the other direction of the
-            // bug): Endurance 10 → Toughness 20, so against the level-1 player the curve reduces by
-            // 20/(20+20) = 0.5 — BaseDamage 20 ⇒ 10 actual. The per-skill stat must book 10, not 20.
+            // bug): Endurance 100 → Toughness 200 (the curve's half-point), so the curve reduces by
+            // 200/(200+200) = 0.5 — BaseDamage 20 ⇒ 10 actual. The per-skill stat must book 10, not 20.
             var skill = MakeSkill(cooldownMs: 100, baseDamage: 20);
             var battleSkill = new BattleSkill(skill);
 
             var player = MakeBattlerWith((Endurance, 0)); // skill's default CriticalChance 0 never crits
-            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness = 2·10 = 20, MaxHealth 250
+            var enemy = MakeBattlerWith((Endurance, 100)); // Toughness = 2·100 = 200, MaxHealth 2050
             var context = new BattleContext(player, enemy, timeDelta: 200, new Mulberry32(0));
 
             battleSkill.Update(context);
