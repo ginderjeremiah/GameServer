@@ -61,7 +61,12 @@ namespace Game.Core.Battle
         // Captures each resistance attribute's composed value once, before any timed effect can lower it — the
         // baseline the Hex tally measures an applied vulnerability against (#1427). Durable resistance (base,
         // gear, mods, proficiency, class) is already composed at this point; only in-battle skill effects move
-        // resistance afterward, so a live value below its snapshot is exactly the opponent-applied vulnerability.
+        // resistance afterward, so a live value below its snapshot is the net reduction below the baseline. Today
+        // only the player debuffs enemy resistance, so that net equals the applied vulnerability. If an enemy were
+        // to buff its own resistance mid-battle, the tally still behaves safely — a self-buff raising resistance
+        // yields v ≤ 0 (no credit), and a buff combined with a player debuff credits only the NET reduction below
+        // the innate baseline, not the player's gross debuff. Should such content ever exist and gross-contribution
+        // attribution be wanted, this would need to track the player-contributed resistance delta specifically.
         private static IReadOnlyDictionary<EAttribute, double> SnapshotInnateResistance(AttributeCollection attributes)
         {
             var resistanceAttributes = DamageTypes.ResistanceAttributesAll;

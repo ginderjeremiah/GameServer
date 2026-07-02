@@ -795,6 +795,46 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void DamageTarget_EnemySelfBuffsResistance_NoPlayerDebuff_BooksNoHexBonus()
+        {
+            // A hypothetical enemy resistance self-buff (no such content today) raises live resistance ABOVE the
+            // innate baseline, so v = innate − live is negative → clamped to 0. The enemy hardening itself never
+            // credits the player's Hex; the innate-baseline snapshot handles it for free (no crash, no credit).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(SelfResistanceBuff(FireResistance, 0.5)); // enemy buffs its own Fire resistance
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − 0.5) = 15 dealt, no applied vulnerability
+
+            Assert.Equal(15, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemySelfBuffThenPlayerDebuff_CreditsOnlyTheNetReductionBelowInnate()
+        {
+            // Both move the same resistance: the enemy self-buffs +0.5, the player debuffs −0.8, so live sits 0.3
+            // BELOW the innate baseline. Hex credits that net 0.3 (the extra damage that actually landed vs. the
+            // innate hit), not the player's gross 0.8 — the enemy's buff first had to be overcome. Pinned so the
+            // interaction is intentional: the tally is "damage enabled vs. the innate baseline", not gross debuff.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(SelfResistanceBuff(FireResistance, 0.5)); // enemy: FireResistance 0 → 0.5
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // player: 0.5 → −0.3, net v = 0.3
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − (−0.3)) = 39 dealt
+
+            Assert.Equal(39, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(30.0 * 0.3 / 1.3, context.Stats.HexBonusDealt, 0.001); // (39 − 30) / (1 + 0.3) ≈ 6.92
+        }
+
+        [Fact]
         public void DamageTarget_EnemyAttacking_BooksNoHexBonus()
         {
             // Hex is a player-offense signal. Even if the player is somehow vulnerable, an enemy hit never trains
@@ -878,6 +918,20 @@ namespace Game.Core.Tests.Battle
         {
             Id = 1,
             Target = ESkillEffectTarget.Opponent,
+            AttributeId = resistance,
+            ModifierType = EModifierType.Additive,
+            Amount = amount,
+            DurationMs = 10_000,
+            ScalingAttributeId = EAttribute.Strength,
+            ScalingAmount = 0,
+        };
+
+        // A self-targeted resistance buff (positive additive) — an enemy hardening its own resistance mid-battle.
+        // Cast while the enemy is the active battler so it lands on the enemy (the Hex isolation edge case).
+        private static SkillEffect SelfResistanceBuff(EAttribute resistance, double amount) => new()
+        {
+            Id = 3,
+            Target = ESkillEffectTarget.Self,
             AttributeId = resistance,
             ModifierType = EModifierType.Additive,
             Amount = amount,
