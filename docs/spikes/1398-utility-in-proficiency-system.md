@@ -57,7 +57,7 @@ _Added after the spike closed, resolving **how** the "tallied magnitude" is actu
 
 **The double-count is harmless; the real question is strength-proportionality.** Accrual is **non-zero-sum** — each path independently claims `pie × clamp(activity ÷ power)` ([`ProficiencyXpCalculator`](../../Game.Core/Proficiencies/ProficiencyXpCalculator.cs)), so a crit hit training *both* its type path and Precision robs neither. "Double-counting" is not the defect. The defect a **full-hit** tally has is that its magnitude is **not proportional to the commitment's strength**: it folds in the base damage that would have landed anyway, so investing in a *stronger* overlay (more crit damage, a deeper vulnerability) barely moves the tally. Crit ships full-hit today and it is *tolerable* only because a crit's bonus is a sizeable fraction of its hit — the same full-hit tally on Hex (whose marginal is a sliver on top of the full landing) would train a token debuff as fast as a committed one. So the decision is **marginal, applied uniformly** (crit included).
 
-**Four resolutions (the shape):**
+**Four resolutions (the shape):** _(resolutions 2–3 were later superseded — see [Second refinement](#second-refinement--share-claims-supersede-the-counterfactual-marginal-1481) below)_
 
 1. **Marginal, normalized — uniform across overlays.** Tally the archetype's **marginal contribution** (the extra damage it enabled), not the full hit, passed through a **concave, saturating normalization** `φ` so the training rate rewards magnitude investment without a raw-linear runaway (weak still trains proportionally; a huge magnitude saturates rather than blowing through the curve). Whatever `φ` is chosen is applied to **crit as well** — consistency across the template.
 2. **Fixed-baseline _add-one-in_, never leave-one-out.** With several overlays stacking multiplicatively (`net = base × amp × crit × (1−resist) × (1−tough)`), each overlay's marginal must be measured against a **fixed baseline** — the vanilla net with *every* player overlay neutralized — as `N(only overlay i) − N₀`, **not** leave-one-out from the fully-amplified state (`N(all) − N(all except i)`). Leave-one-out double-counts the multiplicative synergy into every overlay (the tallies sum to more than the total extra); add-one-in credits each its standalone contribution, leaves the synergy unattributed, and — critically — makes each overlay's tally **independent of what else is stacked** (your Hex training does not balloon because you also crit).
@@ -71,6 +71,19 @@ _Added after the spike closed, resolving **how** the "tallied magnitude" is actu
 - Proc-based vs deterministic Hex/Sunder enablers — deferred; does not affect the tally rule.
 
 **Gameplay-tuning note (distinct from the tally).** Because a mitigation debuff's *value* is hyperbolic in the enemy's mitigation, a strong enough vulnerability can trivialize a high-resist wall. That is a **content-tuning** concern (authored resist values × debuff strengths), separate from XP attribution — flag it when authoring Hex/Sunder enablers so a debuff cannot erase a resist-gated boss.
+
+### Second refinement — share claims supersede the counterfactual marginal (#1481)
+
+_Added 2026-07, after Sunder ([#1429](https://github.com/ginderjeremiah/GameServer/issues/1429)) shipped the first no-counterfactual tally. The remaining literal-marginal tallies turned out to violate resolution 2 in practice: their baselines run at the target's **live** (debuffed) mitigation, so the debuff archetypes inflate crit/Momentum/Cull first-order (a 0.4 vulnerability at 30% enemy resistance inflates the crit baseline ≈1.57×), and a Sunder debuff inflates Hex through the live Toughness factor. This was latent when the crit reference (#1448) landed — nothing moved mitigation mid-battle back then._
+
+**Resolution (supersedes resolutions 2–3):** every overlay books the same **share claim** — the hit's **landed** damage (post-mitigation net, capped at the health actually removed, [#1482](https://github.com/ginderjeremiah/GameServer/issues/1482)) × `φ(its own investment)`. No fixed baselines, no counterfactual curve evaluations. The properties the old machinery bought are carried structurally:
+
+- **Strength-proportionality** — the requirement this whole section opened with — lives in `φ(investment)`; the marginal was only ever one way to compute an attribution, as Sunder's proxy already established.
+- **Anti-inflation**: the landed basis sums to at most the enemy's health pool per won battle, so per-battle claims are enemy-authored — stacking overlays shortens the fight instead of ballooning the other tallies, which is what add-one-in was protecting against.
+- **Enemy-independence** (resolution 3's goal) holds at the **accrual level** (per-battle claim ≈ coverage share of the HP pool × `φ`) rather than per-hit, and the hyperbolic resist-farming exploit stays impossible (the basis is mitigated damage, never a ratio).
+- The accrual's own non-zero-sum, overlapping-claims model (`ProficiencyXpCalculator`) is the native philosophy here — each path claims a `φ`-scaled share of the real output.
+
+Resolutions 1 and 4 stand: the tally is uniform across all five overlays (crit included), and crit remains the reference implementation. Implemented in [#1481](https://github.com/ginderjeremiah/GameServer/issues/1481), on top of the overkill booking cap ([#1482](https://github.com/ginderjeremiah/GameServer/issues/1482)).
 
 ### Candidate archetype roster (committed direction; content placement follows the arc)
 

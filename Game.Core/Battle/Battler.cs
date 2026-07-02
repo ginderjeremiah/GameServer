@@ -107,12 +107,28 @@ namespace Game.Core.Battle
         /// </summary>
         public double ComputeNetDamage(double dealt, EDamageType damageType, int attackerLevel)
         {
-            return NetDamageAfterResistance(dealt, SumTypeResistance(damageType), attackerLevel);
+            var mitigated = dealt * (1 - SumTypeResistance(damageType));
+            if (mitigated <= 0)
+            {
+                // Absorption (or a zero hit): the target takes a net heal; the toughness curve does not apply
+                // (mitigation can neither heal nor deepen an absorption heal).
+                return mitigated;
+            }
+
+            // Toughness mitigation: Toughness / (Toughness + K·attackerLevel) as a multiplier, so EHP is linear in
+            // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
+            // K·attackerLevel keeps the band stable across content scaling. The curve is floored at Toughness = 0
+            // (a debuff can strip mitigation to 0%, never past its pole at -K·attackerLevel into amplification or a
+            // net heal — #1461). Both simulators must compute this expression identically for battle parity.
+            var toughness = Math.Max(_attributes[Toughness], 0);
+            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
+            var toughnessReduction = toughness / (toughness + scaled);
+
+            return mitigated * (1 - toughnessReduction);
         }
 
-        // The raw (unclamped, signed) resistance sum for a type — shared by ComputeNetDamage,
-        // TypeResistanceMitigated, and HexBonusForHit's live-resistance baseline, each applying their own
-        // clamping (or none) on top.
+        // The raw (unclamped, signed) resistance sum for a type — shared by ComputeNetDamage and
+        // TypeResistanceMitigated, each applying their own clamping (or none) on top.
         private double SumTypeResistance(EDamageType damageType)
         {
             var resistance = 0.0;
@@ -140,51 +156,32 @@ namespace Game.Core.Battle
             return dealt * Math.Clamp(SumTypeResistance(damageType), 0, 1);
         }
 
-        // The mitigation tail shared by the live hit and the Hex counterfactual: percentage resistance then the
-        // Toughness curve. Factored out (byte-identical to the former inline body) so the Hex tally can measure
-        // the same hit against a different resistance — the innate baseline — without duplicating the curve.
-        private double NetDamageAfterResistance(double dealt, double resistance, int attackerLevel)
+        /// <summary>
+        /// The shared overlay-tally saturation <c>φ(a) = a / (1 + a)</c>, applied to an overlay's own investment
+        /// magnitude when booking its share claim (#1481): ~linear at the low end so a token investment trains
+        /// proportionally little, asymptoting to <c>1</c> so even a huge investment claims at most the full booked
+        /// hit. Every overlay signal (crit, Hex, Momentum, Sunder, Cull) uses it on its own investment.
+        /// </summary>
+        public static double NormalizeInvestment(double investment)
         {
-            var mitigated = dealt * (1 - resistance);
-            if (mitigated <= 0)
-            {
-                // Absorption (or a zero hit): the target takes a net heal; the toughness curve does not apply
-                // (mitigation can neither heal nor deepen an absorption heal).
-                return mitigated;
-            }
-
-            // Toughness mitigation: Toughness / (Toughness + K·attackerLevel) as a multiplier, so EHP is linear in
-            // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
-            // K·attackerLevel keeps the band stable across content scaling. The curve is floored at Toughness = 0
-            // (a debuff can strip mitigation to 0%, never past its pole at -K·attackerLevel into amplification or a
-            // net heal — #1461). Both simulators must compute this expression identically for battle parity.
-            var toughness = Math.Max(_attributes[Toughness], 0);
-            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            var toughnessReduction = toughness / (toughness + scaled);
-
-            return mitigated * (1 - toughnessReduction);
+            return investment / (1.0 + investment);
         }
 
         /// <summary>
-        /// The normalized-marginal Hex bonus for a direct hit of <paramref name="dealt"/> (attacker-amplified,
-        /// pre-crit) of <paramref name="damageType"/> against this (defending) battler — the extra damage the
-        /// <b>opponent-applied</b> vulnerability let through, booked to the attacker's Hex signal (#1427). The
-        /// vulnerability <c>v</c> is the opponent's own applied resistance reduction for the type
-        /// (<see cref="AppliedVulnerability"/>) — tracked as the modifiers the opponent contributed, so it credits
-        /// the <b>work the debuff did</b> regardless of the target's base resistance or its own resistance buffs.
-        /// The raw marginal is the live net minus the net the hit <em>would</em> have dealt without that debuff
-        /// (live resistance raised back by <c>v</c>), discounted by <c>1/(1 + v)</c> — the same concave saturation
-        /// the crit bonus applies to its investment (<c>marginal / (1 + investment)</c>, so a token debuff trains
-        /// little and a committed one saturates toward one baseline hit). In the normal region the marginal is
-        /// <c>dealt × v × toughnessFactor</c>, flat in the target's resistance — Hex trains the same against a soft
-        /// or a resistant enemy (no resist-farming). (That flatness is scoped to the non-absorbing region: if the
-        /// without-debuff resistance exceeds <c>1</c>, that baseline hit is a net heal and the marginal folds in
-        /// the avoided heal — correctly crediting the debuff for turning a heal into a hit, but no longer flat. No
-        /// content authors enemy absorption today.) Measured against the vanilla (pre-crit) hit so it composes with
-        /// crit without either overlay inflating the other. Returns <c>0</c> when no vulnerability is applied. A
-        /// backend-only side channel — it never mutates health.
+        /// The Hex bonus for a hit that booked <paramref name="bookedNet"/> (the post-mitigation damage capped at
+        /// the health it actually removed, #1482) of <paramref name="damageType"/> against this (defending)
+        /// battler — the attacker's Hex signal (#1427), booked as <c>bookedNet × φ(v)</c>
+        /// (<see cref="NormalizeInvestment"/>). The vulnerability <c>v</c> is the opponent's own applied resistance
+        /// reduction for the type (<see cref="AppliedVulnerability"/>) — tracked as the modifiers the opponent
+        /// contributed, so it credits the <b>work the debuff did</b> regardless of the target's base resistance or
+        /// its own resistance buffs. A <b>share claim on the damage that actually landed</b>, not a counterfactual
+        /// marginal (#1481): the booked nets over a won battle are bounded by this battler's health pool, so the
+        /// per-battle claim is ≈ the debuff's coverage share of that pool × <c>φ(v)</c> — enemy-independent at the
+        /// accrual level, proportional to the investment through <c>φ</c>, and computed with no counterfactual
+        /// curve evaluation. Returns <c>0</c> when no vulnerability is applied. A backend-only side channel — it
+        /// never mutates health.
         /// </summary>
-        public double HexBonusForHit(double dealt, EDamageType damageType, int attackerLevel)
+        public double HexBonusForHit(double bookedNet, EDamageType damageType)
         {
             var vulnerability = AppliedVulnerability(damageType);
             if (vulnerability <= 0)
@@ -192,13 +189,7 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            var liveResistance = SumTypeResistance(damageType);
-
-            // The baseline is the same hit without the opponent's debuff — resistance raised back by v — so the
-            // marginal is exactly the damage that debuff enabled (independent of base resistance and enemy buffs).
-            var marginal = NetDamageAfterResistance(dealt, liveResistance, attackerLevel)
-                - NetDamageAfterResistance(dealt, liveResistance + vulnerability, attackerLevel);
-            return marginal > 0 ? marginal / (1 + vulnerability) : 0;
+            return bookedNet * NormalizeInvestment(vulnerability);
         }
 
         /// <summary>
@@ -230,31 +221,19 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// <summary>
-        /// The Sunder bonus for a direct hit of <paramref name="dealt"/> (attacker-amplified, pre-crit,
-        /// pre-mitigation) against this (defending) battler — the attacker's Sunder signal (#1429), booked as
-        /// <c>dealt × φ(investment)</c>, <c>φ(a) = a / (1 + a)</c>, where the investment is the opponent-applied
-        /// Toughness reduction (<see cref="AppliedSunder"/>) scaled by the curve's own characteristic magnitude
-        /// <c>K·attackerLevel</c> (<see cref="GameConstants.ToughnessMitigationConstant"/>) — the same constant
-        /// the live mitigation curve itself divides by.
-        /// <para>
-        /// Unlike Hex, this is <b>not</b> a literal before/after marginal through <see cref="ComputeNetDamage"/>.
-        /// An earlier version computed one (the live net minus the net at the pre-debuff Toughness), but that
-        /// marginal reduces algebraically to <c>dealt × (1 − resistance) × [curve(baseline) − curve(live)]</c> —
-        /// still scaled by the target's own resistance, and still running the nonlinear Toughness curve at two
-        /// different baselines that are themselves target-dependent. Because the Toughness curve is nonlinear
-        /// (unlike Hex's flat resistance percentage, where the base resistance term cancels out of the marginal
-        /// algebraically), there is no way to compute a literal marginal through it that is actually flat in the
-        /// target's stats. So Sunder instead uses <paramref name="dealt"/> directly as a designed, saturating
-        /// proxy — the fraction of the hit's own magnitude credited to the debuff — which is genuinely
-        /// enemy-independent for a fixed investment (it reads neither the target's Toughness nor its resistance)
-        /// and costs nothing beyond the investment ratio itself (no counterfactual curve evaluation at all).
-        /// </para>
-        /// Returns <c>0</c> when no Sunder debuff is applied. A backend-only side channel — it never mutates
-        /// health. Direct-hit only: DoT bypasses the Toughness curve entirely (a Toughness debuff cannot affect
-        /// it), so there is no DoT counterpart to this method.
+        /// The Sunder bonus for a hit that booked <paramref name="bookedNet"/> (the post-mitigation damage capped
+        /// at the health it actually removed, #1482) against this (defending) battler — the attacker's Sunder
+        /// signal (#1429), booked as <c>bookedNet × φ(investment)</c> (<see cref="NormalizeInvestment"/>), where
+        /// the investment is the opponent-applied Toughness reduction (<see cref="AppliedSunder"/>) made
+        /// dimensionless by the curve's own characteristic magnitude <c>K·attackerLevel</c>
+        /// (<see cref="GameConstants.ToughnessMitigationConstant"/>) — the same constant the live mitigation curve
+        /// divides by. The same share-claim shape as every overlay tally (#1481; Sunder pioneered the
+        /// no-counterfactual proxy because the nonlinear Toughness curve has no target-flat marginal). Returns
+        /// <c>0</c> when no Sunder debuff is applied. A backend-only side channel — it never mutates health.
+        /// Direct-hit only: DoT bypasses the Toughness curve entirely (a Toughness debuff cannot affect it), so
+        /// there is no DoT counterpart to this method.
         /// </summary>
-        public double SunderBonusForHit(double dealt, int attackerLevel)
+        public double SunderBonusForHit(double bookedNet, int attackerLevel)
         {
             var sunder = AppliedSunder();
             if (sunder <= 0)
@@ -263,7 +242,7 @@ namespace Game.Core.Battle
             }
 
             var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            return dealt * sunder / (sunder + scaled);
+            return bookedNet * NormalizeInvestment(sunder / scaled);
         }
 
         /// <summary>
@@ -419,10 +398,10 @@ namespace Game.Core.Battle
         /// side channel that adds no parity surface.
         /// </param>
         /// <param name="recordHexBonus">
-        /// Optional recorder for the attacker's Hex signal (#1427) — invoked per DoT type with the
-        /// normalized-marginal damage the opponent-applied vulnerability enabled this tick (type-neutral, so it
-        /// takes just the amount). Supplied only when this battler is the victim of the player's DoT (the enemy);
-        /// <c>null</c> skips the vulnerability lookup entirely. A backend-only side channel like the others.
+        /// Optional recorder for the attacker's Hex signal (#1427/#1481) — invoked per DoT type with the tick's
+        /// booked (health-capped) damage × <c>φ(v)</c> share claim (<see cref="HexBonusForHit"/>; type-neutral, so
+        /// it takes just the amount). Supplied only when this battler is the victim of the player's DoT (the
+        /// enemy); <c>null</c> skips the vulnerability lookup entirely. A backend-only side channel like the others.
         /// </param>
         /// <param name="recordMitigated">
         /// Optional per-type recorder for the resist-mitigated portion of the resist-training split (#1454) —
@@ -470,23 +449,20 @@ namespace Game.Core.Battle
                 // type; compute it once so the recorded damage-dealt and the health math cannot drift. The
                 // booked amount is capped at the health the tick actually removes (#1482).
                 var tickDamage = preMitigation * (1 - resistance);
-                if (recordDamageDealt is not null)
-                {
-                    recordDamageDealt(accumulators[i].Type, HealthRemoved(tickDamage, bookableHealth));
-                    bookableHealth = Math.Max(0, bookableHealth - tickDamage);
-                }
+                var bookedTick = HealthRemoved(tickDamage, bookableHealth);
+                bookableHealth = Math.Max(0, bookableHealth - tickDamage);
+                recordDamageDealt?.Invoke(accumulators[i].Type, bookedTick);
                 recordMitigated?.Invoke(accumulators[i].Type, preMitigation * Math.Clamp(resistance, 0, 1));
 
-                // The attacker's Hex bonus for this tick: the opponent-applied vulnerability v (the resistance the
-                // attacker's own debuff removed) let through preMitigation × v, discounted by the same 1/(1 + v)
-                // saturation the direct-hit and crit bonuses use. DoT bypasses the Toughness curve, so the enabled
-                // damage is just preMitigation × v — flat in this battler's resistance.
-                if (recordHexBonus is not null)
+                // The attacker's Hex bonus for this tick (#1427/#1481): the same share claim the direct-hit tally
+                // books — the tick's booked (health-capped) damage × φ(v) — so direct hits and DoT ticks share one
+                // shape. An absorbed or fully-overkilled tick (booked ≤ 0) trains nothing.
+                if (recordHexBonus is not null && bookedTick > 0)
                 {
-                    var vulnerability = AppliedVulnerability(accumulators[i].Type);
-                    if (vulnerability > 0)
+                    var hexBonus = HexBonusForHit(bookedTick, accumulators[i].Type);
+                    if (hexBonus > 0)
                     {
-                        recordHexBonus(preMitigation * vulnerability / (1 + vulnerability));
+                        recordHexBonus(hexBonus);
                     }
                 }
 
