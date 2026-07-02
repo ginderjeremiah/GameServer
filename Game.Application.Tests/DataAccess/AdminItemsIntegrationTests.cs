@@ -617,6 +617,50 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveItems_WeaponGrantingMultiPortionSignature_ResolvesPrimaryTypeByWeight_ReturnsFailure()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                // Fire is authored first (weight 1) but Sword is heavier (weight 5), so resolving the
+                // signature's primary type must walk past the first portion rather than just reading it.
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Flaming Slash",
+                    acquisition: ESkillAcquisition.Item, damageType: EDamageType.Fire);
+                context.SkillDamagePortions.Add(new Entities.SkillDamagePortion
+                {
+                    SkillId = skill.Id,
+                    DamageType = (int)EDamageType.Sword,
+                    Weight = 5.0m,
+                });
+                await context.SaveChangesAsync();
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The skill's primary type resolves to Sword (heaviest portion), which strands the wielder of a
+            // Club exactly as a single-portion Sword signature would.
+            var changes = new List<Change<Contracts.Item>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Mismatched Multi-Portion Club", itemCategoryId: EItemCategory.Weapon,
+                        weaponType: EDamageType.Club, grantedSkillId: skillId),
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            var result = admin.SaveItems(changes);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "'Club' weapon grants a 'Sword' signature skill, which strands the wielder — a martial signature must match its own weapon's type.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
         public void SaveItems_WeaponWithoutGrantedSkill_ReturnsFailure()
         {
             using var scope = CreateScope();
