@@ -233,17 +233,17 @@ namespace Game.Core.Tests.Battle
 
         private static Skill MakeSkill(
             int cooldownMs, double baseDamage, List<DamageMultiplier>? multipliers = null, double criticalChance = 0) => new()
-        {
-            Id = 1,
-            Name = "Test Skill",
-            Description = string.Empty,
-            DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
-            CooldownMs = cooldownMs,
-            BaseDamage = baseDamage,
-            CriticalChance = criticalChance,
-            DamageMultipliers = multipliers ?? [],
-            Effects = [],
-        };
+            {
+                Id = 1,
+                Name = "Test Skill",
+                Description = string.Empty,
+                DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
+                CooldownMs = cooldownMs,
+                BaseDamage = baseDamage,
+                CriticalChance = criticalChance,
+                DamageMultipliers = multipliers ?? [],
+                Effects = [],
+            };
 
         /// <summary>
         /// Creates a BattleContext using two minimal battlers built from throwaway players.
