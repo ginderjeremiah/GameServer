@@ -34,6 +34,7 @@ export enum EActivityKey {
 	Unarmed = 29,
 	Hex = 30,
 	Momentum = 31,
+	Sunder = 32,
 }
 
 export enum EAttribute {
