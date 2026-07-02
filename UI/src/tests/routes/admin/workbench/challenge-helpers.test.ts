@@ -96,6 +96,17 @@ const TYPES: IChallengeType[] = [
 			bossOnly: false,
 			name: 'Skills Used'
 		}
+	},
+	{
+		id: EChallengeType.KillsByDamageType,
+		name: 'Kills By Damage Type',
+		goalComparison: EChallengeGoalComparison.AtLeast,
+		statisticType: {
+			id: EStatisticType.KillsByDamageType,
+			entityType: EEntityType.DamageType,
+			bossOnly: false,
+			name: 'Kills By Damage Type'
+		}
 	}
 ];
 
@@ -205,6 +216,18 @@ describe('challengeSentence', () => {
 		expect(challengeSentence(make({ challengeTypeId: EChallengeType.LevelReached, progressGoal: 20 }), resolve)).toBe(
 			'Reach level 20'
 		);
+	});
+
+	it('scopes kills by damage type to the target, or falls back when untargeted', () => {
+		expect(
+			challengeSentence(
+				make({ challengeTypeId: EChallengeType.KillsByDamageType, progressGoal: 20, targetEntityId: 1 }),
+				resolve
+			)
+		).toBe('Defeat 20 enemies with DamageType#1');
+		expect(
+			challengeSentence(make({ challengeTypeId: EChallengeType.KillsByDamageType, progressGoal: 20 }), resolve)
+		).toBe('Defeat 20 enemies with any damage type');
 	});
 });
 

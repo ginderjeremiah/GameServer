@@ -4,6 +4,7 @@ import {
 	EAttribute,
 	EChallengeGoalComparison,
 	EChallengeType,
+	EDamageTypeKey,
 	EEntityType,
 	EItemCategory,
 	EItemModType,
@@ -212,6 +213,18 @@ describe('buildChallengeVM', () => {
 	it('resolves the target entity name from the matching reference pool', () => {
 		expect(buildChallengeVM(staticData.challenges[1]).target).toBe('Goblin');
 		expect(buildChallengeVM(staticData.challenges[0]).target).toBeNull();
+	});
+
+	it('resolves a DamageType target via the fixed damage-type-key labels, not a reference pool', () => {
+		const ch = challenge({
+			id: 3,
+			name: 'Firebrand',
+			challengeTypeId: EChallengeType.KillsByDamageType,
+			entityType: EEntityType.DamageType,
+			targetEntityId: EDamageTypeKey.Fire,
+			progressGoal: 20
+		});
+		expect(buildChallengeVM(ch).target).toBe('Fire');
 	});
 
 	it("uses the type's intrinsic comparison so a TimeTrial reads as a minimisation goal", () => {

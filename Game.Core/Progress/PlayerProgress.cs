@@ -291,6 +291,7 @@ namespace Game.Core.Progress
 
         /// <summary>
         /// Records a reported value for a statistic, aggregating it according to the statistic type's
+        /// <see cref="StatisticType.AggregationKind"/>. This single dispatch is the one place a statistic's
         /// aggregation direction is consumed — the same derived fact drives a challenge's goal comparison —
         /// so adding a "lower is better" statistic needs no change here, only its mapping on
         /// <see cref="StatisticType"/>.

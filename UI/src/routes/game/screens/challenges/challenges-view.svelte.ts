@@ -13,6 +13,7 @@ import { BattleAttributes, type Item } from '$lib/battle';
 import {
 	challengeTypeColor,
 	challengeTypeName,
+	damageTypeKeyName,
 	rarityGlow,
 	rarityLevel,
 	resolveUnlockReward,
@@ -115,8 +116,9 @@ function targetName(ch: IChallenge): string | null {
 		case EEntityType.Skill:
 			return staticData.skills?.[ch.targetEntityId]?.name ?? null;
 		case EEntityType.DamageType:
-			// Not a DB reference table — a fixed intrinsic enum, so the name is the enum member itself.
-			return EDamageTypeKey[ch.targetEntityId] ?? null;
+			// Not a DB reference table — a fixed intrinsic enum — so the display name comes from the
+			// same damage-type-key label source the rest of the UI uses, not the raw enum member name.
+			return EDamageTypeKey[ch.targetEntityId] != null ? damageTypeKeyName(ch.targetEntityId) : null;
 		default:
 			return null;
 	}
