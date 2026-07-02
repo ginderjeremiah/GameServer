@@ -451,6 +451,47 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task MomentumBonus_TrainsTheMomentumPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Momentum trains from the ramp-enabled marginal damage (#1428) — an output-book event, type-neutral
+            // like the other overlays (routed straight to the single Momentum activity key with no applies() split).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Momentum", activityKey: EActivityKey.Momentum);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Momentum", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { MomentumBonusDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoMomentumBonus_TrainsNoMomentum()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with other events but no ramp-enabled damage routes no
+            // Momentum activity, so a Momentum-keyed path is never reached.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Momentum", activityKey: EActivityKey.Momentum);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Momentum", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage, PlayerDamageHealed = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
         public async Task NoReflectedDamage_TrainsNoRetribution()
         {
             using var scope = CreateScope();

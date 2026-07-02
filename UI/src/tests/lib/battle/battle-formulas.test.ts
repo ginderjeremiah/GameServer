@@ -175,6 +175,22 @@ describe('battle-formulas', () => {
 			// Toughness 20: vs level 3 → 20/(20+60) = 0.25 reduction → 40 × 0.75 = 30.
 			expect(toughnessMitigatedDamage(40, 20, 3)).toBeCloseTo(30, 10);
 		});
+
+		// The curve is floored at Toughness = 0 (#1461): a debuff-driven negative Toughness never crosses the
+		// unfloored pole at -K·attackerLevel into amplification or a net heal.
+		it('floors a negative Toughness to zero — behaves like no Toughness', () => {
+			expect(toughnessMitigatedDamage(40, -10, 1)).toBe(40);
+		});
+
+		it('floors Toughness exactly at the pole (-K·attackerLevel) without dividing by zero', () => {
+			expect(toughnessMitigatedDamage(40, -20, 1)).toBe(40);
+		});
+
+		it('floors Toughness past the pole — never amplifies or heals', () => {
+			const net = toughnessMitigatedDamage(40, -1000, 1);
+			expect(net).toBe(40);
+			expect(net).toBeGreaterThan(0);
+		});
 	});
 
 	// Damage typing (#1320): mirrors the backend `Battler.AmplifyDamage` / `Battler.ComputeNetDamage` math.
