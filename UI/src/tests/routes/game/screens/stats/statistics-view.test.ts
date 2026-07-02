@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
+import { EDamageTypeKey, EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
 
 // StatisticsView reads the statistic-type catalogue + entity lists from the in-memory staticData
 // store, and deep-links enemies into the Codex via the navigation store — both mocked here.
@@ -14,6 +14,7 @@ import {
 	buildStatTypes,
 	StatisticsData,
 	StatisticsView,
+	type StatBreakdownKind,
 	type StatEntity,
 	type StatType
 } from '$routes/game/screens/stats/statistics-view.svelte';
@@ -21,13 +22,17 @@ import { SERVER_STAT_TYPES } from './stat-fixtures';
 
 const statTypes: StatType[] = buildStatTypes(SERVER_STAT_TYPES);
 
-const entities: Record<'enemy' | 'zone' | 'skill', StatEntity[]> = {
+const entities: Record<StatBreakdownKind, StatEntity[]> = {
 	enemy: [
 		{ id: 0, name: 'Cave Bat' },
 		{ id: 1, name: 'Goblin', boss: true }
 	],
 	zone: [{ id: 0, name: 'Verdant Hollow', zoneNum: 1 }],
-	skill: [{ id: 0, name: 'Cleave' }]
+	skill: [{ id: 0, name: 'Cleave' }],
+	damageType: [
+		{ id: EDamageTypeKey.Physical, name: 'Physical' },
+		{ id: EDamageTypeKey.Fire, name: 'Fire' }
+	]
 };
 
 const stats: IPlayerStatistic[] = [
@@ -36,7 +41,9 @@ const stats: IPlayerStatistic[] = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, value: 120 },
 	{ statisticTypeId: EStatisticType.FastestVictory, entityId: 0, value: 2.0 },
 	{ statisticTypeId: EStatisticType.FastestVictory, entityId: 1, value: 5.0 },
-	{ statisticTypeId: EStatisticType.PlayerDeaths, value: 7 }
+	{ statisticTypeId: EStatisticType.PlayerDeaths, value: 7 },
+	{ statisticTypeId: EStatisticType.KillsByDamageType, entityId: EDamageTypeKey.Fire, value: 30 },
+	{ statisticTypeId: EStatisticType.KillsByDamageType, entityId: EDamageTypeKey.Physical, value: 10 }
 ];
 
 const data = () => new StatisticsData(statTypes, stats, entities);
@@ -67,7 +74,7 @@ beforeEach(() => {
 
 describe('buildStatTypes', () => {
 	it('builds one entry per presented statistic with names from the server', () => {
-		expect(statTypes).toHaveLength(19);
+		expect(statTypes).toHaveLength(20);
 		expect(statTypes.find((s) => s.id === EStatisticType.HighestSingleAttackDamage)!.name).toBe(
 			'Highest Single Attack Damage'
 		);
@@ -94,6 +101,10 @@ describe('buildStatTypes', () => {
 
 		expect(statTypes.find((s) => s.id === EStatisticType.ZonesCleared)!.kind).toBe('zone');
 		expect(statTypes.find((s) => s.id === EStatisticType.DamageDealt)!.kind).toBe('skill');
+	});
+
+	it('presents KillsByDamageType as a damage-type breakdown, not dossier-navigable', () => {
+		expect(statTypes.find((s) => s.id === EStatisticType.KillsByDamageType)!.kind).toBe('damageType');
 	});
 
 	it('treats None entity types as total-only (no per-entity breakdown)', () => {
@@ -124,7 +135,7 @@ describe('buildStatTypes', () => {
 	it('skips statistics the server does not return', () => {
 		const partial = SERVER_STAT_TYPES.filter((s) => s.id !== EStatisticType.SkillsUsed);
 		const built = buildStatTypes(partial);
-		expect(built).toHaveLength(18);
+		expect(built).toHaveLength(19);
 		expect(built.find((s) => s.id === EStatisticType.SkillsUsed)).toBeUndefined();
 	});
 });
@@ -152,6 +163,12 @@ describe('StatisticsData.rowsForStat', () => {
 			entities
 		);
 		expect(d.rowsForStat(EStatisticType.EnemiesKilled)).toEqual([]);
+	});
+
+	it('resolves a damage-type breakdown by key, sorted best-first', () => {
+		const rows = data().rowsForStat(EStatisticType.KillsByDamageType);
+		expect(rows.map((r) => r.entityId)).toEqual([EDamageTypeKey.Fire, EDamageTypeKey.Physical]);
+		expect(rows[0].entity.name).toBe('Fire');
 	});
 });
 
@@ -258,11 +275,18 @@ describe('StatisticsView data wiring', () => {
 
 	it('builds the catalogue + entities from staticData once stats arrive', () => {
 		const view = seededView();
-		expect(view.data.statTypes).toHaveLength(19);
+		expect(view.data.statTypes).toHaveLength(20);
 		expect(view.data.entityList('enemy').map((e) => e.name)).toEqual(['Cave Bat', 'Goblin']);
 		// isBoss / order are resolved from the raw reference data.
 		expect(view.data.entity('enemy', 1)?.boss).toBe(true);
 		expect(view.data.entity('zone', 0)?.zoneNum).toBe(1);
 		expect(view.data.statHeadline(EStatisticType.EnemiesKilled)).toBe(120);
+	});
+
+	it('builds the damage-type breakdown from the fixed enum, not staticData', () => {
+		const view = seededView();
+		expect(view.data.entityList('damageType')).toHaveLength(16);
+		expect(view.data.entity('damageType', EDamageTypeKey.Fire)?.name).toBe('Fire');
+		expect(view.data.statHeadline(EStatisticType.KillsByDamageType)).toBe(40);
 	});
 });

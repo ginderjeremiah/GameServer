@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EStatisticType, type IPlayerStatistic } from '$lib/api';
+import { EDamageTypeKey, EStatisticType, type IPlayerStatistic } from '$lib/api';
 import { SERVER_STAT_TYPES } from './stat-fixtures';
 
 // Statistics fetches values over the socket (GetPlayerStatistics) and resolves entities from staticData.
@@ -31,7 +31,8 @@ const STATS: IPlayerStatistic[] = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, value: 350 },
 	{ statisticTypeId: EStatisticType.FastestVictory, entityId: 0, value: 1.8 },
 	{ statisticTypeId: EStatisticType.TotalBattleTime, value: 1200 },
-	{ statisticTypeId: EStatisticType.PlayerDeaths, value: 2 }
+	{ statisticTypeId: EStatisticType.PlayerDeaths, value: 2 },
+	{ statisticTypeId: EStatisticType.KillsByDamageType, entityId: EDamageTypeKey.Fire, value: 12 }
 ];
 
 beforeEach(() => {
@@ -66,6 +67,14 @@ describe('Statistics screen', () => {
 		await fireEvent.click(screen.getByTestId('tab-time'));
 		expect(screen.getByText('Total Battle Time')).toBeTruthy();
 		expect(screen.getByText('Fastest Victory')).toBeTruthy();
+	});
+
+	it('shows the damage-type breakdown card with a non-interactive per-key row', async () => {
+		render(Statistics);
+		const row = await screen.findByTestId(`stat-row-${EStatisticType.KillsByDamageType}-${EDamageTypeKey.Fire}`);
+		expect(row.tagName).toBe('DIV');
+		await fireEvent.click(row);
+		expect(navigation.requestedScreen).toBeNull();
 	});
 
 	it('deep-links an enemy stat row into the Codex (cross-link)', async () => {

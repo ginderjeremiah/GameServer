@@ -21,7 +21,7 @@
 			<span class="overall-note">Tracked overall — no per-entity breakdown.</span>
 		{:else}
 			{#each top as row (row.entityId)}
-				<StatCardRow {row} {stat} kind={asKind} {maxVal} onPick={(id) => onPickEntity(asKind, id)} />
+				<StatCardRow {row} {stat} kind={asKind} {maxVal} onPick={handlePick} />
 			{/each}
 			{#if more > 0}
 				<span class="more">+{more} more {statKindPlural(asKind).toLowerCase()}</span>
@@ -35,7 +35,7 @@ import CategoryTag from './CategoryTag.svelte';
 import KindBadge from './KindBadge.svelte';
 import CompHint from './CompHint.svelte';
 import StatCardRow from './StatCardRow.svelte';
-import type { StatSummary, StatType, StatEntityKind } from './statistics-view.svelte';
+import type { StatSummary, StatType, StatEntityKind, StatBreakdownKind } from './statistics-view.svelte';
 import { fmtValue, statKindPlural } from './statistics-display';
 
 interface Props {
@@ -52,7 +52,14 @@ const maxVal = $derived(summary.maxVal);
 const top = $derived(summary.rows.slice(0, 4));
 const more = $derived(summary.rows.length - top.length);
 // Safe to read only when kind !== 'none' (guarded in the template).
-const asKind = $derived(stat.kind as StatEntityKind);
+const asKind = $derived(stat.kind as StatBreakdownKind);
+
+// The damage-type breakdown has no dossier to navigate to, so its rows don't call back.
+const handlePick = (id: number): void => {
+	if (asKind !== 'damageType') {
+		onPickEntity(asKind, id);
+	}
+};
 </script>
 
 <style lang="scss">

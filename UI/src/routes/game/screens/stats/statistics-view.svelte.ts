@@ -13,7 +13,8 @@
    the server metadata by buildStatTypes(). The actual values come from
    the `GetPlayerStatistics` socket command; entity ids resolve against the live staticData. */
 
-import { EEntityType, EStatisticType, type IPlayerStatistic, type IStatisticType } from '$lib/api';
+import { EDamageTypeKey, EEntityType, EStatisticType, type IPlayerStatistic, type IStatisticType } from '$lib/api';
+import { damageTypeKeyName } from '$lib/common';
 import { navigation, staticData } from '$stores';
 import { statCategoryLabel } from './statistics-display';
 import type { CodexNavPayload } from '../codex/codex-view.svelte';
@@ -21,10 +22,13 @@ import type { CodexNavPayload } from '../codex/codex-view.svelte';
 export type StatUnit = 'count' | 'damage' | 'time';
 export type StatAgg = 'sum' | 'max' | 'min';
 export type StatComp = 'AtLeast' | 'AtMost';
-/** Entity a statistic can break down by. */
+/** Dossier-navigable entity a statistic can break down by. */
 export type StatEntityKind = 'enemy' | 'zone' | 'skill';
-/** A statistic either breaks down by an entity kind, or is a single total. */
-export type StatKind = StatEntityKind | 'none';
+/** Any breakdown kind a statistic can have, dossier-navigable or not — `damageType` (#1473) has no
+ *  dossier to pivot into, so it renders as a flat, non-interactive list instead of dossier-linked rows. */
+export type StatBreakdownKind = StatEntityKind | 'damageType';
+/** A statistic either breaks down by a kind, or is a single total. */
+export type StatKind = StatBreakdownKind | 'none';
 export type StatCategory = 'combat' | 'survival' | 'exploration' | 'time';
 
 /** A reference entity a statistic can break down by — the shape `StatisticsData`
@@ -64,9 +68,8 @@ interface StatPresentation {
 }
 
 /** The presentation catalogue, ordered for the category-tab grouping. Covers every
- *  EStatisticType with a dossier-navigable (or global) breakdown; the entity breakdown
- *  (kind) + name come from the server. KillsByDamageType (#1455) is deliberately absent —
- *  see KIND_BY_ENTITY_TYPE. */
+ *  EStatisticType with a breakdown (dossier-navigable, or the flat damage-type list) or a
+ *  global total; the entity breakdown (kind) + name come from the server. */
 const STAT_PRESENTATION: StatPresentation[] = [
 	// Combat
 	{ id: EStatisticType.EnemiesKilled, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
@@ -76,6 +79,7 @@ const STAT_PRESENTATION: StatPresentation[] = [
 	{ id: EStatisticType.HighestSingleAttackDamage, unit: 'damage', agg: 'max', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.CriticalHits, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.CriticalDamageDealt, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
+	{ id: EStatisticType.KillsByDamageType, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	// Survival
 	{ id: EStatisticType.DamageTaken, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.DamageHealed, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
@@ -93,18 +97,19 @@ const STAT_PRESENTATION: StatPresentation[] = [
 	{ id: EStatisticType.FastestVictory, unit: 'time', agg: 'min', comp: 'AtMost', cat: 'time' }
 ];
 
-/** Maps the backend's entity type onto the screen's entity-kind discriminator.
- *  DamageType (#1455) has no dossier to pivot into yet — its statistic (KillsByDamageType)
- *  backs "kill N with <type>" challenges but is deliberately absent from STAT_PRESENTATION
- *  below, so it's simply not shown on this screen (a per-damage-type breakdown card is a
- *  reasonable follow-up, not required for the challenge-backing feature itself). */
+/** Maps the backend's entity type onto the screen's breakdown-kind discriminator. DamageType
+ *  (#1455) has no Codex dossier to pivot into, so its rows render as a flat, non-interactive
+ *  list (`StatBreakdownKind.damageType`) rather than dossier-linked rows (#1473). */
 const KIND_BY_ENTITY_TYPE: Record<EEntityType, StatKind> = {
 	[EEntityType.None]: 'none',
 	[EEntityType.Enemy]: 'enemy',
 	[EEntityType.Zone]: 'zone',
 	[EEntityType.Skill]: 'skill',
-	[EEntityType.DamageType]: 'none'
+	[EEntityType.DamageType]: 'damageType'
 };
+
+/** Every damage-type key, in enum order — the breakdown rows for `KillsByDamageType`. */
+const DAMAGE_TYPE_KEYS = Object.values(EDamageTypeKey).filter((v): v is EDamageTypeKey => typeof v === 'number');
 
 /** Builds the statistic-type catalogue by merging the frontend presentation
  *  metadata with the backend statistic-type reference data (name + entity
@@ -132,13 +137,15 @@ export function buildStatTypes(statisticTypes: IStatisticType[]): StatType[] {
 	return out;
 }
 
-/** Builds the entity reference lists the screen resolves ids against from the
- *  in-memory static reference data (enemies / zones / skills). */
-export function buildStatEntities(): Record<StatEntityKind, StatEntity[]> {
+/** Builds the breakdown reference lists the screen resolves ids against: the dossier-navigable
+ *  entities from the in-memory static reference data (enemies / zones / skills), plus the
+ *  damage-type keys (a fixed enum, not reference data) using the shared player-facing labels. */
+export function buildStatEntities(): Record<StatBreakdownKind, StatEntity[]> {
 	return {
 		enemy: (staticData.enemies ?? []).filter(Boolean).map((e) => ({ id: e.id, name: e.name, boss: e.isBoss })),
 		zone: (staticData.zones ?? []).filter(Boolean).map((z) => ({ id: z.id, name: z.name, zoneNum: z.order })),
-		skill: (staticData.skills ?? []).filter(Boolean).map((s) => ({ id: s.id, name: s.name }))
+		skill: (staticData.skills ?? []).filter(Boolean).map((s) => ({ id: s.id, name: s.name })),
+		damageType: DAMAGE_TYPE_KEYS.map((key) => ({ id: key, name: damageTypeKeyName(key) }))
 	};
 }
 
@@ -196,20 +203,21 @@ const aggregate = (values: number[], agg: StatAgg): number => {
 export class StatisticsData {
 	readonly statTypes: StatType[];
 	readonly stats: IPlayerStatistic[];
-	readonly entities: Record<StatEntityKind, StatEntity[]>;
+	readonly entities: Record<StatBreakdownKind, StatEntity[]>;
 	/** Entity lookup per kind, built once so id resolution is O(1) (not Array.find per row). */
-	private readonly entityById: Record<StatEntityKind, Map<number, StatEntity>>;
+	private readonly entityById: Record<StatBreakdownKind, Map<number, StatEntity>>;
 	/** Per-statistic display summaries, memoised once over the immutable inputs. */
 	private readonly summaries: Map<EStatisticType, StatSummary>;
 
-	constructor(statTypes: StatType[], stats: IPlayerStatistic[], entities: Record<StatEntityKind, StatEntity[]>) {
+	constructor(statTypes: StatType[], stats: IPlayerStatistic[], entities: Record<StatBreakdownKind, StatEntity[]>) {
 		this.statTypes = statTypes;
 		this.stats = stats;
 		this.entities = entities;
 		this.entityById = {
 			enemy: indexEntities(entities.enemy),
 			zone: indexEntities(entities.zone),
-			skill: indexEntities(entities.skill)
+			skill: indexEntities(entities.skill),
+			damageType: indexEntities(entities.damageType)
 		};
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive memo map
 		this.summaries = new Map(statTypes.map((s) => [s.id, this.computeSummary(s)]));
@@ -220,11 +228,11 @@ export class StatisticsData {
 		return cat === 'all' ? this.statTypes : this.statTypes.filter((s) => s.cat === cat);
 	}
 
-	entityList(kind: StatEntityKind): StatEntity[] {
+	entityList(kind: StatBreakdownKind): StatEntity[] {
 		return this.entities[kind] ?? [];
 	}
 
-	entity(kind: StatEntityKind, id: number): StatEntity | undefined {
+	entity(kind: StatBreakdownKind, id: number): StatEntity | undefined {
 		return this.entityById[kind]?.get(id);
 	}
 
