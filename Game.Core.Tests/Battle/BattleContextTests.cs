@@ -1097,7 +1097,7 @@ namespace Game.Core.Tests.Battle
             enemy.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(10, Single(EDamageType.Physical));
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
 
             Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
@@ -1112,7 +1112,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0)); // full health
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(10, Single(EDamageType.Physical));
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
 
             Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
@@ -1130,7 +1130,7 @@ namespace Game.Core.Tests.Battle
             enemy.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(10, Single(EDamageType.Physical));
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
 
             Assert.Equal(50 - 20 - 14, enemy.CurrentHealth, 0.001);
             Assert.Equal(14, context.Stats.PlayerDamageDealt, 0.001);
@@ -1149,7 +1149,7 @@ namespace Game.Core.Tests.Battle
             enemy.TakeReflectedDamage(49); // CurrentHealth 1 (98% missing)
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical));
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
 
             Assert.Equal(1000, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(19.6, context.Stats.CullBonusDealt, 0.001);
@@ -1164,12 +1164,12 @@ namespace Game.Core.Tests.Battle
             // investment m−1 = 1, φ(1) = 0.5 ⇒ 10×0.5 = 5. The real damage composes both multipliers:
             // 10 × 2 (crit) × 1.4 (execute) = 28.
             var player = MakeBattlerWith(
-                (Endurance, 0), (CriticalChance, 1), (CriticalDamage, 0.5), (ExecuteBonus, 1.0)); // CriticalDamage 2
+                (Endurance, 0), (CriticalDamage, 0.5), (ExecuteBonus, 1.0)); // CriticalDamage 2
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             enemy.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(10, Single(EDamageType.Physical));
+            context.DamageTarget(10, Single(EDamageType.Physical), 1);
 
             Assert.Equal(28, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(10.0 * 0.4 / 1.4, context.Stats.CullBonusDealt, 0.001); // unaffected by the crit
@@ -1188,7 +1188,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers(); // enemy attacks
 
-            context.DamageTarget(10, Single(EDamageType.Physical));
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
 
             Assert.Equal(30 - 10, player.CurrentHealth, 0.001);
             Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
