@@ -962,7 +962,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(30, Single(EDamageType.Fire));
+            context.DamageTarget(30, Single(EDamageType.Fire), 0);
 
             Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
         }
@@ -977,7 +977,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × 1.5 = 45 dealt, but no applied ramp
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × 1.5 = 45 dealt, but no applied ramp
 
             Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
@@ -994,7 +994,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Ramp(FireAmplification, 0.5));
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 + 0.5) = 45 dealt
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 + 0.5) = 45 dealt
 
             Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // (45 − 30) / (1 + 0.5) = 10
@@ -1011,7 +1011,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Ramp(FireAmplification, 10));
 
-            context.DamageTarget(30, Single(EDamageType.Fire));
+            context.DamageTarget(30, Single(EDamageType.Fire), 0);
 
             Assert.Equal(30.0 * 10.0 / 11.0, context.Stats.MomentumBonusDealt, 0.001);
         }
@@ -1028,7 +1028,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Ramp(FireAmplification, 0.5));
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 45 × (1 − 0.5) = 22.5 dealt
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 45 × (1 − 0.5) = 22.5 dealt
 
             Assert.Equal(22.5, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(15.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // 5
@@ -1041,12 +1041,12 @@ namespace Game.Core.Tests.Battle
             // not inflate it: r = 0.5 on raw 30 still banks 10. Crit books its own marginal off the (ramped)
             // non-crit baseline 45: investment m−1 = 1, φ(1) = 0.5 ⇒ 45 × 0.5 = 22.5. Neither overlay balloons
             // the other.
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Ramp(FireAmplification, 0.5));
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // ramped non-crit 45, crit ×2 = 90 dealt
+            context.DamageTarget(30, Single(EDamageType.Fire), 1); // ramped non-crit 45, crit ×2 = 90 dealt
 
             Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // 10, unaffected by the crit
             Assert.Equal(45.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 22.5
@@ -1063,7 +1063,7 @@ namespace Game.Core.Tests.Battle
             context.ApplySkillEffect(Ramp(FireAmplification, 0.5)); // DurationMs 10_000
             player.AdvanceEffects(10_001); // past expiry → the FireAmplification stack and its contribution are gone
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // amplification back to 0 ⇒ 30 dealt, no ramp
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // amplification back to 0 ⇒ 30 dealt, no ramp
 
             Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
@@ -1080,7 +1080,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers();
             context.ApplySkillEffect(Ramp(FireAmplification, 0.5)); // enemy ramps its own Fire amplification
 
-            context.DamageTarget(30, Single(EDamageType.Fire));
+            context.DamageTarget(30, Single(EDamageType.Fire), 0);
 
             Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
         }
