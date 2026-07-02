@@ -107,6 +107,13 @@ namespace Game.Core.Battle
         /// </summary>
         public double ComputeNetDamage(double dealt, EDamageType damageType, int attackerLevel)
         {
+            return NetDamageAfterResistance(dealt, SumTypeResistance(damageType), attackerLevel);
+        }
+
+        // The raw (unclamped, signed) resistance sum for a type — shared by ComputeNetDamage and
+        // TypeResistanceMitigated, which each apply their own clamping semantics on top.
+        private double SumTypeResistance(EDamageType damageType)
+        {
             var resistance = 0.0;
             var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
             for (var i = 0; i < resistanceAttributes.Count; i++)
@@ -114,7 +121,22 @@ namespace Game.Core.Battle
                 resistance += _attributes[resistanceAttributes[i]];
             }
 
-            return NetDamageAfterResistance(dealt, resistance, attackerLevel);
+            return resistance;
+        }
+
+        /// <summary>
+        /// The amount of a direct hit of <paramref name="dealt"/> this battler's own type-resistance for
+        /// <paramref name="damageType"/> blocks — <c>dealt × clamp(resistance, 0, 1)</c>, deliberately isolated
+        /// from the Toughness curve (spike #1398 → resistance training split, #1454). Toughness is a generic,
+        /// non-typed stat every build can raise, so folding it in would let it accelerate every resist path's
+        /// training at once; this credits only the type-specific resistance investment the path actually
+        /// represents. Clamped to <c>[0, 1]</c> because this is a training-weight fraction, not a damage
+        /// multiplier: a resistance debuff pushing the sum negative blocks nothing (anti-mitigation, not
+        /// credited here), and a sum above <c>1</c> (absorption) still credits at most the full dealt amount.
+        /// </summary>
+        public double TypeResistanceMitigated(double dealt, EDamageType damageType)
+        {
+            return dealt * Math.Clamp(SumTypeResistance(damageType), 0, 1);
         }
 
         // The mitigation tail shared by the live hit and the Hex counterfactual: percentage resistance then the
@@ -348,11 +370,20 @@ namespace Game.Core.Battle
         /// takes just the amount). Supplied only when this battler is the victim of the player's DoT (the enemy);
         /// <c>null</c> skips the vulnerability lookup entirely. A backend-only side channel like the others.
         /// </param>
+        /// <param name="recordMitigated">
+        /// Optional per-type recorder for the resist-mitigated portion of the resist-training split (#1454) —
+        /// invoked with each DoT type and <c>preMitigation × clamp(resistance, 0, 1)</c>, the amount this
+        /// battler's own type-resistance blocked. DoT bypasses the Toughness curve entirely (resistance is its
+        /// only mitigation), so unlike the direct-hit path this needs no separate Toughness-excluding helper.
+        /// Supplied only when this battler's exposure is tracked (the player); <c>null</c> leaves the loop
+        /// unchanged. A backend-only side channel like the others.
+        /// </param>
         public double ApplyDamageOverTime(
             int ms,
             Action<EDamageType, double>? recordExposure = null,
             Action<EDamageType, double>? recordDamageDealt = null,
-            Action<double>? recordHexBonus = null)
+            Action<double>? recordHexBonus = null,
+            Action<EDamageType, double>? recordMitigated = null)
         {
             var dot = 0.0;
             var accumulators = DamageTypes.DotAccumulators;
@@ -381,6 +412,7 @@ namespace Game.Core.Battle
                 // type; compute it once so the recorded damage-dealt and the health math cannot drift.
                 var tickDamage = preMitigation * (1 - resistance);
                 recordDamageDealt?.Invoke(accumulators[i].Type, tickDamage);
+                recordMitigated?.Invoke(accumulators[i].Type, preMitigation * Math.Clamp(resistance, 0, 1));
 
                 // The attacker's Hex bonus for this tick: the opponent-applied vulnerability v (the resistance the
                 // attacker's own debuff removed) let through preMitigation × v, discounted by the same 1/(1 + v)

@@ -505,6 +505,72 @@ namespace Game.Core.Tests.Battle
             Assert.Empty(context.Stats.TypedDamageExposure);
         }
 
+        // ── DamageTarget: resistance-only mitigated slice of exposure (resist-training split, #1454) ─
+
+        [Fact]
+        public void DamageTarget_EnemyHit_RecordsResistanceMitigatedAmount()
+        {
+            // The resistance-only mitigated slice of the exposure: 40 Fire × 0.5 FireResistance = 20, matching
+            // the reduction FireResistance alone accounts for (the player has no Toughness, so it is the whole
+            // reduction — PlayerDamageTaken is 20 too).
+            var player = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Toughness 0
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(40, Single(EDamageType.Fire));
+
+            Assert.Equal(20, context.Stats.PlayerDamageTaken, 0.001);
+            Assert.Equal(20, Mitigated(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyHit_ToughnessAloneRecordsNoResistanceMitigation()
+        {
+            // Toughness is deliberately excluded from the resist-training split (#1454): a Toughness-only build
+            // blocks real damage (PlayerDamageTaken well under the pre-mitigation hit) but banks zero
+            // resistance-mitigated credit, since Toughness is a generic stat every build can raise, not the
+            // type-specific resistance investment a resist path represents.
+            var player = MakeBattlerWith((Endurance, 50)); // Toughness 100 derived, no FireResistance
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(40, Single(EDamageType.Fire));
+
+            Assert.True(context.Stats.PlayerDamageTaken < 40);
+            Assert.Equal(0, Mitigated(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyHit_VulnerableResistanceRecordsNoResistanceMitigation()
+        {
+            // A negative summed resistance (a vulnerability debuff) is anti-mitigation, not resistance — it
+            // blocks nothing, so the mitigated slice clamps to 0 rather than going negative.
+            var player = MakeBattlerWith((Endurance, 0), (FireResistance, -0.5)); // Toughness 0
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(40, Single(EDamageType.Fire));
+
+            Assert.Equal(0, Mitigated(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerDodge_RecordsNoResistanceMitigation()
+        {
+            // A dodged hit was evaded, not mitigated — like exposure, it does not feed the resist-training split.
+            var player = MakeBattlerWith((DodgeChance, 1), (FireResistance, 0.5));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(40, Single(EDamageType.Fire));
+
+            Assert.Empty(context.Stats.TypedDamageResistanceMitigated);
+        }
+
         [Fact]
         public void DamageTarget_PlayerActive_RecordsNoExposure()
         {
@@ -1155,6 +1221,9 @@ namespace Game.Core.Tests.Battle
 
         private static double Exposure(BattleContext context, EDamageType type) =>
             context.Stats.TypedDamageExposure.TryGetValue(type, out var value) ? value : 0;
+
+        private static double Mitigated(BattleContext context, EDamageType type) =>
+            context.Stats.TypedDamageResistanceMitigated.TryGetValue(type, out var value) ? value : 0;
 
         private static BattleContext MakeContext()
         {

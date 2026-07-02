@@ -36,5 +36,22 @@ namespace Game.Core
         /// the client. A strawman magnitude, tunable against the authored per-proficiency XP curves.
         /// </summary>
         public const double ProficiencyXpPerVictory = 10.0;
+
+        /// <summary>
+        /// The resist-training rate applied to the portion of a resist path's pre-mitigation exposure that
+        /// still landed despite the player's own type-resistance — paired with
+        /// <see cref="ResistMitigatedTrainingRate"/> so a resist path trains faster the more of its exposure the
+        /// player's own resistance actually blocks (#1454), rather than the two being weighted equally. A
+        /// strawman magnitude, tunable during balancing.
+        /// </summary>
+        public const double ResistUnmitigatedTrainingRate = 0.25;
+
+        /// <summary>
+        /// The resist-training rate applied to the portion of a resist path's pre-mitigation exposure the
+        /// player's own type-resistance blocked — see <see cref="ResistUnmitigatedTrainingRate"/> for the paired
+        /// rate on the portion that still landed. Full rate rewards the resistance investment the path
+        /// represents.
+        /// </summary>
+        public const double ResistMitigatedTrainingRate = 1.0;
     }
 }

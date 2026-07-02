@@ -328,6 +328,36 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(1, dealt);
         }
 
+        // ── Resistance-mitigated recorder (resist-training split, #1454) ─────
+
+        [Fact]
+        public void ApplyDamageOverTime_RecordMitigated_ReportsResistanceBlockedPerType()
+        {
+            // DoT bypasses the Toughness curve entirely, so resistance is its only mitigation: the mitigated
+            // recorder receives exactly the pre-mitigation tick's resistance-blocked slice (2 × 0.5 = 1), the
+            // same amount the exposure/dealt gap already reflects.
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 0.5));
+            var mitigated = new Dictionary<EDamageType, double>();
+
+            var dealt = battler.ApplyDamageOverTime(40, recordMitigated: (type, amount) => mitigated[type] = amount);
+
+            Assert.Equal(1, dealt);
+            Assert.Equal(1, mitigated[EDamageType.Bleed]);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_RecordMitigated_NegativeResistanceClampsToZero()
+        {
+            // A negative resistance (vulnerability) is anti-mitigation, not resistance — it blocks nothing, so
+            // the mitigated slice clamps to 0 rather than going negative.
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, -1.0));
+            var mitigated = new Dictionary<EDamageType, double>();
+
+            battler.ApplyDamageOverTime(40, recordMitigated: (type, amount) => mitigated[type] = amount);
+
+            Assert.Equal(0, mitigated[EDamageType.Bleed]);
+        }
+
         // ── Post-mitigation damage-dealt recorder (offense book, #1338) ──────
 
         [Fact]
@@ -376,6 +406,24 @@ namespace Game.Core.Tests.Battle
             Assert.False(context.Stats.TypedDamageExposure.ContainsKey(EDamageType.Bleed));
             Assert.Equal(2, context.Stats.TypedDamageDealt[EDamageType.Bleed], 0.001);     // 50 → 2 dealt to enemy
             Assert.False(context.Stats.TypedDamageDealt.ContainsKey(EDamageType.Burn));
+            // No resistance authored on either side, so the player's incoming Burn blocks nothing (#1454).
+            Assert.Equal(0, context.Stats.TypedDamageResistanceMitigated[EDamageType.Burn], 0.001);
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_PlayerBurnResistance_RecordsResistanceMitigatedShare()
+        {
+            // The player's incoming DoT resist-mitigated tracking (#1454) flows through ResolveDamageOverTime
+            // exactly like ApplyDamageOverTime's recorder: 250 BurnDamagePerSecond → 10 pre-mitigation, halved by
+            // 0.5 FireResistance → 5 mitigated (and 5 actually dealt).
+            var player = MakeBattler(Stat(Strength, 0), Stat(FireResistance, 0.5), Stat(BurnDamagePerSecond, 250));
+            var enemy = MakeBattler(Stat(Strength, 0));
+            var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
+
+            context.ResolveDamageOverTime();
+
+            Assert.Equal(10, context.Stats.TypedDamageExposure[EDamageType.Burn], 0.001);
+            Assert.Equal(5, context.Stats.TypedDamageResistanceMitigated[EDamageType.Burn], 0.001);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────
