@@ -401,6 +401,9 @@ namespace Game.Core
         /// <summary>Reflected damage dealt (the Retribution mastery). The player-as-defender reflection (#1363).</summary>
         Reflect = 13,
 
+        // Hex (#1427) is a fifth combat-event key — an overlay archetype, not a damage type — appended after the
+        // resist and weapon keys so the existing persisted ordinals are untouched (its ordinal is 30, below).
+
         // The ten resist keys — the incoming-book counterparts of the ten damage-type keys above (spike #1338).
         // A path keyed on one trains on the player's pre-mitigation exposure to that type's hits/DoT, routed
         // through the same Applies(type) map on the incoming side (a fire hit trains FireResist and
@@ -458,6 +461,15 @@ namespace Game.Core
 
         /// <summary>Unarmed damage dealt (the Martial-arts mastery). Mirrors <see cref="EDamageTypeKey.Unarmed"/>.</summary>
         Unarmed = 29,
+
+        /// <summary>
+        /// Vulnerability damage enabled (the Hex mastery — spike #1398, #1427). The normalized-marginal extra
+        /// damage the player's applied vulnerability (a negative-resistance debuff on the opponent) let through,
+        /// booked as an overlay tally like <see cref="Crit"/>. A combat-event key — type-neutral, routed straight
+        /// to a single activity key by the accrual with no <see cref="Attributes.DamageTypes.Applies"/> routing.
+        /// Appended after the weapon-mastery keys (the enum grows append-only).
+        /// </summary>
+        Hex = 30,
     }
 
     /// <summary>

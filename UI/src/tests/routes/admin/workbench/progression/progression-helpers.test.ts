@@ -65,6 +65,7 @@ describe('activity-key picker', () => {
 
 	it('labels combat events by what they train, and resist keys with a (resist) suffix', () => {
 		expect(activityKeyLabel(EActivityKey.Crit)).toBe('Critical damage');
+		expect(activityKeyLabel(EActivityKey.Hex)).toBe('Vulnerability damage enabled');
 		expect(activityKeyLabel(EActivityKey.FireResist)).toBe('Fire (resist)');
 		expect(activityKeyLabel(EActivityKey.DotResist)).toBe('DoT (resist)');
 	});

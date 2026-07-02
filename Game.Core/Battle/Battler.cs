@@ -12,6 +12,7 @@ namespace Game.Core.Battle
     {
         private readonly AttributeCollection _attributes;
 
+
         /// <summary>
         /// The active timed skill effects, folded to one <see cref="AttributeEffectStack"/> per affected
         /// attribute rather than one record per application. Every application on an attribute shares a single
@@ -110,6 +111,14 @@ namespace Game.Core.Battle
                 resistance += _attributes[resistanceAttributes[i]];
             }
 
+            return NetDamageAfterResistance(dealt, resistance, attackerLevel);
+        }
+
+        // The mitigation tail shared by the live hit and the Hex counterfactual: percentage resistance then the
+        // Toughness curve. Factored out (byte-identical to the former inline body) so the Hex tally can measure
+        // the same hit against a different resistance — the innate baseline — without duplicating the curve.
+        private double NetDamageAfterResistance(double dealt, double resistance, int attackerLevel)
+        {
             var mitigated = dealt * (1 - resistance);
             if (mitigated <= 0)
             {
@@ -127,6 +136,90 @@ namespace Game.Core.Battle
             var toughnessReduction = toughness / (toughness + scaled);
 
             return mitigated * (1 - toughnessReduction);
+        }
+
+        /// <summary>
+        /// The normalized-marginal Hex bonus for a direct hit of <paramref name="dealt"/> (attacker-amplified,
+        /// pre-crit) of <paramref name="damageType"/> against this (defending) battler — the extra damage the
+        /// <b>opponent-applied</b> vulnerability let through, booked to the attacker's Hex signal (#1427). The
+        /// vulnerability <c>v</c> is the opponent's own applied resistance reduction for the type
+        /// (<see cref="AppliedVulnerability"/>) — tracked as the modifiers the opponent contributed, so it credits
+        /// the <b>work the debuff did</b> regardless of the target's base resistance or its own resistance buffs.
+        /// The raw marginal is the live net minus the net the hit <em>would</em> have dealt without that debuff
+        /// (live resistance raised back by <c>v</c>), discounted by <c>1/(1 + v)</c> — the same concave saturation
+        /// the crit bonus applies to its investment (<c>marginal / (1 + investment)</c>, so a token debuff trains
+        /// little and a committed one saturates toward one baseline hit). In the normal region the marginal is
+        /// <c>dealt × v × toughnessFactor</c>, flat in the target's resistance — Hex trains the same against a soft
+        /// or a resistant enemy (no resist-farming). (That flatness is scoped to the non-absorbing region: if the
+        /// without-debuff resistance exceeds <c>1</c>, that baseline hit is a net heal and the marginal folds in
+        /// the avoided heal — correctly crediting the debuff for turning a heal into a hit, but no longer flat. No
+        /// content authors enemy absorption today.) Measured against the vanilla (pre-crit) hit so it composes with
+        /// crit without either overlay inflating the other. Returns <c>0</c> when no vulnerability is applied. A
+        /// backend-only side channel — it never mutates health.
+        /// </summary>
+        public double HexBonusForHit(double dealt, EDamageType damageType, int attackerLevel)
+        {
+            var vulnerability = AppliedVulnerability(damageType);
+            if (vulnerability <= 0)
+            {
+                return 0;
+            }
+
+            var liveResistance = 0.0;
+            var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
+            for (var i = 0; i < resistanceAttributes.Count; i++)
+            {
+                liveResistance += _attributes[resistanceAttributes[i]];
+            }
+
+            // The baseline is the same hit without the opponent's debuff — resistance raised back by v — so the
+            // marginal is exactly the damage that debuff enabled (independent of base resistance and enemy buffs).
+            var marginal = NetDamageAfterResistance(dealt, liveResistance, attackerLevel)
+                - NetDamageAfterResistance(dealt, liveResistance + vulnerability, attackerLevel);
+            return marginal > 0 ? marginal / (1 + vulnerability) : 0;
+        }
+
+        /// <summary>
+        /// The opponent-applied vulnerability on this (defending) battler for <paramref name="damageType"/> — the
+        /// total resistance <b>reduction</b> the opponent's timed effects contributed across the type's resistance
+        /// attributes, clamped at <c>0</c> (spike #1398 → Hex, #1427). Tracked from the effects the opponent
+        /// applied (<see cref="ApplyEffect"/>'s <c>tracksVulnerability</c>) rather than diffed against a baseline,
+        /// so it credits the debuff's own work even when the target's base resistance is high or the target buffs
+        /// its own resistance (a self-buff never lowers this). Rides the shared per-attribute effect-stack expiry,
+        /// so it returns to <c>0</c> for free when the debuff lapses.
+        /// </summary>
+        public double AppliedVulnerability(EDamageType damageType)
+        {
+            if (_attributeStacks is null)
+            {
+                return 0;
+            }
+
+            var contribution = 0.0;
+            var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
+            for (var i = 0; i < resistanceAttributes.Count; i++)
+            {
+                contribution += StackVulnerabilityContribution(resistanceAttributes[i]);
+            }
+
+            // Contributions are the signed resistance deltas the opponent applied (negative for a debuff); the
+            // vulnerability is their reduction, so negate and clamp — an opponent that only raised resistance is 0.
+            return contribution < 0 ? -contribution : 0;
+        }
+
+        // The vulnerability-tracked resistance delta the opponent has applied to one attribute, or 0 when no
+        // effect stack for it is active. A linear scan over the affected-attribute count, like GetOrCreateStack.
+        private double StackVulnerabilityContribution(EAttribute attribute)
+        {
+            foreach (var stack in _attributeStacks!)
+            {
+                if (stack.Attribute == attribute)
+                {
+                    return stack.VulnerabilityContribution;
+                }
+            }
+
+            return 0;
         }
 
         /// <summary>
@@ -205,10 +298,17 @@ namespace Game.Core.Battle
         /// direct hit's post-mitigation actual damage; <c>null</c> leaves the loop unchanged. Like
         /// <paramref name="recordExposure"/> it is a backend-only side channel that adds no parity surface.
         /// </param>
+        /// <param name="recordHexBonus">
+        /// Optional recorder for the attacker's Hex signal (#1427) — invoked per DoT type with the
+        /// normalized-marginal damage the opponent-applied vulnerability enabled this tick (type-neutral, so it
+        /// takes just the amount). Supplied only when this battler is the victim of the player's DoT (the enemy);
+        /// <c>null</c> skips the vulnerability lookup entirely. A backend-only side channel like the others.
+        /// </param>
         public double ApplyDamageOverTime(
             int ms,
             Action<EDamageType, double>? recordExposure = null,
-            Action<EDamageType, double>? recordDamageDealt = null)
+            Action<EDamageType, double>? recordDamageDealt = null,
+            Action<double>? recordHexBonus = null)
         {
             var dot = 0.0;
             var accumulators = DamageTypes.DotAccumulators;
@@ -237,6 +337,20 @@ namespace Game.Core.Battle
                 // type; compute it once so the recorded damage-dealt and the health math cannot drift.
                 var tickDamage = preMitigation * (1 - resistance);
                 recordDamageDealt?.Invoke(accumulators[i].Type, tickDamage);
+
+                // The attacker's Hex bonus for this tick: the opponent-applied vulnerability v (the resistance the
+                // attacker's own debuff removed) let through preMitigation × v, discounted by the same 1/(1 + v)
+                // saturation the direct-hit and crit bonuses use. DoT bypasses the Toughness curve, so the enabled
+                // damage is just preMitigation × v — flat in this battler's resistance.
+                if (recordHexBonus is not null)
+                {
+                    var vulnerability = AppliedVulnerability(accumulators[i].Type);
+                    if (vulnerability > 0)
+                    {
+                        recordHexBonus(preMitigation * vulnerability / (1 + vulnerability));
+                    }
+                }
+
                 dot += tickDamage;
             }
 
@@ -272,8 +386,16 @@ namespace Game.Core.Battle
         /// stack to this application's duration, so it expires together with no independent per-portion
         /// expirations (#992 / #740). A new modifier may shift <see cref="MaxHealth"/>, so the health is
         /// re-clamped.
+        /// <para>
+        /// When <paramref name="tracksVulnerability"/> is set (an opponent-applied resistance debuff — the Hex
+        /// enabler, #1427), the resolved additive <paramref name="amount"/> is also accumulated onto the stack's
+        /// <see cref="AttributeEffectStack.VulnerabilityContribution"/>, so <see cref="AppliedVulnerability"/> can
+        /// credit the debuff's own work independently of the target's base resistance or its own buffs. It rides
+        /// the shared stack expiry — cleared for free when the stack lapses — and is a backend-only side channel
+        /// that never touches the combined modifier or the health math, so it adds no parity surface.
+        /// </para>
         /// </summary>
-        public void ApplyEffect(SkillEffect effect, double amount)
+        public void ApplyEffect(SkillEffect effect, double amount, bool tracksVulnerability = false)
         {
             _attributeStacks ??= [];
             var stack = GetOrCreateStack(effect.AttributeId);
@@ -281,6 +403,13 @@ namespace Game.Core.Battle
             // Re-applying any effect on this attribute resets the whole stack's shared expiry to the new
             // application's duration (it may extend a longer-lived application or cut a shorter one short).
             stack.ExpiresAtMs = _elapsedMs + effect.DurationMs;
+
+            // An opponent-applied resistance debuff also accrues its signed delta to the vulnerability tally the
+            // Hex signal reads — separate from the combined modifier below, so the health math is untouched.
+            if (tracksVulnerability)
+            {
+                stack.VulnerabilityContribution += amount;
+            }
 
             // Fold the application into the attribute's single combined modifier for its type, swapping the old
             // combined instance for the new one. The collection therefore holds at most one effect modifier per
@@ -411,6 +540,14 @@ namespace Game.Core.Battle
             public long ExpiresAtMs { get; set; }
             public AttributeModifier? Additive { get; set; }
             public AttributeModifier? Multiplicative { get; set; }
+
+            /// <summary>
+            /// The signed resistance delta an opponent's tracked debuffs contributed to this attribute (negative
+            /// for a vulnerability), summed across applications and read by <see cref="AppliedVulnerability"/> for
+            /// the Hex tally (#1427). Separate from the combined modifiers above so it never touches the health
+            /// math, and cleared with the stack on the shared expiry. <c>0</c> for any non-debuffed attribute.
+            /// </summary>
+            public double VulnerabilityContribution { get; set; }
         }
     }
 }

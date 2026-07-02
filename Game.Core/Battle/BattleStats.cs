@@ -39,6 +39,20 @@ namespace Game.Core.Battle
         /// </summary>
         public double PlayerReflectedDamageDealt { get; set; }
 
+        /// <summary>
+        /// The Hex (<c>Hex</c> activity key) training signal — the normalized-marginal damage the player's
+        /// applied vulnerability enabled this battle (spike #1398 → the overlay tally shape, reference #1448).
+        /// <c>v</c> is the resistance the player's own debuff removed (tracked from the applied effect, not diffed
+        /// against a baseline), so an enemy's base resistance or its own resistance buffs can't rob the player of
+        /// credit for the work the debuff did. For each hit and DoT tick the extra damage that reduction let
+        /// through vs. the same hit without the debuff — <c>D × v</c> in the normal region — is booked with the
+        /// same <c>/(1 + v)</c> saturation the crit bonus uses, on the debuff strength <c>v</c>. Because the
+        /// enabled damage is the pre-resistance amount, it is flat in the enemy's resistance (no resist-farming),
+        /// and the saturation makes it proportional to how hard the player invested in the debuff. Like the crit
+        /// bonus this is a backend-only side channel with no parity mirror.
+        /// </summary>
+        public double HexBonusDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>
@@ -79,6 +93,14 @@ namespace Game.Core.Battle
         {
             TypedDamageExposure.TryGetValue(type, out var existing);
             TypedDamageExposure[type] = existing + amount;
+        }
+
+        /// <summary>Accumulates a normalized-marginal vulnerability-enabled <paramref name="amount"/> into the
+        /// type-neutral Hex signal (#1427). Cached as a method group by <see cref="BattleContext"/> so the
+        /// per-tick DoT phase can record the enemy's Hex bonus without allocating.</summary>
+        public void AddHexBonus(double amount)
+        {
+            HexBonusDealt += amount;
         }
     }
 

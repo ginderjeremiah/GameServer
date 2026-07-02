@@ -132,6 +132,19 @@ namespace Game.Core.Attributes
         /// <summary>The leaf damage types, in enum order.</summary>
         public static IReadOnlyList<EDamageType> LeafTypes { get; } = Enum.GetValues<EDamageType>();
 
+        // The set of defender-side resistance attributes (one per non-weapon key; the amplification-only weapon
+        // keys drop out). Backs the O(1) IsResistanceAttribute gate the Hex enabler uses to decide which
+        // opponent-applied debuffs feed the vulnerability tally (#1427).
+        private static readonly IReadOnlySet<EAttribute> ResistanceAttributeSet =
+            KeyInfos.Select(info => info.Resistance).OfType<EAttribute>().ToHashSet();
+
+        /// <summary>Whether <paramref name="attribute"/> is a defender-side resistance attribute — the gate the
+        /// Hex enabler uses to track an opponent-applied resistance debuff as vulnerability (#1427).</summary>
+        public static bool IsResistanceAttribute(EAttribute attribute)
+        {
+            return ResistanceAttributeSet.Contains(attribute);
+        }
+
         // The weapon-type leaves (#1340): the non-Physical leaves that roll up under the shared Physical
         // category key (their applies() set is [<weapon>, Physical]). Derived from the taxonomy table so the
         // classification can't drift from the append-only enum. The single source of truth for "is this leaf a

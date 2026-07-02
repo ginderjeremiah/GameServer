@@ -679,6 +679,227 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(20, TypedDealt(context, EDamageType.Fire), 0.001);
         }
 
+        // ── DamageTarget: Hex vulnerability tally (#1427) ────────────────────
+
+        [Fact]
+        public void DamageTarget_NoVulnerabilityApplied_BooksNoHexBonus()
+        {
+            // A hit against an un-debuffed enemy enables no vulnerability damage, so Hex trains on nothing.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(30, Single(EDamageType.Fire));
+
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_InnateEnemyVulnerability_TrainsNoHex()
+        {
+            // The enemy is innately vulnerable to Fire (−0.5 FireResistance from the start), but nothing the
+            // player applied lowered it — Hex credits only player-applied vulnerability, so this trains nothing.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, -0.5));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × 1.5 = 45 dealt, but no applied vulnerability
+
+            Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_AppliedVulnerability_BooksNormalizedMarginalBonus()
+        {
+            // The player debuffs the enemy's FireResistance by −0.5 (a vulnerability of v = 0.5), then hits for
+            // raw 30. The un-hexed hit would deal 30; the hexed hit deals 45 — the vulnerability enabled 15,
+            // discounted by 1/(1 + 0.5) to 10 (the marginal, saturated on the debuff strength).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.5));
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − (−0.5)) = 45 dealt
+
+            Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // (45 − 30) / (1 + 0.5) = 10
+        }
+
+        [Fact]
+        public void DamageTarget_HexBonus_IsFlatInEnemyBaseResistance()
+        {
+            // Same applied vulnerability (v = 0.5) against a soft enemy (innate 0 → live −0.5) and a resistant
+            // enemy (innate 0.4 → live −0.1). The enabled damage is the pre-resistance amount × v, so Hex banks
+            // the identical bonus either way — no resist-farming (the "D × v is flat in base resistance" rule).
+            var softContext = MakeHexContext(innateFireResistance: 0);
+            var resistantContext = MakeHexContext(innateFireResistance: 0.4);
+
+            softContext.DamageTarget(30, Single(EDamageType.Fire));
+            resistantContext.DamageTarget(30, Single(EDamageType.Fire));
+
+            Assert.Equal(30.0 * 0.5 / 1.5, softContext.Stats.HexBonusDealt, 0.001);
+            Assert.Equal(softContext.Stats.HexBonusDealt, resistantContext.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_HeavilyInvestedVulnerability_SaturatesTowardOneBaselineHit()
+        {
+            // A crushing vulnerability (v = 10) enables 10× the pre-resistance damage, but the 1/(1 + v)
+            // saturation bounds the tally at one baseline (pre-resistance) hit: 30 × 10 / 11 ≈ 27.27, approaching
+            // 30 — a monster debuff cannot dwarf every other training axis (mirrors the crit-bonus ceiling).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -10));
+
+            context.DamageTarget(30, Single(EDamageType.Fire));
+
+            Assert.Equal(30.0 * 10.0 / 11.0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_CritAndHex_BookIndependentBonuses()
+        {
+            // Crit and Hex are separate overlays. Hex is measured on the pre-crit vanilla hit, so a crit does not
+            // inflate it: v = 0.5 on raw 30 still banks 10. Crit books its own marginal off the (hexed) non-crit
+            // baseline 45: investment m−1 = 1, φ(1) = 0.5 ⇒ 45 × 0.5 = 22.5. Neither overlay balloons the other.
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.5));
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // hexed non-crit 45, crit ×2 = 90 dealt
+
+            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // 10, unaffected by the crit
+            Assert.Equal(45.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 22.5
+        }
+
+        [Fact]
+        public void DamageTarget_VulnerabilityCrossesAbsorptionToDamage_CreditsTheWholeSwing()
+        {
+            // The crossover edge: the enemy innately absorbs Fire (FireResistance 1.5 > 1 → the un-hexed hit is a
+            // −15 net heal). The player's −0.8 debuff brings live resistance to 0.7, so the hit deals +9. The
+            // vulnerability turned a 15 heal into a 9 hit — a 24 swing — credited (÷ (1 + 0.8)) as the enabled
+            // marginal. Here the flat-in-base-resistance property intentionally does NOT hold (the innate
+            // absorption folds into the marginal); pinned so the crossover behaviour cannot silently drift.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 1.5));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // live FireResistance 0.7, v = 0.8
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − 0.7) = 9 dealt
+
+            Assert.Equal(9, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal((9.0 - (-15.0)) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 = 13.33
+        }
+
+        [Fact]
+        public void DamageTarget_EnemySelfBuffsResistance_NoPlayerDebuff_BooksNoHexBonus()
+        {
+            // A hypothetical enemy resistance self-buff (no such content today) raises live resistance ABOVE the
+            // innate baseline, so v = innate − live is negative → clamped to 0. The enemy hardening itself never
+            // credits the player's Hex; the innate-baseline snapshot handles it for free (no crash, no credit).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(SelfResistanceBuff(FireResistance, 0.5)); // enemy buffs its own Fire resistance
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − 0.5) = 15 dealt, no applied vulnerability
+
+            Assert.Equal(15, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemySelfBuffThenPlayerDebuff_CreditsThePlayersGrossContribution()
+        {
+            // Both move the same resistance: the enemy self-buffs +0.5 (untracked), the player debuffs −0.8
+            // (tracked as v = 0.8). Hex credits the player's GROSS debuff — the resistance its debuff removed —
+            // not the net reduction, so the enemy hardening itself does not rob the player of training for the
+            // work their debuff did. The marginal is measured against the without-debuff hit (resistance raised
+            // back by 0.8 to the enemy-buffed 0.5): N(−0.3) − N(0.5) = 39 − 15 = 24, ÷ (1 + 0.8).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(SelfResistanceBuff(FireResistance, 0.5)); // enemy: FireResistance 0 → 0.5
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // player: 0.5 → −0.3, gross v = 0.8
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − (−0.3)) = 39 dealt
+
+            Assert.Equal(39, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal((39.0 - 15.0) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 ≈ 13.33
+        }
+
+        [Fact]
+        public void DamageTarget_VulnerabilityExpired_BooksNoHexBonus()
+        {
+            // The tracked vulnerability rides the effect stack's shared expiry: once the debuff lapses the stack
+            // (and its contribution) is gone, so a later hit trains no Hex and lands at full resistance again.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.5)); // DurationMs 10_000
+            enemy.AdvanceEffects(10_001); // past expiry → the FireResistance stack and its contribution are removed
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // resistance back to 0 ⇒ 30 dealt, no vulnerability
+
+            Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyAttacking_BooksNoHexBonus()
+        {
+            // Hex is a player-offense signal. Even if the player is somehow vulnerable, an enemy hit never trains
+            // the player's Hex — only the player-active branch accrues it.
+            var player = MakeBattlerWith((Endurance, 0), (FireResistance, -0.5));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(30, Single(EDamageType.Fire));
+
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_AppliedVulnerability_BooksHexBonusForTheEnemyDot()
+        {
+            // The player applies a Bleed DoT (100/s) and a Bleed vulnerability (−0.5 BleedResistance) to the
+            // enemy, then a 1s tick resolves. The tick deals 100 × (1 − (−0.5)) = 150; the vulnerability enabled
+            // 100 × 0.5 = 50 of that, discounted by 1/(1 + 0.5) to the same 33.33 marginal shape as a direct hit.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 1000, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(BleedResistance, -0.5));
+            context.ApplySkillEffect(Dot(BleedDamagePerSecond, 100));
+
+            context.ResolveDamageOverTime();
+
+            Assert.Equal(150, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(100.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // 33.33
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_NoVulnerability_BooksNoHexBonus()
+        {
+            // A plain DoT with no applied vulnerability trains Hex on nothing.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 1000, new Mulberry32(0));
+            context.ApplySkillEffect(Dot(BleedDamagePerSecond, 100));
+
+            context.ResolveDamageOverTime();
+
+            Assert.Equal(100, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static IReadOnlyList<SkillDamagePortion> Single(EDamageType type) =>
@@ -697,6 +918,58 @@ namespace Game.Core.Tests.Battle
         {
             return new BattleContext(MakeBattler(), MakeBattler(), timeDelta: 0, new Mulberry32(0));
         }
+
+        // A player-active context whose enemy carries the given innate Fire resistance, with a −0.5 FireResistance
+        // vulnerability already applied by the player (so v = 0.5 regardless of the base resistance).
+        private static BattleContext MakeHexContext(double innateFireResistance)
+        {
+            var player = MakeBattlerWith((EAttribute.Endurance, 0));
+            var enemy = MakeBattlerWith((EAttribute.Endurance, 0), (EAttribute.FireResistance, innateFireResistance));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(EAttribute.FireResistance, -0.5));
+            return context;
+        }
+
+        // A player-cast Opponent-targeted resistance debuff (negative additive) — the vulnerability enabler Hex
+        // trains on. Applied via BattleContext.ApplySkillEffect so it lands on the target (enemy) battler.
+        private static SkillEffect Vulnerability(EAttribute resistance, double amount) => new()
+        {
+            Id = 1,
+            Target = ESkillEffectTarget.Opponent,
+            AttributeId = resistance,
+            ModifierType = EModifierType.Additive,
+            Amount = amount,
+            DurationMs = 10_000,
+            ScalingAttributeId = EAttribute.Strength,
+            ScalingAmount = 0,
+        };
+
+        // A self-targeted resistance buff (positive additive) — an enemy hardening its own resistance mid-battle.
+        // Cast while the enemy is the active battler so it lands on the enemy (the Hex isolation edge case).
+        private static SkillEffect SelfResistanceBuff(EAttribute resistance, double amount) => new()
+        {
+            Id = 3,
+            Target = ESkillEffectTarget.Self,
+            AttributeId = resistance,
+            ModifierType = EModifierType.Additive,
+            Amount = amount,
+            DurationMs = 10_000,
+            ScalingAttributeId = EAttribute.Strength,
+            ScalingAmount = 0,
+        };
+
+        // A player-cast Opponent-targeted DoT accumulator effect (per-second amount) for the DoT Hex tests.
+        private static SkillEffect Dot(EAttribute accumulator, double perSecond) => new()
+        {
+            Id = 2,
+            Target = ESkillEffectTarget.Opponent,
+            AttributeId = accumulator,
+            ModifierType = EModifierType.Additive,
+            Amount = perSecond,
+            DurationMs = 10_000,
+            ScalingAttributeId = EAttribute.Strength,
+            ScalingAmount = 0,
+        };
 
         private static Battler MakeBattler()
         {
