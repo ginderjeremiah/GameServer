@@ -765,10 +765,9 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
-					{ id: EAttribute.CriticalChance, amount: 1 },
 					{ id: EAttribute.CriticalDamage, amount: 0.5 }
 				],
-				[makeSkill(20, 400)]
+				[makeSkill(20, 400, [], [], undefined, 1)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 1200 }
@@ -802,10 +801,9 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
-					{ id: EAttribute.CriticalChance, amount: 1 },
 					{ id: EAttribute.CriticalDamage, amount: 0.5 }
 				],
-				[makeSkill(10, 400), makeSkill(15, 400)]
+				[makeSkill(10, 400, [], [], undefined, 1), makeSkill(15, 400, [], [], undefined, 1)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], [makeSkill(12, 400), makeSkill(14, 400)]),
 		expected: { victory: true, playerDied: false, totalMs: 800 }
@@ -821,11 +819,10 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
-					{ id: EAttribute.CriticalChance, amount: 1 },
 					{ id: EAttribute.CriticalDamage, amount: 2 },
 					{ id: EAttribute.DodgeChance, amount: 1 }
 				],
-				[makeSkill(20, 400)]
+				[makeSkill(20, 400, [], [], undefined, 1)]
 			),
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
@@ -886,10 +883,9 @@ const scenarios: ParityScenario[] = [
 			makeBattler(
 				[
 					{ id: EAttribute.Strength, amount: 10 },
-					{ id: EAttribute.CriticalChance, amount: 0.5 },
 					{ id: EAttribute.CriticalDamage, amount: 0.5 }
 				],
-				[makeSkill(12, 400)]
+				[makeSkill(12, 400, [], [], undefined, 0.5)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(5, 400)]),
 		expected: { victory: true, playerDied: false, totalMs: 1600 }
@@ -905,13 +901,7 @@ const scenarios: ParityScenario[] = [
 	{
 		name: 'fractionalCritChance',
 		player: () =>
-			makeBattler(
-				[
-					{ id: EAttribute.CriticalChance, amount: 0.5 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 }
-				],
-				[makeSkill(12, 400)]
-			),
+			makeBattler([{ id: EAttribute.CriticalDamage, amount: 0.5 }], [makeSkill(12, 400, [], [], undefined, 0.5)]),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2400 }
 	},
@@ -1079,13 +1069,7 @@ const scenarios: ParityScenario[] = [
 	{
 		name: 'critPunchesThroughTyped',
 		player: () =>
-			makeBattler(
-				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 }
-				],
-				[makeSkill(20, 400, [], [], EDamageType.Fire)]
-			),
+			makeBattler([{ id: EAttribute.CriticalDamage, amount: 0.5 }], [makeSkill(20, 400, [], [], EDamageType.Fire, 1)]),
 		enemy: () =>
 			makeBattler(
 				[
@@ -1347,15 +1331,19 @@ const scenarios: ParityScenario[] = [
 		name: 'multiTypeCritAppliesToAllPortions',
 		player: () =>
 			makeBattler(
+				[{ id: EAttribute.CriticalDamage, amount: 0.5 }],
 				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 }
-				],
-				[
-					makeMultiTypeSkill(20, 400, [
-						{ type: EDamageType.Physical, weight: 50 },
-						{ type: EDamageType.Fire, weight: 50 }
-					])
+					makeMultiTypeSkill(
+						20,
+						400,
+						[
+							{ type: EDamageType.Physical, weight: 50 },
+							{ type: EDamageType.Fire, weight: 50 }
+						],
+						[],
+						[],
+						1
+					)
 				]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),

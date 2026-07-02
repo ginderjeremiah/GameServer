@@ -83,12 +83,12 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerCrit_MultipliesRawBeforeMitigation()
         {
-            // CriticalChance 1 always succeeds; CriticalDamage is the base 1.5 + 0.5 = 2, read directly as the multiplier.
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5));
+            // baseCriticalChance 1 always succeeds; CriticalDamage is the base 1.5 + 0.5 = 2, read directly as the multiplier.
+            var player = MakeBattlerWith((CriticalDamage, 0.5));
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // crit ⇒ 20×2 = 40; no Toughness ⇒ 40 dealt
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // crit ⇒ 20×2 = 40; no Toughness ⇒ 40 dealt
 
             Assert.Equal(50 - 40, enemy.CurrentHealth, 0.001);
             Assert.Equal(40, context.Stats.PlayerDamageDealt, 0.001);
@@ -97,13 +97,64 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerNoCrit_DealsRawUnmitigated()
         {
-            var player = MakeBattlerWith((CriticalChance, 0), (CriticalDamage, 2));
+            var player = MakeBattlerWith((CriticalDamage, 2));
             var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // no crit ⇒ 20, no Toughness ⇒ 20
+            context.DamageTarget(20, Single(EDamageType.Physical), 0); // no crit ⇒ 20, no Toughness ⇒ 20
 
             Assert.Equal(50 - 20, enemy.CurrentHealth, 0.001);
+        }
+
+        // ── DamageTarget: per-skill crit enabler × CriticalChanceMultiplier (#1453) ──
+
+        [Fact]
+        public void DamageTarget_ZeroBaseCriticalChance_NeverCritsEvenWithHeavyMultiplierInvestment()
+        {
+            // The enabler is the SKILL's own base chance, not the multiplier: a build stacking
+            // CriticalChanceMultiplier (base 1 + 999 = 1000) still crits for nothing when the fired skill's own
+            // CriticalChance is 0 (0 × 1000 = 0) — crit stays a committed per-skill identity, not a free stat
+            // any investment in the multiplier alone can unlock.
+            var player = MakeBattlerWith((CriticalChanceMultiplier, 999));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0); // baseCriticalChance 0 ⇒ never crits
+
+            Assert.Equal(50 - 20, enemy.CurrentHealth, 0.001);
+            Assert.Equal(0, context.Stats.CriticalHits);
+        }
+
+        [Fact]
+        public void DamageTarget_MultiplierComposesMultiplicativelyWithTheSkillsBase()
+        {
+            // CriticalChanceMultiplier zeroed out (base 1 + (-1) = 0) cancels even a skill authored to always
+            // crit on its own (baseCriticalChance 1): 1 × 0 = 0 — proving the composition is a product, not an
+            // independent OR, so a multiplier debuff can fully negate a committed skill's own investment.
+            var player = MakeBattlerWith((CriticalChanceMultiplier, -1));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // 1 × 0 ⇒ never crits
+
+            Assert.Equal(50 - 20, enemy.CurrentHealth, 0.001);
+            Assert.Equal(0, context.Stats.CriticalHits);
+        }
+
+        [Fact]
+        public void DamageTarget_MultiplierScalesAFractionalBaseAboveOne_AlwaysCrits()
+        {
+            // A fractional skill base (0.5) scaled by a CriticalChanceMultiplier of 2 (base 1 + 1 = 2) reaches an
+            // effective chance of 1.0 — at or above every possible [0,1) RNG draw, so the roll always succeeds
+            // even though neither factor alone would guarantee it. CriticalDamage is the base 1.5 + 0.5 = 2.
+            var player = MakeBattlerWith((CriticalChanceMultiplier, 1), (CriticalDamage, 0.5));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0.5); // 0.5 × 2 = 1.0 ⇒ always crits
+
+            Assert.Equal(1, context.Stats.CriticalHits);
+            Assert.Equal(50 - 40, enemy.CurrentHealth, 0.001); // 20 × 2 (CriticalDamage), no Toughness
         }
 
         // ── DamageTarget: enemy attacking the player (dodge) ──────────────────
@@ -117,7 +168,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers(); // enemy attacks the player
             var before = player.CurrentHealth;
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // dodged ⇒ 0
+            context.DamageTarget(20, Single(EDamageType.Physical), 0); // dodged ⇒ 0
 
             Assert.Equal(before, player.CurrentHealth, 0.001);
             Assert.Equal(0, context.Stats.PlayerDamageTaken, 0.001);
@@ -126,15 +177,16 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_EnemyAttacking_NeverCrits()
         {
-            // The enemy carries a forced crit, but the roll is gated on the player attacking, so the enemy's
-            // hit lands un-multiplied (20, not 40). The player has no Toughness, so it lands in full.
+            // A forced baseCriticalChance of 1 is passed, but the crit roll is gated on the player attacking, so
+            // the enemy's hit lands un-multiplied (20, not 40) even though its CriticalDamage would double it.
+            // The player has no Toughness, so it lands in full.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 2));
+            var enemy = MakeBattlerWith((CriticalDamage, 2));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
             var before = player.CurrentHealth;
 
-            context.DamageTarget(20, Single(EDamageType.Physical));
+            context.DamageTarget(20, Single(EDamageType.Physical), 1);
 
             Assert.Equal(before - 20, player.CurrentHealth, 0.001);
         }
@@ -144,11 +196,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerCrit_RecordsCritHitAndPostMitigationDamage()
         {
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
             var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // 20×2 = 40, no Toughness ⇒ 40 dealt
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20×2 = 40, no Toughness ⇒ 40 dealt
 
             Assert.Equal(1, context.Stats.CriticalHits);
             // The player-facing statistic is the actual full crit damage dealt.
@@ -161,11 +213,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerNoCrit_RecordsNoCritStatistics()
         {
-            var player = MakeBattlerWith((CriticalChance, 0), (CriticalDamage, 2));
+            var player = MakeBattlerWith((CriticalDamage, 2));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical));
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
 
             Assert.Equal(0, context.Stats.CriticalHits);
             Assert.Equal(0, context.Stats.CriticalDamageDealt, 0.001);
@@ -178,11 +230,11 @@ namespace Game.Core.Tests.Battle
         {
             // Base CriticalDamage only (1.5, no invested bonus): m = 1.5, investment m−1 = 0.5, φ(0.5) = 1/3.
             // baseline 20 ⇒ bonus ≈ 6.667 — a token crit trains Precision far less than a committed one.
-            var player = MakeBattlerWith((CriticalChance, 1)); // CriticalDamage 1.5 (base)
+            var player = MakeBattlerWith(); // CriticalDamage 1.5 (base)
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // 20 × 1.5 = 30 dealt
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20 × 1.5 = 30 dealt
 
             Assert.Equal(30, context.Stats.CriticalDamageDealt, 0.001);
             Assert.Equal(20.0 * 0.5 / 1.5, context.Stats.CriticalBonusDealt, 0.001);
@@ -194,11 +246,11 @@ namespace Game.Core.Tests.Battle
             // Heavy crit-damage investment: CriticalDamage 1.5 + 98.5 = 100, investment 99, φ(99) = 99/100 = 0.99.
             // baseline 20 ⇒ bonus 19.8, approaching one baseline hit (20) — the saturation ceiling — even though
             // the full crit dealt 2000. The signal is bounded so a monster crit cannot dwarf every other axis.
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 98.5));
+            var player = MakeBattlerWith((CriticalDamage, 98.5));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // 20 × 100 = 2000 dealt
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20 × 100 = 2000 dealt
 
             Assert.Equal(2000, context.Stats.CriticalDamageDealt, 0.001);
             Assert.Equal(19.8, context.Stats.CriticalBonusDealt, 0.001);
@@ -212,7 +264,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // would deal 20 (no Toughness), fully avoided
+            context.DamageTarget(20, Single(EDamageType.Physical), 0); // would deal 20 (no Toughness), fully avoided
 
             Assert.Equal(1, context.Stats.AttacksDodged);
             Assert.Equal(20, context.Stats.DamageDodged, 0.001);
@@ -226,7 +278,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20, Single(EDamageType.Physical));
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
 
             Assert.Equal(0, context.Stats.AttacksDodged);
             Assert.Equal(0, context.Stats.DamageDodged, 0.001);
@@ -247,9 +299,9 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, rng);
 
-            context.DamageTarget(5, Single(EDamageType.Physical));               // player attacking → 1 draw
+            context.DamageTarget(5, Single(EDamageType.Physical), 0);               // player attacking → 1 draw
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(5, Single(EDamageType.Physical));               // enemy attacking → 1 draw
+            context.DamageTarget(5, Single(EDamageType.Physical), 0);               // enemy attacking → 1 draw
 
             var reference = new Mulberry32(seed);
             reference.Next();
@@ -270,7 +322,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             var playerBefore = player.CurrentHealth;
 
-            var dealt = context.DamageTarget(40, Single(EDamageType.Physical)); // 40 to the enemy
+            var dealt = context.DamageTarget(40, Single(EDamageType.Physical), 0); // 40 to the enemy
 
             Assert.Equal(40, dealt, 0.001);
             Assert.Equal(playerBefore - 20, player.CurrentHealth, 0.001); // 40 × 0.5, unmitigated
@@ -291,7 +343,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers(); // enemy attacks the player
             var enemyBefore = enemy.CurrentHealth;
 
-            context.DamageTarget(50, Single(EDamageType.Physical));
+            context.DamageTarget(50, Single(EDamageType.Physical), 0);
 
             Assert.Equal(enemyBefore - 20, enemy.CurrentHealth, 0.001); // 50 × 0.4 reflected onto the enemy
             Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
@@ -309,7 +361,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers();
             var enemyBefore = enemy.CurrentHealth;
 
-            context.DamageTarget(50, Single(EDamageType.Physical));
+            context.DamageTarget(50, Single(EDamageType.Physical), 0);
 
             Assert.Equal(enemyBefore, enemy.CurrentHealth, 0.001);
             Assert.Equal(0, context.Stats.PlayerDamageDealt, 0.001);
@@ -326,10 +378,10 @@ namespace Game.Core.Tests.Battle
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0), (DamageReflection, 1.0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.DamageTarget(30, Single(EDamageType.Physical)); // enemy 50 → 20; the enemy reflects this 30 onto the player
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // enemy 50 → 20; the enemy reflects this 30 onto the player
             var playerBefore = player.CurrentHealth;
 
-            context.DamageTarget(20, Single(EDamageType.Fire)); // 20 × (1 − 2) = −20, absorbed (enemy 20 → 40) — no reflection
+            context.DamageTarget(20, Single(EDamageType.Fire), 0); // 20 × (1 − 2) = −20, absorbed (enemy 20 → 40) — no reflection
 
             Assert.Equal(playerBefore, player.CurrentHealth, 0.001); // the absorbed hit reflected nothing onto the attacker
         }
@@ -347,7 +399,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // Toughness 0, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(50 - 30, enemy.CurrentHealth, 0.001);
             Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
@@ -362,7 +414,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(50 - 60, enemy.CurrentHealth, 0.001);
         }
@@ -376,9 +428,9 @@ namespace Game.Core.Tests.Battle
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Toughness 0, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.DamageTarget(30, Single(EDamageType.Physical)); // 30 (no Toughness) → CurrentHealth 20
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // 30 (no Toughness) → CurrentHealth 20
 
-            context.DamageTarget(20, Single(EDamageType.Fire));
+            context.DamageTarget(20, Single(EDamageType.Fire), 0);
 
             // Healed 20 (mitigation ignored) → 40; the booked damage is 30 (physical) + (−20) (absorption) = 10.
             Assert.Equal(40, enemy.CurrentHealth, 0.001);
@@ -391,11 +443,11 @@ namespace Game.Core.Tests.Battle
             // Order: amp (none) → crit (× 2) → resist (× 0.5) → Toughness curve. The enemy's Toughness 20 against
             // the level-1 player halves the post-resistance hit. A normal Fire hit (20 × 0.5 = 10, × 0.5 = 5)
             // deals only 5, but the crit (20 × 2 = 40, × 0.5 = 20, × 0.5 = 10) punches through for 10.
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2.0
+            var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2.0
             var enemy = MakeBattlerWith((Endurance, 0), (Toughness, 20), (FireResistance, 0.5)); // Toughness 20, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Fire));
+            context.DamageTarget(20, Single(EDamageType.Fire), 1);
 
             Assert.Equal(50 - 10, enemy.CurrentHealth, 0.001);
         }
@@ -409,7 +461,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Fire)); // no Toughness ⇒ 20 dealt
+            context.DamageTarget(20, Single(EDamageType.Fire), 0); // no Toughness ⇒ 20 dealt
 
             // The typed offense book sums the same post-mitigation figure each hit booked into PlayerDamageDealt.
             Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
@@ -423,9 +475,9 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Fire));     // 20
-            context.DamageTarget(10, Single(EDamageType.Fire));     // 10
-            context.DamageTarget(30, Single(EDamageType.Physical)); // 30
+            context.DamageTarget(20, Single(EDamageType.Fire), 0);     // 20
+            context.DamageTarget(10, Single(EDamageType.Fire), 0);     // 10
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // 30
 
             Assert.Equal(30, TypedDealt(context, EDamageType.Fire), 0.001); // 20 + 10
             Assert.Equal(30, TypedDealt(context, EDamageType.Physical), 0.001);
@@ -434,11 +486,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PlayerCrit_TypedDamageDealtUsesPostMitigationActual()
         {
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
             var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical)); // 20×2 = 40, no Toughness ⇒ 40
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20×2 = 40, no Toughness ⇒ 40
 
             Assert.Equal(40, TypedDealt(context, EDamageType.Physical), 0.001);
         }
@@ -452,7 +504,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20, Single(EDamageType.Physical));
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
 
             Assert.Empty(context.Stats.TypedDamageDealt);
         }
@@ -469,7 +521,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(20, context.Stats.PlayerDamageTaken, 0.001);
             Assert.Equal(40, Exposure(context, EDamageType.Fire), 0.001);
@@ -485,7 +537,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(60, Exposure(context, EDamageType.Fire), 0.001);
         }
@@ -500,7 +552,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(20, Single(EDamageType.Physical));
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
 
             Assert.Empty(context.Stats.TypedDamageExposure);
         }
@@ -513,7 +565,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(20, Single(EDamageType.Physical));
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
 
             Assert.Empty(context.Stats.TypedDamageExposure);
         }
@@ -533,7 +585,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            var dealt = context.DamageTarget(100, Portions((EDamageType.Physical, 60), (EDamageType.Fire, 40)));
+            var dealt = context.DamageTarget(100, Portions((EDamageType.Physical, 60), (EDamageType.Fire, 40)), 0);
 
             Assert.Equal(80, dealt, 0.001);
             Assert.Equal(80, context.Stats.PlayerDamageDealt, 0.001);
@@ -546,13 +598,13 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_MultiPortion_SingleCritMultipliesEveryPortion()
         {
-            // CriticalChance 1, CriticalDamage 1.5 + 0.5 = 2. One crit draw scales BOTH portions: [Physical 50,
+            // baseCriticalChance 1, CriticalDamage 1.5 + 0.5 = 2. One crit draw scales BOTH portions: [Physical 50,
             // Fire 50] of raw 20 → 10 each, ×2 → 20 each = 40 net (a per-portion-only crit would give 30).
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5));
+            var player = MakeBattlerWith((CriticalDamage, 0.5));
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            var dealt = context.DamageTarget(20, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)));
+            var dealt = context.DamageTarget(20, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)), 1);
 
             Assert.Equal(40, dealt, 0.001);
             Assert.Equal(50 - 40, enemy.CurrentHealth, 0.001);
@@ -576,9 +628,9 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, rng);
             var threePortions = Portions((EDamageType.Physical, 1), (EDamageType.Fire, 1), (EDamageType.Water, 1));
 
-            context.DamageTarget(9, threePortions);              // player attacking → 1 draw
+            context.DamageTarget(9, threePortions, 0);              // player attacking → 1 draw
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(9, threePortions);              // enemy attacking → 1 draw
+            context.DamageTarget(9, threePortions, 0);              // enemy attacking → 1 draw
 
             var reference = new Mulberry32(seed);
             reference.Next();
@@ -597,7 +649,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers();
             var before = player.CurrentHealth;
 
-            var dealt = context.DamageTarget(40, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)));
+            var dealt = context.DamageTarget(40, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)), 0);
 
             Assert.Equal(0, dealt, 0.001);
             Assert.Equal(before, player.CurrentHealth, 0.001);
@@ -618,7 +670,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            var dealt = context.DamageTarget(40, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)));
+            var dealt = context.DamageTarget(40, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)), 0);
 
             Assert.Equal(30, dealt, 0.001);
             Assert.Equal(30, context.Stats.PlayerDamageTaken, 0.001);
@@ -637,7 +689,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             var playerBefore = player.CurrentHealth;
 
-            var dealt = context.DamageTarget(40, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)));
+            var dealt = context.DamageTarget(40, Portions((EDamageType.Physical, 50), (EDamageType.Fire, 50)), 0);
 
             Assert.Equal(40, dealt, 0.001);
             Assert.Equal(playerBefore - 20, player.CurrentHealth, 0.001);
@@ -655,7 +707,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            var dealt = context.DamageTarget(100, Portions((EDamageType.Physical, 20), (EDamageType.Fire, 80)));
+            var dealt = context.DamageTarget(100, Portions((EDamageType.Physical, 20), (EDamageType.Fire, 80)), 0);
 
             Assert.Equal(0, dealt, 0.001);
             Assert.Equal(50, enemy.CurrentHealth, 0.001); // 50 → 30 (Physical) → 50 (Fire heal capped at 20 room)
@@ -672,7 +724,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            var dealt = context.DamageTarget(20, Portions((EDamageType.Fire, 2.0)));
+            var dealt = context.DamageTarget(20, Portions((EDamageType.Fire, 2.0)), 0);
 
             Assert.Equal(20, dealt, 0.001);
             Assert.Equal(50 - 20, enemy.CurrentHealth, 0.001);
@@ -689,7 +741,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(30, Single(EDamageType.Fire));
+            context.DamageTarget(30, Single(EDamageType.Fire), 0);
 
             Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
         }
@@ -703,7 +755,7 @@ namespace Game.Core.Tests.Battle
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, -0.5));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × 1.5 = 45 dealt, but no applied vulnerability
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × 1.5 = 45 dealt, but no applied vulnerability
 
             Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
@@ -720,7 +772,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Vulnerability(FireResistance, -0.5));
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − (−0.5)) = 45 dealt
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − (−0.5)) = 45 dealt
 
             Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // (45 − 30) / (1 + 0.5) = 10
@@ -735,8 +787,8 @@ namespace Game.Core.Tests.Battle
             var softContext = MakeHexContext(innateFireResistance: 0);
             var resistantContext = MakeHexContext(innateFireResistance: 0.4);
 
-            softContext.DamageTarget(30, Single(EDamageType.Fire));
-            resistantContext.DamageTarget(30, Single(EDamageType.Fire));
+            softContext.DamageTarget(30, Single(EDamageType.Fire), 0);
+            resistantContext.DamageTarget(30, Single(EDamageType.Fire), 0);
 
             Assert.Equal(30.0 * 0.5 / 1.5, softContext.Stats.HexBonusDealt, 0.001);
             Assert.Equal(softContext.Stats.HexBonusDealt, resistantContext.Stats.HexBonusDealt, 0.001);
@@ -753,7 +805,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Vulnerability(FireResistance, -10));
 
-            context.DamageTarget(30, Single(EDamageType.Fire));
+            context.DamageTarget(30, Single(EDamageType.Fire), 0);
 
             Assert.Equal(30.0 * 10.0 / 11.0, context.Stats.HexBonusDealt, 0.001);
         }
@@ -764,12 +816,12 @@ namespace Game.Core.Tests.Battle
             // Crit and Hex are separate overlays. Hex is measured on the pre-crit vanilla hit, so a crit does not
             // inflate it: v = 0.5 on raw 30 still banks 10. Crit books its own marginal off the (hexed) non-crit
             // baseline 45: investment m−1 = 1, φ(1) = 0.5 ⇒ 45 × 0.5 = 22.5. Neither overlay balloons the other.
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Vulnerability(FireResistance, -0.5));
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // hexed non-crit 45, crit ×2 = 90 dealt
+            context.DamageTarget(30, Single(EDamageType.Fire), 1); // hexed non-crit 45, crit ×2 = 90 dealt
 
             Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // 10, unaffected by the crit
             Assert.Equal(45.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 22.5
@@ -788,7 +840,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // live FireResistance 0.7, v = 0.8
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − 0.7) = 9 dealt
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − 0.7) = 9 dealt
 
             Assert.Equal(9, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal((9.0 - (-15.0)) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 = 13.33
@@ -807,7 +859,7 @@ namespace Game.Core.Tests.Battle
             context.ApplySkillEffect(SelfResistanceBuff(FireResistance, 0.5)); // enemy buffs its own Fire resistance
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − 0.5) = 15 dealt, no applied vulnerability
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − 0.5) = 15 dealt, no applied vulnerability
 
             Assert.Equal(15, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
@@ -829,7 +881,7 @@ namespace Game.Core.Tests.Battle
             context.SwapActiveAndTargetBattlers();
             context.ApplySkillEffect(Vulnerability(FireResistance, -0.8)); // player: 0.5 → −0.3, gross v = 0.8
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 − (−0.3)) = 39 dealt
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − (−0.3)) = 39 dealt
 
             Assert.Equal(39, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal((39.0 - 15.0) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 ≈ 13.33
@@ -846,7 +898,7 @@ namespace Game.Core.Tests.Battle
             context.ApplySkillEffect(Vulnerability(FireResistance, -0.5)); // DurationMs 10_000
             enemy.AdvanceEffects(10_001); // past expiry → the FireResistance stack and its contribution are removed
 
-            context.DamageTarget(30, Single(EDamageType.Fire)); // resistance back to 0 ⇒ 30 dealt, no vulnerability
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // resistance back to 0 ⇒ 30 dealt, no vulnerability
 
             Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
@@ -862,7 +914,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(30, Single(EDamageType.Fire));
+            context.DamageTarget(30, Single(EDamageType.Fire), 0);
 
             Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
         }

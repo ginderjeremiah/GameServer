@@ -122,6 +122,7 @@ namespace Game.Core.Tests.Battle
                     DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
                     CooldownMs = 1000,
                     BaseDamage = 10,
+                    CriticalChance = 0,
                     DamageMultipliers = [
                         new DamageMultiplier
                         {
@@ -153,6 +154,7 @@ namespace Game.Core.Tests.Battle
                     DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
                     CooldownMs = 1500,
                     BaseDamage = 5,
+                    CriticalChance = 0,
                     DamageMultipliers = [],
                     Effects = [],
                 }

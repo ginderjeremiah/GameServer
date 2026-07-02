@@ -11,6 +11,7 @@ export const makeSkill = (owner: Battler, over: Partial<ISkill> = {}): Skill =>
 			id: 1,
 			name: 'Slash',
 			baseDamage: 10,
+			criticalChance: 0,
 			damageMultipliers: [],
 			effects: [],
 			description: 'A basic slash.',

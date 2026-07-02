@@ -164,6 +164,7 @@ describe('BattleEngine', () => {
 			id: 0,
 			name: 'Slash',
 			baseDamage: 100,
+			criticalChance: 0,
 			damageMultipliers: [],
 			effects: [],
 			description: '',
@@ -673,7 +674,8 @@ describe('BattleEngine', () => {
 			};
 
 			it('logs a critical-hit line when the player crits', () => {
-				forcePlayerChance(EAttribute.CriticalChance);
+				// The enabler is now the skill's own base chance (#1453); 1 guarantees every [0,1) draw crits.
+				mockSkills[0].criticalChance = 1;
 				engine.start();
 				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 
@@ -816,7 +818,8 @@ describe('BattleEngine', () => {
 			});
 
 			it('emits an enemy-targeted crit when the player crits', () => {
-				forcePlayerChance(EAttribute.CriticalChance);
+				// The enabler is now the skill's own base chance (#1453); 1 guarantees every [0,1) draw crits.
+				mockSkills[0].criticalChance = 1;
 				engine.start();
 				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
 

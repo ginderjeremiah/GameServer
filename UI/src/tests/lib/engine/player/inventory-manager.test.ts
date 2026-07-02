@@ -333,6 +333,7 @@ describe('InventoryManager', () => {
 				id: PUNCH_SKILL_ID,
 				name: 'Punch',
 				baseDamage: 4,
+				criticalChance: 0,
 				damageMultipliers: [],
 				effects: [],
 				description: '',

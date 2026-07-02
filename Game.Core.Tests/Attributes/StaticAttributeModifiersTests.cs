@@ -27,8 +27,10 @@ namespace Game.Core.Tests.Attributes
                 (EAttribute.MaxHealth, 50.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.MaxHealth, 20.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
                 (EAttribute.MaxHealth, 5.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Strength),
-                // CriticalChance is opt-in (crit rework #1425): no base, no derivation — sourced from items/skills
-                // only — so it has no static modifier at all (like DamageReflection).
+                // CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): a base of 1 (like
+                // CooldownRecovery) and no derivation — the enabler is a skill's own authored CriticalChance, not
+                // this attribute, which only scales it.
+                (EAttribute.CriticalChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),

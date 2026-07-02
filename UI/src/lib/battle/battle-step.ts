@@ -143,9 +143,11 @@ export function battleStep(
 	// draws from the shared seeded RNG in a fixed, outcome-independent order (1 crit draw per player fire,
 	// 1 dodge draw per enemy fire — Block's second draw was retired, #1330) so both simulators stay in lockstep.
 	player.advanceCooldowns(timeDelta, (skill) => {
-		// Player crit: one draw (always), independent of portion count — a single crit multiplies EVERY portion
-		// by CriticalDamage BEFORE mitigation.
-		const crit = rng.next() < player.attributes.getValue(EAttribute.CriticalChance);
+		// Player crit: one draw (always), independent of portion count — rolled against the firing skill's own
+		// base CriticalChance (the per-skill opt-in enabler, #1453) scaled by the player's CriticalChanceMultiplier
+		// (base 1, so an unenhanced skill still crits at its own authored rate). A single crit multiplies EVERY
+		// portion by CriticalDamage BEFORE mitigation.
+		const crit = rng.next() < skill.criticalChance * player.attributes.getValue(EAttribute.CriticalChanceMultiplier);
 		const raw = skill.calculateDamage();
 		const critMultiplier = crit ? player.attributes.getValue(EAttribute.CriticalDamage) : 1;
 		// Split the raw hit across the skill's weighted portions, each amplified, crit-scaled, then run through

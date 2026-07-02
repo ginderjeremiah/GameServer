@@ -38,6 +38,9 @@ export interface SkillSpec {
 	multipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
 	damagePortions: ISkillDamagePortion[];
+	/** This skill's own base critical-hit chance (#1453), scaled by the battler's
+	 *  CriticalChanceMultiplier at fire time. Defaults to 0 (never crits). */
+	criticalChance: number;
 }
 
 export const makeSkill = (
@@ -45,8 +48,16 @@ export const makeSkill = (
 	cooldownMs: number,
 	multipliers: IAttributeMultiplier[] = [],
 	effects: ISkillEffect[] = [],
-	damageType: EDamageType = EDamageType.Physical
-): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects, damagePortions: [{ type: damageType, weight: 1 }] });
+	damageType: EDamageType = EDamageType.Physical,
+	criticalChance = 0
+): SkillSpec => ({
+	baseDamage,
+	cooldownMs,
+	multipliers,
+	effects,
+	damagePortions: [{ type: damageType, weight: 1 }],
+	criticalChance
+});
 
 /** A skill carrying a multi-typed weighted damage-portion split (#1343). Weights are stored raw and
  *  normalized at fire time (`raw × weight ÷ Σweights`), so they need not sum to 1. Mirrors the backend
@@ -56,8 +67,9 @@ export const makeMultiTypeSkill = (
 	cooldownMs: number,
 	damagePortions: ISkillDamagePortion[],
 	multipliers: IAttributeMultiplier[] = [],
-	effects: ISkillEffect[] = []
-): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects, damagePortions });
+	effects: ISkillEffect[] = [],
+	criticalChance = 0
+): SkillSpec => ({ baseDamage, cooldownMs, multipliers, effects, damagePortions, criticalChance });
 
 /** A timed skill effect, mirroring the backend parity test's MakeEffect helper. The scaling fields
  *  default to no scaling (a `scalingAmount` of 0), so existing scenarios are unaffected. */
@@ -80,6 +92,7 @@ function registerSkill(registry: ISkill[], spec: SkillSpec): number {
 		id,
 		name: `Skill ${id}`,
 		baseDamage: spec.baseDamage,
+		criticalChance: spec.criticalChance,
 		cooldownMs: spec.cooldownMs,
 		// The skill's weighted leaf-type split (#1343); a single full-weight portion is identical to the
 		// pre-portions single-type hit.

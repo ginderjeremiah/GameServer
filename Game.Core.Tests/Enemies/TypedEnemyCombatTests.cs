@@ -33,8 +33,8 @@ namespace Game.Core.Tests.Enemies
             var enemy = EnemyBattler(MakeEnemy(level: 1, (Endurance, 0, 0), (FireResistance, 0.5m, 0m)));
             var context = new BattleContext(Player(), enemy, timeDelta: 0, new Mulberry32(0));
 
-            var fire = context.DamageTarget(40, Single(EDamageType.Fire));
-            var physical = context.DamageTarget(40, Single(EDamageType.Physical));
+            var fire = context.DamageTarget(40, Single(EDamageType.Fire), 0);
+            var physical = context.DamageTarget(40, Single(EDamageType.Physical), 0);
 
             Assert.Equal(20, fire, 0.001);     // 40 × (1 − 0.5)
             Assert.Equal(40, physical, 0.001); // unresisted
@@ -47,7 +47,7 @@ namespace Game.Core.Tests.Enemies
             var enemy = EnemyBattler(MakeEnemy(level: 1, (Endurance, 0, 0), (FireResistance, -0.5m, 0m)));
             var context = new BattleContext(Player(), enemy, timeDelta: 0, new Mulberry32(0));
 
-            var dealt = context.DamageTarget(40, Single(EDamageType.Fire));
+            var dealt = context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(60, dealt, 0.001);
         }
@@ -59,7 +59,7 @@ namespace Game.Core.Tests.Enemies
             var enemy = EnemyBattler(MakeEnemy(level: 1, (Endurance, 0, 0), (FireResistance, 1.0m, 0m)));
             var context = new BattleContext(Player(), enemy, timeDelta: 0, new Mulberry32(0));
 
-            var dealt = context.DamageTarget(40, Single(EDamageType.Fire));
+            var dealt = context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(0, dealt, 0.001);
         }
@@ -72,9 +72,9 @@ namespace Game.Core.Tests.Enemies
             var enemy = EnemyBattler(MakeEnemy(level: 1, (Endurance, 0, 0), (FireResistance, 2.0m, 0m)));
             var context = new BattleContext(Player(), enemy, timeDelta: 0, new Mulberry32(0));
 
-            context.DamageTarget(30, Single(EDamageType.Physical)); // open 30 of room
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // open 30 of room
             var healthBeforeAbsorb = enemy.CurrentHealth;
-            var net = context.DamageTarget(20, Single(EDamageType.Fire)); // 20 × (1 − 2) = −20, absorbed
+            var net = context.DamageTarget(20, Single(EDamageType.Fire), 0); // 20 × (1 − 2) = −20, absorbed
 
             Assert.Equal(-20, net, 0.001);
             Assert.Equal(healthBeforeAbsorb + 20, enemy.CurrentHealth, 0.001);
@@ -88,7 +88,7 @@ namespace Game.Core.Tests.Enemies
             var enemy = EnemyBattler(MakeEnemy(level: 1, (Endurance, 0, 0), (ElementalResistance, 0.5m, 0m)));
             var context = new BattleContext(Player(), enemy, timeDelta: 0, new Mulberry32(0));
 
-            var dealt = context.DamageTarget(40, Single(EDamageType.Fire));
+            var dealt = context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(20, dealt, 0.001);
         }
@@ -103,9 +103,9 @@ namespace Game.Core.Tests.Enemies
             var highLevel = EnemyBattler(MakeEnemy(level: 8, (Endurance, 0, 0), (FireResistance, 0m, 0.1m)));
 
             var lowDealt = new BattleContext(Player(), lowLevel, timeDelta: 0, new Mulberry32(0))
-                .DamageTarget(100, Single(EDamageType.Fire));
+                .DamageTarget(100, Single(EDamageType.Fire), 0);
             var highDealt = new BattleContext(Player(), highLevel, timeDelta: 0, new Mulberry32(0))
-                .DamageTarget(100, Single(EDamageType.Fire));
+                .DamageTarget(100, Single(EDamageType.Fire), 0);
 
             Assert.Equal(80, lowDealt, 0.001);  // 100 × (1 − 0.2)
             Assert.Equal(20, highDealt, 0.001); // 100 × (1 − 0.8)
@@ -178,6 +178,7 @@ namespace Game.Core.Tests.Enemies
                 Name = "Enemy Fireball",
                 Description = "",
                 BaseDamage = baseDamage,
+                CriticalChance = 0,
                 CooldownMs = 0, // fires on the first tick
                 DamagePortions = [new SkillDamagePortion { Type = EDamageType.Fire, Weight = 1.0 }],
                 DamageMultipliers = [],

@@ -7,6 +7,10 @@
         public decimal BaseDamage { get; set; }
         public required string Description { get; set; }
         public int CooldownMs { get; set; }
+
+        /// <summary>This skill's own base critical-hit chance (decimal probability, 0.05 = 5%). See
+        /// <see cref="Core.Skills.Skill.CriticalChance"/>. Backfills to <c>0</c> (never crits).</summary>
+        public decimal CriticalChance { get; set; }
         public required string IconPath { get; set; }
         public int RarityId { get; set; }
 

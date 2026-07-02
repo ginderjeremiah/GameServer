@@ -88,15 +88,18 @@ const enemyToughness = $derived(opponent?.attributes.getValue(EAttribute.Toughne
 
 // Crit folds into the shown damage as its long-run average: the expected multiplier scales the raw
 // damage BEFORE mitigation (mirroring the battle, where a crit punches through the Toughness curve), then
-// the curve applies once. Display-only — the live battle rolls each crit individually.
-const critChance = $derived(skill?.owner.attributes.getValue(EAttribute.CriticalChance) ?? 0);
+// the curve applies once. Display-only — the live battle rolls each crit individually. The chance is this
+// skill's own base (#1453, the per-skill opt-in enabler) scaled by the owner's CriticalChanceMultiplier.
+const critChance = $derived(
+	(skill?.criticalChance ?? 0) * (skill?.owner.attributes.getValue(EAttribute.CriticalChanceMultiplier) ?? 1)
+);
 const critDamage = $derived(skill?.owner.attributes.getValue(EAttribute.CriticalDamage) ?? 0);
 const critBonus = $derived(totalDamage * (expectedCritMultiplier(critChance, critDamage) - 1));
 // Surface the crit row only when a crit can occur — a 0 chance contributes nothing.
 const crit = $derived(
 	critChance > 0
 		? {
-				chance: formatAttributeValue(critChance, EAttribute.CriticalChance, staticData.attributes),
+				chance: formatAttributeValue(critChance, EAttribute.CriticalChanceMultiplier, staticData.attributes),
 				damage: critDamage,
 				bonus: critBonus
 			}

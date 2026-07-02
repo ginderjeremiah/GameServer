@@ -30,6 +30,7 @@ namespace Game.DataAccess.Repositories.Admin
                 {
                     Name = item.Name,
                     BaseDamage = item.BaseDamage,
+                    CriticalChance = item.CriticalChance,
                     CooldownMs = item.CooldownMs,
                     Description = item.Description,
                     IconPath = item.IconPath,
@@ -45,6 +46,7 @@ namespace Game.DataAccess.Repositories.Admin
                     Id = item.Id,
                     Name = item.Name,
                     BaseDamage = item.BaseDamage,
+                    CriticalChance = item.CriticalChance,
                     CooldownMs = item.CooldownMs,
                     Description = item.Description,
                     IconPath = item.IconPath,

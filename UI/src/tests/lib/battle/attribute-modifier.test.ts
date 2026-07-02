@@ -85,8 +85,16 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Strength
 			},
-			// CriticalChance is opt-in (crit rework #1425): no base, no derivation — sourced from items/skills
-			// only — so it has no static modifier at all (like DamageReflection).
+			// CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): the enabler is a
+			// skill's own authored CriticalChance (0 by default), and this attribute is only the base-1
+			// multiplier scaling that per-skill base — like CooldownRecovery, a committed skill still crits at
+			// its own rate with zero further investment.
+			{
+				attribute: EAttribute.CriticalChanceMultiplier,
+				amount: 1,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
+			},
 			// CriticalDamage = base 1.5 + 0.0025·LUK
 			{
 				attribute: EAttribute.CriticalDamage,

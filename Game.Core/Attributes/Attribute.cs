@@ -108,7 +108,7 @@ namespace Game.Core.Attributes
                 Toughness => "Reduces all incoming direct damage by a percentage that grows with diminishing returns, never reaching full immunity.",
                 CooldownRecovery => "A percentage multiplier to the rate at which skills become available again after being used.",
                 DropBonus => "Obsolete. Previously increased the rate at which items were dropped by enemies.",
-                CriticalChance => "The percentage chance for an attack to deal increased damage.",
+                CriticalChanceMultiplier => "A multiplier applied to a skill's own base critical-hit chance.",
                 CriticalDamage => "The additional percentage of damage dealt when a critical hit occurs.",
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
                 DamageReflection => "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
@@ -151,7 +151,7 @@ namespace Game.Core.Attributes
                 MaxHealth => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "HP", 6, 0),
                 Toughness => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "TGH", 7, 0),
                 CooldownRecovery => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CDR", 8, 0),
-                CriticalChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT", 9, 0),
+                CriticalChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT", 9, 0),
                 CriticalDamage => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT DMG", 10, 0),
                 DodgeChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "DOD", 11, 0),
                 // DamageReflection (spike #1330) takes the defensive-secondary slot Block vacated, so it groups

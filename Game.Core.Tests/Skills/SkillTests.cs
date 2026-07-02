@@ -58,6 +58,7 @@ namespace Game.Core.Tests.Skills
             Id = 0,
             Name = "Test",
             BaseDamage = 1,
+            CriticalChance = 0,
             Description = "",
             CooldownMs = 1000,
             DamagePortions = portions,

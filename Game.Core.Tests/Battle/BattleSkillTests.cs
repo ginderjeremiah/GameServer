@@ -190,11 +190,11 @@ namespace Game.Core.Tests.Battle
             // A crit makes the raw pre-mitigation value understate the real hit: BaseDamage 20, crit
             // ×2 ⇒ 40; the enemy has no Toughness, so 40 lands. The per-skill stat must book 40 (not the raw
             // 20) so it reconciles with the global stat DamageTarget books from the same hit.
-            var skill = MakeSkill(cooldownMs: 100, baseDamage: 20);
+            var skill = MakeSkill(cooldownMs: 100, baseDamage: 20, criticalChance: 1);
             var battleSkill = new BattleSkill(skill);
 
-            // CriticalChance 1 always crits; CriticalDamage base 1.5 + 0.5 = 2.0.
-            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5));
+            // The skill's own base CriticalChance 1 always crits; CriticalDamage base 1.5 + 0.5 = 2.0.
+            var player = MakeBattlerWith((CriticalDamage, 0.5));
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 200, new Mulberry32(0));
 
@@ -216,8 +216,8 @@ namespace Game.Core.Tests.Battle
             var skill = MakeSkill(cooldownMs: 100, baseDamage: 20);
             var battleSkill = new BattleSkill(skill);
 
-            var player = MakeBattlerWith((CriticalChance, 0)); // never crits
-            var enemy = MakeBattlerWith((Endurance, 10));      // Toughness = 2·10 = 20, MaxHealth 250
+            var player = MakeBattlerWith((Endurance, 0)); // skill's default CriticalChance 0 never crits
+            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness = 2·10 = 20, MaxHealth 250
             var context = new BattleContext(player, enemy, timeDelta: 200, new Mulberry32(0));
 
             battleSkill.Update(context);
@@ -231,7 +231,8 @@ namespace Game.Core.Tests.Battle
 
         // ── Helpers ──────────────────────────────────────────────────────────
 
-        private static Skill MakeSkill(int cooldownMs, double baseDamage, List<DamageMultiplier>? multipliers = null) => new()
+        private static Skill MakeSkill(
+            int cooldownMs, double baseDamage, List<DamageMultiplier>? multipliers = null, double criticalChance = 0) => new()
         {
             Id = 1,
             Name = "Test Skill",
@@ -239,6 +240,7 @@ namespace Game.Core.Tests.Battle
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = cooldownMs,
             BaseDamage = baseDamage,
+            CriticalChance = criticalChance,
             DamageMultipliers = multipliers ?? [],
             Effects = [],
         };
