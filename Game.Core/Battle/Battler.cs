@@ -107,6 +107,14 @@ namespace Game.Core.Battle
         /// </summary>
         public double ComputeNetDamage(double dealt, EDamageType damageType, int attackerLevel)
         {
+            return NetDamageAfterResistance(dealt, SumTypeResistance(damageType), attackerLevel);
+        }
+
+        // The raw (unclamped, signed) resistance sum for a type — shared by ComputeNetDamage,
+        // TypeResistanceMitigated, and HexBonusForHit's live-resistance baseline, each applying their own
+        // clamping (or none) on top.
+        private double SumTypeResistance(EDamageType damageType)
+        {
             var resistance = 0.0;
             var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
             for (var i = 0; i < resistanceAttributes.Count; i++)
@@ -114,7 +122,22 @@ namespace Game.Core.Battle
                 resistance += _attributes[resistanceAttributes[i]];
             }
 
-            return NetDamageAfterResistance(dealt, resistance, attackerLevel);
+            return resistance;
+        }
+
+        /// <summary>
+        /// The amount of a direct hit of <paramref name="dealt"/> this battler's own type-resistance for
+        /// <paramref name="damageType"/> blocks — <c>dealt × clamp(resistance, 0, 1)</c>, deliberately isolated
+        /// from the Toughness curve (spike #1398 → resistance training split, #1454). Toughness is a generic,
+        /// non-typed stat every build can raise, so folding it in would let it accelerate every resist path's
+        /// training at once; this credits only the type-specific resistance investment the path actually
+        /// represents. Clamped to <c>[0, 1]</c> because this is a training-weight fraction, not a damage
+        /// multiplier: a resistance debuff pushing the sum negative blocks nothing (anti-mitigation, not
+        /// credited here), and a sum above <c>1</c> (absorption) still credits at most the full dealt amount.
+        /// </summary>
+        public double TypeResistanceMitigated(double dealt, EDamageType damageType)
+        {
+            return dealt * Math.Clamp(SumTypeResistance(damageType), 0, 1);
         }
 
         // The mitigation tail shared by the live hit and the Hex counterfactual: percentage resistance then the
@@ -169,12 +192,7 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            var liveResistance = 0.0;
-            var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
-            for (var i = 0; i < resistanceAttributes.Count; i++)
-            {
-                liveResistance += _attributes[resistanceAttributes[i]];
-            }
+            var liveResistance = SumTypeResistance(damageType);
 
             // The baseline is the same hit without the opponent's debuff — resistance raised back by v — so the
             // marginal is exactly the damage that debuff enabled (independent of base resistance and enemy buffs).
@@ -203,27 +221,12 @@ namespace Game.Core.Battle
             var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
             for (var i = 0; i < resistanceAttributes.Count; i++)
             {
-                contribution += StackVulnerabilityContribution(resistanceAttributes[i]);
+                contribution += StackContribution(resistanceAttributes[i], stack => stack.VulnerabilityContribution);
             }
 
             // Contributions are the signed resistance deltas the opponent applied (negative for a debuff); the
             // vulnerability is their reduction, so negate and clamp — an opponent that only raised resistance is 0.
             return contribution < 0 ? -contribution : 0;
-        }
-
-        // The vulnerability-tracked resistance delta the opponent has applied to one attribute, or 0 when no
-        // effect stack for it is active. A linear scan over the affected-attribute count, like GetOrCreateStack.
-        private double StackVulnerabilityContribution(EAttribute attribute)
-        {
-            foreach (var stack in _attributeStacks!)
-            {
-                if (stack.Attribute == attribute)
-                {
-                    return stack.VulnerabilityContribution;
-                }
-            }
-
-            return 0;
         }
 
         /// <summary>
@@ -245,21 +248,28 @@ namespace Game.Core.Battle
             var amplificationAttributes = DamageTypes.AmplificationAttributes(damageType);
             for (var i = 0; i < amplificationAttributes.Count; i++)
             {
-                contribution += StackMomentumContribution(amplificationAttributes[i]);
+                contribution += StackContribution(amplificationAttributes[i], stack => stack.MomentumContribution);
             }
 
             return contribution > 0 ? contribution : 0;
         }
 
-        // The ramp-tracked amplification this battler has applied to one of its own attributes, or 0 when no
-        // effect stack for it is active. A linear scan over the affected-attribute count, like GetOrCreateStack.
-        private double StackMomentumContribution(EAttribute attribute)
+        // The tracked contribution (selected via <paramref name="selector"/>) an active effect stack has
+        // accrued for one attribute, or 0 when no stack for it exists yet. A linear scan over the
+        // affected-attribute count, like GetOrCreateStack. Shared by the per-overlay applied-* readers
+        // (AppliedVulnerability, AppliedMomentum, ...) so each just supplies its own contribution field.
+        private double StackContribution(EAttribute attribute, Func<AttributeEffectStack, double> selector)
         {
-            foreach (var stack in _attributeStacks!)
+            if (_attributeStacks is null)
+            {
+                return 0;
+            }
+
+            foreach (var stack in _attributeStacks)
             {
                 if (stack.Attribute == attribute)
                 {
-                    return stack.MomentumContribution;
+                    return selector(stack);
                 }
             }
 
@@ -348,11 +358,20 @@ namespace Game.Core.Battle
         /// takes just the amount). Supplied only when this battler is the victim of the player's DoT (the enemy);
         /// <c>null</c> skips the vulnerability lookup entirely. A backend-only side channel like the others.
         /// </param>
+        /// <param name="recordMitigated">
+        /// Optional per-type recorder for the resist-mitigated portion of the resist-training split (#1454) —
+        /// invoked with each DoT type and <c>preMitigation × clamp(resistance, 0, 1)</c>, the amount this
+        /// battler's own type-resistance blocked. DoT bypasses the Toughness curve entirely (resistance is its
+        /// only mitigation), so unlike the direct-hit path this needs no separate Toughness-excluding helper.
+        /// Supplied only when this battler's exposure is tracked (the player); <c>null</c> leaves the loop
+        /// unchanged. A backend-only side channel like the others.
+        /// </param>
         public double ApplyDamageOverTime(
             int ms,
             Action<EDamageType, double>? recordExposure = null,
             Action<EDamageType, double>? recordDamageDealt = null,
-            Action<double>? recordHexBonus = null)
+            Action<double>? recordHexBonus = null,
+            Action<EDamageType, double>? recordMitigated = null)
         {
             var dot = 0.0;
             var accumulators = DamageTypes.DotAccumulators;
@@ -381,6 +400,7 @@ namespace Game.Core.Battle
                 // type; compute it once so the recorded damage-dealt and the health math cannot drift.
                 var tickDamage = preMitigation * (1 - resistance);
                 recordDamageDealt?.Invoke(accumulators[i].Type, tickDamage);
+                recordMitigated?.Invoke(accumulators[i].Type, preMitigation * Math.Clamp(resistance, 0, 1));
 
                 // The attacker's Hex bonus for this tick: the opponent-applied vulnerability v (the resistance the
                 // attacker's own debuff removed) let through preMitigation × v, discounted by the same 1/(1 + v)
@@ -449,7 +469,6 @@ namespace Game.Core.Battle
         public void ApplyEffect(
             SkillEffect effect, double amount, bool tracksVulnerability = false, bool tracksMomentum = false)
         {
-            _attributeStacks ??= [];
             var stack = GetOrCreateStack(effect.AttributeId);
 
             // Re-applying any effect on this attribute resets the whole stack's shared expiry to the new
@@ -546,11 +565,13 @@ namespace Game.Core.Battle
             }
         }
 
-        // Returns the stack for the given attribute, creating it on first use. The scan is over the
-        // affected-attribute count (≤ the attribute count), never the application count, so it stays cheap.
+        // Returns the stack for the given attribute, creating it (and the backing list) on first use. The scan
+        // is over the affected-attribute count (≤ the attribute count), never the application count, so it
+        // stays cheap.
         private AttributeEffectStack GetOrCreateStack(EAttribute attribute)
         {
-            foreach (var stack in _attributeStacks!)
+            _attributeStacks ??= [];
+            foreach (var stack in _attributeStacks)
             {
                 if (stack.Attribute == attribute)
                 {

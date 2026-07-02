@@ -21,6 +21,7 @@ namespace Game.DataAccess.Mapping
                 Id = entity.Id,
                 Name = entity.Name,
                 BaseDamage = entity.BaseDamage,
+                CriticalChance = entity.CriticalChance,
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
                 IconPath = entity.IconPath,
@@ -69,6 +70,7 @@ namespace Game.DataAccess.Mapping
                 Id = contract.Id,
                 Name = contract.Name,
                 BaseDamage = contract.BaseDamage,
+                CriticalChance = contract.CriticalChance,
                 Description = contract.Description,
                 CooldownMs = contract.CooldownMs,
                 IconPath = contract.IconPath,
@@ -120,6 +122,7 @@ namespace Game.DataAccess.Mapping
                 Id = entity.Id,
                 Name = entity.Name,
                 BaseDamage = (double)entity.BaseDamage,
+                CriticalChance = (double)entity.CriticalChance,
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
                 DamagePortions = entity.SkillDamagePortions

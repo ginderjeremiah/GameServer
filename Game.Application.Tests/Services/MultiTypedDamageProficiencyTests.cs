@@ -133,18 +133,50 @@ namespace Game.Application.Tests.Services
             var playerId = await SeedPlayerAsync(context);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
 
-            // The incoming book is pre-resist, so the player's own resistance never throttles the training signal:
-            // exposure is 60 Physical / 40 Fire regardless of how much the player mitigates.
+            // The incoming book's exposure is pre-resist regardless of how much the player mitigates: exposure is
+            // 60 Physical / 40 Fire whether or not the player has any resistance (#1454's split, below, is what
+            // then weights it into a training claim).
             var stats = FireEnemyHit(raw: 100, FlamingSword);
             Assert.Equal(60, Exposure(stats, EDamageType.Physical), 0.001);
             Assert.Equal(40, Exposure(stats, EDamageType.Fire), 0.001);
 
             var accrual = await AccrueAsync(scope, playerId, stats);
 
-            // The resist paths train in proportion to each portion's exposure — the same 60:40 split, on the
-            // incoming side.
-            Assert.Equal(ExpectedXp(60), XpFor(accrual, physicalResist));
-            Assert.Equal(ExpectedXp(40), XpFor(accrual, fireResist));
+            // A resistance-less player blocks nothing, so both portions' exposure is entirely "unmitigated" and
+            // trains at ResistUnmitigatedTrainingRate — still in the same 60:40 proportion as the exposure split.
+            Assert.Equal(ExpectedXp(60 * ServerGameConstants.ResistUnmitigatedTrainingRate), XpFor(accrual, physicalResist));
+            Assert.Equal(ExpectedXp(40 * ServerGameConstants.ResistUnmitigatedTrainingRate), XpFor(accrual, fireResist));
+        }
+
+        [Fact]
+        public async Task EnemyFlamingSword_AgainstAResistantPlayer_TrainsThatPortionsResistPathFaster()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Same enemy hit, but the player now carries Fire resistance (and none against Physical) — the
+            // resist-training split (#1454) should train Fire-resist faster than Physical-resist even though the
+            // exposure split (60 Physical / 40 Fire) favors Physical.
+            var physicalResist = await CreateKeyedTierAsync(context, EActivityKey.PhysicalResist, "Physical Warding");
+            var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, "Fire Warding");
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = FireEnemyHit(raw: 100, FlamingSword, playerFireResistance: 0.5);
+            Assert.Equal(60, Exposure(stats, EDamageType.Physical), 0.001);
+            Assert.Equal(40, Exposure(stats, EDamageType.Fire), 0.001);
+            Assert.Equal(0, Mitigated(stats, EDamageType.Physical), 0.001);
+            Assert.Equal(20, Mitigated(stats, EDamageType.Fire), 0.001);
+
+            var accrual = await AccrueAsync(scope, playerId, stats);
+
+            // Physical: fully unmitigated → 60 × 0.25 = 15 activity. Fire: half mitigated, half not →
+            // 20 × 1.0 + 20 × 0.25 = 25 activity — more than Physical despite the smaller exposure share.
+            Assert.Equal(ExpectedXp(60 * ServerGameConstants.ResistUnmitigatedTrainingRate), XpFor(accrual, physicalResist));
+            Assert.Equal(
+                ExpectedXp(20 * ServerGameConstants.ResistMitigatedTrainingRate + 20 * ServerGameConstants.ResistUnmitigatedTrainingRate),
+                XpFor(accrual, fireResist));
+            Assert.True(XpFor(accrual, fireResist) > XpFor(accrual, physicalResist));
         }
 
         // ── The example content (#1343 part D) ──────────────────────────────────
@@ -175,19 +207,22 @@ namespace Game.Application.Tests.Services
             var player = MakeBattler();
             var enemy = MakeBattler((EAttribute.FireResistance, enemyFireResistance));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.DamageTarget(raw, portions);
+            context.DamageTarget(raw, portions, 0);
             return context.Stats;
         }
 
         // Runs one real enemy fire of a multi-typed hit at the player and returns the stats (the incoming exposure
         // book). The player never dodges (no DodgeChance), so every portion's pre-resist exposure is recorded.
-        private static BattleStats FireEnemyHit(double raw, IReadOnlyList<SkillDamagePortion> portions)
+        // Optionally carries the player's own Fire resistance, so the resist-training split (#1454) has something
+        // to mitigate.
+        private static BattleStats FireEnemyHit(
+            double raw, IReadOnlyList<SkillDamagePortion> portions, double playerFireResistance = 0)
         {
-            var player = MakeBattler();
+            var player = MakeBattler((EAttribute.FireResistance, playerFireResistance));
             var enemy = MakeBattler();
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(raw, portions);
+            context.DamageTarget(raw, portions, 0);
             return context.Stats;
         }
 
@@ -250,5 +285,8 @@ namespace Game.Application.Tests.Services
 
         private static double Exposure(BattleStats stats, EDamageType type) =>
             stats.TypedDamageExposure.TryGetValue(type, out var value) ? value : 0;
+
+        private static double Mitigated(BattleStats stats, EDamageType type) =>
+            stats.TypedDamageResistanceMitigated.TryGetValue(type, out var value) ? value : 0;
     }
 }

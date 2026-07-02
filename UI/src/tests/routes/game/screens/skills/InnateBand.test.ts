@@ -53,6 +53,7 @@ import InnateBand from '$routes/game/screens/skills/InnateBand.svelte';
 const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	name: `Skill ${over.id}`,
 	baseDamage: 10,
+	criticalChance: 0,
 	damageMultipliers: [],
 	effects: [],
 	description: '',

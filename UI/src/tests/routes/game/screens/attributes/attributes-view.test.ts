@@ -84,7 +84,7 @@ describe('deriveStats', () => {
 		const ids = DERIVED_STATS.map((d) => d.id);
 		expect(ids).toEqual([EAttribute.MaxHealth, EAttribute.Toughness, EAttribute.CooldownRecovery]);
 		expect(ids).not.toContain(EAttribute.DropBonus);
-		expect(ids).not.toContain(EAttribute.CriticalChance);
+		expect(ids).not.toContain(EAttribute.CriticalChanceMultiplier);
 		expect(ids).not.toContain(EAttribute.DamageReflection);
 	});
 });

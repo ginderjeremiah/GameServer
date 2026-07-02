@@ -56,6 +56,7 @@ import SkillCardStats from '$routes/game/screens/skills/SkillCardStats.svelte';
 const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	name: `Skill ${over.id}`,
 	baseDamage: 10,
+	criticalChance: 0,
 	damageMultipliers: [],
 	effects: [],
 	description: '',

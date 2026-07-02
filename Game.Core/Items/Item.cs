@@ -38,7 +38,8 @@ namespace Game.Core.Items
         public int? GrantedSkillId { get; init; }
 
         /// <summary>
-        /// The weapon-leaf <see cref="EDamageType"/> this weapon deals, or null for a non-weapon item. Only
+        /// The <see cref="EDamageType"/> leaf this weapon deals, or null for a non-weapon item — any leaf is
+        /// valid, so a caster weapon can declare its element (e.g. Fire) rather than a martial leaf. Only
         /// meaningful on a <see cref="EItemCategory.Weapon"/> item; the weapon-match loadout gate resolves an
         /// equipped weapon's type as <c>weapon?.WeaponType ?? Unarmed</c> (an empty slot is the virtual fists).
         /// </summary>

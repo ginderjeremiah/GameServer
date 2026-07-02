@@ -437,6 +437,7 @@ namespace Game.Application.Tests.Mapping
                     Id = skillId,
                     Name = $"Skill {skillId}",
                     BaseDamage = 1,
+                    CriticalChance = 0,
                     Description = string.Empty,
                     DamagePortions = [new Game.Core.Skills.SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
                     CooldownMs = 1000,

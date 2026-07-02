@@ -201,6 +201,7 @@ export interface ISkill {
 	id: number;
 	name: string;
 	baseDamage: number;
+	criticalChance: number;
 	damageMultipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
 	damagePortions: ISkillDamagePortion[];

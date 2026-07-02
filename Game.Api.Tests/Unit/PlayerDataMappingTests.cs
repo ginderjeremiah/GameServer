@@ -148,6 +148,7 @@ namespace Game.Api.Tests.Unit
             Id = id,
             Name = $"Skill {id}",
             BaseDamage = 1,
+            CriticalChance = 0,
             Description = string.Empty,
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = 1000,

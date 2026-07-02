@@ -562,6 +562,7 @@ namespace Game.Core.Tests.Battle.Performance
                 DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
                 CooldownMs = SkillCooldownMs, // fires every couple of ticks, so the damage path runs heavily
                 BaseDamage = 0,               // zero damage keeps both combatants immortal (runs to the cap)
+                CriticalChance = 0,
                 DamageMultipliers = multipliers,
                 Effects = effects,
             };

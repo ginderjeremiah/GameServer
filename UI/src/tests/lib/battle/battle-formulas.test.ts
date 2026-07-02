@@ -17,6 +17,7 @@ const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
 	id: 1,
 	name: 'Slash',
 	baseDamage: 10,
+	criticalChance: 0,
 	damageMultipliers: [],
 	effects: [],
 	description: 'A basic slash',

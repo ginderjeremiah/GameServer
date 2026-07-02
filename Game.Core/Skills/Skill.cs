@@ -19,6 +19,16 @@
         public required int CooldownMs { get; init; }
 
         /// <summary>
+        /// This skill's own base critical-hit chance — a decimal probability (0.05 = 5%) compared, after
+        /// scaling by the attacking battler's <see cref="EAttribute.CriticalChanceMultiplier"/>, directly
+        /// against the battle RNG draw (<see cref="Battle.BattleContext.DamageTarget"/>). The per-skill opt-in
+        /// enabler the crit rework (#1425) anticipated but never wired up (#1453): <c>0</c> by default, so an
+        /// unauthored skill never crits regardless of the multiplier, making crit a committed identity of the
+        /// specific skill rather than a build-wide stat.
+        /// </summary>
+        public required double CriticalChance { get; init; }
+
+        /// <summary>
         /// The weighted leaf-type split this skill's direct hits deal (spike #1343). A hit's raw damage is
         /// split across these portions by weight; each portion runs the single-type pipeline under its own
         /// type. A single-portion skill is byte-for-byte the pre-feature single-typed hit. The direct-hit

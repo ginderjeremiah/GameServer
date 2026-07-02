@@ -243,12 +243,10 @@ describe('battleStep', () => {
 	describe('crit / dodge / reflection (player-only, seeded)', () => {
 		it('multiplies a player crit by CriticalDamage before mitigation', () => {
 			// CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, read directly as the multiplier.
+			// The skill's own base chance (#1453) is 1, so it always crits (the multiplier stays at its base 1).
 			const player = makeBattler(
-				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 }
-				],
-				[makeSkill(20, 40)]
+				[{ id: EAttribute.CriticalDamage, amount: 0.5 }],
+				[makeSkill(20, 40, [], [], undefined, 1)]
 			);
 			const enemy = makeBattler(baseStats, []);
 
@@ -260,7 +258,8 @@ describe('battleStep', () => {
 		});
 
 		it('deals raw damage when the player does not crit', () => {
-			const player = makeBattler([{ id: EAttribute.CriticalChance, amount: 0 }], [makeSkill(20, 40)]);
+			// The skill's own base chance defaults to 0 (#1453), so it never crits.
+			const player = makeBattler(baseStats, [makeSkill(20, 40)]);
 			const enemy = makeBattler(baseStats, []);
 
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
@@ -360,11 +359,8 @@ describe('battleStep', () => {
 		it('never crits on the enemy’s attack, even with a forced crit chance', () => {
 			const player = makeBattler(baseStats, []);
 			const enemy = makeBattler(
-				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 2 }
-				],
-				[makeSkill(20, 40)]
+				[{ id: EAttribute.CriticalDamage, amount: 2 }],
+				[makeSkill(20, 40, [], [], undefined, 1)]
 			);
 
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
@@ -463,18 +459,23 @@ describe('battleStep', () => {
 		});
 
 		it('multiplies every portion by a single crit', () => {
-			// CriticalDamage 1.5 + 0.5 = 2. One crit scales BOTH portions of [Physical 50, Fire 50] of raw 20 →
-			// 10 each, ×2 → 20 each = 40 (a per-portion-only crit would give 30).
+			// CriticalDamage 1.5 + 0.5 = 2. The skill's own base chance (#1453) is 1, so it always crits, scaling
+			// BOTH portions of [Physical 50, Fire 50] of raw 20 → 10 each, ×2 → 20 each = 40 (a per-portion-only
+			// crit would give 30).
 			const player = makeBattler(
+				[{ id: EAttribute.CriticalDamage, amount: 0.5 }],
 				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 }
-				],
-				[
-					makeMultiTypeSkill(20, 40, [
-						{ type: EDamageType.Physical, weight: 50 },
-						{ type: EDamageType.Fire, weight: 50 }
-					])
+					makeMultiTypeSkill(
+						20,
+						40,
+						[
+							{ type: EDamageType.Physical, weight: 50 },
+							{ type: EDamageType.Fire, weight: 50 }
+						],
+						[],
+						[],
+						1
+					)
 				]
 			);
 			const enemy = makeBattler([{ id: EAttribute.Strength, amount: 10 }], []);
