@@ -6,7 +6,7 @@
    categories and the entity-kind breakdowns reuse the shared accent palette
    (the same hues the attribute/log tokens use), so no new variables are
    introduced. The damage-type breakdown's per-row colour instead comes from
-   the `--dmg-*` tokens via `damageTypeKeyColor` (see DamageTypeStatRow). */
+   the `--dmg-*` tokens via `damageTypeKeyColor` (see StatCardRow.svelte). */
 
 import type { StatBreakdownKind, StatCategory, StatUnit } from './statistics-view.svelte';
 
@@ -63,7 +63,7 @@ const KIND_COLOR: Record<StatBreakdownKind, string> = {
 	zone: 'var(--success)',
 	skill: 'var(--accent)',
 	// The card-head "kind" badge needs one representative hue; individual damage-type rows are
-	// tinted per-type via `damageTypeKeyColor` instead (see DamageTypeStatRow).
+	// tinted per-type via `damageTypeKeyColor` instead (see StatCardRow.svelte).
 	damageType: 'var(--dmg-elemental)'
 };
 
