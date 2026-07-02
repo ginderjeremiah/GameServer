@@ -33,7 +33,7 @@ namespace Game.Api.Tests.Unit
             // the ping/close paths can all reach SendData, so it must serialize them itself.
             var session = new SessionService(new NoOpSessionStore());
             var socket = new FakeWebSocket();
-            var context = new SocketContext(socket, playerId: 1, session, NullLogger<SocketContext>.Instance);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, NullLogger<SocketContext>.Instance);
 
             var sends = Enumerable.Range(0, 10).Select(i => context.SendData($"message-{i}")).ToArray();
             var results = await Task.WhenAll(sends);
@@ -66,7 +66,7 @@ namespace Game.Api.Tests.Unit
 
             var sendGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var socket = new FakeWebSocket(sendGate.Task);
-            var context = new SocketContext(socket, playerId: 1, session, NullLogger<SocketContext>.Instance);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, NullLogger<SocketContext>.Instance);
             var handler = new SocketHandler(context, commandFactory, countingScopeFactory, NullLogger<SocketHandler>.Instance, () => { });
 
             var first = handler.ExecuteCommand(new SocketCommandInfo("GetStatisticTypes") { Id = "first" });

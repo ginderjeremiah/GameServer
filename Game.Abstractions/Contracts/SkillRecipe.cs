@@ -3,7 +3,7 @@ namespace Game.Abstractions.Contracts
     /// <summary>Read/authoring contract for a skill-synthesis recipe in the reference-data catalogue (spike
     /// #1125). The child collections are read projections; the identity save ignores them (they are persisted
     /// through the dedicated relationship setters, mirroring the proficiency editor).</summary>
-    public class SkillRecipe : IModel
+    public class SkillRecipe : IModel, IHasDesignerNotes
     {
         public int Id { get; set; }
 

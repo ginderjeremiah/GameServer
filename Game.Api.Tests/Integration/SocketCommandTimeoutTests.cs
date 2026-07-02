@@ -135,7 +135,7 @@ namespace Game.Api.Tests.Integration
 
             var commandFactory = new GatingSocketCommandFactory(gatedCommands.ToDictionary(c => c.Name));
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var context = new SocketContext(socket, playerId: 1, session, contextLogger);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, contextLogger);
             var handler = new SocketHandler(context, commandFactory, scopeFactory, handlerLogger,
                 () => { }, commandTimeout);
 

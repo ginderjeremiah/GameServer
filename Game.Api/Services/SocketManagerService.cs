@@ -37,10 +37,10 @@ namespace Game.Api.Services
             _socketRegistry = socketRegistry;
         }
 
-        public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService)
+        public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService, bool isAdmin)
         {
             var playerId = sessionService.SelectedPlayerId;
-            var socketContext = new SocketContext(socket, playerId, sessionService, _loggerFactory.CreateLogger<SocketContext>());
+            var socketContext = new SocketContext(socket, playerId, sessionService, isAdmin, _loggerFactory.CreateLogger<SocketContext>());
             var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId));
             var presenceKey = CurrentSocketKey(playerId);
             // Claim the presence key with its TTL atomically so a fault here can never leave the key without an

@@ -121,7 +121,7 @@ namespace Game.Api.Tests.Unit
         {
             var session = new SessionService(new NoOpSessionStore());
             session.CreateSession(userId: 1, playerId: 1);
-            var context = new SocketContext(socket, playerId: 1, session, _loggerFactory.CreateLogger<SocketContext>());
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(), _scopeFactory,
                 _loggerFactory.CreateLogger<SocketHandler>(), onActivity ?? (() => { }));
             return (context, handler);

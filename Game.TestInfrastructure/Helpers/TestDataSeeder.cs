@@ -84,7 +84,8 @@ namespace Game.TestInfrastructure.Helpers
             EDamageType damageType = EDamageType.Physical,
             string word = "",
             string pronunciation = "",
-            string translation = "")
+            string translation = "",
+            string designerNotes = "")
         {
             var skill = new Skill
             {
@@ -98,7 +99,7 @@ namespace Game.TestInfrastructure.Helpers
                 Pronunciation = pronunciation,
                 Translation = translation,
                 Acquisition = (int)acquisition,
-                DesignerNotes = "",
+                DesignerNotes = designerNotes,
             };
 
             context.Skills.Add(skill);

@@ -150,7 +150,7 @@ namespace Game.Api.Tests.Unit
             session.CreateSession(userId: 1, playerId: 42);
 
             // The Subscribe failure propagates out of RegisterSocket...
-            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session, isAdmin: false));
 
             // ...and the partial registration was rolled back: the presence key was released via a
             // compare-and-delete keyed on the exact socket id that was claimed (so a newer owner's key would be
@@ -197,7 +197,7 @@ namespace Game.Api.Tests.Unit
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
             session.CreateSession(userId: 1, playerId: 77);
-            var context = await manager.RegisterSocket(socket, session);
+            var context = await manager.RegisterSocket(socket, session, isAdmin: false);
 
             // The unsubscribe fault during teardown must be swallowed, not propagated...
             await manager.UnRegisterSocket(context);
@@ -224,7 +224,7 @@ namespace Game.Api.Tests.Unit
             session.CreateSession(userId: 1, playerId: 1);
             // RegisterSocket wires the real processor into the fake pub/sub via RegisterSocketCommandListener,
             // so the captured callback is the production GetSocketCommandProcessor closure under test.
-            manager.RegisterSocket(socket, session).GetAwaiter().GetResult();
+            manager.RegisterSocket(socket, session, isAdmin: false).GetAwaiter().GetResult();
 
             var processor = capturingPubSub.CapturedProcessor
                 ?? throw new InvalidOperationException("Processor was not registered.");
