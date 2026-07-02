@@ -44,6 +44,7 @@
                 EChallengeType.DamageDealt => EStatisticType.DamageDealt,
                 EChallengeType.BattlesWon => EStatisticType.BattlesWon,
                 EChallengeType.SkillsUsed => EStatisticType.SkillsUsed,
+                EChallengeType.KillsByDamageType => EStatisticType.KillsByDamageType,
                 // LevelReached accumulates the player's level directly and has no backing statistic;
                 // UpdateChallengeProgress special-cases it. Listed explicitly so the default arm can
                 // fail loud on a newly-added type that was wired up only half-way.

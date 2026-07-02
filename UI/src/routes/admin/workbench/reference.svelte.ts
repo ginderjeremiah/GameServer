@@ -2,6 +2,7 @@ import {
 	ApiRequest,
 	EAttribute,
 	EDamageType,
+	EDamageTypeKey,
 	EEntityType,
 	EEquipmentSlot,
 	EItemCategory,
@@ -26,6 +27,10 @@ const toOptions = (pairs: { id: number; name: string }[]): SelectOption[] =>
 
 /** A zero-based-id reference record that can be retired (kept at its slot, resolvable by id). */
 type RetireableRef = { id: number; name: string; retiredAt?: string | null };
+
+/** Synthetic, never-retired refs for the fixed EDamageTypeKey enum — the EEntityType.DamageType
+ *  dimension has no DB reference table to load, so its "records" are just the enum itself. */
+const damageTypeKeyRefs: RetireableRef[] = enumPairs(EDamageTypeKey);
 
 /**
  * Loads and exposes the reference data the workbench's select options, tag UI,
@@ -223,6 +228,8 @@ class WorkbenchReference {
 				return staticData.zones;
 			case EEntityType.Skill:
 				return staticData.skills;
+			case EEntityType.DamageType:
+				return damageTypeKeyRefs;
 			default:
 				return undefined;
 		}

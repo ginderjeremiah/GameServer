@@ -111,6 +111,13 @@ namespace Game.Application.Content
             {
                 foreach (var challenge in Live(_graph.Challenges, c => c.RetiredAt))
                 {
+                    // A KillsByDamageType challenge with no target can never track progress — the statistic
+                    // writes only per-damage-type-key rows, no global row (#1455).
+                    if (challenge.ChallengeTypeId == EChallengeType.KillsByDamageType && challenge.TargetEntityId is null)
+                    {
+                        Error("ChallengeTarget", "Challenge", challenge.Id, "is a KillsByDamageType challenge with no target damage-type key, so it can never track progress.");
+                    }
+
                     // A challenge whose completion target is retired can never be completed (unreachable content);
                     // a missing target id is a dangling reference (a genuine break).
                     if (challenge.TargetEntityId is int targetId)
@@ -125,6 +132,14 @@ namespace Game.Application.Content
                                 break;
                             case EEntityType.Skill:
                                 CheckRef("ChallengeTarget", "Challenge", challenge.Id, _skillRetire, "skill", targetId, ContentGraphSeverity.Error, ContentGraphSeverity.Warning);
+                                break;
+                            case EEntityType.DamageType:
+                                // Not a DB reference table — a fixed intrinsic enum, like Item.WeaponType — so
+                                // validity is a structural enum-membership check, not a retirement lookup.
+                                if (!Enum.IsDefined(typeof(EDamageTypeKey), targetId))
+                                {
+                                    Error("ChallengeTarget", "Challenge", challenge.Id, $"targets damage-type key {targetId}, which is not a defined EDamageTypeKey.");
+                                }
                                 break;
                             case EEntityType.None:
                                 break;

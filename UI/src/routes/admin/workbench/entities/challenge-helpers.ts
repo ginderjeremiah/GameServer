@@ -78,7 +78,8 @@ const STAT_UNIT: Record<EStatisticType, string> = {
 	[EStatisticType.CriticalHits]: 'crits',
 	[EStatisticType.CriticalDamageDealt]: 'damage',
 	[EStatisticType.AttacksDodged]: 'dodges',
-	[EStatisticType.DamageDodged]: 'damage'
+	[EStatisticType.DamageDodged]: 'damage',
+	[EStatisticType.KillsByDamageType]: 'kills'
 };
 
 export const goalUnit = (c: IChallenge): string => {
@@ -122,6 +123,8 @@ export function challengeSentence(c: IChallenge, resolveEntityName: EntityNameRe
 			return tgt ? `Win ${fmtNum(g)} battles against ${tgt}` : `Win ${fmtNum(g)} battles`;
 		case EChallengeType.SkillsUsed:
 			return tgt ? `Use ${tgt} ${fmtNum(g)} times` : `Use skills ${fmtNum(g)} times`;
+		case EChallengeType.KillsByDamageType:
+			return tgt ? `Defeat ${fmtNum(g)} enemies with ${tgt}` : `Defeat ${fmtNum(g)} enemies with any damage type`;
 		default:
 			return `${fmtNum(g)} ${goalUnit(c)}`;
 	}

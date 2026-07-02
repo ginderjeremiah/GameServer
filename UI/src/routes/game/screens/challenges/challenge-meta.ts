@@ -20,7 +20,8 @@ export const CHALLENGE_TYPE_META: Record<EChallengeType, ChallengeTypeMeta> = {
 	[EChallengeType.LevelReached]: { unit: 'level', blurb: 'Grow in power.' },
 	[EChallengeType.DamageDealt]: { unit: 'damage', blurb: 'Pour on the hurt.' },
 	[EChallengeType.BattlesWon]: { unit: 'wins', blurb: 'Come out on top.' },
-	[EChallengeType.SkillsUsed]: { unit: 'casts', blurb: 'Master your abilities.' }
+	[EChallengeType.SkillsUsed]: { unit: 'casts', blurb: 'Master your abilities.' },
+	[EChallengeType.KillsByDamageType]: { unit: 'kills', blurb: 'Master a school of damage.' }
 };
 
 /** A type's progress noun, with a sensible fallback for unknown types. */

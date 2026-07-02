@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
 	EAttribute,
 	EChallengeGoalComparison,
+	EDamageTypeKey,
 	EEntityType,
 	EItemCategory,
 	EItemModType,
@@ -305,6 +306,15 @@ describe('entityOptions / entityCatalog target-entity picker', () => {
 	it('returns null when the target id or dimension does not resolve', () => {
 		expect(reference.entityName(EEntityType.Enemy, 99)).toBeNull();
 		expect(reference.entityName(EEntityType.None, 0)).toBeNull();
+	});
+
+	it('resolves the DamageType dimension from the fixed EDamageTypeKey enum, not a DB catalogue', () => {
+		// Not a retireable reference table — every key is always offered, none ever "· retired".
+		const opts = reference.entityOptions(EEntityType.DamageType);
+		expect(opts).toHaveLength(Object.keys(EDamageTypeKey).length / 2);
+		expect(opts).toContainEqual({ value: EDamageTypeKey.Fire, text: 'Fire' });
+		expect(opts.every((o) => !o.text.includes('retired'))).toBe(true);
+		expect(reference.entityName(EEntityType.DamageType, EDamageTypeKey.Elemental)).toBe('Elemental');
 	});
 });
 

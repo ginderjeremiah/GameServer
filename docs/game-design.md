@@ -219,6 +219,12 @@ A dedicated-boss victory updates two distinct statistics, which are deliberately
 
 This split keeps "how many zones have I beaten" and "how many times have I farmed this boss" as separate, individually meaningful numbers.
 
+## Kills by Damage Type (`KillsByDamageType`)
+
+Backs "kill N with `<type>`" challenges — e.g. *"kill 20 enemies with fire magic"* (#1455). A kill is attributed to whichever leaf `EDamageType` the player dealt the **most** damage of that battle (the offense book already accumulated for proficiency training), tie-broken on the lower enum ordinal — not the literal killing blow, which has no well-defined type on a multi-portion hit and would need new tracking through the tick loop for no real accuracy gain. This is a pure post-battle read (no battle-parity surface), robust to last-hit noise.
+
+The kill rolls up through the same `Applies()` map proficiency training uses, so a Burn-majority kill books `Burn`, `Fire`, `Elemental`, and `Dot` alike — one kill counts toward every "kill with `<family>`" challenge it plausibly belongs to. Because weapon leaves are damage-type leaves ([Items](#items-item-mods-and-tags)), the same statistic also backs "kill with a weapon type" without separate plumbing. Its declared `StatisticType.EntityType` is `DamageType`, a **fixed intrinsic enum** rather than a live/retireable DB table (like `Item.WeaponType`) — a target is validated by enum membership, not retirement. Unlike the other entity-scoped statistics it writes **no global (`null`-entity) row**, so a `KillsByDamageType` challenge always requires a target damage-type key (the content lint flags one that omits it).
+
 ## Zone Progression — locking zones behind challenges
 
 Zone navigation is gated so later zones become real progression rather than being freely reachable from the start (#190). A zone carries an optional **`Zone.UnlockChallengeId`**: it is navigable iff that field is `null` (always open) **or** the player has completed the referenced challenge.
