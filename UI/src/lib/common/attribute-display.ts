@@ -31,12 +31,15 @@ export const attributeColor = (id: EAttribute): string => {
 /** Icon filename (in `static/img`) per attribute. Frontend-owned, like `attributeColor`/
  *  `attributeCode`: the art lives in `UI/static/img` and the backend never references these
  *  paths. Two shared badge languages keep families consistent: the crit/dodge set uses a clean
- *  base symbol for the magnitude attribute (`CriticalDamage`) and that symbol plus a `%` badge for
- *  the chance attributes; the damage-type amplification/resistance family (#1320/#1340) uses the
- *  type's base icon plus an `amp` (up-arrow) or `resist` (shield) badge, composited by
- *  `badge.py` so the `…Amplification` / `…Resistance` siblings are identical bar the badge. Only
- *  the obsolete `DropBonus` and the typed DoT accumulators (Bleed/Poison/Burn DamagePerSecond, owned
- *  by the #1320 Area F UX work) have no art and degrade to an empty icon. */
+ *  base symbol for each family's plain "read directly" magnitude attribute (`CriticalDamage`,
+ *  `DodgeChance`'s sibling has no such attribute) and that same base symbol plus a badge for an
+ *  attribute that scales something else — a `%` badge for a genuine probability (`DodgeChance`)
+ *  or a `×` badge for a base-1 multiplier (`CriticalChanceMultiplier`, which scales a skill's own
+ *  authored crit chance rather than being a chance itself); the damage-type amplification/resistance
+ *  family (#1320/#1340) uses the type's base icon plus an `amp` (up-arrow) or `resist` (shield)
+ *  badge. All badges are composited by `badge.py` so each badged variant is identical to its base
+ *  bar the badge. Only the obsolete `DropBonus` and the typed DoT accumulators (Bleed/Poison/Burn
+ *  DamagePerSecond, owned by the #1320 Area F UX work) have no art and degrade to an empty icon. */
 const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Strength]: 'Strength',
 	[EAttribute.Endurance]: 'Endurance',
@@ -47,7 +50,7 @@ const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.MaxHealth]: 'Max Health',
 	[EAttribute.Toughness]: 'Toughness',
 	[EAttribute.CooldownRecovery]: 'Cooldown Recovery',
-	[EAttribute.CriticalChanceMultiplier]: 'Critical Chance',
+	[EAttribute.CriticalChanceMultiplier]: 'Critical Chance Multiplier',
 	[EAttribute.CriticalDamage]: 'Critical Damage',
 	[EAttribute.DodgeChance]: 'Dodge Chance',
 	[EAttribute.HealthRegenPerSecond]: 'Health Regen Per Second',
