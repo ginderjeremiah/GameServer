@@ -93,17 +93,14 @@ namespace Game.Core.Battle
         /// mutating health: percentage resistance first (<c>dealt × (1 − Σ applies(type).Resistance)</c>,
         /// <b>unclamped</b> — a negative total amplifies as vulnerability, a total above <c>1</c> drives the
         /// result negative as absorption), then — only while the post-resistance damage is still positive — the
-        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + K·attackerLevel))</c>,
-        /// with <c>Toughness</c> <b>floored at 0</b> for this curve only (a debuff can strip mitigation down to
-        /// <c>0%</c>, never past it — below the floor the curve has a pole at <c>Toughness = −K·attackerLevel</c>
-        /// and inverts into amplification/healing beyond it; #1461). The toughness curve is a diminishing-returns
-        /// percentage: effective HP is linear in Toughness while the reduction asymptotes below <c>100%</c> (no
-        /// immunity), and <paramref name="attackerLevel"/> scales the denominator so the band stays stable as
-        /// content scales (spike #1330). The resistance sum is folded in the fixed
-        /// <see cref="DamageTypes.ResistanceAttributes"/> order for parity; with no resistance and no Toughness the
-        /// positive branch reduces to <c>dealt</c>. The whole stack is multiplicative — with Block's flat reduction
-        /// removed (spike #1330 Area B) there is no flat subtraction left, so the only path to a negative
-        /// (absorbing) result is a resistance above <c>1</c>, and no clamp is needed there.
+        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + K·attackerLevel))</c>.
+        /// The toughness curve is a diminishing-returns percentage: effective HP is linear in Toughness while the
+        /// reduction asymptotes below <c>100%</c> (no immunity), and <paramref name="attackerLevel"/> scales the
+        /// denominator so the band stays stable as content scales (spike #1330). The resistance sum is folded in
+        /// the fixed <see cref="DamageTypes.ResistanceAttributes"/> order for parity; with no resistance and no
+        /// Toughness the positive branch reduces to <c>dealt</c>. The whole stack is multiplicative — with Block's
+        /// flat reduction removed (spike #1330 Area B) there is no flat subtraction left, so the only path to a
+        /// negative (absorbing) result is a resistance above <c>1</c>, and no clamp is needed there.
         /// </summary>
         public double ComputeNetDamage(double dealt, EDamageType damageType, int attackerLevel)
         {
@@ -117,10 +114,9 @@ namespace Game.Core.Battle
 
             // Toughness mitigation: Toughness / (Toughness + K·attackerLevel) as a multiplier, so EHP is linear in
             // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
-            // K·attackerLevel keeps the band stable across content scaling. The curve is floored at Toughness = 0
-            // (a debuff can strip mitigation to 0%, never past its pole at -K·attackerLevel into amplification or a
-            // net heal — #1461). Both simulators must compute this expression identically for battle parity.
-            var toughness = Math.Max(_attributes[Toughness], 0);
+            // K·attackerLevel keeps the band stable across content scaling. Both simulators must compute this
+            // expression identically for battle parity.
+            var toughness = _attributes[Toughness];
             var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
             var toughnessReduction = toughness / (toughness + scaled);
 
