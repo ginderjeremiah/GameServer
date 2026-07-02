@@ -541,15 +541,15 @@ namespace Game.Core.Tests.Battle
                 // taken in lockstep on both sides, so these pin the player-only crit/dodge math and draw order
                 // while staying hand-computable.
 
-                // A forced crit (CriticalChance 1) multiplies the raw damage by CriticalDamage BEFORE mitigation.
-                // CriticalDamage is the base 1.5 (sourced by #799) plus a 0.5 allocation = 2.0 total: 20 raw × 2
-                // = 40/hit (the enemy has no Toughness), so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms
-                // (vs hit 5 / 2000ms at the un-critted 20/hit).
+                // A forced crit (the skill's own base CriticalChance 1) multiplies the raw damage by CriticalDamage
+                // BEFORE mitigation. CriticalDamage is the base 1.5 (sourced by #799) plus a 0.5 allocation = 2.0
+                // total: 20 raw × 2 = 40/hit (the enemy has no Toughness), so the 100-HP enemy dies on hit 3 at
+                // tick 30 → 1200ms (vs hit 5 / 2000ms at the un-critted 20/hit).
                 ["forcedCrit"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
-                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)],
-                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, criticalChance: 1)],
+                        extra: [(EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
@@ -581,10 +581,10 @@ namespace Game.Core.Tests.Battle
                         strength: 10, endurance: 0,
                         skills:
                         [
-                            MakeSkill(1, baseDamage: 10, cooldownMs: 400),
-                            MakeSkill(2, baseDamage: 15, cooldownMs: 400),
+                            MakeSkill(1, baseDamage: 10, cooldownMs: 400, criticalChance: 1),
+                            MakeSkill(2, baseDamage: 15, cooldownMs: 400, criticalChance: 1),
                         ],
-                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
+                        extra: [(EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(
                         strength: 10, endurance: 0,
                         skills:
@@ -606,15 +606,35 @@ namespace Game.Core.Tests.Battle
                         skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)]),
                     Enemy: () => MakeEnemy(
                         strength: 10, endurance: 0,
-                        skills: [MakeSkill(2, baseDamage: 20, cooldownMs: 400)],
-                        extra:
-                        [
-                            (EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 2.0),
-                            (EAttribute.DodgeChance, 1.0),
-                        ]),
+                        skills: [MakeSkill(2, baseDamage: 20, cooldownMs: 400, criticalChance: 1)],
+                        extra: [(EAttribute.CriticalDamage, 2.0), (EAttribute.DodgeChance, 1.0)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2000),
+
+                // ── The Cull execute overlay (#1430) ──────────────────────────────────────────
+                // A committed ExecuteBonus (1.0 = up to +100% at 0 target health) scales each fire's raw damage
+                // by (1 + ExecuteBonus × missingHpFraction), sampled once per fire off the target's health
+                // BEFORE that hit — a genuinely new damage-calc conditional (unlike Hex/Momentum/Sunder, which
+                // train off the existing resistance/amplification/toughness pipeline and never alter real
+                // damage). Both simulators must compute the accelerating multiplier identically as the target's
+                // missing-health fraction grows hit over hit.
+
+                // Player 20 raw/hit (no crit, no Toughness either side), 100-HP enemy:
+                //   Hit1 (tick 10): target full HP, mult 1.0 → 20 dealt, 80 remaining.
+                //   Hit2 (tick 20): missing 20/100=0.2 → mult 1.2 → 24 dealt, 56 remaining.
+                //   Hit3 (tick 30): missing 44/100=0.44 → mult 1.44 → 28.8 dealt, 27.2 remaining.
+                //   Hit4 (tick 40): missing 72.8/100=0.728 → mult 1.728 → 34.56 dealt ≥ 27.2 remaining → dies at
+                //   1600ms (vs hit 5 / 2000ms at a flat, un-executed 20/hit).
+                ["forcedExecute"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)],
+                        extra: [(EAttribute.ExecuteBonus, 1.0)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
 
                 // ── Deterministic damage reflection (spike #1330) ────────────────────────────
                 // Reflection returns the defender's DamageReflection share of a direct hit's net damage to the
@@ -664,8 +684,8 @@ namespace Game.Core.Tests.Battle
                 ["drawOrderDodgeOnlyAlignsCrit"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
-                        skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400)],
-                        extra: [(EAttribute.CriticalChance, 0.5), (EAttribute.CriticalDamage, 0.5)]),
+                        skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400, criticalChance: 0.5)],
+                        extra: [(EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(
                         strength: 6, endurance: 0,
                         skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 400)]),
@@ -686,8 +706,8 @@ namespace Game.Core.Tests.Battle
                 ["fractionalCritChance"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,
-                        skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400)],
-                        extra: [(EAttribute.CriticalChance, 0.5), (EAttribute.CriticalDamage, 0.5)]),
+                        skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400, criticalChance: 0.5)],
+                        extra: [(EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
@@ -848,8 +868,8 @@ namespace Game.Core.Tests.Battle
                 ["critPunchesThroughTyped"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,
-                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire)],
-                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, damageType: EDamageType.Fire, criticalChance: 1)],
+                        extra: [(EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(
                         strength: 0, endurance: 0, skills: [],
                         extra: [(EAttribute.Toughness, 20.0), (EAttribute.FireResistance, 0.5)]),
@@ -1037,8 +1057,8 @@ namespace Game.Core.Tests.Battle
                     Player: () => MakeBattler(
                         strength: 0, endurance: 0,
                         skills: [MakeMultiTypeSkill(1, baseDamage: 20, cooldownMs: 400,
-                            [(EDamageType.Physical, 50), (EDamageType.Fire, 50)])],
-                        extra: [(EAttribute.CriticalChance, 1.0), (EAttribute.CriticalDamage, 0.5)]),
+                            [(EDamageType.Physical, 50), (EDamageType.Fire, 50)], criticalChance: 1)],
+                        extra: [(EAttribute.CriticalDamage, 0.5)]),
                     Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
@@ -1248,7 +1268,8 @@ namespace Game.Core.Tests.Battle
             int id, double baseDamage, int cooldownMs,
             EAttribute? mult = null, double multAmount = 0,
             List<SkillEffect>? effects = null,
-            EDamageType damageType = EDamageType.Physical) => new()
+            EDamageType damageType = EDamageType.Physical,
+            double criticalChance = 0) => new()
             {
                 Id = id,
                 Name = $"Skill {id}",
@@ -1256,6 +1277,7 @@ namespace Game.Core.Tests.Battle
                 DamagePortions = [new SkillDamagePortion { Type = damageType, Weight = 1.0 }],
                 CooldownMs = cooldownMs,
                 BaseDamage = baseDamage,
+                CriticalChance = criticalChance,
                 DamageMultipliers = mult is null
                     ? []
                     :
@@ -1274,7 +1296,8 @@ namespace Game.Core.Tests.Battle
         /// normalized at fire time (<c>raw × weight ÷ Σweights</c>), so they need not sum to 1.
         /// </summary>
         private static Skill MakeMultiTypeSkill(
-            int id, double baseDamage, int cooldownMs, (EDamageType Type, double Weight)[] portions) => new()
+            int id, double baseDamage, int cooldownMs, (EDamageType Type, double Weight)[] portions,
+            double criticalChance = 0) => new()
             {
                 Id = id,
                 Name = $"Skill {id}",
@@ -1282,6 +1305,7 @@ namespace Game.Core.Tests.Battle
                 DamagePortions = portions.Select(p => new SkillDamagePortion { Type = p.Type, Weight = p.Weight }).ToList(),
                 CooldownMs = cooldownMs,
                 BaseDamage = baseDamage,
+                CriticalChance = criticalChance,
                 DamageMultipliers = [],
                 Effects = [],
             };

@@ -33,6 +33,8 @@ export enum EActivityKey {
 	Dagger = 28,
 	Unarmed = 29,
 	Hex = 30,
+	Momentum = 31,
+	Cull = 32,
 }
 
 export enum EAttribute {
@@ -47,7 +49,7 @@ export enum EAttribute {
 	CooldownRecovery = 8,
 	/** @deprecated Drop system has been replaced by challenge-based unlocks. */
 	DropBonus = 9,
-	CriticalChance = 10,
+	CriticalChanceMultiplier = 10,
 	CriticalDamage = 11,
 	DodgeChance = 12,
 	BleedDamagePerSecond = 15,
@@ -81,6 +83,7 @@ export enum EAttribute {
 	DaggerAmplification = 43,
 	UnarmedAmplification = 44,
 	DamageReflection = 45,
+	ExecuteBonus = 46,
 }
 
 export enum EAttributeModifierSource {
@@ -116,6 +119,7 @@ export enum EChallengeType {
 	DamageDealt = 6,
 	BattlesWon = 7,
 	SkillsUsed = 8,
+	KillsByDamageType = 9,
 }
 
 export enum EChangeType {
@@ -176,6 +180,7 @@ export enum EEntityType {
 	Enemy = 1,
 	Zone = 2,
 	Skill = 3,
+	DamageType = 4,
 }
 
 export enum EEquipmentSlot {
@@ -260,4 +265,5 @@ export enum EStatisticType {
 	CriticalDamageDealt = 17,
 	AttacksDodged = 18,
 	DamageDodged = 19,
+	KillsByDamageType = 22,
 }

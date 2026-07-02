@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EChangeType, EDamageType, EItemCategory, ERarity } from '$lib/api';
-import { isWeaponLeaf } from '$lib/battle/damage-types';
 import type { FieldsSectionConfig } from '$routes/admin/workbench/entities/types';
 
-/* Item config transforms specific to the WeaponType field (#1372): the `newItem` default, the no-stranding
-   validation warning (a weapon needs both a weapon type and a granted skill; only a weapon may carry a type),
-   the weapon-leaf-constrained picker, and the persist normalisation of the "None" sentinel (-1) ↔ undefined.
-   `fetchSocketData`/`ApiRequest` are stubbed; the real `persistEntity` orchestration runs unmocked. */
+/* Item config transforms specific to the WeaponType field (#1372, relaxed to any leaf by #1456): the
+   `newItem` default, the no-stranding validation warning (a weapon needs both a weapon type and a granted
+   skill; only a weapon may carry a type), the any-leaf picker, and the persist normalisation of the "None"
+   sentinel (-1) ↔ undefined. `fetchSocketData`/`ApiRequest` are stubbed; the real `persistEntity`
+   orchestration runs unmocked. */
 
 const { staticData, socket, mockPost, mockFetch } = vi.hoisted(() => {
 	const socket = { items: [] as unknown[] };
@@ -95,17 +95,16 @@ describe('itemEntity weapon type', () => {
 		expect(identityWarn(itemEntity.newItem(1))).toBeNull();
 	});
 
-	it('weaponTypeOptions offers None plus exactly the weapon-leaf types', () => {
+	it('weaponTypeOptions offers None plus every damage-type leaf, martial or caster', () => {
 		const options = reference.weaponTypeOptions();
 		expect(options[0]).toEqual({ value: -1, text: 'None' });
 
 		const offered = options.slice(1).map((o) => o.value);
 		expect(offered).toContain(EDamageType.Sword);
 		expect(offered).toContain(EDamageType.Unarmed);
-		// Generic Physical and the elementals are not weapon leaves, so they are never offered.
-		expect(offered).not.toContain(EDamageType.Physical);
-		expect(offered).not.toContain(EDamageType.Fire);
-		expect(offered.every((v) => isWeaponLeaf(v as EDamageType))).toBe(true);
+		// A caster weapon declares its element directly — Physical and the elementals are offered too.
+		expect(offered).toContain(EDamageType.Physical);
+		expect(offered).toContain(EDamageType.Fire);
 	});
 
 	it('persist sends a weapon type through and maps the None sentinel back to undefined', async () => {

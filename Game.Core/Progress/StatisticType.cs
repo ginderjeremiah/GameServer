@@ -88,6 +88,7 @@ namespace Game.Core.Progress
                 // PlayerProgress.RecordBattleCompleted, so its declared breakdown is by enemy.
                 FastestVictory => Enemy,
                 SkillsUsed => Skill,
+                KillsByDamageType => DamageType,
                 _ => None
             };
         }

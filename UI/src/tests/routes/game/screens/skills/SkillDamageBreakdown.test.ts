@@ -12,15 +12,17 @@ vi.mock('$stores', () => ({ staticData }));
 import SkillDamageBreakdown from '$routes/game/screens/skills/SkillDamageBreakdown.svelte';
 import type { SkillMetrics, SkillsView } from '$routes/game/screens/skills/skills-view.svelte';
 
-// CriticalChance is flagged `isPercentage` so the chance renders as e.g. `50%`.
+// CriticalChanceMultiplier is flagged `isPercentage`, reused for the per-skill crit chance's display
+// formatting, so the chance renders as e.g. `50%`.
 staticData.attributes = [
-	{ id: EAttribute.CriticalChance, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
+	{ id: EAttribute.CriticalChanceMultiplier, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
 ] as unknown as IAttribute[];
 
 const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	id: 0,
 	name: 'Cleave',
 	baseDamage: 50,
+	criticalChance: 0,
 	damageMultipliers: [],
 	effects: [],
 	description: '',
@@ -36,18 +38,20 @@ const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
 	...over
 });
 
+// The per-skill crit chance now rides SkillMetrics (#1453) rather than a page-wide SkillsView value.
 const stubMetrics = (over: Partial<SkillMetrics> = {}): SkillMetrics => ({
 	skill: stubSkill(),
 	rawDamage: 50,
 	cooldown: 1,
 	contributions: [],
+	critChance: 0.5,
+	critMultiplier: 1.5,
 	...over
 });
 
 // Only the members the component reads are stubbed; the per-skill reads ignore the id (one skill here).
 function stubView(over: Partial<Record<string, unknown>> = {}): SkillsView {
 	return {
-		critChance: 0.5,
 		critDamage: 2,
 		critBonus: () => 25,
 		mitigatedAmount: () => 5,
@@ -64,14 +68,14 @@ describe('SkillDamageBreakdown — critical row', () => {
 		const crit = container.querySelector('.brk-line.crit') as HTMLElement;
 		expect(crit).not.toBeNull();
 		expect(crit.textContent).toContain('Critical');
-		expect(crit.textContent).toContain('50%'); // crit chance (isPercentage)
+		expect(crit.textContent).toContain('50%'); // this skill's own crit chance (isPercentage)
 		expect(crit.textContent).toContain('×2'); // crit damage multiplier
 		expect(crit.textContent).toContain('+25'); // expected crit bonus
 	});
 
-	it('omits the Critical row when the player has no crit chance', () => {
+	it('omits the Critical row when the skill has no crit chance', () => {
 		const { container } = render(SkillDamageBreakdown, {
-			props: { view: stubView({ critChance: 0, critBonus: () => 0 }), metrics: stubMetrics() }
+			props: { view: stubView({ critBonus: () => 0 }), metrics: stubMetrics({ critChance: 0, critMultiplier: 1 }) }
 		});
 		expect(container.querySelector('.brk-line.crit')).toBeNull();
 		// The Toughness-mitigation and effective-hit lines still render.

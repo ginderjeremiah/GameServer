@@ -1120,6 +1120,7 @@ namespace Game.Core.Tests.Players
             Id = id,
             Name = $"Skill {id}",
             BaseDamage = 10,
+            CriticalChance = 0,
             Description = string.Empty,
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = 1000,

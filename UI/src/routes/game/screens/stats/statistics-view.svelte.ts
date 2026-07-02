@@ -63,8 +63,10 @@ interface StatPresentation {
 	cat: StatCategory;
 }
 
-/** The presentation catalogue, ordered for the category-tab grouping. Covers
- *  every EStatisticType; the entity breakdown (kind) + name come from the server. */
+/** The presentation catalogue, ordered for the category-tab grouping. Covers every
+ *  EStatisticType with a dossier-navigable (or global) breakdown; the entity breakdown
+ *  (kind) + name come from the server. KillsByDamageType (#1455) is deliberately absent —
+ *  see KIND_BY_ENTITY_TYPE. */
 const STAT_PRESENTATION: StatPresentation[] = [
 	// Combat
 	{ id: EStatisticType.EnemiesKilled, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
@@ -91,12 +93,17 @@ const STAT_PRESENTATION: StatPresentation[] = [
 	{ id: EStatisticType.FastestVictory, unit: 'time', agg: 'min', comp: 'AtMost', cat: 'time' }
 ];
 
-/** Maps the backend's entity type onto the screen's entity-kind discriminator. */
+/** Maps the backend's entity type onto the screen's entity-kind discriminator.
+ *  DamageType (#1455) has no dossier to pivot into yet — its statistic (KillsByDamageType)
+ *  backs "kill N with <type>" challenges but is deliberately absent from STAT_PRESENTATION
+ *  below, so it's simply not shown on this screen (a per-damage-type breakdown card is a
+ *  reasonable follow-up, not required for the challenge-backing feature itself). */
 const KIND_BY_ENTITY_TYPE: Record<EEntityType, StatKind> = {
 	[EEntityType.None]: 'none',
 	[EEntityType.Enemy]: 'enemy',
 	[EEntityType.Zone]: 'zone',
-	[EEntityType.Skill]: 'skill'
+	[EEntityType.Skill]: 'skill',
+	[EEntityType.DamageType]: 'none'
 };
 
 /** Builds the statistic-type catalogue by merging the frontend presentation

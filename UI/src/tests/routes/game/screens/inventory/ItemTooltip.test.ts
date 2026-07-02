@@ -71,6 +71,7 @@ const skill = (id: number, name: string): ISkill => ({
 	id,
 	name,
 	baseDamage: 0,
+	criticalChance: 0,
 	damageMultipliers: [],
 	effects: [],
 	description: '',

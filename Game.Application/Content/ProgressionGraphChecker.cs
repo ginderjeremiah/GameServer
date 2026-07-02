@@ -1,5 +1,6 @@
 using Game.Core;
 using Game.Core.Attributes;
+using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Application.Content
@@ -111,6 +112,13 @@ namespace Game.Application.Content
             {
                 foreach (var challenge in Live(_graph.Challenges, c => c.RetiredAt))
                 {
+                    // A KillsByDamageType challenge with no target can never track progress — the statistic
+                    // writes only per-damage-type-key rows, no global row (#1455).
+                    if (challenge.ChallengeTypeId == EChallengeType.KillsByDamageType && challenge.TargetEntityId is null)
+                    {
+                        Error("ChallengeTarget", "Challenge", challenge.Id, "is a KillsByDamageType challenge with no target damage-type key, so it can never track progress.");
+                    }
+
                     // A challenge whose completion target is retired can never be completed (unreachable content);
                     // a missing target id is a dangling reference (a genuine break).
                     if (challenge.TargetEntityId is int targetId)
@@ -125,6 +133,14 @@ namespace Game.Application.Content
                                 break;
                             case EEntityType.Skill:
                                 CheckRef("ChallengeTarget", "Challenge", challenge.Id, _skillRetire, "skill", targetId, ContentGraphSeverity.Error, ContentGraphSeverity.Warning);
+                                break;
+                            case EEntityType.DamageType:
+                                // Not a DB reference table — a fixed intrinsic enum, like Item.WeaponType — so
+                                // validity is a structural enum-membership check, not a retirement lookup.
+                                if (!Enum.IsDefined(typeof(EDamageTypeKey), targetId))
+                                {
+                                    Error("ChallengeTarget", "Challenge", challenge.Id, $"targets damage-type key {targetId}, which is not a defined EDamageTypeKey.");
+                                }
                                 break;
                             case EEntityType.None:
                                 break;
@@ -222,11 +238,12 @@ namespace Game.Application.Content
             {
                 if (item.ItemCategoryId == EItemCategory.Weapon)
                 {
-                    // Every weapon must bring a signature attack of its own weapon-leaf type, or it strands the
-                    // player with no usable skill once the weapon-match gate dims mismatched selected skills.
-                    if (item.WeaponType is not EDamageType weaponType || !DamageTypes.IsWeaponLeaf(weaponType))
+                    // Every weapon must declare a WeaponType (any damage-type leaf — a caster weapon declares
+                    // its element) and bring a signature attack fieldable with it, or it strands the player
+                    // once the weapon-match gate dims mismatched selected skills (the signature check is below).
+                    if (item.WeaponType is not EDamageType weaponType || !Enum.IsDefined(weaponType))
                     {
-                        Error("WeaponStranding", "Item", item.Id, "is a weapon but does not declare a weapon-leaf WeaponType.");
+                        Error("WeaponStranding", "Item", item.Id, "is a weapon but does not declare a valid WeaponType.");
                     }
 
                     if (item.GrantedSkillId is null)
@@ -242,45 +259,24 @@ namespace Game.Application.Content
 
             private void CheckWeaponSignatureType(Contracts.Item item, int grantedSkillId)
             {
-                // A weapon's signature must actually fire with that weapon. The weapon-match gate dims a skill
-                // whose type is a weapon leaf other than the equipped weapon's, so a weapon granting a signature
-                // of a different weapon leaf strands the player exactly as a missing signature would — and the
-                // type lives on the granted Skill record, out of a per-item save's reach.
+                // A weapon's signature must actually fire with that weapon. The weapon-match gate dims a
+                // martial (weapon-leaf) skill whose type doesn't match the equipped weapon, so a weapon
+                // granting a mismatched martial signature strands the player exactly as a missing signature
+                // would; a non-martial signature (elemental/DoT/caster) is never gated and always qualifies —
+                // and the type lives on the granted Skill record, out of a per-item save's reach.
                 if (item.ItemCategoryId != EItemCategory.Weapon
                     || item.WeaponType is not EDamageType weaponType
-                    || !DamageTypes.IsWeaponLeaf(weaponType)
                     || !_skills.TryGetValue(grantedSkillId, out var skill)
                     || skill.RetiredAt is not null)
                 {
                     return;
                 }
 
-                var signatureType = PrimaryDamageType(skill);
+                var signatureType = PrimaryDamageTypeResolver.Resolve(skill.DamagePortions.ToList(), p => p.Weight, p => p.Type);
                 if (DamageTypes.IsWeaponLeaf(signatureType) && signatureType != weaponType)
                 {
                     Error("WeaponStranding", "Item", item.Id, $"grants signature skill {grantedSkillId} of weapon type {signatureType}, which the equipped {weaponType} weapon dims — the weapon fields no usable signature.");
                 }
-            }
-
-            // Mirrors Game.Core.Skills.Skill.PrimaryDamageType over the read contract: highest-weight portion,
-            // first-authored on a tie, Physical for an empty split.
-            private static EDamageType PrimaryDamageType(Contracts.Skill skill)
-            {
-                var portions = skill.DamagePortions.ToList();
-                if (portions.Count == 0)
-                {
-                    return EDamageType.Physical;
-                }
-
-                var primary = portions[0];
-                foreach (var portion in portions)
-                {
-                    if (portion.Weight > primary.Weight)
-                    {
-                        primary = portion;
-                    }
-                }
-                return primary.Type;
             }
 
             private void CheckProficiencyGate(Contracts.Item item, int proficiencyId)

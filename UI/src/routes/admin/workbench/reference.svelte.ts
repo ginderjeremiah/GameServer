@@ -2,6 +2,7 @@ import {
 	ApiRequest,
 	EAttribute,
 	EDamageType,
+	EDamageTypeKey,
 	EEntityType,
 	EEquipmentSlot,
 	EItemCategory,
@@ -18,7 +19,6 @@ import {
 	type ITagCategory
 } from '$lib/api';
 import { enumPairs, hasFlag, rarityColor as rarityVar, rarityLabel, tagColor } from '$lib/common';
-import { isWeaponLeaf } from '$lib/battle/damage-types';
 import { staticData } from '$stores';
 import type { SelectOption } from './entities/types';
 
@@ -27,6 +27,10 @@ const toOptions = (pairs: { id: number; name: string }[]): SelectOption[] =>
 
 /** A zero-based-id reference record that can be retired (kept at its slot, resolvable by id). */
 type RetireableRef = { id: number; name: string; retiredAt?: string | null };
+
+/** Synthetic, never-retired refs for the fixed EDamageTypeKey enum — the EEntityType.DamageType
+ *  dimension has no DB reference table to load, so its "records" are just the enum itself. */
+const damageTypeKeyRefs: RetireableRef[] = enumPairs(EDamageTypeKey);
 
 /**
  * Loads and exposes the reference data the workbench's select options, tag UI,
@@ -117,14 +121,12 @@ class WorkbenchReference {
 	/** Leaf damage-type picker options (the eight EDamageType leaf types) for the skill editor. */
 	damageTypeOptions = (): SelectOption[] => toOptions(enumPairs(EDamageType));
 	/**
-	 * Item weapon-type picker options: a "None" sentinel (-1) plus the weapon-leaf damage types
-	 * (Sword/Axe/Bow/Club/Dagger/Unarmed). Constrained to weapon leaves — a weapon's WeaponType must be one of
-	 * these and is required (with a granted skill); the backend enforces both on save as anti-tamper.
+	 * Item weapon-type picker options: a "None" sentinel (-1) plus every damage-type leaf — any leaf is a
+	 * valid WeaponType, so a caster weapon can declare its element (e.g. Fire) rather than a martial leaf. A
+	 * weapon's WeaponType is required (with a granted skill); the backend enforces both on save as anti-tamper,
+	 * along with the granted skill's own type being fieldable with this weapon.
 	 */
-	weaponTypeOptions = (): SelectOption[] => [
-		{ value: -1, text: 'None' },
-		...toOptions(enumPairs(EDamageType).filter((p) => isWeaponLeaf(p.id as EDamageType)))
-	];
+	weaponTypeOptions = (): SelectOption[] => [{ value: -1, text: 'None' }, ...toOptions(enumPairs(EDamageType))];
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
 	skillEffectTargetOptions = (): SelectOption[] => toOptions(enumPairs(ESkillEffectTarget));
 	modifierTypeOptions = (): SelectOption[] => toOptions(enumPairs(EModifierType));
@@ -226,6 +228,8 @@ class WorkbenchReference {
 				return staticData.zones;
 			case EEntityType.Skill:
 				return staticData.skills;
+			case EEntityType.DamageType:
+				return damageTypeKeyRefs;
 			default:
 				return undefined;
 		}

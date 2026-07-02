@@ -21,6 +21,7 @@ const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISki
 	id,
 	name: `Skill ${id}`,
 	baseDamage,
+	criticalChance: 0,
 	damageMultipliers: [],
 	effects: [],
 	description: '',

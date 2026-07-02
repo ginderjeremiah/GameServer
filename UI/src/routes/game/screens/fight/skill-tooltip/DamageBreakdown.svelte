@@ -16,7 +16,7 @@
 	{#if crit}
 		<div class="tt-dmg-row">
 			<span class="tt-dmg-label">
-				<AttributeIcon id={EAttribute.CriticalChance} size={13} />
+				<AttributeIcon id={EAttribute.CriticalChanceMultiplier} size={13} />
 				Critical
 				<span class="tt-mult-dim">{crit.chance} · ×{formatNum(crit.damage)}</span>
 			</span>

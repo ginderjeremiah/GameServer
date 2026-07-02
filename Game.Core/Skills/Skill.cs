@@ -19,6 +19,16 @@
         public required int CooldownMs { get; init; }
 
         /// <summary>
+        /// This skill's own base critical-hit chance — a decimal probability (0.05 = 5%) compared, after
+        /// scaling by the attacking battler's <see cref="EAttribute.CriticalChanceMultiplier"/>, directly
+        /// against the battle RNG draw (<see cref="Battle.BattleContext.DamageTarget"/>). The per-skill opt-in
+        /// enabler the crit rework (#1425) anticipated but never wired up (#1453): <c>0</c> by default, so an
+        /// unauthored skill never crits regardless of the multiplier, making crit a committed identity of the
+        /// specific skill rather than a build-wide stat.
+        /// </summary>
+        public required double CriticalChance { get; init; }
+
+        /// <summary>
         /// The weighted leaf-type split this skill's direct hits deal (spike #1343). A hit's raw damage is
         /// split across these portions by weight; each portion runs the single-type pipeline under its own
         /// type. A single-portion skill is byte-for-byte the pre-feature single-typed hit. The direct-hit
@@ -35,29 +45,11 @@
         /// highest-weight portion, the first in authored order on a tie. Falls back to
         /// <see cref="EDamageType.Physical"/> for a malformed skill carrying no portions, so a display read
         /// never throws. The direct-hit pipeline reads the full <see cref="DamagePortions"/> split, not this
-        /// single primary type.
+        /// single primary type. Resolved by the shared <see cref="PrimaryDamageTypeResolver"/> — also used by
+        /// the read-contract and persisted-entity mirrors of this accessor.
         /// </summary>
-        public EDamageType PrimaryDamageType
-        {
-            get
-            {
-                // Index loop with a strict '>' so the first portion wins a weight tie (first-authored), and so
-                // the read allocates nothing on the per-fire hot path.
-                if (DamagePortions.Count == 0)
-                {
-                    return EDamageType.Physical;
-                }
-                var primary = DamagePortions[0];
-                for (var i = 1; i < DamagePortions.Count; i++)
-                {
-                    if (DamagePortions[i].Weight > primary.Weight)
-                    {
-                        primary = DamagePortions[i];
-                    }
-                }
-                return primary.Type;
-            }
-        }
+        public EDamageType PrimaryDamageType =>
+            PrimaryDamageTypeResolver.Resolve(DamagePortions, p => p.Weight, p => p.Type);
 
         public required IReadOnlyList<DamageMultiplier> DamageMultipliers { get; init; }
 

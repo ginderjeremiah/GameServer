@@ -31,7 +31,7 @@ namespace Game.Core.Battle
                 // skill's weighted damage portions, #1343), so per-skill stats reconcile with the global stats
                 // (which DamageTarget also books) rather than the raw pre-mitigation value. Recording therefore
                 // has to follow the hit, not precede it.
-                var actualDamage = context.DamageTarget(damage, Skill.DamagePortions);
+                var actualDamage = context.DamageTarget(damage, Skill.DamagePortions, Skill.CriticalChance);
                 context.RecordSkillUse(Skill.Id, actualDamage);
                 ApplyEffects(context);
             }

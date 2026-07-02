@@ -117,7 +117,7 @@ describe('attributeIcon', () => {
 		expect(attributeIcon(EAttribute.MaxHealth)).toBe('/img/Max Health.png');
 		expect(attributeIcon(EAttribute.CooldownRecovery)).toBe('/img/Cooldown Recovery.png');
 		expect(attributeIcon(EAttribute.HealthRegenPerSecond)).toBe('/img/Health Regen Per Second.png');
-		expect(attributeIcon(EAttribute.CriticalChance)).toBe('/img/Critical Chance.png');
+		expect(attributeIcon(EAttribute.CriticalChanceMultiplier)).toBe('/img/Critical Chance Multiplier.png');
 	});
 
 	it('maps every attribute with art to a non-empty path', () => {
@@ -131,7 +131,7 @@ describe('attributeIcon', () => {
 			EAttribute.MaxHealth,
 			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
-			EAttribute.CriticalChance,
+			EAttribute.CriticalChanceMultiplier,
 			EAttribute.CriticalDamage,
 			EAttribute.DodgeChance,
 			EAttribute.HealthRegenPerSecond,

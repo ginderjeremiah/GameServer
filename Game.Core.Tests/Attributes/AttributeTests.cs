@@ -10,7 +10,7 @@ namespace Game.Core.Tests.Attributes
         [InlineData(EAttribute.Strength, "Strength")]
         [InlineData(EAttribute.MaxHealth, "Max Health")]
         [InlineData(EAttribute.CooldownRecovery, "Cooldown Recovery")]
-        [InlineData(EAttribute.CriticalChance, "Critical Chance")]
+        [InlineData(EAttribute.CriticalChanceMultiplier, "Critical Chance Multiplier")]
         public void Constructor_SetsIdAndHumanReadableName(EAttribute id, string expectedName)
         {
             var attribute = new Attribute(id);
@@ -133,7 +133,7 @@ namespace Game.Core.Tests.Attributes
 
         [Theory]
         [InlineData(EAttribute.CooldownRecovery, true, 0)]
-        [InlineData(EAttribute.CriticalChance, true, 0)]
+        [InlineData(EAttribute.CriticalChanceMultiplier, true, 0)]
         [InlineData(EAttribute.DodgeChance, true, 0)]
         [InlineData(EAttribute.DamageReflection, true, 0)]
         [InlineData(EAttribute.Strength, false, 0)]

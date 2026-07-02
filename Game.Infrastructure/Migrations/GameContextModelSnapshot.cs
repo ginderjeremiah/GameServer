@@ -129,8 +129,8 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 10,
-                            Description = "The percentage chance for an attack to deal increased damage.",
-                            Name = "Critical Chance"
+                            Description = "A multiplier applied to a skill's own base critical-hit chance.",
+                            Name = "Critical Chance Multiplier"
                         },
                         new
                         {
@@ -329,6 +329,12 @@ namespace Game.Infrastructure.Migrations
                             Id = 45,
                             Description = "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
                             Name = "Damage Reflection"
+                        },
+                        new
+                        {
+                            Id = 46,
+                            Description = "The maximum percentage of bonus damage dealt against a target, scaled by how much health it is missing.",
+                            Name = "Execute Bonus"
                         });
                 });
 
@@ -508,6 +514,12 @@ namespace Game.Infrastructure.Migrations
                             Id = 8,
                             Name = "Skills Used",
                             StatisticTypeId = 14
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Name = "Kills By Damage Type",
+                            StatisticTypeId = 22
                         });
                 });
 
@@ -1534,6 +1546,10 @@ namespace Game.Infrastructure.Migrations
                     b.Property<int>("CooldownMs")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("CriticalChance")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1853,6 +1869,12 @@ namespace Game.Infrastructure.Migrations
                             Id = 19,
                             EntityType = 0,
                             Name = "Damage Dodged"
+                        },
+                        new
+                        {
+                            Id = 22,
+                            EntityType = 4,
+                            Name = "Kills By Damage Type"
                         });
                 });
 

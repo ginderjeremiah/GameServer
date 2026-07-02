@@ -568,43 +568,17 @@ namespace Game.Core.Tests.Battle.Offline
         private static Scenario CoinFlipBossScenario() => new()
         {
             Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: 7, bossLevel: 1),
-            // Crit is opt-in (crit rework #1425): crit chance comes from an equipped enabler item (0.3),
-            // not from attributes. Luck 100 still drives the 1.75x crit multiplier (CriticalDamage keeps its
-            // Luck derivation), and Dexterity 100 preserves the CooldownRecovery that sets the ~4-fire cadence
-            // — so the fight tuning and its outcome mix are identical to the pre-rework attribute-derived setup.
-            Snapshot = PlayerSnapshot(
-                strength: 50, endurance: 10, dexterity: 100, luck: 100,
-                equippedItems: [new EquippedItemSnapshot { ItemId = CritEnablerItemId, AppliedModIds = [] }]),
+            // Crit is a per-skill opt-in enabler (crit rework #1425, per-skill base #1453): the fired skill's own
+            // CriticalChance (0.3, on SlowHeavySkill below) is the enabler, scaled by the base-1
+            // CriticalChanceMultiplier (untouched here). Luck 100 still drives the 1.75x crit multiplier
+            // (CriticalDamage keeps its Luck derivation), and Dexterity 100 preserves the CooldownRecovery that
+            // sets the ~4-fire cadence — so the fight tuning and its outcome mix are identical to the pre-#1453
+            // gear-derived setup.
+            Snapshot = PlayerSnapshot(strength: 50, endurance: 10, dexterity: 100, luck: 100),
             // A long cooldown → only ~4 fires across the 120s cap, so crit count (and thus the outcome)
             // swings battle to battle.
             ResolveSkill = id => id == 0 ? SlowHeavySkill() : null,
             ResolveEnemy = level => CoinFlipBoss(level),
-            ResolveItem = id => id == CritEnablerItemId ? CritEnablerItem() : ThrowItem(id),
-        };
-
-        private const int CritEnablerItemId = 0;
-
-        // A flat crit-chance enabler item. Since crit chance has no attribute base (crit rework #1425), the
-        // coin-flip fixture opts in through gear rather than deriving crit from Dexterity/Luck; 0.3 reproduces
-        // the ~30% chance the old derivation produced from DEX 100 / LUK 100.
-        private static Item CritEnablerItem() => new()
-        {
-            Id = CritEnablerItemId,
-            Name = "Keen Charm",
-            Description = string.Empty,
-            Category = EItemCategory.Accessory,
-            Rarity = ERarity.Common,
-            Attributes =
-            [
-                new AttributeModifier
-                {
-                    Attribute = CriticalChance,
-                    Amount = 0.3,
-                    Type = EModifierType.Additive,
-                    Source = EAttributeModifierSource.Item,
-                },
-            ],
-            ModSlots = [],
         };
 
         // ── Builders ─────────────────────────────────────────────────────────
@@ -728,12 +702,14 @@ namespace Game.Core.Tests.Battle.Offline
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = 1000,
             BaseDamage = 10,
+            CriticalChance = 0,
             DamageMultipliers = [new DamageMultiplier { Attribute = Strength, Amount = 1.0 }],
             Effects = [],
         };
 
         // A high-cooldown variant of the player's attack: it fires only a few times across the battle cap,
-        // so the count of crits among those fires (and thus the outcome) swings with each battle's seed.
+        // so the count of crits among those fires (and thus the outcome) swings with each battle's seed. Its own
+        // CriticalChance (0.3) is the per-skill opt-in enabler the coin-flip fixture relies on (#1453).
         private static Skill SlowHeavySkill() => new()
         {
             Id = 0,
@@ -742,6 +718,7 @@ namespace Game.Core.Tests.Battle.Offline
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = 30_000,
             BaseDamage = 10,
+            CriticalChance = 0.3,
             DamageMultipliers = [new DamageMultiplier { Attribute = Strength, Amount = 1.0 }],
             Effects = [],
         };
@@ -773,6 +750,7 @@ namespace Game.Core.Tests.Battle.Offline
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = 1500,
             BaseDamage = 5,
+            CriticalChance = 0,
             DamageMultipliers = [],
             Effects = [],
         };

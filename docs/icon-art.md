@@ -324,12 +324,13 @@ sentence to force small-size legibility, in place of the gear closing sentence:
 | `Damage Taken Per Second.png` | Two blood droplets — one large dominant teardrop with a small highlight, plus a second much smaller drop beside/below it. Deep red. Fills most of the frame. | Two-drop motif separates it from the single Max Health heart. |
 | `Health Regen Per Second.png` | A single heart with a small upward arrow and a tiny sparkle above it. A fresh healing **green** heart (not red). | **Magenta backdrop** (green subject), `--bg-hue 300`. |
 
-### Crit / dodge (issue #801; Block retired #1378)
+### Crit / dodge (issue #801; Block retired #1378; multiplier badge #1465)
 
 The player crit/dodge attributes (the #178 spike) share a small **visual language**: each
 family has **one clean base symbol**; the _magnitude_ attribute uses the clean symbol
-unchanged, and the _chance_ attribute reuses it with a **composited `%` badge** in the
-lower-right corner:
+unchanged, and an attribute that **scales** something else reuses it with a composited badge
+in the lower-right corner — a `%` badge for a genuine probability, a `×` badge (#1465) for a
+base-1 multiplier:
 
 - **Crit** — an explosive impact burst (white-hot core, jagged shockwave rays).
 - **Dodge** — a cool blue-grey humanoid silhouette mid-sidestep with two faded **phantom
@@ -351,20 +352,34 @@ attributes they use the locked STYLE **minus** the metal/leather palette sentenc
 | crit | A single bold explosive critical-hit impact burst - a sharp jagged multi-pointed starburst exploding outward with a bright white-hot center and sharp angular shockwave rays of varying length, conveying a powerful high-impact strike. Centred, filling most of the frame. Bright white-yellow core, vivid orange middle, deep red-orange pointed tips. |
 | dodge | A single sleek bold humanoid silhouette dodging to the side - leaning and stepping sideways to evade an incoming attack, the body angled and weight shifted to one side so it clearly reads as sidestepping rather than running forward, with two translucent phantom afterimage copies trailing to show the quick evasive motion. The leading silhouette is a solid cool slate blue-grey, the trailing afterimages a faded lighter blue-grey, never green. Centred, filling most of the frame. |
 
-**Files.** Each base ships twice — the clean symbol and a `%`-badged variant:
+**Files.** Each base ships twice — the clean symbol and a badged variant:
 
 <!-- prettier-ignore -->
 | File | Base | Variant |
 |---|---|---|
 | `Critical Damage.png` | crit | clean (magnitude) |
-| `Critical Chance.png` | crit | + `%` (chance) |
+| `Critical Chance Multiplier.png` | crit | + `×` (multiplier, #1465) |
 | `Dodge.png` | dodge | clean — standalone, for the combat-float popup |
 | `Dodge Chance.png` | dodge | + `%` (chance) |
 
-The `%` badge is **not generated** — it is composited onto the stripped base PNG (a bold
-outlined off-white `%`, lower-right, ~46% of the icon width with a thick dark outline so it
-reads even over the light dodge figure), so the chance and magnitude siblings stay
-pixel-identical apart from the badge, and the badge is trivially restyled.
+The `%` badge (`Dodge Chance.png`) is **not generated** — it is composited onto the stripped
+base PNG (a bold outlined off-white `%`, lower-right, ~46% of the icon width with a thick dark
+outline so it reads even over the light dodge figure), so the chance and magnitude siblings
+stay pixel-identical apart from the badge, and the badge is trivially restyled.
+
+The `×` badge (`Critical Chance Multiplier.png`, #1465) replaced an earlier `%`-badged
+`Critical Chance.png` — `CriticalChanceMultiplier` was renamed and reconceived (#1458) as a
+base-1 multiplier that *scales* a skill's own authored crit chance rather than being a chance
+itself, so a `%` badge misrepresented it (the same "read directly" family as `CooldownRecovery`/
+`CriticalDamage`, which is why it gets a badge at all — to stay distinct from `CriticalDamage`'s
+unbadged clean symbol sharing the same crit base). Composited via `badge.py --badge multiplier`
+like the amp/resist family, from `badges/multiplier.png`. That badge source was **hand-drawn with
+PIL** (`badges/make_multiplier_badge.py`), not run through the AI pipeline — a cream-gradient,
+dark-outlined capsule "×" matched by eye to the amp/resist badges' measured palette — because
+generating it requires the `/image` skill's `agy` CLI or `GEMINI_API_KEY`, neither available in
+the (headless) session that produced it. Regenerate through the normal pipeline if a closer
+house-style match is wanted; `make_multiplier_badge.py` stays checked in as the badge's
+reproducible source since (unlike AI art) it has no prompt to record in this catalog.
 
 The clean symbols double as the **combat-float popup** art: `CombatFloaters.svelte`'s
 `.floater-icon` renders `Critical Damage.png` / `Dodge.png` for the per-outcome CRIT/DODGE

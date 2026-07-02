@@ -22,12 +22,16 @@ namespace Game.Application.Services
     /// Every avenue is wired here, folded across each leaf type's applicable keys
     /// (<see cref="DamageTypes.Applies"/>): the <b>offense</b> book trains offense keys on the typed damage the
     /// player dealt — direct hits and DoT alike (<see cref="BattleStats.TypedDamageDealt"/>) — the
-    /// <b>incoming</b> book trains resist keys on the player's pre-mitigation typed exposure
-    /// (<see cref="BattleStats.TypedDamageExposure"/>), and the event-keyed combat magnitudes — the normalized
+    /// <b>incoming</b> book trains resist keys on the player's typed exposure, split into its resistance-blocked
+    /// and still-landed components and weighted separately so a resist path trains faster the more it actually
+    /// blocks (<see cref="BattleStats.TypedDamageExposure"/> / <see cref="BattleStats.TypedDamageResistanceMitigated"/>,
+    /// #1454), and the event-keyed combat magnitudes — the normalized
     /// marginal crit bonus (Precision, <see cref="BattleStats.CriticalBonusDealt"/>), dodged damage (Evasion),
     /// healing done (Restoration), reflected damage dealt
-    /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363), and the vulnerability-enabled
-    /// Hex bonus (<see cref="BattleStats.HexBonusDealt"/> — #1427) — are damage-type-neutral
+    /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363), the vulnerability-enabled
+    /// Hex bonus (<see cref="BattleStats.HexBonusDealt"/> — #1427), the ramp-enabled Momentum bonus
+    /// (<see cref="BattleStats.MomentumBonusDealt"/> — #1428), and the execute-enabled Cull bonus
+    /// (<see cref="BattleStats.CullBonusDealt"/> — #1430) — are damage-type-neutral
     /// and map straight to a single activity key. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
@@ -176,13 +180,17 @@ namespace Game.Application.Services
         // frontier) banks nothing; a retired path is absent from the index (frozen). The avenues:
         //   • Offense (output book): the typed damage the player dealt — direct hits and DoT alike
         //     (BattleStats.TypedDamageDealt), post-mitigation, routed to the offense keys.
-        //   • Resist (incoming book): the player's pre-mitigation typed exposure
-        //     (BattleStats.TypedDamageExposure), routed to the resist keys, so a resist never throttles its own
-        //     training signal.
+        //   • Resist (incoming book): the player's typed exposure (BattleStats.TypedDamageExposure), split by
+        //     BuildResistTrainingByType into its resistance-blocked portion (TypedDamageResistanceMitigated,
+        //     weighted at ResistMitigatedTrainingRate) and the portion that still landed (weighted at
+        //     ResistUnmitigatedTrainingRate), so a resist path trains faster the more of its own exposure the
+        //     player's type-resistance actually blocks (#1454) — Toughness is excluded from the split (a
+        //     generic stat every build can raise, not the type-specific investment the path represents).
         //   • Events: the normalized marginal crit bonus (not the full crit hit — #1448), dodged damage, healing
-        //     done, reflected damage dealt, and the vulnerability-enabled Hex bonus (#1427) — damage-type-neutral
-        //     magnitudes that map straight to a single activity key (Crit / Dodge / Heal / Reflect / Hex) without
-        //     applies() routing.
+        //     done, reflected damage dealt, the vulnerability-enabled Hex bonus (#1427), the ramp-enabled
+        //     Momentum bonus (#1428), and the execute-enabled Cull bonus (#1430) — damage-type-neutral
+        //     magnitudes that map straight to a single activity key
+        //     (Crit / Dodge / Heal / Reflect / Hex / Momentum / Cull) without applies() routing.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
@@ -192,7 +200,7 @@ namespace Game.Application.Services
             // ForDamageKey resolves for every key; ForDamageKeyResist is null for the amp-only weapon keys
             // (#1340), whose exposure routes to the shared Physical resist key only — the fold skips those nulls.
             FoldIntoActivityKeys(activityByKey, stats.TypedDamageDealt, key => ActivityKeys.ForDamageKey(key));
-            FoldIntoActivityKeys(activityByKey, stats.TypedDamageExposure, ActivityKeys.ForDamageKeyResist);
+            FoldIntoActivityKeys(activityByKey, BuildResistTrainingByType(stats), ActivityKeys.ForDamageKeyResist);
 
             // Event-keyed activities: combat magnitudes that are not typed damage, so each maps straight to a
             // single global activity key (no applies() routing, no per-type split). Only positive amounts are
@@ -210,6 +218,8 @@ namespace Game.Application.Services
             AddEvent(EActivityKey.Heal, stats.PlayerDamageHealed);
             AddEvent(EActivityKey.Reflect, stats.PlayerReflectedDamageDealt);
             AddEvent(EActivityKey.Hex, stats.HexBonusDealt);
+            AddEvent(EActivityKey.Momentum, stats.MomentumBonusDealt);
+            AddEvent(EActivityKey.Cull, stats.CullBonusDealt);
 
             // Route each key's activity to the frontier tier of every path bound to it — but only to a frontier
             // the player has actually unlocked. Within-path tiers open implicitly as the prior tier maxes (the
@@ -253,6 +263,27 @@ namespace Game.Application.Services
                     }
                 }
             }
+        }
+
+        // The resist book's per-leaf-type training quantity (#1454): each type's pre-mitigation exposure is
+        // split into what the player's own type-resistance blocked (TypedDamageResistanceMitigated) and what
+        // still landed (the remainder of TypedDamageExposure), weighted separately so a resist path trains
+        // faster the more of its exposure it actually blocks. Keyed off TypedDamageExposure (a superset of
+        // TypedDamageResistanceMitigated's keys — mitigated is only ever recorded alongside an exposure entry)
+        // so a type with no incoming damage this battle contributes nothing.
+        private static Dictionary<EDamageType, double> BuildResistTrainingByType(BattleStats stats)
+        {
+            var trainingByType = new Dictionary<EDamageType, double>();
+            foreach (var (type, exposure) in stats.TypedDamageExposure)
+            {
+                stats.TypedDamageResistanceMitigated.TryGetValue(type, out var mitigated);
+                var unmitigated = exposure - mitigated;
+                trainingByType[type] =
+                    unmitigated * ServerGameConstants.ResistUnmitigatedTrainingRate
+                    + mitigated * ServerGameConstants.ResistMitigatedTrainingRate;
+            }
+
+            return trainingByType;
         }
     }
 }

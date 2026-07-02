@@ -451,6 +451,88 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task MomentumBonus_TrainsTheMomentumPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Momentum trains from the ramp-enabled marginal damage (#1428) — an output-book event, type-neutral
+            // like the other overlays (routed straight to the single Momentum activity key with no applies() split).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Momentum", activityKey: EActivityKey.Momentum);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Momentum", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { MomentumBonusDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoMomentumBonus_TrainsNoMomentum()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with other events but no ramp-enabled damage routes no
+            // Momentum activity, so a Momentum-keyed path is never reached.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Momentum", activityKey: EActivityKey.Momentum);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Momentum", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage, PlayerDamageHealed = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
+        public async Task CullBonus_TrainsTheCullPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Cull trains from the execute-enabled marginal damage (#1430) — an output-book event, type-neutral
+            // like the other overlays (routed straight to the single Cull activity key with no applies() split).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Cull", activityKey: EActivityKey.Cull);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Cull", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CullBonusDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoCullBonus_TrainsNoCull()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with other events but no execute-enabled damage routes no
+            // Cull activity, so a Cull-keyed path is never reached.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Cull", activityKey: EActivityKey.Cull);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Cull", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage, PlayerDamageHealed = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
         public async Task NoReflectedDamage_TrainsNoRetribution()
         {
             using var scope = CreateScope();
@@ -532,10 +614,10 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // The incoming book: a battle exposing the player to FiredDamage of pre-mitigation Fire trains the
-            // Fire-resist path and the Elemental-resist path (applies(Fire) = [Fire, Elemental] on the incoming
-            // side), each claiming the full pie. The Fire *offense* path keyed on the same type is untouched —
-            // exposure trains resist keys only.
+            // The incoming book: a battle exposing the player to FiredDamage of pre-mitigation Fire (with no
+            // resistance recorded, so it trains at the unmitigated rate, #1454) trains the Fire-resist path and
+            // the Elemental-resist path (applies(Fire) = [Fire, Elemental] on the incoming side). The Fire
+            // *offense* path keyed on the same type is untouched — exposure trains resist keys only.
             var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, name: "Fire Ward");
             var elementalResist = await CreateKeyedTierAsync(context, EActivityKey.ElementalResist, name: "Elemental Ward");
             var fireOffense = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
@@ -558,8 +640,8 @@ namespace Game.Application.Tests.Services
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             // The two books are independent axes (no shared pie): a battle where the player both dealt Fire and
-            // was exposed to Fire trains the Fire *offense* path and the Fire *resist* path in parallel, each
-            // claiming its own full pie from its own book.
+            // was exposed to (fully resistance-mitigated) Fire trains the Fire *offense* path and the Fire
+            // *resist* path in parallel, each claiming its own full pie from its own book.
             var fireOffense = await CreateKeyedTierAsync(context, EActivityKey.Fire, name: "Fire Magic");
             var fireResist = await CreateKeyedTierAsync(context, EActivityKey.FireResist, name: "Fire Ward");
             var playerId = await SeedPlayerAsync(context);
@@ -568,6 +650,10 @@ namespace Game.Application.Tests.Services
             var stats = new BattleStats();
             stats.AddTypedDamageDealt(EDamageType.Fire, FiredDamage);
             stats.AddTypedDamageExposure(EDamageType.Fire, FiredDamage);
+            // Fully resistance-mitigated (#1454), so the resist book trains at the full ResistMitigatedTrainingRate
+            // — the same full-pie claim the offense book makes — keeping this test's "both books claim a full
+            // pie, independently" assertion meaningful under the new split.
+            stats.AddTypedDamageResistanceMitigated(EDamageType.Fire, FiredDamage);
             var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
 
             var offense = Assert.Single(accrual.Results, r => r.ProficiencyId == fireOffense.Id);

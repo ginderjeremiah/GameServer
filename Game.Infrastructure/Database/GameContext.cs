@@ -465,6 +465,9 @@ namespace Game.Infrastructure.Database
                 entity.Property(s => s.BaseDamage)
                     .HasPrecision(18, 3);
 
+                entity.Property(s => s.CriticalChance)
+                    .HasPrecision(18, 3);
+
                 entity.Property(s => s.Name)
                     .HasMaxLength(50);
 

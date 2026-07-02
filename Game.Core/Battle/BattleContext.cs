@@ -13,10 +13,12 @@ namespace Game.Core.Battle
         private Battler _targetBattler;
         private bool _isPlayerActive;
 
-        // The player's typed-exposure recorder (incoming book) and the player's typed DoT-damage-dealt recorder
-        // (offense book), each cached once — a method group converts to a fresh delegate on every use — so the
-        // per-tick DoT phase can hand them to ApplyDamageOverTime without allocating on the replay hot path.
+        // The player's typed-exposure recorder (incoming book), the player's typed resist-mitigated recorder
+        // (the resist-training split, #1454), and the player's typed DoT-damage-dealt recorder (offense book),
+        // each cached once — a method group converts to a fresh delegate on every use — so the per-tick DoT
+        // phase can hand them to ApplyDamageOverTime without allocating on the replay hot path.
         private readonly Action<EDamageType, double> _recordPlayerExposure;
+        private readonly Action<EDamageType, double> _recordPlayerMitigated;
         private readonly Action<EDamageType, double> _recordPlayerDotDealt;
 
         // The player's Hex-signal recorder for the enemy's DoT phase, cached once so the per-tick DoT loop hands
@@ -36,6 +38,7 @@ namespace Game.Core.Battle
             _isPlayerActive = true;
             TimeDelta = timeDelta;
             _recordPlayerExposure = Stats.AddTypedDamageExposure;
+            _recordPlayerMitigated = Stats.AddTypedDamageResistanceMitigated;
             _recordPlayerDotDealt = Stats.AddTypedDamageDealt;
             _recordPlayerHexBonus = Stats.AddHexBonus;
         }
@@ -83,8 +86,15 @@ namespace Game.Core.Battle
                 && effect.ModifierType is EModifierType.Additive
                 && DamageTypes.IsResistanceAttribute(effect.AttributeId);
 
+            // A self-targeted additive amplification buff is the Momentum ramp enabler (#1428): track its delta
+            // on the caster's own stack so the Momentum signal credits only the ramp's own contribution,
+            // isolated from any static amplification the caster already carries.
+            var tracksMomentum = effect.Target is ESkillEffectTarget.Self
+                && effect.ModifierType is EModifierType.Additive
+                && DamageTypes.IsAmplificationAttribute(effect.AttributeId);
+
             var battler = effect.Target is ESkillEffectTarget.Self ? _activeBattler : _targetBattler;
-            battler.ApplyEffect(effect, amount, tracksVulnerability);
+            battler.ApplyEffect(effect, amount, tracksVulnerability, tracksMomentum);
         }
 
         /// <summary>
@@ -114,7 +124,8 @@ namespace Game.Core.Battle
                 return;
             }
 
-            Stats.PlayerDamageTaken += _playerBattler.ApplyDamageOverTime(TimeDelta, _recordPlayerExposure);
+            Stats.PlayerDamageTaken += _playerBattler.ApplyDamageOverTime(
+                TimeDelta, recordExposure: _recordPlayerExposure, recordMitigated: _recordPlayerMitigated);
             Stats.PlayerDamageHealed += _playerBattler.ApplyHealOverTime(TimeDelta);
         }
 
@@ -131,9 +142,11 @@ namespace Game.Core.Battle
         /// stays <c>playerFires×1 + enemyFires×1</c>:
         /// </para>
         /// <list type="bullet">
-        /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage). A crit
-        /// multiplies <b>every</b> portion by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b>
-        /// mitigation — identical to scaling the whole hit — so high crit damage punches through
+        /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage) against
+        /// <paramref name="baseCriticalChance"/> — the firing skill's own opt-in enabler (#1453) — scaled by the
+        /// active battler's <see cref="EAttribute.CriticalChanceMultiplier"/>. A crit multiplies <b>every</b>
+        /// portion by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b> mitigation —
+        /// identical to scaling the whole hit — so high crit damage punches through
         /// <see cref="EAttribute.Toughness"/>.</item>
         /// <item>When the <b>enemy</b> attacks the player, a <b>single</b> dodge draw is taken (Block was retired
         /// in spike #1330). A dodge zeroes the <b>whole</b> multi-typed hit.</item>
@@ -145,9 +158,16 @@ namespace Game.Core.Battle
         /// <c>totalNet</c> — one swing is one attack. The Precision signal is instead the normalized marginal crit
         /// bonus (<see cref="BattleStats.CriticalBonusDealt"/>, #1448), booked from the vanilla-hit baseline rather
         /// than the full crit net; the Hex signal (<see cref="BattleStats.HexBonusDealt"/>, #1427) is booked
-        /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled.
-        /// Each portion's absorption heal is capped at the
-        /// <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
+        /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled,
+        /// and the Momentum signal (<see cref="BattleStats.MomentumBonusDealt"/>, #1428) is booked per-portion as
+        /// the marginal damage the player's own applied ramp enabled. The Cull signal
+        /// (<see cref="BattleStats.CullBonusDealt"/>, #1430) is likewise booked per-portion off the pre-crit
+        /// baseline, but — unlike Hex/Momentum, which train off the existing resistance/amplification pipeline —
+        /// its enabler (<see cref="EAttribute.ExecuteBonus"/> scaled by the target's missing-health fraction,
+        /// sampled once per fire) also multiplies the <b>real</b> damage dealt, identically to
+        /// <see cref="EAttribute.CriticalDamage"/> and before mitigation, so it is the one overlay that is
+        /// parity-critical beyond its tally. Each portion's absorption heal is capped at
+        /// the <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
         /// untyped, so once equals per-portion, and once gives a single clean reflection event. The Toughness curve
@@ -160,7 +180,7 @@ namespace Game.Core.Battle
         /// reconciling per-skill total instead of the raw pre-mitigation hit. Reflected damage dealt back to the
         /// attacker is booked separately and is not part of this return.
         /// </returns>
-        public double DamageTarget(double rawDamage, IReadOnlyList<SkillDamagePortion> portions)
+        public double DamageTarget(double rawDamage, IReadOnlyList<SkillDamagePortion> portions, double baseCriticalChance)
         {
             // Fold the total weight in fixed portion order (a parity contract — float addition is not associative),
             // so each portion takes its raw × weight ÷ Σweights share of the one raw hit. Computing it draws no RNG.
@@ -175,16 +195,33 @@ namespace Game.Core.Battle
             var totalNet = 0.0;
             if (_isPlayerActive)
             {
-                // ONE crit draw per player fire, before any damage and independent of portion count. A single crit
-                // multiplies every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
-                var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
+                // ONE crit draw per player fire, before any damage and independent of portion count. The rolled
+                // chance is the firing skill's own base (0 for an unauthored skill, the per-skill opt-in enabler)
+                // scaled by the active battler's CriticalChanceMultiplier (base 1, so an uncommitted skill still
+                // crits at its own authored rate and further investment scales it). A single crit multiplies
+                // every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
+                var isCrit = _rng.Next() < baseCriticalChance * _activeBattler.GetAttributeValue(CriticalChanceMultiplier);
                 var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
+
+                // The Cull execute overlay (#1430): the target's missing-health fraction AT THE START of this
+                // fire, sampled once (like the crit draw) so an earlier portion's damage within the same
+                // multi-typed hit cannot change a later portion's bonus. executeInvestment is this fire's
+                // multiplier above 1 — 0 when ExecuteBonus is unauthored or the target is at full health —
+                // applied to the raw damage identically to critMultiplier, before mitigation.
+                var targetMaxHealth = _targetBattler.GetAttributeValue(MaxHealth);
+                var missingHpFraction = Math.Clamp(
+                    (targetMaxHealth - _targetBattler.CurrentHealth) / targetMaxHealth, 0.0, 1.0);
+                var executeInvestment = _activeBattler.GetAttributeValue(ExecuteBonus) * missingHpFraction;
+                var executeMultiplier = 1.0 + executeInvestment;
+
                 var baselineNet = 0.0;
                 for (var i = 0; i < portions.Count; i++)
                 {
                     var type = portions[i].Type;
-                    var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
-                    var net = _targetBattler.TakeDamage(dealt * critMultiplier, type, _activeBattler.Level);
+                    var rawPortion = PortionRawDamage(rawDamage, totalWeight, portions[i]);
+                    var dealt = _activeBattler.AmplifyDamage(rawPortion, type);
+                    var net = _targetBattler.TakeDamage(
+                        dealt * critMultiplier * executeMultiplier, type, _activeBattler.Level);
                     Stats.AddTypedDamageDealt(type, net);
                     totalNet += net;
                     // The Hex overlay tally (#1427): the marginal damage the player's applied vulnerability let
@@ -192,6 +229,27 @@ namespace Game.Core.Battle
                     // overlay inflating the other. Zero unless a vulnerability debuff lowered the target's
                     // resistance below its innate baseline. A backend-only side channel — no health mutation.
                     Stats.HexBonusDealt += _targetBattler.HexBonusForHit(dealt, type, _activeBattler.Level);
+                    // The Momentum overlay tally (#1428): the marginal damage the player's own applied ramp (a
+                    // stacking self-buff to this portion's amplification) enabled, measured against the un-ramped
+                    // baseline (dealt minus exactly the ramp's own contribution) so it composes with crit/Hex
+                    // without inflating either. Zero unless a ramp buff amplified this portion's type.
+                    var rampContribution = _activeBattler.AppliedMomentum(type);
+                    if (rampContribution > 0)
+                    {
+                        var unrampedDealt = dealt - rawPortion * rampContribution;
+                        var marginal = _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level)
+                            - _targetBattler.ComputeNetDamage(unrampedDealt, type, _activeBattler.Level);
+                        Stats.MomentumBonusDealt += marginal > 0 ? marginal / (1 + rampContribution) : 0;
+                    }
+                    // The Cull overlay tally (#1430): the marginal damage the execute investment enabled,
+                    // measured on the vanilla (pre-crit) portion — the same independence Hex/Momentum keep —
+                    // so a crit on the same hit neither inflates nor is inflated by the execute bonus.
+                    if (executeInvestment > 0)
+                    {
+                        var executeMarginal = _targetBattler.ComputeNetDamage(dealt * executeMultiplier, type, _activeBattler.Level)
+                            - _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level);
+                        Stats.CullBonusDealt += executeMarginal > 0 ? executeMarginal / (1 + executeInvestment) : 0;
+                    }
                     if (isCrit)
                     {
                         // The vanilla (non-crit) net of this portion — the fixed baseline the crit bonus is
@@ -243,8 +301,11 @@ namespace Game.Core.Battle
                         var type = portions[i].Type;
                         var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
                         // The player was exposed to this portion's full pre-mitigation typed damage — recorded for
-                        // the incoming book before resistance/mitigation.
+                        // the incoming book before resistance/mitigation — and separately the resistance-only
+                        // (Toughness-excluded) slice of it the player's own type-resistance blocked, feeding the
+                        // resist-training split (#1454).
                         Stats.AddTypedDamageExposure(type, dealt);
+                        Stats.AddTypedDamageResistanceMitigated(type, _targetBattler.TypeResistanceMitigated(dealt, type));
                         totalNet += _targetBattler.TakeDamage(dealt, type, _activeBattler.Level);
                     }
                 }
@@ -257,14 +318,23 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// One portion's attacker-amplified pre-mitigation damage: its weighted share of the single raw hit
-        /// (<c>rawDamage × weight ÷ totalWeight</c>, the fixed-order fold of the weights done by the caller) run
-        /// through the active (attacking) battler's typed amplification. A method call rather than an inline
-        /// expression so the three per-portion loops cannot diverge in their split arithmetic.
+        /// One portion's pre-amplification share of the single raw hit: <c>rawDamage × weight ÷ totalWeight</c>,
+        /// the fixed-order fold of the weights done by the caller. A method call rather than an inline expression
+        /// so the per-portion loops (and the Momentum tally's un-ramped counterfactual, which needs this same raw
+        /// share before amplification) cannot diverge in their split arithmetic.
+        /// </summary>
+        private double PortionRawDamage(double rawDamage, double totalWeight, SkillDamagePortion portion)
+        {
+            return rawDamage * portion.Weight / totalWeight;
+        }
+
+        /// <summary>
+        /// One portion's attacker-amplified pre-mitigation damage — <see cref="PortionRawDamage"/> run through the
+        /// active (attacking) battler's typed amplification.
         /// </summary>
         private double AmplifiedPortion(double rawDamage, double totalWeight, SkillDamagePortion portion)
         {
-            return _activeBattler.AmplifyDamage(rawDamage * portion.Weight / totalWeight, portion.Type);
+            return _activeBattler.AmplifyDamage(PortionRawDamage(rawDamage, totalWeight, portion), portion.Type);
         }
 
         /// <summary>

@@ -53,6 +53,38 @@ namespace Game.Core.Battle
         /// </summary>
         public double HexBonusDealt { get; set; }
 
+        /// <summary>
+        /// The Momentum (<c>Momentum</c> activity key) training signal — the normalized-marginal damage the
+        /// player's applied ramp enabled this battle (spike #1398 → the overlay tally shape, reference #1448). A
+        /// ramp is a stacking self-buff to one of the attacker's typed amplification attributes; <c>r</c> is the
+        /// amplification the buff itself contributed (tracked from the applied effect, isolated from any static
+        /// amplification the attacker already carries — <see cref="Battle.Battler.AppliedMomentum"/>). For each
+        /// hit the extra damage that amplification enabled — the live post-amplification hit minus the same hit
+        /// without the ramp's contribution, both carried through the defender's mitigation — is booked with the
+        /// same <c>/(1 + r)</c> saturation the crit and Hex bonuses use, on the ramp's own magnitude. Unlike Hex
+        /// this is <b>not</b> flat in the defender's mitigation (Momentum amplifies the attacker's output, so a
+        /// tougher target mitigates the ramp bonus exactly as it mitigates the rest of the hit — the same
+        /// property the crit bonus has). Backend-only like the other overlay tallies.
+        /// </summary>
+        public double MomentumBonusDealt { get; set; }
+
+        /// <summary>
+        /// The Cull (<c>Cull</c> activity key) training signal — the normalized-marginal execute bonus an
+        /// authored <see cref="EAttribute.ExecuteBonus"/> enabled this battle (spike #1398 → the overlay tally
+        /// shape, reference #1448; #1430). Cull is the one delivery archetype whose enabler is a genuinely new
+        /// damage-calc conditional rather than an existing resistance/amplification attribute: the target's
+        /// missing-health fraction at the moment of the hit scales <c>ExecuteBonus</c> into that fire's
+        /// multiplier above 1 (the investment), applied to the raw damage identically to <c>CriticalDamage</c>
+        /// before mitigation. For each portion the extra damage that investment enabled — the live post-execute
+        /// hit minus the same hit without it, both carried through the defender's mitigation — is booked with
+        /// the same <c>/(1 + investment)</c> saturation the crit/Hex/Momentum bonuses use, on the investment's
+        /// own magnitude, measured off the pre-crit portion so it composes with crit without either overlay
+        /// inflating the other. A target at full health enables nothing; a target near death saturates the
+        /// multiplier toward the full <c>ExecuteBonus</c>. Backend-only like the other overlay tallies — DoT has
+        /// no counterpart (there is no per-tick "hit" to execute).
+        /// </summary>
+        public double CullBonusDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>
@@ -66,11 +98,23 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// Per-leaf-type incoming damage the player was exposed to this battle — the proficiency "incoming book"
-        /// (spike #1318) — captured <b>before</b> the player's type-resistance and Defense, so a resist never
-        /// throttles its own training signal. Covers both direct hits and typed DoT; a fully dodged hit is
-        /// excluded (it was evaded, not mitigated — dodged damage trains evasion instead).
+        /// (spike #1318) — captured <b>before</b> the player's type-resistance and Toughness. Covers both direct
+        /// hits and typed DoT; a fully dodged hit is excluded (it was evaded, not mitigated — dodged damage
+        /// trains evasion instead). Paired with <see cref="TypedDamageResistanceMitigated"/>: the accrual
+        /// (<c>ProficiencyRewardService</c>) splits this pre-mitigation total into its resistance-blocked and
+        /// still-landed components and weights them separately (#1454), so a resist trains faster the more of
+        /// this exposure it actually blocks rather than the two being indistinguishable here.
         /// </summary>
         public Dictionary<EDamageType, double> TypedDamageExposure { get; set; } = [];
+
+        /// <summary>
+        /// Per-leaf-type portion of <see cref="TypedDamageExposure"/> this battler's own type-resistance blocked
+        /// this battle — <see cref="Battle.Battler.TypeResistanceMitigated"/> per direct hit, and the
+        /// resistance-only tick reduction per DoT tick. Deliberately excludes the Toughness curve (a generic,
+        /// non-typed stat) so only the type-specific resistance investment a resist path actually represents
+        /// accelerates that path's training (#1454).
+        /// </summary>
+        public Dictionary<EDamageType, double> TypedDamageResistanceMitigated { get; set; } = [];
 
         /// <summary>
         /// The player's power for this battle — the sum of core additive attribute modifiers, the same measure
@@ -93,6 +137,13 @@ namespace Game.Core.Battle
         {
             TypedDamageExposure.TryGetValue(type, out var existing);
             TypedDamageExposure[type] = existing + amount;
+        }
+
+        /// <summary>Accumulates a resistance-blocked <paramref name="amount"/> into the typed resist-mitigated book.</summary>
+        public void AddTypedDamageResistanceMitigated(EDamageType type, double amount)
+        {
+            TypedDamageResistanceMitigated.TryGetValue(type, out var existing);
+            TypedDamageResistanceMitigated[type] = existing + amount;
         }
 
         /// <summary>Accumulates a normalized-marginal vulnerability-enabled <paramref name="amount"/> into the

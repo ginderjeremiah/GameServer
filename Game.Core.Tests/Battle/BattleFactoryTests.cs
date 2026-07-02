@@ -135,6 +135,7 @@ namespace Game.Core.Tests.Battle
             Description = "",
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             BaseDamage = 1,
+            CriticalChance = 0,
             CooldownMs = 1000,
             DamageMultipliers = [],
             Effects = [],

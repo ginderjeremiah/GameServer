@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Enemies;
 using Game.Core.Players;
@@ -75,6 +76,7 @@ namespace Game.Core.Progress
                 Record(EStatisticType.FastestVictory, enemy.Id, totalMs / 1000m);
                 Record(EStatisticType.EnemiesKilled, null, 1);
                 Record(EStatisticType.EnemiesKilled, enemy.Id, 1);
+                RecordKillByDamageType(stats);
 
                 // A dedicated-boss victory both farms the boss and (on the first clear) clears its zone. The
                 // boss-ness comes from the explicit challenge marker (threaded from PlayerState), not the
@@ -256,6 +258,35 @@ namespace Game.Core.Progress
             }
 
             _dirtyProficiencies.Add(proficiencyId);
+        }
+
+        /// <summary>
+        /// Attributes this kill to the damage-type key(s) the battle's <em>majority-dealt</em> leaf type rolls
+        /// up to (#1455) — not the literal killing blow's type, which would need new tracking through the
+        /// per-portion hit/DoT-tick loop for an ill-defined tie-break on a multi-portion hit. Reusing the
+        /// already-accumulated offense book (<see cref="BattleStats.TypedDamageDealt"/>) instead is robust to
+        /// last-hit noise and stays a pure post-battle read, matching how this whole statistics pass has no
+        /// battle-parity surface. Ties break on the lower <see cref="EDamageType"/> ordinal, for determinism.
+        /// Rolled up through <see cref="DamageTypes.Applies"/> like proficiency training, so a Burn-majority
+        /// kill books Burn, Fire, Elemental, and Dot alike (backing both "kill with fire magic" and "kill with
+        /// a weapon type" challenges — weapon leaves are damage-type leaves).
+        /// </summary>
+        private void RecordKillByDamageType(BattleStats stats)
+        {
+            if (stats.TypedDamageDealt.Count == 0)
+            {
+                return;
+            }
+
+            var majorityType = stats.TypedDamageDealt
+                .OrderByDescending(kv => kv.Value)
+                .ThenBy(kv => (int)kv.Key)
+                .First().Key;
+
+            foreach (var key in DamageTypes.Applies(majorityType))
+            {
+                Record(EStatisticType.KillsByDamageType, (int)key, 1);
+            }
         }
 
         /// <summary>

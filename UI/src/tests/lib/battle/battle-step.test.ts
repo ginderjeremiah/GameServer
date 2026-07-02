@@ -243,12 +243,10 @@ describe('battleStep', () => {
 	describe('crit / dodge / reflection (player-only, seeded)', () => {
 		it('multiplies a player crit by CriticalDamage before mitigation', () => {
 			// CriticalDamage is the base 1.5 (sourced by #799) + 0.5 = 2, read directly as the multiplier.
+			// The skill's own base chance (#1453) is 1, so it always crits (the multiplier stays at its base 1).
 			const player = makeBattler(
-				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 }
-				],
-				[makeSkill(20, 40)]
+				[{ id: EAttribute.CriticalDamage, amount: 0.5 }],
+				[makeSkill(20, 40, [], [], undefined, 1)]
 			);
 			const enemy = makeBattler(baseStats, []);
 
@@ -260,7 +258,8 @@ describe('battleStep', () => {
 		});
 
 		it('deals raw damage when the player does not crit', () => {
-			const player = makeBattler([{ id: EAttribute.CriticalChance, amount: 0 }], [makeSkill(20, 40)]);
+			// The skill's own base chance defaults to 0 (#1453), so it never crits.
+			const player = makeBattler(baseStats, [makeSkill(20, 40)]);
 			const enemy = makeBattler(baseStats, []);
 
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
@@ -357,20 +356,119 @@ describe('battleStep', () => {
 			expect(player.currentHealth).toBe(20);
 		});
 
+		// Mirrors the backend's BattleContextTests composition scenarios for skill.criticalChance ×
+		// CriticalChanceMultiplier inside the crit roll (#1464, surfaced during review of #1458).
+		describe('CriticalChanceMultiplier composition (#1453)', () => {
+			it('never crits even with a heavy multiplier investment when the skill has zero base critical chance', () => {
+				// The enabler is the SKILL's own base chance, not the multiplier: CriticalChanceMultiplier's base 1 +
+				// 999 = 1000 still crits for nothing when the fired skill's own criticalChance is 0 (0 × 1000 = 0).
+				const player = makeBattler(
+					[{ id: EAttribute.CriticalChanceMultiplier, amount: 999 }],
+					[makeSkill(20, 40)] // criticalChance defaults to 0
+				);
+				const enemy = makeBattler(baseStats, []);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].crit).toBe(false);
+				expect(activations[0].damage).toBe(20); // enemy Toughness 0
+				expect(enemy.currentHealth).toBe(50 - 20);
+			});
+
+			it('composes multiplicatively with the skill’s base, letting a zeroed multiplier cancel an always-crit skill', () => {
+				// CriticalChanceMultiplier's base 1 + (-1) = 0 cancels even a skill authored to always crit on its
+				// own (criticalChance 1): 1 × 0 = 0, proving the composition is a product, not an independent OR.
+				const player = makeBattler(
+					[{ id: EAttribute.CriticalChanceMultiplier, amount: -1 }],
+					[makeSkill(20, 40, [], [], undefined, 1)]
+				);
+				const enemy = makeBattler(baseStats, []);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].crit).toBe(false);
+				expect(activations[0].damage).toBe(20);
+				expect(enemy.currentHealth).toBe(50 - 20);
+			});
+
+			it('scales a fractional skill base above one and always crits', () => {
+				// A fractional skill base (0.5) scaled by a CriticalChanceMultiplier of 2 (base 1 + 1 = 2) reaches
+				// an effective chance of 1.0 — at or above every possible [0,1) RNG draw — even though neither
+				// factor alone would guarantee it. CriticalDamage is the base 1.5 + 0.5 = 2.
+				const player = makeBattler(
+					[
+						{ id: EAttribute.CriticalChanceMultiplier, amount: 1 },
+						{ id: EAttribute.CriticalDamage, amount: 0.5 }
+					],
+					[makeSkill(20, 40, [], [], undefined, 0.5)]
+				);
+				const enemy = makeBattler(baseStats, []);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].crit).toBe(true);
+				expect(activations[0].damage).toBe(40); // 20 × 2 (CriticalDamage), no Toughness
+				expect(enemy.currentHealth).toBe(50 - 40);
+			});
+		});
+
 		it('never crits on the enemy’s attack, even with a forced crit chance', () => {
 			const player = makeBattler(baseStats, []);
 			const enemy = makeBattler(
-				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 2 }
-				],
-				[makeSkill(20, 40)]
+				[{ id: EAttribute.CriticalDamage, amount: 2 }],
+				[makeSkill(20, 40, [], [], undefined, 1)]
 			);
 
 			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
 
 			expect(activations[0].crit).toBe(false);
 			expect(activations[0].damage).toBe(20); // 20 (no crit), NOT 40
+		});
+
+		describe('Cull execute overlay (#1430)', () => {
+			it('deals unmultiplied damage without an authored ExecuteBonus', () => {
+				const player = makeBattler(baseStats, [makeSkill(10, 40)]);
+				const enemy = makeBattler(baseStats, []); // MaxHealth 50, Toughness 0
+				enemy.currentHealth = 30; // 40% missing, but nothing to scale the multiplier
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].damage).toBe(10);
+				expect(enemy.currentHealth).toBe(30 - 10);
+			});
+
+			it('deals unmultiplied damage against a target at full health', () => {
+				const player = makeBattler([{ id: EAttribute.ExecuteBonus, amount: 1 }], [makeSkill(10, 40)]);
+				const enemy = makeBattler(baseStats, []); // full health ⇒ missing-HP fraction 0
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].damage).toBe(10);
+			});
+
+			it('scales raw damage by 1 + ExecuteBonus × the target’s missing-health fraction', () => {
+				// The enemy is missing 40% of its health (20/50), so a full (100%) ExecuteBonus scales this fire's
+				// multiplier to 1 + 1.0×0.4 = 1.4: 10 raw × 1.4 = 14 dealt (vs 10 unmultiplied).
+				const player = makeBattler([{ id: EAttribute.ExecuteBonus, amount: 1 }], [makeSkill(10, 40)]);
+				const enemy = makeBattler(baseStats, []); // MaxHealth 50, Toughness 0
+				enemy.currentHealth = 30; // 40% missing
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].damage).toBe(14);
+				expect(enemy.currentHealth).toBe(30 - 14);
+			});
+
+			it('never applies to the enemy’s attack, even with a forced ExecuteBonus', () => {
+				const player = makeBattler(baseStats, []); // MaxHealth 50, Toughness 0
+				player.currentHealth = 30; // 40% missing, so the enemy's ExecuteBonus WOULD apply if it were live
+				const enemy = makeBattler([{ id: EAttribute.ExecuteBonus, amount: 1 }], [makeSkill(10, 40)]);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].byPlayer).toBe(false);
+				expect(activations[0].damage).toBe(10); // 10 (unmultiplied), NOT 14
+			});
 		});
 
 		it('draws once per player fire and once per enemy fire, in order', () => {
@@ -417,18 +515,23 @@ describe('battleStep', () => {
 		});
 
 		it('multiplies every portion by a single crit', () => {
-			// CriticalDamage 1.5 + 0.5 = 2. One crit scales BOTH portions of [Physical 50, Fire 50] of raw 20 →
-			// 10 each, ×2 → 20 each = 40 (a per-portion-only crit would give 30).
+			// CriticalDamage 1.5 + 0.5 = 2. The skill's own base chance (#1453) is 1, so it always crits, scaling
+			// BOTH portions of [Physical 50, Fire 50] of raw 20 → 10 each, ×2 → 20 each = 40 (a per-portion-only
+			// crit would give 30).
 			const player = makeBattler(
+				[{ id: EAttribute.CriticalDamage, amount: 0.5 }],
 				[
-					{ id: EAttribute.CriticalChance, amount: 1 },
-					{ id: EAttribute.CriticalDamage, amount: 0.5 }
-				],
-				[
-					makeMultiTypeSkill(20, 40, [
-						{ type: EDamageType.Physical, weight: 50 },
-						{ type: EDamageType.Fire, weight: 50 }
-					])
+					makeMultiTypeSkill(
+						20,
+						40,
+						[
+							{ type: EDamageType.Physical, weight: 50 },
+							{ type: EDamageType.Fire, weight: 50 }
+						],
+						[],
+						[],
+						1
+					)
 				]
 			);
 			const enemy = makeBattler([{ id: EAttribute.Strength, amount: 10 }], []);

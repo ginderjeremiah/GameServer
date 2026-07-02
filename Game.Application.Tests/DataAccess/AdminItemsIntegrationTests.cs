@@ -501,23 +501,163 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveItems_WeaponWithNonLeafWeaponType_ReturnsFailure()
+        public void SaveItems_WeaponWithUndefinedWeaponType_ReturnsFailure()
         {
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
 
-            // Anti-tamper: a tampered client could send a non-weapon leaf (e.g. Fire); the save rejects it.
+            // Anti-tamper: a tampered client could send an out-of-range enum value; the save rejects it. Any
+            // *defined* leaf (including a non-martial caster type like Fire) is a valid weapon type (#1456).
             var result = admin.SaveItems(
             [
                 new Change<Contracts.Item>
                 {
                     ChangeType = EChangeType.Add,
-                    Item = NewItem(name: "Fire Blade", itemCategoryId: EItemCategory.Weapon, weaponType: EDamageType.Fire),
+                    Item = NewItem(name: "Undefined Blade", itemCategoryId: EItemCategory.Weapon, weaponType: (EDamageType)999),
                 },
             ]);
 
             Assert.False(result.Succeeded);
-            Assert.Equal("'Fire' is not a valid weapon type.", result.ErrorMessage);
+            Assert.Equal("'999' is not a valid weapon type.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveItems_CasterWeaponWithMatchingElementalSignature_Succeeds()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Fireball",
+                    acquisition: ESkillAcquisition.Item, damageType: EDamageType.Fire);
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A caster weapon's WeaponType is its element (Fire), not a martial leaf; its signature shares
+            // that element, so it is never gated by the weapon-match gate and always fields fine.
+            var changes = new List<Change<Contracts.Item>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Fire Staff", itemCategoryId: EItemCategory.Weapon,
+                        weaponType: EDamageType.Fire, grantedSkillId: skillId),
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            Assert.True(admin.SaveItems(changes).Succeeded);
+        }
+
+        [Fact]
+        public async Task SaveItems_WeaponGrantingNonMartialSignature_Succeeds()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Flame Slash",
+                    acquisition: ESkillAcquisition.Item, damageType: EDamageType.Fire);
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A non-martial (elemental/DoT) signature is never gated by the weapon-match gate, so it always
+            // qualifies regardless of the weapon's own (martial) type.
+            var changes = new List<Change<Contracts.Item>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Flaming Sword", itemCategoryId: EItemCategory.Weapon,
+                        weaponType: EDamageType.Sword, grantedSkillId: skillId),
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            Assert.True(admin.SaveItems(changes).Succeeded);
+        }
+
+        [Fact]
+        public async Task SaveItems_WeaponGrantingMismatchedMartialSignature_ReturnsFailure()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Sword Slash",
+                    acquisition: ESkillAcquisition.Item, damageType: EDamageType.Sword);
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A Club weapon granting a Sword-typed signature strands the wielder: the weapon-match gate dims
+            // the Sword signature in the Club's own hands (the no-stranding gap #1456 closes).
+            var changes = new List<Change<Contracts.Item>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Mismatched Club", itemCategoryId: EItemCategory.Weapon,
+                        weaponType: EDamageType.Club, grantedSkillId: skillId),
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            var result = admin.SaveItems(changes);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "'Club' weapon grants a 'Sword' signature skill, which strands the wielder — a martial signature must match its own weapon's type.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveItems_WeaponGrantingMultiPortionSignature_ResolvesPrimaryTypeByWeight_ReturnsFailure()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                // Fire is authored first (weight 1) but Sword is heavier (weight 5), so resolving the
+                // signature's primary type must walk past the first portion rather than just reading it.
+                var skill = await TestDataSeeder.CreateSkillAsync(context, "Flaming Slash",
+                    acquisition: ESkillAcquisition.Item, damageType: EDamageType.Fire);
+                context.SkillDamagePortions.Add(new Entities.SkillDamagePortion
+                {
+                    SkillId = skill.Id,
+                    DamageType = (int)EDamageType.Sword,
+                    Weight = 5.0m,
+                });
+                await context.SaveChangesAsync();
+                skillId = skill.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The skill's primary type resolves to Sword (heaviest portion), which strands the wielder of a
+            // Club exactly as a single-portion Sword signature would.
+            var changes = new List<Change<Contracts.Item>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewItem(name: "Mismatched Multi-Portion Club", itemCategoryId: EItemCategory.Weapon,
+                        weaponType: EDamageType.Club, grantedSkillId: skillId),
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            var result = admin.SaveItems(changes);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "'Club' weapon grants a 'Sword' signature skill, which strands the wielder — a martial signature must match its own weapon's type.",
+                result.ErrorMessage);
         }
 
         [Fact]

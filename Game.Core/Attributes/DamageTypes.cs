@@ -145,15 +145,31 @@ namespace Game.Core.Attributes
             return ResistanceAttributeSet.Contains(attribute);
         }
 
-        // The weapon-type leaves (#1340): the non-Physical leaves that roll up under the shared Physical
-        // category key (their applies() set is [<weapon>, Physical]). Derived from the taxonomy table so the
-        // classification can't drift from the append-only enum. The single source of truth for "is this leaf a
-        // weapon type", consumed by Item.WeaponType authoring validation (#1372) and the weapon-match gate (#1373).
+        // The set of attacker-side amplification attributes (one per key, all non-weapon and weapon keys alike).
+        // Backs the O(1) IsAmplificationAttribute gate the Momentum enabler uses to decide which self-applied
+        // ramp buffs feed the ramp tally (#1428).
+        private static readonly IReadOnlySet<EAttribute> AmplificationAttributeSet =
+            KeyInfos.Select(info => info.Amplification).ToHashSet();
+
+        /// <summary>Whether <paramref name="attribute"/> is an attacker-side amplification attribute — the gate
+        /// the Momentum enabler uses to track a self-applied ramp buff (#1428).</summary>
+        public static bool IsAmplificationAttribute(EAttribute attribute)
+        {
+            return AmplificationAttributeSet.Contains(attribute);
+        }
+
+        // The weapon-type (martial) leaves (#1340): the non-Physical leaves that roll up under the shared
+        // Physical category key (their applies() set is [<weapon>, Physical]). Derived from the taxonomy table
+        // so the classification can't drift from the append-only enum. The single source of truth for "is this
+        // leaf martial", consumed by the weapon-match gate (#1373) and the weapon no-stranding signature check
+        // (#1456) — a weapon's own WeaponType is not restricted to this set (a caster weapon declares its
+        // element instead), but a *martial* signature must match its own weapon's type.
         private static readonly IReadOnlySet<EDamageType> WeaponLeafSet =
             LeafTypes.Where(t => t != EDamageType.Physical && AppliesMap[t].Contains(Physical)).ToHashSet();
 
-        /// <summary>The weapon-type leaf damage types (Sword / Axe / Bow / Club / Dagger / Unarmed), in enum order.
-        /// The set a weapon's <see cref="Items.Item.WeaponType"/> is constrained to.</summary>
+        /// <summary>The martial weapon-leaf damage types (Sword / Axe / Bow / Club / Dagger / Unarmed), in enum
+        /// order — the types the weapon-match gate treats as gated. A weapon's <see cref="Items.Item.WeaponType"/>
+        /// is not constrained to this set (any leaf is valid, e.g. a caster weapon's element).</summary>
         public static IReadOnlyList<EDamageType> WeaponLeaves { get; } = LeafTypes.Where(WeaponLeafSet.Contains).ToList();
 
         /// <summary>Whether <paramref name="type"/> is a weapon-type leaf — a leaf under the Physical category key,

@@ -203,6 +203,7 @@ describe('Battler skill-effect bookkeeping', () => {
 				id: 0,
 				name: 'Dual',
 				baseDamage: 0,
+				criticalChance: 0,
 				cooldownMs: 40,
 				damageMultipliers: [],
 				effects: [
@@ -236,6 +237,7 @@ describe('Battler skill-effect bookkeeping', () => {
 				id: 0,
 				name: 'Dual',
 				baseDamage: 0,
+				criticalChance: 0,
 				cooldownMs: 40,
 				damageMultipliers: [],
 				effects: [
@@ -387,6 +389,7 @@ describe('Skill effect attribute scaling', () => {
 				id: 0,
 				name: 'Scaler',
 				baseDamage: 0,
+				criticalChance: 0,
 				cooldownMs: 40,
 				damageMultipliers: [],
 				effects: [effect],

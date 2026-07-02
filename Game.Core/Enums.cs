@@ -63,10 +63,14 @@ namespace Game.Core
         DropBonus = 9,
 
         /// <summary>
-        /// A derived game attribute. A decimal probability (0.05 = 5%) that an attack lands a critical hit,
-        /// compared directly against the battle RNG draw. Sourced from Dexterity/Luck (player-only).
+        /// A derived game attribute. A base-1 multiplier (like <see cref="CooldownRecovery"/>) applied against a
+        /// <b>skill's own authored base critical-hit chance</b> (<see cref="Skills.Skill.CriticalChance"/>) — the
+        /// per-skill opt-in enabler, so an unauthored skill never crits regardless of this multiplier. Read
+        /// directly and composed additively from base 1 plus any authored sources (items, proficiency, mods,
+        /// class), so an uncommitted skill still crits at its own authored rate and a committed investment scales
+        /// it up (or down below 1).
         /// </summary>
-        CriticalChance = 10,
+        CriticalChanceMultiplier = 10,
 
         /// <summary>
         /// A derived game attribute. A base-≥1 multiplier (base 1.5) read directly: on a critical hit the raw
@@ -216,6 +220,17 @@ namespace Game.Core
         /// <see cref="Battle.BattleContext.DamageTarget"/>.
         /// </summary>
         DamageReflection = 45,
+
+        /// <summary>
+        /// A derived game attribute. The maximum bonus-damage multiplier applied to a direct hit, scaled by the
+        /// target's missing-health fraction at the moment of the hit — the Cull execute/finisher delivery
+        /// archetype (spike #1398, #1430). A value of <c>0.5</c> means up to a +50% damage bonus against a
+        /// target with no health remaining, scaling down to <c>0</c> against a target at full health.
+        /// Decimal-percentage convention, base <c>0</c> and <b>authored-only</b> — granted by gear/skills, never
+        /// derived from a core attribute — so it is a committed build identity like <see cref="DamageReflection"/>,
+        /// inert without an enabler. See <see cref="Battle.BattleContext.DamageTarget"/>.
+        /// </summary>
+        ExecuteBonus = 46,
     }
 
     /// <summary>
@@ -470,6 +485,25 @@ namespace Game.Core
         /// Appended after the weapon-mastery keys (the enum grows append-only).
         /// </summary>
         Hex = 30,
+
+        /// <summary>
+        /// Ramp damage enabled (the Momentum mastery — spike #1398, #1428). The normalized-marginal extra damage
+        /// a player-applied ramp (a stacking self-buff to a typed amplification attribute) enabled, booked as an
+        /// overlay tally like <see cref="Crit"/> and <see cref="Hex"/>. A combat-event key — type-neutral, routed
+        /// straight to a single activity key with no <see cref="Attributes.DamageTypes.Applies"/> routing.
+        /// Appended after Hex (the enum grows append-only).
+        /// </summary>
+        Momentum = 31,
+
+        /// <summary>
+        /// Execute bonus damage enabled (the Cull mastery — spike #1398, #1430). The normalized-marginal extra
+        /// damage an authored <see cref="EAttribute.ExecuteBonus"/> enabled, scaled by the target's
+        /// missing-health fraction at the moment of the hit, booked as an overlay tally like <see cref="Crit"/>,
+        /// <see cref="Hex"/>, and <see cref="Momentum"/>. A combat-event key — type-neutral, routed straight to a
+        /// single activity key with no <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after
+        /// Momentum (the enum grows append-only).
+        /// </summary>
+        Cull = 32,
     }
 
     /// <summary>
@@ -487,7 +521,7 @@ namespace Game.Core
 
         /// <summary>
         /// An aggregate stat computed from a base/derived formula (MaxHealth, Toughness, CooldownRecovery,
-        /// the crit/dodge set), plus the authored-only DamageReflection (base 0, no derivation).
+        /// the crit/dodge set), plus the authored-only DamageReflection and ExecuteBonus (base 0, no derivation).
         /// </summary>
         Secondary = 2,
 
@@ -719,6 +753,9 @@ namespace Game.Core
         DamageDealt = 6,
         BattlesWon = 7,
         SkillsUsed = 8,
+
+        /// <summary>Kills attributed to a damage-type key — see <see cref="EStatisticType.KillsByDamageType"/> (#1455).</summary>
+        KillsByDamageType = 9,
     }
 
     /// <summary>
@@ -792,6 +829,16 @@ namespace Game.Core
         DamageDodged = 19,
         // 20 and 21 are retired (the former AttacksBlocked / DamageBlocked, removed with the Block mechanic in
         // spike #1330). The enum is intrinsic, DB-backed reference data, so the ordinals are left as a gap.
+
+        /// <summary>
+        /// Kills attributed to a damage-type key (#1455). Recorded per <see cref="EDamageTypeKey"/> the
+        /// battle's majority-dealt <see cref="EDamageType"/> rolls up to via
+        /// <see cref="Attributes.DamageTypes.Applies"/> — a Burn-majority kill books rows for Burn, Fire,
+        /// Elemental, and Dot alike, mirroring how proficiency training rolls up a typed hit. Its declared
+        /// <see cref="EEntityType.DamageType"/> breakdown backs "kill N with &lt;type&gt;" challenges (and,
+        /// since weapon leaves are damage-type leaves, "kill N with a weapon type" too).
+        /// </summary>
+        KillsByDamageType = 22,
     }
 
     /// <summary>
@@ -803,6 +850,14 @@ namespace Game.Core
         Enemy = 1,
         Zone = 2,
         Skill = 3,
+
+        /// <summary>
+        /// A damage-type key (<see cref="EDamageTypeKey"/>), keyed by its ordinal. Unlike the other entity
+        /// types this is not a live/retireable DB reference table — the taxonomy is a fixed intrinsic enum
+        /// (like <see cref="Items.Item.WeaponType"/>), so a target of this type is validated by enum
+        /// membership rather than a retirement lookup (#1455).
+        /// </summary>
+        DamageType = 4,
     }
 
     /// <summary>

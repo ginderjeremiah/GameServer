@@ -59,7 +59,7 @@ $category-armor: $accent;
 $category-weapon: $enemy-accent;
 $category-accessory: #e8c878;
 
-// challenge-type accents (one hue per EChallengeType 1..8) — consumed via the
+// challenge-type accents (one hue per EChallengeType 1..9) — consumed via the
 // helpers in $lib/common/challenge-type
 $challenge-enemies-killed: #df8470;
 $challenge-bosses-defeated: #d9a441;
@@ -69,6 +69,7 @@ $challenge-level-reached: #6f9fd9;
 $challenge-damage-dealt: #cf7a9e;
 $challenge-battles-won: #5fae9a;
 $challenge-skills-used: #5aa6bd;
+$challenge-kills-by-damage-type: #e0935a;
 
 // rarity palette (white → green → blue → purple → gold → red, ascending tier)
 $rarity-common: #d4d4d4;

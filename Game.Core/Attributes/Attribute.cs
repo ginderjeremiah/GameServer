@@ -108,10 +108,11 @@ namespace Game.Core.Attributes
                 Toughness => "Reduces all incoming direct damage by a percentage that grows with diminishing returns, never reaching full immunity.",
                 CooldownRecovery => "A percentage multiplier to the rate at which skills become available again after being used.",
                 DropBonus => "Obsolete. Previously increased the rate at which items were dropped by enemies.",
-                CriticalChance => "The percentage chance for an attack to deal increased damage.",
+                CriticalChanceMultiplier => "A multiplier applied to a skill's own base critical-hit chance.",
                 CriticalDamage => "The additional percentage of damage dealt when a critical hit occurs.",
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
                 DamageReflection => "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
+                ExecuteBonus => "The maximum percentage of bonus damage dealt against a target, scaled by how much health it is missing.",
                 BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
                 PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
                 BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
@@ -151,12 +152,15 @@ namespace Game.Core.Attributes
                 MaxHealth => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "HP", 6, 0),
                 Toughness => new(EAttributeType.Secondary, IsPercentage: false, IsHarmful: false, "TGH", 7, 0),
                 CooldownRecovery => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CDR", 8, 0),
-                CriticalChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT", 9, 0),
+                CriticalChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT", 9, 0),
                 CriticalDamage => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CRT DMG", 10, 0),
                 DodgeChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "DOD", 11, 0),
                 // DamageReflection (spike #1330) takes the defensive-secondary slot Block vacated, so it groups
                 // with the other combat-secondary stats on the breakdown screen. Authored-only, decimal-percentage.
                 DamageReflection => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "REF", 12, 0),
+                // ExecuteBonus (spike #1398, #1430) is the Cull archetype's enabler — authored-only like
+                // DamageReflection, grouped with the other combat-secondary stats.
+                ExecuteBonus => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "EXE", 13, 0),
                 BleedDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "BLD DOT", 14, 0),
                 HealthRegenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: false, "REG", 15, 0),
                 // Obsolete: never displayed, so it gets neutral display metadata and sorts last.

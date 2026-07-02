@@ -20,7 +20,8 @@ const CHALLENGE_TYPE_KEY: Record<EChallengeType, string> = {
 	[EChallengeType.LevelReached]: 'level-reached',
 	[EChallengeType.DamageDealt]: 'damage-dealt',
 	[EChallengeType.BattlesWon]: 'battles-won',
-	[EChallengeType.SkillsUsed]: 'skills-used'
+	[EChallengeType.SkillsUsed]: 'skills-used',
+	[EChallengeType.KillsByDamageType]: 'kills-by-damage-type'
 };
 
 /** Themeable challenge-type accent hue, e.g. `var(--challenge-enemies-killed)`. */

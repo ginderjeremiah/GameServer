@@ -299,6 +299,107 @@ namespace Game.Core.Tests.Progress
             Assert.Equal(0m, progress.GetStatisticValue(EStatisticType.PlayerDeaths, null));
         }
 
+        // ── RecordBattleCompleted: kills by damage type (#1455) ──────────────
+
+        [Fact]
+        public void RecordBattleCompleted_Victory_RecordsKillForMajorityTypeAndItsCategories()
+        {
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                TypedDamageDealt =
+                {
+                    [EDamageType.Fire] = 80.0,
+                    [EDamageType.Physical] = 20.0,
+                },
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            // Fire is the majority type — Applies(Fire) = [Fire, Elemental], so both keys book a kill.
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Fire));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Elemental));
+            // The minority type (and its non-applicable keys) get no credit.
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Physical, out _));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_Victory_BurnMajority_RollsUpToAllFourKeys()
+        {
+            var progress = MakeProgress();
+            var stats = new BattleStats { TypedDamageDealt = { [EDamageType.Burn] = 50.0 } };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            // Burn is fire, elemental, and DoT alike — Applies(Burn) = [Burn, Fire, Elemental, Dot].
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Burn));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Fire));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Elemental));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Dot));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_Victory_TiedTypedDamage_BreaksTieOnLowerOrdinal()
+        {
+            var progress = MakeProgress();
+            // Physical (ordinal 0) and Water (ordinal 2) tie — Physical wins the deterministic tie-break.
+            var stats = new BattleStats
+            {
+                TypedDamageDealt =
+                {
+                    [EDamageType.Water] = 50.0,
+                    [EDamageType.Physical] = 50.0,
+                },
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Physical));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Water, out _));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_Victory_NoTypedDamageDealt_RecordsNoKillByDamageType()
+        {
+            // Defensive branch: a victory with an empty offense book (shouldn't happen in practice, since a
+            // kill requires dealing typed damage) must not throw or record a row.
+            var progress = MakeProgress();
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Physical, out _));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_Loss_DoesNotRecordKillByDamageType()
+        {
+            var progress = MakeProgress();
+            var stats = new BattleStats { TypedDamageDealt = { [EDamageType.Fire] = 30.0 } };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: false, playerDied: true, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Fire, out _));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_RepeatedFireKills_AccumulatesKillsByDamageType()
+        {
+            var progress = MakeProgress();
+            var stats = new BattleStats { TypedDamageDealt = { [EDamageType.Fire] = 30.0 } };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Fire));
+        }
+
         // ── RecordBattleCompleted: per-skill statistics ──────────────────────
 
         [Fact]

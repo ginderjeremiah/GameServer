@@ -106,15 +106,16 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.CooldownRecovery]
 			},
 
-			// CriticalChance is opt-in (crit rework #1425): no base and no attribute derivation, so even a heavy
-			// Dexterity/Luck build sits at exactly 0 — DEX/LUK no longer feed crit. Flat crit chance comes from
-			// item/skill enablers only (opt-in-multiplicative math covered in attribute-collection.test.ts).
-			criticalChance: {
+			// CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): a base of 1 (like
+			// CooldownRecovery) and no attribute derivation, so even a heavy Dexterity/Luck build sits at
+			// exactly 1 — DEX/LUK no longer feed crit, and the enabler is a skill's own authored base chance,
+			// not this attribute. The opt-in-multiplicative math is covered in attribute-collection.test.ts.
+			criticalChanceMultiplier: {
 				allocations: [
 					[EAttribute.Dexterity, 20],
 					[EAttribute.Luck, 10]
 				],
-				derivedAttributes: [EAttribute.CriticalChance]
+				derivedAttributes: [EAttribute.CriticalChanceMultiplier]
 			},
 
 			// CriticalDamage = 1.5 (base) + 0.0025*Luck
@@ -129,9 +130,10 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.DodgeChance]
 			},
 
-			// With no allocations every derived stat collapses to just its base: the two with a base carry
-			// it (MaxHealth 50, CriticalDamage 1.5), the pure-derived stats are 0. DamageReflection is
-			// authored-only (no static modifier), so it composes to 0 without any allocation.
+			// With no allocations every derived stat collapses to just its base: the three with a base carry
+			// it (MaxHealth 50, CriticalDamage 1.5, CriticalChanceMultiplier 1), the pure-derived stats
+			// (Toughness, CooldownRecovery's coefficients aside, and DodgeChance) are 0/base. DamageReflection
+			// is authored-only (no static modifier at all), so it is 0 here too.
 			zeroBaseStats: {
 				allocations: [],
 				derivedAttributes: [
@@ -139,9 +141,9 @@ describe('BattleAttributes', () => {
 					EAttribute.Toughness,
 					EAttribute.CooldownRecovery,
 					EAttribute.CriticalDamage,
-					EAttribute.CriticalChance,
-					EAttribute.DodgeChance,
-					EAttribute.DamageReflection
+					EAttribute.DamageReflection,
+					EAttribute.CriticalChanceMultiplier,
+					EAttribute.DodgeChance
 				]
 			}
 		};
