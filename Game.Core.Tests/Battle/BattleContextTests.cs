@@ -558,6 +558,23 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void DamageTarget_EnemyHit_AbsorptionResistanceCreditsAtMostTheFullDealtAmount()
+        {
+            // A summed resistance above 1 drives the live hit into absorption (a net heal, capped at 0 here since
+            // the player starts at full health with no room to heal into), but the resist-training credit is a
+            // weighting fraction, not a damage multiplier — it clamps at 1, so it credits at most the full
+            // pre-mitigation dealt amount rather than crediting more than was dealt.
+            var player = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Toughness 0
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(40, Single(EDamageType.Fire));
+
+            Assert.Equal(40, Mitigated(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
         public void DamageTarget_PlayerDodge_RecordsNoResistanceMitigation()
         {
             // A dodged hit was evaded, not mitigated — like exposure, it does not feed the resist-training split.

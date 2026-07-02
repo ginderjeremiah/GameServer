@@ -110,8 +110,9 @@ namespace Game.Core.Battle
             return NetDamageAfterResistance(dealt, SumTypeResistance(damageType), attackerLevel);
         }
 
-        // The raw (unclamped, signed) resistance sum for a type — shared by ComputeNetDamage and
-        // TypeResistanceMitigated, which each apply their own clamping semantics on top.
+        // The raw (unclamped, signed) resistance sum for a type — shared by ComputeNetDamage,
+        // TypeResistanceMitigated, and HexBonusForHit's live-resistance baseline, each applying their own
+        // clamping (or none) on top.
         private double SumTypeResistance(EDamageType damageType)
         {
             var resistance = 0.0;
@@ -191,12 +192,7 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            var liveResistance = 0.0;
-            var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
-            for (var i = 0; i < resistanceAttributes.Count; i++)
-            {
-                liveResistance += _attributes[resistanceAttributes[i]];
-            }
+            var liveResistance = SumTypeResistance(damageType);
 
             // The baseline is the same hit without the opponent's debuff — resistance raised back by v — so the
             // marginal is exactly the damage that debuff enabled (independent of base resistance and enemy buffs).
