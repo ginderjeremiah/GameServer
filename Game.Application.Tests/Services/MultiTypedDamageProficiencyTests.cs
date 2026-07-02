@@ -200,12 +200,14 @@ namespace Game.Application.Tests.Services
 
         // Runs one real player fire of a multi-typed hit through the unmodified battle pipeline and returns the
         // resulting stats (the offense book). The enemy optionally resists Fire so the per-portion mitigation shows
-        // up in the Fire portion's net.
+        // up in the Fire portion's net; its MaxHealth (150) exceeds every scenario's net so the hit never kills —
+        // the offense book is capped at the health actually removed (#1482), and these tests are about the split,
+        // not the overkill cap (pinned by the BattleContext suite).
         private static BattleStats FirePlayerHit(
             double raw, IReadOnlyList<SkillDamagePortion> portions, double enemyFireResistance)
         {
             var player = MakeBattler();
-            var enemy = MakeBattler((EAttribute.FireResistance, enemyFireResistance));
+            var enemy = MakeBattler((EAttribute.FireResistance, enemyFireResistance), (EAttribute.MaxHealth, 100));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.DamageTarget(raw, portions, 0);
             return context.Stats;

@@ -391,6 +391,56 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void ApplyDamageOverTime_KillingTick_RecordsOnlyTheHealthRemoved()
+        {
+            // An 80-damage tick (2000/s over 40ms) overkills the 50-HP battler by 30: the recorded offense
+            // amount is capped at the health actually removed (#1482), while the health math and the returned
+            // aggregate total stay uncapped.
+            var battler = MakeBattler(Stat(Strength, 0), Stat(BleedDamagePerSecond, 2000)); // MaxHealth 50
+            var dealtByType = new Dictionary<EDamageType, double>();
+
+            var dealt = battler.ApplyDamageOverTime(40, recordDamageDealt: (type, amount) => dealtByType[type] = amount);
+
+            Assert.Equal(80, dealt);
+            Assert.Equal(-30, battler.CurrentHealth);
+            Assert.Equal(50, dealtByType[EDamageType.Bleed]);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_MultiTypeKillingTick_CapsInAccumulatorOrder()
+        {
+            // Bleed resolves before Burn in the fixed accumulator order: its 80 exhausts the 50 HP, so the
+            // Burn tick books 0 while both still subtract from health in full (#1482).
+            var battler = MakeBattler(
+                Stat(Strength, 0), Stat(BleedDamagePerSecond, 2000), Stat(BurnDamagePerSecond, 250));
+            var dealtByType = new Dictionary<EDamageType, double>();
+
+            var dealt = battler.ApplyDamageOverTime(40, recordDamageDealt: (type, amount) => dealtByType[type] = amount);
+
+            Assert.Equal(90, dealt); // 80 + 10 — the health math is uncapped
+            Assert.Equal(50, dealtByType[EDamageType.Bleed]);
+            Assert.Equal(0, dealtByType[EDamageType.Burn]);
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_AbsorbedTickRestoresBookableHealth_ForLaterTypes()
+        {
+            // A Bleed absorption (resistance 2) heals 80 (uncapped, per the DoT absorption rule) before Burn
+            // resolves in the fixed order, so the Burn tick's 100 comes out of genuinely restored health and
+            // books in full — the #1482 cap tracks the running health through the order, negatives included.
+            var battler = MakeBattler(
+                Stat(Strength, 0), Stat(BleedDamagePerSecond, 2000), Stat(BleedResistance, 2.0),
+                Stat(BurnDamagePerSecond, 2500));
+            var dealtByType = new Dictionary<EDamageType, double>();
+
+            battler.ApplyDamageOverTime(40, recordDamageDealt: (type, amount) => dealtByType[type] = amount);
+
+            Assert.Equal(-80, dealtByType[EDamageType.Bleed]); // the negative (heal) passes through unchanged
+            Assert.Equal(100, dealtByType[EDamageType.Burn]);  // fully booked — it removed real, restored health
+            Assert.Equal(30, battler.CurrentHealth);           // 50 + 80 − 100
+        }
+
+        [Fact]
         public void ResolveDamageOverTime_RecordsPlayerDotExposure_AndEnemyDotAsDamageDealt()
         {
             // The two books split by side: the player's incoming DoT records pre-mitigation exposure into the

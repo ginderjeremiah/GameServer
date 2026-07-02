@@ -105,10 +105,13 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// Per-leaf-type damage the player dealt this battle — the proficiency offense "output book" (spike
-        /// #1318), consumed directly by the accrual's offense binding. Sums the same post-mitigation amount each
-        /// hit booked into <see cref="PlayerDamageDealt"/>, so a focused build trains its damage type fully while
-        /// a dabbled one trains it proportionally. Covers both direct hits and the player's typed DoT damage
-        /// dealt (#1338 — a bleed tick is type-routed to Bleed with no source-skill attribution).
+        /// #1318), consumed directly by the accrual's offense binding. Books each hit's post-mitigation amount
+        /// <b>capped at the health it actually removed</b> (#1482) — a killing blow's overkill tail is not
+        /// activity, so the per-battle total is bounded by the enemy's health pool and a one-shot on a trivial
+        /// enemy cannot mint a power-proportional activity floor. The player-facing aggregates
+        /// (<see cref="PlayerDamageDealt"/>, <see cref="HighestPlayerAttack"/>, the per-skill totals) deliberately
+        /// keep the full uncapped net. Covers both direct hits and the player's typed DoT damage dealt (#1338 — a
+        /// bleed tick is type-routed to Bleed with no source-skill attribution).
         /// </summary>
         public Dictionary<EDamageType, double> TypedDamageDealt { get; set; } = [];
 
@@ -141,7 +144,8 @@ namespace Game.Core.Battle
         /// </summary>
         public double PlayerPower { get; set; }
 
-        /// <summary>Accumulates a direct hit of <paramref name="amount"/> into the typed offense book.</summary>
+        /// <summary>Accumulates a direct hit's or DoT tick's booked <paramref name="amount"/> (already capped at
+        /// the health it removed by the caller — #1482) into the typed offense book.</summary>
         public void AddTypedDamageDealt(EDamageType type, double amount)
         {
             TypedDamageDealt.TryGetValue(type, out var existing);
