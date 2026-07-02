@@ -48,17 +48,14 @@ export function skillContributions(skill: ISkill, attributes: BattleAttributes):
  *  `Toughness / (Toughness + K·attackerLevel)` (K = {@link TOUGHNESS_MITIGATION_CONSTANT}): effective HP is
  *  linear in Toughness while the reduction asymptotes below 100% (no immunity), and the attacker's level scales
  *  the denominator so the band stays stable as content scales (#1330). With no Toughness the factor is an exact
- *  1.0 and the hit is unchanged. `toughness` is floored at 0 for this curve only — a debuff can strip mitigation
- *  down to 0%, never past its pole at `-K·attackerLevel` into amplification or a net heal (#1461). Block's flat
- *  reduction was removed (#1330), so the stack is now purely multiplicative and never needs a floor on
- *  `rawDamage` itself — it is already positive here (the absorption branch in {@link mitigateDamage} handles the
- *  non-positive case). Mirrors the backend `Battler.ComputeNetDamage`'s Toughness tail — the expression must match
- *  bit-for-bit for battle parity, including the unreachable 0/0 reduction (Toughness AND attackerLevel both 0 →
- *  NaN, since battler Level ≥ 1) which both ports propagate identically. */
+ *  1.0 and the hit is unchanged. Block's flat reduction was removed (#1330), so the stack is now purely
+ *  multiplicative and never needs a floor — `rawDamage` is already positive here (the absorption branch in
+ *  {@link mitigateDamage} handles the non-positive case). Mirrors the backend `Battler.ComputeNetDamage` — the
+ *  expression must match bit-for-bit for battle parity, including the unreachable 0/0 reduction (Toughness AND
+ *  attackerLevel both 0 → NaN, since battler Level ≥ 1) which both ports propagate identically with no clamp. */
 export function toughnessMitigatedDamage(rawDamage: number, toughness: number, attackerLevel: number): number {
-	const effectiveToughness = Math.max(toughness, 0);
 	const scaled = TOUGHNESS_MITIGATION_CONSTANT * attackerLevel;
-	const toughnessReduction = effectiveToughness / (effectiveToughness + scaled);
+	const toughnessReduction = toughness / (toughness + scaled);
 	return rawDamage * (1 - toughnessReduction);
 }
 

@@ -176,20 +176,10 @@ describe('battle-formulas', () => {
 			expect(toughnessMitigatedDamage(40, 20, 3)).toBeCloseTo(30, 10);
 		});
 
-		// The curve is floored at Toughness = 0 (#1461): a debuff-driven negative Toughness never crosses the
-		// unfloored pole at -K·attackerLevel into amplification or a net heal.
-		it('floors a negative Toughness to zero — behaves like no Toughness', () => {
-			expect(toughnessMitigatedDamage(40, -10, 1)).toBe(40);
-		});
-
-		it('floors Toughness exactly at the pole (-K·attackerLevel) without dividing by zero', () => {
-			expect(toughnessMitigatedDamage(40, -20, 1)).toBe(40);
-		});
-
-		it('floors Toughness past the pole — never amplifies or heals', () => {
-			const net = toughnessMitigatedDamage(40, -1000, 1);
-			expect(net).toBe(40);
-			expect(net).toBeGreaterThan(0);
+		it('amplifies the hit for a negative Toughness within the pole (#1478)', () => {
+			// A debuff-driven negative Toughness inverts the curve rather than flooring at 0% mitigation:
+			// -10/(-10+20) = -1 reduction → 40 × (1 − (−1)) = 80.
+			expect(toughnessMitigatedDamage(40, -10, 1)).toBeCloseTo(80, 10);
 		});
 	});
 
