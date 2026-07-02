@@ -34,6 +34,7 @@ export enum EActivityKey {
 	Unarmed = 29,
 	Hex = 30,
 	Momentum = 31,
+	Cull = 32,
 }
 
 export enum EAttribute {
@@ -82,6 +83,7 @@ export enum EAttribute {
 	DaggerAmplification = 43,
 	UnarmedAmplification = 44,
 	DamageReflection = 45,
+	ExecuteBonus = 46,
 }
 
 export enum EAttributeModifierSource {

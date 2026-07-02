@@ -156,7 +156,13 @@ namespace Game.Core.Battle
         /// than the full crit net; the Hex signal (<see cref="BattleStats.HexBonusDealt"/>, #1427) is booked
         /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled,
         /// and the Momentum signal (<see cref="BattleStats.MomentumBonusDealt"/>, #1428) is booked per-portion as
-        /// the marginal damage the player's own applied ramp enabled. Each portion's absorption heal is capped at
+        /// the marginal damage the player's own applied ramp enabled. The Cull signal
+        /// (<see cref="BattleStats.CullBonusDealt"/>, #1430) is likewise booked per-portion off the pre-crit
+        /// baseline, but — unlike Hex/Momentum, which train off the existing resistance/amplification pipeline —
+        /// its enabler (<see cref="EAttribute.ExecuteBonus"/> scaled by the target's missing-health fraction,
+        /// sampled once per fire) also multiplies the <b>real</b> damage dealt, identically to
+        /// <see cref="EAttribute.CriticalDamage"/> and before mitigation, so it is the one overlay that is
+        /// parity-critical beyond its tally. Each portion's absorption heal is capped at
         /// the <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
@@ -192,13 +198,26 @@ namespace Game.Core.Battle
                 // every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
                 var isCrit = _rng.Next() < baseCriticalChance * _activeBattler.GetAttributeValue(CriticalChanceMultiplier);
                 var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
+
+                // The Cull execute overlay (#1430): the target's missing-health fraction AT THE START of this
+                // fire, sampled once (like the crit draw) so an earlier portion's damage within the same
+                // multi-typed hit cannot change a later portion's bonus. executeInvestment is this fire's
+                // multiplier above 1 — 0 when ExecuteBonus is unauthored or the target is at full health —
+                // applied to the raw damage identically to critMultiplier, before mitigation.
+                var targetMaxHealth = _targetBattler.GetAttributeValue(MaxHealth);
+                var missingHpFraction = Math.Clamp(
+                    (targetMaxHealth - _targetBattler.CurrentHealth) / targetMaxHealth, 0.0, 1.0);
+                var executeInvestment = _activeBattler.GetAttributeValue(ExecuteBonus) * missingHpFraction;
+                var executeMultiplier = 1.0 + executeInvestment;
+
                 var baselineNet = 0.0;
                 for (var i = 0; i < portions.Count; i++)
                 {
                     var type = portions[i].Type;
                     var rawPortion = PortionRawDamage(rawDamage, totalWeight, portions[i]);
                     var dealt = _activeBattler.AmplifyDamage(rawPortion, type);
-                    var net = _targetBattler.TakeDamage(dealt * critMultiplier, type, _activeBattler.Level);
+                    var net = _targetBattler.TakeDamage(
+                        dealt * critMultiplier * executeMultiplier, type, _activeBattler.Level);
                     Stats.AddTypedDamageDealt(type, net);
                     totalNet += net;
                     // The Hex overlay tally (#1427): the marginal damage the player's applied vulnerability let
@@ -217,6 +236,15 @@ namespace Game.Core.Battle
                         var marginal = _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level)
                             - _targetBattler.ComputeNetDamage(unrampedDealt, type, _activeBattler.Level);
                         Stats.MomentumBonusDealt += marginal > 0 ? marginal / (1 + rampContribution) : 0;
+                    }
+                    // The Cull overlay tally (#1430): the marginal damage the execute investment enabled,
+                    // measured on the vanilla (pre-crit) portion — the same independence Hex/Momentum keep —
+                    // so a crit on the same hit neither inflates nor is inflated by the execute bonus.
+                    if (executeInvestment > 0)
+                    {
+                        var executeMarginal = _targetBattler.ComputeNetDamage(dealt * executeMultiplier, type, _activeBattler.Level)
+                            - _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level);
+                        Stats.CullBonusDealt += executeMarginal > 0 ? executeMarginal / (1 + executeInvestment) : 0;
                     }
                     if (isCrit)
                     {

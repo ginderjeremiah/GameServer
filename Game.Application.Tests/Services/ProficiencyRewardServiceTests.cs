@@ -492,6 +492,47 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task CullBonus_TrainsTheCullPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Cull trains from the execute-enabled marginal damage (#1430) — an output-book event, type-neutral
+            // like the other overlays (routed straight to the single Cull activity key with no applies() split).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Cull", activityKey: EActivityKey.Cull);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Cull", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CullBonusDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoCullBonus_TrainsNoCull()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with other events but no execute-enabled damage routes no
+            // Cull activity, so a Cull-keyed path is never reached.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Cull", activityKey: EActivityKey.Cull);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Cull", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage, PlayerDamageHealed = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
         public async Task NoReflectedDamage_TrainsNoRetribution()
         {
             using var scope = CreateScope();

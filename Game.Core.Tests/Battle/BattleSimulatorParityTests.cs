@@ -612,6 +612,30 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2000),
 
+                // ── The Cull execute overlay (#1430) ──────────────────────────────────────────
+                // A committed ExecuteBonus (1.0 = up to +100% at 0 target health) scales each fire's raw damage
+                // by (1 + ExecuteBonus × missingHpFraction), sampled once per fire off the target's health
+                // BEFORE that hit — a genuinely new damage-calc conditional (unlike Hex/Momentum/Sunder, which
+                // train off the existing resistance/amplification/toughness pipeline and never alter real
+                // damage). Both simulators must compute the accelerating multiplier identically as the target's
+                // missing-health fraction grows hit over hit.
+
+                // Player 20 raw/hit (no crit, no Toughness either side), 100-HP enemy:
+                //   Hit1 (tick 10): target full HP, mult 1.0 → 20 dealt, 80 remaining.
+                //   Hit2 (tick 20): missing 20/100=0.2 → mult 1.2 → 24 dealt, 56 remaining.
+                //   Hit3 (tick 30): missing 44/100=0.44 → mult 1.44 → 28.8 dealt, 27.2 remaining.
+                //   Hit4 (tick 40): missing 72.8/100=0.728 → mult 1.728 → 34.56 dealt ≥ 27.2 remaining → dies at
+                //   1600ms (vs hit 5 / 2000ms at a flat, un-executed 20/hit).
+                ["forcedExecute"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 10, endurance: 0,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400)],
+                        extra: [(EAttribute.ExecuteBonus, 1.0)]),
+                    Enemy: () => MakeEnemy(strength: 10, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
                 // ── Deterministic damage reflection (spike #1330) ────────────────────────────
                 // Reflection returns the defender's DamageReflection share of a direct hit's net damage to the
                 // attacker, bypassing the attacker's mitigation. Authored-only (granted here as a raw attribute),

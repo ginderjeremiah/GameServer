@@ -369,6 +369,52 @@ describe('battleStep', () => {
 			expect(activations[0].damage).toBe(20); // 20 (no crit), NOT 40
 		});
 
+		describe('Cull execute overlay (#1430)', () => {
+			it('deals unmultiplied damage without an authored ExecuteBonus', () => {
+				const player = makeBattler(baseStats, [makeSkill(10, 40)]);
+				const enemy = makeBattler(baseStats, []); // MaxHealth 50, Toughness 0
+				enemy.currentHealth = 30; // 40% missing, but nothing to scale the multiplier
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].damage).toBe(10);
+				expect(enemy.currentHealth).toBe(30 - 10);
+			});
+
+			it('deals unmultiplied damage against a target at full health', () => {
+				const player = makeBattler([{ id: EAttribute.ExecuteBonus, amount: 1 }], [makeSkill(10, 40)]);
+				const enemy = makeBattler(baseStats, []); // full health ⇒ missing-HP fraction 0
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].damage).toBe(10);
+			});
+
+			it('scales raw damage by 1 + ExecuteBonus × the target’s missing-health fraction', () => {
+				// The enemy is missing 40% of its health (20/50), so a full (100%) ExecuteBonus scales this fire's
+				// multiplier to 1 + 1.0×0.4 = 1.4: 10 raw × 1.4 = 14 dealt (vs 10 unmultiplied).
+				const player = makeBattler([{ id: EAttribute.ExecuteBonus, amount: 1 }], [makeSkill(10, 40)]);
+				const enemy = makeBattler(baseStats, []); // MaxHealth 50, Toughness 0
+				enemy.currentHealth = 30; // 40% missing
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].damage).toBe(14);
+				expect(enemy.currentHealth).toBe(30 - 14);
+			});
+
+			it('never applies to the enemy’s attack, even with a forced ExecuteBonus', () => {
+				const player = makeBattler(baseStats, []); // MaxHealth 50, Toughness 0
+				player.currentHealth = 30; // 40% missing, so the enemy's ExecuteBonus WOULD apply if it were live
+				const enemy = makeBattler([{ id: EAttribute.ExecuteBonus, amount: 1 }], [makeSkill(10, 40)]);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].byPlayer).toBe(false);
+				expect(activations[0].damage).toBe(10); // 10 (unmultiplied), NOT 14
+			});
+		});
+
 		it('draws once per player fire and once per enemy fire, in order', () => {
 			// One crit draw for the player's hit, then one dodge draw for the enemy's — two draws total (Block's
 			// second draw was retired, #1330).

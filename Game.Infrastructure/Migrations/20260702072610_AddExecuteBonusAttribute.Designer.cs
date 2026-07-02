@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260702072610_AddExecuteBonusAttribute")]
+    partial class AddExecuteBonusAttribute
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -129,8 +132,8 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 10,
-                            Description = "A multiplier applied to a skill's own base critical-hit chance.",
-                            Name = "Critical Chance Multiplier"
+                            Description = "The percentage chance for an attack to deal increased damage.",
+                            Name = "Critical Chance"
                         },
                         new
                         {
@@ -1539,10 +1542,6 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<int>("CooldownMs")
                         .HasColumnType("integer");
-
-                    b.Property<decimal>("CriticalChance")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)");
 
                     b.Property<string>("Description")
                         .IsRequired()

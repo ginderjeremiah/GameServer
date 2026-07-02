@@ -220,6 +220,17 @@ namespace Game.Core
         /// <see cref="Battle.BattleContext.DamageTarget"/>.
         /// </summary>
         DamageReflection = 45,
+
+        /// <summary>
+        /// A derived game attribute. The maximum bonus-damage multiplier applied to a direct hit, scaled by the
+        /// target's missing-health fraction at the moment of the hit — the Cull execute/finisher delivery
+        /// archetype (spike #1398, #1430). A value of <c>0.5</c> means up to a +50% damage bonus against a
+        /// target with no health remaining, scaling down to <c>0</c> against a target at full health.
+        /// Decimal-percentage convention, base <c>0</c> and <b>authored-only</b> — granted by gear/skills, never
+        /// derived from a core attribute — so it is a committed build identity like <see cref="DamageReflection"/>,
+        /// inert without an enabler. See <see cref="Battle.BattleContext.DamageTarget"/>.
+        /// </summary>
+        ExecuteBonus = 46,
     }
 
     /// <summary>
@@ -483,6 +494,16 @@ namespace Game.Core
         /// Appended after Hex (the enum grows append-only).
         /// </summary>
         Momentum = 31,
+
+        /// <summary>
+        /// Execute bonus damage enabled (the Cull mastery — spike #1398, #1430). The normalized-marginal extra
+        /// damage an authored <see cref="EAttribute.ExecuteBonus"/> enabled, scaled by the target's
+        /// missing-health fraction at the moment of the hit, booked as an overlay tally like <see cref="Crit"/>,
+        /// <see cref="Hex"/>, and <see cref="Momentum"/>. A combat-event key — type-neutral, routed straight to a
+        /// single activity key with no <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after
+        /// Momentum (the enum grows append-only).
+        /// </summary>
+        Cull = 32,
     }
 
     /// <summary>
@@ -500,7 +521,7 @@ namespace Game.Core
 
         /// <summary>
         /// An aggregate stat computed from a base/derived formula (MaxHealth, Toughness, CooldownRecovery,
-        /// the crit/dodge set), plus the authored-only DamageReflection (base 0, no derivation).
+        /// the crit/dodge set), plus the authored-only DamageReflection and ExecuteBonus (base 0, no derivation).
         /// </summary>
         Secondary = 2,
 
