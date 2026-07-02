@@ -67,6 +67,8 @@ describe('activity-key picker', () => {
 		expect(activityKeyLabel(EActivityKey.Crit)).toBe('Critical damage');
 		expect(activityKeyLabel(EActivityKey.Hex)).toBe('Vulnerability damage enabled');
 		expect(activityKeyLabel(EActivityKey.Momentum)).toBe('Ramp damage enabled');
+		expect(activityKeyLabel(EActivityKey.Sunder)).toBe('Mitigation damage enabled');
+		expect(activityKeyLabel(EActivityKey.Cull)).toBe('Execute damage enabled');
 		expect(activityKeyLabel(EActivityKey.FireResist)).toBe('Fire (resist)');
 		expect(activityKeyLabel(EActivityKey.DotResist)).toBe('DoT (resist)');
 	});

@@ -504,6 +504,15 @@ namespace Game.Core
         /// Momentum (the enum grows append-only).
         /// </summary>
         Cull = 32,
+
+        /// <summary>
+        /// Mitigation damage enabled (the Sunder mastery — spike #1398, #1429). The normalized-marginal extra
+        /// damage a player-applied Toughness debuff let through the mitigation curve, booked as an overlay tally
+        /// like <see cref="Crit"/>, <see cref="Hex"/>, <see cref="Momentum"/>, and <see cref="Cull"/>. A
+        /// combat-event key — type-neutral, routed straight to a single activity key with no
+        /// <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after Cull (the enum grows append-only).
+        /// </summary>
+        Sunder = 33,
     }
 
     /// <summary>

@@ -93,8 +93,14 @@ namespace Game.Core.Battle
                 && effect.ModifierType is EModifierType.Additive
                 && DamageTypes.IsAmplificationAttribute(effect.AttributeId);
 
+            // An opponent-targeted additive Toughness debuff is the Sunder enabler (#1429): track its signed
+            // delta on the target so the attacker's Sunder signal credits the mitigation its debuff removed.
+            var tracksSunder = effect.Target is ESkillEffectTarget.Opponent
+                && effect.ModifierType is EModifierType.Additive
+                && effect.AttributeId is Toughness;
+
             var battler = effect.Target is ESkillEffectTarget.Self ? _activeBattler : _targetBattler;
-            battler.ApplyEffect(effect, amount, tracksVulnerability, tracksMomentum);
+            battler.ApplyEffect(effect, amount, tracksVulnerability, tracksMomentum, tracksSunder);
         }
 
         /// <summary>
@@ -159,14 +165,18 @@ namespace Game.Core.Battle
         /// bonus (<see cref="BattleStats.CriticalBonusDealt"/>, #1448), booked from the vanilla-hit baseline rather
         /// than the full crit net; the Hex signal (<see cref="BattleStats.HexBonusDealt"/>, #1427) is booked
         /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled,
-        /// and the Momentum signal (<see cref="BattleStats.MomentumBonusDealt"/>, #1428) is booked per-portion as
-        /// the marginal damage the player's own applied ramp enabled. The Cull signal
+        /// the Sunder signal (<see cref="BattleStats.SunderBonusDealt"/>, #1429) is booked per-portion as a
+        /// designed proxy (<c>dealt × φ(investment)</c>, not a literal marginal — the Toughness curve's
+        /// nonlinearity has no target-flat marginal the way Hex's resistance does) scaled by the applied
+        /// Toughness debuff, and the Momentum signal (<see cref="BattleStats.MomentumBonusDealt"/>, #1428) is
+        /// booked per-portion as the marginal damage the player's own applied ramp enabled. The Cull signal
         /// (<see cref="BattleStats.CullBonusDealt"/>, #1430) is likewise booked per-portion off the pre-crit
-        /// baseline, but — unlike Hex/Momentum, which train off the existing resistance/amplification pipeline —
-        /// its enabler (<see cref="EAttribute.ExecuteBonus"/> scaled by the target's missing-health fraction,
-        /// sampled once per fire) also multiplies the <b>real</b> damage dealt, identically to
-        /// <see cref="EAttribute.CriticalDamage"/> and before mitigation, so it is the one overlay that is
-        /// parity-critical beyond its tally. Each portion's absorption heal is capped at
+        /// baseline, but — unlike Hex/Momentum, which train off the existing resistance/amplification
+        /// pipeline — its enabler
+        /// (<see cref="EAttribute.ExecuteBonus"/> scaled by the target's missing-health fraction, sampled once per
+        /// fire) also multiplies the <b>real</b> damage dealt, identically to <see cref="EAttribute.CriticalDamage"/>
+        /// and before mitigation, so it is the one overlay that is parity-critical beyond its tally. Each
+        /// portion's absorption heal is capped at
         /// the <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
@@ -229,6 +239,12 @@ namespace Game.Core.Battle
                     // overlay inflating the other. Zero unless a vulnerability debuff lowered the target's
                     // resistance below its innate baseline. A backend-only side channel — no health mutation.
                     Stats.HexBonusDealt += _targetBattler.HexBonusForHit(dealt, type, _activeBattler.Level);
+                    // The Sunder overlay tally (#1429): dealt × φ(investment), a designed proxy rather than a
+                    // literal marginal (the nonlinear Toughness curve has no flat-in-the-target marginal the way
+                    // Hex's resistance does), measured on the vanilla (pre-crit) portion so it composes with
+                    // crit/Hex without either overlay inflating the other. Zero unless a Sunder debuff lowered
+                    // the target's Toughness below its baseline.
+                    Stats.SunderBonusDealt += _targetBattler.SunderBonusForHit(dealt, _activeBattler.Level);
                     // The Momentum overlay tally (#1428): the marginal damage the player's own applied ramp (a
                     // stacking self-buff to this portion's amplification) enabled, measured against the un-ramped
                     // baseline (dealt minus exactly the ramp's own contribution) so it composes with crit/Hex

@@ -230,6 +230,59 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
+        /// <summary>
+        /// The Sunder bonus for a direct hit of <paramref name="dealt"/> (attacker-amplified, pre-crit,
+        /// pre-mitigation) against this (defending) battler — the attacker's Sunder signal (#1429), booked as
+        /// <c>dealt × φ(investment)</c>, <c>φ(a) = a / (1 + a)</c>, where the investment is the opponent-applied
+        /// Toughness reduction (<see cref="AppliedSunder"/>) scaled by the curve's own characteristic magnitude
+        /// <c>K·attackerLevel</c> (<see cref="GameConstants.ToughnessMitigationConstant"/>) — the same constant
+        /// the live mitigation curve itself divides by.
+        /// <para>
+        /// Unlike Hex, this is <b>not</b> a literal before/after marginal through <see cref="ComputeNetDamage"/>.
+        /// An earlier version computed one (the live net minus the net at the pre-debuff Toughness), but that
+        /// marginal reduces algebraically to <c>dealt × (1 − resistance) × [curve(baseline) − curve(live)]</c> —
+        /// still scaled by the target's own resistance, and still running the nonlinear Toughness curve at two
+        /// different baselines that are themselves target-dependent. Because the Toughness curve is nonlinear
+        /// (unlike Hex's flat resistance percentage, where the base resistance term cancels out of the marginal
+        /// algebraically), there is no way to compute a literal marginal through it that is actually flat in the
+        /// target's stats. So Sunder instead uses <paramref name="dealt"/> directly as a designed, saturating
+        /// proxy — the fraction of the hit's own magnitude credited to the debuff — which is genuinely
+        /// enemy-independent for a fixed investment (it reads neither the target's Toughness nor its resistance)
+        /// and costs nothing beyond the investment ratio itself (no counterfactual curve evaluation at all).
+        /// </para>
+        /// Returns <c>0</c> when no Sunder debuff is applied. A backend-only side channel — it never mutates
+        /// health. Direct-hit only: DoT bypasses the Toughness curve entirely (a Toughness debuff cannot affect
+        /// it), so there is no DoT counterpart to this method.
+        /// </summary>
+        public double SunderBonusForHit(double dealt, int attackerLevel)
+        {
+            var sunder = AppliedSunder();
+            if (sunder <= 0)
+            {
+                return 0;
+            }
+
+            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
+            return dealt * sunder / (sunder + scaled);
+        }
+
+        /// <summary>
+        /// The opponent-applied Toughness reduction on this (defending) battler — the total <see cref="Toughness"/>
+        /// debuff the opponent's timed effects contributed, clamped at <c>0</c> (spike #1398 → Sunder, #1429).
+        /// Tracked from the effects the opponent applied (<see cref="ApplyEffect"/>'s <c>tracksSunder</c>) rather
+        /// than diffed against a baseline, so it credits the debuff's own work even when the target's base
+        /// Toughness is high or the target buffs its own Toughness (a self-buff never lowers this). Toughness is
+        /// untyped and a single attribute (unlike resistance's per-type keys), so this reads one stack directly
+        /// rather than folding over a type's resistance attributes. Rides the shared per-attribute effect-stack
+        /// expiry, so it returns to <c>0</c> for free when the debuff lapses.
+        /// </summary>
+        public double AppliedSunder()
+        {
+            var contribution = StackContribution(Toughness, stack => stack.SunderContribution);
+            return contribution < 0 ? -contribution : 0;
+        }
+
+        /// <summary>
         /// This (attacking) battler's own applied ramp on <paramref name="damageType"/> — the total amplification
         /// its <b>own</b> timed self-buffs contributed across the type's amplification attributes (spike #1398 →
         /// Momentum, #1428). Tracked from the effects this battler applied to itself
@@ -465,9 +518,17 @@ namespace Game.Core.Battle
         /// the ramp's own contribution from any static amplification the battler already carries. Same shared
         /// expiry, same no-parity-surface side channel as the vulnerability tracker above.
         /// </para>
+        /// <para>
+        /// When <paramref name="tracksSunder"/> is set (an opponent-applied Toughness debuff — the Sunder
+        /// enabler, #1429), <paramref name="amount"/> is likewise accumulated onto the stack's
+        /// <see cref="AttributeEffectStack.SunderContribution"/>, so <see cref="AppliedSunder"/> can credit the
+        /// debuff's own work independently of the target's base Toughness or its own buffs. Same shared expiry,
+        /// same no-parity-surface side channel as the trackers above.
+        /// </para>
         /// </summary>
         public void ApplyEffect(
-            SkillEffect effect, double amount, bool tracksVulnerability = false, bool tracksMomentum = false)
+            SkillEffect effect, double amount,
+            bool tracksVulnerability = false, bool tracksMomentum = false, bool tracksSunder = false)
         {
             var stack = GetOrCreateStack(effect.AttributeId);
 
@@ -487,6 +548,13 @@ namespace Game.Core.Battle
             if (tracksMomentum)
             {
                 stack.MomentumContribution += amount;
+            }
+
+            // An opponent-applied Toughness debuff likewise accrues its signed delta to the Sunder tally's
+            // contribution tracker — separate from the combined modifier below, so the health math is untouched.
+            if (tracksSunder)
+            {
+                stack.SunderContribution += amount;
             }
 
             // Fold the application into the attribute's single combined modifier for its type, swapping the old
@@ -636,6 +704,14 @@ namespace Game.Core.Battle
             /// cleared with the stack on the shared expiry. <c>0</c> for any non-ramped attribute.
             /// </summary>
             public double MomentumContribution { get; set; }
+
+            /// <summary>
+            /// The signed Toughness delta an opponent's tracked debuffs contributed to this attribute (negative
+            /// for a Sunder debuff), summed across applications and read by <see cref="AppliedSunder"/> for the
+            /// Sunder tally (#1429). Separate from the combined modifiers above so it never touches the health
+            /// math, and cleared with the stack on the shared expiry. Only ever populated on the Toughness stack.
+            /// </summary>
+            public double SunderContribution { get; set; }
         }
     }
 }

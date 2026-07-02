@@ -1277,6 +1277,167 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
         }
 
+        // ── DamageTarget: Sunder mitigation tally (#1429) ─────────────────────
+
+        [Fact]
+        public void DamageTarget_NoSunderApplied_BooksNoSunderBonus()
+        {
+            // A hit against an un-debuffed enemy enables no Toughness-curve bypass, so Sunder trains on nothing.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(30, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(0, context.Stats.SunderBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_AppliedSunder_BooksDealtScaledByInvestment()
+        {
+            // Sunder books dealt × φ(investment) — not a literal before/after marginal (the nonlinear Toughness
+            // curve has no marginal that is actually flat in the target's own stats the way Hex's resistance
+            // does), so this is a designed proxy rather than a measured difference. Attacker (player) level 1 ⇒
+            // K·level = 20; a −20 debuff (s = 20) gives investment 20/20 = 1.0, φ(1.0) = 0.5, so raw 30 dealt
+            // banks 30 × 0.5 = 15. The enemy's own Toughness (20, fully stripped to 0 by the debuff) drives the
+            // ACTUAL damage dealt but is never read by the tally itself.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(SunderDebuff(-20));
+
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // Toughness 0 ⇒ no curve ⇒ 30 dealt
+
+            Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(15, context.Stats.SunderBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PartialSunder_BooksSmallerProportionalBonus()
+        {
+            // A lighter debuff (−10, half of the previous case) gives half the investment (10/20 = 0.5),
+            // φ(0.5) = 1/3, so the same raw 30 dealt now banks only 30/3 = 10 — smaller for a smaller
+            // investment (strength-proportionality).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(SunderDebuff(-10)); // live Toughness 10, live reduction 1/3
+
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // 30 × (1 − 1/3) = 20 dealt
+
+            Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(10, context.Stats.SunderBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_HeavilyInvestedSunder_SaturatesTowardDealt()
+        {
+            // A towering debuff (s = 180) drives the investment to 180/20 = 9, φ(9) = 0.9, so the tally
+            // approaches (but never reaches) the full dealt amount: 30 × 0.9 = 27 — the same saturating ceiling
+            // shape the crit/Hex/Momentum bonuses use, here bounding a single hit's credit at one dealt's worth.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 10));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(SunderDebuff(-180));
+
+            context.DamageTarget(30, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(27, context.Stats.SunderBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_SunderBonus_IsIndependentOfEnemyStats()
+        {
+            // The tally reads neither the target's Toughness nor its resistance — only the player's own applied
+            // debuff and level — so the same investment trains identically against a soft, undefended enemy and
+            // a heavily-invested, resistant one, even though the REAL damage dealt differs sharply between them.
+            var softPlayer = MakeBattlerWith((Endurance, 0));
+            var softEnemy = MakeBattlerWith((Endurance, 10)); // Toughness 20, no resistance
+            var softContext = new BattleContext(softPlayer, softEnemy, timeDelta: 0, new Mulberry32(0));
+            softContext.ApplySkillEffect(SunderDebuff(-10));
+
+            var toughPlayer = MakeBattlerWith((Endurance, 0));
+            var toughEnemy = MakeBattlerWith((Endurance, 200), (PhysicalResistance, 0.5)); // Toughness 400, 50% resist
+            var toughContext = new BattleContext(toughPlayer, toughEnemy, timeDelta: 0, new Mulberry32(0));
+            toughContext.ApplySkillEffect(SunderDebuff(-10));
+
+            softContext.DamageTarget(30, Single(EDamageType.Physical), 0);
+            toughContext.DamageTarget(30, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(10, softContext.Stats.SunderBonusDealt, 0.001);
+            Assert.Equal(softContext.Stats.SunderBonusDealt, toughContext.Stats.SunderBonusDealt, 0.001);
+            Assert.NotEqual(softContext.Stats.PlayerDamageDealt, toughContext.Stats.PlayerDamageDealt);
+        }
+
+        [Fact]
+        public void DamageTarget_CritAndSunder_BookIndependentBonuses()
+        {
+            // Crit and Sunder are separate overlays. Sunder is measured on the pre-crit dealt, so a crit does not
+            // inflate it: it still banks 15 (the same as the isolated case above). Crit books its own marginal
+            // off the non-crit baseline net (30, unaffected by Sunder's own tally formula): investment m−1 = 1,
+            // φ(1) = 0.5 ⇒ 30 × 0.5 = 15.
+            var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
+            var enemy = MakeBattlerWith((Endurance, 10));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(SunderDebuff(-20));
+
+            context.DamageTarget(30, Single(EDamageType.Physical), 1); // sundered Toughness 0, crit ×2 = 60 dealt
+
+            Assert.Equal(60, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(15, context.Stats.SunderBonusDealt, 0.001); // unaffected by the crit
+            Assert.Equal(15, context.Stats.CriticalBonusDealt, 0.001); // unaffected by Sunder
+        }
+
+        [Fact]
+        public void DamageTarget_SunderExpired_BooksNoSunderBonus()
+        {
+            // The tracked Sunder debuff rides the effect stack's shared expiry: once it lapses the stack (and its
+            // contribution) is gone, so a later hit trains no Sunder and lands at full Toughness again.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 10));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(SunderDebuff(-20)); // DurationMs 10_000
+            enemy.AdvanceEffects(10_001); // past expiry ⇒ the Toughness stack and its contribution are removed
+
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // Toughness back to 20 ⇒ 15 dealt, no debuff
+
+            Assert.Equal(15, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.SunderBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyAttacking_BooksNoSunderBonus()
+        {
+            // Sunder is a player-offense signal. Even if the player is somehow sundered, an enemy hit never
+            // trains the player's Sunder — only the player-active branch accrues it.
+            var player = MakeBattlerWith((Endurance, 10));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(SunderDebuff(-20)); // lands on the player while the enemy is active
+
+            context.DamageTarget(30, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(0, context.Stats.SunderBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void ResolveDamageOverTime_AppliedSunder_BooksNoSunderBonus()
+        {
+            // DoT bypasses the Toughness curve entirely, so a Toughness debuff cannot affect it — no marginal to
+            // credit, unlike Hex's resistance debuff which does have a DoT counterpart.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 10));
+            var context = new BattleContext(player, enemy, timeDelta: 1000, new Mulberry32(0));
+            context.ApplySkillEffect(SunderDebuff(-20));
+            context.ApplySkillEffect(Dot(BleedDamagePerSecond, 100));
+
+            context.ResolveDamageOverTime();
+
+            Assert.Equal(100, context.Stats.PlayerDamageDealt, 0.001); // unaffected by the Toughness debuff
+            Assert.Equal(0, context.Stats.SunderBonusDealt, 0.001);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static IReadOnlyList<SkillDamagePortion> Single(EDamageType type) =>
@@ -1360,6 +1521,20 @@ namespace Game.Core.Tests.Battle
             AttributeId = accumulator,
             ModifierType = EModifierType.Additive,
             Amount = perSecond,
+            DurationMs = 10_000,
+            ScalingAttributeId = EAttribute.Strength,
+            ScalingAmount = 0,
+        };
+
+        // A player-cast Opponent-targeted Toughness debuff (negative additive) — the Sunder enabler (#1429).
+        // Applied via BattleContext.ApplySkillEffect so it lands on the target (enemy) battler.
+        private static SkillEffect SunderDebuff(double amount) => new()
+        {
+            Id = 5,
+            Target = ESkillEffectTarget.Opponent,
+            AttributeId = EAttribute.Toughness,
+            ModifierType = EModifierType.Additive,
+            Amount = amount,
             DurationMs = 10_000,
             ScalingAttributeId = EAttribute.Strength,
             ScalingAmount = 0,
