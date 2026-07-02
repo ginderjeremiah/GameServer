@@ -1,5 +1,6 @@
 using Game.Core;
 using Game.Core.Attributes;
+using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Application.Content
@@ -271,32 +272,11 @@ namespace Game.Application.Content
                     return;
                 }
 
-                var signatureType = PrimaryDamageType(skill);
+                var signatureType = PrimaryDamageTypeResolver.Resolve(skill.DamagePortions.ToList(), p => p.Weight, p => p.Type);
                 if (DamageTypes.IsWeaponLeaf(signatureType) && signatureType != weaponType)
                 {
                     Error("WeaponStranding", "Item", item.Id, $"grants signature skill {grantedSkillId} of weapon type {signatureType}, which the equipped {weaponType} weapon dims — the weapon fields no usable signature.");
                 }
-            }
-
-            // Mirrors Game.Core.Skills.Skill.PrimaryDamageType over the read contract: highest-weight portion,
-            // first-authored on a tie, Physical for an empty split.
-            private static EDamageType PrimaryDamageType(Contracts.Skill skill)
-            {
-                var portions = skill.DamagePortions.ToList();
-                if (portions.Count == 0)
-                {
-                    return EDamageType.Physical;
-                }
-
-                var primary = portions[0];
-                foreach (var portion in portions)
-                {
-                    if (portion.Weight > primary.Weight)
-                    {
-                        primary = portion;
-                    }
-                }
-                return primary.Type;
             }
 
             private void CheckProficiencyGate(Contracts.Item item, int proficiencyId)

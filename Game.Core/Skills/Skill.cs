@@ -45,29 +45,11 @@
         /// highest-weight portion, the first in authored order on a tie. Falls back to
         /// <see cref="EDamageType.Physical"/> for a malformed skill carrying no portions, so a display read
         /// never throws. The direct-hit pipeline reads the full <see cref="DamagePortions"/> split, not this
-        /// single primary type.
+        /// single primary type. Resolved by the shared <see cref="PrimaryDamageTypeResolver"/> — also used by
+        /// the read-contract and persisted-entity mirrors of this accessor.
         /// </summary>
-        public EDamageType PrimaryDamageType
-        {
-            get
-            {
-                // Index loop with a strict '>' so the first portion wins a weight tie (first-authored), and so
-                // the read allocates nothing on the per-fire hot path.
-                if (DamagePortions.Count == 0)
-                {
-                    return EDamageType.Physical;
-                }
-                var primary = DamagePortions[0];
-                for (var i = 1; i < DamagePortions.Count; i++)
-                {
-                    if (DamagePortions[i].Weight > primary.Weight)
-                    {
-                        primary = DamagePortions[i];
-                    }
-                }
-                return primary.Type;
-            }
-        }
+        public EDamageType PrimaryDamageType =>
+            PrimaryDamageTypeResolver.Resolve(DamagePortions, p => p.Weight, p => p.Type);
 
         public required IReadOnlyList<DamageMultiplier> DamageMultipliers { get; init; }
 
