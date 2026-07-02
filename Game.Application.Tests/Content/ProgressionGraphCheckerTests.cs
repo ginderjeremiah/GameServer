@@ -418,12 +418,13 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
-        public void Item_WeaponWithNonLeafWeaponType_IsError()
+        public void Item_WeaponWithUndefinedWeaponType_IsError()
         {
             var graph = HealthyGraph() with
             {
-                // Fire is a damage type but not a weapon leaf.
-                Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 3, weaponType: EDamageType.Fire)],
+                // Any defined leaf (including a non-martial caster type like Fire, #1456) is valid; an
+                // out-of-range value is the only rejection left.
+                Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 3, weaponType: (EDamageType)999)],
             };
             AssertHasFinding(graph, "WeaponStranding", ContentGraphSeverity.Error, "Item", 0);
         }
@@ -446,6 +447,32 @@ namespace Game.Application.Tests.Content
             var graph = HealthyGraph() with
             {
                 Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Item, primaryType: EDamageType.Sword)).ToList(),
+                Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 6, weaponType: EDamageType.Sword)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.EntityKind == "Item" && f.EntityId == 0);
+        }
+
+        [Fact]
+        public void Item_CasterWeaponWithMatchingElementalSignature_IsSilent()
+        {
+            var graph = HealthyGraph() with
+            {
+                // A Fire staff (WeaponType = Fire) granting a Fire-typed signature: a caster weapon declaring
+                // its element rather than a martial leaf (#1456).
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Item, primaryType: EDamageType.Fire)).ToList(),
+                Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 6, weaponType: EDamageType.Fire)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.EntityKind == "Item" && f.EntityId == 0);
+        }
+
+        [Fact]
+        public void Item_WeaponSignatureOfNonMartialType_IsSilentRegardlessOfWeaponType()
+        {
+            var graph = HealthyGraph() with
+            {
+                // A Sword weapon granting a Fire-typed signature: non-martial signatures are never gated, so
+                // they always qualify even though they don't match the weapon's own (martial) type.
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Item, primaryType: EDamageType.Fire)).ToList(),
                 Items = [Item(0, category: EItemCategory.Weapon, grantedSkillId: 6, weaponType: EDamageType.Sword)],
             };
             Assert.DoesNotContain(_checker.Check(graph), f => f.EntityKind == "Item" && f.EntityId == 0);

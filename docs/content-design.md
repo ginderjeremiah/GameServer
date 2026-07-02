@@ -183,7 +183,7 @@ Four classes, each anchored on a different core attribute and weapon family:
 - Covers four of the six core attributes (STR / DEX / INT / END); **AGI and LUK** are deliberately left to the Technique paths (dodge / crit), not class identities.
 - Each secondary should open a *second* path, so a character starts with **two roots** (weapon family + secondary) — seeding the depth-vs-breadth choice from level 1.
 - **The TBD secondaries open their second root via a *committed* effect, not a universal buff** ([#1398](./spikes/1398-utility-in-proficiency-system.md), §4): a raw STR/CDR buff trains nothing (it is a universal amplifier), so a secondary meant to open a root must carry a *committed* hook — a small damage/event portion or an opt-in archetype enabler. A class *may* instead take a pure-utility secondary and deliberately start single-rooted.
-- **Minor open content question:** the **staff** has no weapon-leaf in the current taxonomy (`Sword/Axe/Bow/Club/Dagger/Unarmed`) — decide whether the Wizard's staff is a new `Staff` leaf or reuses an existing one; its *signature* is Fire-typed regardless.
+- **Settled: the staff needs no new leaf** ([#1456](https://github.com/ginderjeremiah/GameServer/issues/1456)). A `WeaponType` isn't restricted to the martial leaves — a caster weapon declares its element directly, so the Wizard's staff is simply a `Fire` weapon (`WeaponType = Fire`) granting the Fire-typed *Fireball* signature; no dedicated `Staff` leaf.
 
 ---
 
