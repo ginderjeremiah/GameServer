@@ -223,6 +223,46 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
+        /// This (attacking) battler's own applied ramp on <paramref name="damageType"/> — the total amplification
+        /// its <b>own</b> timed self-buffs contributed across the type's amplification attributes (spike #1398 →
+        /// Momentum, #1428). Tracked from the effects this battler applied to itself
+        /// (<see cref="ApplyEffect"/>'s <c>tracksMomentum</c>), so it isolates the ramp's own contribution from
+        /// any static (item/base) amplification the battler already carries. Rides the shared per-attribute
+        /// effect-stack expiry, so it returns to <c>0</c> for free when the ramp lapses.
+        /// </summary>
+        public double AppliedMomentum(EDamageType damageType)
+        {
+            if (_attributeStacks is null)
+            {
+                return 0;
+            }
+
+            var contribution = 0.0;
+            var amplificationAttributes = DamageTypes.AmplificationAttributes(damageType);
+            for (var i = 0; i < amplificationAttributes.Count; i++)
+            {
+                contribution += StackMomentumContribution(amplificationAttributes[i]);
+            }
+
+            return contribution > 0 ? contribution : 0;
+        }
+
+        // The ramp-tracked amplification this battler has applied to one of its own attributes, or 0 when no
+        // effect stack for it is active. A linear scan over the affected-attribute count, like GetOrCreateStack.
+        private double StackMomentumContribution(EAttribute attribute)
+        {
+            foreach (var stack in _attributeStacks!)
+            {
+                if (stack.Attribute == attribute)
+                {
+                    return stack.MomentumContribution;
+                }
+            }
+
+            return 0;
+        }
+
+        /// <summary>
         /// Applies an incoming hit of <paramref name="dealt"/> (already amplified and crit-multiplied) of the
         /// given <paramref name="damageType"/> via <see cref="ComputeNetDamage"/> — percentage resistance then
         /// the <see cref="EAttribute.Toughness"/> mitigation curve (scaled by the <paramref name="attackerLevel"/>).
@@ -394,8 +434,16 @@ namespace Game.Core.Battle
         /// the shared stack expiry — cleared for free when the stack lapses — and is a backend-only side channel
         /// that never touches the combined modifier or the health math, so it adds no parity surface.
         /// </para>
+        /// <para>
+        /// When <paramref name="tracksMomentum"/> is set (a self-applied amplification ramp — the Momentum
+        /// enabler, #1428), <paramref name="amount"/> is likewise accumulated onto the stack's
+        /// <see cref="AttributeEffectStack.MomentumContribution"/>, so <see cref="AppliedMomentum"/> can isolate
+        /// the ramp's own contribution from any static amplification the battler already carries. Same shared
+        /// expiry, same no-parity-surface side channel as the vulnerability tracker above.
+        /// </para>
         /// </summary>
-        public void ApplyEffect(SkillEffect effect, double amount, bool tracksVulnerability = false)
+        public void ApplyEffect(
+            SkillEffect effect, double amount, bool tracksVulnerability = false, bool tracksMomentum = false)
         {
             _attributeStacks ??= [];
             var stack = GetOrCreateStack(effect.AttributeId);
@@ -409,6 +457,13 @@ namespace Game.Core.Battle
             if (tracksVulnerability)
             {
                 stack.VulnerabilityContribution += amount;
+            }
+
+            // A self-applied amplification ramp likewise accrues its delta to the Momentum tally's contribution
+            // tracker — separate from the combined modifier below, so the health math is untouched.
+            if (tracksMomentum)
+            {
+                stack.MomentumContribution += amount;
             }
 
             // Fold the application into the attribute's single combined modifier for its type, swapping the old
@@ -548,6 +603,14 @@ namespace Game.Core.Battle
             /// math, and cleared with the stack on the shared expiry. <c>0</c> for any non-debuffed attribute.
             /// </summary>
             public double VulnerabilityContribution { get; set; }
+
+            /// <summary>
+            /// The amplification this battler's own tracked ramp applications contributed to this attribute,
+            /// summed across applications and read by <see cref="AppliedMomentum"/> for the Momentum tally
+            /// (#1428). Separate from the combined modifiers above so it never touches the health math, and
+            /// cleared with the stack on the shared expiry. <c>0</c> for any non-ramped attribute.
+            /// </summary>
+            public double MomentumContribution { get; set; }
         }
     }
 }

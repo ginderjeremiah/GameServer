@@ -145,6 +145,19 @@ namespace Game.Core.Attributes
             return ResistanceAttributeSet.Contains(attribute);
         }
 
+        // The set of attacker-side amplification attributes (one per key, all non-weapon and weapon keys alike).
+        // Backs the O(1) IsAmplificationAttribute gate the Momentum enabler uses to decide which self-applied
+        // ramp buffs feed the ramp tally (#1428).
+        private static readonly IReadOnlySet<EAttribute> AmplificationAttributeSet =
+            KeyInfos.Select(info => info.Amplification).ToHashSet();
+
+        /// <summary>Whether <paramref name="attribute"/> is an attacker-side amplification attribute — the gate
+        /// the Momentum enabler uses to track a self-applied ramp buff (#1428).</summary>
+        public static bool IsAmplificationAttribute(EAttribute attribute)
+        {
+            return AmplificationAttributeSet.Contains(attribute);
+        }
+
         // The weapon-type leaves (#1340): the non-Physical leaves that roll up under the shared Physical
         // category key (their applies() set is [<weapon>, Physical]). Derived from the taxonomy table so the
         // classification can't drift from the append-only enum. The single source of truth for "is this leaf a

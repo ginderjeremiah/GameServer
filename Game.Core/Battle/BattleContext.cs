@@ -83,8 +83,15 @@ namespace Game.Core.Battle
                 && effect.ModifierType is EModifierType.Additive
                 && DamageTypes.IsResistanceAttribute(effect.AttributeId);
 
+            // A self-targeted additive amplification buff is the Momentum ramp enabler (#1428): track its delta
+            // on the caster's own stack so the Momentum signal credits only the ramp's own contribution,
+            // isolated from any static amplification the caster already carries.
+            var tracksMomentum = effect.Target is ESkillEffectTarget.Self
+                && effect.ModifierType is EModifierType.Additive
+                && DamageTypes.IsAmplificationAttribute(effect.AttributeId);
+
             var battler = effect.Target is ESkillEffectTarget.Self ? _activeBattler : _targetBattler;
-            battler.ApplyEffect(effect, amount, tracksVulnerability);
+            battler.ApplyEffect(effect, amount, tracksVulnerability, tracksMomentum);
         }
 
         /// <summary>
@@ -145,9 +152,10 @@ namespace Game.Core.Battle
         /// <c>totalNet</c> — one swing is one attack. The Precision signal is instead the normalized marginal crit
         /// bonus (<see cref="BattleStats.CriticalBonusDealt"/>, #1448), booked from the vanilla-hit baseline rather
         /// than the full crit net; the Hex signal (<see cref="BattleStats.HexBonusDealt"/>, #1427) is booked
-        /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled.
-        /// Each portion's absorption heal is capped at the
-        /// <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
+        /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled,
+        /// and the Momentum signal (<see cref="BattleStats.MomentumBonusDealt"/>, #1428) is booked per-portion as
+        /// the marginal damage the player's own applied ramp enabled. Each portion's absorption heal is capped at
+        /// the <see cref="EAttribute.MaxHealth"/> room <b>at that point in the fixed portion order</b>, so the order is
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
         /// untyped, so once equals per-portion, and once gives a single clean reflection event. The Toughness curve
@@ -183,7 +191,8 @@ namespace Game.Core.Battle
                 for (var i = 0; i < portions.Count; i++)
                 {
                     var type = portions[i].Type;
-                    var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
+                    var rawPortion = PortionRawDamage(rawDamage, totalWeight, portions[i]);
+                    var dealt = _activeBattler.AmplifyDamage(rawPortion, type);
                     var net = _targetBattler.TakeDamage(dealt * critMultiplier, type, _activeBattler.Level);
                     Stats.AddTypedDamageDealt(type, net);
                     totalNet += net;
@@ -192,6 +201,18 @@ namespace Game.Core.Battle
                     // overlay inflating the other. Zero unless a vulnerability debuff lowered the target's
                     // resistance below its innate baseline. A backend-only side channel — no health mutation.
                     Stats.HexBonusDealt += _targetBattler.HexBonusForHit(dealt, type, _activeBattler.Level);
+                    // The Momentum overlay tally (#1428): the marginal damage the player's own applied ramp (a
+                    // stacking self-buff to this portion's amplification) enabled, measured against the un-ramped
+                    // baseline (dealt minus exactly the ramp's own contribution) so it composes with crit/Hex
+                    // without inflating either. Zero unless a ramp buff amplified this portion's type.
+                    var rampContribution = _activeBattler.AppliedMomentum(type);
+                    if (rampContribution > 0)
+                    {
+                        var unrampedDealt = dealt - rawPortion * rampContribution;
+                        var marginal = _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level)
+                            - _targetBattler.ComputeNetDamage(unrampedDealt, type, _activeBattler.Level);
+                        Stats.MomentumBonusDealt += marginal > 0 ? marginal / (1 + rampContribution) : 0;
+                    }
                     if (isCrit)
                     {
                         // The vanilla (non-crit) net of this portion — the fixed baseline the crit bonus is
@@ -257,14 +278,23 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// One portion's attacker-amplified pre-mitigation damage: its weighted share of the single raw hit
-        /// (<c>rawDamage × weight ÷ totalWeight</c>, the fixed-order fold of the weights done by the caller) run
-        /// through the active (attacking) battler's typed amplification. A method call rather than an inline
-        /// expression so the three per-portion loops cannot diverge in their split arithmetic.
+        /// One portion's pre-amplification share of the single raw hit: <c>rawDamage × weight ÷ totalWeight</c>,
+        /// the fixed-order fold of the weights done by the caller. A method call rather than an inline expression
+        /// so the per-portion loops (and the Momentum tally's un-ramped counterfactual, which needs this same raw
+        /// share before amplification) cannot diverge in their split arithmetic.
+        /// </summary>
+        private double PortionRawDamage(double rawDamage, double totalWeight, SkillDamagePortion portion)
+        {
+            return rawDamage * portion.Weight / totalWeight;
+        }
+
+        /// <summary>
+        /// One portion's attacker-amplified pre-mitigation damage — <see cref="PortionRawDamage"/> run through the
+        /// active (attacking) battler's typed amplification.
         /// </summary>
         private double AmplifiedPortion(double rawDamage, double totalWeight, SkillDamagePortion portion)
         {
-            return _activeBattler.AmplifyDamage(rawDamage * portion.Weight / totalWeight, portion.Type);
+            return _activeBattler.AmplifyDamage(PortionRawDamage(rawDamage, totalWeight, portion), portion.Type);
         }
 
         /// <summary>

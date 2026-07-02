@@ -900,6 +900,139 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
         }
 
+        // ── DamageTarget: Momentum ramp tally (#1428) ─────────────────────────
+
+        [Fact]
+        public void DamageTarget_NoRampApplied_BooksNoMomentumBonus()
+        {
+            // A hit with no self-applied ramp enables no amplification bonus, so Momentum trains on nothing.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(30, Single(EDamageType.Fire));
+
+            Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_InnateAmplification_TrainsNoMomentum()
+        {
+            // The player already carries +0.5 FireAmplification from a static source (gear), but nothing was
+            // applied via a ramp effect — Momentum credits only the ramp's own contribution, so this trains
+            // nothing even though the hit itself is amplified.
+            var player = MakeBattlerWith((Endurance, 0), (FireAmplification, 0.5));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × 1.5 = 45 dealt, but no applied ramp
+
+            Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_AppliedRamp_BooksNormalizedMarginalBonus()
+        {
+            // The player ramps its own FireAmplification by +0.5, then hits for raw 30. The un-ramped hit would
+            // deal 30; the ramped hit deals 45 — the ramp enabled 15, discounted by 1/(1 + 0.5) to 10 (the
+            // marginal, saturated on the ramp's own magnitude).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Ramp(FireAmplification, 0.5));
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 30 × (1 + 0.5) = 45 dealt
+
+            Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // (45 − 30) / (1 + 0.5) = 10
+        }
+
+        [Fact]
+        public void DamageTarget_HeavilyInvestedRamp_SaturatesTowardOneBaselineHit()
+        {
+            // A towering ramp (r = 10) enables 10× the un-ramped damage, but the 1/(1 + r) saturation bounds the
+            // tally at one baseline (pre-ramp) hit: 30 × 10 / 11 ≈ 27.27 — a monster stack cannot dwarf every
+            // other training axis (mirrors the crit-bonus and Hex-bonus ceilings).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Ramp(FireAmplification, 10));
+
+            context.DamageTarget(30, Single(EDamageType.Fire));
+
+            Assert.Equal(30.0 * 10.0 / 11.0, context.Stats.MomentumBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_MomentumBonus_IsMitigatedLikeTheRestOfTheHit()
+        {
+            // Unlike Hex, Momentum amplifies the attacker's own output, so its bonus is mitigated exactly like
+            // the rest of the hit (the same property the crit bonus has) — NOT flat in the defender's mitigation.
+            // A 50% resistant enemy halves the marginal too: (45 − 30) × (1 − 0.5) / (1 + 0.5) = 5, half the
+            // unmitigated 10.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Ramp(FireAmplification, 0.5));
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // 45 × (1 − 0.5) = 22.5 dealt
+
+            Assert.Equal(22.5, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(15.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // 5
+        }
+
+        [Fact]
+        public void DamageTarget_CritAndMomentum_BookIndependentBonuses()
+        {
+            // Crit and Momentum are separate overlays. Momentum is measured on the pre-crit hit, so a crit does
+            // not inflate it: r = 0.5 on raw 30 still banks 10. Crit books its own marginal off the (ramped)
+            // non-crit baseline 45: investment m−1 = 1, φ(1) = 0.5 ⇒ 45 × 0.5 = 22.5. Neither overlay balloons
+            // the other.
+            var player = MakeBattlerWith((CriticalChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Ramp(FireAmplification, 0.5));
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // ramped non-crit 45, crit ×2 = 90 dealt
+
+            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // 10, unaffected by the crit
+            Assert.Equal(45.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 22.5
+        }
+
+        [Fact]
+        public void DamageTarget_RampExpired_BooksNoMomentumBonus()
+        {
+            // The tracked ramp rides the caster's own effect stack's shared expiry: once it lapses the stack
+            // (and its contribution) is gone, so a later hit trains no Momentum and lands unamplified again.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Ramp(FireAmplification, 0.5)); // DurationMs 10_000
+            player.AdvanceEffects(10_001); // past expiry → the FireAmplification stack and its contribution are gone
+
+            context.DamageTarget(30, Single(EDamageType.Fire)); // amplification back to 0 ⇒ 30 dealt, no ramp
+
+            Assert.Equal(30, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyAttacking_BooksNoMomentumBonus()
+        {
+            // Momentum is a player-offense signal. Even if the enemy has ramped itself, an enemy hit never trains
+            // the player's Momentum — only the player-active branch accrues it.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            context.ApplySkillEffect(Ramp(FireAmplification, 0.5)); // enemy ramps its own Fire amplification
+
+            context.DamageTarget(30, Single(EDamageType.Fire));
+
+            Assert.Equal(0, context.Stats.MomentumBonusDealt, 0.001);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static IReadOnlyList<SkillDamagePortion> Single(EDamageType type) =>
@@ -951,6 +1084,20 @@ namespace Game.Core.Tests.Battle
             Id = 3,
             Target = ESkillEffectTarget.Self,
             AttributeId = resistance,
+            ModifierType = EModifierType.Additive,
+            Amount = amount,
+            DurationMs = 10_000,
+            ScalingAttributeId = EAttribute.Strength,
+            ScalingAmount = 0,
+        };
+
+        // A player-cast Self-targeted amplification buff (positive additive) — the ramp enabler Momentum trains
+        // on (#1428). Applied via BattleContext.ApplySkillEffect so it lands on the active (casting) battler.
+        private static SkillEffect Ramp(EAttribute amplification, double amount) => new()
+        {
+            Id = 4,
+            Target = ESkillEffectTarget.Self,
+            AttributeId = amplification,
             ModifierType = EModifierType.Additive,
             Amount = amount,
             DurationMs = 10_000,

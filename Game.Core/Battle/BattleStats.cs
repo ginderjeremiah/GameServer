@@ -53,6 +53,21 @@ namespace Game.Core.Battle
         /// </summary>
         public double HexBonusDealt { get; set; }
 
+        /// <summary>
+        /// The Momentum (<c>Momentum</c> activity key) training signal — the normalized-marginal damage the
+        /// player's applied ramp enabled this battle (spike #1398 → the overlay tally shape, reference #1448). A
+        /// ramp is a stacking self-buff to one of the attacker's typed amplification attributes; <c>r</c> is the
+        /// amplification the buff itself contributed (tracked from the applied effect, isolated from any static
+        /// amplification the attacker already carries — <see cref="Battle.Battler.AppliedMomentum"/>). For each
+        /// hit the extra damage that amplification enabled — the live post-amplification hit minus the same hit
+        /// without the ramp's contribution, both carried through the defender's mitigation — is booked with the
+        /// same <c>/(1 + r)</c> saturation the crit and Hex bonuses use, on the ramp's own magnitude. Unlike Hex
+        /// this is <b>not</b> flat in the defender's mitigation (Momentum amplifies the attacker's output, so a
+        /// tougher target mitigates the ramp bonus exactly as it mitigates the rest of the hit — the same
+        /// property the crit bonus has). Backend-only like the other overlay tallies.
+        /// </summary>
+        public double MomentumBonusDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>
