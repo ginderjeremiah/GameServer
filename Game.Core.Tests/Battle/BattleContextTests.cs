@@ -570,7 +570,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(20, context.Stats.PlayerDamageTaken, 0.001);
             Assert.Equal(20, Mitigated(context, EDamageType.Fire), 0.001);
@@ -588,7 +588,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.True(context.Stats.PlayerDamageTaken < 40);
             Assert.Equal(0, Mitigated(context, EDamageType.Fire), 0.001);
@@ -604,7 +604,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(0, Mitigated(context, EDamageType.Fire), 0.001);
         }
@@ -621,7 +621,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Equal(40, Mitigated(context, EDamageType.Fire), 0.001);
         }
@@ -635,7 +635,7 @@ namespace Game.Core.Tests.Battle
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
-            context.DamageTarget(40, Single(EDamageType.Fire));
+            context.DamageTarget(40, Single(EDamageType.Fire), 0);
 
             Assert.Empty(context.Stats.TypedDamageResistanceMitigated);
         }
