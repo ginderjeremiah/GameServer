@@ -1418,10 +1418,12 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_HeavilyInvestedSunder_SaturatesTowardTheLandedHit()
         {
             // A towering debuff (s = 180) drives the investment to 180/20 = 9, φ(9) = 0.9, so the claim
-            // approaches (but never reaches) the landed hit: the over-stripped Toughness floors at 0 (the hit
-            // lands the full 30) and the tally banks 30 × 0.9 = 27 — the same ceiling shape as the other overlays.
+            // approaches (but never reaches) the landed hit. The enemy's own Toughness (Endurance 90 → 180)
+            // exactly cancels the debuff to the 0 boundary — the curve's unfloored pole at -20 is deliberately
+            // left unguarded (#1478), so this pins the boundary rather than crossing into it: the hit lands the
+            // full 30 and the tally banks 30 × 0.9 = 27 — the same ceiling shape as the other overlays.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 10));
+            var enemy = MakeBattlerWith((Endurance, 90));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(SunderDebuff(-180));
 
