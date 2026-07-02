@@ -231,7 +231,7 @@ describe('pure helpers', () => {
 		expect([a, b].sort(sortMetrics('cd', 0)).map((m) => m.skill.id)).toEqual([1, 0]);
 		// dps with no toughness: a=100/2=50, b=30/1=30 → a first.
 		expect([b, a].sort(sortMetrics('dps', 0)).map((m) => m.skill.id)).toEqual([0, 1]);
-		// dps with toughness 80 (factor 200/280≈0.714): a=100·0.714/2≈35.7, b=30·0.714/1≈21.4 → a first.
+		// damage with toughness 80 (factor 200/280≈0.714): a=100·0.714≈71.4, b=30·0.714≈21.4 → a first.
 		expect([b, a].sort(sortMetrics('dmg', 80)).map((m) => m.skill.id)).toEqual([0, 1]);
 	});
 
