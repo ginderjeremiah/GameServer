@@ -723,9 +723,9 @@ namespace Game.Core.Tests.Battle.Offline
             Effects = [],
         };
 
-        // The coin-flip boss: an injected Toughness 80 heavily mitigates each hit while Strength 2 keeps
-        // MaxHealth low (50 + 5·2 = 60). Against the level-1 player (K·level = 20) the curve reduces by
-        // 80/(80+20) = 0.8, so a normal 60-damage hit deals 60×0.2 = 12 and a 1.75× crit (105) deals 21.
+        // The coin-flip boss: an injected Toughness 800 heavily mitigates each hit while Strength 2 keeps
+        // MaxHealth low (50 + 5·2 = 60). The curve (constant C = 200) reduces by 800/(800+200) = 0.8, so a
+        // normal 60-damage hit deals 60×0.2 = 12 and a 1.75× crit (105) deals 21.
         // Across 4 fires the boss takes 48 + 9·crits, so it dies (≥60) only with at least two crits — the
         // crit count flips the outcome between a win and a draw.
         private static Enemy CoinFlipBoss(int level) => new()
@@ -737,7 +737,7 @@ namespace Game.Core.Tests.Battle.Offline
             AttributeDistributions =
             [
                 new AttributeDistribution { AttributeId = Strength, BaseAmount = 2, AmountPerLevel = 0 },
-                new AttributeDistribution { AttributeId = Toughness, BaseAmount = 80, AmountPerLevel = 0 },
+                new AttributeDistribution { AttributeId = Toughness, BaseAmount = 800, AmountPerLevel = 0 },
             ],
             AvailableSkills = [EnemyAttackSkill(0)],
         };

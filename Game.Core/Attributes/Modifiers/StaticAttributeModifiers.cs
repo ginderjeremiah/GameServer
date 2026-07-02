@@ -31,7 +31,7 @@ namespace Game.Core.Attributes.Modifiers
             new() { Attribute = CooldownRecovery, Amount = 0.001, Source = Derived, DerivedSource = Dexterity, Type = Additive },
 
             // Toughness = 2·Endurance (no base, Endurance-only). It feeds the diminishing mitigation curve
-            // (Toughness / (Toughness + K·attackerLevel)), so a non-Endurance build simply has no Toughness and
+            // (Toughness / (Toughness + C)), so a non-Endurance build simply has no Toughness and
             // leans on Dodge/offense instead — the archetype split (spike #1330): Endurance → Toughness curve,
             // Agility → Dodge. The coefficient is a strawman to tune during balancing.
             new() { Attribute = Toughness, Amount = 2.0, Source = Derived, DerivedSource = Endurance, Type = Additive },

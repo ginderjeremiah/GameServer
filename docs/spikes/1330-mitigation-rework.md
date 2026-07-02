@@ -77,6 +77,25 @@ Created as native sub-issues of #1330:
 - `docs/game-design.md` — the **Critical hits, dodge & block** section: Defense as an armor-curve %, Block removed, deterministic authored **reflection** as the tank kill-condition, and the refreshed archetype mapping.
 - `docs/backend-battle.md` — the damage-resolution order (now fully multiplicative, flat floor gone), the simplified #178 draw order (dodge-only on enemy attacks), and reflection as a parity-critical mechanic.
 
+## Addendum — level normalization replaced by a constant (#1487, 2026-07)
+
+The `K·attackerLevel` factor in the curve's denominator was replaced with a tuned **constant**
+(`C` = `GameConstants.ToughnessMitigationConstant`, strawman `200`), making the curve
+`Toughness / (Toughness + C)` — `C` is the Toughness at which mitigation is exactly 50%.
+
+Rationale ([#1487](https://github.com/ginderjeremiah/GameServer/issues/1487)): under the realistic
+progression lens (player level ≈ enemy level), the level normalization only delivered its "stable
+mitigation band" for a build whose Toughness grew **proportionally with level**; any flat or modest
+investment decayed toward 0% as the denominator inflated — a decay tax, not a stability guarantee.
+With a constant, an investment retains its mitigation % forever and per-item value is legible
+(`Toughness = C → 50%`). This is not runaway immunity: post-mitigation damage flattens toward a
+constant while HP grows with level, so survivability vs direct hits grows ~linearly, and DoT (which
+bypasses the curve) remains the late-game pressure valve. Early-game durability is deliberately
+carried by MaxHealth (which Endurance also provides); the Endurance→Toughness coefficient was left
+at `2·Endurance`. Sunder's investment normalization (#1429) moved with the curve, from
+`φ(s / (K·attackerLevel))` to `φ(s / C)`, and the now-unused attacker-level threading was removed
+from the mitigation call path on both simulators.
+
 ## Out of scope / deferred
 
 - **Other defensive mechanics** — mitigation→sustain, absorb shield, last-stand — tracked in [#1331](https://github.com/ginderjeremiah/GameServer/issues/1331) (shield/last-stand lean toward the skill-effect system; mitigation→sustain toward an authored attribute like reflection).

@@ -71,8 +71,8 @@ interface ParityScenario {
 
 const scenarios: ParityScenario[] = [
 	// Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
-	//   Player: MaxHealth=900, Toughness=60, CDR=1.09 → cdMult=1.09; damage 85 → enemy Toughness 30 → 34/hit.
-	//   Enemy:  MaxHealth=400, Toughness=30; damage 5 → player Toughness 60 → 1.25/hit. 12 hits → 13440ms.
+	//   Player: MaxHealth=900, Toughness=60, CDR=1.09 → cdMult=1.09; damage 85 → enemy Toughness 30 → 73.913/hit.
+	//   Enemy:  MaxHealth=400, Toughness=30; damage 5 → player Toughness 60 → 3.846/hit.
 	//   6 hits at ticks 28,56,84,112,140,168 → 6720ms.
 	{
 		name: 'cooldownRecovery',
@@ -94,13 +94,13 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(5, 2000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 13440 }
+		expected: { victory: true, playerDied: false, totalMs: 6720 }
 	},
 
 	// Two player skills on different cooldowns vs an enemy that deals real damage.
-	//   Player: MaxHealth=600, Toughness=40; skillA 50 raw→20/hit every 20 ticks, skillB 25 raw→10/hit every 30 ticks.
-	//   Enemy:  MaxHealth=450, Toughness=30; attack 30 raw→player Toughness 40→10/hit every 25 ticks. Kill at tick 340 → 13600ms.
-	//   Cumulative player damage first reaches 450 at tick 240 → 9600ms.
+	//   Player: MaxHealth=600, Toughness=40; skillA 50 raw→43.478/hit every 20 ticks, skillB 25 raw→21.739/hit every 30 ticks.
+	//   Enemy:  MaxHealth=450, Toughness=30; attack 30 raw→player Toughness 40→25/hit every 25 ticks.
+	//   Cumulative player damage first reaches 450 at tick 160 → 6400ms.
 	{
 		name: 'multiSkill',
 		player: () =>
@@ -119,17 +119,17 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(30, 1000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 13600 }
+		expected: { victory: true, playerDied: false, totalMs: 6400 }
 	},
 
-	// Both sides have so much Toughness (Endurance 50 → Toughness 100) that each 5-damage hit is reduced to a
-	// trickle (5 × 20/(100+20) ≈ 0.83), and with their Endurance-inflated MaxHealth (1050 each) that trickle
+	// Both sides have so much Toughness (Endurance 500 → Toughness 1000) that each 5-damage hit is reduced to a
+	// trickle (5 × 200/(1000+200) ≈ 0.83), and with their Endurance-inflated MaxHealth (10050 each) that trickle
 	// cannot kill within the cap — a draw. The curve never clamps a hit fully to 0 (it asymptotes below 100%),
 	// so the stalemate now comes from EHP outpacing the trickle rather than a hard floor.
 	{
 		name: 'highToughnessTrickle',
-		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
-		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 50 }], [makeSkill(5, 1000)]),
+		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 500 }], [makeSkill(5, 1000)]),
+		enemy: () => makeBattler([{ id: EAttribute.Endurance, amount: 500 }], [makeSkill(5, 1000)]),
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
@@ -158,9 +158,9 @@ const scenarios: ParityScenario[] = [
 	// A dedicated-boss encounter: a higher-level boss bringing its FULL authored loadout (3 skills)
 	// against a player who out-tanks it. Mirrors the backend `bossFullLoadout` scenario. Under the curve the
 	// boss's smaller skills no longer clamp to 0 — they all chip — so the player is built tankier to still win.
-	//   Player: Str=60, End=50 → MaxHealth=1350, Toughness=100; skill 130 raw → boss Toughness 60 → 32.5/hit, every 25 ticks.
-	//   Boss:   Str=20, End=30 → MaxHealth=750, Toughness=60; 3 skills → 8.33 + 3.33 + 5 = 16.67/volley every 25 ticks.
-	//   24 player hits reach 780 ≥ 750 at tick 600 → 24000ms; the boss's chip never threatens the 1350-HP player.
+	//   Player: Str=60, End=50 → MaxHealth=1350, Toughness=100; skill 130 raw → boss Toughness 60 → 100/hit, every 25 ticks.
+	//   Boss:   Str=20, End=30 → MaxHealth=750, Toughness=60; 3 skills → 33.33 + 13.33 + 20 = 66.67/volley every 25 ticks.
+	//   8 player hits reach 800 ≥ 750 at tick 200 → 8000ms; the boss's chip never threatens the 1350-HP player.
 	{
 		name: 'bossFullLoadout',
 		player: () =>
@@ -179,7 +179,7 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(50, 1000), makeSkill(20, 1000), makeSkill(30, 1000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 24000 }
+		expected: { victory: true, playerDied: false, totalMs: 8000 }
 	},
 
 	// The cooldownRecovery matchup capped before either skill fires: stops at maxMs.
@@ -214,11 +214,10 @@ const scenarios: ParityScenario[] = [
 	// additionally feed CooldownRecovery, so the whole merge is exercised end to end.
 	//   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
 	//   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Toughness=40, CDR=1.10 → cdMult=1.10.
-	//   Player skill: 10 + 45*1.5 = 77.5 raw → enemy Toughness 30 → 31/hit, fires every 28 ticks
+	//   Player skill: 10 + 45*1.5 = 77.5 raw → enemy Toughness 30 → 67.391/hit, fires every 28 ticks
 	//     (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
-	//   Enemy: MaxHealth=400, Toughness=30; attack 5 → 1.67/hit, so the player never dies. 13 hits → 14560ms.
-	//   7 hits reach 423.5 ≥ 400 at tick 196 → 7840ms (vs 21600ms for the same allocations
-	//   with no equipment — proof the merged attributes change the outcome).
+	//   Enemy: MaxHealth=400, Toughness=30; attack 5 → 4.17/hit, so the player never dies.
+	//   6 hits reach 404 ≥ 400 at tick 168 → 6720ms (proof the merged attributes drive the outcome).
 	{
 		name: 'equippedItemWithMods',
 		player: () =>
@@ -256,7 +255,7 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(5, 2000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 14560 }
+		expected: { victory: true, playerDied: false, totalMs: 6720 }
 	},
 
 	// Fractional enemy attribute distribution (#941): the only scenario whose enemy attribute is a FRACTIONAL
@@ -563,21 +562,22 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: false, totalMs: DEFAULT_MAX_BATTLE_MS }
 	},
 
-	// DoT bypasses the Toughness curve. The enemy's Endurance 10 → Toughness 20 would halve a direct hit against
-	// the level-1 player, but its constant 250 PoisonDamagePerSecond (base poison) -> 10/tick ignores mitigation
-	// and grinds the enemy's 250 HP down: victory at tick 1000. If DoT were mitigated (5/tick) it would die at 2000.
+	// DoT bypasses the Toughness curve. The enemy's Endurance 100 → Toughness 200 (the curve's half-point)
+	// would halve a direct hit, but its constant 250 PoisonDamagePerSecond (base poison) -> 10/tick ignores
+	// mitigation and grinds the enemy's 2050 HP down: victory at tick 205 → 8200ms. If DoT were mitigated
+	// (5/tick) it would die at tick 410 instead.
 	{
 		name: 'dotBypassesMitigation',
 		player: () => makeBattler([{ id: EAttribute.Endurance, amount: 0 }], [makeSkill(0, 40)]),
 		enemy: () =>
 			makeBattler(
 				[
-					{ id: EAttribute.Endurance, amount: 10 },
+					{ id: EAttribute.Endurance, amount: 100 },
 					{ id: EAttribute.PoisonDamagePerSecond, amount: 250 }
 				],
 				[]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 1000 }
+		expected: { victory: true, playerDied: false, totalMs: 8200 }
 	},
 
 	// DoT stops when its effect expires. A single poison application -- the skill's 2000ms cooldown fires it
@@ -1090,8 +1090,8 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Crit multiplies pre-mitigation, so it punches through resistance AND the Toughness curve: a forced crit
-	// (CriticalDamage base 1.5 + 0.5 = 2.0) on a Fire hit. The enemy's Toughness 20 vs the level-1 player halves
-	// the post-resistance hit, so a normal hit deals 20 × (1 − 0.5 res) × 0.5 = 5 while the crit deals
+	// (CriticalDamage base 1.5 + 0.5 = 2.0) on a Fire hit. The enemy's Toughness 200 (the curve's half-point)
+	// halves the post-resistance hit, so a normal hit deals 20 × (1 − 0.5 res) × 0.5 = 5 while the crit deals
 	// 20 × 2 × 0.5 × 0.5 = 10/hit — dropping the 50-HP enemy on hit 5 at tick 50 → 2000ms.
 	{
 		name: 'critPunchesThroughTyped',
@@ -1100,7 +1100,7 @@ const scenarios: ParityScenario[] = [
 		enemy: () =>
 			makeBattler(
 				[
-					{ id: EAttribute.Toughness, amount: 20 },
+					{ id: EAttribute.Toughness, amount: 200 },
 					{ id: EAttribute.FireResistance, amount: 0.5 }
 				],
 				[]
@@ -1599,7 +1599,7 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.cdMultiplier).toBeCloseTo(2.18, 10);
 
 		const result = new BattleSimulator(player, enemy, PARITY_SEED).simulate();
-		expect(result.totalMs).toBe(6720);
-		expect(result.totalMs).toBeLessThan(13440);
+		expect(result.totalMs).toBe(3360);
+		expect(result.totalMs).toBeLessThan(6720);
 	});
 });

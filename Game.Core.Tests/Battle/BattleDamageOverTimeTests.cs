@@ -76,7 +76,7 @@ namespace Game.Core.Tests.Battle
             // A +2.0 BleedResistance drives the tick negative (2 × (1 − 2) = −2): absorption heals. DoT bypasses
             // mitigation and is not floored, so the negative tick restores health (here the battler is below max).
             var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 2.0));
-            battler.TakeDamage(50, EDamageType.Physical, attackerLevel: 1); // no Toughness → 50 damage → CurrentHealth 50
+            battler.TakeDamage(50, EDamageType.Physical); // no Toughness → 50 damage → CurrentHealth 50
 
             var dealt = battler.ApplyDamageOverTime(40);
 
@@ -137,7 +137,7 @@ namespace Game.Core.Tests.Battle
         public void ApplyHealOverTime_ScalesPerSecondAttributeByTick()
         {
             var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
-            battler.TakeDamage(50, EDamageType.Physical, attackerLevel: 1); // no Toughness → 50 damage → CurrentHealth 50
+            battler.TakeDamage(50, EDamageType.Physical); // no Toughness → 50 damage → CurrentHealth 50
 
             var healed = battler.ApplyHealOverTime(40); // 75 * 40 / 1000 = 3
 
@@ -160,7 +160,7 @@ namespace Game.Core.Tests.Battle
         public void ApplyHealOverTime_NearMax_HealsOnlyUpToTheCap()
         {
             var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
-            battler.TakeDamage(2, EDamageType.Physical, attackerLevel: 1); // no Toughness → 2 damage → CurrentHealth 98
+            battler.TakeDamage(2, EDamageType.Physical); // no Toughness → 2 damage → CurrentHealth 98
 
             var healed = battler.ApplyHealOverTime(40); // would heal 3, but only 2 of room remains
 
@@ -172,7 +172,7 @@ namespace Game.Core.Tests.Battle
         public void ApplyHealOverTime_KeepsIsDeadInSync()
         {
             var battler = MakeBattler(Stat(Strength, 10), Stat(HealthRegenPerSecond, 75)); // MaxHealth 100
-            battler.TakeDamage(50, EDamageType.Physical, attackerLevel: 1); // no Toughness → 50 damage → CurrentHealth 50
+            battler.TakeDamage(50, EDamageType.Physical); // no Toughness → 50 damage → CurrentHealth 50
 
             battler.ApplyHealOverTime(40); // heals 3 → CurrentHealth 53
 
@@ -275,7 +275,7 @@ namespace Game.Core.Tests.Battle
             // DoT and heals 4, dying at −1. The applied heal is still recorded toward PlayerDamageHealed.
             var player = MakeBattler(
                 Stat(Strength, 0), Stat(BleedDamagePerSecond, 250), Stat(HealthRegenPerSecond, 100));
-            player.TakeDamage(45, EDamageType.Physical, attackerLevel: 1); // no Toughness → 45 damage → MaxHealth 50 → CurrentHealth 5
+            player.TakeDamage(45, EDamageType.Physical); // no Toughness → 45 damage → MaxHealth 50 → CurrentHealth 5
             var enemy = MakeBattler(Stat(Strength, 0));
             var context = new BattleContext(player, enemy, 40, new Mulberry32(0));
 

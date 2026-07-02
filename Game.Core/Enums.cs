@@ -44,9 +44,9 @@ namespace Game.Core
 
         /// <summary>
         /// A derived game attribute. Bulk mitigation sourced from Endurance, applied as a diminishing-returns
-        /// percentage — <c>Toughness / (Toughness + K·attackerLevel)</c> — that multiplies incoming direct hits.
+        /// percentage — <c>Toughness / (Toughness + C)</c> — that multiplies incoming direct hits.
         /// Effective HP is linear in this stat (each point is worth a constant % of EHP) while the reduction
-        /// itself asymptotes below 100% (no immunity, no breakpoint). The per-level scale K is
+        /// itself asymptotes below 100% (no immunity, no breakpoint). The constant denominator C is
         /// <see cref="GameConstants.ToughnessMitigationConstant"/>; see <see cref="Battle.Battler.ComputeNetDamage"/>.
         /// </summary>
         Toughness = 7,
