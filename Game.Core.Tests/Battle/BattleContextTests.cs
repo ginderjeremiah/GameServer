@@ -463,16 +463,68 @@ namespace Game.Core.Tests.Battle
 
             context.DamageTarget(20, Single(EDamageType.Fire), 0); // no Toughness ⇒ 20 dealt
 
-            // The typed offense book sums the same post-mitigation figure each hit booked into PlayerDamageDealt.
+            // The typed offense book sums the same post-mitigation figure each hit booked into
+            // PlayerDamageDealt (no overkill here, so the #1482 cap doesn't bite).
             Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(20, TypedDealt(context, EDamageType.Fire), 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_KillingHit_BooksOnlyTheHealthRemoved()
+        {
+            // The 80-damage hit overkills the 50-HP enemy by 30: the typed offense book is capped at the
+            // health actually removed (#1482), while the health math and the whole-hit stats keep the full
+            // net — overkill is real "biggest hit" feedback, it just isn't training activity.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0, MaxHealth 50
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(80, Single(EDamageType.Fire), 0);
+
+            Assert.Equal(-30, enemy.CurrentHealth, 0.001); // the health math itself is uncapped
+            Assert.Equal(50, TypedDealt(context, EDamageType.Fire), 0.001);
+            Assert.Equal(80, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(80, context.Stats.HighestPlayerAttack, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_MultiPortionKillingSwing_CapsInPortionOrder()
+        {
+            // A 200-raw swing split evenly: the first (Physical) portion's 100 exhausts the 50 HP, so the
+            // second (Fire) portion books 0 — the #1482 cap distributes across portions in the fixed order.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(200, Portions((EDamageType.Physical, 1.0), (EDamageType.Fire, 1.0)), 0);
+
+            Assert.Equal(50, TypedDealt(context, EDamageType.Physical), 0.001);
+            Assert.Equal(0, TypedDealt(context, EDamageType.Fire), 0.001);
+            Assert.Equal(200, context.Stats.PlayerDamageDealt, 0.001); // the whole-hit total keeps the full net
+        }
+
+        [Fact]
+        public void DamageTarget_AbsorbedHit_BooksTheNegativeNetUnchanged()
+        {
+            // The #1482 cap trims only positive overkill: an absorbed hit's negative net (the capped heal
+            // TakeDamage reports) still books through to the typed book exactly as before.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Toughness 0, MaxHealth 50
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // 50 → 20, room for the heal
+
+            context.DamageTarget(20, Single(EDamageType.Fire), 0); // 20 × (1 − 2) = −20, absorbed
+
+            Assert.Equal(30, TypedDealt(context, EDamageType.Physical), 0.001);
+            Assert.Equal(-20, TypedDealt(context, EDamageType.Fire), 0.001);
         }
 
         [Fact]
         public void DamageTarget_PlayerHitsDifferentTypes_AccumulatedPerType()
         {
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0));
+            // MaxHealth 100 so the 60 total doesn't kill — the overkill booking cap (#1482) has its own tests.
+            var enemy = MakeBattlerWith((Endurance, 0), (MaxHealth, 50));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
             context.DamageTarget(20, Single(EDamageType.Fire), 0);     // 20
@@ -663,16 +715,17 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_MultiPortion_SplitsRawByWeightAndSumsPerPortionNet()
         {
             // Portions [Physical 60, Fire 40] of a raw-100 hit → 60 Physical + 40 Fire. The enemy resists Fire
-            // 0.5 (Physical unresisted), no Toughness: 60 + 40×0.5 = 60 + 20 = 80 net.
+            // 0.5 (Physical unresisted), no Toughness: 60 + 40×0.5 = 60 + 20 = 80 net. MaxHealth 100 so the
+            // swing doesn't kill — the overkill booking cap (#1482) has its own tests.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5)); // MaxHealth 50, Toughness 0
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5), (MaxHealth, 50)); // MaxHealth 100, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
             var dealt = context.DamageTarget(100, Portions((EDamageType.Physical, 60), (EDamageType.Fire, 40)), 0);
 
             Assert.Equal(80, dealt, 0.001);
             Assert.Equal(80, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(50 - 80, enemy.CurrentHealth, 0.001);
+            Assert.Equal(100 - 80, enemy.CurrentHealth, 0.001);
             // Per-portion typed offense book: each portion's own post-mitigation net under its type.
             Assert.Equal(60, TypedDealt(context, EDamageType.Physical), 0.001);
             Assert.Equal(20, TypedDealt(context, EDamageType.Fire), 0.001);

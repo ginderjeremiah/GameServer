@@ -180,7 +180,8 @@ namespace Game.Application.Services
         // key captures (focus beats spread within a book) and the axes train in parallel. A fully-maxed path (no
         // frontier) banks nothing; a retired path is absent from the index (frozen). The avenues:
         //   • Offense (output book): the typed damage the player dealt — direct hits and DoT alike
-        //     (BattleStats.TypedDamageDealt), post-mitigation, routed to the offense keys.
+        //     (BattleStats.TypedDamageDealt), post-mitigation and capped at the health actually removed
+        //     (overkill trains nothing, #1482), routed to the offense keys.
         //   • Resist (incoming book): the player's typed exposure (BattleStats.TypedDamageExposure), split by
         //     BuildResistTrainingByType into its resistance-blocked portion (TypedDamageResistanceMitigated,
         //     weighted at ResistMitigatedTrainingRate) and the portion that still landed (weighted at

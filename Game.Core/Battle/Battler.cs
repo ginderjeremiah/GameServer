@@ -357,6 +357,17 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
+        /// The share of a hit's <paramref name="damage"/> that removed live health, given the target's
+        /// <paramref name="healthBefore"/> it landed: capped at the positive health remaining, so a killing
+        /// blow's overkill tail books nothing (#1482). A negative amount (an absorption heal) passes through
+        /// unchanged. A booking rule for the proficiency offense book only — the health math is never capped.
+        /// </summary>
+        public static double HealthRemoved(double damage, double healthBefore)
+        {
+            return Math.Min(damage, Math.Max(0, healthBefore));
+        }
+
+        /// <summary>
         /// Subtracts <paramref name="amount"/> of reflected damage directly from this (attacking) battler's
         /// health, <b>bypassing all of its own mitigation</b> (resistance and the Toughness curve) — the
         /// deterministic damage-reflection channel (spike #1330). The caller resolves the amount
@@ -399,11 +410,13 @@ namespace Game.Core.Battle
         /// </param>
         /// <param name="recordDamageDealt">
         /// Optional per-type <b>post-mitigation</b> recorder for the proficiency offense book (spike #1338) —
-        /// invoked with each DoT type and the tick damage <em>after</em> this battler's resistance, the same
-        /// value the tick subtracts from health. Supplied when this battler is the victim of the player's DoT
-        /// (the enemy), so the player's DoT damage dealt is typed for the offense binding consistently with a
-        /// direct hit's post-mitigation actual damage; <c>null</c> leaves the loop unchanged. Like
-        /// <paramref name="recordExposure"/> it is a backend-only side channel that adds no parity surface.
+        /// invoked with each DoT type and the tick damage <em>after</em> this battler's resistance, capped at
+        /// the health the tick actually removes (<see cref="HealthRemoved"/>, #1482) across the fixed
+        /// accumulator order, so a killing tick's overkill tail books nothing while the health math below stays
+        /// uncapped. Supplied when this battler is the victim of the player's DoT (the enemy), so the player's
+        /// DoT damage dealt is typed for the offense binding consistently with a direct hit's booked damage;
+        /// <c>null</c> leaves the loop unchanged. Like <paramref name="recordExposure"/> it is a backend-only
+        /// side channel that adds no parity surface.
         /// </param>
         /// <param name="recordHexBonus">
         /// Optional recorder for the attacker's Hex signal (#1427) — invoked per DoT type with the
@@ -427,6 +440,10 @@ namespace Game.Core.Battle
             Action<EDamageType, double>? recordMitigated = null)
         {
             var dot = 0.0;
+            // The positive health the offense book can still credit this tick (#1482): damage-dealt booking is
+            // capped at the health each type actually removes, tracked through the fixed accumulator order (a
+            // negative tick — an authored absorption heal — restores it). Booking only; the health math is untouched.
+            var bookableHealth = Math.Max(0, CurrentHealth);
             var accumulators = DamageTypes.DotAccumulators;
             for (var i = 0; i < accumulators.Count; i++)
             {
@@ -450,9 +467,14 @@ namespace Game.Core.Battle
                 }
 
                 // The post-resistance tick is both what the health loses and what the attacker dealt of this
-                // type; compute it once so the recorded damage-dealt and the health math cannot drift.
+                // type; compute it once so the recorded damage-dealt and the health math cannot drift. The
+                // booked amount is capped at the health the tick actually removes (#1482).
                 var tickDamage = preMitigation * (1 - resistance);
-                recordDamageDealt?.Invoke(accumulators[i].Type, tickDamage);
+                if (recordDamageDealt is not null)
+                {
+                    recordDamageDealt(accumulators[i].Type, HealthRemoved(tickDamage, bookableHealth));
+                    bookableHealth = Math.Max(0, bookableHealth - tickDamage);
+                }
                 recordMitigated?.Invoke(accumulators[i].Type, preMitigation * Math.Clamp(resistance, 0, 1));
 
                 // The attacker's Hex bonus for this tick: the opponent-applied vulnerability v (the resistance the

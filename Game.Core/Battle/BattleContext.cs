@@ -157,11 +157,12 @@ namespace Game.Core.Battle
         /// <item>When the <b>enemy</b> attacks the player, a <b>single</b> dodge draw is taken (Block was retired
         /// in spike #1330). A dodge zeroes the <b>whole</b> multi-typed hit.</item>
         /// </list>
-        /// The per-portion typed books (<see cref="BattleStats.AddTypedDamageDealt"/> per portion's net,
+        /// The per-portion typed books (<see cref="BattleStats.AddTypedDamageDealt"/> per portion's net capped at
+        /// the health it actually removed — overkill books nothing, #1482 —
         /// <see cref="BattleStats.AddTypedDamageExposure"/> per portion's pre-resist dealt) are the cross-school
         /// proficiency signal; the whole-hit stats (<see cref="BattleStats.HighestPlayerAttack"/>,
         /// <see cref="BattleStats.CriticalDamageDealt"/>, and the per-skill total via the return) use
-        /// <c>totalNet</c> — one swing is one attack. The Precision signal is instead the normalized marginal crit
+        /// <c>totalNet</c> — one swing is one attack, and it deliberately keeps the full uncapped net. The Precision signal is instead the normalized marginal crit
         /// bonus (<see cref="BattleStats.CriticalBonusDealt"/>, #1448), booked from the vanilla-hit baseline rather
         /// than the full crit net; the Hex signal (<see cref="BattleStats.HexBonusDealt"/>, #1427) is booked
         /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled,
@@ -230,9 +231,13 @@ namespace Game.Core.Battle
                     var type = portions[i].Type;
                     var rawPortion = PortionRawDamage(rawDamage, totalWeight, portions[i]);
                     var dealt = _activeBattler.AmplifyDamage(rawPortion, type);
+                    var healthBefore = _targetBattler.CurrentHealth;
                     var net = _targetBattler.TakeDamage(
                         dealt * critMultiplier * executeMultiplier, type, _activeBattler.Level);
-                    Stats.AddTypedDamageDealt(type, net);
+                    // The typed offense book is capped at the health the portion actually removed (#1482): a
+                    // killing swing's overkill tail — and every later portion of it — books nothing, while the
+                    // whole-hit stats below keep the full net (feedback like HighestPlayerAttack includes overkill).
+                    Stats.AddTypedDamageDealt(type, Battler.HealthRemoved(net, healthBefore));
                     totalNet += net;
                     // The Hex overlay tally (#1427): the marginal damage the player's applied vulnerability let
                     // through, measured on the vanilla (pre-crit) portion so it composes with crit without either
