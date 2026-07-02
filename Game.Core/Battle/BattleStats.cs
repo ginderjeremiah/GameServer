@@ -18,13 +18,13 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// The Precision (<c>Crit</c> activity key) training signal — distinct from the player-facing
-        /// <see cref="CriticalDamageDealt"/> statistic. It is the <b>normalized marginal</b> crit bonus: for each
-        /// crit, the extra post-mitigation damage over the vanilla (non-crit) hit — measured against that fixed
-        /// baseline, <c>N(crit) − N₀ = baseline × (m − 1)</c> — with the concave-saturating normalization
-        /// <c>φ(a) = a / (1 + a)</c> applied to the crit-damage investment <c>(m − 1)</c>, so a bigger crit trains
-        /// Precision more but a single crit is bounded at one baseline hit (spike #1398 → the delivery-archetype
-        /// normalized-marginal tally, reference implementation #1448). This makes the training signal proportional
-        /// to crit-damage investment, which the full-hit <see cref="CriticalDamageDealt"/> is not.
+        /// <see cref="CriticalDamageDealt"/> statistic. Each crit books the hit's booked (post-mitigation,
+        /// health-capped — #1482) damage × <c>φ(m − 1)</c>, where <c>m</c> is <see cref="EAttribute.CriticalDamage"/>
+        /// and <c>φ</c> is the shared overlay saturation (<see cref="Battle.Battler.NormalizeInvestment"/>) — the
+        /// uniform share-claim tally every overlay uses (#1481, superseding the counterfactual normalized marginal
+        /// of #1448): proportional to crit-damage investment through <c>φ</c> (which the full-hit
+        /// <see cref="CriticalDamageDealt"/> is not), and bounded per battle by the enemy's health pool through
+        /// the booked basis.
         /// </summary>
         public double CriticalBonusDealt { get; set; }
 
@@ -40,64 +40,54 @@ namespace Game.Core.Battle
         public double PlayerReflectedDamageDealt { get; set; }
 
         /// <summary>
-        /// The Hex (<c>Hex</c> activity key) training signal — the normalized-marginal damage the player's
-        /// applied vulnerability enabled this battle (spike #1398 → the overlay tally shape, reference #1448).
-        /// <c>v</c> is the resistance the player's own debuff removed (tracked from the applied effect, not diffed
-        /// against a baseline), so an enemy's base resistance or its own resistance buffs can't rob the player of
-        /// credit for the work the debuff did. For each hit and DoT tick the extra damage that reduction let
-        /// through vs. the same hit without the debuff — <c>D × v</c> in the normal region — is booked with the
-        /// same <c>/(1 + v)</c> saturation the crit bonus uses, on the debuff strength <c>v</c>. Because the
-        /// enabled damage is the pre-resistance amount, it is flat in the enemy's resistance (no resist-farming),
-        /// and the saturation makes it proportional to how hard the player invested in the debuff. Like the crit
-        /// bonus this is a backend-only side channel with no parity mirror.
+        /// The Hex (<c>Hex</c> activity key) training signal — the share of the player's landed damage claimed by
+        /// an applied vulnerability (#1427, reshaped to the uniform share claim by #1481). <c>v</c> is the
+        /// resistance the player's own debuff removed (tracked from the applied effect —
+        /// <see cref="Battle.Battler.AppliedVulnerability"/> — so the target's base resistance or its own
+        /// resistance buffs can't rob the player of credit). Each direct hit and DoT tick books its booked
+        /// (health-capped) damage × <c>φ(v)</c> (<see cref="Battle.Battler.HexBonusForHit"/>). Because the booked
+        /// basis sums to at most the enemy's health pool per battle, a fixed investment trains ≈ its coverage
+        /// share of that pool × <c>φ(v)</c> regardless of the enemy's mitigation — enemy-independent at the
+        /// accrual level, with no counterfactual curve evaluation. Like the crit bonus this is a backend-only side
+        /// channel with no parity mirror.
         /// </summary>
         public double HexBonusDealt { get; set; }
 
         /// <summary>
-        /// The Momentum (<c>Momentum</c> activity key) training signal — the normalized-marginal damage the
-        /// player's applied ramp enabled this battle (spike #1398 → the overlay tally shape, reference #1448). A
-        /// ramp is a stacking self-buff to one of the attacker's typed amplification attributes; <c>r</c> is the
-        /// amplification the buff itself contributed (tracked from the applied effect, isolated from any static
-        /// amplification the attacker already carries — <see cref="Battle.Battler.AppliedMomentum"/>). For each
-        /// hit the extra damage that amplification enabled — the live post-amplification hit minus the same hit
-        /// without the ramp's contribution, both carried through the defender's mitigation — is booked with the
-        /// same <c>/(1 + r)</c> saturation the crit and Hex bonuses use, on the ramp's own magnitude. Unlike Hex
-        /// this is <b>not</b> flat in the defender's mitigation (Momentum amplifies the attacker's output, so a
-        /// tougher target mitigates the ramp bonus exactly as it mitigates the rest of the hit — the same
-        /// property the crit bonus has). Backend-only like the other overlay tallies.
+        /// The Momentum (<c>Momentum</c> activity key) training signal — the share of the player's landed damage
+        /// claimed by an applied ramp (#1428, reshaped to the uniform share claim by #1481). A ramp is a stacking
+        /// self-buff to one of the attacker's typed amplification attributes; <c>r</c> is the amplification the
+        /// buff itself contributed (tracked from the applied effect, isolated from any static amplification the
+        /// attacker already carries — <see cref="Battle.Battler.AppliedMomentum"/>). Each direct hit whose type
+        /// the ramp amplifies books its booked (health-capped) damage × <c>φ(r)</c>. Direct-hit only: a DoT's
+        /// frozen amplification already includes whatever ramp was active when it was cast, but the tally does not
+        /// extend to DoT ticks. Backend-only like the other overlay tallies.
         /// </summary>
         public double MomentumBonusDealt { get; set; }
 
         /// <summary>
-        /// The Cull (<c>Cull</c> activity key) training signal — the normalized-marginal execute bonus an
-        /// authored <see cref="EAttribute.ExecuteBonus"/> enabled this battle (spike #1398 → the overlay tally
-        /// shape, reference #1448; #1430). Cull is the one delivery archetype whose enabler is a genuinely new
-        /// damage-calc conditional rather than an existing resistance/amplification attribute: the target's
-        /// missing-health fraction at the moment of the hit scales <c>ExecuteBonus</c> into that fire's
-        /// multiplier above 1 (the investment), applied to the raw damage identically to <c>CriticalDamage</c>
-        /// before mitigation. For each portion the extra damage that investment enabled — the live post-execute
-        /// hit minus the same hit without it, both carried through the defender's mitigation — is booked with
-        /// the same <c>/(1 + investment)</c> saturation the crit/Hex/Momentum bonuses use, on the investment's
-        /// own magnitude, measured off the pre-crit portion so it composes with crit without either overlay
-        /// inflating the other. A target at full health enables nothing; a target near death saturates the
-        /// multiplier toward the full <c>ExecuteBonus</c>. Backend-only like the other overlay tallies — DoT has
-        /// no counterpart (there is no per-tick "hit" to execute).
+        /// The Cull (<c>Cull</c> activity key) training signal — the share of the player's landed damage claimed
+        /// by the execute investment (#1430, reshaped to the uniform share claim by #1481). Cull is the one
+        /// delivery archetype whose enabler is a genuinely new damage-calc conditional rather than an existing
+        /// resistance/amplification attribute: the target's missing-health fraction at the moment of the fire
+        /// scales <see cref="EAttribute.ExecuteBonus"/> into that fire's multiplier above 1 (the investment),
+        /// applied to the raw damage identically to <c>CriticalDamage</c> before mitigation — that real-damage
+        /// multiplier stays parity-critical and is untouched by the tally shape. Each portion books its booked
+        /// (health-capped) damage × <c>φ(investment)</c>. A target at full health enables nothing; a target near
+        /// death saturates the multiplier toward the full <c>ExecuteBonus</c>. Backend-only like the other
+        /// overlay tallies — DoT has no counterpart (there is no per-tick "hit" to execute).
         /// </summary>
         public double CullBonusDealt { get; set; }
 
         /// <summary>
-        /// The Sunder (<c>Sunder</c> activity key) training signal — a designed proxy for the damage the player's
-        /// applied Toughness debuff enabled this battle (spike #1398 → the overlay tally shape, reference
-        /// #1448; #1429), booked per hit as <c>dealt × φ(investment)</c> where the investment is the opponent's
-        /// applied Toughness reduction (<see cref="Battle.Battler.AppliedSunder"/>) scaled by the curve's own
-        /// characteristic magnitude <c>K·attackerLevel</c>. Unlike the other overlays this is <b>not</b> a
-        /// literal before/after marginal — the Toughness curve is nonlinear, so (unlike Hex's flat resistance
-        /// percentage) there is no way to compute a real marginal through it that is actually independent of the
-        /// target's own stats; <c>dealt × φ(investment)</c> is instead a saturating proxy that reads neither the
-        /// target's Toughness nor its resistance, so a fixed debuff trains the same regardless of which enemy it
-        /// lands on (see <see cref="Battle.Battler.SunderBonusForHit"/>). Direct-hit only: DoT bypasses the
-        /// Toughness curve entirely, so a Toughness debuff cannot affect it. Backend-only like the other overlay
-        /// tallies.
+        /// The Sunder (<c>Sunder</c> activity key) training signal — the share of the player's landed damage
+        /// claimed by an applied Toughness debuff (#1429, aligned with the uniform share claim by #1481; Sunder
+        /// pioneered the no-counterfactual shape, since the nonlinear Toughness curve has no target-flat
+        /// marginal). Each direct hit books its booked (health-capped) damage × <c>φ(investment)</c>, where the
+        /// investment is the opponent-applied Toughness reduction (<see cref="Battle.Battler.AppliedSunder"/>)
+        /// made dimensionless by the curve's own characteristic magnitude <c>K·attackerLevel</c>
+        /// (see <see cref="Battle.Battler.SunderBonusForHit"/>). Direct-hit only: DoT bypasses the Toughness
+        /// curve entirely, so a Toughness debuff cannot affect it. Backend-only like the other overlay tallies.
         /// </summary>
         public double SunderBonusDealt { get; set; }
 
@@ -166,9 +156,9 @@ namespace Game.Core.Battle
             TypedDamageResistanceMitigated[type] = existing + amount;
         }
 
-        /// <summary>Accumulates a normalized-marginal vulnerability-enabled <paramref name="amount"/> into the
-        /// type-neutral Hex signal (#1427). Cached as a method group by <see cref="BattleContext"/> so the
-        /// per-tick DoT phase can record the enemy's Hex bonus without allocating.</summary>
+        /// <summary>Accumulates a vulnerability share-claim <paramref name="amount"/> (#1427/#1481) into the
+        /// type-neutral Hex signal. Cached as a method group by <see cref="BattleContext"/> so the per-tick DoT
+        /// phase can record the enemy's Hex bonus without allocating.</summary>
         public void AddHexBonus(double amount)
         {
             HexBonusDealt += amount;

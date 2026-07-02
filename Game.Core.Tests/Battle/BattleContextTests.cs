@@ -205,9 +205,9 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(1, context.Stats.CriticalHits);
             // The player-facing statistic is the actual full crit damage dealt.
             Assert.Equal(40, context.Stats.CriticalDamageDealt, 0.001);
-            // The Precision signal is the normalized marginal bonus: baseline 20, investment m−1 = 1, φ(1) = 0.5
-            // ⇒ 20 × 0.5 = 10 (the crit added 20 over the vanilla hit, discounted to 10 by the saturation).
-            Assert.Equal(10, context.Stats.CriticalBonusDealt, 0.001);
+            // The Precision signal is the share claim (#1481): the crit hit's booked (landed) 40 × φ(m−1) with
+            // investment m−1 = 1, φ(1) = 0.5 ⇒ 20.
+            Assert.Equal(20, context.Stats.CriticalBonusDealt, 0.001);
         }
 
         [Fact]
@@ -226,10 +226,11 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_MinimallyInvestedCrit_BooksASmallMarginalBonus()
+        public void DamageTarget_MinimallyInvestedCrit_BooksASmallShare()
         {
             // Base CriticalDamage only (1.5, no invested bonus): m = 1.5, investment m−1 = 0.5, φ(0.5) = 1/3.
-            // baseline 20 ⇒ bonus ≈ 6.667 — a token crit trains Precision far less than a committed one.
+            // The booked crit hit is 30 ⇒ claim 10 — a token crit claims a far smaller share of its own hit
+            // than a committed one (strength-proportionality lives in φ, #1481).
             var player = MakeBattlerWith(); // CriticalDamage 1.5 (base)
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -237,15 +238,16 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20 × 1.5 = 30 dealt
 
             Assert.Equal(30, context.Stats.CriticalDamageDealt, 0.001);
-            Assert.Equal(20.0 * 0.5 / 1.5, context.Stats.CriticalBonusDealt, 0.001);
+            Assert.Equal(30.0 / 3.0, context.Stats.CriticalBonusDealt, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_HeavilyInvestedCrit_SaturatesTowardOneBaselineHit()
+        public void DamageTarget_HeavilyInvestedCrit_ClaimsAtMostTheHealthRemoved()
         {
-            // Heavy crit-damage investment: CriticalDamage 1.5 + 98.5 = 100, investment 99, φ(99) = 99/100 = 0.99.
-            // baseline 20 ⇒ bonus 19.8, approaching one baseline hit (20) — the saturation ceiling — even though
-            // the full crit dealt 2000. The signal is bounded so a monster crit cannot dwarf every other axis.
+            // Heavy crit-damage investment: CriticalDamage 1.5 + 98.5 = 100, investment 99, φ(99) = 0.99. The
+            // 2000-damage crit overkills the 50-HP enemy, so the booked basis is the 50 actually removed (#1482)
+            // and the claim is 50 × 0.99 = 49.5 — a monster crit cannot mint training beyond the health it
+            // removed, and φ bounds the share below even that.
             var player = MakeBattlerWith((CriticalDamage, 98.5));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -253,7 +255,7 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20 × 100 = 2000 dealt
 
             Assert.Equal(2000, context.Stats.CriticalDamageDealt, 0.001);
-            Assert.Equal(19.8, context.Stats.CriticalBonusDealt, 0.001);
+            Assert.Equal(49.5, context.Stats.CriticalBonusDealt, 0.001);
         }
 
         [Fact]
@@ -747,9 +749,9 @@ namespace Game.Core.Tests.Battle
             // A crit is one hit; the crit damage stat uses the whole-hit summed net.
             Assert.Equal(1, context.Stats.CriticalHits);
             Assert.Equal(40, context.Stats.CriticalDamageDealt, 0.001);
-            // The marginal bonus sums each portion's vanilla-hit baseline (10 + 10 = 20) before φ: investment
-            // m−1 = 1, φ(1) = 0.5 ⇒ 20 × 0.5 = 10, so a multi-typed crit trains Precision as one marginal event.
-            Assert.Equal(10, context.Stats.CriticalBonusDealt, 0.001);
+            // The share claim sums each portion's booked (landed) damage (20 + 20 = 40) before φ: investment
+            // m−1 = 1, φ(1) = 0.5 ⇒ 20, so a multi-typed crit trains Precision as one whole-hit claim (#1481).
+            Assert.Equal(20, context.Stats.CriticalBonusDealt, 0.001);
         }
 
         [Fact]
@@ -898,11 +900,11 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_AppliedVulnerability_BooksNormalizedMarginalBonus()
+        public void DamageTarget_AppliedVulnerability_BooksShareOfLandedDamage()
         {
             // The player debuffs the enemy's FireResistance by −0.5 (a vulnerability of v = 0.5), then hits for
-            // raw 30. The un-hexed hit would deal 30; the hexed hit deals 45 — the vulnerability enabled 15,
-            // discounted by 1/(1 + 0.5) to 10 (the marginal, saturated on the debuff strength).
+            // raw 30: the hexed hit lands 45. The Hex share claim (#1481) is the booked (landed) 45 × φ(0.5) =
+            // 45 × 1/3 = 15 — no counterfactual, just a φ-scaled share of what actually landed.
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -911,66 +913,101 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − (−0.5)) = 45 dealt
 
             Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // (45 − 30) / (1 + 0.5) = 10
+            Assert.Equal(45.0 / 3.0, context.Stats.HexBonusDealt, 0.001); // 45 × φ(0.5) = 15
         }
 
         [Fact]
-        public void DamageTarget_HexBonus_IsFlatInEnemyBaseResistance()
+        public void DamageTarget_HexBonus_ScalesWithTheLandedHit()
         {
-            // Same applied vulnerability (v = 0.5) against a soft enemy (innate 0 → live −0.5) and a resistant
-            // enemy (innate 0.4 → live −0.1). The enabled damage is the pre-resistance amount × v, so Hex banks
-            // the identical bonus either way — no resist-farming (the "D × v is flat in base resistance" rule).
+            // Same applied vulnerability (v = 0.5) against a soft enemy (innate 0 → live −0.5, lands 45) and a
+            // resistant one (innate 0.4 → live −0.1, lands 33). The share claim scales with what landed — 15 vs
+            // 11 — a deliberate property of the #1481 share shape: per battle the booked basis sums to at most
+            // the enemy's health pool, so the per-hit mitigation dependence washes out at the accrual level
+            // (where the old per-hit "flat in base resistance" marginal guarantee used to live).
             var softContext = MakeHexContext(innateFireResistance: 0);
             var resistantContext = MakeHexContext(innateFireResistance: 0.4);
 
             softContext.DamageTarget(30, Single(EDamageType.Fire), 0);
             resistantContext.DamageTarget(30, Single(EDamageType.Fire), 0);
 
-            Assert.Equal(30.0 * 0.5 / 1.5, softContext.Stats.HexBonusDealt, 0.001);
-            Assert.Equal(softContext.Stats.HexBonusDealt, resistantContext.Stats.HexBonusDealt, 0.001);
+            Assert.Equal(45.0 / 3.0, softContext.Stats.HexBonusDealt, 0.001);
+            Assert.Equal(33.0 / 3.0, resistantContext.Stats.HexBonusDealt, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_HeavilyInvestedVulnerability_SaturatesTowardOneBaselineHit()
+        public void DamageTarget_HeavilyInvestedVulnerability_ClaimsAtMostTheBookedHit()
         {
-            // A crushing vulnerability (v = 10) enables 10× the pre-resistance damage, but the 1/(1 + v)
-            // saturation bounds the tally at one baseline (pre-resistance) hit: 30 × 10 / 11 ≈ 27.27, approaching
-            // 30 — a monster debuff cannot dwarf every other training axis (mirrors the crit-bonus ceiling).
+            // A crushing vulnerability (v = 10) drives the hit to 330, but φ(10) = 10/11 bounds the claim below
+            // the booked hit itself: 330 × 10/11 = 300 — a monster debuff cannot claim more than the damage that
+            // landed (mirrors the crit-share ceiling). MaxHealth 350 so the swing doesn't kill (the health-removed
+            // cap has its own test below).
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (MaxHealth, 300));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Vulnerability(FireResistance, -10));
 
-            context.DamageTarget(30, Single(EDamageType.Fire), 0);
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × 11 = 330 dealt
 
-            Assert.Equal(30.0 * 10.0 / 11.0, context.Stats.HexBonusDealt, 0.001);
+            Assert.Equal(330.0 * 10.0 / 11.0, context.Stats.HexBonusDealt, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_CritAndHex_BookIndependentBonuses()
+        public void DamageTarget_KillingHit_OverlayClaimIsCappedAtHealthRemoved()
         {
-            // Crit and Hex are separate overlays. Hex is measured on the pre-crit vanilla hit, so a crit does not
-            // inflate it: v = 0.5 on raw 30 still banks 10. Crit books its own marginal off the (hexed) non-crit
-            // baseline 45: investment m−1 = 1, φ(1) = 0.5 ⇒ 45 × 0.5 = 22.5. Neither overlay balloons the other.
+            // The share basis is the booked (health-capped, #1482) damage: a 120-damage hexed hit on the 50-HP
+            // enemy books 50, so Hex claims 50 × φ(0.5) — overkill mints no overlay training either.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.5));
+
+            context.DamageTarget(80, Single(EDamageType.Fire), 0); // 80 × 1.5 = 120 dealt, 50 removed
+
+            Assert.Equal(120, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(50.0 / 3.0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_AbsorbedHit_BooksNoOverlayClaim()
+        {
+            // An absorbed hit (live resistance still above 1 despite the debuff) heals the enemy — nothing
+            // landed, so the share basis is 0 and no overlay trains on it.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.ApplySkillEffect(Vulnerability(FireResistance, -0.3)); // live 1.7, still absorbing
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // 50 → 20, room for the heal
+
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − 1.7) = −21, absorbed
+
+            Assert.Equal(0, context.Stats.HexBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_CritAndHex_ClaimSharesOfTheSameLandedHit()
+        {
+            // Under the share shape both overlays claim off the same booked hit: v = 0.5 and a ×2 crit land 90,
+            // so Hex claims 90 × φ(0.5) = 30 and Precision claims 90 × φ(1) = 45. The synergy pays through the
+            // landed damage itself — bounded per battle by the enemy's health pool — while each φ stays on its
+            // own investment (a crit cannot change v, nor the debuff m). MaxHealth 100 so the swing doesn't kill.
             var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
-            var enemy = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (MaxHealth, 50));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Vulnerability(FireResistance, -0.5));
 
             context.DamageTarget(30, Single(EDamageType.Fire), 1); // hexed non-crit 45, crit ×2 = 90 dealt
 
-            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // 10, unaffected by the crit
-            Assert.Equal(45.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 22.5
+            Assert.Equal(90.0 / 3.0, context.Stats.HexBonusDealt, 0.001); // 30
+            Assert.Equal(90.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 45
         }
 
         [Fact]
-        public void DamageTarget_VulnerabilityCrossesAbsorptionToDamage_CreditsTheWholeSwing()
+        public void DamageTarget_VulnerabilityCrossesAbsorptionToDamage_ClaimsShareOfTheLandedHit()
         {
-            // The crossover edge: the enemy innately absorbs Fire (FireResistance 1.5 > 1 → the un-hexed hit is a
-            // −15 net heal). The player's −0.8 debuff brings live resistance to 0.7, so the hit deals +9. The
-            // vulnerability turned a 15 heal into a 9 hit — a 24 swing — credited (÷ (1 + 0.8)) as the enabled
-            // marginal. Here the flat-in-base-resistance property intentionally does NOT hold (the innate
-            // absorption folds into the marginal); pinned so the crossover behaviour cannot silently drift.
+            // The crossover edge: the enemy innately absorbs Fire (FireResistance 1.5 > 1), and the player's −0.8
+            // debuff brings live resistance to 0.7 so the hit lands +9. The share claim reads only what landed —
+            // 9 × φ(0.8) = 4 — the old marginal's extra credit for the heal it prevented is deliberately gone
+            // with #1481 (a share claim never runs a counterfactual); pinned so the crossover cannot drift.
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 1.5));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -979,7 +1016,7 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − 0.7) = 9 dealt
 
             Assert.Equal(9, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal((9.0 - (-15.0)) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 = 13.33
+            Assert.Equal(9.0 * 0.8 / 1.8, context.Stats.HexBonusDealt, 0.001); // 4
         }
 
         [Fact]
@@ -1006,9 +1043,8 @@ namespace Game.Core.Tests.Battle
         {
             // Both move the same resistance: the enemy self-buffs +0.5 (untracked), the player debuffs −0.8
             // (tracked as v = 0.8). Hex credits the player's GROSS debuff — the resistance its debuff removed —
-            // not the net reduction, so the enemy hardening itself does not rob the player of training for the
-            // work their debuff did. The marginal is measured against the without-debuff hit (resistance raised
-            // back by 0.8 to the enemy-buffed 0.5): N(−0.3) − N(0.5) = 39 − 15 = 24, ÷ (1 + 0.8).
+            // not the net reduction, so the enemy hardening itself lowers the landed basis but never the tracked
+            // investment: the claim is the landed 39 × φ(0.8), not 39 × φ(0.3).
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -1020,7 +1056,7 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 − (−0.3)) = 39 dealt
 
             Assert.Equal(39, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal((39.0 - 15.0) / 1.8, context.Stats.HexBonusDealt, 0.001); // 24 / 1.8 ≈ 13.33
+            Assert.Equal(39.0 * 0.8 / 1.8, context.Stats.HexBonusDealt, 0.001); // ≈ 17.33
         }
 
         [Fact]
@@ -1059,10 +1095,11 @@ namespace Game.Core.Tests.Battle
         public void ResolveDamageOverTime_AppliedVulnerability_BooksHexBonusForTheEnemyDot()
         {
             // The player applies a Bleed DoT (100/s) and a Bleed vulnerability (−0.5 BleedResistance) to the
-            // enemy, then a 1s tick resolves. The tick deals 100 × (1 − (−0.5)) = 150; the vulnerability enabled
-            // 100 × 0.5 = 50 of that, discounted by 1/(1 + 0.5) to the same 33.33 marginal shape as a direct hit.
+            // enemy, then a 1s tick resolves. The tick lands 100 × (1 − (−0.5)) = 150, and the Hex share claim
+            // is the same shape as a direct hit's (#1481): the booked tick × φ(0.5) = 150 × 1/3 = 50.
+            // MaxHealth 200 so the tick doesn't kill (the killing tick's booking cap is pinned in the DoT suite).
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (MaxHealth, 150));
             var context = new BattleContext(player, enemy, timeDelta: 1000, new Mulberry32(0));
             context.ApplySkillEffect(Vulnerability(BleedResistance, -0.5));
             context.ApplySkillEffect(Dot(BleedDamagePerSecond, 100));
@@ -1070,7 +1107,7 @@ namespace Game.Core.Tests.Battle
             context.ResolveDamageOverTime();
 
             Assert.Equal(150, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(100.0 * 0.5 / 1.5, context.Stats.HexBonusDealt, 0.001); // 33.33
+            Assert.Equal(150.0 / 3.0, context.Stats.HexBonusDealt, 0.001); // 150 × φ(0.5) = 50
         }
 
         [Fact]
@@ -1120,11 +1157,11 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_AppliedRamp_BooksNormalizedMarginalBonus()
+        public void DamageTarget_AppliedRamp_BooksShareOfLandedDamage()
         {
-            // The player ramps its own FireAmplification by +0.5, then hits for raw 30. The un-ramped hit would
-            // deal 30; the ramped hit deals 45 — the ramp enabled 15, discounted by 1/(1 + 0.5) to 10 (the
-            // marginal, saturated on the ramp's own magnitude).
+            // The player ramps its own FireAmplification by +0.5, then hits for raw 30: the ramped hit lands 45.
+            // The Momentum share claim (#1481) is the booked (landed) 45 × φ(0.5) = 15 — no un-ramped
+            // counterfactual, just a φ-scaled share of what actually landed.
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -1133,32 +1170,31 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × (1 + 0.5) = 45 dealt
 
             Assert.Equal(45, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // (45 − 30) / (1 + 0.5) = 10
+            Assert.Equal(45.0 / 3.0, context.Stats.MomentumBonusDealt, 0.001); // 45 × φ(0.5) = 15
         }
 
         [Fact]
-        public void DamageTarget_HeavilyInvestedRamp_SaturatesTowardOneBaselineHit()
+        public void DamageTarget_HeavilyInvestedRamp_ClaimsAtMostTheBookedHit()
         {
-            // A towering ramp (r = 10) enables 10× the un-ramped damage, but the 1/(1 + r) saturation bounds the
-            // tally at one baseline (pre-ramp) hit: 30 × 10 / 11 ≈ 27.27 — a monster stack cannot dwarf every
-            // other training axis (mirrors the crit-bonus and Hex-bonus ceilings).
+            // A towering ramp (r = 10) drives the hit to 330, but φ(10) = 10/11 bounds the claim below the booked
+            // hit itself: 330 × 10/11 = 300 — a monster stack cannot claim more than the damage that landed
+            // (mirrors the crit and Hex ceilings). MaxHealth 350 so the swing doesn't kill.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (MaxHealth, 300));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Ramp(FireAmplification, 10));
 
-            context.DamageTarget(30, Single(EDamageType.Fire), 0);
+            context.DamageTarget(30, Single(EDamageType.Fire), 0); // 30 × 11 = 330 dealt
 
-            Assert.Equal(30.0 * 10.0 / 11.0, context.Stats.MomentumBonusDealt, 0.001);
+            Assert.Equal(330.0 * 10.0 / 11.0, context.Stats.MomentumBonusDealt, 0.001);
         }
 
         [Fact]
         public void DamageTarget_MomentumBonus_IsMitigatedLikeTheRestOfTheHit()
         {
-            // Unlike Hex, Momentum amplifies the attacker's own output, so its bonus is mitigated exactly like
-            // the rest of the hit (the same property the crit bonus has) — NOT flat in the defender's mitigation.
-            // A 50% resistant enemy halves the marginal too: (45 − 30) × (1 − 0.5) / (1 + 0.5) = 5, half the
-            // unmitigated 10.
+            // The share basis is the landed damage, so the defender's mitigation flows through: a 50% resistant
+            // enemy halves the claim too (22.5 × φ(0.5) = 7.5, half the unresisted 15). Per battle this washes
+            // out — the booked basis sums to at most the enemy's health pool either way (#1481).
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 0.5));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -1167,25 +1203,24 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(30, Single(EDamageType.Fire), 0); // 45 × (1 − 0.5) = 22.5 dealt
 
             Assert.Equal(22.5, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(15.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // 5
+            Assert.Equal(22.5 / 3.0, context.Stats.MomentumBonusDealt, 0.001); // 7.5
         }
 
         [Fact]
-        public void DamageTarget_CritAndMomentum_BookIndependentBonuses()
+        public void DamageTarget_CritAndMomentum_ClaimSharesOfTheSameLandedHit()
         {
-            // Crit and Momentum are separate overlays. Momentum is measured on the pre-crit hit, so a crit does
-            // not inflate it: r = 0.5 on raw 30 still banks 10. Crit books its own marginal off the (ramped)
-            // non-crit baseline 45: investment m−1 = 1, φ(1) = 0.5 ⇒ 45 × 0.5 = 22.5. Neither overlay balloons
-            // the other.
+            // Both overlays claim off the same booked hit: r = 0.5 and a ×2 crit land 90, so Momentum claims
+            // 90 × φ(0.5) = 30 and Precision claims 90 × φ(1) = 45 — the synergy pays through the landed damage
+            // (HP-bounded per battle), each φ staying on its own investment. MaxHealth 100 so no kill.
             var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
-            var enemy = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (MaxHealth, 50));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(Ramp(FireAmplification, 0.5));
 
             context.DamageTarget(30, Single(EDamageType.Fire), 1); // ramped non-crit 45, crit ×2 = 90 dealt
 
-            Assert.Equal(30.0 * 0.5 / 1.5, context.Stats.MomentumBonusDealt, 0.001); // 10, unaffected by the crit
-            Assert.Equal(45.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 22.5
+            Assert.Equal(90.0 / 3.0, context.Stats.MomentumBonusDealt, 0.001); // 30
+            Assert.Equal(90.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 45
         }
 
         [Fact]
@@ -1255,12 +1290,11 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_ExecuteBonusAgainstDamagedTarget_MultipliesRealDamageAndBooksNormalizedMarginalBonus()
+        public void DamageTarget_ExecuteBonusAgainstDamagedTarget_MultipliesRealDamageAndBooksShareOfLandedDamage()
         {
             // The target is missing 40% of its health (20/50), so a full (100%) ExecuteBonus scales this fire's
-            // multiplier to 1 + 1.0×0.4 = 1.4: 10 raw × 1.4 = 14 dealt (vs 10 unmultiplied). The Cull tally is the
-            // marginal (14 − 10 = 4) discounted by the same 1/(1 + investment) saturation crit/Hex/Momentum use:
-            // 4 / 1.4 ≈ 2.857.
+            // multiplier to 1 + 1.0×0.4 = 1.4: 10 raw × 1.4 = 14 dealt. The Cull share claim (#1481) is the
+            // booked (landed) 14 × φ(0.4) = 14 × 0.4/1.4 = 4.
             var player = MakeBattlerWith((Endurance, 0), (ExecuteBonus, 1.0));
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             enemy.TakeReflectedDamage(20); // CurrentHealth 30 (40% missing)
@@ -1270,16 +1304,17 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(50 - 20 - 14, enemy.CurrentHealth, 0.001);
             Assert.Equal(14, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(10.0 * 0.4 / 1.4, context.Stats.CullBonusDealt, 0.001);
+            Assert.Equal(14.0 * 0.4 / 1.4, context.Stats.CullBonusDealt, 0.001); // 4
         }
 
         [Fact]
-        public void DamageTarget_HeavilyInvestedExecuteAgainstNearDeadTarget_SaturatesTowardOneBaselineHit()
+        public void DamageTarget_HeavilyInvestedExecuteAgainstNearDeadTarget_ClaimsAtMostTheHealthRemoved()
         {
             // A target at 2% health (1/50) with a towering ExecuteBonus (50 = 5000%) drives the multiplier to
-            // 1 + 50×0.98 = 50: 20 raw × 50 = 1000 dealt. But the 1/(1 + investment) saturation bounds the Cull
-            // tally at one baseline hit: (1000 − 20) / (1 + 49) = 19.6, approaching but never reaching the 20
-            // baseline — a monster investment cannot dwarf every other training axis.
+            // 1 + 50×0.98 = 50: 20 raw × 50 = 1000 dealt — but only 1 health existed to remove, so the booked
+            // basis is 1 (#1482) and the claim is 1 × φ(49) = 0.98. The execute archetype is the natural
+            // overkill machine; the health-removed basis is exactly what stops execute one-shots from minting
+            // Cull training out of damage that hit a corpse.
             var player = MakeBattlerWith((Endurance, 0), (ExecuteBonus, 50.0));
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
             enemy.TakeReflectedDamage(49); // CurrentHealth 1 (98% missing)
@@ -1288,17 +1323,15 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(20, Single(EDamageType.Physical), 0);
 
             Assert.Equal(1000, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(19.6, context.Stats.CullBonusDealt, 0.001);
+            Assert.Equal(1.0 * 49.0 / 50.0, context.Stats.CullBonusDealt, 0.001); // 0.98
         }
 
         [Fact]
-        public void DamageTarget_CritAndCull_BookIndependentBonuses()
+        public void DamageTarget_CritAndCull_ClaimSharesOfTheSameLandedHit()
         {
-            // Crit and Cull are separate overlays. Cull is measured on the pre-crit hit, so a crit does not
-            // inflate it: investment 0.4 on raw 10 still banks 10×0.4/1.4 ≈ 2.857 — identical to the isolated
-            // case above. Crit books its own marginal off the (execute-untouched) non-crit baseline 10:
-            // investment m−1 = 1, φ(1) = 0.5 ⇒ 10×0.5 = 5. The real damage composes both multipliers:
-            // 10 × 2 (crit) × 1.4 (execute) = 28.
+            // Both overlays claim off the same booked hit. The real damage composes both multipliers —
+            // 10 × 2 (crit) × 1.4 (execute) = 28 — so Cull claims 28 × φ(0.4) = 8 and Precision claims
+            // 28 × φ(1) = 14, each φ on its own investment.
             var player = MakeBattlerWith(
                 (Endurance, 0), (CriticalDamage, 0.5), (ExecuteBonus, 1.0)); // CriticalDamage 2
             var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
@@ -1308,8 +1341,8 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(10, Single(EDamageType.Physical), 1);
 
             Assert.Equal(28, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(10.0 * 0.4 / 1.4, context.Stats.CullBonusDealt, 0.001); // unaffected by the crit
-            Assert.Equal(10.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // unaffected by execute
+            Assert.Equal(28.0 * 0.4 / 1.4, context.Stats.CullBonusDealt, 0.001); // 8
+            Assert.Equal(28.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 14
         }
 
         [Fact]
@@ -1346,14 +1379,12 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_AppliedSunder_BooksDealtScaledByInvestment()
+        public void DamageTarget_AppliedSunder_BooksLandedDamageScaledByInvestment()
         {
-            // Sunder books dealt × φ(investment) — not a literal before/after marginal (the nonlinear Toughness
-            // curve has no marginal that is actually flat in the target's own stats the way Hex's resistance
-            // does), so this is a designed proxy rather than a measured difference. Attacker (player) level 1 ⇒
-            // K·level = 20; a −20 debuff (s = 20) gives investment 20/20 = 1.0, φ(1.0) = 0.5, so raw 30 dealt
-            // banks 30 × 0.5 = 15. The enemy's own Toughness (20, fully stripped to 0 by the debuff) drives the
-            // ACTUAL damage dealt but is never read by the tally itself.
+            // Sunder books the landed (booked) damage × φ(investment) — the share-claim shape every overlay uses
+            // (#1481). Attacker (player) level 1 ⇒ K·level = 20; a −20 debuff (s = 20) gives investment
+            // 20/20 = 1.0, φ(1.0) = 0.5. The debuff strips the enemy's Toughness 20 to 0, so the hit lands the
+            // full 30 and the claim is 30 × 0.5 = 15.
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -1369,8 +1400,9 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_PartialSunder_BooksSmallerProportionalBonus()
         {
             // A lighter debuff (−10, half of the previous case) gives half the investment (10/20 = 0.5),
-            // φ(0.5) = 1/3, so the same raw 30 dealt now banks only 30/3 = 10 — smaller for a smaller
-            // investment (strength-proportionality).
+            // φ(0.5) = 1/3 — and the half-stripped Toughness (10) also mitigates the hit to 20 landed, so the
+            // claim is 20/3 ≈ 6.667 — smaller investment, smaller share of a smaller landed hit
+            // (strength-proportionality lives in φ; the basis is what actually landed).
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -1379,15 +1411,15 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(30, Single(EDamageType.Physical), 0); // 30 × (1 − 1/3) = 20 dealt
 
             Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(10, context.Stats.SunderBonusDealt, 0.001);
+            Assert.Equal(20.0 / 3.0, context.Stats.SunderBonusDealt, 0.001);
         }
 
         [Fact]
-        public void DamageTarget_HeavilyInvestedSunder_SaturatesTowardDealt()
+        public void DamageTarget_HeavilyInvestedSunder_SaturatesTowardTheLandedHit()
         {
-            // A towering debuff (s = 180) drives the investment to 180/20 = 9, φ(9) = 0.9, so the tally
-            // approaches (but never reaches) the full dealt amount: 30 × 0.9 = 27 — the same saturating ceiling
-            // shape the crit/Hex/Momentum bonuses use, here bounding a single hit's credit at one dealt's worth.
+            // A towering debuff (s = 180) drives the investment to 180/20 = 9, φ(9) = 0.9, so the claim
+            // approaches (but never reaches) the landed hit: the over-stripped Toughness floors at 0 (the hit
+            // lands the full 30) and the tally banks 30 × 0.9 = 27 — the same ceiling shape as the other overlays.
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 10));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -1399,11 +1431,14 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_SunderBonus_IsIndependentOfEnemyStats()
+        public void DamageTarget_SunderBonus_ScalesWithTheLandedHit()
         {
-            // The tally reads neither the target's Toughness nor its resistance — only the player's own applied
-            // debuff and level — so the same investment trains identically against a soft, undefended enemy and
-            // a heavily-invested, resistant one, even though the REAL damage dealt differs sharply between them.
+            // The investment (φ side) reads only the player's own debuff and level, but the basis is the landed
+            // hit — so the same −10 debuff claims 20/3 against a soft enemy (Toughness 20 → 10, lands 20) and far
+            // less against a resistant fortress (Toughness 400 → 390, 50% resist ⇒ lands ≈ 0.73). Deliberate
+            // under the #1481 share shape: per battle the booked basis sums to at most the enemy's health pool,
+            // so the per-hit difference washes out at the accrual level (where the old per-hit
+            // enemy-independence guarantee used to live).
             var softPlayer = MakeBattlerWith((Endurance, 0));
             var softEnemy = MakeBattlerWith((Endurance, 10)); // Toughness 20, no resistance
             var softContext = new BattleContext(softPlayer, softEnemy, timeDelta: 0, new Mulberry32(0));
@@ -1417,28 +1452,27 @@ namespace Game.Core.Tests.Battle
             softContext.DamageTarget(30, Single(EDamageType.Physical), 0);
             toughContext.DamageTarget(30, Single(EDamageType.Physical), 0);
 
-            Assert.Equal(10, softContext.Stats.SunderBonusDealt, 0.001);
-            Assert.Equal(softContext.Stats.SunderBonusDealt, toughContext.Stats.SunderBonusDealt, 0.001);
+            Assert.Equal(20.0 / 3.0, softContext.Stats.SunderBonusDealt, 0.001);
+            // Tough enemy: 30 × 0.5 resisted = 15, × (1 − 390/410) through the curve = 15 × 20/410 landed, × φ(0.5).
+            Assert.Equal(15.0 * 20.0 / 410.0 / 3.0, toughContext.Stats.SunderBonusDealt, 0.001);
             Assert.NotEqual(softContext.Stats.PlayerDamageDealt, toughContext.Stats.PlayerDamageDealt);
         }
 
         [Fact]
-        public void DamageTarget_CritAndSunder_BookIndependentBonuses()
+        public void DamageTarget_CritAndSunder_ClaimSharesOfTheSameLandedHit()
         {
-            // Crit and Sunder are separate overlays. Sunder is measured on the pre-crit dealt, so a crit does not
-            // inflate it: it still banks 15 (the same as the isolated case above). Crit books its own marginal
-            // off the non-crit baseline net (30, unaffected by Sunder's own tally formula): investment m−1 = 1,
-            // φ(1) = 0.5 ⇒ 30 × 0.5 = 15.
+            // Both overlays claim off the same booked hit: the sundered (Toughness 0) crit lands 60, so Sunder
+            // claims 60 × φ(1.0) = 30 and Precision claims 60 × φ(1) = 30 — each φ on its own investment.
             var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
-            var enemy = MakeBattlerWith((Endurance, 10));
+            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20, MaxHealth 250
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.ApplySkillEffect(SunderDebuff(-20));
 
             context.DamageTarget(30, Single(EDamageType.Physical), 1); // sundered Toughness 0, crit ×2 = 60 dealt
 
             Assert.Equal(60, context.Stats.PlayerDamageDealt, 0.001);
-            Assert.Equal(15, context.Stats.SunderBonusDealt, 0.001); // unaffected by the crit
-            Assert.Equal(15, context.Stats.CriticalBonusDealt, 0.001); // unaffected by Sunder
+            Assert.Equal(30, context.Stats.SunderBonusDealt, 0.001); // 60 × φ(1.0)
+            Assert.Equal(30, context.Stats.CriticalBonusDealt, 0.001); // 60 × φ(m−1)
         }
 
         [Fact]

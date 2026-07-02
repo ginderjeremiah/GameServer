@@ -52,7 +52,7 @@ export function skillContributions(skill: ISkill, attributes: BattleAttributes):
  *  down to 0%, never past its pole at `-K·attackerLevel` into amplification or a net heal (#1461). Block's flat
  *  reduction was removed (#1330), so the stack is now purely multiplicative and never needs a floor on
  *  `rawDamage` itself — it is already positive here (the absorption branch in {@link mitigateDamage} handles the
- *  non-positive case). Mirrors the backend `Battler.NetDamageAfterResistance` — the expression must match
+ *  non-positive case). Mirrors the backend `Battler.ComputeNetDamage`'s Toughness tail — the expression must match
  *  bit-for-bit for battle parity, including the unreachable 0/0 reduction (Toughness AND attackerLevel both 0 →
  *  NaN, since battler Level ≥ 1) which both ports propagate identically. */
 export function toughnessMitigatedDamage(rawDamage: number, toughness: number, attackerLevel: number): number {

@@ -22,7 +22,7 @@ namespace Game.Core.Battle
         private readonly Action<EDamageType, double> _recordPlayerDotDealt;
 
         // The player's Hex-signal recorder for the enemy's DoT phase, cached once so the per-tick DoT loop hands
-        // the enemy its vulnerability-enabled marginal without allocating on the replay hot path (#1427).
+        // the enemy its vulnerability share claim without allocating on the replay hot path (#1427/#1481).
         private readonly Action<double> _recordPlayerHexBonus;
 
         public int TimeDelta { get; set; }
@@ -162,18 +162,18 @@ namespace Game.Core.Battle
         /// <see cref="BattleStats.AddTypedDamageExposure"/> per portion's pre-resist dealt) are the cross-school
         /// proficiency signal; the whole-hit stats (<see cref="BattleStats.HighestPlayerAttack"/>,
         /// <see cref="BattleStats.CriticalDamageDealt"/>, and the per-skill total via the return) use
-        /// <c>totalNet</c> — one swing is one attack, and it deliberately keeps the full uncapped net. The Precision signal is instead the normalized marginal crit
-        /// bonus (<see cref="BattleStats.CriticalBonusDealt"/>, #1448), booked from the vanilla-hit baseline rather
-        /// than the full crit net; the Hex signal (<see cref="BattleStats.HexBonusDealt"/>, #1427) is booked
-        /// per-portion off that same pre-crit baseline as the marginal damage an applied vulnerability enabled,
-        /// the Sunder signal (<see cref="BattleStats.SunderBonusDealt"/>, #1429) is booked per-portion as a
-        /// designed proxy (<c>dealt × φ(investment)</c>, not a literal marginal — the Toughness curve's
-        /// nonlinearity has no target-flat marginal the way Hex's resistance does) scaled by the applied
-        /// Toughness debuff, and the Momentum signal (<see cref="BattleStats.MomentumBonusDealt"/>, #1428) is
-        /// booked per-portion as the marginal damage the player's own applied ramp enabled. The Cull signal
-        /// (<see cref="BattleStats.CullBonusDealt"/>, #1430) is likewise booked per-portion off the pre-crit
-        /// baseline, but — unlike Hex/Momentum, which train off the existing resistance/amplification
-        /// pipeline — its enabler
+        /// <c>totalNet</c> — one swing is one attack, and it deliberately keeps the full uncapped net. Every
+        /// overlay training signal books the <b>same share-claim shape</b> (#1481): the portion's booked
+        /// (health-capped) net × <c>φ</c> of the overlay's own investment
+        /// (<see cref="Battler.NormalizeInvestment"/>) — Precision
+        /// (<see cref="BattleStats.CriticalBonusDealt"/>, #1448, on the whole crit hit's booked total with the
+        /// crit-damage investment <c>m − 1</c>), Hex (<see cref="BattleStats.HexBonusDealt"/>, #1427, on the
+        /// opponent-applied vulnerability), Sunder (<see cref="BattleStats.SunderBonusDealt"/>, #1429, on the
+        /// opponent-applied Toughness debuff scaled dimensionless by <c>K·level</c>), Momentum
+        /// (<see cref="BattleStats.MomentumBonusDealt"/>, #1428, on the attacker's own applied ramp), and Cull
+        /// (<see cref="BattleStats.CullBonusDealt"/>, #1430, on the sampled execute investment). No tally runs a
+        /// counterfactual curve evaluation, none re-reads the target's debuffed mitigation, and an absorbed
+        /// portion trains nothing — see the loop comment for the rationale. Cull's enabler
         /// (<see cref="EAttribute.ExecuteBonus"/> scaled by the target's missing-health fraction, sampled once per
         /// fire) also multiplies the <b>real</b> damage dealt, identically to <see cref="EAttribute.CriticalDamage"/>
         /// and before mitigation, so it is the one overlay that is parity-critical beyond its tally. Each
@@ -225,7 +225,7 @@ namespace Game.Core.Battle
                 var executeInvestment = _activeBattler.GetAttributeValue(ExecuteBonus) * missingHpFraction;
                 var executeMultiplier = 1.0 + executeInvestment;
 
-                var baselineNet = 0.0;
+                var totalBooked = 0.0;
                 for (var i = 0; i < portions.Count; i++)
                 {
                     var type = portions[i].Type;
@@ -237,47 +237,35 @@ namespace Game.Core.Battle
                     // The typed offense book is capped at the health the portion actually removed (#1482): a
                     // killing swing's overkill tail — and every later portion of it — books nothing, while the
                     // whole-hit stats below keep the full net (feedback like HighestPlayerAttack includes overkill).
-                    Stats.AddTypedDamageDealt(type, Battler.HealthRemoved(net, healthBefore));
+                    var booked = Battler.HealthRemoved(net, healthBefore);
+                    Stats.AddTypedDamageDealt(type, booked);
                     totalNet += net;
-                    // The Hex overlay tally (#1427): the marginal damage the player's applied vulnerability let
-                    // through, measured on the vanilla (pre-crit) portion so it composes with crit without either
-                    // overlay inflating the other. Zero unless a vulnerability debuff lowered the target's
-                    // resistance below its innate baseline. A backend-only side channel — no health mutation.
-                    Stats.HexBonusDealt += _targetBattler.HexBonusForHit(dealt, type, _activeBattler.Level);
-                    // The Sunder overlay tally (#1429): dealt × φ(investment), a designed proxy rather than a
-                    // literal marginal (the nonlinear Toughness curve has no flat-in-the-target marginal the way
-                    // Hex's resistance does), measured on the vanilla (pre-crit) portion so it composes with
-                    // crit/Hex without either overlay inflating the other. Zero unless a Sunder debuff lowered
-                    // the target's Toughness below its baseline.
-                    Stats.SunderBonusDealt += _targetBattler.SunderBonusForHit(dealt, _activeBattler.Level);
-                    // The Momentum overlay tally (#1428): the marginal damage the player's own applied ramp (a
-                    // stacking self-buff to this portion's amplification) enabled, measured against the un-ramped
-                    // baseline (dealt minus exactly the ramp's own contribution) so it composes with crit/Hex
-                    // without inflating either. Zero unless a ramp buff amplified this portion's type.
+
+                    // Every overlay tally books a share claim on the damage this portion actually landed (#1481):
+                    // the booked (health-capped) net × φ(its own investment) — one uniform shape with no
+                    // counterfactual curve evaluations, structurally immune to cross-overlay inflation (the basis
+                    // never re-reads the target's debuffed mitigation) and bounded per battle by the enemy's
+                    // health pool. An absorbed portion (negative booked) trains nothing. All backend-only side
+                    // channels — no health mutation, no parity surface.
+                    var overlayBasis = booked > 0 ? booked : 0;
+                    totalBooked += overlayBasis;
+                    // Hex (#1427): the target-side applied-vulnerability share — zero unless the player's own
+                    // debuff lowered the target's resistance.
+                    Stats.HexBonusDealt += _targetBattler.HexBonusForHit(overlayBasis, type);
+                    // Sunder (#1429): the target-side Toughness-debuff share, the investment made dimensionless
+                    // by the mitigation curve's own K·level magnitude.
+                    Stats.SunderBonusDealt += _targetBattler.SunderBonusForHit(overlayBasis, _activeBattler.Level);
+                    // Momentum (#1428): the attacker's own applied-ramp share for this portion's type.
                     var rampContribution = _activeBattler.AppliedMomentum(type);
                     if (rampContribution > 0)
                     {
-                        var unrampedDealt = dealt - rawPortion * rampContribution;
-                        var marginal = _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level)
-                            - _targetBattler.ComputeNetDamage(unrampedDealt, type, _activeBattler.Level);
-                        Stats.MomentumBonusDealt += marginal > 0 ? marginal / (1 + rampContribution) : 0;
+                        Stats.MomentumBonusDealt += overlayBasis * Battler.NormalizeInvestment(rampContribution);
                     }
-                    // The Cull overlay tally (#1430): the marginal damage the execute investment enabled,
-                    // measured on the vanilla (pre-crit) portion — the same independence Hex/Momentum keep —
-                    // so a crit on the same hit neither inflates nor is inflated by the execute bonus.
+                    // Cull (#1430): the execute-investment share. The executeMultiplier still scales the real
+                    // damage above — that part stays parity-critical and unchanged; only the tally is reshaped.
                     if (executeInvestment > 0)
                     {
-                        var executeMarginal = _targetBattler.ComputeNetDamage(dealt * executeMultiplier, type, _activeBattler.Level)
-                            - _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level);
-                        Stats.CullBonusDealt += executeMarginal > 0 ? executeMarginal / (1 + executeInvestment) : 0;
-                    }
-                    if (isCrit)
-                    {
-                        // The vanilla (non-crit) net of this portion — the fixed baseline the crit bonus is
-                        // measured against. ComputeNetDamage is non-mutating and health-independent, so summing it
-                        // here (alongside the mutating crit TakeDamage) is order-independent and reduces to the same
-                        // linear mitigation the crit hit went through: N(crit) − N₀ = baseline × (m − 1) exactly.
-                        baselineNet += _targetBattler.ComputeNetDamage(dealt, type, _activeBattler.Level);
+                        Stats.CullBonusDealt += overlayBasis * Battler.NormalizeInvestment(executeInvestment);
                     }
                 }
 
@@ -287,10 +275,11 @@ namespace Game.Core.Battle
                     Stats.CriticalHits++;
                     // The actual crit damage dealt — the player-facing CriticalDamageDealt statistic.
                     Stats.CriticalDamageDealt += totalNet;
-                    // The Precision training signal (#1448): the normalized marginal crit bonus — the extra over the
-                    // vanilla hit — with φ applied to the crit-damage investment so it stays proportional to
-                    // investment yet bounded at one baseline hit. Kept separate from the statistic above.
-                    Stats.CriticalBonusDealt += baselineNet * NormalizeCritInvestment(critMultiplier - 1.0);
+                    // The Precision training signal (#1448, reshaped by #1481): the same share claim as the other
+                    // overlays, on the whole crit hit's booked damage — φ on the crit-damage investment, so a
+                    // heavier investment trains proportionally more while a single crit claims at most its own
+                    // booked hit. Kept separate from the player-facing statistic above.
+                    Stats.CriticalBonusDealt += totalBooked * Battler.NormalizeInvestment(critMultiplier - 1.0);
                 }
 
                 if (totalNet > Stats.HighestPlayerAttack)
@@ -341,8 +330,7 @@ namespace Game.Core.Battle
         /// <summary>
         /// One portion's pre-amplification share of the single raw hit: <c>rawDamage × weight ÷ totalWeight</c>,
         /// the fixed-order fold of the weights done by the caller. A method call rather than an inline expression
-        /// so the per-portion loops (and the Momentum tally's un-ramped counterfactual, which needs this same raw
-        /// share before amplification) cannot diverge in their split arithmetic.
+        /// so the per-portion loops cannot diverge in their split arithmetic.
         /// </summary>
         private double PortionRawDamage(double rawDamage, double totalWeight, SkillDamagePortion portion)
         {
@@ -356,18 +344,6 @@ namespace Game.Core.Battle
         private double AmplifiedPortion(double rawDamage, double totalWeight, SkillDamagePortion portion)
         {
             return _activeBattler.AmplifyDamage(PortionRawDamage(rawDamage, totalWeight, portion), portion.Type);
-        }
-
-        /// <summary>
-        /// The concave-saturating normalization <c>φ(a) = a / (1 + a)</c> applied to a crit's damage investment
-        /// <c>a = m − 1</c> (the crit multiplier above the non-crit baseline) when booking its marginal bonus to
-        /// the Precision signal (#1448). It is ~linear in the investment at the low end (so a token crit trains
-        /// little and a committed one trains more — strength-proportionality) and asymptotes to <c>1</c> as the
-        /// investment grows, bounding a single crit's contribution at one baseline hit.
-        /// </summary>
-        private static double NormalizeCritInvestment(double investment)
-        {
-            return investment / (1.0 + investment);
         }
 
         /// <summary>

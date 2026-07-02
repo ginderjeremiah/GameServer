@@ -25,14 +25,15 @@ namespace Game.Application.Services
     /// <b>incoming</b> book trains resist keys on the player's typed exposure, split into its resistance-blocked
     /// and still-landed components and weighted separately so a resist path trains faster the more it actually
     /// blocks (<see cref="BattleStats.TypedDamageExposure"/> / <see cref="BattleStats.TypedDamageResistanceMitigated"/>,
-    /// #1454), and the event-keyed combat magnitudes — the normalized
-    /// marginal crit bonus (Precision, <see cref="BattleStats.CriticalBonusDealt"/>), dodged damage (Evasion),
+    /// #1454), and the event-keyed combat magnitudes — the crit share claim (Precision,
+    /// <see cref="BattleStats.CriticalBonusDealt"/>), dodged damage (Evasion),
     /// healing done (Restoration), reflected damage dealt
-    /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363), the vulnerability-enabled
-    /// Hex bonus (<see cref="BattleStats.HexBonusDealt"/> — #1427), the ramp-enabled Momentum bonus
-    /// (<see cref="BattleStats.MomentumBonusDealt"/> — #1428), the Toughness-debuff-enabled Sunder bonus
-    /// (<see cref="BattleStats.SunderBonusDealt"/> — #1429), and the execute-enabled Cull bonus
-    /// (<see cref="BattleStats.CullBonusDealt"/> — #1430) — are damage-type-neutral
+    /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363), the vulnerability
+    /// Hex share (<see cref="BattleStats.HexBonusDealt"/> — #1427), the ramp Momentum share
+    /// (<see cref="BattleStats.MomentumBonusDealt"/> — #1428), the Toughness-debuff Sunder share
+    /// (<see cref="BattleStats.SunderBonusDealt"/> — #1429), and the execute Cull share
+    /// (<see cref="BattleStats.CullBonusDealt"/> — #1430), each booked as the hit's health-capped damage ×
+    /// φ(the overlay's own investment) (#1481) — are damage-type-neutral
     /// and map straight to a single activity key. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
@@ -188,10 +189,10 @@ namespace Game.Application.Services
         //     ResistUnmitigatedTrainingRate), so a resist path trains faster the more of its own exposure the
         //     player's type-resistance actually blocks (#1454) — Toughness is excluded from the split (a
         //     generic stat every build can raise, not the type-specific investment the path represents).
-        //   • Events: the normalized marginal crit bonus (not the full crit hit — #1448), dodged damage, healing
-        //     done, reflected damage dealt, the vulnerability-enabled Hex bonus (#1427), the ramp-enabled
-        //     Momentum bonus (#1428), the Toughness-debuff-enabled Sunder bonus (#1429), and the execute-enabled
-        //     Cull bonus (#1430) — damage-type-neutral magnitudes that map straight to a single activity key
+        //   • Events: the overlay share claims — each the hit's booked (health-capped) damage × φ(the overlay's
+        //     own investment) (#1481): crit (#1448), Hex (#1427), Momentum (#1428), Sunder (#1429), Cull
+        //     (#1430) — plus dodged damage, healing done, and reflected damage dealt: damage-type-neutral
+        //     magnitudes that map straight to a single activity key
         //     (Crit / Dodge / Heal / Reflect / Hex / Momentum / Sunder / Cull) without applies() routing.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
