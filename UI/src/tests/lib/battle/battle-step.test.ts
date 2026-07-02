@@ -356,6 +356,62 @@ describe('battleStep', () => {
 			expect(player.currentHealth).toBe(20);
 		});
 
+		// Mirrors the backend's BattleContextTests composition scenarios for skill.criticalChance ×
+		// CriticalChanceMultiplier inside the crit roll (#1464, surfaced during review of #1458).
+		describe('CriticalChanceMultiplier composition (#1453)', () => {
+			it('never crits even with a heavy multiplier investment when the skill has zero base critical chance', () => {
+				// The enabler is the SKILL's own base chance, not the multiplier: CriticalChanceMultiplier's base 1 +
+				// 999 = 1000 still crits for nothing when the fired skill's own criticalChance is 0 (0 × 1000 = 0).
+				const player = makeBattler(
+					[{ id: EAttribute.CriticalChanceMultiplier, amount: 999 }],
+					[makeSkill(20, 40)] // criticalChance defaults to 0
+				);
+				const enemy = makeBattler(baseStats, []);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].crit).toBe(false);
+				expect(activations[0].damage).toBe(20); // enemy Toughness 0
+				expect(enemy.currentHealth).toBe(50 - 20);
+			});
+
+			it('composes multiplicatively with the skill’s base, letting a zeroed multiplier cancel an always-crit skill', () => {
+				// CriticalChanceMultiplier's base 1 + (-1) = 0 cancels even a skill authored to always crit on its
+				// own (criticalChance 1): 1 × 0 = 0, proving the composition is a product, not an independent OR.
+				const player = makeBattler(
+					[{ id: EAttribute.CriticalChanceMultiplier, amount: -1 }],
+					[makeSkill(20, 40, [], [], undefined, 1)]
+				);
+				const enemy = makeBattler(baseStats, []);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].crit).toBe(false);
+				expect(activations[0].damage).toBe(20);
+				expect(enemy.currentHealth).toBe(50 - 20);
+			});
+
+			it('scales a fractional skill base above one and always crits', () => {
+				// A fractional skill base (0.5) scaled by a CriticalChanceMultiplier of 2 (base 1 + 1 = 2) reaches
+				// an effective chance of 1.0 — at or above every possible [0,1) RNG draw — even though neither
+				// factor alone would guarantee it. CriticalDamage is the base 1.5 + 0.5 = 2.
+				const player = makeBattler(
+					[
+						{ id: EAttribute.CriticalChanceMultiplier, amount: 1 },
+						{ id: EAttribute.CriticalDamage, amount: 0.5 }
+					],
+					[makeSkill(20, 40, [], [], undefined, 0.5)]
+				);
+				const enemy = makeBattler(baseStats, []);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].crit).toBe(true);
+				expect(activations[0].damage).toBe(40); // 20 × 2 (CriticalDamage), no Toughness
+				expect(enemy.currentHealth).toBe(50 - 40);
+			});
+		});
+
 		it('never crits on the enemy’s attack, even with a forced crit chance', () => {
 			const player = makeBattler(baseStats, []);
 			const enemy = makeBattler(
