@@ -68,6 +68,20 @@ namespace Game.Core.Battle
         /// </summary>
         public double MomentumBonusDealt { get; set; }
 
+        /// <summary>
+        /// The Sunder (<c>Sunder</c> activity key) training signal — the normalized-marginal damage the player's
+        /// applied Toughness debuff enabled this battle (spike #1398 → the overlay tally shape, reference
+        /// #1448). A Sunder debuff lowers the opponent's <see cref="Battle.Battler.AppliedSunder"/> Toughness;
+        /// for each direct hit the extra damage that removal let through the mitigation curve — the live net
+        /// minus the net the hit would have dealt at the pre-debuff Toughness — is booked with the same
+        /// <c>/(1 + investment)</c> saturation the other overlays use, where the investment is the
+        /// mitigation-percentage-points the debuff removed (not raw Toughness points, which have no bounded
+        /// scale — see <see cref="Battle.Battler.SunderBonusForHit"/>). Direct-hit only: DoT bypasses the
+        /// Toughness curve entirely, so a Toughness debuff cannot affect it. Backend-only like the other overlay
+        /// tallies.
+        /// </summary>
+        public double SunderBonusDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>

@@ -24,7 +24,8 @@ const ACTIVITY_EVENT_LABELS: Partial<Record<EActivityKey, string>> = {
 	[EActivityKey.Heal]: 'Healing done',
 	[EActivityKey.Reflect]: 'Reflected damage',
 	[EActivityKey.Hex]: 'Vulnerability damage enabled',
-	[EActivityKey.Momentum]: 'Ramp damage enabled'
+	[EActivityKey.Momentum]: 'Ramp damage enabled',
+	[EActivityKey.Sunder]: 'Mitigation damage enabled'
 };
 
 /** Spell the damage-type stem of an activity-key name ("Dot" → "DoT"; others read as authored). */
