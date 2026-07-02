@@ -19,10 +19,12 @@ namespace Game.Abstractions.Contracts
         /// <see cref="ESkillAcquisition.Item"/>-flagged, enforced on save), or null for none.</summary>
         public int? GrantedSkillId { get; set; }
 
-        /// <summary>The weapon-leaf <see cref="EDamageType"/> this weapon deals, or null for a non-weapon item.
-        /// Only meaningful on a <see cref="EItemCategory.Weapon"/> item; the equipped weapon's type is what a
-        /// weapon-typed skill matches against. Constrained to a weapon leaf, and required (alongside
-        /// <see cref="GrantedSkillId"/>) for a weapon, by admin authoring validation.</summary>
+        /// <summary>The <see cref="EDamageType"/> leaf this weapon deals, or null for a non-weapon item. Any
+        /// leaf is valid (a caster weapon declares its element, e.g. Fire, rather than a martial leaf); only
+        /// meaningful on a <see cref="EItemCategory.Weapon"/> item, whose equipped type is what a martial
+        /// weapon-typed skill matches against. Required (alongside <see cref="GrantedSkillId"/>) for a weapon,
+        /// and the granted skill's own type must itself be fieldable with this weapon — both enforced by admin
+        /// authoring validation.</summary>
         public EDamageType? WeaponType { get; set; }
 
         /// <summary>The id of the proficiency that gates equipping this item, or null when the item is

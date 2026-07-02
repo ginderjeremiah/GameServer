@@ -38,10 +38,12 @@ namespace Game.DataAccess.Repositories.Admin
                 return categoryRejection;
             }
 
-            // The no-stranding invariant: a weapon must declare both a weapon-leaf WeaponType and a signature
-            // GrantedSkill (its own-type signature guarantees the player always fields ≥1 usable skill even when
-            // every selected skill is dimmed by the weapon-match gate). A non-weapon item may not carry a
-            // WeaponType. Enforced server-side as anti-tamper (a tampered client can't bypass the editor).
+            // The no-stranding invariant: a weapon must declare both a WeaponType (any damage-type leaf) and a
+            // signature GrantedSkill that is itself fieldable with that weapon (a martial signature must match
+            // its own weapon's type; a non-martial one always qualifies), guaranteeing the player always fields
+            // ≥1 usable skill even when every selected skill is dimmed by the weapon-match gate. A non-weapon
+            // item may not carry a WeaponType. Enforced server-side as anti-tamper (a tampered client can't
+            // bypass the editor).
             if (FindWeaponInvariantViolation(changes) is { } weaponRejection)
             {
                 return weaponRejection;
@@ -103,12 +105,16 @@ namespace Game.DataAccess.Repositories.Admin
 
         /// <summary>
         /// Returns a rejection for the first added/edited item that breaks the weapon no-stranding invariant,
-        /// or null when every item is valid. A <see cref="EItemCategory.Weapon"/> item must declare a weapon-leaf
-        /// <c>WeaponType</c> (Sword/Axe/Bow/Club/Dagger/Unarmed) and a <c>GrantedSkillId</c> — its own-type
-        /// signature is what keeps the player with ≥1 usable skill once the weapon-match gate dims the rest. A
-        /// non-weapon item may not carry a <c>WeaponType</c> (it is only meaningful on a weapon). Deletes are skipped.
+        /// or null when every item is valid. A <see cref="EItemCategory.Weapon"/> item must declare a
+        /// <c>WeaponType</c> — any damage-type leaf, so a caster weapon can declare its element (e.g. a Fire
+        /// staff) rather than a martial leaf — and a <c>GrantedSkillId</c>. The granted signature must itself be
+        /// fieldable while <em>this</em> weapon is equipped: a martial (weapon-leaf) signature must match the
+        /// weapon's own type, while a non-martial signature (elemental/DoT/caster) is never gated and always
+        /// qualifies. Either way the signature is what keeps the player with ≥1 usable skill once the
+        /// weapon-match gate dims the rest. A non-weapon item may not carry a <c>WeaponType</c> (it is only
+        /// meaningful on a weapon). Deletes are skipped.
         /// </summary>
-        private static AdminSaveResult? FindWeaponInvariantViolation(IReadOnlyList<Change<Contracts.Item>> changes)
+        private AdminSaveResult? FindWeaponInvariantViolation(IReadOnlyList<Change<Contracts.Item>> changes)
         {
             foreach (var change in changes)
             {
@@ -125,14 +131,26 @@ namespace Game.DataAccess.Repositories.Admin
                         return AdminSaveResult.Failure("A weapon item must declare a weapon type.");
                     }
 
-                    if (!DamageTypes.IsWeaponLeaf(weaponType))
+                    if (!Enum.IsDefined(weaponType))
                     {
                         return AdminSaveResult.Failure($"'{weaponType}' is not a valid weapon type.");
                     }
 
-                    if (item.GrantedSkillId is null)
+                    if (item.GrantedSkillId is not { } grantedSkillId)
                     {
                         return AdminSaveResult.Failure("A weapon item must grant a signature skill.");
+                    }
+
+                    // A missing/unresolvable skill is reported by FindGrantedSkillFlagViolation, which runs
+                    // next; skip the signature-type check here rather than duplicating that rejection.
+                    if (_skills.LookupSkill(grantedSkillId) is { } grantedSkill)
+                    {
+                        var signatureType = PrimaryDamageType(grantedSkill);
+                        if (DamageTypes.IsWeaponLeaf(signatureType) && signatureType != weaponType)
+                        {
+                            return AdminSaveResult.Failure(
+                                $"'{weaponType}' weapon grants a '{signatureType}' signature skill, which strands the wielder — a martial signature must match its own weapon's type.");
+                        }
                     }
                 }
                 else if (item.WeaponType is not null)
@@ -142,6 +160,29 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return null;
+        }
+
+        // Mirrors Game.Core.Skills.Skill.PrimaryDamageType over the persisted entity (highest-weight portion,
+        // first-authored on a tie, Physical for an unauthored/malformed skill) — the entity layer has no such
+        // computed accessor of its own.
+        private static EDamageType PrimaryDamageType(Entities.Skill skill)
+        {
+            var portions = skill.SkillDamagePortions;
+            if (portions.Count == 0)
+            {
+                return EDamageType.Physical;
+            }
+
+            var primary = portions[0];
+            for (var i = 1; i < portions.Count; i++)
+            {
+                if (portions[i].Weight > primary.Weight)
+                {
+                    primary = portions[i];
+                }
+            }
+
+            return (EDamageType)primary.DamageType;
         }
 
         /// <summary>

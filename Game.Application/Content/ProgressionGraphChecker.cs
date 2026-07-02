@@ -222,11 +222,12 @@ namespace Game.Application.Content
             {
                 if (item.ItemCategoryId == EItemCategory.Weapon)
                 {
-                    // Every weapon must bring a signature attack of its own weapon-leaf type, or it strands the
-                    // player with no usable skill once the weapon-match gate dims mismatched selected skills.
-                    if (item.WeaponType is not EDamageType weaponType || !DamageTypes.IsWeaponLeaf(weaponType))
+                    // Every weapon must declare a WeaponType (any damage-type leaf — a caster weapon declares
+                    // its element) and bring a signature attack fieldable with it, or it strands the player
+                    // once the weapon-match gate dims mismatched selected skills (the signature check is below).
+                    if (item.WeaponType is not EDamageType weaponType || !Enum.IsDefined(weaponType))
                     {
-                        Error("WeaponStranding", "Item", item.Id, "is a weapon but does not declare a weapon-leaf WeaponType.");
+                        Error("WeaponStranding", "Item", item.Id, "is a weapon but does not declare a valid WeaponType.");
                     }
 
                     if (item.GrantedSkillId is null)
@@ -242,13 +243,13 @@ namespace Game.Application.Content
 
             private void CheckWeaponSignatureType(Contracts.Item item, int grantedSkillId)
             {
-                // A weapon's signature must actually fire with that weapon. The weapon-match gate dims a skill
-                // whose type is a weapon leaf other than the equipped weapon's, so a weapon granting a signature
-                // of a different weapon leaf strands the player exactly as a missing signature would — and the
-                // type lives on the granted Skill record, out of a per-item save's reach.
+                // A weapon's signature must actually fire with that weapon. The weapon-match gate dims a
+                // martial (weapon-leaf) skill whose type doesn't match the equipped weapon, so a weapon
+                // granting a mismatched martial signature strands the player exactly as a missing signature
+                // would; a non-martial signature (elemental/DoT/caster) is never gated and always qualifies —
+                // and the type lives on the granted Skill record, out of a per-item save's reach.
                 if (item.ItemCategoryId != EItemCategory.Weapon
                     || item.WeaponType is not EDamageType weaponType
-                    || !DamageTypes.IsWeaponLeaf(weaponType)
                     || !_skills.TryGetValue(grantedSkillId, out var skill)
                     || skill.RetiredAt is not null)
                 {

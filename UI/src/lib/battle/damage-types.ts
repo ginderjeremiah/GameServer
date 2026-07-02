@@ -55,10 +55,11 @@ export function applies(type: EDamageType): readonly EDamageTypeKey[] {
 	return DAMAGE_TYPE_APPLIES[type];
 }
 
-/** Whether `type` is a weapon-type leaf (Sword/Axe/Bow/Club/Dagger/Unarmed): a non-Physical leaf that rolls
- *  up under the shared `Physical` category key. Mirrors the backend's `DamageTypes.IsWeaponLeaf`, derived from
- *  the same generated taxonomy table so the classification can't drift. The set a weapon's `Item.weaponType`
- *  is constrained to (and what the weapon-match loadout gate keys on). */
+/** Whether `type` is a martial weapon-leaf (Sword/Axe/Bow/Club/Dagger/Unarmed): a non-Physical leaf that
+ *  rolls up under the shared `Physical` category key. Mirrors the backend's `DamageTypes.IsWeaponLeaf`, derived
+ *  from the same generated taxonomy table so the classification can't drift. What the weapon-match loadout gate
+ *  keys on — a weapon's own `Item.weaponType` is not constrained to this set (any leaf is valid, e.g. a caster
+ *  weapon's element). */
 export function isWeaponLeaf(type: EDamageType): boolean {
 	return type !== EDamageType.Physical && applies(type).includes(EDamageTypeKey.Physical);
 }
