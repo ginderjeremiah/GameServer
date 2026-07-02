@@ -2,6 +2,7 @@ using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
 using Game.Core.Attributes;
+using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -145,7 +146,8 @@ namespace Game.DataAccess.Repositories.Admin
                     // next; skip the signature-type check here rather than duplicating that rejection.
                     if (_skills.LookupSkill(grantedSkillId) is { } grantedSkill)
                     {
-                        var signatureType = PrimaryDamageType(grantedSkill);
+                        var signatureType = PrimaryDamageTypeResolver.Resolve(
+                            grantedSkill.SkillDamagePortions, p => p.Weight, p => (EDamageType)p.DamageType);
                         if (DamageTypes.IsWeaponLeaf(signatureType) && signatureType != weaponType)
                         {
                             return AdminSaveResult.Failure(
@@ -160,29 +162,6 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return null;
-        }
-
-        // Mirrors Game.Core.Skills.Skill.PrimaryDamageType over the persisted entity (highest-weight portion,
-        // first-authored on a tie, Physical for an unauthored/malformed skill) — the entity layer has no such
-        // computed accessor of its own.
-        private static EDamageType PrimaryDamageType(Entities.Skill skill)
-        {
-            var portions = skill.SkillDamagePortions;
-            if (portions.Count == 0)
-            {
-                return EDamageType.Physical;
-            }
-
-            var primary = portions[0];
-            for (var i = 1; i < portions.Count; i++)
-            {
-                if (portions[i].Weight > primary.Weight)
-                {
-                    primary = portions[i];
-                }
-            }
-
-            return (EDamageType)primary.DamageType;
         }
 
         /// <summary>
