@@ -256,6 +256,42 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(12.5, battler.TakeDamage(50, EDamageType.Fire, attackerLevel: 1), 0.001);
         }
 
+        // ── TakeDamage: Toughness curve is floored at 0 (#1461) ────────────────
+
+        [Fact]
+        public void TakeDamage_NegativeToughness_BehavesLikeZeroToughness()
+        {
+            // A debuff-driven negative Toughness (e.g. -10, well short of the pole at -20 for a level-1
+            // attacker) floors to 0 for the curve, so the reduction is 0 and the full 40 lands unmitigated —
+            // exactly like TakeDamage_NoToughness_LeavesHitUnreduced.
+            var battler = MakeBattler((EAttribute.Toughness, -10));
+
+            Assert.Equal(40, battler.TakeDamage(40, EDamageType.Physical, attackerLevel: 1), 0.001);
+        }
+
+        [Fact]
+        public void TakeDamage_ToughnessAtThePole_DoesNotDivideByZero()
+        {
+            // Toughness = -K·attackerLevel (-20 vs a level-1 attacker) is exactly the curve's unfloored pole
+            // (denominator 0). Floored at 0 it is a clean no-reduction case instead of a division by zero.
+            var battler = MakeBattler((EAttribute.Toughness, -20));
+
+            Assert.Equal(40, battler.TakeDamage(40, EDamageType.Physical, attackerLevel: 1), 0.001);
+        }
+
+        [Fact]
+        public void TakeDamage_ToughnessPastThePole_NeverAmplifiesOrHeals()
+        {
+            // Past the unfloored pole (-20 vs a level-1 attacker) the raw curve would invert into
+            // amplification/healing; floored at 0 the hit still lands unmitigated and never goes negative.
+            var battler = MakeBattler((EAttribute.Toughness, -1000));
+
+            var net = battler.TakeDamage(40, EDamageType.Physical, attackerLevel: 1);
+
+            Assert.Equal(40, net, 0.001);
+            Assert.True(net > 0);
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
