@@ -82,20 +82,23 @@ describe('SkillTooltip', () => {
 	it('folds the expected crit contribution into the breakdown and total', () => {
 		staticData.attributes = [
 			makeAttribute(EAttribute.Strength, 'Strength'),
-			makeAttribute(EAttribute.CriticalChance, 'Critical Chance', { isPercentage: true })
+			makeAttribute(EAttribute.CriticalChanceMultiplier, 'Critical Chance', { isPercentage: true })
 		];
-		// Crit chance 50%, crit damage ×2 → expected multiplier 1 + 0.5·(2−1) = 1.5.
+		// The skill's own base chance is 50%; these raw fixtures skip the derived pass, so
+		// CriticalChanceMultiplier is supplied explicitly at its 1.0 base (like CooldownRecovery).
+		// Crit damage ×2 → expected multiplier 1 + 0.5·(2−1) = 1.5.
 		const critOwner = makeBattler({
 			attributes: [
 				{ attributeId: EAttribute.Strength, amount: 20 },
 				{ attributeId: EAttribute.CooldownRecovery, amount: 1 },
-				{ attributeId: EAttribute.CriticalChance, amount: 0.5 },
+				{ attributeId: EAttribute.CriticalChanceMultiplier, amount: 1 },
 				{ attributeId: EAttribute.CriticalDamage, amount: 2 }
 			]
 		});
 		const skill = makeSkill(critOwner, {
 			name: 'Cleave',
 			baseDamage: 10,
+			criticalChance: 0.5,
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 2 }],
 			cooldownMs: 1000
 		});

@@ -91,6 +91,7 @@ import Skills from '$routes/game/screens/skills/Skills.svelte';
 const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	name: `Skill ${over.id}`,
 	baseDamage: 10,
+	criticalChance: 0,
 	damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
 	effects: [],
 	description: 'A skill.',
@@ -418,15 +419,20 @@ describe('Skills screen', () => {
 	});
 
 	it('folds the expected crit contribution into the inspector breakdown and raw note', async () => {
-		// CriticalChance is flagged `isPercentage` so the breakdown's chance renders as `50%`.
+		// CriticalChanceMultiplier is flagged `isPercentage` so the breakdown's chance renders as `50%`.
 		staticData.attributes = [
-			{ id: EAttribute.CriticalChance, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
+			{
+				id: EAttribute.CriticalChanceMultiplier,
+				name: 'Critical Chance',
+				code: 'CRIT',
+				isPercentage: true,
+				decimals: 0
+			}
 		] as unknown as typeof staticData.attributes;
-		// Chance 0.5, damage 0.5 + 1.5 base = 2.0 → expected multiplier 1.5; Alpha's raw 10 → +5 crit.
-		mockPlayerManager.attributes = [
-			{ attributeId: EAttribute.CriticalChance, amount: 0.5 },
-			{ attributeId: EAttribute.CriticalDamage, amount: 0.5 }
-		];
+		// Alpha's own base chance 0.5 (multiplier stays at its 1.0 base); damage 0.5 + 1.5 base = 2.0 →
+		// expected multiplier 1.5; Alpha's raw 10 → +5 crit.
+		staticData.skills = [skill({ id: 0, name: 'Alpha', criticalChance: 0.5 }), ...SKILLS.slice(1)];
+		mockPlayerManager.attributes = [{ attributeId: EAttribute.CriticalDamage, amount: 0.5 }];
 		const { container } = render(Skills);
 		// Alpha (equipped slot 1) is selected into the inspector by default.
 		expect(container.querySelector('.d-name')?.textContent).toBe('Alpha');

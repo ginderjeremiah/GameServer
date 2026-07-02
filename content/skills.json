@@ -3,6 +3,7 @@
     "id": 0,
     "name": "Punch",
     "baseDamage": 4.000,
+    "criticalChance": 0.000,
     "damageMultipliers": [
       {
         "attributeId": "Strength",
@@ -31,6 +32,7 @@
     "id": 1,
     "name": "Strike",
     "baseDamage": 10.000,
+    "criticalChance": 0.000,
     "damageMultipliers": [
       {
         "attributeId": "Strength",
@@ -59,6 +61,7 @@
     "id": 2,
     "name": "Cleave",
     "baseDamage": 8.000,
+    "criticalChance": 0.000,
     "damageMultipliers": [
       {
         "attributeId": "Strength",
@@ -87,6 +90,7 @@
     "id": 3,
     "name": "Focus",
     "baseDamage": 6.000,
+    "criticalChance": 0.000,
     "damageMultipliers": [
       {
         "attributeId": "Intellect",

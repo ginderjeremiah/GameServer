@@ -32,6 +32,8 @@ export const skillEntity: EntityConfig<ISkill> = {
 		id,
 		name: '',
 		baseDamage: 10,
+		// The per-skill opt-in crit enabler (#1453): 0 by default, so a new skill never crits until authored.
+		criticalChance: 0,
 		cooldownMs: 2000,
 		iconPath: '',
 		rarityId: ERarity.Common,
@@ -73,6 +75,13 @@ export const skillEntity: EntityConfig<ISkill> = {
 					reqMsg: 'Missing name'
 				},
 				{ key: 'baseDamage', label: 'Base Damage', type: 'number', suffix: 'dmg', width: 150 },
+				{
+					key: 'criticalChance',
+					label: 'Critical Chance',
+					type: 'number',
+					suffix: '0–1',
+					width: 150
+				},
 				{ key: 'cooldownMs', label: 'Cooldown', type: 'number', suffix: 'ms', width: 150 },
 				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },
 				{ key: 'iconPath', label: 'Icon Path', type: 'text', placeholder: 'skills/icon.png', grow: true },

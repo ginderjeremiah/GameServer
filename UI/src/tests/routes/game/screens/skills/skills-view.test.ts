@@ -83,6 +83,7 @@ import { expectedCritMultiplier } from '$lib/battle';
 const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
 	name: `Skill ${over.id}`,
 	baseDamage: 0,
+	criticalChance: 0,
 	damageMultipliers: [],
 	effects: [],
 	description: '',
@@ -102,6 +103,8 @@ const metric = (over: Partial<SkillMetrics> & { skill: ISkill }): SkillMetrics =
 	rawDamage: 0,
 	cooldown: 1,
 	contributions: [],
+	critChance: 0,
+	critMultiplier: 1,
 	...over
 });
 
@@ -236,18 +239,23 @@ describe('pure helpers', () => {
 		expect(zoneSpawnLevel(ZONES[0])).toBe(5); // (2 + 8) / 2
 	});
 
-	it('folds the crit multiplier into the effective dps/damage ranking', () => {
-		// The crit multiplier scales raw damage before the Toughness curve, mirroring the battle and the
-		// displayed numbers. The curve is multiplicative, so a uniform crit scales both rows' effective
-		// values by the same factor — it preserves dps ordering rather than flipping it.
+	it('folds each metric’s own crit multiplier into the effective dps/damage ranking', () => {
+		// Each SkillMetrics carries its own crit multiplier (#1453 — the enabler is the skill's own base
+		// chance, not a build-wide stat), scaling raw damage before the Toughness curve, mirroring the battle
+		// and the displayed numbers. The curve is multiplicative, so a UNIFORM crit multiplier across both
+		// rows scales their effective values by the same factor — it preserves dps ordering rather than
+		// flipping it.
 		const a = metric({ skill: skill({ id: 0 }), rawDamage: 30, cooldown: 3 });
 		const b = metric({ skill: skill({ id: 1 }), rawDamage: 22, cooldown: 2 });
 		// toughness 10 (level 1 → factor 20/30), no crit: A=30·(2/3)/3≈6.67 < B=22·(2/3)/2≈7.33 → B first.
 		expect([b, a].sort(sortMetrics('dps', 10)).map((m) => m.skill.id)).toEqual([1, 0]);
-		// crit ×2 (attackerLevel 1): both effective values double, so the order is unchanged → B still first.
-		expect([a, b].sort(sortMetrics('dps', 10, 1, 2)).map((m) => m.skill.id)).toEqual([1, 0]);
+		// crit ×2 (attackerLevel 1) on both rows: both effective values double, so the order is unchanged
+		// → B still first.
+		const aCrit = metric({ skill: skill({ id: 0 }), rawDamage: 30, cooldown: 3, critMultiplier: 2 });
+		const bCrit = metric({ skill: skill({ id: 1 }), rawDamage: 22, cooldown: 2, critMultiplier: 2 });
+		expect([aCrit, bCrit].sort(sortMetrics('dps', 10, 1)).map((m) => m.skill.id)).toEqual([1, 0]);
 		// dmg sort, toughness 25 (factor 20/45), crit ×2: A=60·(20/45)≈26.7 > B=44·(20/45)≈19.6 → A first.
-		expect([a, b].sort(sortMetrics('dmg', 25, 1, 2)).map((m) => m.skill.id)).toEqual([0, 1]);
+		expect([aCrit, bCrit].sort(sortMetrics('dmg', 25, 1)).map((m) => m.skill.id)).toEqual([0, 1]);
 	});
 });
 
@@ -569,33 +577,35 @@ describe('SkillsView — compare-vs enemy presets', () => {
 
 describe('SkillsView — critical hits fold into effective damage', () => {
 	beforeEach(() => {
-		// Give the player crit chance + damage; the derived attribute pass also adds the base crit
-		// damage (1.5) and any Dex/Luck contribution, so expectations are built off the view's resolved
-		// values rather than hard-coding the derived model. Here: chance 0.5, damage 0.5 + 1.5 = 2.0.
-		mockPlayerManager.attributes = [
-			{ attributeId: EAttribute.CriticalChance, amount: 0.5 },
-			{ attributeId: EAttribute.CriticalDamage, amount: 0.5 }
-		];
+		// Each skill's own base CriticalChance is the opt-in enabler (#1453), not a build-wide stat, so
+		// every skill in the shared catalogue is given the same 0.5 base to keep these uniform-crit
+		// assertions as before. CriticalChanceMultiplier defaults to its base of 1 (no investment), so the
+		// resolved chance is exactly the skill's own 0.5. CriticalDamage is still page-wide: the derived
+		// attribute pass adds its base (1.5) to the 0.5 allocation, so expectations are built off the
+		// view's resolved values rather than hard-coding the derived model. Here: damage 0.5 + 1.5 = 2.0.
+		staticData.skills = SKILLS.map((s) => ({ ...s, criticalChance: 0.5 }));
+		mockPlayerManager.attributes = [{ attributeId: EAttribute.CriticalDamage, amount: 0.5 }];
 		view = new SkillsView();
 	});
 
-	it('exposes a player-wide crit multiplier matching the shared display helper', () => {
-		expect(view.critChance).toBeCloseTo(0.5, 10);
+	it('exposes each skill’s effective crit chance/multiplier matching the shared display helper', () => {
+		const alpha = view.metric(0);
+		expect(alpha?.critChance).toBeCloseTo(0.5, 10);
 		expect(view.critDamage).toBeCloseTo(2, 10);
-		expect(view.critMultiplier).toBe(expectedCritMultiplier(view.critChance, view.critDamage));
-		expect(view.critMultiplier).toBeCloseTo(1.5, 10); // 1 + 0.5·(2−1)
+		expect(alpha?.critMultiplier).toBe(expectedCritMultiplier(alpha!.critChance, view.critDamage));
+		expect(alpha?.critMultiplier).toBeCloseTo(1.5, 10); // 1 + 0.5·(2−1)
 	});
 
-	it('leaves the multiplier at 1 when the player has no crit chance', () => {
-		mockPlayerManager.attributes = [];
+	it('leaves the multiplier at 1 when a skill has no crit chance', () => {
+		staticData.skills = SKILLS; // the default catalogue's skills all backfill to 0
 		const noCrit = new SkillsView();
-		expect(noCrit.critChance).toBe(0);
-		expect(noCrit.critMultiplier).toBe(1);
+		expect(noCrit.metric(0)?.critChance).toBe(0);
+		expect(noCrit.metric(0)?.critMultiplier).toBe(1);
 		expect(noCrit.critBonus(0)).toBe(0);
 	});
 
-	it('scales raw damage by the crit multiplier before the toughness curve in effective/dps/burst', () => {
-		const k = view.critMultiplier;
+	it('scales raw damage by each skill’s own crit multiplier before the toughness curve in effective/dps/burst', () => {
+		const k = view.metric(0)!.critMultiplier;
 		view.setToughness(10);
 		// Toughness 10 at the player's level 1 → curve factor 20/(10+20) = 2/3.
 		const curve = 20 / (10 + 20);
@@ -603,13 +613,14 @@ describe('SkillsView — critical hits fold into effective damage', () => {
 		expect(view.rawDamage(0)).toBe(12);
 		expect(view.effective(0)).toBeCloseTo(12 * k * curve, 10); // 12·1.5·(2/3) = 12
 		expect(view.effectiveDps(0)).toBeCloseTo(view.effective(0) / view.cooldown(0), 10);
-		// Combined burst sums each loadout skill's crit-scaled, curve-mitigated hit.
+		// Combined burst sums each loadout skill's own crit-scaled, curve-mitigated hit (uniform crit here,
+		// so it reduces to the same k for every id).
 		const expectedBurst = [0, 1, 2].reduce((sum, id) => sum + view.rawDamage(id) * k * curve, 0);
 		expect(view.combinedEffectiveBurst).toBeCloseTo(expectedBurst, 10);
 	});
 
 	it('reports the expected crit bonus and the curve-mitigated amount of the crit-scaled hit', () => {
-		const k = view.critMultiplier;
+		const k = view.metric(1)!.critMultiplier;
 		expect(view.critBonus(1)).toBeCloseTo(view.rawDamage(1) * (k - 1), 10); // Bravo: 40·0.5 = 20
 		// The curve asymptotes, so even overwhelming toughness leaves a positive sliver through — it never
 		// fully blocks. mitigatedAmount is the crit-scaled hit minus that remaining effective damage.

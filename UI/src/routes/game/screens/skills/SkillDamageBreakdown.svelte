@@ -15,10 +15,10 @@
 	{:else}
 		<div class="d-desc">No attribute scaling.</div>
 	{/if}
-	{#if view.critChance > 0}
+	{#if metrics.critChance > 0}
 		<div class="brk-line crit">
 			<span class="brk-k">
-				<AttributeIcon id={EAttribute.CriticalChance} size={12} />
+				<AttributeIcon id={EAttribute.CriticalChanceMultiplier} size={12} />
 				Critical
 				<span class="crit-meta">{critChanceLabel} · ×{formatNum(view.critDamage)}</span>
 			</span>
@@ -55,9 +55,10 @@ const fmt = (n: number) => formatNum(Math.round(n));
 
 const maxContribution = $derived(Math.max(metrics.skill.baseDamage, ...metrics.contributions.map((c) => c.value), 1));
 
-// Crit chance in its display form (e.g. `5%`), honoring the attribute's `isPercentage`/`decimals`.
+// This skill's own effective crit chance in its display form (e.g. `5%`), honoring the
+// CriticalChanceMultiplier attribute's `isPercentage`/`decimals` display metadata.
 const critChanceLabel = $derived(
-	formatAttributeValue(view.critChance, EAttribute.CriticalChance, staticData.attributes)
+	formatAttributeValue(metrics.critChance, EAttribute.CriticalChanceMultiplier, staticData.attributes)
 );
 </script>
 

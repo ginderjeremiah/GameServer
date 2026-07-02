@@ -45,16 +45,20 @@ namespace Game.Core.Attributes.Modifiers
             // compared directly against the [0,1) battle RNG draw — and the coefficients are a conservative
             // strawman expected to be tuned during balancing. Two of them are deliberately NOT derived from a
             // core attribute here:
-            //   • CriticalChance is opt-in (crit rework #1425): no base and no derivation, so an un-enabled build
-            //     sits at exactly 0, and a multiplicative Precision-path bonus stays inert (0 × mult = 0). Flat
-            //     crit chance is sourced only from items/skills, making crit a committed build identity rather
-            //     than a stat every Dexterity/Luck build accrues for free. CriticalDamage keeps its Luck
-            //     derivation + base below: inert without chance, it stays opt-in-gated and pays off the moment an
-            //     enabler is equipped.
+            //   • CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): the ENABLER is a
+            //     skill's own authored CriticalChance (0 by default, so an un-authored skill never crits) — this
+            //     attribute is only the base-1 MULTIPLIER scaling that per-skill base, exactly like
+            //     CooldownRecovery scales the tick rate. A base of 1 (not 0) is deliberate: a committed skill
+            //     still crits at its own authored rate with zero further investment, and a Precision/gear/mod
+            //     bonus scales it up (or a debuff below 1). This makes crit a committed per-skill build identity
+            //     rather than a stat every Dexterity/Luck build accrues for free. CriticalDamage keeps its Luck
+            //     derivation + base below: inert without a crit, it stays opt-in-gated and pays off the moment a
+            //     skill with a base chance fires.
             //   • DamageReflection (spike #1330) is authored-only — granted by gear/mod/proficiency/class rather
             //     than derived from a core attribute — so it too has no entry here (base 0 everywhere).
             // DodgeChance, by contrast, stays Agility-derived (its entry is last, below), so evasion is live
             // from raw allocations; the value is also grantable by gear/item-mods/skill-effects.
+            new() { Attribute = CriticalChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
 
             // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
             // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.

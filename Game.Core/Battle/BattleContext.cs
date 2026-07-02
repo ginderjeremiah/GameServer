@@ -138,9 +138,11 @@ namespace Game.Core.Battle
         /// stays <c>playerFires×1 + enemyFires×1</c>:
         /// </para>
         /// <list type="bullet">
-        /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage). A crit
-        /// multiplies <b>every</b> portion by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b>
-        /// mitigation — identical to scaling the whole hit — so high crit damage punches through
+        /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage) against
+        /// <paramref name="baseCriticalChance"/> — the firing skill's own opt-in enabler (#1453) — scaled by the
+        /// active battler's <see cref="EAttribute.CriticalChanceMultiplier"/>. A crit multiplies <b>every</b>
+        /// portion by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b> mitigation —
+        /// identical to scaling the whole hit — so high crit damage punches through
         /// <see cref="EAttribute.Toughness"/>.</item>
         /// <item>When the <b>enemy</b> attacks the player, a <b>single</b> dodge draw is taken (Block was retired
         /// in spike #1330). A dodge zeroes the <b>whole</b> multi-typed hit.</item>
@@ -174,7 +176,7 @@ namespace Game.Core.Battle
         /// reconciling per-skill total instead of the raw pre-mitigation hit. Reflected damage dealt back to the
         /// attacker is booked separately and is not part of this return.
         /// </returns>
-        public double DamageTarget(double rawDamage, IReadOnlyList<SkillDamagePortion> portions)
+        public double DamageTarget(double rawDamage, IReadOnlyList<SkillDamagePortion> portions, double baseCriticalChance)
         {
             // Fold the total weight in fixed portion order (a parity contract — float addition is not associative),
             // so each portion takes its raw × weight ÷ Σweights share of the one raw hit. Computing it draws no RNG.
@@ -189,9 +191,12 @@ namespace Game.Core.Battle
             var totalNet = 0.0;
             if (_isPlayerActive)
             {
-                // ONE crit draw per player fire, before any damage and independent of portion count. A single crit
-                // multiplies every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
-                var isCrit = _rng.Next() < _activeBattler.GetAttributeValue(CriticalChance);
+                // ONE crit draw per player fire, before any damage and independent of portion count. The rolled
+                // chance is the firing skill's own base (0 for an unauthored skill, the per-skill opt-in enabler)
+                // scaled by the active battler's CriticalChanceMultiplier (base 1, so an uncommitted skill still
+                // crits at its own authored rate and further investment scales it). A single crit multiplies
+                // every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
+                var isCrit = _rng.Next() < baseCriticalChance * _activeBattler.GetAttributeValue(CriticalChanceMultiplier);
                 var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
 
                 // The Cull execute overlay (#1430): the target's missing-health fraction AT THE START of this

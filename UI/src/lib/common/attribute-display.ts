@@ -47,7 +47,7 @@ const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.MaxHealth]: 'Max Health',
 	[EAttribute.Toughness]: 'Toughness',
 	[EAttribute.CooldownRecovery]: 'Cooldown Recovery',
-	[EAttribute.CriticalChance]: 'Critical Chance',
+	[EAttribute.CriticalChanceMultiplier]: 'Critical Chance',
 	[EAttribute.CriticalDamage]: 'Critical Damage',
 	[EAttribute.DodgeChance]: 'Dodge Chance',
 	[EAttribute.HealthRegenPerSecond]: 'Health Regen Per Second',

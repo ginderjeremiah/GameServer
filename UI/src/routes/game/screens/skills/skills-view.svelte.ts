@@ -60,6 +60,14 @@ export interface SkillMetrics {
 	 *  the in-battle skill tooltip's `adjustedCd`). */
 	cooldown: number;
 	contributions: SkillContribution[];
+	/** This skill's own effective critical-hit chance — its authored base (#1453) scaled by the
+	 *  player's CriticalChanceMultiplier — so an unauthored skill (0) never shows a crit row. */
+	critChance: number;
+	/** The long-run average damage multiplier from this skill's crits (≥1), folded into every
+	 *  effective-damage read below so the page mirrors the in-fight skill tooltip and the battle.
+	 *  Per-skill because the enabler is now the skill's own base chance, not a build-wide stat; the
+	 *  live battle still rolls each crit individually. */
+	critMultiplier: number;
 }
 
 /** A read-only innate skill granted by an equipped item — shown in the loadout band but not selectable,
@@ -87,28 +95,28 @@ export interface ComparePreset {
 /* ── pure helpers (no reactive state — unit-tested directly) ───────────────── */
 
 /** Comparator over `SkillMetrics` for the given sort + Compare-vs Toughness.
- *  DPS/Damage rank by *effective* value (mitigation-aware), descending. The crit multiplier scales raw
- *  damage before mitigation (mirroring {@link SkillsView.effective}), so the ranking matches the
- *  crit-inclusive numbers the rows display; the player is the attacker, so `attackerLevel` scales the curve.
- *  Both default for unit-test convenience (no crit, level 1). */
+ *  DPS/Damage rank by *effective* value (mitigation-aware), descending. Each skill's own
+ *  `critMultiplier` scales its raw damage before mitigation (mirroring {@link SkillsView.effective}) —
+ *  per-skill because the crit enabler is now the skill's own base chance (#1453), not a build-wide
+ *  stat — so the ranking matches the crit-inclusive numbers the rows display; the player is the
+ *  attacker, so `attackerLevel` scales the curve. Defaults for unit-test convenience (level 1). */
 export function sortMetrics(
 	sort: SkillSort,
 	toughness: number,
-	attackerLevel = 1,
-	critMultiplier = 1
+	attackerLevel = 1
 ): (a: SkillMetrics, b: SkillMetrics) => number {
-	const mitigated = (raw: number) => toughnessMitigatedDamage(raw * critMultiplier, toughness, attackerLevel);
+	const mitigated = (m: SkillMetrics) =>
+		toughnessMitigatedDamage(m.rawDamage * m.critMultiplier, toughness, attackerLevel);
 	switch (sort) {
 		case 'name':
 			return (a, b) => a.skill.name.localeCompare(b.skill.name);
 		case 'cd':
 			return (a, b) => a.cooldown - b.cooldown;
 		case 'dmg':
-			return (a, b) => mitigated(b.rawDamage) - mitigated(a.rawDamage);
+			return (a, b) => mitigated(b) - mitigated(a);
 		case 'dps':
 		default:
-			return (a, b) =>
-				damagePerSecond(mitigated(b.rawDamage), b.cooldown) - damagePerSecond(mitigated(a.rawDamage), a.cooldown);
+			return (a, b) => damagePerSecond(mitigated(b), b.cooldown) - damagePerSecond(mitigated(a), a.cooldown);
 	}
 }
 
@@ -188,27 +196,29 @@ export class SkillsView {
 		new BattleAttributes([...playerManager.attributes, ...inventoryManager.equipmentStats], true)
 	);
 
-	/** The player's expected critical-hit damage multiplier (≥1), folded into every effective-damage
-	 *  read so the page mirrors the in-fight skill tooltip and the battle (a crit scales raw damage
-	 *  before mitigation). Player-wide — the crit attributes are the player's own — so it applies uniformly
-	 *  across the loadout; reuses the shared display-only `expectedCritMultiplier` rather than duplicating
-	 *  the formula. The live battle still rolls each crit individually. */
-	readonly critChance = $derived(this.battleAttributes.getValue(EAttribute.CriticalChance));
+	/** The player's CriticalDamage multiplier (≥1) — still build-wide, unlike the chance itself (#1453),
+	 *  since only the ENABLER (a skill's own base chance) moved onto the skill. Folded into each skill's
+	 *  {@link SkillMetrics.critMultiplier} below. */
 	readonly critDamage = $derived(this.battleAttributes.getValue(EAttribute.CriticalDamage));
-	readonly critMultiplier = $derived(expectedCritMultiplier(this.critChance, this.critDamage));
 
 	/** Toughness-independent metrics per catalogue skill, keyed by id. Recomputed
 	 *  wholesale when attributes/equipment change — read via {@link metric}. */
 	readonly metricsById = $derived.by(() => {
 		const attrs = this.battleAttributes;
 		const cdMultiplier = cooldownMultiplier(attrs);
+		const critChanceMultiplier = attrs.getValue(EAttribute.CriticalChanceMultiplier);
 		const byId: Record<number, SkillMetrics> = {};
 		for (const skill of this.catalogue) {
+			// Each skill's own base CriticalChance (#1453) is the opt-in enabler; the player's
+			// CriticalChanceMultiplier only scales it, so an unauthored skill (0) stays inert.
+			const critChance = skill.criticalChance * critChanceMultiplier;
 			byId[skill.id] = {
 				skill,
 				rawDamage: calculateSkillDamage(skill, attrs),
 				cooldown: cdMultiplier > 0 ? skill.cooldownMs / 1000 / cdMultiplier : skill.cooldownMs / 1000,
-				contributions: skillContributions(skill, attrs)
+				contributions: skillContributions(skill, attrs),
+				critChance,
+				critMultiplier: expectedCritMultiplier(critChance, this.critDamage)
 			};
 		}
 		return byId;
@@ -283,7 +293,7 @@ export class SkillsView {
 				}
 				return true;
 			});
-		return list.sort(sortMetrics(this.sort, this.toughness, playerManager.level, this.critMultiplier));
+		return list.sort(sortMetrics(this.sort, this.toughness, playerManager.level));
 	});
 
 	/** Equipped rail rows, ordered by loadout slot (not by the active sort). Built from
@@ -356,10 +366,12 @@ export class SkillsView {
 		return this.metricsById[id]?.cooldown ?? 0;
 	}
 
-	/** Effective single-hit damage: raw damage scaled by the expected crit multiplier (a crit applies before
-	 *  mitigation, so it scales first), then run through the Compare-vs Toughness curve at the player's level. */
+	/** Effective single-hit damage: raw damage scaled by the skill's own expected crit multiplier (a crit
+	 *  applies before mitigation, so it scales first), then run through the Compare-vs Toughness curve at
+	 *  the player's level. */
 	effective(id: number): number {
-		return toughnessMitigatedDamage(this.rawDamage(id) * this.critMultiplier, this.toughness, playerManager.level);
+		const critMultiplier = this.metricsById[id]?.critMultiplier ?? 1;
+		return toughnessMitigatedDamage(this.rawDamage(id) * critMultiplier, this.toughness, playerManager.level);
 	}
 
 	effectiveDps(id: number): number {
@@ -369,13 +381,15 @@ export class SkillsView {
 	/** Expected crit damage folded into a skill's hit before mitigation (`raw × (critMultiplier − 1)`),
 	 *  0 when no crit can occur — drives the breakdown's Critical row and the raw-note's crit clause. */
 	critBonus(id: number): number {
-		return this.rawDamage(id) * (this.critMultiplier - 1);
+		const critMultiplier = this.metricsById[id]?.critMultiplier ?? 1;
+		return this.rawDamage(id) * (critMultiplier - 1);
 	}
 
 	/** Damage the Compare-vs Toughness curve removes from a skill's crit-scaled hit (`raw×crit − effective`),
 	 *  so the breakdown's raw + crit − mitigation reconciles with {@link effective}. */
 	mitigatedAmount(id: number): number {
-		return this.rawDamage(id) * this.critMultiplier - this.effective(id);
+		const critMultiplier = this.metricsById[id]?.critMultiplier ?? 1;
+		return this.rawDamage(id) * critMultiplier - this.effective(id);
 	}
 
 	/* ── selection + loadout edits ───────────────────────────────────────────── */

@@ -8,6 +8,12 @@ namespace Game.Abstractions.Contracts
         public int Id { get; set; }
         public required string Name { get; set; }
         public decimal BaseDamage { get; set; }
+
+        /// <summary>This skill's own base critical-hit chance (decimal probability, 0.05 = 5%), scaled by the
+        /// attacking battler's <see cref="EAttribute.CriticalChanceMultiplier"/> at fire time — see
+        /// <see cref="Core.Skills.Skill.CriticalChance"/>. Existing skills backfill to <c>0</c> (never crits).</summary>
+        public decimal CriticalChance { get; set; }
+
         public required IEnumerable<AttributeMultiplier> DamageMultipliers { get; set; }
         public required IEnumerable<SkillEffect> Effects { get; set; }
 

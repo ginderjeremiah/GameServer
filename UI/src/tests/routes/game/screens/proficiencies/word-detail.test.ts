@@ -35,12 +35,12 @@ const attr = (id: EAttribute, name: string, isPercentage = false): IAttribute =>
 
 // A percentage attribute (renders a `+2%`-style delta) and a flat one (renders a plain `+5`).
 const ATTRIBUTES: IAttribute[] = [
-	attr(EAttribute.CriticalChance, 'Fire Damage', true),
+	attr(EAttribute.CriticalChanceMultiplier, 'Fire Damage', true),
 	attr(EAttribute.Toughness, 'Toughness', false)
 ];
 
 const modifier = (o: Partial<IProficiencyLevelModifier> & { level: number }): IProficiencyLevelModifier => ({
-	attributeId: EAttribute.CriticalChance,
+	attributeId: EAttribute.CriticalChanceMultiplier,
 	modifierTypeId: EModifierType.Additive,
 	amount: 0.02,
 	...o
@@ -123,7 +123,7 @@ describe('decipherReveal', () => {
 
 describe('formatModifier', () => {
 	it('formats an additive percentage modifier as a signed delta plus the attribute name', () => {
-		const mod = modifier({ level: 1, attributeId: EAttribute.CriticalChance, amount: 0.02 });
+		const mod = modifier({ level: 1, attributeId: EAttribute.CriticalChanceMultiplier, amount: 0.02 });
 		expect(formatModifier(mod, ATTRIBUTES)).toBe('+2% Fire Damage');
 	});
 
@@ -174,7 +174,7 @@ describe('buildLadder', () => {
 			id: 1,
 			maxLevel: 3,
 			levelModifiers: [
-				modifier({ level: 1, attributeId: EAttribute.CriticalChance, amount: 0.02 }),
+				modifier({ level: 1, attributeId: EAttribute.CriticalChanceMultiplier, amount: 0.02 }),
 				modifier({ level: 3, attributeId: EAttribute.Toughness, modifierTypeId: EModifierType.Additive, amount: 4 })
 			]
 		});
@@ -189,7 +189,7 @@ describe('buildLadder', () => {
 			id: 1,
 			maxLevel: 2,
 			levelModifiers: [
-				modifier({ level: 2, attributeId: EAttribute.CriticalChance, amount: 0.03 }),
+				modifier({ level: 2, attributeId: EAttribute.CriticalChanceMultiplier, amount: 0.03 }),
 				modifier({ level: 2, attributeId: EAttribute.Toughness, modifierTypeId: EModifierType.Additive, amount: 2 })
 			]
 		});

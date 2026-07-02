@@ -175,7 +175,7 @@ namespace Game.Application.Tests.Services
             var player = MakeBattler();
             var enemy = MakeBattler((EAttribute.FireResistance, enemyFireResistance));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.DamageTarget(raw, portions);
+            context.DamageTarget(raw, portions, 0);
             return context.Stats;
         }
 
@@ -187,7 +187,7 @@ namespace Game.Application.Tests.Services
             var enemy = MakeBattler();
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(raw, portions);
+            context.DamageTarget(raw, portions, 0);
             return context.Stats;
         }
 

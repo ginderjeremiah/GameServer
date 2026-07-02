@@ -49,7 +49,7 @@ export enum EAttribute {
 	CooldownRecovery = 8,
 	/** @deprecated Drop system has been replaced by challenge-based unlocks. */
 	DropBonus = 9,
-	CriticalChance = 10,
+	CriticalChanceMultiplier = 10,
 	CriticalDamage = 11,
 	DodgeChance = 12,
 	BleedDamagePerSecond = 15,

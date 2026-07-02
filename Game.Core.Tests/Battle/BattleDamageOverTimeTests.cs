@@ -402,6 +402,7 @@ namespace Game.Core.Tests.Battle
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
             CooldownMs = 40,
             BaseDamage = baseDamage,
+            CriticalChance = 0,
             DamageMultipliers = [],
             Effects = [],
         };

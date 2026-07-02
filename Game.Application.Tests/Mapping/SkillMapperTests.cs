@@ -90,6 +90,24 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal("why this skill exists", SkillMapper.ToContract(entity).DesignerNotes);
         }
 
+        [Fact]
+        public void ToContract_RoundTripsCriticalChance()
+        {
+            var entity = NewSkill(ESkillAcquisition.Player);
+            entity.CriticalChance = 0.25m;
+
+            Assert.Equal(0.25m, SkillMapper.ToContract(entity).CriticalChance);
+        }
+
+        [Fact]
+        public void ToCore_RoundTripsCriticalChance()
+        {
+            var entity = NewSkill(ESkillAcquisition.Player);
+            entity.CriticalChance = 0.25m;
+
+            Assert.Equal(0.25, SkillMapper.ToCore(entity).CriticalChance);
+        }
+
         private static EntitySkill NewSkill(ESkillAcquisition acquisition, ERarity rarity = ERarity.Common) => new()
         {
             Id = 0,

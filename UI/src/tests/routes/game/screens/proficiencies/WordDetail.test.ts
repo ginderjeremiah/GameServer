@@ -93,7 +93,7 @@ const renderInspector = (tier: TierView, path = pathView(), controller = stubCon
 beforeEach(() => {
 	staticData.skills = SKILLS;
 	staticData.attributes = [
-		attribute(EAttribute.CriticalChance, 'Fire Damage', true),
+		attribute(EAttribute.CriticalChanceMultiplier, 'Fire Damage', true),
 		attribute(EAttribute.Toughness, 'Toughness')
 	];
 });
@@ -184,7 +184,12 @@ describe('WordDetail — per-level ladder', () => {
 			maxLevel: 10,
 			milestoneLevels: [5],
 			levelModifiers: [
-				{ level: 1, attributeId: EAttribute.CriticalChance, modifierTypeId: EModifierType.Additive, amount: 0.02 }
+				{
+					level: 1,
+					attributeId: EAttribute.CriticalChanceMultiplier,
+					modifierTypeId: EModifierType.Additive,
+					amount: 0.02
+				}
 			],
 			levelRewards: [{ level: 5, rewardSkillId: 2 }]
 		});

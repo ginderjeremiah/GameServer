@@ -16,6 +16,9 @@ export class Skill implements ISkill {
 	id: number;
 	name: string;
 	baseDamage: number;
+	// This skill's own base critical-hit chance, scaled by the attacking battler's
+	// CriticalChanceMultiplier at fire time (#1453) — see battle-step.ts.
+	criticalChance: number;
 	damageMultipliers: IAttributeMultiplier[];
 	effects: ISkillEffect[];
 	// The weighted leaf-type split this skill's direct hits deal (#1343), read by the portion-aware
@@ -46,6 +49,7 @@ export class Skill implements ISkill {
 		this.id = data.id;
 		this.name = data.name;
 		this.baseDamage = data.baseDamage;
+		this.criticalChance = data.criticalChance;
 		this.damageMultipliers = data.damageMultipliers;
 		this.effects = data.effects;
 		this.damagePortions = data.damagePortions;

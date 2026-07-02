@@ -3,6 +3,7 @@ using System;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    partial class GameContextModelSnapshot : ModelSnapshot
+    [Migration("20260702032330_AddSkillCriticalChance")]
+    partial class AddSkillCriticalChance
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -329,12 +332,6 @@ namespace Game.Infrastructure.Migrations
                             Id = 45,
                             Description = "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
                             Name = "Damage Reflection"
-                        },
-                        new
-                        {
-                            Id = 46,
-                            Description = "The maximum percentage of bonus damage dealt against a target, scaled by how much health it is missing.",
-                            Name = "Execute Bonus"
                         });
                 });
 

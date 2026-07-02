@@ -63,10 +63,14 @@ namespace Game.Core
         DropBonus = 9,
 
         /// <summary>
-        /// A derived game attribute. A decimal probability (0.05 = 5%) that an attack lands a critical hit,
-        /// compared directly against the battle RNG draw. Sourced from Dexterity/Luck (player-only).
+        /// A derived game attribute. A base-1 multiplier (like <see cref="CooldownRecovery"/>) applied against a
+        /// <b>skill's own authored base critical-hit chance</b> (<see cref="Skills.Skill.CriticalChance"/>) — the
+        /// per-skill opt-in enabler, so an unauthored skill never crits regardless of this multiplier. Read
+        /// directly and composed additively from base 1 plus any authored sources (items, proficiency, mods,
+        /// class), so an uncommitted skill still crits at its own authored rate and a committed investment scales
+        /// it up (or down below 1).
         /// </summary>
-        CriticalChance = 10,
+        CriticalChanceMultiplier = 10,
 
         /// <summary>
         /// A derived game attribute. A base-≥1 multiplier (base 1.5) read directly: on a critical hit the raw

@@ -90,41 +90,21 @@ describe('computeAttributes', () => {
 		expect(str.lines.at(-1)!.factor).toBe(1.5);
 	});
 
-	// Crit is opt-in (crit rework #1425): CriticalChance has no attribute derivation, so it is 0 until an
-	// item/skill enabler feeds it. These two mirror Game.Core.Tests AttributeCollectionTests.
-	it('leaves CriticalChance at 0 for an uncommitted build, even with heavy DEX/LUK and a Precision multiplier', () => {
-		// The attributes that used to feed crit (Dexterity/Luck) no longer do; with no enabler the multiplicative
-		// Precision bonus stays inert (0 × mult = 0).
-		const computed = computeAttributes(
-			withStatics([
-				additive(EAttribute.Dexterity, 100),
-				additive(EAttribute.Luck, 100),
-				{
-					attribute: EAttribute.CriticalChance,
-					amount: 1.5,
-					type: EModifierType.Multiplicative,
-					source: EAttributeModifierSource.ItemMod
-				}
-			])
-		);
-		expect(computed.get(EAttribute.CriticalChance)?.total ?? 0).toBe(0);
+	// Crit is a per-skill opt-in enabler (crit rework #1425, per-skill base #1453): the ENABLER is a skill's
+	// own authored CriticalChance (0 unless authored), and CriticalChanceMultiplier only scales that base —
+	// so, unlike the other chance attributes, it carries a base of 1 (like CooldownRecovery/CriticalDamage),
+	// never 0. These two mirror Game.Core.Tests AttributeCollectionTests.
+	it('leaves CriticalChanceMultiplier at its base 1 with no further investment', () => {
+		// With no further investment the multiplier is exactly 1, so a committed skill still crits at its
+		// own authored rate with zero additional cost.
+		const computed = computeAttributes(withStatics([]));
+		expect(computed.get(EAttribute.CriticalChanceMultiplier)!.total).toBe(1);
 	});
 
-	it('multiplies a flat crit enabler by the Precision path bonus (opt-in-multiplicative)', () => {
-		// A flat item/skill enabler is the only base; Additive applies before Multiplicative, so the final
-		// chance is enabler × bonus — meaningful only because the enabler opted the build in. 0.1 × 1.5 = 0.15.
-		const computed = computeAttributes(
-			withStatics([
-				additive(EAttribute.CriticalChance, 0.1, EAttributeModifierSource.Item),
-				{
-					attribute: EAttribute.CriticalChance,
-					amount: 1.5,
-					type: EModifierType.Multiplicative,
-					source: EAttributeModifierSource.ItemMod
-				}
-			])
-		);
-		expect(computed.get(EAttribute.CriticalChance)!.total).toBeCloseTo(0.15, 10);
+	it('stacks an additive Precision/gear bonus onto the CriticalChanceMultiplier base', () => {
+		// A Precision/gear bonus composes additively onto the base 1, exactly like CooldownRecovery.
+		const computed = computeAttributes(withStatics([additive(EAttribute.CriticalChanceMultiplier, 0.5)]));
+		expect(computed.get(EAttribute.CriticalChanceMultiplier)!.total).toBeCloseTo(1.5, 10);
 	});
 
 	it('returns a zero total with no lines for an attribute with no modifiers', () => {

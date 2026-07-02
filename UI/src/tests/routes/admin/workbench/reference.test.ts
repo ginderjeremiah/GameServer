@@ -84,7 +84,7 @@ describe('enum-backed select options', () => {
 		// pickers — which read this same enum-backed option set — must offer them.
 		const opts = reference.attributeOptions();
 		const byValue = (value: EAttribute) => opts.find((o) => o.value === value)?.text;
-		expect(byValue(EAttribute.CriticalChance)).toBe('Critical Chance');
+		expect(byValue(EAttribute.CriticalChanceMultiplier)).toBe('Critical Chance Multiplier');
 		expect(byValue(EAttribute.CriticalDamage)).toBe('Critical Damage');
 		expect(byValue(EAttribute.DodgeChance)).toBe('Dodge Chance');
 	});
