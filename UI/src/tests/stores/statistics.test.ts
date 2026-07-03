@@ -56,6 +56,25 @@ describe('statistics store', () => {
 		expect(mockFetchSocket).toHaveBeenCalledTimes(1);
 	});
 
+	it('a forced load issued mid-flight fetches fresh data instead of settling for the stale response', async () => {
+		const stale = Promise.withResolvers<IPlayerStatistic[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = statistics.load();
+		const forced = statistics.load(true);
+		expect(mockFetchSocket).toHaveBeenCalledTimes(1);
+
+		// The in-flight response predates the force, so the forced caller must get a second
+		// fetch — issued after the stale one settles — and its data.
+		mockFetchSocket.mockResolvedValueOnce([zonesCleared(3, 1)]);
+		stale.resolve([]);
+		await forced;
+
+		expect(mockFetchSocket).toHaveBeenCalledTimes(2);
+		expect(statistics.stats).toEqual([zonesCleared(3, 1)]);
+		await initial;
+	});
+
 	it('flags an error and leaves stats empty when the fetch fails', async () => {
 		mockFetchSocket.mockRejectedValue(new Error('boom'));
 

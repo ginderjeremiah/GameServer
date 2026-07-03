@@ -92,6 +92,25 @@ describe('proficiencies store', () => {
 		expect(mockFetchSocket).toHaveBeenCalledTimes(1);
 	});
 
+	it('a forced load issued mid-flight fetches fresh data instead of settling for the stale response', async () => {
+		const stale = Promise.withResolvers<IPlayerProficiency[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = playerProficiencies.load();
+		const forced = playerProficiencies.load(true);
+		expect(mockFetchSocket).toHaveBeenCalledTimes(1);
+
+		// The in-flight response predates the force (e.g. divergence recovery after a failed push),
+		// so the forced caller must get a second fetch — issued after the stale one settles — and its data.
+		mockFetchSocket.mockResolvedValueOnce([playerProficiency(1, 5)]);
+		stale.resolve([]);
+		await forced;
+
+		expect(mockFetchSocket).toHaveBeenCalledTimes(2);
+		expect(playerProficiencies.all).toEqual([playerProficiency(1, 5)]);
+		await initial;
+	});
+
 	it('flags an error and leaves proficiencies empty when the fetch fails', async () => {
 		mockFetchSocket.mockRejectedValue(new Error('boom'));
 

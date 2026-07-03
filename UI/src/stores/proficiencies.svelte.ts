@@ -7,13 +7,12 @@
 import { fetchSocketData, type IPlayerProficiency, type IProficiencyXpGainedModel } from '$lib/api';
 import { proficiencyModifiers } from '$lib/battle/proficiency-modifiers';
 import type { AttributeModifier } from '$lib/battle/attribute-modifier';
+import { CoalescedLoader } from '$lib/common/coalesced-loader';
 import { staticData } from './static-data.svelte';
 
 let proficiencies = $state<IPlayerProficiency[]>([]);
 let loaded = $state(false);
 let error = $state(false);
-/** Coalesces concurrent callers (game boot + screen mount) onto one request. */
-let inFlight: Promise<void> | undefined;
 
 const fetchProficiencies = async () => {
 	try {
@@ -27,6 +26,10 @@ const fetchProficiencies = async () => {
 		error = true;
 	}
 };
+
+/** Coalesces concurrent callers (game boot + screen mount) onto one request; a forced load
+ *  issued mid-flight chains a fresh fetch so it never resolves with stale data. */
+const loader = new CoalescedLoader(fetchProficiencies, () => loaded);
 
 /**
  * The proficiency attribute bonuses for the player's current levels, composed against the proficiency
@@ -100,15 +103,7 @@ export const playerProficiencies = {
 	/** Fetch the player's proficiency progress. Idempotent — only hits the network the first time
 	 *  unless `force` re-fetches the latest values. */
 	async load(force = false) {
-		if (loaded && !force) {
-			return;
-		}
-		if (!inFlight) {
-			inFlight = fetchProficiencies().finally(() => {
-				inFlight = undefined;
-			});
-		}
-		await inFlight;
+		await loader.load(force);
 	},
 
 	/** Reset to the unloaded state (e.g. on logout / session replacement). */
@@ -116,6 +111,6 @@ export const playerProficiencies = {
 		proficiencies = [];
 		loaded = false;
 		error = false;
-		inFlight = undefined;
+		loader.reset();
 	}
 };

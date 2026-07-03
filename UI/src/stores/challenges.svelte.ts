@@ -5,12 +5,11 @@
    challenge is completed). */
 
 import { fetchSocketData, type IPlayerChallenge } from '$lib/api';
+import { CoalescedLoader } from '$lib/common/coalesced-loader';
 
 let challenges = $state<IPlayerChallenge[]>([]);
 let loaded = $state(false);
 let error = $state(false);
-/** Coalesces concurrent callers (game boot + screen mount) onto one request. */
-let inFlight: Promise<void> | undefined;
 
 const fetchChallenges = async () => {
 	try {
@@ -24,6 +23,10 @@ const fetchChallenges = async () => {
 		error = true;
 	}
 };
+
+/** Coalesces concurrent callers (game boot + screen mount) onto one request; a forced load
+ *  issued mid-flight chains a fresh fetch so it never resolves with stale data. */
+const loader = new CoalescedLoader(fetchChallenges, () => loaded);
 
 export const playerChallenges = {
 	get all() {
@@ -39,15 +42,7 @@ export const playerChallenges = {
 	/** Fetch the player's challenge progress. Idempotent — only hits the network the first
 	 *  time unless `force` re-fetches the latest values (e.g. on the challenges screen). */
 	async load(force = false) {
-		if (loaded && !force) {
-			return;
-		}
-		if (!inFlight) {
-			inFlight = fetchChallenges().finally(() => {
-				inFlight = undefined;
-			});
-		}
-		await inFlight;
+		await loader.load(force);
 	},
 
 	/** Whether the player has completed the given challenge. */
@@ -75,6 +70,6 @@ export const playerChallenges = {
 		challenges = [];
 		loaded = false;
 		error = false;
-		inFlight = undefined;
+		loader.reset();
 	}
 };
