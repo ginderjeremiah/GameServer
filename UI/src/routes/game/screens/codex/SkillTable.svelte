@@ -40,80 +40,38 @@ let { view }: Props = $props();
 </script>
 
 <style lang="scss">
+@use '$styles/codex-table' as table;
+
 .table {
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
+	@include table.frame;
 }
 
 .head {
-	display: flex;
-	align-items: center;
-	font-family: var(--mono);
-	font-size: 8.5px;
-	letter-spacing: 1.4px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	padding: 0 14px 8px;
-	border-bottom: 1px solid var(--border-subtle);
-	margin-right: 14px;
+	@include table.head-row;
 }
 
 .c-name {
-	flex: 2.4;
-	min-width: 0;
+	@include table.col-name;
 }
 
 .c-num {
-	flex: 1;
-	text-align: right;
+	@include table.col-num;
 }
 
 .narrow {
-	flex: 0.9;
+	@include table.col-narrow;
 }
 
 .rows {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	padding-right: 6px;
+	@include table.rows-list;
 }
 
 .row {
-	width: 100%;
-	text-align: left;
-	display: flex;
-	align-items: center;
-	padding: 9px 14px;
-	border: none;
-	border-left: 2px solid transparent;
-	border-bottom: 1px solid color-mix(in srgb, var(--white) 5%, transparent);
-	background: transparent;
-	cursor: pointer;
-	font-family: var(--sans);
-
-	&:hover {
-		background: color-mix(in srgb, var(--white) 3%, transparent);
-	}
-
-	&.selected {
-		border-left-color: var(--attr-intellect);
-		background: color-mix(in srgb, var(--attr-intellect) 10%, transparent);
-
-		.name {
-			color: var(--white);
-			font-weight: 600;
-		}
-	}
+	@include table.row(var(--attr-intellect));
 }
 
 .name-cell {
-	display: flex;
-	align-items: center;
-	gap: 11px;
-	min-width: 0;
+	@include table.name-cell;
 }
 
 .mark {
@@ -127,11 +85,7 @@ let { view }: Props = $props();
 }
 
 .name {
-	font-size: 13.5px;
-	color: var(--text-primary);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	@include table.row-name;
 }
 
 .val {
@@ -141,8 +95,6 @@ let { view }: Props = $props();
 }
 
 .muted {
-	font-family: var(--mono);
-	font-size: 10.5px;
-	color: var(--text-tertiary);
+	@include table.muted-num;
 }
 </style>
