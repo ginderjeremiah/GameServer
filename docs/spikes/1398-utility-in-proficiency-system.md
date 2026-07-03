@@ -139,4 +139,4 @@ The archetype issues are **ready-to-implement engine features** — the mechanic
 
 ## Follow-on spikes
 
-- **Attribute identity-sourcing redesign** ([#1426](https://github.com/ginderjeremiah/GameServer/issues/1426)) — what `Dexterity` / `Luck` / `Agility` become once combat identities (crit, and potentially CDR/dodge) move from attribute derivations to opt-in enablers: multiplicative-amplifier vs direct-removal per stat, whether they remain allocatable attributes or become gear-only, and the newbie-trap of allocating into a now-inert stat. Seeded by Decision 8.
+- **Attribute identity-sourcing redesign** ([#1426](https://github.com/ginderjeremiah/GameServer/issues/1426)) — what `Dexterity` / `Luck` / `Agility` become once combat identities (crit, and potentially CDR/dodge) move from attribute derivations to opt-in enablers: multiplicative-amplifier vs direct-removal per stat, whether they remain allocatable attributes or become gear-only, and the newbie-trap of allocating into a now-inert stat. Seeded by Decision 8. **Resolved** — see [1426-attribute-identity-sourcing.md](./1426-attribute-identity-sourcing.md).
