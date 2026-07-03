@@ -143,9 +143,11 @@ namespace Game.DataAccess.Repositories.Admin
         /// derived from the challenge type (mirrors the content-graph lint's <c>CheckChallenges</c>): an
         /// <see cref="EEntityType.Enemy"/>/<see cref="EEntityType.Zone"/>/
         /// <see cref="EEntityType.Skill"/> target must reference an existing record (retirement is tolerated —
-        /// only a dangling id would fault the runtime), and an <see cref="EEntityType.DamageType"/> target must
-        /// be a defined <see cref="EDamageTypeKey"/> (a fixed intrinsic enum, not a DB reference table).
-        /// <see cref="EEntityType.None"/> carries no dimension to validate. Deletes are skipped.
+        /// unlike a reward, a retired target can't fault the runtime; it only risks an eventually-uncompletable
+        /// challenge, which the content-graph lint already flags post-hoc as a warning), and an
+        /// <see cref="EEntityType.DamageType"/> target must be a defined <see cref="EDamageTypeKey"/> (a fixed
+        /// intrinsic enum, not a DB reference table). <see cref="EEntityType.None"/> carries no dimension to
+        /// validate. Deletes are skipped.
         /// </summary>
         private AdminSaveResult? FindTargetViolation(IReadOnlyList<Change<Contracts.Challenge>> changes)
         {
@@ -179,7 +181,7 @@ namespace Game.DataAccess.Repositories.Admin
                         return AdminSaveResult.Failure($"Target zone {targetId} does not exist.");
                     case EEntityType.Skill when _skills.LookupSkill(targetId) is null:
                         return AdminSaveResult.Failure($"Target skill {targetId} does not exist.");
-                    case EEntityType.DamageType when !Enum.IsDefined(typeof(EDamageTypeKey), targetId):
+                    case EEntityType.DamageType when !Enum.IsDefined((EDamageTypeKey)targetId):
                         return AdminSaveResult.Failure($"{targetId} is not a valid damage-type key.");
                 }
             }

@@ -212,6 +212,32 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveChallenges_NewRewardItemModRetired_ReturnsFailure()
+        {
+            int itemModId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var itemMod = await TestDataSeeder.CreateItemModAsync(context, name: "Old Prefix");
+                itemMod.RetiredAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                await context.SaveChangesAsync(CancellationToken);
+                itemModId = itemMod.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminChallenges>();
+
+            var result = admin.SaveChallenges(
+            [
+                new Change<Contracts.Challenge> { ChangeType = EChangeType.Add, Item = NewChallenge(name: "Retired Reward Mod", rewardItemModId: itemModId) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Reward item mod 'Old Prefix' is retired and cannot be newly assigned as a challenge reward.", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveChallenges_EditKeepingRetiredRewardUnchanged_Succeeds()
         {
             // A reward resolves by id forever: an item retired after being authored as a challenge's reward
@@ -337,6 +363,65 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.False(result.Succeeded);
             Assert.Equal("Target skill 99999 does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveChallenges_TargetingRetiredEnemy_Succeeds()
+        {
+            // Unlike a reward, a retired target is tolerated: it can't fault the runtime the way a dangling id
+            // would, and only risks an eventually-uncompletable challenge, which the content-graph lint already
+            // flags post-hoc as a warning rather than a save-time rejection.
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context, name: "Ancient Dragon");
+                enemy.RetiredAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                await context.SaveChangesAsync(CancellationToken);
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var changes = new List<Change<Contracts.Challenge>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewChallenge(name: "Dragon Slayer", challengeTypeId: EChallengeType.EnemiesKilled, targetEntityId: enemyId),
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminChallenges>();
+            Assert.True(admin.SaveChallenges(changes).Succeeded);
+        }
+
+        [Fact]
+        public async Task SaveChallenges_ValidDamageTypeTarget_PersistsTargetEntityId()
+        {
+            var changes = new List<Change<Contracts.Challenge>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewChallenge(name: "Fire Hunter", challengeTypeId: EChallengeType.KillsByDamageType,
+                        targetEntityId: (int)EDamageTypeKey.Fire),
+                },
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminChallenges>();
+                Assert.True(admin.SaveChallenges(changes).Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var created = await context.Challenges.AsNoTracking().SingleAsync(c => c.Name == "Fire Hunter", CancellationToken);
+                Assert.Equal((int)EDamageTypeKey.Fire, created.TargetEntityId);
+            }
         }
 
         [Fact]
