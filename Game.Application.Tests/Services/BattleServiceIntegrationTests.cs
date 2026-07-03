@@ -1861,5 +1861,33 @@ namespace Game.Application.Tests.Services
             Assert.False(success);
             Assert.False(player.AutoChallengeBoss);
         }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_OutOfRangeCurrentZone_ReturnsFalseAndLeavesModeIdle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // A stale/corrupt CurrentZoneId (e.g. after a content reseed) must be a graceful rejection, not an
+            // ArgumentOutOfRangeException from resolving the domain zone.
+            player.ChangeZone(999);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: true);
+
+            Assert.False(success);
+            Assert.False(player.AutoChallengeBoss);
+        }
     }
 }

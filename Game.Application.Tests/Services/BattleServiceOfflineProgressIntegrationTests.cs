@@ -304,6 +304,108 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SimulateOfflineProgress_BossModeInBosslessZone_FallsBackToIdleInSameZone()
+        {
+            using var scope = CreateScope();
+            var setup = await SeedWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+
+            // The persisted mode is boss-farming, but the current zone has no dedicated boss (e.g. it was
+            // unauthored since the mode was enabled): the loop must fall back to idle rather than stall.
+            player.SetAutoChallengeBoss(true);
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.False(summary.AutoChallengeBoss);
+            // The zone is still viable for idling, so no relocation happens.
+            Assert.Equal(setup.ZoneId, summary.ZoneId);
+            Assert.True(summary.BattlesWon > 1);
+        }
+
+        [Fact]
+        public async Task SimulateOfflineProgress_BossModeInRetiredZone_FallsBackToIdleInViableZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The player parked boss-farming in a zone that has since been retired. Its boss is no longer
+            // challengeable (out of circulation), so the loop falls back to idle — and the retired zone is
+            // not viable either, so the idle fallback relocates to the nearest viable, unlocked zone.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+
+            var viableZone = await TestDataSeeder.CreateZoneAsync(context, "Viable", levelMin: 1, levelMax: 1, order: 0);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, viableZone.Id, enemy.Id);
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Boss", isBoss: true);
+            var retiredZone = await TestDataSeeder.CreateZoneAsync(
+                context, "Retired Boss Zone", levelMin: 1, levelMax: 1, order: 1,
+                bossEnemyId: boss.Id, bossLevel: 1, retiredAt: DateTime.UtcNow);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: retiredZone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, playerEntity.Id);
+            player.SetAutoChallengeBoss(true);
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.False(summary.AutoChallengeBoss);
+            Assert.Equal(viableZone.Id, summary.ZoneId);
+            Assert.Equal(viableZone.Id, player.CurrentZoneId);
+            Assert.True(summary.BattlesWon > 1);
+        }
+
+        [Fact]
+        public async Task SimulateOfflineProgress_BossModeInLockedZone_FallsBackToIdleInSameZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The current zone has a boss but is gated behind a challenge the player has not completed, so
+            // its boss is not challengeable and the loop falls back to idle. The zone itself is viable
+            // (spawnable enemies), so the idle fallback runs in place without relocating.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Boss", isBoss: true);
+            var gate = await TestDataSeeder.CreateChallengeAsync(context, "Reach the boss zone");
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Locked Boss Zone", levelMin: 1, levelMax: 1,
+                bossEnemyId: boss.Id, bossLevel: 1, unlockChallengeId: gate.Id);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, playerEntity.Id);
+            player.SetAutoChallengeBoss(true);
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.False(summary.AutoChallengeBoss);
+            Assert.Equal(zone.Id, summary.ZoneId);
+            Assert.True(summary.BattlesWon > 1);
+        }
+
+        [Fact]
         public async Task SimulateSwitchProgress_SubThresholdAway_StillCreditsAndReanchors()
         {
             // A deliberate character switch drops the 5-minute floor: an away window the login path would treat
