@@ -30,6 +30,10 @@
 	{:else if kind === 'tag'}
 		<path d="M2.5 2.5h5L13 8l-5 5-5.5-5.5z" stroke-linejoin="round" />
 		<circle cx="5" cy="5" r="0.9" fill={stroke} stroke="none" />
+	{:else if kind === 'gauge'}
+		<path d="M2.8 11.5a5.2 5.2 0 0110.4 0" stroke-linecap="round" />
+		<path d="M8 11.3l2.7-3" stroke-linecap="round" />
+		<circle cx="8" cy="11.3" r="1" fill={stroke} stroke="none" />
 	{:else if kind === 'back'}
 		<path d="M7 3.5L2.5 8 7 12.5M2.5 8H13" stroke-linecap="round" stroke-linejoin="round" />
 	{:else if kind === 'trophy'}
@@ -43,19 +47,24 @@
 </svg>
 
 <script lang="ts" module>
-export type AdminGlyphKind =
-	| 'skull'
-	| 'bars'
-	| 'rune'
-	| 'box'
-	| 'bolt'
-	| 'multiply'
-	| 'map'
-	| 'pin'
-	| 'tag'
-	| 'back'
-	| 'trophy'
-	| 'inbox';
+/** Runtime list of every glyph kind (each must have a branch above) — lets tests assert none render blank. */
+export const ADMIN_GLYPH_KINDS = [
+	'skull',
+	'bars',
+	'rune',
+	'box',
+	'bolt',
+	'multiply',
+	'map',
+	'pin',
+	'tag',
+	'gauge',
+	'back',
+	'trophy',
+	'inbox'
+] as const;
+
+export type AdminGlyphKind = (typeof ADMIN_GLYPH_KINDS)[number];
 </script>
 
 <script lang="ts">
