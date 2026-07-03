@@ -420,6 +420,7 @@ namespace Game.Api.Tests.Unit
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
         }
 
         /// <summary>A pub/sub whose <c>Subscribe</c> throws, to drive the registration-rollback path.</summary>
@@ -490,6 +491,7 @@ namespace Game.Api.Tests.Unit
             public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
         }
 
         private sealed class NoOpHostLifetime : IHostApplicationLifetime

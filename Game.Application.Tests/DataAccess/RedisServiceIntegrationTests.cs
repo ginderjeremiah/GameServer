@@ -109,6 +109,82 @@ namespace Game.Application.Tests.DataAccess
             Assert.Fail($"Expected the fire-and-forget null write to delete key '{key}' within the timeout.");
         }
 
+        [Fact]
+        public async Task ReclaimAndForget_OnAMissingKey_ClaimsItWithTtl()
+        {
+            // Mirrors a live socket's presence key having lapsed (TTL expiry or a registration rollback) while
+            // it is still the genuine owner — the resurrection case ExpireAndForget can't handle (#1497).
+            var key = $"redis-reclaim-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            cache.ReclaimAndForget(key, "owner-a", TimeSpan.FromSeconds(30));
+
+            Assert.True(await WaitUntilValueEqualsAsync(cache, key, "owner-a"));
+            var ttl = await ReadTtlAsync(key);
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TimeSpan.Zero && ttl <= TimeSpan.FromSeconds(30), $"Expected a positive TTL within 30s but was {ttl}.");
+        }
+
+        [Fact]
+        public async Task ReclaimAndForget_OnAKeyItAlreadyOwns_RefreshesTtlWithoutChangingValue()
+        {
+            var key = $"redis-reclaim-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            await cache.Set(key, "owner-a", TimeSpan.FromSeconds(2));
+
+            cache.ReclaimAndForget(key, "owner-a", TimeSpan.FromSeconds(30));
+
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            TimeSpan? ttl = null;
+            while (DateTime.UtcNow < deadline)
+            {
+                ttl = await ReadTtlAsync(key);
+                if (ttl > TimeSpan.FromSeconds(10))
+                {
+                    break;
+                }
+
+                await Task.Delay(25);
+            }
+
+            Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be extended past its 2s seed but was {ttl}.");
+            Assert.Equal("owner-a", await cache.Get(key));
+        }
+
+        [Fact]
+        public async Task ReclaimAndForget_OnAKeyOwnedBySomeoneElse_DoesNotOverwriteIt()
+        {
+            // The no-clobber guarantee: a stale owner's heartbeat must never steal the key back from a newer
+            // claimant, exactly like the existing takeover-safety behavior on ExpireAndForget.
+            var key = $"redis-reclaim-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            await cache.Set(key, "owner-b", TimeSpan.FromSeconds(30));
+
+            cache.ReclaimAndForget(key, "owner-a", TimeSpan.FromSeconds(30));
+
+            await Task.Delay(500);
+            Assert.Equal("owner-b", await cache.Get(key));
+        }
+
+        private static async Task<bool> WaitUntilValueEqualsAsync(ICacheService cache, string key, string expected, int timeoutMs = 5000)
+        {
+            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await cache.Get(key) == expected)
+                {
+                    return true;
+                }
+
+                await Task.Delay(25);
+            }
+
+            return await cache.Get(key) == expected;
+        }
+
         private async Task<TimeSpan?> ReadTtlAsync(string key)
         {
             await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);

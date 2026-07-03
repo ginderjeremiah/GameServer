@@ -56,5 +56,14 @@
         /// update is never silently lost. The optimistic-concurrency counterpart to <see cref="CompareAndDelete"/>.
         /// </summary>
         public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Fire-and-forget "SET NX + expire": if <paramref name="key"/> is currently unset, claims it as
+        /// <paramref name="ownerValue"/> with <paramref name="expiry"/> as its TTL; otherwise just extends the
+        /// TTL of whatever value is already there (matching <see cref="ExpireAndForget"/>'s existing
+        /// don't-care-who-asked refresh — it never overwrites a value that isn't <paramref name="ownerValue"/>).
+        /// Unlike <see cref="ExpireAndForget"/> (a bare TTL bump that no-ops on a missing key), this can
+        /// resurrect a claim that expired or was rolled back out from under a still-live owner.
+        /// </summary>
+        public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry);
     }
 }
