@@ -1,5 +1,5 @@
-using Game.Abstractions.Infrastructure;
 using Game.DataAccess;
+using Game.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Application.Tests.DataAccess
@@ -100,43 +100,21 @@ namespace Game.Application.Tests.DataAccess
 
         // Records each PublishBatch call's items rather than verifying call behavior via a mocking framework,
         // matching this project's classical (state-based) testing style.
-        private sealed class RecordingPubSubService : IPubSubService
+        private sealed class RecordingPubSubService : NotSupportedPubSubService
         {
             public List<List<object?>> Calls { get; } = [];
 
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default)
+            public override Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default)
             {
                 Calls.Add(queueData.Select(data => (object?)data).ToList());
                 return Task.CompletedTask;
             }
-
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Wake(string channel) => throw new NotSupportedException();
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new NotSupportedException();
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new NotSupportedException();
-            public Task UnSubscribe(string channel) => throw new NotSupportedException();
-            public Task UnSubscribe(string channel, string id) => throw new NotSupportedException();
-            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
         }
 
-        private sealed class ThrowingPubSubService : IPubSubService
+        private sealed class ThrowingPubSubService : NotSupportedPubSubService
         {
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default)
+            public override Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default)
                 => throw new InvalidOperationException("Simulated transient publish failure.");
-
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Wake(string channel) => throw new NotSupportedException();
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new NotSupportedException();
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new NotSupportedException();
-            public Task UnSubscribe(string channel) => throw new NotSupportedException();
-            public Task UnSubscribe(string channel, string id) => throw new NotSupportedException();
-            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
         }
     }
 }

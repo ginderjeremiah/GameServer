@@ -1361,19 +1361,11 @@ namespace Game.Application.Tests.DataAccess
         /// A minimal <see cref="IPubSubService"/> stub whose <c>Subscribe</c> overloads always throw, used to verify
         /// that <see cref="DataProviderSynchronizer.StartAsync"/> propagates a subscribe failure rather than swallowing it.
         /// </summary>
-        private sealed class ThrowingPubSubService : IPubSubService
+        private sealed class ThrowingPubSubService : NotSupportedPubSubService
         {
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task Wake(string channel) => Task.CompletedTask;
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
-            public Task UnSubscribe(string channel) => Task.CompletedTask;
-            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
-            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
+            public override Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public override Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
+            public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
         }
 
         /// <summary>
@@ -1400,23 +1392,18 @@ namespace Game.Application.Tests.DataAccess
         /// <summary>
         /// An <see cref="IPubSubService"/> that exposes a single fixed queue for the player update queue (and a
         /// throwaway in-memory queue for any other name, e.g. the dead-letter queue) and treats every subscribe
-        /// as a no-op, so a test can drive only the startup drain over a queue it fully controls.
+        /// (and the id-scoped unsubscribe StopAsync issues) as a no-op, so a test can drive only the startup
+        /// drain over a queue it fully controls.
         /// </summary>
-        private sealed class SingleQueuePubSubService(IPubSubQueue playerQueue) : IPubSubService
+        private sealed class SingleQueuePubSubService(IPubSubQueue playerQueue) : NotSupportedPubSubService
         {
-            public IPubSubQueue GetQueue(string queueName) =>
+            public override IPubSubQueue GetQueue(string queueName) =>
                 queueName == Constants.PUBSUB_PLAYER_QUEUE ? playerQueue : new InMemoryPubSubQueue();
 
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public Task Wake(string channel) => Task.CompletedTask;
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
-            public Task UnSubscribe(string channel) => Task.CompletedTask;
-            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public override Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
+            public override Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
+            public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
+            public override Task UnSubscribe(string channel, string id) => Task.CompletedTask;
         }
 
         /// <summary>
