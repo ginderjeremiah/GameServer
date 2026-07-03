@@ -101,7 +101,7 @@ namespace Game.Core.Attributes
                 Strength => "A measure of one's raw physical force. Increases the damage of some physical skills and contributes to maximum health.",
                 Endurance => "A measure of one's resilience and physical fortitude. Contributes to maximum health and toughness.",
                 Intellect => "A measure of one's mental acuity and command of the arcane. Increases the damage of magical skills.",
-                Agility => "A measure of one's speed and reflexes. Improves cooldown recovery and the chance to dodge attacks.",
+                Agility => "A measure of one's speed and reflexes. Improves cooldown recovery and amplifies dodge chance.",
                 Dexterity => "A measure of one's precision and finesse. Increases the damage of some physical skills and improves cooldown recovery.",
                 Luck => "A measure of one's fortune, influencing various chance-based outcomes.",
                 MaxHealth => "The amount of health a character has at the start of a battle.",
@@ -115,6 +115,7 @@ namespace Game.Core.Attributes
                 ExecuteBonus => "The maximum percentage of bonus damage dealt against a target, scaled by how much health it is missing.",
                 ParryChance => "The percentage chance to parry an incoming attack, negating it and striking back with the equipped weapon's signature skill.",
                 ParryChanceMultiplier => "A multiplier applied to your parry chance.",
+                DodgeChanceMultiplier => "A multiplier applied to your dodge chance.",
                 BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
                 PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
                 BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
@@ -175,6 +176,7 @@ namespace Game.Core.Attributes
                 // (display order = enum value): combat secondaries like DodgeChance/ExecuteBonus.
                 ParryChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY", 47, 0),
                 ParryChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY MULT", 48, 0),
+                DodgeChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "DOD MULT", 49, 0),
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No display metadata defined for the given attribute.")
             };
 #pragma warning restore CS0618

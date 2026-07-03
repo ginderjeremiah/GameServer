@@ -36,11 +36,14 @@ namespace Game.Core.Tests.Attributes
                 // is the authored-only ParryChance (base 0 everywhere, so it has no static modifier).
                 (EAttribute.ParryChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.ParryChanceMultiplier, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
+                // DodgeChanceMultiplier = 1 (base) + 0.002·Agility (#1523), the same template: the enabler is the
+                // authored-only DodgeChance (base 0 everywhere, so it has no static modifier — DamageReflection
+                // is the other authored-only attribute with no static modifier).
+                (EAttribute.DodgeChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
+                (EAttribute.DodgeChanceMultiplier, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
-                // DodgeChance = 0.001·Agility (DamageReflection is authored-only, so it has no static modifier)
-                (EAttribute.DodgeChance, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
             };
 
             Assert.Equal(expected.Length, StaticAttributeModifiers.All.Count);

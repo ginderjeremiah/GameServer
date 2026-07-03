@@ -23,7 +23,8 @@ namespace Game.Core
         Intellect = 2,
 
         /// <summary>
-        /// One of the core game attributes. Primarily determines a character's <see cref="CooldownRecovery"/> and <see cref="DodgeChance"/>.
+        /// One of the core game attributes. Primarily determines a character's <see cref="CooldownRecovery"/> and,
+        /// as the tempo &amp; evasion amplifier (spike #1426), <see cref="DodgeChanceMultiplier"/>.
         /// </summary>
         Agility = 3,
 
@@ -80,7 +81,10 @@ namespace Game.Core
 
         /// <summary>
         /// A derived game attribute. A decimal probability (0.05 = 5%) to fully ignore an incoming attack,
-        /// compared directly against the battle RNG draw. Sourced from Agility (player-only).
+        /// compared directly against the battle RNG draw after being scaled by <see cref="DodgeChanceMultiplier"/>.
+        /// Base <c>0</c> and <b>authored-only</b> (spike #1426) — granted by items/item mods/skill effects, never
+        /// derived from a core attribute — so it is a committed build identity like <see cref="ParryChance"/>.
+        /// Player-only, like crit/parry.
         /// </summary>
         DodgeChance = 12,
 
@@ -248,6 +252,14 @@ namespace Game.Core
         /// scales an authored parry chance while remaining inert for the uncommitted (<c>0 × mult = 0</c>).
         /// </summary>
         ParryChanceMultiplier = 48,
+
+        /// <summary>
+        /// A derived game attribute. A base-1 multiplier (like <see cref="ParryChanceMultiplier"/>) applied
+        /// against <see cref="DodgeChance"/> — derived from Agility (spike #1426), the Evasion proficiency
+        /// path's bonus target, so path/attribute investment scales an authored dodge chance while remaining
+        /// inert for the uncommitted (<c>0 × mult = 0</c>).
+        /// </summary>
+        DodgeChanceMultiplier = 49,
     }
 
     /// <summary>

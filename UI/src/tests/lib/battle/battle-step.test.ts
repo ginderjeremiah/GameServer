@@ -294,6 +294,52 @@ describe('battleStep', () => {
 			expect(player.currentHealth).toBe(before);
 		});
 
+		it('an uncommitted defender never dodges — the enemy hit lands unchanged (#1523)', () => {
+			// DodgeChance is base 0 with no derivation (dodge rework #1523), mirroring ParryChance's
+			// authored-only enabler.
+			const player = makeBattler(baseStats, []);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const before = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+			expect(activations[0].dodged).toBe(false);
+			expect(player.currentHealth).toBe(before - 20);
+		});
+
+		it('a multiplier alone never dodges at an authored chance of 0 (#1523)', () => {
+			// The enabler is the authored DodgeChance, not the multiplier: base 1 + 999 = 1000 still
+			// multiplies a 0 chance to 0 — the same commitment template as parry's authored-only enabler.
+			const player = makeBattler([{ id: EAttribute.DodgeChanceMultiplier, amount: 999 }], []);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const before = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+			expect(activations[0].dodged).toBe(false);
+			expect(player.currentHealth).toBe(before - 20);
+		});
+
+		it('the multiplier scales a fractional dodge chance to 1 — always dodges (#1523)', () => {
+			// 0.5 authored × (base 1 + 1) = 1.0, at or above every [0,1) draw — mirroring how
+			// ParryChanceMultiplier scales a fractional authored parry chance.
+			const player = makeBattler(
+				[
+					{ id: EAttribute.DodgeChance, amount: 0.5 },
+					{ id: EAttribute.DodgeChanceMultiplier, amount: 1 }
+				],
+				[]
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const before = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+			expect(activations[0].dodged).toBe(true);
+			expect(activations[0].damage).toBe(0);
+			expect(player.currentHealth).toBe(before);
+		});
+
 		it('reflects a share of a direct hit back to the attacker, bypassing its mitigation', () => {
 			// The enemy carries 0.5 DamageReflection; the player's 40-damage hit lands in full (enemy Toughness
 			// 0) and 40 × 0.5 = 20 is returned to the player, IGNORING the player's Toughness 100.
