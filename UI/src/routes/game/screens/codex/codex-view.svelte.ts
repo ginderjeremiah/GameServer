@@ -384,7 +384,7 @@ export class CodexView {
 			return explicit;
 		}
 		const firstVisible = this.enemyRows[0];
-		return (firstVisible && this.enemies.find((e) => e.id === firstVisible.id)) ?? this.enemies[0];
+		return (firstVisible && (staticData.enemies ?? [])[firstVisible.id]) ?? this.enemies[0];
 	});
 
 	readonly range = $derived.by<LevelRange | undefined>(() => {
