@@ -855,11 +855,110 @@ namespace Game.Core.Tests.Progress
             // The rows the battle touched are dirty (e.g. the global kill counter and its per-enemy twin)...
             Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
             Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == 3);
-            // ...while stats this battle never touched stay out of the persist set (BattlesLost on a win).
-            // Note a touched stat can legitimately be dirty with value 0 (e.g. zero DamageTaken this battle),
-            // which is the same set the pre-cache Save persisted.
+            // ...while stats this battle never touched stay out of the persist set (BattlesLost on a win)...
             Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.BattlesLost);
             Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.BattlesWon && s.EntityId == 999);
+            // ...and a Sum statistic reported as 0 (zero DamageTaken this battle) is not "touched" at all —
+            // a zero delta is skipped outright, so it never enters the persist set (#1515).
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.DamageTaken);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_ZeroDeltaSumStatistics_CreateNoRowAndAreNotDirtiedOrTouched()
+        {
+            // A battle with no crits/dodges/parries/heals reports the whole family as 0. A zero-delta Sum
+            // record carries no information (row absence is the "no data" signal), so it creates no row,
+            // enters no persist set, and returns no touched key re-evaluating its challenges (#1515).
+            var progress = MakeProgress();
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            EStatisticType[] zeroDeltaSums =
+            [
+                EStatisticType.DamageDealt, EStatisticType.DamageTaken, EStatisticType.DamageHealed,
+                EStatisticType.CriticalHits, EStatisticType.CriticalDamageDealt,
+                EStatisticType.AttacksDodged, EStatisticType.DamageDodged,
+                EStatisticType.AttacksParried, EStatisticType.DamageParried,
+                EStatisticType.CounterDamageDealt, EStatisticType.SkillsUsed,
+            ];
+            foreach (var type in zeroDeltaSums)
+            {
+                Assert.False(progress.TryGetStatisticValue(type, null, out _));
+                Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == type);
+                Assert.DoesNotContain((type, (int?)null), touched);
+            }
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_ZeroDeltaSumOnExistingRow_LeavesItCleanAndUntouched()
+        {
+            // An aggregate loaded with a prior crit count records a crit-less battle: the existing row's
+            // value is unchanged, so it must stay out of both the persist set and the touched keys.
+            var progress = MakeProgress(statistics: [Stat(EStatisticType.CriticalHits, null, 5m)]);
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(5m, progress.GetStatisticValue(EStatisticType.CriticalHits, null));
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.CriticalHits);
+            Assert.DoesNotContain((EStatisticType.CriticalHits, (int?)null), touched);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_NonZeroSumDelta_IsRecordedDirtiedAndTouched()
+        {
+            // The zero-delta skip must not swallow real deltas: a battle with crits records, dirties, and
+            // touches the stat so its challenges are re-evaluated.
+            var progress = MakeProgress();
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats { CriticalHits = 2 }, isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.CriticalHits, null));
+            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.CriticalHits && s.EntityId == null);
+            Assert.Contains((EStatisticType.CriticalHits, (int?)null), touched);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_ZeroFirstWriteMinMaxStatistics_StillCreateAndDirtyTheirRows()
+        {
+            // The deliberate asymmetry with the zero-delta Sum skip: Min/Max first-write semantics are
+            // untouched — a first recorded 0 (an instant victory, a battle with no player attack) is a
+            // genuine value, so the row is created and persisted.
+            var progress = MakeProgress();
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
+                totalMs: 0, new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            Assert.True(progress.TryGetStatisticValue(EStatisticType.FastestVictory, null, out var fastest));
+            Assert.Equal(0m, fastest);
+            Assert.True(progress.TryGetStatisticValue(EStatisticType.HighestSingleAttackDamage, null, out var highest));
+            Assert.Equal(0m, highest);
+            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.FastestVictory && s.EntityId == null);
+            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.HighestSingleAttackDamage && s.EntityId == null);
+            Assert.Contains((EStatisticType.FastestVictory, (int?)null), touched);
+            Assert.Contains((EStatisticType.HighestSingleAttackDamage, (int?)null), touched);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_ZeroDamageSkill_RecordsItsUsesButNoDamageDealtRow()
+        {
+            // A used utility skill that dealt no damage: the per-skill use count is a real delta, while its
+            // per-skill DamageDealt Sum stays absent (its Max twin keeps first-write semantics).
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                PlayerSkillsUsed = 2,
+                SkillStats = { [10] = new SkillStats { Uses = 2, TotalDamage = 0.0, HighestSingleAttack = 0.0 } },
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.SkillsUsed, 10));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDealt, 10, out _));
+            Assert.True(progress.TryGetStatisticValue(EStatisticType.HighestSingleAttackDamage, 10, out _));
         }
 
         [Fact]
