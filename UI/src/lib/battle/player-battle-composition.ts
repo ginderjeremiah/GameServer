@@ -25,12 +25,26 @@ export function playerBattleModifiers(
 	return [...lockedBaseModifiers, ...proficiencyModifiers];
 }
 
+/** The composition's LAST step — adds the class signature passive to `attrs`, resolved against that same
+ *  just-assembled set so an attribute-scaled passive reads the final value of its scaling attribute
+ *  (snapshot state, like a skill effect reads its caster). Callers must apply it after every other
+ *  modifier — float addition is not associative, so the anti-cheat replay depends on this apply order
+ *  matching the backend `BattleSnapshot.ToBattler`. `resolveSignaturePassive` is
+ *  `PlayerManager.battleSignaturePassiveModifier`, threaded through so the module stays pure. The
+ *  attribute-breakdown screen mirrors this step inline (it needs the labeled modifier itself, resolved
+ *  over its `computeAttributes` fold); keep that copy in lockstep with this one. */
+export function applySignaturePassive(
+	attrs: BattleAttributes,
+	resolveSignaturePassive: (resolveScalingValue: (attribute: EAttribute) => number) => AttributeModifier
+): void {
+	attrs.addModifier(resolveSignaturePassive((attribute) => attrs.getValue(attribute)));
+}
+
 /** Builds the player's full live {@link BattleAttributes}: allocation + equipped gear, the class locked
- *  base and proficiency bonuses, and the class signature passive composed last against the resolved set.
- *  Any surface displaying live battle numbers must read off this rather than a partial hand-rolled copy,
- *  so a composition change can't silently desync one surface from what the player actually fights with.
- *  `resolveSignaturePassive` is `PlayerManager.battleSignaturePassiveModifier`, threaded through so this
- *  stays pure — it is invoked with a resolver over the just-assembled set, as the live battler does. */
+ *  base and proficiency bonuses, and the class signature passive composed last against the resolved set
+ *  ({@link applySignaturePassive}). Any surface displaying live battle numbers must read off this rather
+ *  than a partial hand-rolled copy, so a composition change can't silently desync one surface from what
+ *  the player actually fights with. */
 export function composePlayerBattleAttributes(
 	attributes: readonly IBattlerAttribute[],
 	equipmentStats: readonly IBattlerAttribute[],
@@ -44,6 +58,6 @@ export function composePlayerBattleAttributes(
 		true,
 		playerBattleModifiers(lockedBaseModifiers, proficiencyModifiers)
 	);
-	attrs.addModifier(resolveSignaturePassive((attribute) => attrs.getValue(attribute)));
+	applySignaturePassive(attrs, resolveSignaturePassive);
 	return attrs;
 }

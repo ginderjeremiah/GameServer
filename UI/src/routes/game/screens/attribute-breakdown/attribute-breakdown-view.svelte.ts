@@ -316,9 +316,10 @@ export function buildPlayerModifiers(): LabeledModifier[] {
 	}
 
 	// The class signature passive is composed LAST (after the locked base, proficiency, and statics),
-	// resolved against the already-assembled value of its scaling attribute — the same two-pass the
-	// battler does (build the set, then add the passive reading the resolved scaling value, like a skill
-	// effect reads its caster). The resolve pass is lazy so a flat (non-scaled) passive skips it.
+	// resolved against the already-assembled set — an inline mirror of `applySignaturePassive`
+	// ($lib/battle/player-battle-composition, the canonical ordering the battler and skills screen share),
+	// kept inline because this surface needs the labeled modifier itself, resolved over the
+	// `computeAttributes` fold (lazily, so a flat non-scaled passive skips the resolve pass).
 	let resolved: Map<EAttribute, ComputedAttribute<LabeledModifier>> | undefined;
 	const passive = playerManager.battleSignaturePassiveModifier((attribute) => {
 		resolved ??= computeAttributes(mods);
