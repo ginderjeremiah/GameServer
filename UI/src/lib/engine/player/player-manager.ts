@@ -207,6 +207,11 @@ export class PlayerManager implements IPlayerData {
 	 * server-side — always win over the local recompute.
 	 */
 	public applyVictoryRewards(rewards: IDefeatRewards) {
+		// grantExp is invoked only for its log-message side effect (the "Earned X exp." / level-up lines);
+		// its own level/exp recompute is discarded below. `expReward` is the server's pre-clamp raw reward,
+		// so in the (effectively unreachable in normal play) case of a single grant exceeding
+		// MaxExpPerGrant, this can over-level and log phantom level-up lines before the reconcile below
+		// corrects level/exp back down to the server's actual post-clamp state.
 		this.grantExp(rewards.expReward);
 		this.level = rewards.newLevel;
 		this.exp = rewards.newExp;
