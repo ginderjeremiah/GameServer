@@ -34,6 +34,8 @@ namespace Game.Application.DependencyInjection
                 .AddScoped<LoginBackoffGuard>()
                 .AddScoped<AccountService>()
                 .AddScoped<BattleService>()
+                .AddScoped<ZoneResolutionService>()
+                .AddScoped<OfflineProgressService>()
                 .AddScoped<ChallengeRewardService>()
                 .AddScoped<ProficiencyRewardService>()
                 .AddScoped<LoginTrackingService>()

@@ -25,7 +25,7 @@ namespace Game.Api.Controllers
         LoginTrackingService loginTrackingService,
         SocketManagerService socketManager,
         PlayerService playerService,
-        BattleService battleService,
+        OfflineProgressService offlineProgressService,
         IClasses classes,
         ILogger<LoginController> logger) : ControllerBase
     {
@@ -35,7 +35,7 @@ namespace Game.Api.Controllers
         private readonly LoginTrackingService _loginTrackingService = loginTrackingService;
         private readonly SocketManagerService _socketManager = socketManager;
         private readonly PlayerService _playerService = playerService;
-        private readonly BattleService _battleService = battleService;
+        private readonly OfflineProgressService _offlineProgressService = offlineProgressService;
         private readonly IClasses _classes = classes;
         private readonly ILogger<LoginController> _logger = logger;
 
@@ -216,7 +216,7 @@ namespace Game.Api.Controllers
                 return;
             }
 
-            await _battleService.SimulateSwitchProgress(departed, _sessionService.PlayerState, cancellationToken);
+            await _offlineProgressService.SimulateSwitchProgress(departed, _sessionService.PlayerState, cancellationToken);
         }
 
         /// <summary>
