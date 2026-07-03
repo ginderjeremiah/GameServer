@@ -172,6 +172,39 @@ describe('PlayerManager', () => {
 		});
 	});
 
+	describe('applyVictoryRewards', () => {
+		it('grants exp and adopts the server-authoritative post-grant fields', () => {
+			manager.initialize(makePlayerData({ level: 1, exp: 0, statPointsGained: 0, statPointsUsed: 0 }));
+
+			manager.applyVictoryRewards({ expReward: 100, newLevel: 2, newExp: 0, statPointsGained: 2, statPointsUsed: 0 });
+
+			expect(manager.level).toBe(2);
+			expect(manager.exp).toBe(0);
+			expect(manager.statPointsGained).toBe(2);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.Exp, 'Earned 100 exp.');
+			expect(logMessage).toHaveBeenCalledWith(ELogType.LevelUp, 'Congratulations, you leveled up!');
+		});
+
+		it('reconciles onto the server state even when the local recompute would drift (e.g. a clamped grant)', () => {
+			// The backend clamps a single grant to MaxExpPerGrant (an anti-cheat backstop grantExp
+			// deliberately doesn't mirror); the server's returned fields must win regardless.
+			manager.initialize(makePlayerData({ level: 1, exp: 0, statPointsGained: 0, statPointsUsed: 5 }));
+
+			manager.applyVictoryRewards({
+				expReward: 1_000_000,
+				newLevel: 3,
+				newExp: 40,
+				statPointsGained: 4,
+				statPointsUsed: 5
+			});
+
+			expect(manager.level).toBe(3);
+			expect(manager.exp).toBe(40);
+			expect(manager.statPointsGained).toBe(4);
+			expect(manager.statPointsUsed).toBe(5);
+		});
+	});
+
 	describe('levelUp', () => {
 		it('increments level and grants the per-level free pool stat points', () => {
 			manager.initialize(makePlayerData({ level: 3, exp: 300, statPointsGained: 12 }));

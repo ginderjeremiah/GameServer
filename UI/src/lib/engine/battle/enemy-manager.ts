@@ -3,6 +3,7 @@ import { Action, createHook, delay, isZoneUnlocked, navigableZones, nextZoneByOr
 import { staticData, statistics, playerChallenges } from '$stores';
 import { battleEngine, BattleStage, onBattleStageChanged, playerManager, type PlayerBattleState } from '../';
 import { logMessage } from '../log';
+import { refreshPlayer } from '../session';
 
 const newEnemyLoadedHook = createHook<[IEnemyInstance]>();
 const notifyNewEnemyLoaded = newEnemyLoadedHook.notify;
@@ -638,9 +639,16 @@ export class EnemyManager {
 			if (enemyName) {
 				logMessage(ELogType.EnemyDefeated, enemyName + ' was defeated!');
 			}
-			playerManager.grantExp(defeatResponse.data.rewards.expReward);
+			playerManager.applyVictoryRewards(defeatResponse.data.rewards);
 		} else {
 			logMessage(ELogType.Debug, 'There was an error defeating the enemy: ' + defeatResponse.error);
+			if (defeatResponse.error) {
+				// The transport settles a lost/timed-out response as an error even when the command may have
+				// actually succeeded server-side (see docs/frontend.md's socket request lifecycle) — resync the
+				// authoritative player state rather than leaving exp/level silently diverged for the rest of
+				// the session.
+				await refreshPlayer();
+			}
 		}
 		// Guard `data` for a possible error response (absent `data`), now that this is the shared
 		// victory path for both the idle and boss loops.

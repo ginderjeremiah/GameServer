@@ -19,7 +19,8 @@ const h = vi.hoisted(() => ({
 		playerBattleStateMatches: vi.fn(() => true)
 	},
 	BattleStage: { Idle: 0, Active: 1, Victorious: 2, Defeated: 3, Loading: 4, Paused: 5, Drawn: 6 },
-	playerManager: { currentZone: 3, grantExp: vi.fn() },
+	playerManager: { currentZone: 3, applyVictoryRewards: vi.fn() },
+	refreshPlayer: vi.fn(() => Promise.resolve()),
 	staticData: {
 		enemies: [{ id: 0, name: 'Catacomb Lich', isBoss: true }],
 		zones: undefined as IZone[] | undefined
@@ -41,6 +42,7 @@ vi.mock('$lib/engine', () => ({
 	}),
 	playerManager: h.playerManager
 }));
+vi.mock('$lib/engine/session', () => ({ refreshPlayer: h.refreshPlayer }));
 vi.mock('$stores', () => ({
 	staticData: h.staticData,
 	statistics: h.statistics,
@@ -65,9 +67,10 @@ const resp = <T extends 'ChallengeBoss' | 'DefeatEnemy' | 'BattleLost' | 'NewEne
 
 const challengeResponse = resp('ChallengeBoss', { enemyInstance: bossInstance });
 const challengeError = { id: '1', name: 'ChallengeBoss', error: 'no boss' } as IApiSocketResponse<'ChallengeBoss'>;
+const defeatRewards = { expReward: 50, newLevel: 1, newExp: 50, statPointsGained: 0, statPointsUsed: 0 };
 const defeatResponse = resp('DefeatEnemy', {
 	cooldown: 0,
-	rewards: { expReward: 50, newLevel: 1, newExp: 50, statPointsGained: 0, statPointsUsed: 0 }
+	rewards: defeatRewards
 });
 const lostResponse = resp('BattleLost', { cooldown: 5000 });
 const newEnemyResponse = resp('NewEnemy', { enemyInstance: normalInstance });
@@ -75,7 +78,7 @@ const newEnemyResponse = resp('NewEnemy', { enemyInstance: normalInstance });
 const bundledDefeatResponse = (cooldown: number) =>
 	resp('DefeatEnemy', {
 		cooldown,
-		rewards: { expReward: 50, newLevel: 1, newExp: 50, statPointsGained: 0, statPointsUsed: 0 },
+		rewards: defeatRewards,
 		nextEnemy: preparedInstance,
 		nextZoneId: 3
 	});
@@ -111,7 +114,8 @@ describe('EnemyManager boss mode', () => {
 		h.battleEngine.capturePlayerBattleState.mockClear();
 		h.battleEngine.playerBattleStateMatches.mockReset();
 		h.battleEngine.playerBattleStateMatches.mockReturnValue(true);
-		h.playerManager.grantExp.mockClear();
+		h.playerManager.applyVictoryRewards.mockClear();
+		h.refreshPlayer.mockClear();
 		h.statistics.markZoneCleared.mockClear();
 		// Default: no zones authored ⇒ no "next zone" to unlock; the unlock tests opt in.
 		h.staticData.zones = undefined;
@@ -271,7 +275,7 @@ describe('EnemyManager boss mode', () => {
 		await fireStage(h.BattleStage.Victorious);
 
 		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ clientTotalMs: expect.any(Number) }));
-		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
+		expect(h.playerManager.applyVictoryRewards).toHaveBeenCalledWith(defeatRewards);
 		expect(h.statistics.markZoneCleared).toHaveBeenCalledWith(3);
 		// Auto-fight off ⇒ hand back to the idle farm loop.
 		expect(manager.mode).toBe('idle');
@@ -842,7 +846,7 @@ describe('EnemyManager boss mode', () => {
 		await fireStage(h.BattleStage.Victorious);
 
 		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.objectContaining({ clientTotalMs: expect.any(Number) }));
-		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
+		expect(h.playerManager.applyVictoryRewards).toHaveBeenCalledWith(defeatRewards);
 		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
 		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 		expect(manager.mode).toBe('idle');
@@ -872,6 +876,8 @@ describe('EnemyManager boss mode', () => {
 
 		// The "X was defeated!" line is logged with the resolved enemy name once rewards are granted.
 		expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Catacomb Lich was defeated!');
+		// A successful claim needs no resync — the response itself carried the authoritative state.
+		expect(h.refreshPlayer).not.toHaveBeenCalled();
 	});
 
 	it('does not log the defeat when DefeatEnemy fails (no premature "defeated" line)', async () => {
@@ -888,7 +894,11 @@ describe('EnemyManager boss mode', () => {
 
 		expect(logMessage).not.toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.anything());
 		expect(logMessage).toHaveBeenCalledWith(ELogType.Debug, 'There was an error defeating the enemy: boom');
-		expect(h.playerManager.grantExp).not.toHaveBeenCalled();
+		expect(h.playerManager.applyVictoryRewards).not.toHaveBeenCalled();
+		// The transport can settle a lost/timed-out DefeatEnemy as an error even when it actually succeeded
+		// server-side, so an errored claim resyncs the authoritative player state rather than leaving the
+		// client's exp/level silently diverged.
+		expect(h.refreshPlayer).toHaveBeenCalledOnce();
 	});
 
 	it('survives a missing/retired enemy id on victory (still grants rewards, omits the name log)', async () => {
@@ -900,7 +910,7 @@ describe('EnemyManager boss mode', () => {
 
 		await expect(fireStage(h.BattleStage.Victorious)).resolves.not.toThrow();
 
-		expect(h.playerManager.grantExp).toHaveBeenCalledWith(50);
+		expect(h.playerManager.applyVictoryRewards).toHaveBeenCalledWith(defeatRewards);
 		expect(logMessage).not.toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.anything());
 	});
 
