@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { EAttribute, EModifierType, type IAttribute } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import { EAttributeModifierSource, type AttributeModifier } from '$lib/battle/attribute-modifier';
-import { composePlayerBattleAttributes, playerBattleModifiers } from '$lib/battle/player-battle-composition';
+import {
+	applySignaturePassive,
+	composePlayerBattleAttributes,
+	playerBattleModifiers
+} from '$lib/battle/player-battle-composition';
 
 // BattleAttributes resolves attribute names through the static-data store; an empty mock is enough here
 // since these assertions read raw values, not names.
@@ -37,6 +41,26 @@ describe('playerBattleModifiers', () => {
 
 	it('returns an empty array when both inputs are empty', () => {
 		expect(playerBattleModifiers([], [])).toEqual([]);
+	});
+});
+
+describe('applySignaturePassive', () => {
+	it('adds a flat passive to the supplied set', () => {
+		const attrs = new BattleAttributes();
+		attrs.setData(makeAttrs([EAttribute.Strength, 10]), true, []);
+		applySignaturePassive(attrs, () => additive(EAttribute.Strength, 4, EAttributeModifierSource.Class));
+		expect(attrs.getValue(EAttribute.Strength)).toBe(14);
+	});
+
+	it('resolves an attribute-scaled passive against the set it is applied to', () => {
+		const attrs = new BattleAttributes();
+		attrs.setData(makeAttrs([EAttribute.Endurance, 6]), true, [
+			additive(EAttribute.Endurance, 2, EAttributeModifierSource.AttributeDistribution)
+		]);
+		applySignaturePassive(attrs, (resolveScalingValue) =>
+			additive(EAttribute.Luck, resolveScalingValue(EAttribute.Endurance) * 2, EAttributeModifierSource.Class)
+		);
+		expect(attrs.getValue(EAttribute.Luck)).toBe(16); // 8 (resolved Endurance) × 2
 	});
 });
 
