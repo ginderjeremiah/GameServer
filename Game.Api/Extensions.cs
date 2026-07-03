@@ -14,6 +14,7 @@ namespace Game.Api
                 ESocketCloseReason.SocketReplaced => "The socket has been closed because a new one was established.",
                 ESocketCloseReason.MessageTooBig => "The socket has been closed because a message exceeded the maximum allowed size.",
                 ESocketCloseReason.ServerShuttingDown => "The socket has been closed because the server is shutting down.",
+                ESocketCloseReason.MalformedFrame => "The socket has been closed because a received frame could not be parsed.",
                 _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unhandled socket close reason.")
             };
         }
@@ -24,7 +25,8 @@ namespace Game.Api
         /// closures use <see cref="WebSocketCloseStatus.NormalClosure"/>: a finished connection, an intentional
         /// single-session takeover, and a planned shutdown drain (the client treats that normal closure as a
         /// cue to reconnect to a healthy instance). Non-graceful closures get a distinct status — an idle
-        /// timeout as a policy violation, an oversized message as the matching message-too-big code.
+        /// timeout as a policy violation, an oversized message as the matching message-too-big code, an
+        /// unparseable frame as invalid payload data.
         /// </summary>
         public static WebSocketCloseStatus GetCloseStatus(this ESocketCloseReason reason)
         {
@@ -35,6 +37,7 @@ namespace Game.Api
                 ESocketCloseReason.ServerShuttingDown => WebSocketCloseStatus.NormalClosure,
                 ESocketCloseReason.Inactivity => WebSocketCloseStatus.PolicyViolation,
                 ESocketCloseReason.MessageTooBig => WebSocketCloseStatus.MessageTooBig,
+                ESocketCloseReason.MalformedFrame => WebSocketCloseStatus.InvalidPayloadData,
                 _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unhandled socket close reason.")
             };
         }

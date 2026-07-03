@@ -30,6 +30,12 @@ namespace Game.TestInfrastructure.Helpers
         /// <summary>The total number of completed sends.</summary>
         public int CompletedSends { get; private set; }
 
+        /// <summary>Whether <see cref="CloseAsync"/> has been called.</summary>
+        public bool CloseAsyncCalled { get; private set; }
+
+        /// <summary>The status passed to the most recent <see cref="CloseAsync"/> call.</summary>
+        public WebSocketCloseStatus? CloseStatusUsed { get; private set; }
+
         /// <summary>The fully-sent messages, reassembled from their chunks (one entry per end-of-message).</summary>
         public IReadOnlyList<string> SentMessages
         {
@@ -89,12 +95,17 @@ namespace Game.TestInfrastructure.Helpers
             }
         }
 
-        public override WebSocketState State => WebSocketState.Open;
+        public override WebSocketState State => CloseAsyncCalled ? WebSocketState.Closed : WebSocketState.Open;
         public override WebSocketCloseStatus? CloseStatus => null;
         public override string? CloseStatusDescription => null;
         public override string? SubProtocol => null;
         public override void Abort() { }
-        public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => Task.CompletedTask;
+        public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+        {
+            CloseAsyncCalled = true;
+            CloseStatusUsed = closeStatus;
+            return Task.CompletedTask;
+        }
         public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => Task.CompletedTask;
         public override void Dispose() { }
 

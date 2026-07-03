@@ -22,12 +22,21 @@ namespace Game.Api.Tests.Unit
             Assert.Contains("maximum allowed size", description, StringComparison.OrdinalIgnoreCase);
         }
 
+        [Fact]
+        public void GetDescription_MalformedFrame_DescribesUnparseableFrame()
+        {
+            var description = ESocketCloseReason.MalformedFrame.GetDescription();
+
+            Assert.Contains("could not be parsed", description, StringComparison.OrdinalIgnoreCase);
+        }
+
         [Theory]
         [InlineData(ESocketCloseReason.Finished)]
         [InlineData(ESocketCloseReason.Inactivity)]
         [InlineData(ESocketCloseReason.SocketReplaced)]
         [InlineData(ESocketCloseReason.MessageTooBig)]
         [InlineData(ESocketCloseReason.ServerShuttingDown)]
+        [InlineData(ESocketCloseReason.MalformedFrame)]
         public void GetDescription_AnyReason_ReturnsNonEmptyDescription(ESocketCloseReason reason)
         {
             Assert.False(string.IsNullOrWhiteSpace(reason.GetDescription()));
@@ -75,9 +84,16 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(WebSocketCloseStatus.PolicyViolation, ESocketCloseReason.Inactivity.GetCloseStatus());
         }
 
+        [Fact]
+        public void GetCloseStatus_MalformedFrame_IsInvalidPayloadData()
+        {
+            Assert.Equal(WebSocketCloseStatus.InvalidPayloadData, ESocketCloseReason.MalformedFrame.GetCloseStatus());
+        }
+
         [Theory]
         [InlineData(ESocketCloseReason.Inactivity)]
         [InlineData(ESocketCloseReason.MessageTooBig)]
+        [InlineData(ESocketCloseReason.MalformedFrame)]
         public void GetCloseStatus_NonGracefulReason_IsNotNormalClosure(ESocketCloseReason reason)
         {
             // The motivating bug: error/abnormal closures previously reported NormalClosure, so a client
@@ -91,6 +107,7 @@ namespace Game.Api.Tests.Unit
         [InlineData(ESocketCloseReason.SocketReplaced)]
         [InlineData(ESocketCloseReason.MessageTooBig)]
         [InlineData(ESocketCloseReason.ServerShuttingDown)]
+        [InlineData(ESocketCloseReason.MalformedFrame)]
         public void GetCloseStatus_AnyDefinedReason_ReturnsAStatus(ESocketCloseReason reason)
         {
             // Every defined reason must map to a status; an unhandled one would throw rather than fall through.

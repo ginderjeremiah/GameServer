@@ -118,10 +118,23 @@ namespace Game.Api.Sockets
         {
             _logger.LogTrace("Executing command: {CommandInfo} on socket: {Id}", commandInfo, Id);
             var (outcome, fault) = await RunCommandUnderLock(commandInfo);
-            if (outcome is SocketCommandOutcome.Faulted)
+            switch (outcome)
             {
-                _logger.LogError(fault, "An error occurred while executing a socket command: {CommandInfo}", commandInfo);
-                await SendErrorAsync(commandInfo, "Internal Server Error");
+                case SocketCommandOutcome.Faulted:
+                    _logger.LogError(fault, "An error occurred while executing a socket command: {CommandInfo}", commandInfo);
+                    await SendErrorAsync(commandInfo, "Internal Server Error");
+                    break;
+                case SocketCommandOutcome.MalformedParameters:
+                    // A bad request, not a server fault: warn (not error) and reject with a structured rejection
+                    // the client can react to, like the sibling rejections in HandleMessage.
+                    _logger.LogWarning(fault, "Received socket command with malformed parameters: {CommandInfo} on socket: {Id}", commandInfo, Id);
+                    await SendErrorAsync(commandInfo, "Malformed parameters.");
+                    break;
+                case SocketCommandOutcome.NotDelivered:
+                    // The command ran and RunCommandUnderLock already attempted the single send; a second
+                    // attempt would only fail the same way (the socket is closing), so just log it.
+                    _logger.LogWarning("Failed to deliver the response for socket command: {CommandInfo} on socket: {Id}; the client will time out awaiting it.", commandInfo, Id);
+                    break;
             }
         }
 
@@ -136,11 +149,19 @@ namespace Game.Api.Sockets
         {
             _logger.LogTrace("Executing server-initiated command: {CommandInfo} on socket: {Id}", commandInfo, Id);
             var (outcome, fault) = await RunCommandUnderLock(commandInfo);
-            if (outcome is SocketCommandOutcome.Faulted)
+            if (outcome is SocketCommandOutcome.Faulted or SocketCommandOutcome.MalformedParameters)
             {
                 // Logged here (with the exception) so the failure is captured once; the processor logs only
-                // the escalation it then performs.
+                // the escalation it then performs. A malformed server push is a genuine bug (the payload is
+                // server-authored, never client input), so it is logged and escalated the same as a fault.
                 _logger.LogError(fault, "A server-initiated socket command failed: {CommandInfo} on socket: {Id}", commandInfo, Id);
+            }
+            else if (outcome is SocketCommandOutcome.NotDelivered)
+            {
+                // Delivery failed (e.g. the socket closed just as the push executed) — softened by the full
+                // re-sync on reconnect, so this is logged rather than escalated (dead-lettering wouldn't help:
+                // the command itself ran fine, only the send failed).
+                _logger.LogWarning("Failed to deliver a server-initiated socket command: {CommandInfo} on socket: {Id}; the client was likely disconnecting.", commandInfo, Id);
             }
 
             return outcome;
@@ -190,8 +211,11 @@ namespace Game.Api.Sockets
                     return (SocketCommandOutcome.TimedOut, null);
                 }
 
-                await _context.SendData(response);
-                return (SocketCommandOutcome.Succeeded, null);
+                // SendData reports whether the frame actually went out (false on a non-Open socket or send
+                // failure — e.g. the socket closed just as the command finished). That must not be reported as
+                // Succeeded: the client never saw the response, so the caller needs to know delivery failed.
+                var delivered = await _context.SendData(response);
+                return (delivered ? SocketCommandOutcome.Succeeded : SocketCommandOutcome.NotDelivered, null);
             }
             catch (OperationCanceledException ex)
             {
@@ -201,6 +225,12 @@ namespace Game.Api.Sockets
                 // and send no response since the socket is unwinding (#671).
                 _logger.LogDebug(ex, "Socket command cancelled during teardown: {CommandInfo} on socket: {Id}", commandInfo, Id);
                 return (SocketCommandOutcome.TornDown, ex);
+            }
+            catch (MalformedSocketCommandParametersException ex)
+            {
+                // A bad request (unparseable/missing Parameters), not a server fault — classified distinctly so
+                // the caller can reject it as "Malformed parameters." instead of an "Internal Server Error".
+                return (SocketCommandOutcome.MalformedParameters, ex);
             }
             catch (Exception ex)
             {
@@ -227,6 +257,10 @@ namespace Game.Api.Sockets
         private async Task<ApiSocketResponse> RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
         {
             using var scope = _scopeFactory.CreateScope();
+            // CreateCommand binds Parameters (SetParameters), which throws MalformedSocketCommandParametersException
+            // on malformed/missing JSON — thrown right at the deserialize call inside SetParameters (not guessed
+            // here from the exception's type), so it propagates precisely rather than also catching an unrelated
+            // JsonException/ArgumentNullException a command's DI construction happened to throw.
             var command = _commandFactory.CreateCommand(commandInfo, scope);
             var response = await command.ExecuteAsync(_context, cancellationToken);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
@@ -392,7 +426,12 @@ namespace Game.Api.Sockets
             }
             catch (JsonException)
             {
-                _logger.LogWarning("Failed to deserialize socket command: {Message}", message);
+                // A frame that isn't parseable JSON at all carries no request id, so there is no in-flight
+                // request to correlate a structured rejection to — leaving it unanswered would strand the
+                // client waiting out its 30s request timeout with no diagnosable error. Close instead, mirroring
+                // the oversized-frame path: the client's close handler surfaces the drop and reconnects promptly.
+                _logger.LogWarning("Failed to deserialize socket command; closing the socket: {Message}", message);
+                await _context.Close(ESocketCloseReason.MalformedFrame);
             }
         }
 

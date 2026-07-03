@@ -8,6 +8,8 @@ using Game.Core.Players;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Net.WebSockets;
+using System.Text.Json;
 using Xunit;
 
 namespace Game.Api.Tests.Unit
@@ -131,13 +133,87 @@ namespace Game.Api.Tests.Unit
             Assert.Contains(socket.SentMessages, m => m.Contains("c1") && !m.Contains("Internal Server Error"));
         }
 
-        private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn)
+        [Fact]
+        public async Task ExecuteCommand_ParametersMalformed_RejectsWithMalformedParametersInsteadOfInternalServerError()
+        {
+            // SetParameters (invoked from CreateCommand) throws on unparseable/missing Parameters JSON — a bad
+            // request, not a server fault (#1498).
+            var (socket, handler) = CreateHandler(_ => null, throwOnCreate: name => name == "BadParams" ? new MalformedSocketCommandParametersException(name, new JsonException("bad json")) : null);
+
+            await handler.ExecuteCommand(new SocketCommandInfo("BadParams") { Id = "c1" });
+
+            Assert.Contains(socket.SentMessages, m => m.Contains("Malformed parameters.") && m.Contains("c1"));
+            Assert.DoesNotContain(socket.SentMessages, m => m.Contains("Internal Server Error"));
+            // A bad request is a warning, not an error — it must not be logged (or surfaced) like a genuine fault.
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("malformed parameters"));
+            Assert.DoesNotContain(_logs.Entries, e => e.Level == LogLevel.Error);
+        }
+
+        [Fact]
+        public async Task ExecuteServerCommand_ParametersMalformed_ReturnsMalformedParametersAndLogsForEscalation()
+        {
+            // A malformed server-push payload is server-authored, so it's a genuine bug — classified distinctly
+            // from a client bad-request but still escalate-worthy, unlike ExecuteCommand's client-facing path.
+            var (socket, handler) = CreateHandler(_ => null, throwOnCreate: name => name == "BadParams" ? new MalformedSocketCommandParametersException(name, new JsonException("bad json")) : null);
+
+            var outcome = await handler.ExecuteServerCommand(new SocketCommandInfo("BadParams") { Id = "c1" });
+
+            Assert.Equal(SocketCommandOutcome.MalformedParameters, outcome);
+            Assert.DoesNotContain(socket.SentMessages, m => m.Contains("Internal Server Error"));
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("c1"));
+        }
+
+        [Fact]
+        public async Task ExecuteCommand_ResponseNotDelivered_LogsWarningWithoutTreatingItAsSucceededOrFaulted()
+        {
+            // The command runs fine, but the send itself fails (e.g. the socket closed mid-command) — must not
+            // be silently reported as Succeeded (#1498).
+            var (socket, handler) = CreateHandler(_ => null);
+            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, TestContext.Current.CancellationToken);
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c1" });
+
+            Assert.Empty(socket.SentMessages);
+            Assert.DoesNotContain(socket.SentMessages, m => m.Contains("Internal Server Error"));
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Failed to deliver") && e.Message.Contains("c1"));
+        }
+
+        [Fact]
+        public async Task ExecuteServerCommand_ResponseNotDelivered_ReturnsNotDeliveredAndLogsWarning()
+        {
+            var (socket, handler) = CreateHandler(_ => null);
+            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, TestContext.Current.CancellationToken);
+
+            var outcome = await handler.ExecuteServerCommand(new SocketCommandInfo("Ok") { Id = "c1" });
+
+            Assert.Equal(SocketCommandOutcome.NotDelivered, outcome);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Failed to deliver"));
+            // Not escalation-worthy: the payload itself was fine, only delivery failed.
+            Assert.DoesNotContain(_logs.Entries, e => e.Level == LogLevel.Error);
+        }
+
+        [Fact]
+        public async Task HandleMessage_UnparseableJson_ClosesTheSocketInsteadOfLeavingTheClientToTimeOut()
+        {
+            // An invalid-JSON frame carries no request id to correlate a structured rejection to, so closing
+            // (mirroring the oversized-frame path) lets the client's close handler surface the drop and
+            // reconnect promptly instead of waiting out its 30s request timeout undiagnosed (#1498).
+            var (socket, handler) = CreateHandler(_ => null);
+
+            await handler.HandleMessage("{not valid json");
+
+            Assert.True(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketCloseStatus.InvalidPayloadData, socket.CloseStatusUsed);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Failed to deserialize"));
+        }
+
+        private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
             session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
-            var handler = new SocketHandler(context, new StubCommandFactory(throwOn), _scopeFactory,
+            var handler = new SocketHandler(context, new StubCommandFactory(throwOn, throwOnCreate), _scopeFactory,
                 _loggerFactory.CreateLogger<SocketHandler>(), () => { });
             return (socket, handler);
         }
@@ -149,11 +225,19 @@ namespace Game.Api.Tests.Unit
         }
 
         /// <summary>A command factory that produces a command which either succeeds or throws the exception
-        /// the supplied selector returns for the command name.</summary>
-        private sealed class StubCommandFactory(Func<string, Exception?> throwOn) : SocketCommandFactory
+        /// the supplied selector returns for the command name. <paramref name="throwOnCreate"/> optionally
+        /// throws directly from <see cref="CreateCommand"/> instead — simulating what the real factory's
+        /// <c>SetParameters</c> call already throws (a classified <see cref="MalformedSocketCommandParametersException"/>)
+        /// once parameter binding fails, before a command is ever fully constructed.</summary>
+        private sealed class StubCommandFactory(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null) : SocketCommandFactory
         {
             public override AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
             {
+                if (throwOnCreate?.Invoke(commandInfo.Name) is { } creationFault)
+                {
+                    throw creationFault;
+                }
+
                 return new StubCommand(commandInfo.Name, throwOn(commandInfo.Name)) { Id = commandInfo.Id };
             }
 

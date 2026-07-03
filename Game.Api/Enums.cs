@@ -6,7 +6,8 @@
         Inactivity = 1,
         SocketReplaced = 2,
         MessageTooBig = 3,
-        ServerShuttingDown = 4
+        ServerShuttingDown = 4,
+        MalformedFrame = 5
     }
 
     /// <summary>
