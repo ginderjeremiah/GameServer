@@ -114,8 +114,10 @@ namespace Game.DataAccess.Repositories
             else
             {
                 // Standalone progress save (e.g. the offline-rewards batch): flush our own event, then advance
-                // the cache — preserving publish-before-cache so the write is never stranded.
-                await _pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _updateBatch.Drain(), cancellationToken);
+                // the cache — preserving publish-before-cache so the write is never stranded. FlushAsync leaves
+                // the event buffered for the next flush attempt if the publish itself fails, rather than losing
+                // it (#1494).
+                await _updateBatch.FlushAsync(_pubsub, cancellationToken);
                 AdvanceCache();
             }
         }

@@ -73,6 +73,44 @@ namespace Game.Application.Tests.Services
             Assert.Equal(2, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
+        [Fact]
+        public async Task SavePlayer_PublishFails_PreservesTheEventForTheNextFlush()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            // A save whose publish fails (a pre-cancelled budget makes the enqueue throw client-side) must not
+            // lose the buffered event — PlayerUpdateBatch.FlushAsync only drains once the publish actually
+            // succeeds (#1494). The cancellation is client-side only (StackExchange.Redis may still have
+            // dispatched the command), so this doesn't assert the queue is untouched at this point — only that
+            // nothing is permanently lost by the time the next save flushes.
+            player.ChangeZone(1);
+            using (var cts = new CancellationTokenSource())
+            {
+                await cts.CancelAsync();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => playerRepo.SavePlayer(player, cts.Token));
+            }
+
+            // The next successful save's flush carries the earlier ChangeZone(1) event (still buffered, since
+            // the failed flush never cleared it) alongside this save's own ChangeZone(2) event.
+            player.ChangeZone(2);
+            await playerRepo.SavePlayer(player);
+
+            Assert.True(await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE) >= 2);
+        }
+
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
     }
 }

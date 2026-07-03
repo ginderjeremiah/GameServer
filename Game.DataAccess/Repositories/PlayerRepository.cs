@@ -95,11 +95,11 @@ namespace Game.DataAccess.Repositories
             {
                 await _dispatcher.DispatchAsync(player, cancellationToken);
             }
-            await _pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _updateBatch.Drain(), cancellationToken);
 
-            // Run any deferred cache advances a batched progress save registered, now that the flush above has
-            // enqueued their events — keeping progress's publish-before-cache ordering across the shared batch.
-            _updateBatch.RunFlushedCallbacks();
+            // FlushAsync only drains the batch and runs deferred progress cache-advances (see RunFlushedCallbacks)
+            // once the publish has actually succeeded, so a failed flush (a transient Redis blip) leaves both
+            // buffered for the next save's flush instead of silently losing them (#1494).
+            await _updateBatch.FlushAsync(_pubsub, cancellationToken);
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
