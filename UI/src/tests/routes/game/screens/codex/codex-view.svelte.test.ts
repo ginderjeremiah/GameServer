@@ -418,6 +418,29 @@ describe('CodexView dossier projections', () => {
 		expect(view.challenges[0].progressText).toBe('sealed');
 	});
 
+	it('hides a retired enemy-scoped challenge unless it was already completed', () => {
+		staticData.challenges = [
+			...staticData.challenges,
+			{
+				id: 2,
+				name: 'Old Bounty',
+				challengeTypeId: EChallengeType.EnemiesKilled,
+				entityType: EEntityType.Enemy,
+				targetEntityId: 0,
+				progressGoal: 50,
+				retiredAt: '2026-01-01T00:00:00Z'
+			}
+		];
+		const uncompleted = new CodexView();
+		uncompleted.selectEnemy(0);
+		expect(uncompleted.challenges.map((c) => c.id)).toEqual([0]);
+
+		playerChallenges.all = [...playerChallenges.all, { challengeId: 2, progress: 50, completed: true }];
+		const completed = new CodexView();
+		completed.selectEnemy(0);
+		expect(completed.challenges.map((c) => c.id)).toEqual(expect.arrayContaining([0, 2]));
+	});
+
 	it('sorts spawn shares descending and collapses a boss to a single Encounter', () => {
 		const view = new CodexView();
 		view.selectEnemy(0);
@@ -784,6 +807,50 @@ describe('CodexView skill → enemy cross-link', () => {
 		view.openEnemy(2);
 		expect(view.tab).toBe('enemies');
 		expect(view.selectedEnemyId).toBe(2);
+	});
+});
+
+describe('CodexView retired-record resolution', () => {
+	// Retirement keeps a record's slot resolvable by id (backend.md → _Reference Data_); an explicitly
+	// requested retired id must resolve to the actual record rather than silently falling back to the
+	// head of the live list.
+	it('resolves a deep-linked retired enemy id instead of falling back to the head of the list', () => {
+		staticData.enemies[1] = { ...staticData.enemies[1], retiredAt: '2026-01-01T00:00:00Z' };
+		const view = new CodexView({ tab: 'enemies', enemyId: 1 });
+		expect(view.selectedEnemy?.id).toBe(1);
+	});
+
+	it('selectEnemy resolves a retired id (a cross-link into a retired record)', () => {
+		staticData.enemies[1] = { ...staticData.enemies[1], retiredAt: '2026-01-01T00:00:00Z' };
+		const view = new CodexView();
+		view.selectEnemy(1);
+		expect(view.selectedEnemy?.id).toBe(1);
+	});
+
+	it('resolves a deep-linked retired zone id', () => {
+		staticData.zones[1] = { ...staticData.zones[1], retiredAt: '2026-01-01T00:00:00Z' };
+		const view = new CodexView({ tab: 'zones', zoneId: 1 });
+		expect(view.selectedZone?.id).toBe(1);
+	});
+
+	it('selectZone resolves a retired id', () => {
+		staticData.zones[1] = { ...staticData.zones[1], retiredAt: '2026-01-01T00:00:00Z' };
+		const view = new CodexView();
+		view.selectZone(1);
+		expect(view.selectedZone?.id).toBe(1);
+	});
+
+	it('resolves a deep-linked retired skill id', () => {
+		staticData.skills[1] = { ...staticData.skills[1], retiredAt: '2026-01-01T00:00:00Z' };
+		const view = new CodexView({ tab: 'skills', skillId: 1 });
+		expect(view.selectedSkill?.id).toBe(1);
+	});
+
+	it('selectSkill resolves a retired id', () => {
+		staticData.skills[1] = { ...staticData.skills[1], retiredAt: '2026-01-01T00:00:00Z' };
+		const view = new CodexView();
+		view.selectSkill(1);
+		expect(view.selectedSkill?.id).toBe(1);
 	});
 });
 
