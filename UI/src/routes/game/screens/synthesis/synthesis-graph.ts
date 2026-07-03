@@ -269,6 +269,15 @@ export interface Viewport {
 export const ZOOM_MIN = 0.4;
 export const ZOOM_MAX = 2.5;
 
+/** Pointer travel (px) below which a press stays a click; at or past it the press becomes a pan drag. */
+export const DRAG_THRESHOLD_PX = 4;
+
+/** True once the pointer has strayed far enough from the press point to count as a drag rather than a
+ *  click (Euclidean distance, so diagonal travel counts fully). */
+export function isDragPastThreshold(startX: number, startY: number, x: number, y: number): boolean {
+	return Math.hypot(x - startX, y - startY) >= DRAG_THRESHOLD_PX;
+}
+
 /** Clamp a zoom scale into the allowed band. */
 export const clampScale = (scale: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
 
