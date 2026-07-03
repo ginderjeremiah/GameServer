@@ -38,6 +38,7 @@ import { onMount, onDestroy } from 'svelte';
 import { Loading } from '$components';
 import './workbench.scss';
 import type { EntityConfig, Identified } from './entities/types';
+import { workbenchDirty } from './dirty.svelte';
 import { EntityStore } from './entity-store.svelte';
 import WorkbenchIcon from './WorkbenchIcon.svelte';
 import WorkbenchList from './components/WorkbenchList.svelte';
@@ -63,7 +64,15 @@ onMount(async () => {
 
 // Cancel any pending "saved" flash timer so a save that lands near unmount can't
 // write into a torn-down store.
-onDestroy(() => store?.dispose());
+onDestroy(() => {
+	store?.dispose();
+	workbenchDirty.set(0);
+});
+
+// Surface this store's pending-change count to the admin shell's tool-switch/unload guard.
+$effect(() => {
+	workbenchDirty.set(store?.counts.total ?? 0);
+});
 
 const selected = $derived(store ? (store.items.find((it) => it.id === selId) ?? store.items[0]) : undefined);
 const selectedBaseline = $derived(store && selected ? store.baselineOf(selected.id) : undefined);

@@ -103,6 +103,7 @@
 <script lang="ts">
 import { onDestroy, onMount } from 'svelte';
 import Loading from '$components/Loading.svelte';
+import { workbenchDirty } from '../dirty.svelte';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import { ProgressionStore } from './progression-store.svelte';
 import ProgressionList from './ProgressionList.svelte';
@@ -120,6 +121,12 @@ onMount(() => {
 
 onDestroy(() => {
 	store.dispose();
+	workbenchDirty.set(0);
+});
+
+// Surface this store's pending-change count to the admin shell's tool-switch/unload guard.
+$effect(() => {
+	workbenchDirty.set(store.totalChanges);
 });
 </script>
 

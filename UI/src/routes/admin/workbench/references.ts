@@ -1,4 +1,14 @@
-import { EEntityType, type IChallenge, type IEnemy, type IZone } from '$lib/api';
+import {
+	EEntityType,
+	type IChallenge,
+	type IClass,
+	type IEnemy,
+	type IItem,
+	type IProficiency,
+	type ISkill,
+	type ISkillRecipe,
+	type IZone
+} from '$lib/api';
 
 /**
  * Computes the "referenced by" surface for a retire confirm dialog, entirely from the cached
@@ -14,6 +24,11 @@ export interface ReferenceSources {
 	enemies: IEnemy[];
 	zones: IZone[];
 	challenges: IChallenge[];
+	items: IItem[];
+	classes: IClass[];
+	skillRecipes: ISkillRecipe[];
+	proficiencies: IProficiency[];
+	skills: ISkill[];
 }
 
 /** A category of inbound reference and the names of the records that make it. */
@@ -32,10 +47,22 @@ export type ReferenceKind =
 	| 'challengeTarget'
 	| 'unlockGate'
 	| 'challengeReward'
-	| 'enemySkill';
+	| 'enemySkill'
+	| 'grantedSkillOf'
+	| 'starterSkillOf'
+	| 'starterEquipmentOf'
+	| 'recipeResult'
+	| 'recipeInput'
+	| 'milestoneReward'
+	| 'gearGate'
+	| 'recipeCondition'
+	| 'prerequisiteOf';
 
 /** Zero-based-id lookup honouring the retirement Id-as-index invariant (a retired record keeps its slot). */
 const nameByIndex = (records: { name: string }[], id: number): string => records[id]?.name ?? `#${id}`;
+
+/** A skill-synthesis recipe is nameless — identify it in a reference list by the result skill it produces. */
+const recipeName = (recipe: ISkillRecipe, skills: ISkill[]): string => nameByIndex(skills, recipe.resultSkillId);
 
 const group = (kind: ReferenceKind, names: string[], strong = false): ReferenceGroup[] =>
 	names.length ? [{ kind, names, ...(strong ? { strong } : {}) }] : [];
@@ -62,23 +89,59 @@ const challengeReferences = (id: number, { zones }: ReferenceSources): Reference
 	return group('unlockGate', unlockGate, true);
 };
 
-const skillReferences = (id: number, { enemies, challenges }: ReferenceSources): ReferenceGroup[] => {
+const skillReferences = (
+	id: number,
+	{ enemies, challenges, items, classes, skillRecipes, proficiencies, skills }: ReferenceSources
+): ReferenceGroup[] => {
 	const inPool = enemies.filter((e) => e.skillPool.includes(id)).map((e) => e.name);
 	const targetOf = challenges
 		.filter((c) => c.entityType === EEntityType.Skill && c.targetEntityId === id)
 		.map((c) => c.name);
-	return [...group('enemySkill', inPool), ...group('challengeTarget', targetOf)];
+	const grantedSkillOf = items.filter((i) => i.grantedSkillId === id).map((i) => i.name);
+	const starterSkillOf = classes.filter((c) => c.starterSkillIds.includes(id)).map((c) => c.name);
+	const recipeResultOf = skillRecipes.filter((r) => r.resultSkillId === id).map((r) => recipeName(r, skills));
+	const recipeInputOf = skillRecipes.filter((r) => r.inputSkillIds.includes(id)).map((r) => recipeName(r, skills));
+	const milestoneRewardOf = proficiencies
+		.filter((p) => p.levelRewards.some((reward) => reward.rewardSkillId === id))
+		.map((p) => p.name);
+	return [
+		...group('enemySkill', inPool),
+		...group('challengeTarget', targetOf),
+		...group('grantedSkillOf', grantedSkillOf),
+		...group('starterSkillOf', starterSkillOf),
+		...group('recipeResult', recipeResultOf),
+		...group('recipeInput', recipeInputOf),
+		...group('milestoneReward', milestoneRewardOf)
+	];
 };
 
-const rewardReferences = (
-	id: number,
-	{ challenges }: ReferenceSources,
-	key: 'rewardItemId' | 'rewardItemModId'
-): ReferenceGroup[] =>
+const itemReferences = (id: number, { challenges, classes }: ReferenceSources): ReferenceGroup[] => {
+	const rewardOf = challenges.filter((c) => c.rewardItemId === id).map((c) => c.name);
+	const starterEquipmentOf = classes.filter((c) => c.starterEquipment.some((e) => e.itemId === id)).map((c) => c.name);
+	return [...group('challengeReward', rewardOf), ...group('starterEquipmentOf', starterEquipmentOf)];
+};
+
+const itemModReferences = (id: number, { challenges }: ReferenceSources): ReferenceGroup[] =>
 	group(
 		'challengeReward',
-		challenges.filter((c) => c[key] === id).map((c) => c.name)
+		challenges.filter((c) => c.rewardItemModId === id).map((c) => c.name)
 	);
+
+const proficiencyReferences = (
+	id: number,
+	{ items, skillRecipes, proficiencies, skills }: ReferenceSources
+): ReferenceGroup[] => {
+	const gearGate = items.filter((i) => i.requiredProficiencyId === id).map((i) => i.name);
+	const recipeCondition = skillRecipes
+		.filter((r) => r.conditions.some((c) => c.proficiencyId === id))
+		.map((r) => recipeName(r, skills));
+	const prerequisiteOf = proficiencies.filter((p) => p.prerequisiteIds.includes(id)).map((p) => p.name);
+	return [
+		...group('gearGate', gearGate),
+		...group('recipeCondition', recipeCondition),
+		...group('prerequisiteOf', prerequisiteOf)
+	];
+};
 
 /** Every record that references the given retireable record, grouped by relationship (empty when none). */
 export function computeReferences(entityKey: string, id: number, sources: ReferenceSources): ReferenceGroup[] {
@@ -90,11 +153,13 @@ export function computeReferences(entityKey: string, id: number, sources: Refere
 		case 'challenges':
 			return challengeReferences(id, sources);
 		case 'items':
-			return rewardReferences(id, sources, 'rewardItemId');
+			return itemReferences(id, sources);
 		case 'itemMods':
-			return rewardReferences(id, sources, 'rewardItemModId');
+			return itemModReferences(id, sources);
 		case 'skills':
 			return skillReferences(id, sources);
+		case 'proficiencies':
+			return proficiencyReferences(id, sources);
 		default:
 			return [];
 	}
@@ -136,6 +201,24 @@ const clauseFor = (entityKey: string, ref: ReferenceGroup): string => {
 			return `the reward for ${count(n, 'challenge')} (${names})`;
 		case 'enemySkill':
 			return `in the skill pool of ${count(n, 'enemy', 'enemies')} (${names})`;
+		case 'grantedSkillOf':
+			return `the skill granted by ${count(n, 'item')} (${names})`;
+		case 'starterSkillOf':
+			return `a starter skill of ${count(n, 'class', 'classes')} (${names})`;
+		case 'starterEquipmentOf':
+			return `starter equipment for ${count(n, 'class', 'classes')} (${names})`;
+		case 'recipeResult':
+			return `the result of ${count(n, 'synthesis recipe')} (${names})`;
+		case 'recipeInput':
+			return `an input of ${count(n, 'synthesis recipe')} (${names})`;
+		case 'milestoneReward':
+			return `a milestone reward of ${count(n, 'proficiency', 'proficiencies')} (${names})`;
+		case 'gearGate':
+			return `the required proficiency for ${count(n, 'item')} (${names})`;
+		case 'recipeCondition':
+			return `a condition of ${count(n, 'synthesis recipe')} (${names})`;
+		case 'prerequisiteOf':
+			return `a prerequisite for ${count(n, 'proficiency', 'proficiencies')} (${names})`;
 	}
 };
 

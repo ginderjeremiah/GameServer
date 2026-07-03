@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { EChallengeType, EEntityType, type IChallenge, type IEnemy, type IZone } from '$lib/api';
+import {
+	EAttribute,
+	EChallengeType,
+	EEntityType,
+	EItemCategory,
+	EModifierType,
+	ERarity,
+	ESkillAcquisition,
+	type IChallenge,
+	type IClass,
+	type IEnemy,
+	type IItem,
+	type IProficiency,
+	type ISkill,
+	type ISkillRecipe,
+	type IZone
+} from '$lib/api';
 import {
 	computeReferences,
 	formatReferenceBody,
@@ -42,7 +58,97 @@ const challenge = (id: number, name: string, opts: Partial<IChallenge> = {}): IC
 	...opts
 });
 
-// Id-aligned reference sets shared across the computation cases.
+const item = (id: number, name: string, opts: Partial<IItem> = {}): IItem => ({
+	id,
+	name,
+	description: '',
+	itemCategoryId: EItemCategory.Helm,
+	rarityId: ERarity.Common,
+	iconPath: '',
+	attributes: [],
+	modSlots: [],
+	tags: [],
+	requiredProficiencyLevel: 1,
+	designerNotes: '',
+	...opts
+});
+
+const wclass = (id: number, name: string, opts: Partial<IClass> = {}): IClass => ({
+	id,
+	name,
+	description: '',
+	word: '',
+	passiveAttributeId: EAttribute.Strength,
+	passiveAmount: 0,
+	passiveScalingAmount: 0,
+	passiveModifierType: EModifierType.Additive,
+	starterSkillIds: [],
+	starterEquipment: [],
+	attributeDistributions: [],
+	designerNotes: '',
+	...opts
+});
+
+const recipe = (id: number, resultSkillId: number, opts: Partial<ISkillRecipe> = {}): ISkillRecipe => ({
+	id,
+	resultSkillId,
+	designerNotes: '',
+	inputSkillIds: [],
+	conditions: [],
+	...opts
+});
+
+const proficiency = (id: number, name: string, opts: Partial<IProficiency> = {}): IProficiency => ({
+	id,
+	name,
+	description: '',
+	iconPath: '',
+	word: '',
+	pronunciation: '',
+	translation: '',
+	pathId: 0,
+	pathOrdinal: 0,
+	maxLevel: 10,
+	baseXp: 100,
+	xpGrowth: 1.4,
+	designerNotes: '',
+	levelModifiers: [],
+	levelRewards: [],
+	prerequisiteIds: [],
+	...opts
+});
+
+/** Places each record at its own id as the array index, honouring the zero-based-id/index invariant. */
+const bySlot = <T extends { id: number }>(...items: T[]): T[] => {
+	const arr: T[] = [];
+	for (const item of items) {
+		arr[item.id] = item;
+	}
+	return arr;
+};
+
+const skill = (id: number, name: string): ISkill => ({
+	id,
+	name,
+	baseDamage: 10,
+	criticalChance: 0,
+	damageMultipliers: [],
+	effects: [],
+	damagePortions: [],
+	description: '',
+	cooldownMs: 1000,
+	iconPath: '',
+	rarityId: ERarity.Common,
+	word: '',
+	pronunciation: '',
+	translation: '',
+	acquisition: ESkillAcquisition.Player,
+	designerNotes: ''
+});
+
+// Id-aligned reference sets shared across the computation cases. Only enemies/zones/challenges carry
+// cross-referencing fixture data by default — the item/class/recipe/proficiency describes below layer
+// their own scenario-specific entries on top via spread so they can't perturb the base assertions.
 const sources = (): ReferenceSources => ({
 	enemies: [
 		enemy(0, 'Cave Bat', {
@@ -69,7 +175,12 @@ const sources = (): ReferenceSources => ({
 		}),
 		challenge(2, 'Zone Clearer', { entityType: EEntityType.Zone, targetEntityId: 1 }),
 		challenge(3, 'Skill Spammer', { entityType: EEntityType.Skill, targetEntityId: 1 })
-	]
+	],
+	items: [],
+	classes: [],
+	skillRecipes: [],
+	proficiencies: [],
+	skills: []
 });
 
 describe('computeReferences — enemies', () => {
@@ -148,6 +259,110 @@ describe('computeReferences — skills', () => {
 	});
 });
 
+describe('computeReferences — skills, extended (item grant, starter kit, recipes, milestones)', () => {
+	it('lists the item that grants the skill', () => {
+		const src = { ...sources(), items: [item(0, 'Runed Blade', { grantedSkillId: 5 })] };
+		expect(computeReferences('skills', 5, src)).toEqual([{ kind: 'grantedSkillOf', names: ['Runed Blade'] }]);
+	});
+
+	it('lists the class the skill is a starter skill of', () => {
+		const src = { ...sources(), classes: [wclass(0, 'Warden', { starterSkillIds: [5] })] };
+		expect(computeReferences('skills', 5, src)).toEqual([{ kind: 'starterSkillOf', names: ['Warden'] }]);
+	});
+
+	it('lists the synthesis recipe the skill is the result of, named by its own result skill', () => {
+		const src = {
+			...sources(),
+			skillRecipes: [recipe(0, 5)],
+			skills: bySlot(skill(0, 'Fire Bolt'), skill(1, 'Ice Shard'), skill(2, 'Slam'), skill(5, 'Meteor'))
+		};
+		expect(computeReferences('skills', 5, src)).toEqual([{ kind: 'recipeResult', names: ['Meteor'] }]);
+	});
+
+	it('lists the synthesis recipe the skill is an input of', () => {
+		const src = {
+			...sources(),
+			skillRecipes: [recipe(0, 6, { inputSkillIds: [5] })],
+			skills: bySlot(skill(0, 'Fire Bolt'), skill(1, 'Ice Shard'), skill(2, 'Slam'), skill(6, 'Meteor'))
+		};
+		expect(computeReferences('skills', 5, src)).toEqual([{ kind: 'recipeInput', names: ['Meteor'] }]);
+	});
+
+	it('lists the proficiency that grants the skill as a milestone reward', () => {
+		const src = {
+			...sources(),
+			proficiencies: [proficiency(0, 'Blades', { levelRewards: [{ level: 3, rewardSkillId: 5 }] })]
+		};
+		expect(computeReferences('skills', 5, src)).toEqual([{ kind: 'milestoneReward', names: ['Blades'] }]);
+	});
+
+	it('combines every skill-referencing kind together', () => {
+		const src: ReferenceSources = {
+			...sources(),
+			items: [item(0, 'Runed Blade', { grantedSkillId: 5 })],
+			classes: [wclass(0, 'Warden', { starterSkillIds: [5] })],
+			skillRecipes: [recipe(0, 6, { inputSkillIds: [5] })],
+			skills: bySlot(skill(6, 'Meteor')),
+			proficiencies: [proficiency(0, 'Blades', { levelRewards: [{ level: 3, rewardSkillId: 5 }] })]
+		};
+		expect(computeReferences('skills', 5, src)).toEqual([
+			{ kind: 'grantedSkillOf', names: ['Runed Blade'] },
+			{ kind: 'starterSkillOf', names: ['Warden'] },
+			{ kind: 'recipeInput', names: ['Meteor'] },
+			{ kind: 'milestoneReward', names: ['Blades'] }
+		]);
+	});
+});
+
+describe('computeReferences — items, extended (starter equipment)', () => {
+	it('lists the class that equips the item at character creation', () => {
+		const src = {
+			...sources(),
+			classes: [wclass(0, 'Warden', { starterEquipment: [{ itemId: 7, equipmentSlot: 0 }] })]
+		};
+		expect(computeReferences('items', 7, src)).toEqual([{ kind: 'starterEquipmentOf', names: ['Warden'] }]);
+	});
+
+	it('combines the challenge-reward and starter-equipment kinds together', () => {
+		const src: ReferenceSources = {
+			...sources(),
+			classes: [wclass(0, 'Warden', { starterEquipment: [{ itemId: 0, equipmentSlot: 0 }] })]
+		};
+		// Item 0 is already the reward for "First Steps" in the base fixture.
+		expect(computeReferences('items', 0, src)).toEqual([
+			{ kind: 'challengeReward', names: ['First Steps'] },
+			{ kind: 'starterEquipmentOf', names: ['Warden'] }
+		]);
+	});
+});
+
+describe('computeReferences — proficiencies', () => {
+	it('lists the item that gates on the proficiency', () => {
+		const src = { ...sources(), items: [item(0, 'Iron Helm', { requiredProficiencyId: 5 })] };
+		expect(computeReferences('proficiencies', 5, src)).toEqual([{ kind: 'gearGate', names: ['Iron Helm'] }]);
+	});
+
+	it('lists the synthesis recipe conditioned on the proficiency', () => {
+		const src = {
+			...sources(),
+			skillRecipes: [recipe(0, 9, { conditions: [{ proficiencyId: 5, minLevel: 3 }] })],
+			skills: bySlot(skill(9, 'Meteor'))
+		};
+		expect(computeReferences('proficiencies', 5, src)).toEqual([{ kind: 'recipeCondition', names: ['Meteor'] }]);
+	});
+
+	it('lists the other tier that gates on this one as a cross-path prerequisite', () => {
+		const src = { ...sources(), proficiencies: [proficiency(6, 'Advanced Blades', { prerequisiteIds: [5] })] };
+		expect(computeReferences('proficiencies', 5, src)).toEqual([
+			{ kind: 'prerequisiteOf', names: ['Advanced Blades'] }
+		]);
+	});
+
+	it('returns nothing for an unreferenced proficiency', () => {
+		expect(computeReferences('proficiencies', 5, sources())).toEqual([]);
+	});
+});
+
 describe('computeReferences — unknown entity', () => {
 	it('returns no references for an unrecognized entity key', () => {
 		expect(computeReferences('widgets', 0, sources())).toEqual([]);
@@ -215,5 +430,35 @@ describe('formatReferenceBody', () => {
 		const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 		const body = formatReferenceBody('zones', 'Verdant Hollow', [{ kind: 'spawnedBy', names }]);
 		expect(body).toContain('the spawn location for 8 enemies (A, B, C, D, E, F +2 more)');
+	});
+
+	it('phrases the item/class/recipe/proficiency reference kinds added for #1517', () => {
+		expect(formatReferenceBody('skills', 'Meteor', [{ kind: 'grantedSkillOf', names: ['Runed Blade'] }])).toContain(
+			'the skill granted by 1 item (Runed Blade)'
+		);
+		expect(formatReferenceBody('skills', 'Meteor', [{ kind: 'starterSkillOf', names: ['Warden'] }])).toContain(
+			'a starter skill of 1 class (Warden)'
+		);
+		expect(formatReferenceBody('items', 'Iron Helm', [{ kind: 'starterEquipmentOf', names: ['Warden'] }])).toContain(
+			'starter equipment for 1 class (Warden)'
+		);
+		expect(formatReferenceBody('skills', 'Meteor', [{ kind: 'recipeResult', names: ['Meteor'] }])).toContain(
+			'the result of 1 synthesis recipe (Meteor)'
+		);
+		expect(formatReferenceBody('skills', 'Meteor', [{ kind: 'recipeInput', names: ['Meteor'] }])).toContain(
+			'an input of 1 synthesis recipe (Meteor)'
+		);
+		expect(formatReferenceBody('skills', 'Meteor', [{ kind: 'milestoneReward', names: ['Blades'] }])).toContain(
+			'a milestone reward of 1 proficiency (Blades)'
+		);
+		expect(formatReferenceBody('proficiencies', 'Blades', [{ kind: 'gearGate', names: ['Iron Helm'] }])).toContain(
+			'the required proficiency for 1 item (Iron Helm)'
+		);
+		expect(formatReferenceBody('proficiencies', 'Blades', [{ kind: 'recipeCondition', names: ['Meteor'] }])).toContain(
+			'a condition of 1 synthesis recipe (Meteor)'
+		);
+		expect(
+			formatReferenceBody('proficiencies', 'Blades', [{ kind: 'prerequisiteOf', names: ['Advanced Blades'] }])
+		).toContain('a prerequisite for 1 proficiency (Advanced Blades)');
 	});
 });

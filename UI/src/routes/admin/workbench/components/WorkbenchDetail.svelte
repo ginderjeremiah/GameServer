@@ -130,11 +130,12 @@
 {/if}
 
 <script lang="ts">
-import { dangerModal, staticData } from '$stores';
+import { staticData } from '$stores';
 import { fieldsOf, type EntityConfig, type Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';
-import { computeReferences, formatReferenceBody } from '../references';
+import type { ReferenceSources } from '../references';
+import { retireWithConfirm } from '../retire-confirm';
 import { sectionWarnings } from '../validation';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import SectionRenderer from './SectionRenderer.svelte';
@@ -152,30 +153,33 @@ interface Props {
 
 const { entity, store, record, baseline, tab, onTab, onNew }: Props = $props();
 
+/** The cached reference sets used to compute what points at a record being retired (last-saved state). */
+const referenceSources = (): ReferenceSources => ({
+	enemies: staticData.enemies ?? [],
+	zones: staticData.zones ?? [],
+	challenges: staticData.challenges ?? [],
+	items: staticData.items ?? [],
+	classes: staticData.classes ?? [],
+	skillRecipes: staticData.skillRecipes ?? [],
+	proficiencies: staticData.proficiencies ?? [],
+	skills: staticData.skills ?? []
+});
+
 /**
  * Retire a saved reference record, first surfacing what currently references it. The referenced-by
  * surface is computed from the cached reference sets (no backend round-trip); an unreferenced record
  * retires without an extra prompt. Advisory only — confirming proceeds, and the record stays
  * resolvable by id either way (see references.ts).
  */
-const onRetire = async (rec: Identified) => {
-	const groups = computeReferences(entity.key, rec.id, {
-		enemies: staticData.enemies ?? [],
-		zones: staticData.zones ?? [],
-		challenges: staticData.challenges ?? []
+const onRetire = (rec: Identified) =>
+	retireWithConfirm({
+		entityKey: entity.key,
+		id: rec.id,
+		name: entity.title?.(rec) || rec.name || entity.blankName,
+		title: `Retire ${entity.singular}?`,
+		sources: referenceSources(),
+		onConfirmed: () => store.setRetired(rec.id, true)
 	});
-	if (groups.length > 0) {
-		const confirmed = await dangerModal({
-			title: `Retire ${entity.singular}?`,
-			body: formatReferenceBody(entity.key, entity.title?.(rec) || rec.name || entity.blankName, groups),
-			confirmLabel: 'Retire anyway'
-		});
-		if (!confirmed) {
-			return;
-		}
-	}
-	store.setRetired(rec.id, true);
-};
 
 const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): boolean => {
 	if (!record || !baseline) {

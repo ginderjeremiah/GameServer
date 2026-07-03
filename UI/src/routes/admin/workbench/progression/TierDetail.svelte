@@ -16,7 +16,7 @@
 		activeTab={store.tierTab}
 		onTab={(k) => store.setTierTab(k as TierTab)}
 		onReset={store.profStatus(tier) === 'modified' ? () => store.resetProf(tier.id) : undefined}
-		onRetire={() => store.retireProf(tier.id, true)}
+		onRetire={() => onRetire(tier)}
 		onReinstate={() => store.retireProf(tier.id, false)}
 		onRemove={() => store.removeTier(tier.id)}
 	>
@@ -60,7 +60,10 @@
 {/if}
 
 <script lang="ts">
+import { staticData } from '$stores';
 import { childChanged } from '../save-helpers';
+import type { ReferenceSources } from '../references';
+import { retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, TierTab } from './progression-store.svelte';
 import { payoutLevels, proficiencyWarnings } from './progression-helpers';
 import DetailHeader from './DetailHeader.svelte';
@@ -68,6 +71,7 @@ import ConlangIdentity from './ConlangIdentity.svelte';
 import XpCurve from './XpCurve.svelte';
 import MilestonesEditor from './MilestonesEditor.svelte';
 import GatewaysEditor from './GatewaysEditor.svelte';
+import type { WorkbenchProficiency } from './types';
 
 interface Props {
 	store: ProgressionStore;
@@ -76,6 +80,30 @@ interface Props {
 const { store }: Props = $props();
 
 const tier = $derived(store.drilledTier);
+
+/**
+ * Retire a tier, first surfacing what references it — a gear gate (item `requiredProficiencyId`), a
+ * synthesis-recipe condition, or another tier's cross-path prerequisite. The progression editor isn't
+ * a generic `EntityConfig`, so it can't go through `WorkbenchDetail`'s onRetire; this mirrors it.
+ */
+const onRetire = (rec: WorkbenchProficiency) =>
+	retireWithConfirm({
+		entityKey: 'proficiencies',
+		id: rec.id,
+		name: rec.name || 'Unnamed tier',
+		title: 'Retire tier?',
+		sources: {
+			enemies: staticData.enemies ?? [],
+			zones: staticData.zones ?? [],
+			challenges: staticData.challenges ?? [],
+			items: staticData.items ?? [],
+			classes: staticData.classes ?? [],
+			skillRecipes: staticData.skillRecipes ?? [],
+			proficiencies: staticData.proficiencies ?? [],
+			skills: staticData.skills ?? []
+		} satisfies ReferenceSources,
+		onConfirmed: () => store.retireProf(rec.id, true)
+	});
 const baseline = $derived(tier ? store.profBaseline(tier.id) : undefined);
 const isRoot = $derived(tier?.pathOrdinal === 0);
 const payoutCount = $derived(tier ? payoutLevels(tier).length : 0);

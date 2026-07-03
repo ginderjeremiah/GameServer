@@ -48,6 +48,7 @@ import DeadLetterConsole from './ops/DeadLetterConsole.svelte';
 import ContentHealthConsole from './ops/ContentHealthConsole.svelte';
 import Progression from './workbench/progression/Progression.svelte';
 import { entityByKey, groupLabelFor } from './workbench/entities';
+import { workbenchDirty } from './workbench/dirty.svelte';
 import {
 	adminGroups,
 	adminTools,
@@ -57,7 +58,7 @@ import {
 } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
 import { ensureAdminAccess } from './admin-access';
-import { toastError } from '$stores';
+import { dangerModal, toastError } from '$stores';
 
 let active = $state('enemies');
 let sidebarPinned = $state(false);
@@ -79,11 +80,46 @@ onMount(() => {
 	}
 });
 
-const handleNavigate = (key: string) => {
-	active = key;
+/** Prompts to discard pending edits when the active Workbench/Progression surface is dirty. */
+const confirmDiscard = async (): Promise<boolean> => {
+	const pending = workbenchDirty.total;
+	if (pending === 0) {
+		return true;
+	}
+	return dangerModal({
+		title: 'Discard unsaved changes?',
+		body: `You have ${pending} unsaved ${pending === 1 ? 'change' : 'changes'}. Leaving now will discard ${pending === 1 ? 'it' : 'them'}.`,
+		confirmLabel: 'Discard and continue'
+	});
 };
 
-const backToGame = () => goto(resolve('/game'));
+const handleNavigate = async (key: string) => {
+	if (key === active) {
+		return;
+	}
+	if (await confirmDiscard()) {
+		active = key;
+	}
+};
+
+const backToGame = async () => {
+	if (await confirmDiscard()) {
+		goto(resolve('/game'));
+	}
+};
+
+// Backstop for a full page unload (refresh, close, external link) — client-side navigation away
+// (tool switch, "Return to Game") is guarded by confirmDiscard above instead.
+$effect(() => {
+	const handler = (event: BeforeUnloadEvent) => {
+		if (workbenchDirty.total > 0) {
+			event.preventDefault();
+			event.returnValue = '';
+		}
+	};
+	window.addEventListener('beforeunload', handler);
+	return () => window.removeEventListener('beforeunload', handler);
+});
 </script>
 
 <style lang="scss">
