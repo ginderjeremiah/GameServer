@@ -23,6 +23,9 @@ export type LogOutcome =
 	| 'player-hit'
 	| 'player-crit'
 	| 'player-dodge'
+	| 'player-parry'
+	| 'player-counter'
+	| 'player-counter-crit'
 	| 'enemy-hit'
 	| 'player-reflect'
 	| 'enemy-reflect';
@@ -93,6 +96,12 @@ export const damageLogMessage = (
 		return `You dodged ${enemyName}'s ${skillName}!`;
 	}
 
+	// A parry (#1457) negates the incoming hit like a dodge; the riposte that follows logs its own
+	// player-counter line, so this line carries only the avoidance.
+	if (outcome === 'player-parry') {
+		return `You parried ${enemyName}'s ${skillName}!`;
+	}
+
 	const word = typeWord(damageType);
 
 	if (resist === 'absorbed') {
@@ -109,6 +118,10 @@ export const damageLogMessage = (
 			return `You landed a critical hit with ${skillName} for ${amount} ${word}damage${suffix}`;
 		case 'player-hit':
 			return `You used ${skillName} and dealt ${amount} ${word}damage${suffix}`;
+		case 'player-counter':
+			return `You riposted with ${skillName}, dealing ${amount} ${word}damage${suffix}`;
+		case 'player-counter-crit':
+			return `You riposted with a critical ${skillName}, dealing ${amount} ${word}damage${suffix}`;
 		case 'enemy-hit':
 			return `${enemyName} used ${skillName} and dealt ${amount} ${word}damage${suffix}`;
 	}

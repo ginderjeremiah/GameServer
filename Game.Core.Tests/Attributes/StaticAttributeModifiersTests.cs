@@ -31,6 +31,9 @@ namespace Game.Core.Tests.Attributes
                 // CooldownRecovery) and no derivation — the enabler is a skill's own authored CriticalChance, not
                 // this attribute, which only scales it.
                 (EAttribute.CriticalChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
+                // ParryChanceMultiplier follows the same template (#1457): base 1, no derivation — the enabler is
+                // the authored-only ParryChance (base 0 everywhere, so it has no static modifier).
+                (EAttribute.ParryChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),

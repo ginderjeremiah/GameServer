@@ -93,12 +93,13 @@ const removalTimers = new Set<ReturnType<typeof setTimeout>>();
  *  heal in the regen hue rather than a damage number. */
 const isHeal = (event: CombatFloatEvent): boolean => event.amount !== undefined && event.amount < 0;
 
-/** Fallback colour for an event without a damage type (a dodge, or a live-preview sample). */
+/** Fallback colour for an event without a damage type (a dodge/parry, or a live-preview sample). */
 const colorFor = (event: CombatFloatEvent): string => {
 	switch (event.kind) {
 		case 'crit':
 			return 'var(--gold)';
 		case 'dodge':
+		case 'parry':
 			return 'var(--text-secondary)';
 		default:
 			// A player hit/reflect lands on the enemy (brand accent); an incoming enemy hit, or a reflect the
@@ -146,6 +147,10 @@ const labelFor = (kind: CombatFloatEvent['kind']): string => {
 			return 'CRIT';
 		case 'dodge':
 			return 'DODGE';
+		// No dedicated art yet (like the DoT accumulators' attribute icons), so a parry floats as a
+		// label-only popup; the riposte that follows floats as a normal hit/crit number.
+		case 'parry':
+			return 'PARRY';
 		case 'reflect':
 			return 'REFLECT';
 		default:

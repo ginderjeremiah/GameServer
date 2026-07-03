@@ -13,9 +13,22 @@ vi.mock('$stores', () => ({
 
 import { battleStep, type BattleStepLog } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
-import { battlerFactory, makeSkill, makeMultiTypeSkill, makeEffect } from './battle-sim-test-utils';
+import {
+	battlerFactory,
+	grantedBattlerFactory,
+	makeSkill,
+	makeMultiTypeSkill,
+	makeEffect,
+	type SkillSpec
+} from './battle-sim-test-utils';
 
 const makeBattler = battlerFactory(mockSkills);
+const granted = grantedBattlerFactory(mockSkills);
+// A battler carrying a resolved parry counter skill (#1457) — the id is registered and passed as the
+// counterSkillId, exactly how the live engine threads InventoryManager.counterSkillId; the counter is
+// deliberately not fielded as a loadout skill (mirroring the backend MakeBattlerWithCounter helper).
+const makeParryBattler = (attrs: { id: EAttribute; amount: number }[], counterSpec: SkillSpec) =>
+	granted.build(attrs, [], [], undefined, granted.register(counterSpec));
 // A throwaway RNG for the steps that exercise no crit/dodge (their chances are 0, so the draws never
 // change an outcome). The dedicated rolls + draw-order are covered by the crit/dodge block.
 const noRng = () => new Mulberry32(0);
@@ -471,9 +484,10 @@ describe('battleStep', () => {
 			});
 		});
 
-		it('draws once per player fire and once per enemy fire, in order', () => {
-			// One crit draw for the player's hit, then one dodge draw for the enemy's — two draws total (Block's
-			// second draw was retired, #1330).
+		it('draws once per player fire and thrice per enemy fire, in order', () => {
+			// One crit draw for the player's hit, then three draws for the enemy's — parry, dodge, and the parry
+			// counter's crit (#1457; Block's former second draw was retired in #1330) — four draws total, all
+			// taken unconditionally so the stream is a pure function of the fire sequence.
 			const seed = 12345;
 			const rng = new Mulberry32(seed);
 			const player = makeBattler(baseStats, [makeSkill(10, 40)]);
@@ -482,9 +496,272 @@ describe('battleStep', () => {
 			battleStep(player, enemy, 40, rng);
 
 			const reference = new Mulberry32(seed);
-			reference.next();
-			reference.next();
+			for (let i = 0; i < 4; i++) {
+				reference.next();
+			}
 			expect(rng.next()).toBe(reference.next());
+		});
+	});
+
+	// Parry / riposte (#1457): an incoming enemy hit can be parried — fully negated, answered with the
+	// counter skill (the equipped weapon's signature) fired as a first-class player hit. Mirrors the
+	// backend BattleContextTests parry block scenario-for-scenario (the health/activation-observable
+	// subset — the stats bookings are backend-only).
+	describe('parry / riposte (#1457)', () => {
+		it('an uncommitted defender never parries — the enemy hit lands unchanged', () => {
+			const player = makeBattler(baseStats, []);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const before = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations).toHaveLength(1);
+			expect(activations[0].parried).toBe(false);
+			expect(player.currentHealth).toBe(before - 20);
+		});
+
+		it('a multiplier alone never parries at an authored chance of 0', () => {
+			// The enabler is the authored ParryChance, not the multiplier: base 1 + 999 = 1000 still
+			// multiplies a 0 chance to 0 — the same commitment template as crit's per-skill enabler.
+			const player = makeBattler([{ id: EAttribute.ParryChanceMultiplier, amount: 999 }], []);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const before = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[0].parried).toBe(false);
+			expect(player.currentHealth).toBe(before - 20);
+		});
+
+		it('the multiplier scales a fractional chance to 1 — always parries', () => {
+			// 0.5 authored × (base 1 + 1) = 1.0, at or above every [0,1) draw — mirroring how
+			// CriticalChanceMultiplier scales a skill's fractional base.
+			const player = makeBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 0.5 },
+					{ id: EAttribute.ParryChanceMultiplier, amount: 1 }
+				],
+				[]
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const before = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[0].parried).toBe(true);
+			expect(activations[0].damage).toBe(0);
+			expect(player.currentHealth).toBe(before);
+		});
+
+		it('a parry without a resolvable counter skill negates without a riposte', () => {
+			const player = makeBattler([{ id: EAttribute.ParryChance, amount: 1 }], []);
+			const enemy = makeBattler(baseStats, [makeSkill(30, 40)]);
+			const playerBefore = player.currentHealth;
+			const enemyBefore = enemy.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations).toHaveLength(1); // no counter activation follows
+			expect(activations[0].parried).toBe(true);
+			expect(player.currentHealth).toBe(playerBefore);
+			expect(enemy.currentHealth).toBe(enemyBefore);
+		});
+
+		it('parry takes precedence over dodge', () => {
+			// Dodge investment can never starve the riposte — no anti-synergy between the defensive layers.
+			const player = makeBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 1 },
+					{ id: EAttribute.DodgeChance, amount: 1 }
+				],
+				[]
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[0].parried).toBe(true);
+			expect(activations[0].dodged).toBe(false);
+		});
+
+		it('a proc’d parry consumes the same three draws as a quiet enemy fire', () => {
+			// The counter's crit decision uses the already-taken third draw rather than drawing again, so
+			// the stream advances identically whether or not the parry procs.
+			const seed = 12345;
+			const rng = new Mulberry32(seed);
+			const player = makeParryBattler([{ id: EAttribute.ParryChance, amount: 1 }], makeSkill(10, 100_000));
+			const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 100 }], [makeSkill(10, 40)]);
+
+			battleStep(player, enemy, 40, rng);
+
+			const reference = new Mulberry32(seed);
+			for (let i = 0; i < 3; i++) {
+				reference.next();
+			}
+			expect(rng.next()).toBe(reference.next());
+		});
+
+		it('the riposte fires the weapon signature at the enemy as a first-class player hit', () => {
+			// raw = BaseDamage + STR × mult (10 + 10 × 0.5 = 15), typed by the signature (Sword), pushed as
+			// a byPlayer counter activation after the parried enemy activation.
+			const counter = makeSkill(
+				10,
+				100_000,
+				[{ attributeId: EAttribute.Strength, multiplier: 0.5 }],
+				[],
+				EDamageType.Sword
+			);
+			const player = makeParryBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 1 },
+					{ id: EAttribute.Strength, amount: 10 }
+				],
+				counter
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const playerBefore = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations).toHaveLength(2);
+			expect(activations[0].parried).toBe(true);
+			expect(activations[1].byPlayer).toBe(true);
+			expect(activations[1].counter).toBe(true);
+			expect(activations[1].damage).toBe(15);
+			expect(enemy.currentHealth).toBe(50 - 15);
+			expect(player.currentHealth).toBe(playerBefore);
+		});
+
+		it('the riposte is amplified by the defender’s own offense', () => {
+			// Unlike reflection (scaled by the incoming hit, bypassing mitigation), the counter is the
+			// defender's own attack: its typed amplification applies (Sword ⇒ Sword + Physical keys) —
+			// 10 × (1 + 0.2 + 0.1) = 13.
+			const counter = makeSkill(10, 100_000, [], [], EDamageType.Sword);
+			const player = makeParryBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 1 },
+					{ id: EAttribute.SwordAmplification, amount: 0.2 },
+					{ id: EAttribute.PhysicalAmplification, amount: 0.1 }
+				],
+				counter
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[1].damage).toBeCloseTo(13, 10);
+		});
+
+		it('the riposte is mitigated by the enemy', () => {
+			// The counter runs the normal direct-hit pipeline, so the enemy's Toughness curve applies
+			// (Toughness 200 vs the 200 constant ⇒ 50%): a genuine attack, not thorns.
+			const counter = makeSkill(30, 100_000, [], [], EDamageType.Sword);
+			const player = makeParryBattler([{ id: EAttribute.ParryChance, amount: 1 }], counter);
+			const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 100 }], [makeSkill(20, 40)]);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[1].damage).toBe(15);
+		});
+
+		it('the riposte crits from its authored chance', () => {
+			// The signature's own authored CriticalChance (1) × CriticalChanceMultiplier, multiplied by
+			// CriticalDamage (1.5 + 0.5 = 2) — the standard opt-in template.
+			const counter = makeSkill(10, 100_000, [], [], EDamageType.Sword, 1);
+			const player = makeParryBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 1 },
+					{ id: EAttribute.CriticalDamage, amount: 0.5 }
+				],
+				counter
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[1].crit).toBe(true);
+			expect(activations[1].damage).toBe(20);
+		});
+
+		it('the riposte never crits without an authored chance', () => {
+			const counter = makeSkill(10, 100_000, [], [], EDamageType.Sword);
+			const player = makeParryBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 1 },
+					{ id: EAttribute.CriticalChanceMultiplier, amount: 999 }
+				],
+				counter
+			);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[1].crit).toBe(false);
+			expect(activations[1].damage).toBe(10);
+		});
+
+		it('the riposte triggers the enemy’s reflection', () => {
+			// The counter is a genuine direct hit the enemy takes, so an enemy with authored DamageReflection
+			// returns its share of the counter to the player, bypassing the player's mitigation.
+			const counter = makeSkill(10, 100_000, [], [], EDamageType.Sword);
+			const player = makeParryBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 1 },
+					{ id: EAttribute.Endurance, amount: 10 }
+				],
+				counter
+			);
+			const enemy = makeBattler([{ id: EAttribute.DamageReflection, amount: 0.5 }], [makeSkill(20, 40)]);
+			const playerBefore = player.currentHealth;
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations[1].reflected).toBe(5);
+			expect(player.currentHealth).toBe(playerBefore - 5);
+		});
+
+		it('the riposte can kill the enemy', () => {
+			const counter = makeSkill(60, 100_000, [], [], EDamageType.Sword);
+			const player = makeParryBattler([{ id: EAttribute.ParryChance, amount: 1 }], counter);
+			const enemy = makeBattler(baseStats, [makeSkill(20, 40)]); // MaxHealth 50
+
+			battleStep(player, enemy, 40, noRng());
+
+			expect(enemy.isDead).toBe(true);
+		});
+
+		it('a player attack is never parried — parry is player-only', () => {
+			// Even with ParryChance 1 and its own counter skill, the enemy takes the player's hit un-parried,
+			// gated on who acts like crit/dodge.
+			const player = makeBattler(baseStats, [makeSkill(20, 40)]);
+			const enemy = makeParryBattler([{ id: EAttribute.ParryChance, amount: 1 }], makeSkill(10, 100_000));
+
+			const activations = battleStep(player, enemy, 40, noRng());
+
+			expect(activations).toHaveLength(1);
+			expect(activations[0].parried).toBe(false);
+			expect(enemy.currentHealth).toBe(50 - 20);
+		});
+
+		it('damage-over-time is never parried', () => {
+			// DoT has no coherent attacker for a tick, so it bypasses the direct-hit pipeline entirely —
+			// mirroring dodge and reflection.
+			const player = makeParryBattler(
+				[
+					{ id: EAttribute.ParryChance, amount: 1 },
+					{ id: EAttribute.BleedDamagePerSecond, amount: 10 }
+				],
+				makeSkill(10, 100_000)
+			);
+			const enemy = makeBattler(baseStats, []);
+			const before = player.currentHealth;
+			const enemyBefore = enemy.currentHealth;
+
+			const activations = battleStep(player, enemy, 1000, noRng());
+
+			expect(activations).toHaveLength(0);
+			expect(player.currentHealth).toBe(before - 10);
+			expect(enemy.currentHealth).toBe(enemyBefore);
 		});
 	});
 

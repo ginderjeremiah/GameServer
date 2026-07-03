@@ -60,6 +60,12 @@ namespace Game.Core.Attributes.Modifiers
             // from raw allocations; the value is also grantable by gear/item-mods/skill-effects.
             new() { Attribute = CriticalChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
 
+            // ParryChanceMultiplier follows the CriticalChanceMultiplier template (#1457): the ENABLER is the
+            // authored-only ParryChance attribute (base 0 everywhere, granted by stance effects/items — no
+            // entry here), and this base-1 multiplier is what the Riposte proficiency path grants bonuses to,
+            // so path investment scales an authored chance while staying inert for the uncommitted.
+            new() { Attribute = ParryChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
+
             // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
             // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.
             new() { Attribute = CriticalDamage, Amount = 1.5, Source = BaseValue, Type = Additive },

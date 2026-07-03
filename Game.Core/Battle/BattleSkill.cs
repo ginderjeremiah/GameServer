@@ -50,6 +50,17 @@ namespace Game.Core.Battle
 
         public double CalculateDamage(BattleContext context)
         {
+            return CalculateRawDamage(Skill, context.ActiveBattler);
+        }
+
+        /// <summary>
+        /// The raw (pre-amplification, pre-mitigation) damage of one <paramref name="skill"/> fire by
+        /// <paramref name="caster"/>: <c>BaseDamage + Σ(casterAttribute × multiplier)</c>. Static and
+        /// caster-explicit so the parry counter (#1457) can compute a phantom fire's raw damage through the
+        /// identical arithmetic as a normal fire.
+        /// </summary>
+        public static double CalculateRawDamage(Skill skill, Battler caster)
+        {
             // Accumulate the multiplier bonus separately and add BaseDamage last, exactly mirroring the
             // previous `BaseDamage + DamageMultipliers.Sum(...)`. Floating-point addition is not
             // associative, so preserving this order keeps the result bit-for-bit identical — required
@@ -58,14 +69,14 @@ namespace Game.Core.Battle
             // (#286), and a foreach over the IReadOnlyList<> DamageMultipliers (#547) would itself box an
             // interface enumerator — indexing the list allocates nothing.
             var multiplierBonus = 0.0;
-            var multipliers = Skill.DamageMultipliers;
+            var multipliers = skill.DamageMultipliers;
             for (var i = 0; i < multipliers.Count; i++)
             {
                 var multiplier = multipliers[i];
-                multiplierBonus += context.GetActiveBattlerAttribute(multiplier.Attribute) * multiplier.Amount;
+                multiplierBonus += caster.GetAttributeValue(multiplier.Attribute) * multiplier.Amount;
             }
 
-            return Skill.BaseDamage + multiplierBonus;
+            return skill.BaseDamage + multiplierBonus;
         }
     }
 }

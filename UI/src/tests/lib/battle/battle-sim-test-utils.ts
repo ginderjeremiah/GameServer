@@ -156,11 +156,14 @@ export function grantedBattlerFactory(registry: ISkill[]) {
 		// when it matches it; weapon-agnostic skills always field. Undefined leaves the battler ungated (an
 		// enemy). The bare-hands punch / the weapon's signature ride `grantedSkillIds` exactly as the live
 		// InventoryManager appends them, so the harness exercises the same fielded set the engine builds.
+		// `counterSkillId` is the parry riposte's skill (#1457) — the weapon's signature / punch, exactly as
+		// the live InventoryManager.counterSkillId resolves it; undefined leaves the battler with no counter.
 		build: (
 			attrs: { id: EAttribute; amount: number }[],
 			selectedSkillIds: number[],
 			grantedSkillIds: number[],
-			equippedWeaponType?: EDamageType
+			equippedWeaponType?: EDamageType,
+			counterSkillId?: number
 		): Battler =>
 			new Battler(
 				{
@@ -172,7 +175,8 @@ export function grantedBattlerFactory(registry: ISkill[]) {
 				undefined,
 				grantedSkillIds,
 				undefined,
-				equippedWeaponType
+				equippedWeaponType,
+				counterSkillId
 			)
 	};
 }

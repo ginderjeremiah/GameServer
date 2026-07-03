@@ -231,6 +231,23 @@ namespace Game.Core
         /// inert without an enabler. See <see cref="Battle.BattleContext.DamageTarget"/>.
         /// </summary>
         ExecuteBonus = 46,
+
+        /// <summary>
+        /// A derived game attribute. A decimal probability (0.05 = 5%) to parry an incoming direct hit —
+        /// negating it entirely and striking back with the equipped weapon's signature skill (the
+        /// Parry/Riposte delivery archetype, #1457). Base <c>0</c> and <b>authored-only</b> — granted by
+        /// skill effects (a timed parry-stance window) or items, never derived from a core attribute — so it
+        /// is a committed build identity like <see cref="DamageReflection"/>. Player-only, like crit/dodge.
+        /// See <see cref="Battle.BattleContext.DamageTarget"/>.
+        /// </summary>
+        ParryChance = 47,
+
+        /// <summary>
+        /// A derived game attribute. A base-1 multiplier (like <see cref="CriticalChanceMultiplier"/>) applied
+        /// against <see cref="ParryChance"/> — the Riposte proficiency path's bonus target, so path investment
+        /// scales an authored parry chance while remaining inert for the uncommitted (<c>0 × mult = 0</c>).
+        /// </summary>
+        ParryChanceMultiplier = 48,
     }
 
     /// <summary>
@@ -513,6 +530,15 @@ namespace Game.Core
         /// <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after Cull (the enum grows append-only).
         /// </summary>
         Sunder = 33,
+
+        /// <summary>
+        /// Counter damage dealt (the Riposte mastery — #1457). The damage the player's parry counterattacks
+        /// dealt, booked <b>directly</b> like <see cref="Reflect"/> rather than as an overlay share claim —
+        /// the counter is new damage the parry enabled, not a rider on a hit that would have landed anyway.
+        /// A combat-event key — type-neutral, routed straight to a single activity key. Appended after Sunder
+        /// (the enum grows append-only).
+        /// </summary>
+        Parry = 34,
     }
 
     /// <summary>
@@ -848,6 +874,17 @@ namespace Game.Core
         /// since weapon leaves are damage-type leaves, "kill N with a weapon type" too).
         /// </summary>
         KillsByDamageType = 22,
+
+        // Player-only parry outcomes (#1457), recorded globally like the crit/dodge tallies above.
+
+        /// <summary>Incoming attacks parried (count).</summary>
+        AttacksParried = 23,
+
+        /// <summary>Post-mitigation damage a parry avoided — the parry counterpart of <see cref="DamageDodged"/>.</summary>
+        DamageParried = 24,
+
+        /// <summary>Damage the parry counterattacks (ripostes) dealt.</summary>
+        CounterDamageDealt = 25,
     }
 
     /// <summary>

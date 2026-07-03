@@ -68,6 +68,30 @@ describe('damageLogMessage', () => {
 		);
 	});
 
+	it('phrases a parry with no number, type, or resist note (#1457)', () => {
+		expect(damageLogMessage('Ember', 0, 'player-parry', EDamageType.Fire, 'normal', 'Goblin')).toBe(
+			"You parried Goblin's Ember!"
+		);
+	});
+
+	it('phrases a riposte with its type (#1457)', () => {
+		expect(damageLogMessage('Slash', 15, 'player-counter', EDamageType.Sword, 'normal', 'Goblin')).toBe(
+			'You riposted with Slash, dealing 15 sword damage!'
+		);
+	});
+
+	it('phrases a critical riposte (#1457)', () => {
+		expect(damageLogMessage('Slash', 30, 'player-counter-crit', EDamageType.Sword, 'normal', 'Goblin')).toBe(
+			'You riposted with a critical Slash, dealing 30 sword damage!'
+		);
+	});
+
+	it('reports an absorbed riposte as the enemy recovering health (#1457)', () => {
+		expect(damageLogMessage('Slash', -9, 'player-counter', EDamageType.Sword, 'absorbed', 'Goblin')).toBe(
+			'Goblin absorbed your Slash, recovering 9 health!'
+		);
+	});
+
 	it('reports an absorbed player hit as the enemy recovering health', () => {
 		// Absorption returns a negative net (the heal), reported as the magnitude recovered.
 		expect(damageLogMessage('Fireball', -20, 'player-hit', EDamageType.Fire, 'absorbed', 'Goblin')).toBe(

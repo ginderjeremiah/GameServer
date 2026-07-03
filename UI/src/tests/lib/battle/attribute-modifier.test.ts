@@ -95,6 +95,14 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.BaseValue
 			},
+			// ParryChanceMultiplier follows the same template (#1457): base 1, no derivation — the enabler is
+			// the authored-only ParryChance (base 0 everywhere, so it has no static modifier).
+			{
+				attribute: EAttribute.ParryChanceMultiplier,
+				amount: 1,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
+			},
 			// CriticalDamage = base 1.5 + 0.0025·LUK
 			{
 				attribute: EAttribute.CriticalDamage,

@@ -649,6 +649,68 @@ namespace Game.Core.Tests.Battle
             Assert.Equal([5], battler.Skills.Select(s => s.Skill.Id));
         }
 
+        // ── Parry counter-skill resolution (#1457) ────────────────────────────
+
+        [Fact]
+        public void ToBattler_WeaponEquipped_ResolvesItsSignatureAsTheCounterSkill()
+        {
+            // The parry counter is the equipped weapon's signature, resolved once at assembly.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [new EquippedItemSnapshot { ItemId = 1, AppliedModIds = [] }],
+                SkillIds = [],
+            };
+
+            var battler = snapshot.ToBattler(
+                ItemResolver(MakeItem(1, category: EItemCategory.Weapon, weaponType: EDamageType.Sword, grantedSkillId: 5)),
+                ThrowMod,
+                SkillResolver(MakeSkill(5, EDamageType.Sword)));
+
+            Assert.NotNull(battler.CounterSkill);
+            Assert.Equal(5, battler.CounterSkill.Id);
+        }
+
+        [Fact]
+        public void ToBattler_BareHanded_ResolvesPunchAsTheCounterSkill()
+        {
+            // Bare hands riposte with the virtual fists' signature — punch — the same resolution rule the
+            // weapon-match gate uses for the granted signature.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [],
+                SkillIds = [],
+            };
+
+            var battler = snapshot.ToBattler(
+                ThrowItem, ThrowMod,
+                SkillResolver(MakeSkill(GameConstants.PunchSkillId, EDamageType.Unarmed)));
+
+            Assert.NotNull(battler.CounterSkill);
+            Assert.Equal(GameConstants.PunchSkillId, battler.CounterSkill.Id);
+        }
+
+        [Fact]
+        public void ToBattler_BareHanded_PunchUnauthored_HasNoCounterSkill()
+        {
+            // An unauthored punch resolves to no counter skill: a parry then negates without a riposte rather
+            // than firing a phantom — the same graceful degradation as the skill-set assembly.
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = [],
+                EquippedItems = [],
+                SkillIds = [2],
+            };
+
+            var battler = snapshot.ToBattler(ThrowItem, ThrowMod, SkillResolver(MakeSkill(2)));
+
+            Assert.Null(battler.CounterSkill);
+        }
+
         [Fact]
         public void RoundTrip_WeaponGate_DimsOffWeaponSelectedSkill_MatchesLivePlayerBattler()
         {

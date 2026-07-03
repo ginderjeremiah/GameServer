@@ -8,13 +8,24 @@ namespace Game.Core.Battle
         public double HighestPlayerAttack { get; set; }
         public int PlayerSkillsUsed { get; set; }
 
-        // Player-only crit/dodge outcomes, accumulated across the battle (enemies never crit/dodge). The damage
-        // figures are post-mitigation: crit damage is what the crit hits actually dealt, and dodged damage is
-        // the post-mitigation hit avoided.
+        // Player-only crit/dodge/parry outcomes, accumulated across the battle (enemies never
+        // crit/dodge/parry). The damage figures are post-mitigation: crit damage is what the crit hits
+        // actually dealt, and dodged/parried damage is the post-mitigation hit avoided.
         public int CriticalHits { get; set; }
         public double CriticalDamageDealt { get; set; }
         public int AttacksDodged { get; set; }
         public double DamageDodged { get; set; }
+        public int AttacksParried { get; set; }
+        public double DamageParried { get; set; }
+
+        /// <summary>
+        /// The damage the player's parry counterattacks (ripostes) dealt this battle — the proficiency Riposte
+        /// event signal (the <c>Parry</c> activity key, #1457). A <b>direct</b> tally like
+        /// <see cref="PlayerReflectedDamageDealt"/> (the counter is new damage the parry enabled, not an overlay
+        /// rider on a hit that would have landed anyway), also folded into <see cref="PlayerDamageDealt"/> and
+        /// the typed offense book by the shared player-fire pipeline the counter routes through.
+        /// </summary>
+        public double PlayerCounterDamageDealt { get; set; }
 
         /// <summary>
         /// The Precision (<c>Crit</c> activity key) training signal — distinct from the player-facing

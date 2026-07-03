@@ -113,6 +113,8 @@ namespace Game.Core.Attributes
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
                 DamageReflection => "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
                 ExecuteBonus => "The maximum percentage of bonus damage dealt against a target, scaled by how much health it is missing.",
+                ParryChance => "The percentage chance to parry an incoming attack, negating it and striking back with the equipped weapon's signature skill.",
+                ParryChanceMultiplier => "A multiplier applied to your parry chance.",
                 BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
                 PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
                 BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
@@ -169,6 +171,10 @@ namespace Game.Core.Attributes
                 // same convention that block uses) since they append after it; bleed keeps the former DoT slot.
                 PoisonDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "PSN DOT", 37, 0),
                 BurnDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "BRN DOT", 38, 0),
+                // The parry pair (#1457) appends after the amp/resist block like the accumulators above
+                // (display order = enum value): combat secondaries like DodgeChance/ExecuteBonus.
+                ParryChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY", 47, 0),
+                ParryChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY MULT", 48, 0),
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No display metadata defined for the given attribute.")
             };
 #pragma warning restore CS0618

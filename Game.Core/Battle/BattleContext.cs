@@ -49,10 +49,11 @@ namespace Game.Core.Battle
             _isPlayerActive = !_isPlayerActive;
         }
 
-        public double GetActiveBattlerAttribute(EAttribute attribute)
-        {
-            return _activeBattler.GetAttributeValue(attribute);
-        }
+        /// <summary>
+        /// The battler currently acting (attacking / casting). Exposed for the damage arithmetic that reads
+        /// the caster's attributes (<see cref="BattleSkill.CalculateRawDamage"/>).
+        /// </summary>
+        public Battler ActiveBattler => _activeBattler;
 
         public double GetActiveBattlerCooldownMultiplier()
         {
@@ -144,8 +145,8 @@ namespace Game.Core.Battle
         /// <see cref="EDamageType"/>; the per-portion nets are summed into <c>totalNet</c>. A <b>single</b>
         /// portion reduces byte-for-byte to the pre-feature single-typed hit (<c>raw × w ÷ w = raw</c>).
         /// <para>
-        /// The seeded RNG is drawn <b>once per fire regardless of portion count</b>, so the per-tick draw count
-        /// stays <c>playerFires×1 + enemyFires×1</c>:
+        /// The seeded RNG is drawn a <b>fixed number of times per fire regardless of portion count or roll
+        /// outcome</b>, so the per-tick draw count stays <c>playerFires×1 + enemyFires×3</c>:
         /// </para>
         /// <list type="bullet">
         /// <item>When the <b>player</b> attacks, a single crit draw is taken (always, before damage) against
@@ -154,8 +155,13 @@ namespace Game.Core.Battle
         /// portion by <see cref="EAttribute.CriticalDamage"/> (read directly) <b>before</b> mitigation —
         /// identical to scaling the whole hit — so high crit damage punches through
         /// <see cref="EAttribute.Toughness"/>.</item>
-        /// <item>When the <b>enemy</b> attacks the player, a <b>single</b> dodge draw is taken (Block was retired
-        /// in spike #1330). A dodge zeroes the <b>whole</b> multi-typed hit.</item>
+        /// <item>When the <b>enemy</b> attacks the player, <b>three</b> draws are taken unconditionally, in
+        /// fixed order: a parry draw (#1457, against <see cref="EAttribute.ParryChance"/> ×
+        /// <see cref="EAttribute.ParryChanceMultiplier"/>), a dodge draw (Block's former second draw was retired
+        /// in spike #1330), and the parry counter's crit draw — consumed even when no parry procs or the
+        /// defender has no counter skill, so the stream stays a pure function of the fire sequence. A parry
+        /// takes precedence over a dodge; either zeroes the <b>whole</b> multi-typed hit, and a parry
+        /// additionally fires the defender's riposte (see <see cref="FireParryCounter"/>).</item>
         /// </list>
         /// The per-portion typed books (<see cref="BattleStats.AddTypedDamageDealt"/> per portion's net capped at
         /// the health it actually removed — overkill books nothing, #1482 —
@@ -182,8 +188,8 @@ namespace Game.Core.Battle
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
         /// untyped, so once equals per-portion, and once gives a single clean reflection event. The Toughness curve
-        /// scales by the <b>active (attacking) battler's level</b>. Enemies never crit/dodge: the gating reads the
-        /// rolls only on the player's side.
+        /// divides by a <b>tuned constant</b> (#1487/#1489), so it is attacker-level-independent. Enemies never
+        /// crit/dodge/parry: the gating reads the rolls only on the player's side.
         /// </summary>
         /// <returns>
         /// The summed net damage applied across all portions (after amplification, crit, resistance, and the
@@ -211,87 +217,34 @@ namespace Game.Core.Battle
                 // scaled by the active battler's CriticalChanceMultiplier (base 1, so an uncommitted skill still
                 // crits at its own authored rate and further investment scales it). A single crit multiplies
                 // every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
-                var isCrit = _rng.Next() < baseCriticalChance * _activeBattler.GetAttributeValue(CriticalChanceMultiplier);
-                var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
-
-                // The Cull execute overlay (#1430): the target's missing-health fraction AT THE START of this
-                // fire, sampled once (like the crit draw) so an earlier portion's damage within the same
-                // multi-typed hit cannot change a later portion's bonus. executeInvestment is this fire's
-                // multiplier above 1 — 0 when ExecuteBonus is unauthored or the target is at full health —
-                // applied to the raw damage identically to critMultiplier, before mitigation.
-                var targetMaxHealth = _targetBattler.GetAttributeValue(MaxHealth);
-                var missingHpFraction = Math.Clamp(
-                    (targetMaxHealth - _targetBattler.CurrentHealth) / targetMaxHealth, 0.0, 1.0);
-                var executeInvestment = _activeBattler.GetAttributeValue(ExecuteBonus) * missingHpFraction;
-                var executeMultiplier = 1.0 + executeInvestment;
-
-                var totalBooked = 0.0;
-                for (var i = 0; i < portions.Count; i++)
-                {
-                    var type = portions[i].Type;
-                    var rawPortion = PortionRawDamage(rawDamage, totalWeight, portions[i]);
-                    var dealt = _activeBattler.AmplifyDamage(rawPortion, type);
-                    var healthBefore = _targetBattler.CurrentHealth;
-                    var net = _targetBattler.TakeDamage(dealt * critMultiplier * executeMultiplier, type);
-                    // The typed offense book is capped at the health the portion actually removed (#1482): a
-                    // killing swing's overkill tail — and every later portion of it — books nothing, while the
-                    // whole-hit stats below keep the full net (feedback like HighestPlayerAttack includes overkill).
-                    var booked = Battler.HealthRemoved(net, healthBefore);
-                    Stats.AddTypedDamageDealt(type, booked);
-                    totalNet += net;
-
-                    // Every overlay tally books a share claim on the damage this portion actually landed (#1481):
-                    // the booked (health-capped) net × φ(its own investment) — one uniform shape with no
-                    // counterfactual curve evaluations, structurally immune to cross-overlay inflation (the basis
-                    // never re-reads the target's debuffed mitigation) and bounded per battle by the enemy's
-                    // health pool. An absorbed portion (negative booked) trains nothing. All backend-only side
-                    // channels — no health mutation, no parity surface.
-                    var overlayBasis = booked > 0 ? booked : 0;
-                    totalBooked += overlayBasis;
-                    // Hex (#1427): the target-side applied-vulnerability share — zero unless the player's own
-                    // debuff lowered the target's resistance.
-                    Stats.HexBonusDealt += _targetBattler.HexBonusForHit(overlayBasis, type);
-                    // Sunder (#1429): the target-side Toughness-debuff share, the investment made dimensionless
-                    // by the mitigation curve's own constant magnitude.
-                    Stats.SunderBonusDealt += _targetBattler.SunderBonusForHit(overlayBasis);
-                    // Momentum (#1428): the attacker's own applied-ramp share for this portion's type.
-                    var rampContribution = _activeBattler.AppliedMomentum(type);
-                    if (rampContribution > 0)
-                    {
-                        Stats.MomentumBonusDealt += overlayBasis * Battler.NormalizeInvestment(rampContribution);
-                    }
-                    // Cull (#1430): the execute-investment share. The executeMultiplier still scales the real
-                    // damage above — that part stays parity-critical and unchanged; only the tally is reshaped.
-                    if (executeInvestment > 0)
-                    {
-                        Stats.CullBonusDealt += overlayBasis * Battler.NormalizeInvestment(executeInvestment);
-                    }
-                }
-
-                Stats.PlayerDamageDealt += totalNet;
-                if (isCrit)
-                {
-                    Stats.CriticalHits++;
-                    // The actual crit damage dealt — the player-facing CriticalDamageDealt statistic.
-                    Stats.CriticalDamageDealt += totalNet;
-                    // The Precision training signal (#1448, reshaped by #1481): the same share claim as the other
-                    // overlays, on the whole crit hit's booked damage — φ on the crit-damage investment, so a
-                    // heavier investment trains proportionally more while a single crit claims at most its own
-                    // booked hit. Kept separate from the player-facing statistic above.
-                    Stats.CriticalBonusDealt += totalBooked * Battler.NormalizeInvestment(critMultiplier - 1.0);
-                }
-
-                if (totalNet > Stats.HighestPlayerAttack)
-                {
-                    Stats.HighestPlayerAttack = totalNet;
-                }
+                totalNet = ResolvePlayerHit(rawDamage, portions, totalWeight, baseCriticalChance, _rng.Next());
             }
             else
             {
-                // A single dodge draw — the only player-only roll left on an enemy attack now that Block is gone
-                // (spike #1330), so an enemy attack advances the seeded stream by exactly one regardless of portions.
+                // Three draws per enemy fire, in fixed order — parry (#1457), dodge (Block's former second draw
+                // was retired, spike #1330), and the parry counter's crit — all taken unconditionally so the
+                // seeded stream advances as a pure function of the fire sequence, never of a roll outcome or of
+                // the defender's build (a 0-chance draw still consumes). A parry takes precedence over a dodge.
+                var isParry = _rng.Next() < _targetBattler.GetAttributeValue(ParryChance)
+                    * _targetBattler.GetAttributeValue(ParryChanceMultiplier);
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
-                if (isDodge)
+                var counterCritDraw = _rng.Next();
+
+                if (isParry)
+                {
+                    // A parry negates the whole hit exactly like a dodge — the avoided damage is each portion's
+                    // net (resistance then the Toughness curve) computed without mutating health, and no exposure
+                    // is recorded — and then ripostes with the defender's counter skill.
+                    Stats.AttacksParried++;
+                    for (var i = 0; i < portions.Count; i++)
+                    {
+                        var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
+                        Stats.DamageParried += _targetBattler.ComputeNetDamage(dealt, portions[i].Type);
+                    }
+
+                    FireParryCounter(counterCritDraw);
+                }
+                else if (isDodge)
                 {
                     // A dodge zeroes the whole hit; the avoided damage is the sum of each portion's net (resistance
                     // then the Toughness curve), computed without mutating health. A dodge evaded the hit
@@ -324,6 +277,139 @@ namespace Game.Core.Battle
 
             ReflectDamage(totalNet);
             return totalNet;
+        }
+
+        /// <summary>
+        /// The player-fire half of <see cref="DamageTarget"/>: resolves one player hit's crit (from the
+        /// already-taken <paramref name="critDraw"/>), execute multiplier, per-portion amplification /
+        /// mitigation / typed booking / overlay share claims, and the whole-hit crit and highest-attack stats.
+        /// Extracted so the parry counter (#1457) fires through the <b>identical</b> pipeline as a normal
+        /// player fire — same crit template, same execute and overlay tallies, same typed offense booking —
+        /// with its crit draw supplied by the caller (the enemy fire's third unconditional draw) rather than
+        /// drawn here. Requires the player to be the active battler.
+        /// </summary>
+        private double ResolvePlayerHit(
+            double rawDamage, IReadOnlyList<SkillDamagePortion> portions, double totalWeight,
+            double baseCriticalChance, double critDraw)
+        {
+            var isCrit = critDraw < baseCriticalChance * _activeBattler.GetAttributeValue(CriticalChanceMultiplier);
+            var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
+
+            // The Cull execute overlay (#1430): the target's missing-health fraction AT THE START of this
+            // fire, sampled once (like the crit draw) so an earlier portion's damage within the same
+            // multi-typed hit cannot change a later portion's bonus. executeInvestment is this fire's
+            // multiplier above 1 — 0 when ExecuteBonus is unauthored or the target is at full health —
+            // applied to the raw damage identically to critMultiplier, before mitigation.
+            var targetMaxHealth = _targetBattler.GetAttributeValue(MaxHealth);
+            var missingHpFraction = Math.Clamp(
+                (targetMaxHealth - _targetBattler.CurrentHealth) / targetMaxHealth, 0.0, 1.0);
+            var executeInvestment = _activeBattler.GetAttributeValue(ExecuteBonus) * missingHpFraction;
+            var executeMultiplier = 1.0 + executeInvestment;
+
+            var totalNet = 0.0;
+            var totalBooked = 0.0;
+            for (var i = 0; i < portions.Count; i++)
+            {
+                var type = portions[i].Type;
+                var rawPortion = PortionRawDamage(rawDamage, totalWeight, portions[i]);
+                var dealt = _activeBattler.AmplifyDamage(rawPortion, type);
+                var healthBefore = _targetBattler.CurrentHealth;
+                var net = _targetBattler.TakeDamage(dealt * critMultiplier * executeMultiplier, type);
+                // The typed offense book is capped at the health the portion actually removed (#1482): a
+                // killing swing's overkill tail — and every later portion of it — books nothing, while the
+                // whole-hit stats below keep the full net (feedback like HighestPlayerAttack includes overkill).
+                var booked = Battler.HealthRemoved(net, healthBefore);
+                Stats.AddTypedDamageDealt(type, booked);
+                totalNet += net;
+
+                // Every overlay tally books a share claim on the damage this portion actually landed (#1481):
+                // the booked (health-capped) net × φ(its own investment) — one uniform shape with no
+                // counterfactual curve evaluations, structurally immune to cross-overlay inflation (the basis
+                // never re-reads the target's debuffed mitigation) and bounded per battle by the enemy's
+                // health pool. An absorbed portion (negative booked) trains nothing. All backend-only side
+                // channels — no health mutation, no parity surface.
+                var overlayBasis = booked > 0 ? booked : 0;
+                totalBooked += overlayBasis;
+                // Hex (#1427): the target-side applied-vulnerability share — zero unless the player's own
+                // debuff lowered the target's resistance.
+                Stats.HexBonusDealt += _targetBattler.HexBonusForHit(overlayBasis, type);
+                // Sunder (#1429): the target-side Toughness-debuff share, the investment made dimensionless
+                // by the mitigation curve's own constant magnitude.
+                Stats.SunderBonusDealt += _targetBattler.SunderBonusForHit(overlayBasis);
+                // Momentum (#1428): the attacker's own applied-ramp share for this portion's type.
+                var rampContribution = _activeBattler.AppliedMomentum(type);
+                if (rampContribution > 0)
+                {
+                    Stats.MomentumBonusDealt += overlayBasis * Battler.NormalizeInvestment(rampContribution);
+                }
+                // Cull (#1430): the execute-investment share. The executeMultiplier still scales the real
+                // damage above — that part stays parity-critical and unchanged; only the tally is reshaped.
+                if (executeInvestment > 0)
+                {
+                    Stats.CullBonusDealt += overlayBasis * Battler.NormalizeInvestment(executeInvestment);
+                }
+            }
+
+            Stats.PlayerDamageDealt += totalNet;
+            if (isCrit)
+            {
+                Stats.CriticalHits++;
+                // The actual crit damage dealt — the player-facing CriticalDamageDealt statistic.
+                Stats.CriticalDamageDealt += totalNet;
+                // The Precision training signal (#1448, reshaped by #1481): the same share claim as the other
+                // overlays, on the whole crit hit's booked damage — φ on the crit-damage investment, so a
+                // heavier investment trains proportionally more while a single crit claims at most its own
+                // booked hit. Kept separate from the player-facing statistic above.
+                Stats.CriticalBonusDealt += totalBooked * Battler.NormalizeInvestment(critMultiplier - 1.0);
+            }
+
+            if (totalNet > Stats.HighestPlayerAttack)
+            {
+                Stats.HighestPlayerAttack = totalNet;
+            }
+
+            return totalNet;
+        }
+
+        /// <summary>
+        /// Fires the player's riposte after a parry (#1457): the defender (player) strikes back with its
+        /// <see cref="Battler.CounterSkill"/> — the equipped weapon's signature, resolved at battler assembly —
+        /// as a <b>first-class player hit</b> through <see cref="ResolvePlayerHit"/>, so amplification, the
+        /// signature's own authored <see cref="Skills.Skill.CriticalChance"/> (scaled by
+        /// <see cref="EAttribute.CriticalChanceMultiplier"/>), the execute multiplier, the overlay share
+        /// claims, typed offense booking, and the enemy's reflection of the counter all apply exactly as they
+        /// would to a deliberate fire. Damage only — a <b>phantom</b> fire: no effects are applied, no cooldown
+        /// is touched, and no per-skill use is recorded. Its crit decision consumes the already-taken
+        /// <paramref name="counterCritDraw"/> (the enemy fire's third unconditional draw), so a defender with
+        /// no resolvable counter skill (which parries without a riposte) leaves the stream identical. The
+        /// counter's net is additionally booked as <see cref="BattleStats.PlayerCounterDamageDealt"/> — the
+        /// Riposte training signal, a direct tally like Retribution's.
+        /// </summary>
+        private void FireParryCounter(double counterCritDraw)
+        {
+            var counterSkill = _targetBattler.CounterSkill;
+            if (counterSkill is null)
+            {
+                return;
+            }
+
+            SwapActiveAndTargetBattlers();
+            var raw = BattleSkill.CalculateRawDamage(counterSkill, _activeBattler);
+            var counterPortions = counterSkill.DamagePortions;
+            var totalWeight = 0.0;
+            for (var i = 0; i < counterPortions.Count; i++)
+            {
+                totalWeight += counterPortions[i].Weight;
+            }
+
+            var counterNet = ResolvePlayerHit(
+                raw, counterPortions, totalWeight, counterSkill.CriticalChance, counterCritDraw);
+            Stats.PlayerCounterDamageDealt += counterNet;
+            // The enemy's deterministic reflection applies to the counter like any direct hit it takes (the
+            // counter is a genuine attack, subject to the target's defenses — unlike reflection itself, which
+            // never chains: reflected damage is not routed through this pipeline).
+            ReflectDamage(counterNet);
+            SwapActiveAndTargetBattlers();
         }
 
         /// <summary>

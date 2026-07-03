@@ -294,14 +294,16 @@ describe('AttributeBreakdownView', () => {
 		// The engine base/derived aggregates always contribute, so they stay in Secondary. Unlike the other
 		// chance attributes, CriticalChanceMultiplier carries a base of 1 (crit rework #1425, per-skill base
 		// #1453 — the enabler moved to the skill's own CriticalChance, so this attribute is always present).
-		// CriticalDamage (base 1.5) and DodgeChance (Agility-derived) remain too.
+		// CriticalDamage (base 1.5), DodgeChance (Agility-derived), and ParryChanceMultiplier (base 1, the
+		// same template — #1457; its display order tracks its enum value, so it sorts last) remain too.
 		expect(secondary?.attrs.map((a) => a.meta.id)).toEqual([
 			EAttribute.MaxHealth,
 			EAttribute.Toughness,
 			EAttribute.CooldownRecovery,
 			EAttribute.CriticalChanceMultiplier,
 			EAttribute.CriticalDamage,
-			EAttribute.DodgeChance
+			EAttribute.DodgeChance,
+			EAttribute.ParryChanceMultiplier
 		]);
 		// CooldownRecovery carries its reference-data precision (0 decimals) and percentage flag.
 		const cdrMeta = secondary?.attrs.find((a) => a.meta.id === EAttribute.CooldownRecovery)?.meta;
@@ -312,8 +314,9 @@ describe('AttributeBreakdownView', () => {
 	it('self-selects only attributes with a real (non-combat) contributor', () => {
 		// No allocations or gear: only the engine base/derived formulas contribute. The Secondary aggregates
 		// surface — MaxHealth/Toughness/CooldownRecovery, plus CriticalChanceMultiplier (base 1, #1453),
-		// CriticalDamage (base 1.5) and DodgeChance (Agility-derived) — alongside the obsolete attribute and
-		// the combat-only Status channels staying excluded. No Primary group is shown.
+		// CriticalDamage (base 1.5), DodgeChance (Agility-derived), and ParryChanceMultiplier (base 1, #1457)
+		// — alongside the obsolete attribute and the combat-only Status channels staying excluded. No Primary
+		// group is shown.
 		const view = new AttributeBreakdownView();
 		const ids = view.groups.flatMap((g) => g.attrs.map((a) => a.meta.id));
 		expect(ids).toEqual([
@@ -322,7 +325,8 @@ describe('AttributeBreakdownView', () => {
 			EAttribute.CooldownRecovery,
 			EAttribute.CriticalChanceMultiplier,
 			EAttribute.CriticalDamage,
-			EAttribute.DodgeChance
+			EAttribute.DodgeChance,
+			EAttribute.ParryChanceMultiplier
 		]);
 		expect(view.groups.some((g) => g.type === EAttributeType.Primary)).toBe(false);
 		expect(ids).not.toContain(EAttribute.DropBonus);

@@ -129,7 +129,26 @@ namespace Game.Core.Battle
                 .Select(resolveSkill)
                 .OfType<Skill>();
 
-            return new Battler(attributes, skills, Level);
+            // The parry counter skill (#1457): the equipped weapon's signature — the virtual fists' punch
+            // bare-handed — resolved once at assembly like the weapon-match gate. An unresolvable id (an
+            // unauthored punch) yields null, so a parry then negates without a riposte rather than firing a
+            // phantom skill, mirroring how OrderSkillIds drops an unresolvable grant.
+            var weapon = ResolveEquippedWeapon(resolveItem);
+            var counterSkill = resolveSkill(weapon?.GrantedSkillId ?? GameConstants.PunchSkillId);
+
+            return new Battler(attributes, skills, Level, counterSkill);
+        }
+
+        /// <summary>
+        /// The equipped <see cref="EItemCategory.Weapon"/> item captured on this snapshot, or <c>null</c> for
+        /// bare hands (the virtual <c>Unarmed</c> fists). Shared by the battle-skill assembly and the parry
+        /// counter resolution so the two read the same weapon.
+        /// </summary>
+        private Item? ResolveEquippedWeapon(Func<int, Item> resolveItem)
+        {
+            return EquippedItems
+                .Select(equipped => resolveItem(equipped.ItemId))
+                .FirstOrDefault(item => item.Category == EItemCategory.Weapon);
         }
 
         /// <summary>

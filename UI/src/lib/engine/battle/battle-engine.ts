@@ -42,14 +42,16 @@ export const onBattleStageChanged = battleStageChangedHook.onNotified;
 
 /** One combat outcome surfaced for the fight screen's floating numbers. `target` is the battler the
  *  float spawns over (the side that was struck / defended); `kind` picks its label, and `amount` is the
- *  damage to show — omitted for a dodge, which has no number; a negative amount is an absorbed hit's net
- *  heal. `damageType` (present for a damaging `hit`/`crit`) tints the number and picks its type glyph
- *  (#1320, Area F); a `dodge` has no number and a `reflect` is raw/untyped, so both omit it. A `reflect`
- *  (#1330) spawns over the original attacker — the side that took the returned damage — and carries no
- *  type. Player-only crit/dodge mirror the battle-step roll surface (the enemy never dodges/crits). */
+ *  damage to show — omitted for a dodge/parry, which have no number; a negative amount is an absorbed
+ *  hit's net heal. `damageType` (present for a damaging `hit`/`crit`) tints the number and picks its type
+ *  glyph (#1320, Area F); a `dodge`/`parry` has no number and a `reflect` is raw/untyped, so they omit
+ *  it. A `reflect` (#1330) spawns over the original attacker — the side that took the returned damage —
+ *  and carries no type. A `parry` (#1457) spawns over the player like a dodge; its riposte floats
+ *  separately as a normal player hit/crit. Player-only crit/dodge/parry mirror the battle-step roll
+ *  surface (the enemy never dodges/crits/parries). */
 export interface CombatFloatEvent {
 	target: 'player' | 'enemy';
-	kind: 'hit' | 'crit' | 'dodge' | 'reflect';
+	kind: 'hit' | 'crit' | 'dodge' | 'parry' | 'reflect';
 	amount?: number;
 	damageType?: EDamageType;
 	/** The hit's weighted leaf-type split (#1343), present for a damaging `hit`/`crit` so the floater
@@ -227,14 +229,16 @@ export class BattleEngine {
 		// already covers them; read the slot-ordered ids here so the rebuilt battler fields them. The locked
 		// base composes before the proficiency bonuses (the order the backend BattleSnapshot.GetModifiers uses)
 		// so the additive accumulation — and therefore the result down to the last bit — matches the replay.
-		// equippedWeaponType drives the weapon-match gate (#1342): only the player battler is gated; the enemy
-		// rebuild below passes no weapon type and fields its full authored loadout.
+		// equippedWeaponType drives the weapon-match gate (#1342) and counterSkillId the parry riposte (#1457):
+		// only the player battler carries them; the enemy rebuild below passes neither and fields its full
+		// authored loadout with no counter.
 		this.player.reset(
 			playerManager,
 			equipmentStats,
 			inventoryManager.grantedSkillIds,
 			[...lockedBaseModifiers, ...proficiencyModifiers],
-			inventoryManager.equippedWeaponType
+			inventoryManager.equippedWeaponType,
+			inventoryManager.counterSkillId
 		);
 		// Compose the class signature passive LAST — after the locked base, proficiency bonuses, and the static
 		// engine modifiers the rebuild just assembled — so an attribute-scaled passive reads the fully-resolved
@@ -320,21 +324,22 @@ export class BattleEngine {
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
 		if (this.stage === Active) {
 			this.timeElapsed += timeDelta;
-			for (const { skill, damage, byPlayer, crit, dodged, reflected } of battleStep(
+			for (const { skill, damage, byPlayer, crit, dodged, parried, counter, reflected } of battleStep(
 				this.player,
 				this.enemy,
 				timeDelta,
 				this.rng,
 				this.stepLog
 			)) {
-				const outcome = damageLogOutcome(byPlayer, crit, dodged);
+				const outcome = damageLogOutcome(byPlayer, crit, dodged, parried, counter);
 				const damageType = skill.primaryDamageType;
-				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged hit
-				// never resolved, so it can't be resisted). Computed here, not in the parity-critical battleStep,
-				// so the headless simulator stays byte-identical — like the existing crit/dodge log flags.
-				const resist = dodged
-					? 'normal'
-					: classifyResist(resistanceTotal(damageType, (byPlayer ? this.enemy : this.player).attributes), damage);
+				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged or
+				// parried hit never resolved, so it can't be resisted). Computed here, not in the parity-critical
+				// battleStep, so the headless simulator stays byte-identical — like the existing crit/dodge log flags.
+				const resist =
+					dodged || parried
+						? 'normal'
+						: classifyResist(resistanceTotal(damageType, (byPlayer ? this.enemy : this.player).attributes), damage);
 				logMessage(
 					ELogType.Damage,
 					damageLogMessage(skill.name, damage, outcome, damageType, resist, this.enemy.name),
@@ -441,12 +446,25 @@ export class BattleEngine {
 }
 
 /** Resolves the structured {@link LogOutcome} for one damage exchange from the battle-step flags.
- *  The crit/dodge flags are only ever set on the player's side (crit on the player's own hit; dodge
- *  on an incoming enemy hit), so the mapping is unambiguous. Drives both the log prose and the glyph,
- *  keeping them in lockstep. */
-function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): DirectHitOutcome {
+ *  The crit/dodge/parry/counter flags are only ever set on the player's side (crit on the player's own
+ *  hit — a riposte included; dodge/parry on an incoming enemy hit; counter on the riposte that follows a
+ *  parry, #1457), so the mapping is unambiguous. Drives both the log prose and the glyph, keeping them
+ *  in lockstep. */
+function damageLogOutcome(
+	byPlayer: boolean,
+	crit: boolean,
+	dodged: boolean,
+	parried: boolean,
+	counter: boolean
+): DirectHitOutcome {
 	if (byPlayer) {
+		if (counter) {
+			return crit ? 'player-counter-crit' : 'player-counter';
+		}
 		return crit ? 'player-crit' : 'player-hit';
+	}
+	if (parried) {
+		return 'player-parry';
 	}
 	if (dodged) {
 		return 'player-dodge';
@@ -473,6 +491,13 @@ function combatFloatEvent(
 			return { target: 'enemy', kind: 'hit', amount: damage, damageType, portions };
 		case 'player-dodge':
 			return { target: 'player', kind: 'dodge' };
+		case 'player-parry':
+			return { target: 'player', kind: 'parry' };
+		// A riposte (#1457) is a genuine player hit/crit landing on the enemy — same damaging floats.
+		case 'player-counter':
+			return { target: 'enemy', kind: 'hit', amount: damage, damageType, portions };
+		case 'player-counter-crit':
+			return { target: 'enemy', kind: 'crit', amount: damage, damageType, portions };
 		case 'enemy-hit':
 			return { target: 'player', kind: 'hit', amount: damage, damageType, portions };
 	}
