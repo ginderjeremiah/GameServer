@@ -146,6 +146,35 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task RefreshSocketPresence_AfterItsKeyLapsesWhileStillLive_ResurrectsItsOwnClaim()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync();
+            var key = PresenceKey(playerId);
+
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            var idA = await ReadPresenceValueAsync(playerId);
+            Assert.NotNull(idA);
+
+            // Simulate the presence key lapsing out from under a still-live socket — an inbound stall past the
+            // 30s TTL, or a rolled-back superseding registration — by deleting it directly (#1497).
+            using (var scope = CreateScope())
+            {
+                var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+                await cache.Delete(key);
+            }
+            Assert.Null(await ReadPresenceValueAsync(playerId));
+
+            // The next heartbeat on the still-live socket must resurrect its own claim rather than leaving the
+            // key permanently gone (a bare ExpireAndForget is a no-op on a missing key and never recovers).
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+
+            Assert.True(await WaitUntilAsync(async () => await ReadPresenceValueAsync(playerId) == idA),
+                "Expected the live socket's next heartbeat to resurrect its own presence claim.");
+        }
+
+        [Fact]
         public async Task HasActiveSocket_AfterPresenceTtlExpires_ReturnsFalse()
         {
             // HasActiveSocket is a pure presence-key read, so a directly-seeded key with a short TTL

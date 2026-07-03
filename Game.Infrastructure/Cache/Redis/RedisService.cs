@@ -103,6 +103,19 @@ namespace Game.Infrastructure.Cache.Redis
             await ObserveWrite(Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]), cancellationToken);
         }
 
+        public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry)
+        {
+            // "SET NX + expire" in one Lua script: claim the key as ownerValue only if it is currently unset
+            // (the resurrection path ExpireAndForget lacks — a bare expire no-ops on a missing key), otherwise
+            // just extend the TTL of whatever is already there, mirroring ExpireAndForget's existing
+            // don't-care-who-asked refresh so a stale caller still can't overwrite a newer claim's value.
+            // CommandFlags.FireAndForget keeps it off the hot inbound-message path the same way ExpireAndForget is.
+            Redis.ScriptEvaluate(
+                "if redis.call('exists', KEYS[1]) == 0 then redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) else redis.call('pexpire', KEYS[1], ARGV[2]) end",
+                [key], [(RedisValue)ownerValue, (RedisValue)(long)expiry.TotalMilliseconds],
+                flags: CommandFlags.FireAndForget);
+        }
+
         public async Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
             // Compare-and-set in one Lua script (mirroring CompareAndDelete) so the read and the conditional

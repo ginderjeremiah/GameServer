@@ -41,7 +41,7 @@ namespace Game.Api.Services
         {
             var playerId = sessionService.SelectedPlayerId;
             var socketContext = new SocketContext(socket, playerId, sessionService, isAdmin, _loggerFactory.CreateLogger<SocketContext>());
-            var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId));
+            var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId, socketContext.SocketId));
             var presenceKey = CurrentSocketKey(playerId);
             // Claim the presence key with its TTL atomically so a fault here can never leave the key without an
             // expiry — a TTL-less key would defeat the heartbeat design and report a permanent ghost session.
@@ -129,16 +129,19 @@ namespace Game.Api.Services
 
         /// <summary>
         /// Extends the player's socket-presence TTL on connection activity, so a live socket keeps its
-        /// presence key from expiring (see <see cref="SocketPresenceTtl"/>). Uses an expire (not a
-        /// re-set) so it only ever prolongs the currently-registered socket's key and never resurrects a
-        /// key a newer connection has since taken over. Fire-and-forget: presence refresh is best-effort
-        /// (a missed refresh simply lets the sliding TTL lapse), so it must neither throw on a transient
-        /// Redis fault — which would tear down the live read loop — nor add a serial round-trip to the
-        /// front of every inbound command.
+        /// presence key from expiring (see <see cref="SocketPresenceTtl"/>). Reclaims the key as this
+        /// socket's own id if it is currently unset, so a live socket can restore a claim that lapsed (a TTL
+        /// lapse from an inbound stall) or was rolled back out from under it (a superseding registration
+        /// that later failed) — a bare expire is a no-op on a missing key and can never resurrect it. If the
+        /// key already holds a different (newer) socket's id, the refresh still just extends that key's TTL
+        /// without touching its value, so it can never clobber a takeover. Fire-and-forget: presence refresh
+        /// is best-effort (a missed refresh simply lets the sliding TTL lapse), so it must neither throw on a
+        /// transient Redis fault — which would tear down the live read loop — nor add a serial round-trip to
+        /// the front of every inbound command.
         /// </summary>
-        private void RefreshSocketPresence(int playerId)
+        private void RefreshSocketPresence(int playerId, string socketId)
         {
-            _cache.ExpireAndForget(CurrentSocketKey(playerId), SocketPresenceTtl);
+            _cache.ReclaimAndForget(CurrentSocketKey(playerId), socketId, SocketPresenceTtl);
         }
 
         public Task UnRegisterSocket(SocketContext context)
