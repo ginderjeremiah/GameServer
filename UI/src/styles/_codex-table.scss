@@ -1,0 +1,96 @@
+// Shared column-header + selectable-row chrome for the Codex reference tables (EnemyTable, SkillTable).
+// Row marks and the selected accent stay per-table (boss diamond vs. rarity tier), so those are
+// `@include`d locally alongside this frame rather than folded in — see `_codex-dossier.scss` for why
+// mixins rather than a shared component.
+
+@mixin frame {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+@mixin head-row {
+	display: flex;
+	align-items: center;
+	font-family: var(--mono);
+	font-size: 8.5px;
+	letter-spacing: 1.4px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	padding: 0 14px 8px;
+	border-bottom: 1px solid var(--border-subtle);
+	margin-right: 14px;
+}
+
+@mixin col-name {
+	flex: 2.4;
+	min-width: 0;
+}
+
+@mixin col-num {
+	flex: 1;
+	text-align: right;
+}
+
+@mixin col-narrow {
+	flex: 0.9;
+}
+
+@mixin rows-list {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 6px;
+}
+
+// $selected-accent is the CSS colour (usually a `var(--...)` token) applied to the selected row's
+// left border/tint; pass the table's own accent (boss/enemy vs. rarity/intellect).
+@mixin row($selected-accent) {
+	width: 100%;
+	text-align: left;
+	display: flex;
+	align-items: center;
+	padding: 9px 14px;
+	border: none;
+	border-left: 2px solid transparent;
+	border-bottom: 1px solid color-mix(in srgb, var(--white) 5%, transparent);
+	background: transparent;
+	cursor: pointer;
+	font-family: var(--sans);
+
+	&:hover {
+		background: color-mix(in srgb, var(--white) 3%, transparent);
+	}
+
+	&.selected {
+		border-left-color: $selected-accent;
+		background: color-mix(in srgb, $selected-accent 10%, transparent);
+
+		.name {
+			color: var(--white);
+			font-weight: 600;
+		}
+	}
+}
+
+@mixin name-cell {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	min-width: 0;
+}
+
+@mixin row-name {
+	font-size: 13.5px;
+	color: var(--text-primary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+@mixin muted-num {
+	font-family: var(--mono);
+	font-size: 10.5px;
+	color: var(--text-tertiary);
+}

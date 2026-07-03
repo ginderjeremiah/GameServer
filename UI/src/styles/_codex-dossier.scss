@@ -1,0 +1,58 @@
+// Shared body-section chrome for Codex dossiers that stack labelled sections (Zone, Skill) rather
+// than tabbing between sub-panels (Enemy — see `DossierShell` for the header/wrapper the three share).
+// Mixins rather than a shared component: Svelte scopes styles per source file, so a rule only applies
+// to markup declared in that same file — these are `@include`d into each dossier's own `<style>`.
+
+@mixin stacked-body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 16px 20px 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+
+@mixin meta-row {
+	display: flex;
+	gap: 10px;
+}
+
+@mixin meta-card {
+	flex: 1;
+	background: var(--panel);
+	border: 1px solid var(--border-subtle);
+	border-radius: 4px;
+	padding: 9px 11px;
+}
+
+@mixin meta-label {
+	font-family: var(--mono);
+	font-size: 8px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+@mixin meta-val {
+	font-family: var(--mono);
+	font-size: 15px;
+	font-weight: 500;
+	margin-top: 3px;
+	color: var(--text-primary);
+}
+
+@mixin section-label {
+	font-family: var(--mono);
+	font-size: 9px;
+	letter-spacing: 1.6px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	margin-bottom: 10px;
+}
+
+@mixin empty-note {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-style: italic;
+}

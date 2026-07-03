@@ -7,20 +7,20 @@
 {#if view.selectedSkill}
 	{@const skill = view.selectedSkill}
 	{@const rarity = view.selectedSkillRarity}
-	<div class="dossier" data-testid="codex-skill-dossier">
-		<div class="head" style:border-left-color={rarity?.color}>
-			<div class="kind-line">
-				<span class="kind-dot"></span>
-				<span class="kind">Skill</span>
-				{#if rarity}
-					<RarityTagBox color={rarity.color} label={rarity.label} />
-				{/if}
-			</div>
-			<div class="name">{skill.name}</div>
-			{#if skill.description}
-				<div class="desc">{skill.description}</div>
+	<DossierShell
+		selectedItem={skill}
+		testid="codex-skill-dossier"
+		accent="var(--attr-intellect)"
+		borderAccent={rarity?.color}
+		kind="Skill"
+		name={skill.name}
+		description={skill.description}
+	>
+		{#snippet headExtra()}
+			{#if rarity}
+				<RarityTagBox color={rarity.color} label={rarity.label} />
 			{/if}
-		</div>
+		{/snippet}
 
 		<div class="body">
 			<div class="meta">
@@ -117,12 +117,13 @@
 				/>
 			</div>
 		</div>
-	</div>
+	</DossierShell>
 {/if}
 
 <script lang="ts">
 import type { CodexView } from './codex-view.svelte';
 import { formatBaseDamage, formatCooldown } from './codex-display';
+import DossierShell from './DossierShell.svelte';
 import StatisticsPanel from './StatisticsPanel.svelte';
 import RarityTagBox from '$components/RarityTagBox.svelte';
 
@@ -134,104 +135,30 @@ let { view }: Props = $props();
 </script>
 
 <style lang="scss">
-.dossier {
-	width: 380px;
-	flex: none;
-	background: var(--surface);
-	border-left: 1px solid var(--border-subtle);
-	display: flex;
-	flex-direction: column;
-}
-
-.head {
-	border-left: 3px solid var(--attr-intellect);
-	padding: 18px 20px 14px;
-	flex: none;
-}
-
-.kind-line {
-	display: flex;
-	align-items: center;
-	gap: 9px;
-	margin-bottom: 6px;
-}
-
-.kind-dot {
-	width: 6px;
-	height: 6px;
-	transform: rotate(45deg);
-	background: var(--attr-intellect);
-	flex: none;
-}
-
-.kind {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--attr-intellect);
-}
-
-.name {
-	font-size: 21px;
-	font-weight: 500;
-	letter-spacing: -0.3px;
-	line-height: 1.05;
-}
-
-.desc {
-	margin-top: 7px;
-	font-size: 12px;
-	line-height: 1.5;
-	color: var(--text-tertiary);
-}
+@use '$styles/codex-dossier' as dossier;
 
 .body {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	padding: 16px 20px 20px;
-	display: flex;
-	flex-direction: column;
-	gap: 18px;
+	@include dossier.stacked-body;
 }
 
 .meta {
-	display: flex;
-	gap: 10px;
+	@include dossier.meta-row;
 }
 
 .meta-card {
-	flex: 1;
-	background: var(--panel);
-	border: 1px solid var(--border-subtle);
-	border-radius: 4px;
-	padding: 9px 11px;
+	@include dossier.meta-card;
 }
 
 .meta-label {
-	font-family: var(--mono);
-	font-size: 8px;
-	letter-spacing: 1px;
-	text-transform: uppercase;
-	color: var(--text-muted);
+	@include dossier.meta-label;
 }
 
 .meta-val {
-	font-family: var(--mono);
-	font-size: 15px;
-	font-weight: 500;
-	margin-top: 3px;
-	color: var(--text-primary);
+	@include dossier.meta-val;
 }
 
 .section-label {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	margin-bottom: 10px;
+	@include dossier.section-label;
 }
 
 .chips {
@@ -377,8 +304,6 @@ let { view }: Props = $props();
 }
 
 .empty {
-	font-size: 12px;
-	color: var(--text-muted);
-	font-style: italic;
+	@include dossier.empty-note;
 }
 </style>

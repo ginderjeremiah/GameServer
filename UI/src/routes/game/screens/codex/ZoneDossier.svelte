@@ -1,94 +1,94 @@
 <!-- The zone dossier (right panel): a section-accented header (Zone + progression seal + name), the
      level band / spawn-pool meta, the zone boss card, the spawn table and the unlock condition. The
      boss card and spawn rows cross-link into the enemy dossier. -->
-{#if view.selectedZone}
-	<div class="dossier" data-testid="codex-zone-dossier" style:--status-color={zoneStatusColor(view.selectedZoneStatus)}>
-		<div class="head">
-			<div class="kind-line">
-				<span class="kind-dot"></span>
-				<span class="kind">Zone</span>
-				<span class="spacer"></span>
-				<span class="seal" data-testid="codex-zone-status">{ZONE_STATUS_LABELS[view.selectedZoneStatus]}</span>
+<DossierShell
+	selectedItem={view.selectedZone}
+	testid="codex-zone-dossier"
+	accent="var(--accent)"
+	kind="Zone"
+	name={view.selectedZone?.name ?? ''}
+	description={view.selectedZone?.description}
+>
+	{#snippet headExtra()}
+		<span class="spacer"></span>
+		<span class="seal" data-testid="codex-zone-status" style:--status-color={zoneStatusColor(view.selectedZoneStatus)}
+			>{ZONE_STATUS_LABELS[view.selectedZoneStatus]}</span
+		>
+	{/snippet}
+
+	<div class="body">
+		<div class="meta">
+			<div class="meta-card">
+				<div class="meta-label">Level Range</div>
+				<div class="meta-val">{view.zoneBand}</div>
 			</div>
-			<div class="name">{view.selectedZone.name}</div>
-			{#if view.selectedZone.description}
-				<div class="desc">{view.selectedZone.description}</div>
+			<div class="meta-card">
+				<div class="meta-label">Spawn Pool</div>
+				<div class="meta-val">{view.zoneSpawnCount} {view.zoneSpawnCount === 1 ? 'enemy' : 'enemies'}</div>
+			</div>
+		</div>
+
+		{#if view.zoneBoss}
+			{@const boss = view.zoneBoss}
+			<div class="section">
+				<div class="section-label">Zone boss</div>
+				<button
+					type="button"
+					class="boss-card"
+					data-testid="codex-zone-boss"
+					onclick={() => view.openEnemy(boss.enemyId)}
+				>
+					<span class="boss-mark"></span>
+					<span class="boss-text">
+						<span class="boss-name">{boss.name}</span>
+						<span class="boss-meta">Boss · LVL {boss.level}</span>
+					</span>
+					<span class="chev" aria-hidden="true">›</span>
+				</button>
+			</div>
+		{/if}
+
+		<div class="section">
+			<ZoneSpawnPanel {view} />
+		</div>
+
+		<div class="section">
+			<div class="section-label">Unlock condition</div>
+			{#if view.zoneUnlock}
+				{@const unlock = view.zoneUnlock}
+				<div class="unlock" class:sealed={unlock.sealed}>
+					<span class="unlock-text">
+						<span class="unlock-lead">Complete challenge</span>
+						<span class="unlock-name">{unlock.challengeName}</span>
+					</span>
+					<span class="unlock-chip">{unlock.sealed ? 'Sealed' : 'Met'}</span>
+				</div>
+			{:else}
+				<div class="unlock open">
+					<span class="unlock-text">
+						<span class="unlock-name">Always open</span>
+						<span class="unlock-lead">No challenge gates this zone</span>
+					</span>
+				</div>
 			{/if}
 		</div>
 
-		<div class="body">
-			<div class="meta">
-				<div class="meta-card">
-					<div class="meta-label">Level Range</div>
-					<div class="meta-val">{view.zoneBand}</div>
-				</div>
-				<div class="meta-card">
-					<div class="meta-label">Spawn Pool</div>
-					<div class="meta-val">{view.zoneSpawnCount} {view.zoneSpawnCount === 1 ? 'enemy' : 'enemies'}</div>
-				</div>
-			</div>
-
-			{#if view.zoneBoss}
-				{@const boss = view.zoneBoss}
-				<div class="section">
-					<div class="section-label">Zone boss</div>
-					<button
-						type="button"
-						class="boss-card"
-						data-testid="codex-zone-boss"
-						onclick={() => view.openEnemy(boss.enemyId)}
-					>
-						<span class="boss-mark"></span>
-						<span class="boss-text">
-							<span class="boss-name">{boss.name}</span>
-							<span class="boss-meta">Boss · LVL {boss.level}</span>
-						</span>
-						<span class="chev" aria-hidden="true">›</span>
-					</button>
-				</div>
-			{/if}
-
-			<div class="section">
-				<ZoneSpawnPanel {view} />
-			</div>
-
-			<div class="section">
-				<div class="section-label">Unlock condition</div>
-				{#if view.zoneUnlock}
-					{@const unlock = view.zoneUnlock}
-					<div class="unlock" class:sealed={unlock.sealed}>
-						<span class="unlock-text">
-							<span class="unlock-lead">Complete challenge</span>
-							<span class="unlock-name">{unlock.challengeName}</span>
-						</span>
-						<span class="unlock-chip">{unlock.sealed ? 'Sealed' : 'Met'}</span>
-					</div>
-				{:else}
-					<div class="unlock open">
-						<span class="unlock-text">
-							<span class="unlock-name">Always open</span>
-							<span class="unlock-lead">No challenge gates this zone</span>
-						</span>
-					</div>
-				{/if}
-			</div>
-
-			<div class="section">
-				<StatisticsPanel
-					stats={view.zoneStatistics}
-					loading={view.statsLoading}
-					error={view.statsError}
-					emptyMessage="No statistics recorded for this zone yet."
-					testid="codex-zone-stats"
-				/>
-			</div>
+		<div class="section">
+			<StatisticsPanel
+				stats={view.zoneStatistics}
+				loading={view.statsLoading}
+				error={view.statsError}
+				emptyMessage="No statistics recorded for this zone yet."
+				testid="codex-zone-stats"
+			/>
 		</div>
 	</div>
-{/if}
+</DossierShell>
 
 <script lang="ts">
 import type { CodexView } from './codex-view.svelte';
 import { ZONE_STATUS_LABELS, zoneStatusColor } from './codex-display';
+import DossierShell from './DossierShell.svelte';
 import ZoneSpawnPanel from './ZoneSpawnPanel.svelte';
 import StatisticsPanel from './StatisticsPanel.svelte';
 
@@ -100,43 +100,7 @@ let { view }: Props = $props();
 </script>
 
 <style lang="scss">
-.dossier {
-	width: 380px;
-	flex: none;
-	background: var(--surface);
-	border-left: 1px solid var(--border-subtle);
-	display: flex;
-	flex-direction: column;
-}
-
-.head {
-	border-left: 3px solid var(--accent);
-	padding: 18px 20px 14px;
-	flex: none;
-}
-
-.kind-line {
-	display: flex;
-	align-items: center;
-	gap: 9px;
-	margin-bottom: 6px;
-}
-
-.kind-dot {
-	width: 6px;
-	height: 6px;
-	transform: rotate(45deg);
-	background: var(--accent);
-	flex: none;
-}
-
-.kind {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--accent);
-}
+@use '$styles/codex-dossier' as dossier;
 
 .spacer {
 	flex: 1;
@@ -153,66 +117,28 @@ let { view }: Props = $props();
 	padding: 2px 9px;
 }
 
-.name {
-	font-size: 21px;
-	font-weight: 500;
-	letter-spacing: -0.3px;
-	line-height: 1.05;
-}
-
-.desc {
-	margin-top: 7px;
-	font-size: 12px;
-	line-height: 1.5;
-	color: var(--text-tertiary);
-}
-
 .body {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	padding: 16px 20px 20px;
-	display: flex;
-	flex-direction: column;
-	gap: 18px;
+	@include dossier.stacked-body;
 }
 
 .meta {
-	display: flex;
-	gap: 10px;
+	@include dossier.meta-row;
 }
 
 .meta-card {
-	flex: 1;
-	background: var(--panel);
-	border: 1px solid var(--border-subtle);
-	border-radius: 4px;
-	padding: 9px 11px;
+	@include dossier.meta-card;
 }
 
 .meta-label {
-	font-family: var(--mono);
-	font-size: 8px;
-	letter-spacing: 1px;
-	text-transform: uppercase;
-	color: var(--text-muted);
+	@include dossier.meta-label;
 }
 
 .meta-val {
-	font-family: var(--mono);
-	font-size: 15px;
-	font-weight: 500;
-	margin-top: 3px;
-	color: var(--text-primary);
+	@include dossier.meta-val;
 }
 
 .section-label {
-	font-family: var(--mono);
-	font-size: 9px;
-	letter-spacing: 1.6px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	margin-bottom: 10px;
+	@include dossier.section-label;
 }
 
 .boss-card {
