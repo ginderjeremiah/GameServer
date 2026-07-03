@@ -8,6 +8,7 @@ export * from './synthesis-feedback';
 export * from './zone-progression';
 export * from './enemy-attributes';
 export * from './attribute-display';
+export * from './activity-key-display';
 export * from './damage-type-display';
 export * from './damage-log';
 export * from './skill-effect-display';

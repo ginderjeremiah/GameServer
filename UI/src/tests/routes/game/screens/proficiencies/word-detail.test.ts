@@ -222,8 +222,10 @@ describe('buildLadder', () => {
 /* ── trainedBy ─────────────────────────────────────────────────────────────── */
 
 describe('trainedBy', () => {
-	it('labels the path by the activity key it trains on', () => {
+	it('labels the path by the friendly label of the activity key it trains on', () => {
 		expect(trainedBy(EActivityKey.Fire)).toEqual(['Fire']);
-		expect(trainedBy(EActivityKey.Physical)).toEqual(['Physical']);
+		expect(trainedBy(EActivityKey.Dot)).toEqual(['DoT']);
+		expect(trainedBy(EActivityKey.Crit)).toEqual(['Critical damage']);
+		expect(trainedBy(EActivityKey.FireResist)).toEqual(['Fire (resist)']);
 	});
 });
