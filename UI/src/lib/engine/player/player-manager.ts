@@ -2,6 +2,7 @@ import {
 	ELogType,
 	IAttributeDistribution,
 	IBattlerAttribute,
+	IDefeatRewards,
 	IInventoryData,
 	ILogPreference,
 	IPlayerData,
@@ -196,6 +197,26 @@ export class PlayerManager implements IPlayerData {
 		this.statPointsGained += STAT_POINTS_PER_LEVEL;
 		logMessage(ELogType.LevelUp, 'Congratulations, you leveled up!');
 		logMessage(ELogType.LevelUp, `You are now level ${this.level}.`);
+	}
+
+	/**
+	 * Applies a battle victory's exp grant, then reconciles onto the server's authoritative post-grant
+	 * state. `grantExp` re-derives level/exp/statPointsGained locally for its log messages, but the
+	 * backend additionally clamps a single grant to `MaxExpPerGrant` (an anti-cheat backstop the frontend
+	 * deliberately doesn't mirror) and is the source of truth regardless, so `rewards`' fields — computed
+	 * server-side — always win over the local recompute.
+	 */
+	public applyVictoryRewards(rewards: IDefeatRewards) {
+		// grantExp is invoked only for its log-message side effect (the "Earned X exp." / level-up lines);
+		// its own level/exp recompute is discarded below. `expReward` is the server's pre-clamp raw reward,
+		// so in the (effectively unreachable in normal play) case of a single grant exceeding
+		// MaxExpPerGrant, this can over-level and log phantom level-up lines before the reconcile below
+		// corrects level/exp back down to the server's actual post-clamp state.
+		this.grantExp(rewards.expReward);
+		this.level = rewards.newLevel;
+		this.exp = rewards.newExp;
+		this.statPointsGained = rewards.statPointsGained;
+		this.statPointsUsed = rewards.statPointsUsed;
 	}
 }
 
