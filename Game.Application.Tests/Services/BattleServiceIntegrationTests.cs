@@ -1414,6 +1414,40 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_TransitionToOutOfRangeZone_KeepsPlayerInCurrentZone()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // A tampered request naming an out-of-range zone id is ignored — not thrown — exactly like a
+            // locked or retired target: the player stays put and the battle proceeds in their current zone.
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id, newZoneId: 999);
+
+            Assert.NotNull(result);
+            Assert.Equal(zone.Id, player.CurrentZoneId);
+            Assert.Equal(zone.Id, state.BattleZoneId);
+        }
+
+        [Fact]
         public async Task StartBattle_TransitionToHomeZone_KeepsPlayerInCurrentZone()
         {
             using var scope = CreateScope();
@@ -1596,6 +1630,35 @@ namespace Game.Application.Tests.Services
             var state = new PlayerState();
 
             var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.Null(result);
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_OutOfRangeZone_ReturnsNullAndStartsNoBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // A tampered ChallengeBoss request naming an out-of-range zone id is a graceful no-op — not an
+            // ArgumentOutOfRangeException surfacing as an opaque 500 — like the bossless/locked/retired cases.
+            var result = await battleService.StartBossBattle(player, state, 999);
 
             Assert.Null(result);
             Assert.False(state.HasActiveBattle);

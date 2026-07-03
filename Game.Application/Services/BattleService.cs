@@ -77,14 +77,14 @@ namespace Game.Application.Services
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
             }
 
-            // A real zone change is gated on the target being unlocked, in circulation, and a combat zone
-            // (anti-cheat). A legitimate client never navigates a battle into a locked, retired, or Home zone —
-            // the UI gates all three (and never spawns a battle in Home at all) — so such a target is ignored
-            // and the battle simply proceeds in the player's current zone. Refusing the Home target keeps the
-            // "fake zone" invariant the offline path relies on: a player's persisted CurrentZoneId is never the
-            // no-combat Home sanctuary, so offline rewards always replay their last real combat zone. Same-zone
-            // re-requests skip the check (and the redundant save) entirely.
-            if (newZoneId.HasValue && newZoneId.Value != player.CurrentZoneId)
+            // A real zone change is gated on the target being in range, unlocked, in circulation, and a combat
+            // zone (anti-cheat). A legitimate client never navigates a battle into an out-of-range, locked,
+            // retired, or Home zone — the UI gates all four (and never spawns a battle in Home at all) — so
+            // such a target is ignored and the battle simply proceeds in the player's current zone. Refusing
+            // the Home target keeps the "fake zone" invariant the offline path relies on: a player's persisted
+            // CurrentZoneId is never the no-combat Home sanctuary, so offline rewards always replay their last
+            // real combat zone. Same-zone re-requests skip the check (and the redundant save) entirely.
+            if (newZoneId.HasValue && newZoneId.Value != player.CurrentZoneId && _zones.ValidateZoneId(newZoneId.Value))
             {
                 var targetZone = _zones.GetDomainZone(newZoneId.Value);
                 if (!_zones.IsZoneRetired(newZoneId.Value)
@@ -178,6 +178,14 @@ namespace Game.Application.Services
         /// </summary>
         public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
+            // Out-of-range is a true no-op, same as the bossless/locked/retired checks below: validate before
+            // touching the active battle (abandoning is not a cheap no-op) and before resolving the domain
+            // zone, which throws on an out-of-range id.
+            if (!_zones.ValidateZoneId(zoneId))
+            {
+                return null;
+            }
+
             var zone = _zones.GetDomainZone(zoneId);
 
             // Validate the challenge before touching the active battle: abandoning is not a cheap no-op
