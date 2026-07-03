@@ -1,4 +1,4 @@
-<div id={tooltipElementId(id)} role="tooltip" class="tooltip-container" {style} bind:this={container}>
+<div id={tooltipElementId(id)} role="tooltip" class="tooltip-container" bind:this={container}>
 	<!-- The tooltip content is rendered directly into the container, so it is not present in the markup here. -->
 </div>
 
@@ -23,30 +23,42 @@ $effect(() => {
 	}
 });
 
-const style = $derived.by(() => {
+// Positioning is an $effect writing inline styles (not a derived style attribute): the edge-flip
+// logic needs the panel's rendered size, which measures 0x0 until `display: block` reaches the DOM.
+// A derived evaluates before the DOM updates, so the first show — the only positioning a
+// keyboard-focus trigger gets — would never flip and could clip offscreen at viewport edges.
+$effect(() => {
 	const mouseX = position?.x ?? 0;
 	const mouseY = position?.y ?? 0;
 
-	if (!container || !visible) {
+	if (!container) {
 		return;
 	}
 
-	let vertical = '';
-	let horizontal = '';
+	if (!visible) {
+		// Clear the inline display so the scoped `display: none` takes back over.
+		container.style.display = '';
+		return;
+	}
+
+	// Make the panel renderable first so offsetWidth/offsetHeight measure the real box.
+	container.style.display = 'block';
 
 	if (container.offsetWidth + mouseX + 15 < window.innerWidth) {
-		horizontal = `left: ${mouseX + 15}px`;
+		container.style.left = `${mouseX + 15}px`;
+		container.style.right = '';
 	} else {
-		horizontal = `right: ${window.innerWidth - mouseX + 15}px`;
+		container.style.right = `${window.innerWidth - mouseX + 15}px`;
+		container.style.left = '';
 	}
 
 	if (container.offsetHeight + mouseY + 15 < window.innerHeight) {
-		vertical = `top: ${mouseY + 15}px`;
+		container.style.top = `${mouseY + 15}px`;
+		container.style.bottom = '';
 	} else {
-		vertical = `bottom: ${window.innerHeight - mouseY + 15}px`;
+		container.style.bottom = `${window.innerHeight - mouseY + 15}px`;
+		container.style.top = '';
 	}
-
-	return `${vertical}; ${horizontal}; display: block;`;
 });
 </script>
 
