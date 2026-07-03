@@ -783,8 +783,9 @@ namespace Game.Core.Tests.Battle
                 // A heavy-LUK build with NO crit/parry enabler is byte-identical to the 0-LUK multiSkill
                 // matchup: Luck 500 lifts CriticalChanceMultiplier/ParryChanceMultiplier to 2.0 and
                 // CriticalDamage to 2.75, but every skill's authored CriticalChance is 0 (0 × 2 = 0),
-                // ParryChance is 0, and DodgeChance is 0 (Agility 0) — so with all draws taken and every
-                // proc chance still 0, the exchange resolves exactly like multiSkill → 6400ms. (The paired
+                // ParryChance is 0, and DodgeChance is 0 (authored-only, spike #1426/#1523 — unaffected by
+                // Agility here since none is allocated) — so with all draws taken and every proc chance
+                // still 0, the exchange resolves exactly like multiSkill → 6400ms. (The paired
                 // Parity_HighLuckWithoutProcEnabler_MatchesZeroLuckBuild fact pins the equality directly.)
                 ["luckWithoutEnablerIsInert"] = new ParityScenario(
                     Player: () => MakeBattler(

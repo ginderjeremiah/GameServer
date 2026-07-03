@@ -117,6 +117,21 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Luck
 			},
+			// DodgeChanceMultiplier = base 1 + 0.002·AGI (#1523), the same template: the enabler is the
+			// authored-only DodgeChance (base 0 everywhere, so it has no static modifier).
+			{
+				attribute: EAttribute.DodgeChanceMultiplier,
+				amount: 1,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
+			},
+			{
+				attribute: EAttribute.DodgeChanceMultiplier,
+				amount: 0.002,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Agility
+			},
 			// CriticalDamage = base 1.5 + 0.0025·LUK
 			{
 				attribute: EAttribute.CriticalDamage,
@@ -130,14 +145,6 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Luck
-			},
-			// DodgeChance = 0.001·AGI
-			{
-				attribute: EAttribute.DodgeChance,
-				amount: 0.001,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Agility
 			}
 		]);
 	});

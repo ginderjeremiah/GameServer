@@ -43,11 +43,10 @@ namespace Game.Core.Attributes.Modifiers
 
             // The remaining chance-based combat attributes. All use the decimal convention — a chance is
             // compared directly against the [0,1) battle RNG draw — and the coefficients are a conservative
-            // strawman expected to be tuned during balancing. One of them is deliberately NOT derived from a
-            // core attribute here: DamageReflection (spike #1330) is authored-only — granted by
-            // gear/mod/proficiency/class rather than derived — so it has no entry (base 0 everywhere).
-            // DodgeChance, by contrast, stays Agility-derived (its entry is last, below), so evasion is live
-            // from raw allocations; the value is also grantable by gear/item-mods/skill-effects.
+            // strawman expected to be tuned during balancing. Several are deliberately NOT derived from a
+            // core attribute here: DamageReflection (spike #1330) and DodgeChance (spike #1426, dodge rework
+            // #1523) are authored-only — granted by gear/mod/proficiency/class/skill-effects rather than
+            // derived — so they have no entry (base 0 everywhere).
 
             // CriticalChanceMultiplier = 1 (base) + 0.002·Luck. Crit is opt-in (crit rework #1425, per-skill
             // base #1453): the ENABLER is a skill's own authored CriticalChance (0 by default, so an
@@ -69,13 +68,18 @@ namespace Game.Core.Attributes.Modifiers
             new() { Attribute = ParryChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
             new() { Attribute = ParryChanceMultiplier, Amount = 0.002, Source = Derived, DerivedSource = Luck, Type = Additive },
 
+            // DodgeChanceMultiplier = 1 (base) + 0.002·Agility, following the same opt-in-multiplier template
+            // (spike #1426, dodge rework #1523): the ENABLER is the authored-only DodgeChance attribute (base 0
+            // everywhere, granted by items/item-mods/skill-effects — no entry here), and this base-1 multiplier
+            // is what Agility (the tempo & evasion amplifier) and the Evasion proficiency path feed, so
+            // investment scales an authored dodge chance while staying inert for the uncommitted.
+            new() { Attribute = DodgeChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
+            new() { Attribute = DodgeChanceMultiplier, Amount = 0.002, Source = Derived, DerivedSource = Agility, Type = Additive },
+
             // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
             // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.
             new() { Attribute = CriticalDamage, Amount = 1.5, Source = BaseValue, Type = Additive },
             new() { Attribute = CriticalDamage, Amount = 0.0025, Source = Derived, DerivedSource = Luck, Type = Additive },
-
-            // DodgeChance = 0.001·Agility (no base).
-            new() { Attribute = DodgeChance, Amount = 0.001, Source = Derived, DerivedSource = Agility, Type = Additive },
         ];
     }
 }

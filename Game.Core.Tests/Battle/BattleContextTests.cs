@@ -175,6 +175,59 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void DamageTarget_NoDodgeChance_EnemyHitLandsUnchanged()
+        {
+            // DodgeChance is base 0 with no derivation (dodge rework #1523), so an uncommitted defender
+            // never dodges and the enemy hit resolves exactly as before the mechanic existed.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            var before = player.CurrentHealth;
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(before - 20, player.CurrentHealth, 0.001);
+            Assert.Equal(0, context.Stats.AttacksDodged);
+        }
+
+        [Fact]
+        public void DamageTarget_ZeroDodgeChance_MultiplierAloneNeverDodges()
+        {
+            // The enabler is the authored DodgeChance, not the multiplier: a build stacking
+            // DodgeChanceMultiplier (base 1 + 999 = 1000) still dodges nothing at chance 0 (0 × 1000 = 0) —
+            // the same commitment template as parry's authored-only enabler.
+            var player = MakeBattlerWith((DodgeChanceMultiplier, 999));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            var before = player.CurrentHealth;
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(before - 20, player.CurrentHealth, 0.001);
+            Assert.Equal(0, context.Stats.AttacksDodged);
+        }
+
+        [Fact]
+        public void DamageTarget_MultiplierScalesAFractionalDodgeChanceToOne_AlwaysDodges()
+        {
+            // A fractional authored chance (0.5) scaled by a DodgeChanceMultiplier of 2 (base 1 + 1 = 2)
+            // reaches an effective chance of 1.0 — at or above every possible [0,1) draw — mirroring how
+            // ParryChanceMultiplier scales a fractional authored parry chance.
+            var player = MakeBattlerWith((DodgeChance, 0.5), (DodgeChanceMultiplier, 1));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            var before = player.CurrentHealth;
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(before, player.CurrentHealth, 0.001);
+            Assert.Equal(1, context.Stats.AttacksDodged);
+        }
+
+        [Fact]
         public void DamageTarget_EnemyAttacking_NeverCrits()
         {
             // A forced baseCriticalChance of 1 is passed, but the crit roll is gated on the player attacking, so

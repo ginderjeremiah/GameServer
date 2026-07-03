@@ -126,22 +126,25 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.ParryChanceMultiplier]
 			},
 
+			// DodgeChanceMultiplier = 1 (base) + 0.002*Agility (#1523), the same opt-in template as parry:
+			// its enabler is the authored-only DodgeChance, so the Agility-fed multiplier idles until one is
+			// fielded.
+			dodgeChanceMultiplier: {
+				allocations: [[EAttribute.Agility, 20]],
+				derivedAttributes: [EAttribute.DodgeChanceMultiplier]
+			},
+
 			// CriticalDamage = 1.5 (base) + 0.0025*Luck
 			criticalDamage: {
 				allocations: [[EAttribute.Luck, 20]],
 				derivedAttributes: [EAttribute.CriticalDamage]
 			},
 
-			// DodgeChance = 0.001*Agility (no base)
-			dodgeChance: {
-				allocations: [[EAttribute.Agility, 20]],
-				derivedAttributes: [EAttribute.DodgeChance]
-			},
-
-			// With no allocations every derived stat collapses to just its base: the four with a base carry
-			// it (MaxHealth 50, CriticalDamage 1.5, CriticalChanceMultiplier/ParryChanceMultiplier 1), the
-			// pure-derived stats (Toughness, CooldownRecovery's coefficients aside, and DodgeChance) are
-			// 0/base. DamageReflection is authored-only (no static modifier at all), so it is 0 here too.
+			// With no allocations every derived stat collapses to just its base: the five with a base carry
+			// it (MaxHealth 50, CriticalDamage 1.5, CriticalChanceMultiplier/ParryChanceMultiplier/
+			// DodgeChanceMultiplier 1), the pure-derived stats (Toughness, CooldownRecovery's coefficients
+			// aside) are 0/base. DamageReflection and DodgeChance are authored-only (no static modifier at
+			// all), so they are 0 here too.
 			zeroBaseStats: {
 				allocations: [],
 				derivedAttributes: [
@@ -152,6 +155,7 @@ describe('BattleAttributes', () => {
 					EAttribute.DamageReflection,
 					EAttribute.CriticalChanceMultiplier,
 					EAttribute.ParryChanceMultiplier,
+					EAttribute.DodgeChanceMultiplier,
 					EAttribute.DodgeChance
 				]
 			}

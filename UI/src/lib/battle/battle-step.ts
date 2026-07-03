@@ -194,15 +194,18 @@ export function battleStep(
 	// player's turn).
 	if (!enemy.isDead && !player.isDead) {
 		enemy.advanceCooldowns(timeDelta, (skill) => {
-			// Three draws per enemy fire, in fixed order — parry (#1457), dodge (Block's former second draw
-			// was retired, #1330), and the parry counter's crit — all taken unconditionally so the seeded
+			// Three draws per enemy fire, in fixed order — parry (#1457), dodge (#1523; Block's former second
+			// draw was retired, #1330), and the parry counter's crit — all taken unconditionally so the seeded
 			// stream advances as a pure function of the fire sequence, never of a roll outcome or of the
 			// defender's build (a 0-chance draw still consumes). A parry takes precedence over a dodge.
 			const parried =
 				rng.next() <
 				player.attributes.getValue(EAttribute.ParryChance) *
 					player.attributes.getValue(EAttribute.ParryChanceMultiplier);
-			const dodged = rng.next() < player.attributes.getValue(EAttribute.DodgeChance);
+			const dodged =
+				rng.next() <
+				player.attributes.getValue(EAttribute.DodgeChance) *
+					player.attributes.getValue(EAttribute.DodgeChanceMultiplier);
 			const counterCritDraw = rng.next();
 			const raw = skill.calculateDamage();
 			// A parry or dodge zeroes the WHOLE multi-typed hit; otherwise the raw hit is split across the

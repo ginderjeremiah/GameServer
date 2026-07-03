@@ -157,11 +157,12 @@ namespace Game.Core.Battle
         /// <see cref="EAttribute.Toughness"/>.</item>
         /// <item>When the <b>enemy</b> attacks the player, <b>three</b> draws are taken unconditionally, in
         /// fixed order: a parry draw (#1457, against <see cref="EAttribute.ParryChance"/> ×
-        /// <see cref="EAttribute.ParryChanceMultiplier"/>), a dodge draw (Block's former second draw was retired
-        /// in spike #1330), and the parry counter's crit draw — consumed even when no parry procs or the
-        /// defender has no counter skill, so the stream stays a pure function of the fire sequence. A parry
-        /// takes precedence over a dodge; either zeroes the <b>whole</b> multi-typed hit, and a parry
-        /// additionally fires the defender's riposte (see <see cref="FireParryCounter"/>).</item>
+        /// <see cref="EAttribute.ParryChanceMultiplier"/>), a dodge draw (#1523, against
+        /// <see cref="EAttribute.DodgeChance"/> × <see cref="EAttribute.DodgeChanceMultiplier"/>; Block's former
+        /// second draw was retired in spike #1330), and the parry counter's crit draw — consumed even when no
+        /// parry procs or the defender has no counter skill, so the stream stays a pure function of the fire
+        /// sequence. A parry takes precedence over a dodge; either zeroes the <b>whole</b> multi-typed hit, and
+        /// a parry additionally fires the defender's riposte (see <see cref="FireParryCounter"/>).</item>
         /// </list>
         /// The per-portion typed books (<see cref="BattleStats.AddTypedDamageDealt"/> per portion's net capped at
         /// the health it actually removed — overkill books nothing, #1482 —
@@ -221,13 +222,14 @@ namespace Game.Core.Battle
             }
             else
             {
-                // Three draws per enemy fire, in fixed order — parry (#1457), dodge (Block's former second draw
-                // was retired, spike #1330), and the parry counter's crit — all taken unconditionally so the
-                // seeded stream advances as a pure function of the fire sequence, never of a roll outcome or of
-                // the defender's build (a 0-chance draw still consumes). A parry takes precedence over a dodge.
+                // Three draws per enemy fire, in fixed order — parry (#1457), dodge (#1523; Block's former
+                // second draw was retired, spike #1330), and the parry counter's crit — all taken unconditionally
+                // so the seeded stream advances as a pure function of the fire sequence, never of a roll outcome
+                // or of the defender's build (a 0-chance draw still consumes). A parry takes precedence over a dodge.
                 var isParry = _rng.Next() < _targetBattler.GetAttributeValue(ParryChance)
                     * _targetBattler.GetAttributeValue(ParryChanceMultiplier);
-                var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
+                var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance)
+                    * _targetBattler.GetAttributeValue(DodgeChanceMultiplier);
                 var counterCritDraw = _rng.Next();
 
                 if (isParry)
