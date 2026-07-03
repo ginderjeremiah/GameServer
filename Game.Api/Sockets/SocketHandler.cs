@@ -330,13 +330,13 @@ namespace Game.Api.Sockets
             }
             while (_context.State is Open);
 
-            // Complete the closing handshake for a client-initiated close, and close a socket the read loop is
-            // abandoning while still open (the terminal-fault break above) so teardown completes instead of
-            // leaving a half-open socket. Close is a no-op on an already-closed/aborted socket.
-            if (_context.State is Open or CloseReceived)
-            {
-                await _context.Close(ESocketCloseReason.Finished);
-            }
+            // Complete the closing handshake for a client-initiated close, close a socket the read loop is
+            // abandoning while still open (the terminal-fault break above), and settle WaitSocketClosed for
+            // an abrupt disconnect (Aborted) so the middleware awaiting it always unblocks and tears down the
+            // registration. Unconditional: Close() re-checks state itself and only sends a close frame when
+            // still Open, so this is a no-op send on an already-closed/aborted socket but always settles the
+            // TCS.
+            await _context.Close(ESocketCloseReason.Finished);
         }
 
         internal async Task HandleMessage(string message)
