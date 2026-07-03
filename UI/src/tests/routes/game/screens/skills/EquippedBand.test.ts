@@ -1,47 +1,58 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EDamageType, ERarity, ESkillAcquisition } from '$lib/api';
-import type { IChallenge, IEnemy, ISkill, IZone } from '$lib/api';
+import { EDamageType, EModifierType, EAttribute, ERarity, ESkillAcquisition } from '$lib/api';
+import type { IChallenge, IEnemy, ISignaturePassive, ISkill, IZone } from '$lib/api';
+import type { AttributeModifier } from '$lib/battle';
+import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
 // Engine/stores/api are mocked so constructing a real SkillsView doesn't drag in the game engine.
 // `playerManager.selectedSkills` derives the equipped order from `unlockedSkills`, mirroring the
 // real PlayerManager; the band reads everything else off the view.
-const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
-	const playerManager = {
-		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
-		currentZone: 0,
-		attributes: [] as { attributeId: number; amount: number }[],
-		get selectedSkills(): number[] {
-			return playerManager.unlockedSkills
-				.filter((s) => s.selected)
-				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-				.map((s) => s.skillId);
-		},
-		setSelectedSkills(orderedIds: number[]) {
-			for (const unlockedSkill of playerManager.unlockedSkills) {
-				const order = orderedIds.indexOf(unlockedSkill.skillId);
-				unlockedSkill.selected = order >= 0;
-				unlockedSkill.order = order >= 0 ? order : undefined;
+const { mockPlayerManager, mockInventoryManager, playerProficiencies, sendSocketCommand, toastError, staticData } =
+	vi.hoisted(() => {
+		const playerManager = {
+			unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
+			currentZone: 0,
+			attributes: [] as { attributeId: number; amount: number }[],
+			battleLockedBaseModifiers: [] as AttributeModifier[],
+			battleSignaturePassiveModifier: undefined as unknown as (
+				resolve: (attribute: EAttribute) => number
+			) => AttributeModifier,
+			get selectedSkills(): number[] {
+				return playerManager.unlockedSkills
+					.filter((s) => s.selected)
+					.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+					.map((s) => s.skillId);
+			},
+			setSelectedSkills(orderedIds: number[]) {
+				for (const unlockedSkill of playerManager.unlockedSkills) {
+					const order = orderedIds.indexOf(unlockedSkill.skillId);
+					unlockedSkill.selected = order >= 0;
+					unlockedSkill.order = order >= 0 ? order : undefined;
+				}
 			}
-		}
-	};
-	return {
-		mockPlayerManager: playerManager,
-		mockInventoryManager: { equipmentStats: [] as { attributeId: number; amount: number }[] },
-		sendSocketCommand: vi.fn(),
-		toastError: vi.fn(),
-		staticData: {
-			skills: [] as ISkill[],
-			challenges: [] as IChallenge[],
-			zones: undefined as IZone[] | undefined,
-			enemies: undefined as IEnemy[] | undefined,
-			attributes: undefined as unknown
-		}
-	};
-});
+		};
+		return {
+			mockPlayerManager: playerManager,
+			mockInventoryManager: {
+				equipmentStats: [] as { attributeId: number; amount: number }[],
+				grantedSkillIds: [] as number[]
+			},
+			playerProficiencies: { battleModifiers: [] as AttributeModifier[] },
+			sendSocketCommand: vi.fn(),
+			toastError: vi.fn(),
+			staticData: {
+				skills: [] as ISkill[],
+				challenges: [] as IChallenge[],
+				zones: undefined as IZone[] | undefined,
+				enemies: undefined as IEnemy[] | undefined,
+				attributes: undefined as unknown
+			}
+		};
+	});
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
-vi.mock('$stores', () => ({ staticData, toastError }));
+vi.mock('$stores', () => ({ staticData, toastError, playerProficiencies }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, apiSocket: { sendSocketCommand } };
@@ -87,6 +98,14 @@ let view: SkillsView;
 const filledCards = (container: HTMLElement) =>
 	Array.from(container.querySelectorAll<HTMLElement>('.eqcard:not(.empty)'));
 
+// A flat no-op signature passive — the default a player whose class has no passive carries.
+const noOpPassive: ISignaturePassive = {
+	attributeId: EAttribute.Strength,
+	amount: 0,
+	scalingAmount: 0,
+	modifierType: EModifierType.Additive
+};
+
 beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({});
 	toastError.mockReset();
@@ -99,7 +118,11 @@ beforeEach(() => {
 		{ skillId: 3, selected: false, order: 0 }
 	];
 	mockPlayerManager.attributes = [];
+	mockPlayerManager.battleLockedBaseModifiers = [];
+	mockPlayerManager.battleSignaturePassiveModifier = (resolve) => classSignaturePassiveModifier(noOpPassive, resolve);
 	mockInventoryManager.equipmentStats = [];
+	mockInventoryManager.grantedSkillIds = [];
+	playerProficiencies.battleModifiers = [];
 	view = new SkillsView();
 });
 

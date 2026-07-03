@@ -3,6 +3,7 @@ export * from './battle-formulas';
 export * from './battle-step';
 export * from './battle-simulator';
 export * from './battle-attributes';
+export * from './player-battle-composition';
 export * from './attribute-modifier';
 export * from './attribute-collection';
 export * from './damage-types';

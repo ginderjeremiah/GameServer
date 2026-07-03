@@ -23,6 +23,7 @@ import {
 	computeAttributes,
 	groupBySource,
 	keyForAttribute,
+	playerBattleModifiers,
 	STATIC_ATTRIBUTE_MODIFIERS,
 	EModifierType,
 	EAttributeModifierSource,
@@ -298,13 +299,12 @@ export function buildPlayerModifiers(): LabeledModifier[] {
 
 	// Class locked base (the level-scaled attribute fingerprint, source `AttributeDistribution`) then the
 	// proficiency bonuses (source `Proficiency`) — both composed before the static engine modifiers, the
-	// order the battler assembles them in.
-	for (const mod of playerManager.battleLockedBaseModifiers) {
-		if (contributes(mod)) {
-			mods.push({ ...mod });
-		}
-	}
-	for (const mod of playerProficiencies.battleModifiers) {
+	// order the battler assembles them in. The shared `playerBattleModifiers` builder is the single source
+	// of this pairing so the battle engine and the skills screen can't drift from it (#1500).
+	for (const mod of playerBattleModifiers(
+		playerManager.battleLockedBaseModifiers,
+		playerProficiencies.battleModifiers
+	)) {
 		if (contributes(mod)) {
 			mods.push({ ...mod });
 		}

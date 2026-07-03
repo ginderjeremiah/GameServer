@@ -1,63 +1,78 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
 	EDamageType,
+	EModifierType,
 	ERarity,
 	EAttribute,
 	ESkillAcquisition,
 	type IChallenge,
 	type IEnemy,
+	type ISignaturePassive,
 	type ISkill,
 	type IZone
 } from '$lib/api';
+import { EAttributeModifierSource, type AttributeModifier } from '$lib/battle';
+import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
 // Engine + stores are mocked so importing the view-model doesn't drag in the real
 // game engine. `playerManager.unlockedSkills` is a plain writable array and
 // `setSelectedSkills`/`selectedSkills` mirror the real PlayerManager (the view now
-// routes loadout changes through the manager). `vi.hoisted` keeps these ready before
-// the hoisted vi.mock factories run.
-const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
-	const playerManager = {
-		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
-		currentZone: 0,
-		level: 1,
-		attributes: [] as { attributeId: number; amount: number }[],
-		get selectedSkills(): number[] {
-			return playerManager.unlockedSkills
-				.filter((s) => s.selected)
-				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-				.map((s) => s.skillId);
-		},
-		setSelectedSkills(orderedIds: number[]) {
-			for (const unlockedSkill of playerManager.unlockedSkills) {
-				const order = orderedIds.indexOf(unlockedSkill.skillId);
-				unlockedSkill.selected = order >= 0;
-				unlockedSkill.order = order >= 0 ? order : undefined;
+// routes loadout changes through the manager). `battleLockedBaseModifiers` /
+// `battleSignaturePassiveModifier` / `playerProficiencies.battleModifiers` back the live battle-attribute
+// composition (#1500) — reset to no-op defaults in `beforeEach`, overridden per test. `vi.hoisted` keeps
+// these ready before the hoisted vi.mock factories run.
+const { mockPlayerManager, mockInventoryManager, playerProficiencies, sendSocketCommand, toastError, staticData } =
+	vi.hoisted(() => {
+		const playerManager = {
+			unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
+			currentZone: 0,
+			level: 1,
+			attributes: [] as { attributeId: number; amount: number }[],
+			battleLockedBaseModifiers: [] as AttributeModifier[],
+			// Reassigned in beforeEach (and per-test) once ISignaturePassive/EModifierType are importable —
+			// the placeholder keeps the property present for the hoisted factory.
+			battleSignaturePassiveModifier: undefined as unknown as (
+				resolve: (attribute: EAttribute) => number
+			) => AttributeModifier,
+			get selectedSkills(): number[] {
+				return playerManager.unlockedSkills
+					.filter((s) => s.selected)
+					.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+					.map((s) => s.skillId);
+			},
+			setSelectedSkills(orderedIds: number[]) {
+				for (const unlockedSkill of playerManager.unlockedSkills) {
+					const order = orderedIds.indexOf(unlockedSkill.skillId);
+					unlockedSkill.selected = order >= 0;
+					unlockedSkill.order = order >= 0 ? order : undefined;
+				}
 			}
-		}
-	};
-	return {
-		mockPlayerManager: playerManager,
-		mockInventoryManager: {
-			equipmentStats: [] as { attributeId: number; amount: number }[],
-			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[],
-			// The equipped weapon type driving the weapon-match grey-out (#1342); reset to Unarmed in beforeEach.
-			// A numeric literal because this hoisted factory runs before the EDamageType import is evaluated.
-			equippedWeaponType: 13 as EDamageType
-		},
-		sendSocketCommand: vi.fn(),
-		toastError: vi.fn(),
-		staticData: {
-			skills: [] as ISkill[],
-			challenges: [] as IChallenge[],
-			zones: undefined as IZone[] | undefined,
-			enemies: undefined as IEnemy[] | undefined,
-			attributes: undefined as unknown
-		}
-	};
-});
+		};
+		return {
+			mockPlayerManager: playerManager,
+			mockInventoryManager: {
+				equipmentStats: [] as { attributeId: number; amount: number }[],
+				equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[],
+				grantedSkillIds: [] as number[],
+				// The equipped weapon type driving the weapon-match grey-out (#1342); reset to Unarmed in beforeEach.
+				// A numeric literal because this hoisted factory runs before the EDamageType import is evaluated.
+				equippedWeaponType: 13 as EDamageType
+			},
+			playerProficiencies: { battleModifiers: [] as AttributeModifier[] },
+			sendSocketCommand: vi.fn(),
+			toastError: vi.fn(),
+			staticData: {
+				skills: [] as ISkill[],
+				challenges: [] as IChallenge[],
+				zones: undefined as IZone[] | undefined,
+				enemies: undefined as IEnemy[] | undefined,
+				attributes: undefined as unknown
+			}
+		};
+	});
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
-vi.mock('$stores', () => ({ staticData, toastError }));
+vi.mock('$stores', () => ({ staticData, toastError, playerProficiencies }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, apiSocket: { sendSocketCommand } };
@@ -191,6 +206,15 @@ const ENEMIES: IEnemy[] = [
 
 const lastPayload = (): number[] => sendSocketCommand.mock.calls.at(-1)?.[1] as number[];
 
+// A flat no-op signature passive — the default a player whose class has no passive carries. It
+// contributes nothing, so it doesn't perturb the raw-damage assertions below unless a test overrides it.
+const noOpPassive: ISignaturePassive = {
+	attributeId: EAttribute.Strength,
+	amount: 0,
+	scalingAmount: 0,
+	modifierType: EModifierType.Additive
+};
+
 let view: SkillsView;
 
 beforeEach(() => {
@@ -208,9 +232,13 @@ beforeEach(() => {
 		{ skillId: 3, selected: false, order: 0 }
 	];
 	mockPlayerManager.attributes = [];
+	mockPlayerManager.battleLockedBaseModifiers = [];
+	mockPlayerManager.battleSignaturePassiveModifier = (resolve) => classSignaturePassiveModifier(noOpPassive, resolve);
 	mockInventoryManager.equipmentStats = [];
 	mockInventoryManager.equippedSlots = [];
+	mockInventoryManager.grantedSkillIds = [];
 	mockInventoryManager.equippedWeaponType = EDamageType.Unarmed;
+	playerProficiencies.battleModifiers = [];
 	view = new SkillsView();
 });
 
@@ -301,6 +329,43 @@ describe('SkillsView — initial state', () => {
 		expect(fresh.cooldown(0)).toBeCloseTo(1 / 1.04, 10);
 		expect(fresh.metric(0)?.contributions).toEqual([{ attributeId: EAttribute.Strength, multiplier: 1, value: 20 }]);
 	});
+
+	it('folds the class locked base into battle numbers, matching the live battler (#1500)', () => {
+		mockPlayerManager.battleLockedBaseModifiers = [
+			{
+				attribute: EAttribute.Strength,
+				amount: 15,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.AttributeDistribution
+			}
+		];
+		const fresh = new SkillsView();
+		expect(fresh.rawDamage(0)).toBe(27); // Alpha: 12 base + 15 locked-base Strength
+	});
+
+	it('folds proficiency bonuses into battle numbers, matching the live battler (#1500)', () => {
+		playerProficiencies.battleModifiers = [
+			{
+				attribute: EAttribute.Strength,
+				amount: 5,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Proficiency
+			}
+		];
+		const fresh = new SkillsView();
+		expect(fresh.rawDamage(0)).toBe(17); // Alpha: 12 base + 5 proficiency Strength
+	});
+
+	it('folds the class signature passive into battle numbers, matching the live battler (#1500)', () => {
+		mockPlayerManager.battleSignaturePassiveModifier = () => ({
+			attribute: EAttribute.Strength,
+			amount: 8,
+			type: EModifierType.Additive,
+			source: EAttributeModifierSource.Class
+		});
+		const fresh = new SkillsView();
+		expect(fresh.rawDamage(0)).toBe(20); // Alpha: 12 base + 8 signature passive Strength
+	});
 });
 
 describe('SkillsView — innate (item-granted) skills', () => {
@@ -315,6 +380,7 @@ describe('SkillsView — innate (item-granted) skills', () => {
 			{ name: 'Plain Greaves' }, // slot 2, no grant
 			{ name: 'Staff of Embers', grantedSkillId: 4 } // slot 3
 		];
+		mockInventoryManager.grantedSkillIds = [3, 4];
 		const fresh = new SkillsView();
 
 		expect(fresh.innateSkills.map((g) => [g.skill.id, g.sourceItemName, g.duplicate])).toEqual([
@@ -326,6 +392,7 @@ describe('SkillsView — innate (item-granted) skills', () => {
 	it('flags a grant that duplicates a selected skill as already in the loadout', () => {
 		// Skill 0 is in the equipped loadout, so an item granting it is a duplicate (fielded once).
 		mockInventoryManager.equippedSlots = [{ name: 'Echo Blade', grantedSkillId: 0 }];
+		mockInventoryManager.grantedSkillIds = [0];
 		const fresh = new SkillsView();
 
 		const innate = fresh.innateSkills;
@@ -338,9 +405,22 @@ describe('SkillsView — innate (item-granted) skills', () => {
 			{ name: 'First Axe', grantedSkillId: 3 },
 			{ name: 'Second Axe', grantedSkillId: 3 }
 		];
+		mockInventoryManager.grantedSkillIds = [3];
 		const fresh = new SkillsView();
 
 		expect(fresh.innateSkills.map((g) => g.duplicate)).toEqual([false, true]);
+	});
+
+	it('resolves metrics for a granted skill the player has not separately unlocked (#1500)', () => {
+		// Skill 4 is not in unlockedSkills (never owned/unlocked directly) — only granted by the item.
+		// Before #1500 the innate band's read-only card would silently lose its dmg/cd/dps block here.
+		mockInventoryManager.equippedSlots = [{ name: 'Staff of Embers', grantedSkillId: 4 }];
+		mockInventoryManager.grantedSkillIds = [4];
+		const fresh = new SkillsView();
+
+		expect(fresh.catalogue.map((s) => s.id)).not.toContain(4); // still excluded from the unlocked catalogue
+		expect(fresh.metric(4)).toBeDefined();
+		expect(fresh.metric(4)?.rawDamage).toBe(100); // Echo's base damage, no scaling attribute allocated
 	});
 });
 

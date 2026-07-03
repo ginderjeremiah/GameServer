@@ -1,43 +1,52 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EDamageType, ERarity, ESkillAcquisition } from '$lib/api';
-import type { IChallenge, IEnemy, ISkill, IZone } from '$lib/api';
+import { EDamageType, EModifierType, EAttribute, ERarity, ESkillAcquisition } from '$lib/api';
+import type { IChallenge, IEnemy, ISignaturePassive, ISkill, IZone } from '$lib/api';
+import type { AttributeModifier } from '$lib/battle';
+import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
 // Engine/stores/api are mocked so constructing a real SkillsView doesn't drag in the game engine.
-// `inventoryManager.equippedSlots` feeds the innate (item-granted) skills the band renders.
-const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => {
-	const playerManager = {
-		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
-		currentZone: 0,
-		attributes: [] as { attributeId: number; amount: number }[],
-		get selectedSkills(): number[] {
-			return playerManager.unlockedSkills
-				.filter((s) => s.selected)
-				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-				.map((s) => s.skillId);
-		},
-		setSelectedSkills() {}
-	};
-	return {
-		mockPlayerManager: playerManager,
-		mockInventoryManager: {
-			equipmentStats: [] as { attributeId: number; amount: number }[],
-			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[]
-		},
-		sendSocketCommand: vi.fn(),
-		toastError: vi.fn(),
-		staticData: {
-			skills: [] as ISkill[],
-			challenges: [] as IChallenge[],
-			zones: undefined as IZone[] | undefined,
-			enemies: undefined as IEnemy[] | undefined,
-			attributes: undefined as unknown
-		}
-	};
-});
+// `inventoryManager.equippedSlots`/`grantedSkillIds` feed the innate (item-granted) skills the band renders.
+const { mockPlayerManager, mockInventoryManager, playerProficiencies, sendSocketCommand, toastError, staticData } =
+	vi.hoisted(() => {
+		const playerManager = {
+			unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
+			currentZone: 0,
+			attributes: [] as { attributeId: number; amount: number }[],
+			battleLockedBaseModifiers: [] as AttributeModifier[],
+			battleSignaturePassiveModifier: undefined as unknown as (
+				resolve: (attribute: EAttribute) => number
+			) => AttributeModifier,
+			get selectedSkills(): number[] {
+				return playerManager.unlockedSkills
+					.filter((s) => s.selected)
+					.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+					.map((s) => s.skillId);
+			},
+			setSelectedSkills() {}
+		};
+		return {
+			mockPlayerManager: playerManager,
+			mockInventoryManager: {
+				equipmentStats: [] as { attributeId: number; amount: number }[],
+				equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[],
+				grantedSkillIds: [] as number[]
+			},
+			playerProficiencies: { battleModifiers: [] as AttributeModifier[] },
+			sendSocketCommand: vi.fn(),
+			toastError: vi.fn(),
+			staticData: {
+				skills: [] as ISkill[],
+				challenges: [] as IChallenge[],
+				zones: undefined as IZone[] | undefined,
+				enemies: undefined as IEnemy[] | undefined,
+				attributes: undefined as unknown
+			}
+		};
+	});
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
-vi.mock('$stores', () => ({ staticData, toastError }));
+vi.mock('$stores', () => ({ staticData, toastError, playerProficiencies }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, apiSocket: { sendSocketCommand } };
@@ -76,6 +85,14 @@ const SKILLS: ISkill[] = [
 	skill({ id: 3, name: 'Cleave' })
 ];
 
+// A flat no-op signature passive — the default a player whose class has no passive carries.
+const noOpPassive: ISignaturePassive = {
+	attributeId: EAttribute.Strength,
+	amount: 0,
+	scalingAmount: 0,
+	modifierType: EModifierType.Additive
+};
+
 let view: SkillsView;
 
 const cards = (container: HTMLElement) =>
@@ -92,8 +109,12 @@ beforeEach(() => {
 		{ skillId: 3, selected: false, order: 0 }
 	];
 	mockPlayerManager.attributes = [];
+	mockPlayerManager.battleLockedBaseModifiers = [];
+	mockPlayerManager.battleSignaturePassiveModifier = (resolve) => classSignaturePassiveModifier(noOpPassive, resolve);
 	mockInventoryManager.equipmentStats = [];
 	mockInventoryManager.equippedSlots = [];
+	mockInventoryManager.grantedSkillIds = [];
+	playerProficiencies.battleModifiers = [];
 	view = new SkillsView();
 });
 
@@ -107,6 +128,7 @@ describe('InnateBand', () => {
 
 	it('renders a read-only card per granting item, labelled with its source skill and item', () => {
 		mockInventoryManager.equippedSlots = [{ name: 'Staff of Embers', grantedSkillId: 3 }];
+		mockInventoryManager.grantedSkillIds = [3];
 		view = new SkillsView();
 
 		const { container } = render(InnateBand, { props: { view } });
@@ -122,6 +144,7 @@ describe('InnateBand', () => {
 	it('surfaces a grant that duplicates a selected skill as already in the loadout', () => {
 		// Skill 0 (Alpha) is in the equipped loadout, so an item granting it is a duplicate.
 		mockInventoryManager.equippedSlots = [{ name: 'Echo Blade', grantedSkillId: 0 }];
+		mockInventoryManager.grantedSkillIds = [0];
 		view = new SkillsView();
 
 		const { container } = render(InnateBand, { props: { view } });
