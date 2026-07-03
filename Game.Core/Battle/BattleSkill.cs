@@ -50,22 +50,7 @@ namespace Game.Core.Battle
 
         public double CalculateDamage(BattleContext context)
         {
-            // Accumulate the multiplier bonus separately and add BaseDamage last, exactly mirroring the
-            // previous `BaseDamage + DamageMultipliers.Sum(...)`. Floating-point addition is not
-            // associative, so preserving this order keeps the result bit-for-bit identical — required
-            // for frontend/backend battle parity. The manual index loop avoids the per-fire allocations on
-            // this hot path: the old LINQ Sum boxed a list enumerator plus a closure capturing `context`
-            // (#286), and a foreach over the IReadOnlyList<> DamageMultipliers (#547) would itself box an
-            // interface enumerator — indexing the list allocates nothing.
-            var multiplierBonus = 0.0;
-            var multipliers = Skill.DamageMultipliers;
-            for (var i = 0; i < multipliers.Count; i++)
-            {
-                var multiplier = multipliers[i];
-                multiplierBonus += context.GetActiveBattlerAttribute(multiplier.Attribute) * multiplier.Amount;
-            }
-
-            return Skill.BaseDamage + multiplierBonus;
+            return context.CalculateRawDamage(Skill);
         }
     }
 }

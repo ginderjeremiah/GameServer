@@ -60,6 +60,27 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
+        /// A skill's raw pre-mitigation damage — <c>BaseDamage + Σ(activeBattlerAttribute × multiplier.Amount)</c>
+        /// — read off the <b>active</b> battler. Shared by <see cref="BattleSkill.CalculateDamage"/> (an active
+        /// battler's own loadout firing on cooldown) and the Parry (#1457) counter fire below, which computes
+        /// the defender's counter-skill damage after swapping it to active. Accumulates the multiplier bonus
+        /// separately and adds <c>BaseDamage</c> last (float addition is not associative — a parity contract),
+        /// via a manual index loop so neither caller allocates on this hot path.
+        /// </summary>
+        public double CalculateRawDamage(Skill skill)
+        {
+            var multiplierBonus = 0.0;
+            var multipliers = skill.DamageMultipliers;
+            for (var i = 0; i < multipliers.Count; i++)
+            {
+                var multiplier = multipliers[i];
+                multiplierBonus += GetActiveBattlerAttribute(multiplier.Attribute) * multiplier.Amount;
+            }
+
+            return skill.BaseDamage + multiplierBonus;
+        }
+
+        /// <summary>
         /// Applies a skill <paramref name="effect"/> to the battler its <see cref="ESkillEffectTarget"/>
         /// selects: <see cref="ESkillEffectTarget.Self"/> to the active (casting) battler,
         /// <see cref="ESkillEffectTarget.Opponent"/> to the target battler. The effect's magnitude scales
@@ -289,10 +310,28 @@ namespace Game.Core.Battle
             }
             else
             {
-                // A single dodge draw — the only player-only roll left on an enemy attack now that Block is gone
-                // (spike #1330), so an enemy attack advances the seeded stream by exactly one regardless of portions.
+                // Two draws in fixed order — parry, then dodge — taken unconditionally regardless of outcome
+                // (#1457), so an enemy attack advances the seeded stream by exactly two draws (three on a
+                // proc'd parry — see FireCounter) regardless of portion count. Parry is checked first so a
+                // player's dodge investment never starves their riposte output — the two avoidance layers
+                // don't compete for the same draw.
+                var isParry = _rng.Next() < _targetBattler.GetAttributeValue(ParryChance) * _targetBattler.GetAttributeValue(ParryChanceMultiplier);
                 var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance);
-                if (isDodge)
+                if (isParry)
+                {
+                    // A parry fully negates the hit — like a dodge, computed without mutating health — and then
+                    // counterattacks with the defender's weapon signature (FireCounter), booked separately from
+                    // AttacksDodged/DamageDodged.
+                    Stats.AttacksParried++;
+                    for (var i = 0; i < portions.Count; i++)
+                    {
+                        var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
+                        Stats.DamageParried += _targetBattler.ComputeNetDamage(dealt, portions[i].Type, _activeBattler.Level);
+                    }
+
+                    FireCounter();
+                }
+                else if (isDodge)
                 {
                     // A dodge zeroes the whole hit; the avoided damage is the sum of each portion's net (resistance
                     // then the Toughness curve, scaled by the attacking battler's level), computed without mutating
@@ -325,6 +364,35 @@ namespace Game.Core.Battle
 
             ReflectDamage(totalNet);
             return totalNet;
+        }
+
+        /// <summary>
+        /// Fires the defending player's riposte on a proc'd parry (#1457): the counter is the equipped weapon's
+        /// signature skill (<see cref="Battler.CounterSkill"/>, resolved once at battle-loadout assembly), fired
+        /// as damage only — no cooldown consumed, no effects applied, no per-skill use attribution — through the
+        /// exact same <see cref="DamageTarget"/> path a normal player fire uses, so crit (the counter's own
+        /// authored <see cref="Skills.Skill.CriticalChance"/>, scaled by <see cref="EAttribute.CriticalChanceMultiplier"/>
+        /// like any skill), the overlay share claims, typed offense booking, and enemy reflection of the counter
+        /// all fall out of the one shared code path rather than a bespoke branch. Swaps the active/target
+        /// battlers so the player fires as the active battler (restoring the original orientation before
+        /// returning), and books the returned net into the <see cref="BattleStats.PlayerCounterDamageDealt"/>
+        /// direct tally (the Riposte proficiency signal) in addition to the <see cref="BattleStats.PlayerDamageDealt"/>
+        /// total the recursive call already adds. A <c>null</c> counter skill (no resolvable signature) fires
+        /// nothing — Parry is player-only, and the no-stranding invariant guarantees a real player always
+        /// resolves one.
+        /// </summary>
+        private void FireCounter()
+        {
+            var counterSkill = _targetBattler.CounterSkill;
+            if (counterSkill is null)
+            {
+                return;
+            }
+
+            SwapActiveAndTargetBattlers();
+            var raw = CalculateRawDamage(counterSkill);
+            Stats.PlayerCounterDamageDealt += DamageTarget(raw, counterSkill.DamagePortions, counterSkill.CriticalChance);
+            SwapActiveAndTargetBattlers();
         }
 
         /// <summary>

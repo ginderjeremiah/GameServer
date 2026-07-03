@@ -36,6 +36,7 @@ export enum EActivityKey {
 	Momentum = 31,
 	Cull = 32,
 	Sunder = 33,
+	Parry = 34,
 }
 
 export enum EAttribute {
@@ -85,6 +86,8 @@ export enum EAttribute {
 	UnarmedAmplification = 44,
 	DamageReflection = 45,
 	ExecuteBonus = 46,
+	ParryChance = 47,
+	ParryChanceMultiplier = 48,
 }
 
 export enum EAttributeModifierSource {
@@ -267,4 +270,7 @@ export enum EStatisticType {
 	AttacksDodged = 18,
 	DamageDodged = 19,
 	KillsByDamageType = 22,
+	AttacksParried = 23,
+	CounterDamageDealt = 24,
+	DamageParried = 25,
 }

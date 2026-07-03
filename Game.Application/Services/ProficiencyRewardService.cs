@@ -31,9 +31,11 @@ namespace Game.Application.Services
     /// (Retribution, <see cref="BattleStats.PlayerReflectedDamageDealt"/> — #1363), the vulnerability
     /// Hex share (<see cref="BattleStats.HexBonusDealt"/> — #1427), the ramp Momentum share
     /// (<see cref="BattleStats.MomentumBonusDealt"/> — #1428), the Toughness-debuff Sunder share
-    /// (<see cref="BattleStats.SunderBonusDealt"/> — #1429), and the execute Cull share
+    /// (<see cref="BattleStats.SunderBonusDealt"/> — #1429), the execute Cull share
     /// (<see cref="BattleStats.CullBonusDealt"/> — #1430), each booked as the hit's health-capped damage ×
-    /// φ(the overlay's own investment) (#1481) — are damage-type-neutral
+    /// φ(the overlay's own investment) (#1481), and the Riposte counter damage dealt
+    /// (<see cref="BattleStats.PlayerCounterDamageDealt"/> — #1457, a direct tally like Retribution, not a φ
+    /// share claim) — are damage-type-neutral
     /// and map straight to a single activity key. The <c>notify</c> flag drives the live client push: the live path
     /// notifies (a per-battle push), the offline batch suppresses it (the welcome-back summary is the
     /// notification — spike #982 decision 9).
@@ -191,9 +193,10 @@ namespace Game.Application.Services
         //     generic stat every build can raise, not the type-specific investment the path represents).
         //   • Events: the overlay share claims — each the hit's booked (health-capped) damage × φ(the overlay's
         //     own investment) (#1481): crit (#1448), Hex (#1427), Momentum (#1428), Sunder (#1429), Cull
-        //     (#1430) — plus dodged damage, healing done, and reflected damage dealt: damage-type-neutral
+        //     (#1430) — plus dodged damage, healing done, reflected damage dealt, and the Riposte counter
+        //     damage dealt (#1457, a direct tally like Reflect, not a φ share claim): damage-type-neutral
         //     magnitudes that map straight to a single activity key
-        //     (Crit / Dodge / Heal / Reflect / Hex / Momentum / Sunder / Cull) without applies() routing.
+        //     (Crit / Dodge / Heal / Reflect / Hex / Momentum / Sunder / Cull / Parry) without applies() routing.
         private List<PathActivity> BuildActivities(BattleStats stats, PlayerProgress progress)
         {
             int LevelOf(int proficiencyId) =>
@@ -224,6 +227,7 @@ namespace Game.Application.Services
             AddEvent(EActivityKey.Momentum, stats.MomentumBonusDealt);
             AddEvent(EActivityKey.Sunder, stats.SunderBonusDealt);
             AddEvent(EActivityKey.Cull, stats.CullBonusDealt);
+            AddEvent(EActivityKey.Parry, stats.PlayerCounterDamageDealt);
 
             // Route each key's activity to the frontier tier of every path bound to it — but only to a frontier
             // the player has actually unlocked. Within-path tiers open implicitly as the prior tier maxes (the

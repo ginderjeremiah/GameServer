@@ -55,7 +55,10 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 			// The weapon-match gate's equipped weapon type (#1342), threaded to the player battler rebuild.
 			// Literal EDamageType.Unarmed (13) rather than the enum: this object lives in a hoisted vi.mock
 			// factory, where referencing the imported enum value at runtime throws (used before initialization).
-			equippedWeaponType: 13 as EDamageType
+			equippedWeaponType: 13 as EDamageType,
+			// The Parry (#1457) counter-fire source, threaded to the player battler rebuild alongside the
+			// weapon type — the punch skill id (0), like a bare-handed player.
+			counterSkillId: 0
 		};
 		// The player's proficiency battle modifiers — a stable reference (the real store memoises via a
 		// `$derived`) the battle engine compares by identity, so reassigning it simulates a proficiency change.
@@ -982,7 +985,8 @@ describe('BattleEngine', () => {
 				newStats,
 				mockInventoryManager.grantedSkillIds,
 				mockPlayerProficiencies.battleModifiers,
-				mockInventoryManager.equippedWeaponType
+				mockInventoryManager.equippedWeaponType,
+				mockInventoryManager.counterSkillId
 			);
 		});
 
@@ -998,7 +1002,8 @@ describe('BattleEngine', () => {
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
 				mockPlayerProficiencies.battleModifiers,
-				mockInventoryManager.equippedWeaponType
+				mockInventoryManager.equippedWeaponType,
+				mockInventoryManager.counterSkillId
 			);
 		});
 
@@ -1018,7 +1023,8 @@ describe('BattleEngine', () => {
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
 				newModifiers,
-				mockInventoryManager.equippedWeaponType
+				mockInventoryManager.equippedWeaponType,
+				mockInventoryManager.counterSkillId
 			);
 		});
 
@@ -1047,7 +1053,8 @@ describe('BattleEngine', () => {
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
 				newLockedBase,
-				mockInventoryManager.equippedWeaponType
+				mockInventoryManager.equippedWeaponType,
+				mockInventoryManager.counterSkillId
 			);
 		});
 
@@ -1092,7 +1099,8 @@ describe('BattleEngine', () => {
 				mockInventoryManager.equipmentStats,
 				mockInventoryManager.grantedSkillIds,
 				[...lockedBase, ...proficiency],
-				mockInventoryManager.equippedWeaponType
+				mockInventoryManager.equippedWeaponType,
+				mockInventoryManager.counterSkillId
 			);
 		});
 	});

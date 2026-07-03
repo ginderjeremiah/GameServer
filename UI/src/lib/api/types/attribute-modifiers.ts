@@ -15,4 +15,5 @@ export const STATIC_ATTRIBUTE_MODIFIERS = [
 	{ attribute: EAttribute.CriticalDamage, amount: 1.5, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
 	{ attribute: EAttribute.CriticalDamage, amount: 0.0025, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Luck },
 	{ attribute: EAttribute.DodgeChance, amount: 0.001, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },
+	{ attribute: EAttribute.ParryChanceMultiplier, amount: 1, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
 ] as const;

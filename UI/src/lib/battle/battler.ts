@@ -82,6 +82,13 @@ export class Battler {
 	public attributes: BattleAttributes = new BattleAttributes();
 	public skills: (Skill | undefined)[] = [];
 
+	/** The skill a successful Parry (#1457) fires as this battler's riposte: the equipped weapon's granted
+	 *  signature (or the virtual fists' punch bare-handed), resolved the same way {@link fillSkills} resolves
+	 *  the weapon-match gate's type. `undefined` for a battler with no resolvable signature (an enemy, which
+	 *  never passes a `counterSkillId`, or an unauthored id) — a parry proc against no counter skill fires
+	 *  nothing, since Parry is player-only in this version. Mirrors the backend `Battler.CounterSkill`. */
+	public counterSkill?: Skill;
+
 	/** Live-derived death state, mirroring the backend's `IsDead => CurrentHealth <= 0` getter so the two
 	 *  simulators agree by construction. Deriving it (rather than caching a flag re-synced at every
 	 *  currentHealth mutation) removes the whole "forgot to re-sync" class of parity drift — notably the
@@ -115,9 +122,17 @@ export class Battler {
 		additionalAtttributes?: IBattlerAttribute[],
 		grantedSkillIds?: number[],
 		additionalModifiers?: AttributeModifier[],
-		equippedWeaponType?: EDamageType
+		equippedWeaponType?: EDamageType,
+		counterSkillId?: number
 	) {
-		this.reset(battlerData, additionalAtttributes, grantedSkillIds, additionalModifiers, equippedWeaponType);
+		this.reset(
+			battlerData,
+			additionalAtttributes,
+			grantedSkillIds,
+			additionalModifiers,
+			equippedWeaponType,
+			counterSkillId
+		);
 	}
 
 	/** Advances each skill's charge by `timeDelta * cdMultiplier` **in loadout order**, invoking `onFire`
@@ -336,7 +351,8 @@ export class Battler {
 		additionalAtttributes?: IBattlerAttribute[],
 		grantedSkillIds?: number[],
 		additionalModifiers?: AttributeModifier[],
-		equippedWeaponType?: EDamageType
+		equippedWeaponType?: EDamageType,
+		counterSkillId?: number
 	) {
 		// Remove the active effects' modifiers, not just the bookkeeping — a data-less reset keeps the
 		// existing attribute set, so leaving the modifiers would carry the previous battle's buffs over.
@@ -360,6 +376,11 @@ export class Battler {
 			this.level = battlerData.level;
 			this.name = battlerData.name;
 			this.skills = this.fillSkills(battlerData, grantedSkillIds ?? [], equippedWeaponType);
+			// The Parry (#1457) counter skill, resolved once here like the weapon-match gate resolves the
+			// equipped weapon type — undefined for an id with no resolvable skill (an unauthored punch) or when
+			// no id is supplied (an enemy battler, which never parries).
+			const counterData = counterSkillId !== undefined ? staticData.skills?.[counterSkillId] : undefined;
+			this.counterSkill = counterData ? new Skill(counterData, this) : undefined;
 		}
 
 		// Re-arm every skill to the battle-start baseline. The data path's fillSkills already

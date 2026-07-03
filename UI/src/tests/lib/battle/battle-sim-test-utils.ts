@@ -160,7 +160,8 @@ export function grantedBattlerFactory(registry: ISkill[]) {
 			attrs: { id: EAttribute; amount: number }[],
 			selectedSkillIds: number[],
 			grantedSkillIds: number[],
-			equippedWeaponType?: EDamageType
+			equippedWeaponType?: EDamageType,
+			counterSkillId?: number
 		): Battler =>
 			new Battler(
 				{
@@ -172,7 +173,8 @@ export function grantedBattlerFactory(registry: ISkill[]) {
 				undefined,
 				grantedSkillIds,
 				undefined,
-				equippedWeaponType
+				equippedWeaponType,
+				counterSkillId
 			)
 	};
 }

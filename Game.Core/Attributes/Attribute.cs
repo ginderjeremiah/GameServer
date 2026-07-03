@@ -113,6 +113,8 @@ namespace Game.Core.Attributes
                 DodgeChance => "The percentage chance to completely avoid the damage from an incoming attack.",
                 DamageReflection => "The percentage of a direct hit's damage returned to the attacker, ignoring their defenses.",
                 ExecuteBonus => "The maximum percentage of bonus damage dealt against a target, scaled by how much health it is missing.",
+                ParryChance => "The percentage chance to fully avoid an incoming attack and counterattack with your weapon's signature skill.",
+                ParryChanceMultiplier => "A multiplier applied to your base chance to parry.",
                 BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
                 PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
                 BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
@@ -161,6 +163,12 @@ namespace Game.Core.Attributes
                 // ExecuteBonus (spike #1398, #1430) is the Cull archetype's enabler — authored-only like
                 // DamageReflection, grouped with the other combat-secondary stats.
                 ExecuteBonus => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "EXE", 13, 0),
+                // ParryChance/ParryChanceMultiplier (#1457) are authored-only like DamageReflection/ExecuteBonus,
+                // grouped with the other combat-secondary stats. DisplayOrder 45/46 are next free: the amp/resist
+                // templated attributes above occupy 17-44 (their own enum values), and DamageReflection(45)/
+                // ExecuteBonus(46) each took an explicit small number instead of their own enum ordinal.
+                ParryChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY", 45, 0),
+                ParryChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY MULT", 46, 0),
                 BleedDamagePerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: true, "BLD DOT", 14, 0),
                 HealthRegenPerSecond => new(EAttributeType.Status, IsPercentage: false, IsHarmful: false, "REG", 15, 0),
                 // Obsolete: never displayed, so it gets neutral display metadata and sorts last.

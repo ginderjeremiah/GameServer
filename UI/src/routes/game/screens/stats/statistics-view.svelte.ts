@@ -79,12 +79,15 @@ const STAT_PRESENTATION: StatPresentation[] = [
 	{ id: EStatisticType.HighestSingleAttackDamage, unit: 'damage', agg: 'max', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.CriticalHits, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.CriticalDamageDealt, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
+	{ id: EStatisticType.CounterDamageDealt, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	{ id: EStatisticType.KillsByDamageType, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'combat' },
 	// Survival
 	{ id: EStatisticType.DamageTaken, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.DamageHealed, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.AttacksDodged, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.DamageDodged, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
+	{ id: EStatisticType.AttacksParried, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
+	{ id: EStatisticType.DamageParried, unit: 'damage', agg: 'sum', comp: 'AtLeast', cat: 'survival' },
 	{ id: EStatisticType.PlayerDeaths, unit: 'count', agg: 'sum', comp: 'AtMost', cat: 'survival' },
 	// Exploration
 	{ id: EStatisticType.ZonesCleared, unit: 'count', agg: 'sum', comp: 'AtLeast', cat: 'exploration' },

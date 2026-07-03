@@ -116,6 +116,15 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Agility
+			},
+			// ParryChanceMultiplier is opt-in (#1457), like CriticalChanceMultiplier: the enabler is ParryChance
+			// itself (authored-only, no static modifier), and this attribute is only the base-1 multiplier
+			// scaling it.
+			{
+				attribute: EAttribute.ParryChanceMultiplier,
+				amount: 1,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
 			}
 		]);
 	});

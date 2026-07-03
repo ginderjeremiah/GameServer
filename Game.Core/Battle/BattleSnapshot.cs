@@ -129,7 +129,35 @@ namespace Game.Core.Battle
                 .Select(resolveSkill)
                 .OfType<Skill>();
 
-            return new Battler(attributes, skills, Level);
+            // The Parry (#1457) counter skill: the equipped weapon's own signature, resolved once here exactly
+            // like the weapon-match gate resolves the equipped weapon type — parity-safe, since it never
+            // changes mid-battle. Null only for a hand-built snapshot with no items; a real player's weapon (or
+            // the virtual fists) always resolves one via the no-stranding invariant.
+            var counterSkill = resolveSkill(ResolveSignatureSkillId(resolveItem));
+
+            return new Battler(attributes, skills, Level, counterSkill);
+        }
+
+        /// <summary>
+        /// The equipped <see cref="EItemCategory.Weapon"/> item, or <c>null</c> for bare hands — shared by
+        /// <see cref="GetBattleSkillIds"/> and <see cref="ResolveSignatureSkillId"/> so the two never resolve
+        /// a different weapon.
+        /// </summary>
+        private Item? ResolveEquippedWeapon(Func<int, Item> resolveItem)
+        {
+            return EquippedItems
+                .Select(equipped => resolveItem(equipped.ItemId))
+                .FirstOrDefault(item => item.Category == EItemCategory.Weapon);
+        }
+
+        /// <summary>
+        /// The equipped weapon's granted signature skill id, or the virtual fists' punch
+        /// (<see cref="GameConstants.PunchSkillId"/>) bare-handed — the Parry (#1457) counter-fire source,
+        /// resolved the same way the fielded-skill grant list resolves the weapon's signature.
+        /// </summary>
+        private int ResolveSignatureSkillId(Func<int, Item> resolveItem)
+        {
+            return ResolveEquippedWeapon(resolveItem)?.GrantedSkillId ?? GameConstants.PunchSkillId;
         }
 
         /// <summary>
@@ -199,7 +227,7 @@ namespace Game.Core.Battle
         public IEnumerable<int> GetBattleSkillIds(Func<int, Item> resolveItem, Func<int, EDamageType?> resolveSkillType)
         {
             var equippedItems = EquippedItems.Select(equipped => resolveItem(equipped.ItemId)).ToList();
-            var weapon = equippedItems.FirstOrDefault(item => item.Category == EItemCategory.Weapon);
+            var weapon = ResolveEquippedWeapon(resolveItem);
             var equippedWeaponType = weapon?.WeaponType ?? EDamageType.Unarmed;
 
             var grantedSkillIds = equippedItems.SelectNotNull(item => item.GrantedSkillId);

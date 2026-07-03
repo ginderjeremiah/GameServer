@@ -16,6 +16,10 @@
 	{:else if glyph === 'dodge'}
 		<!-- Two motion chevrons suggesting an evasive slip aside. -->
 		<path d="M2.5 3.5l3 3.5-3 3.5M7 3.5l3 3.5-3 3.5" />
+	{:else if glyph === 'parry'}
+		<!-- A guard shield with a counter-strike slash through it: avoided AND answered. -->
+		<path d="M7 1.8l4.3 1.7v3.4c0 3-1.9 4.6-4.3 5.8C4.6 11.5 2.7 9.9 2.7 6.9V3.5z" />
+		<path d="M4.3 8.7l5.4-5.4" />
 	{:else if glyph === 'enemy'}
 		<path d="M3 11L11 3M11 11L3 3" />
 	{:else if glyph === 'loot'}

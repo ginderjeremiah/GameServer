@@ -79,7 +79,10 @@ const STAT_UNIT: Record<EStatisticType, string> = {
 	[EStatisticType.CriticalDamageDealt]: 'damage',
 	[EStatisticType.AttacksDodged]: 'dodges',
 	[EStatisticType.DamageDodged]: 'damage',
-	[EStatisticType.KillsByDamageType]: 'kills'
+	[EStatisticType.KillsByDamageType]: 'kills',
+	[EStatisticType.AttacksParried]: 'parries',
+	[EStatisticType.CounterDamageDealt]: 'damage',
+	[EStatisticType.DamageParried]: 'damage'
 };
 
 export const goalUnit = (c: IChallenge): string => {

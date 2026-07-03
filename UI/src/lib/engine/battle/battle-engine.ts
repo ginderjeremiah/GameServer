@@ -49,7 +49,7 @@ export const onBattleStageChanged = battleStageChangedHook.onNotified;
  *  type. Player-only crit/dodge mirror the battle-step roll surface (the enemy never dodges/crits). */
 export interface CombatFloatEvent {
 	target: 'player' | 'enemy';
-	kind: 'hit' | 'crit' | 'dodge' | 'reflect';
+	kind: 'hit' | 'crit' | 'dodge' | 'parry' | 'reflect';
 	amount?: number;
 	damageType?: EDamageType;
 	/** The hit's weighted leaf-type split (#1343), present for a damaging `hit`/`crit` so the floater
@@ -234,7 +234,8 @@ export class BattleEngine {
 			equipmentStats,
 			inventoryManager.grantedSkillIds,
 			[...lockedBaseModifiers, ...proficiencyModifiers],
-			inventoryManager.equippedWeaponType
+			inventoryManager.equippedWeaponType,
+			inventoryManager.counterSkillId
 		);
 		// Compose the class signature passive LAST — after the locked base, proficiency bonuses, and the static
 		// engine modifiers the rebuild just assembled — so an attribute-scaled passive reads the fully-resolved
@@ -320,21 +321,22 @@ export class BattleEngine {
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
 		if (this.stage === Active) {
 			this.timeElapsed += timeDelta;
-			for (const { skill, damage, byPlayer, crit, dodged, reflected } of battleStep(
+			for (const { skill, damage, byPlayer, crit, dodged, parried, reflected } of battleStep(
 				this.player,
 				this.enemy,
 				timeDelta,
 				this.rng,
 				this.stepLog
 			)) {
-				const outcome = damageLogOutcome(byPlayer, crit, dodged);
+				const outcome = damageLogOutcome(byPlayer, crit, dodged, parried);
 				const damageType = skill.primaryDamageType;
-				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged hit
-				// never resolved, so it can't be resisted). Computed here, not in the parity-critical battleStep,
-				// so the headless simulator stays byte-identical — like the existing crit/dodge log flags.
-				const resist = dodged
-					? 'normal'
-					: classifyResist(resistanceTotal(damageType, (byPlayer ? this.enemy : this.player).attributes), damage);
+				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged or
+				// parried hit never resolved, so it can't be resisted). Computed here, not in the parity-critical
+				// battleStep, so the headless simulator stays byte-identical — like the existing crit/dodge flags.
+				const resist =
+					dodged || parried
+						? 'normal'
+						: classifyResist(resistanceTotal(damageType, (byPlayer ? this.enemy : this.player).attributes), damage);
 				logMessage(
 					ELogType.Damage,
 					damageLogMessage(skill.name, damage, outcome, damageType, resist, this.enemy.name),
@@ -441,12 +443,15 @@ export class BattleEngine {
 }
 
 /** Resolves the structured {@link LogOutcome} for one damage exchange from the battle-step flags.
- *  The crit/dodge flags are only ever set on the player's side (crit on the player's own hit; dodge
- *  on an incoming enemy hit), so the mapping is unambiguous. Drives both the log prose and the glyph,
- *  keeping them in lockstep. */
-function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean): DirectHitOutcome {
+ *  The crit/dodge/parry flags are only ever set on the player's side (crit on the player's own hit;
+ *  dodge/parry on an incoming enemy hit — mutually exclusive, #1457), so the mapping is unambiguous.
+ *  Drives both the log prose and the glyph, keeping them in lockstep. */
+function damageLogOutcome(byPlayer: boolean, crit: boolean, dodged: boolean, parried: boolean): DirectHitOutcome {
 	if (byPlayer) {
 		return crit ? 'player-crit' : 'player-hit';
+	}
+	if (parried) {
+		return 'player-parry';
 	}
 	if (dodged) {
 		return 'player-dodge';
@@ -473,6 +478,8 @@ function combatFloatEvent(
 			return { target: 'enemy', kind: 'hit', amount: damage, damageType, portions };
 		case 'player-dodge':
 			return { target: 'player', kind: 'dodge' };
+		case 'player-parry':
+			return { target: 'player', kind: 'parry' };
 		case 'enemy-hit':
 			return { target: 'player', kind: 'hit', amount: damage, damageType, portions };
 	}

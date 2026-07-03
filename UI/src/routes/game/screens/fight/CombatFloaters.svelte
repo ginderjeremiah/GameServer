@@ -3,7 +3,9 @@
      that pops and drifts up. The number is tinted by its damage type (a typed, non-physical plain hit
      also shows the type glyph); crit/dodge keep their own outcome icon, and an absorbed hit shows
      its net heal in the regen hue (#1320, Area F). A reflect (#1330) floats over the original attacker
-     with the shared combat-log reflect glyph and the side's hue — raw/untyped, never tinted by type.
+     with the shared combat-log reflect glyph and the side's hue — raw/untyped, never tinted by type. A
+     parry (#1457) floats over the player with the same shared-glyph treatment (no number, like dodge);
+     the counter it fires floats separately as an ordinary player hit/crit over the enemy.
      Purely presentational (aria-hidden) — the combat log is the accessible record of the same events. -->
 <div class="floaters" aria-hidden="true" data-testid={testId} style:--float-duration="{DURATION_MS}ms">
 	{#each floaters as floater (floater.id)}
@@ -99,6 +101,7 @@ const colorFor = (event: CombatFloatEvent): string => {
 		case 'crit':
 			return 'var(--gold)';
 		case 'dodge':
+		case 'parry':
 			return 'var(--text-secondary)';
 		default:
 			// A player hit/reflect lands on the enemy (brand accent); an incoming enemy hit, or a reflect the
@@ -128,9 +131,10 @@ const iconOf = (event: CombatFloatEvent): string => {
 		: '';
 };
 
-/** The shared combat-log reflect glyph for a reflect float (#1330), so the returned-damage popup reads
- *  with the same symbol as its log line; empty for every other kind (which use a PNG {@link iconOf}). */
-const glyphOf = (event: CombatFloatEvent): GlyphKind | '' => (event.kind === 'reflect' ? 'reflect' : '');
+/** The shared combat-log reflect/parry glyph (#1330/#1457), so the popup reads with the same symbol as
+ *  its log line; empty for every other kind (which use a PNG {@link iconOf}). */
+const glyphOf = (event: CombatFloatEvent): GlyphKind | '' =>
+	event.kind === 'reflect' || event.kind === 'parry' ? event.kind : '';
 
 /** The number shown: an absorbed heal as `+N`, a dodge/no-amount event as nothing, else the damage. */
 const amountOf = (event: CombatFloatEvent): string => {
@@ -146,6 +150,8 @@ const labelFor = (kind: CombatFloatEvent['kind']): string => {
 			return 'CRIT';
 		case 'dodge':
 			return 'DODGE';
+		case 'parry':
+			return 'PARRY';
 		case 'reflect':
 			return 'REFLECT';
 		default:

@@ -5,6 +5,7 @@ export type GlyphKind =
 	| 'hit'
 	| 'crit'
 	| 'dodge'
+	| 'parry'
 	| 'enemy'
 	| 'loot'
 	| 'system'
@@ -58,6 +59,7 @@ const damageKinds: Record<LogOutcome, LogKind> = {
 	'player-hit': { color: PLAYER, glyph: 'hit', label: 'Hit' },
 	'player-crit': { color: PLAYER, glyph: 'crit', label: 'Crit' },
 	'player-dodge': { color: ENEMY, glyph: 'dodge', label: 'Dodge' },
+	'player-parry': { color: ENEMY, glyph: 'parry', label: 'Parry' },
 	'enemy-hit': { color: ENEMY, glyph: 'enemy', label: 'Hurt' },
 	'player-reflect': { color: PLAYER, glyph: 'reflect', label: 'Reflect' },
 	'enemy-reflect': { color: ENEMY, glyph: 'reflect', label: 'Reflect' }

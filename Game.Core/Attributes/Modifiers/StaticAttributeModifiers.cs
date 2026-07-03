@@ -67,6 +67,14 @@ namespace Game.Core.Attributes.Modifiers
 
             // DodgeChance = 0.001·Agility (no base).
             new() { Attribute = DodgeChance, Amount = 0.001, Source = Derived, DerivedSource = Agility, Type = Additive },
+
+            // ParryChance (#1457) follows the same opt-in-multiplicative template as crit: the ENABLER
+            // (ParryChance itself) is authored-only with no entry here (base 0 everywhere, like
+            // DamageReflection/ExecuteBonus), granted only by skills/items (e.g. a timed parry-stance buff).
+            // ParryChanceMultiplier is the base-1 MULTIPLIER that only scales it — the Riposte proficiency
+            // path's bonus target — so a committed stance still parries at its own authored rate with zero
+            // further investment.
+            new() { Attribute = ParryChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
         ];
     }
 }

@@ -58,6 +58,27 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_TracksParryStatistics()
+        {
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                AttacksParried = 1,
+                DamageParried = 20.0,
+                // The Riposte training signal (PlayerCounterDamageDealt) is folded into the CounterDamageDealt
+                // player-facing statistic too (#1457) — unlike the crit bonus, this one has no separate tally.
+                PlayerCounterDamageDealt = 10.0,
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 4000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.AttacksParried, null));
+            Assert.Equal(20.0m, progress.GetStatisticValue(EStatisticType.DamageParried, null));
+            Assert.Equal(10.0m, progress.GetStatisticValue(EStatisticType.CounterDamageDealt, null));
+        }
+
+        [Fact]
         public void RecordBattleCompleted_TracksEncountersGloballyAndPerEnemy()
         {
             var progress = MakeProgress();

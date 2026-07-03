@@ -160,7 +160,7 @@ The damage-type taxonomy ([leaves, categories, weapon leaves](./game-design.md#d
 | _(Precision)_ | crit | Technique / event | the first **authored-crit skill** in the toolkit | 1–2 | crit chance is **authored on skills** — no enabler item to schedule; attributes/items contribute crit-damage / crit-chance **multipliers**. Placement rides the class routes (§5) |
 | _(Frequency)_ | cadence (CDR) | Technique / event | pending [#1426](https://github.com/ginderjeremiah/GameServer/issues/1426) (severs CDR's attribute sourcing) — **planned for the initial content version** | 1–2 | a representational (build-state) signal, so it needs explicit difficulty scaling (#1426) |
 | _(Retribution)_ | reflect | Technique / event | Z1 — the **Knight kit carries the first reflection source** directly | 1–2 | authored-only reflection; the tank's win-condition route, live from creation |
-| _(Riposte)_ | parry | Technique / event | Z1 (Swordsman kit parry stance) — **mechanic pending [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)** | 1–2 | opt-in `ParryChance` (own 0-based attribute, no derivation) + counterattack; direct tally (counter damage), like Retribution |
+| _(Riposte)_ | parry | Technique / event | Z1 (Swordsman kit parry stance) | 1–2 | opt-in `ParryChance` (own 0-based attribute, no derivation) + counterattack; direct tally (counter damage), like Retribution — engine shipped [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457), the path itself still needs authoring |
 
 **Deliberately *not* at launch:**
 
@@ -203,7 +203,7 @@ Four classes, each anchored on a different core attribute and weapon family:
 
 | Class | Weapon (→ signature) | Secondary | Attribute | Opens (starting roots) |
 |-------|----------------------|-----------|-----------|------------------------|
-| **Swordsman** | Sword | **Parry stance** (riposte — mechanic pending [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)) | STR | Swordsmanship + Riposte |
+| **Swordsman** | Sword | **Parry stance** (riposte, [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)) | STR | Swordsmanship + Riposte |
 | **Bowman** | Bow | Wind skill | DEX | Archery + Wind |
 | **Wizard** | Fire staff (→ Fireball) | **Healing spell** (burst heal) | INT | Fire + Restoration |
 | **Knight** | Blunt / Club | **Regen** (sustained HoT — regen specifically, not a burst) | END | Bludgeoning + Restoration (+ **Retribution** — the kit itself carries the first reflection source) |
@@ -223,7 +223,7 @@ Template per class: **roots → first tailored unlock → archetype hooks → Z3
 > ⚠ The tailored-challenge examples assume a **kills-by-damage-type statistic** that does not exist yet — tracked in [#1455](https://github.com/ginderjeremiah/GameServer/issues/1455).
 
 **Swordsman — the relentless edge (depth + riposte)**
-- **Roots:** Swordsmanship + **Riposte** (the kit's parry stance — mechanic pending [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)).
+- **Roots:** Swordsmanship + **Riposte** (the kit's parry stance, [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457) — the engine mechanic is shipped; the stance skill and Riposte path itself still need authoring).
 - **First tailored unlock:** *"kill N enemies with sword skills"* → the first `RequiredProficiency` sword step (the depth ladder starts immediately).
 - **Archetype hooks:** **Parry/Riposte** is its native archetype from the kit; **Momentum** (#1428 — escalating flurry) arrives on mid-tier sword skills/milestones; **Sunder** (#1429) later as the anti-armor answer.
 - **Z3 win condition:** **depth** — tier-2/3 Swordsmanship compounding + the gated sword, with the parry counter as supplemental offense.

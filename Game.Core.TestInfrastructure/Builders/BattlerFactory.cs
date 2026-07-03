@@ -56,7 +56,12 @@ namespace Game.Core.TestInfrastructure.Builders
                     ? selected
                     : resolveSkill?.Invoke(id) ?? throw new InvalidOperationException($"Skill {id} could not be resolved."));
 
-            return new Battler(player.GetAttributes(), skills, player.Level);
+            // The Parry (#1457) counter skill, mirroring BattleSnapshot.ToBattler: the equipped weapon's own
+            // signature, or the virtual fists' punch bare-handed. Resolver-gated like the punch grant above, so
+            // the resolver-less shortcut fields no counter skill (parry simply fires nothing for it).
+            var counterSkill = resolveSkill?.Invoke(weapon?.GrantedSkillId ?? GameConstants.PunchSkillId);
+
+            return new Battler(player.GetAttributes(), skills, player.Level, counterSkill);
         }
     }
 }

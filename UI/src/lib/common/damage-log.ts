@@ -23,6 +23,7 @@ export type LogOutcome =
 	| 'player-hit'
 	| 'player-crit'
 	| 'player-dodge'
+	| 'player-parry'
 	| 'enemy-hit'
 	| 'player-reflect'
 	| 'enemy-reflect';
@@ -91,6 +92,9 @@ export const damageLogMessage = (
 ): string => {
 	if (outcome === 'player-dodge') {
 		return `You dodged ${enemyName}'s ${skillName}!`;
+	}
+	if (outcome === 'player-parry') {
+		return `You parried ${enemyName}'s ${skillName} and countered!`;
 	}
 
 	const word = typeWord(damageType);

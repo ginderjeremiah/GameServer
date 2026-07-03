@@ -133,11 +133,11 @@ interface EngineParityScenario {
 // exercises the seeded fractional crit AND an enemy firing back, a player defeat driven by DoT/HoT, and a
 // timeout draw — each with identical inputs/expected to its row in battle-simulation-parity.test.ts.
 const scenarios: EngineParityScenario[] = [
-	// drawOrderDodgeOnlyAlignsCrit: real skill CriticalChance 0.5 (so the outcome depends on the exact
+	// drawOrderParryDodgeAlignsCrit: real skill CriticalChance 0.5 (so the outcome depends on the exact
 	// seeded stream) against an enemy that fires every tick — pins both the seed lockstep and the
-	// enemy-attack path.
+	// enemy-attack path (now a parry + dodge draw per enemy fire, #1457).
 	{
-		name: 'drawOrderDodgeOnlyAlignsCrit',
+		name: 'drawOrderParryDodgeAlignsCrit',
 		playerAttrs: [
 			{ id: EAttribute.Strength, amount: 10 },
 			{ id: EAttribute.CriticalDamage, amount: 0.5 }
@@ -145,7 +145,7 @@ const scenarios: EngineParityScenario[] = [
 		playerSkills: [makeSkill(12, 400, [], [], undefined, 0.5)],
 		enemyAttrs: [{ id: EAttribute.Strength, amount: 6 }],
 		enemySkills: [makeSkill(5, 400)],
-		expected: { victory: true, playerDied: false, totalMs: 1600 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 	// dotRegenNetNegativeKillsAfterHeal: the player's net-negative DoT/HoT grinds it down — a defeat with no
 	// direct hits, exercising the live loop's end-of-tick DoT/HoT + player-death branch.

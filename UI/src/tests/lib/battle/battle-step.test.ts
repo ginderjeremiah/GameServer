@@ -13,9 +13,16 @@ vi.mock('$stores', () => ({
 
 import { battleStep, type BattleStepLog } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
-import { battlerFactory, makeSkill, makeMultiTypeSkill, makeEffect } from './battle-sim-test-utils';
+import {
+	battlerFactory,
+	grantedBattlerFactory,
+	makeSkill,
+	makeMultiTypeSkill,
+	makeEffect
+} from './battle-sim-test-utils';
 
 const makeBattler = battlerFactory(mockSkills);
+const granted = grantedBattlerFactory(mockSkills);
 // A throwaway RNG for the steps that exercise no crit/dodge (their chances are 0, so the draws never
 // change an outcome). The dedicated rolls + draw-order are covered by the crit/dodge block.
 const noRng = () => new Mulberry32(0);
@@ -333,6 +340,103 @@ describe('battleStep', () => {
 			expect(enemy.currentHealth).toBe(enemyBefore); // a dodge zeroes the hit, so nothing reflects
 		});
 
+		// Parry / Riposte (#1457): an opt-in chance to fully avoid an incoming hit AND counterattack with the
+		// weapon signature resolved onto Battler.counterSkill, mirroring the backend BattleContextTests.
+		describe('parry / riposte (#1457)', () => {
+			it('negates the incoming hit and pushes no counter activation when there is no counter skill', () => {
+				const player = makeBattler([{ id: EAttribute.ParryChance, amount: 1 }], []);
+				const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+				const before = player.currentHealth;
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations).toHaveLength(1);
+				expect(activations[0].byPlayer).toBe(false);
+				expect(activations[0].parried).toBe(true);
+				expect(activations[0].dodged).toBe(false); // parry takes precedence — dodge never triggers
+				expect(activations[0].damage).toBe(0);
+				expect(player.currentHealth).toBe(before);
+			});
+
+			it('fires a counter through the resolved weapon signature on a proc', () => {
+				const counterSkillId = granted.register(makeSkill(10, 1000));
+				const player = granted.build([{ id: EAttribute.ParryChance, amount: 1 }], [], [], undefined, counterSkillId);
+				const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+				const enemyBefore = enemy.currentHealth;
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations).toHaveLength(2);
+				expect(activations[0].parried).toBe(true);
+				expect(activations[0].damage).toBe(0);
+				const counter = activations[1];
+				expect(counter.byPlayer).toBe(true);
+				expect(counter.damage).toBe(10); // the counter skill's own raw damage, no Toughness either side
+				expect(enemy.currentHealth).toBe(enemyBefore - 10);
+			});
+
+			it('lets the counter crit on its own authored chance', () => {
+				const counterSkillId = granted.register(makeSkill(10, 1000, [], [], undefined, 1));
+				const player = granted.build(
+					[
+						{ id: EAttribute.ParryChance, amount: 1 },
+						{ id: EAttribute.CriticalDamage, amount: 0.5 } // CriticalDamage 2
+					],
+					[],
+					[],
+					undefined,
+					counterSkillId
+				);
+				const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+				const enemyBefore = enemy.currentHealth;
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				const counter = activations[1];
+				expect(counter.crit).toBe(true);
+				expect(counter.damage).toBe(20); // 10 × 2
+				expect(enemy.currentHealth).toBe(enemyBefore - 20);
+			});
+
+			it('reflects the counter off the enemy exactly like an ordinary player fire', () => {
+				const counterSkillId = granted.register(makeSkill(10, 1000));
+				const player = granted.build(
+					[
+						{ id: EAttribute.ParryChance, amount: 1 },
+						{ id: EAttribute.Endurance, amount: 50 } // Toughness 100 — must NOT mitigate the reflected hit
+					],
+					[],
+					[],
+					undefined,
+					counterSkillId
+				);
+				const enemy = makeBattler([{ id: EAttribute.DamageReflection, amount: 0.5 }], [makeSkill(20, 40)]);
+				const playerBefore = player.currentHealth;
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				const counter = activations[1];
+				expect(counter.reflected).toBe(5); // 10 × 0.5, unmitigated
+				expect(player.currentHealth).toBe(playerBefore - 5);
+			});
+
+			it("checks parry before dodge — a committed dodge never overrides a proc'd parry", () => {
+				const player = makeBattler(
+					[
+						{ id: EAttribute.ParryChance, amount: 1 },
+						{ id: EAttribute.DodgeChance, amount: 1 }
+					],
+					[]
+				);
+				const enemy = makeBattler(baseStats, [makeSkill(20, 40)]);
+
+				const activations = battleStep(player, enemy, 40, new Mulberry32(0));
+
+				expect(activations[0].parried).toBe(true);
+				expect(activations[0].dodged).toBe(false);
+			});
+		});
+
 		it('reflects nothing when the incoming hit is absorbed', () => {
 			// The enemy both reflects and absorbs Fire (resistance > 1 → net heal). The player's physical hit lands
 			// and is reflected back (player 50 → 20), dropping the enemy to 20; the player's Fire hit is then
@@ -471,9 +575,9 @@ describe('battleStep', () => {
 			});
 		});
 
-		it('draws once per player fire and once per enemy fire, in order', () => {
-			// One crit draw for the player's hit, then one dodge draw for the enemy's — two draws total (Block's
-			// second draw was retired, #1330).
+		it('draws once per player fire and twice per enemy fire, in order', () => {
+			// One crit draw for the player's hit, then a parry draw + a dodge draw for the enemy's (both
+			// unconditional, #1457) — three draws total (Block's second draw was retired, #1330).
 			const seed = 12345;
 			const rng = new Mulberry32(seed);
 			const player = makeBattler(baseStats, [makeSkill(10, 40)]);
@@ -482,6 +586,7 @@ describe('battleStep', () => {
 			battleStep(player, enemy, 40, rng);
 
 			const reference = new Mulberry32(seed);
+			reference.next();
 			reference.next();
 			reference.next();
 			expect(rng.next()).toBe(reference.next());

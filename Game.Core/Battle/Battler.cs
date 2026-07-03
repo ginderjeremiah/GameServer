@@ -40,12 +40,24 @@ namespace Game.Core.Battle
 
         public bool IsDead => CurrentHealth <= 0;
 
-        public Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level)
+        /// <summary>
+        /// The skill a successful Parry (#1457) fires as this battler's riposte — resolved once at
+        /// battle-loadout assembly, like the weapon-match gate, from the equipped weapon's
+        /// <see cref="Items.Item.GrantedSkillId"/> (or the virtual fists' punch when bare-handed). <c>null</c>
+        /// for a battler with no resolvable signature (an enemy, or a hand-built snapshot with no items) — a
+        /// parry proc against a null counter skill fires nothing, since Parry is player-only in this version
+        /// and the no-stranding invariant guarantees a real player always resolves one. See
+        /// <see cref="Battle.BattleContext.DamageTarget"/>.
+        /// </summary>
+        public Skill? CounterSkill { get; }
+
+        public Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level, Skill? counterSkill = null)
         {
             _attributes = attributes;
             CurrentHealth = _attributes[MaxHealth];
             Skills = skills.Select(s => new BattleSkill(s)).ToList();
             Level = level;
+            CounterSkill = counterSkill;
         }
 
         public void Update(BattleContext context)

@@ -857,7 +857,7 @@ const scenarios: ParityScenario[] = [
 	// ── Deterministic damage reflection (#1330) ──────────────────────────────────
 	// Reflection returns the defender's DamageReflection share of a direct hit's net damage to the attacker,
 	// bypassing the attacker's mitigation. Authored-only, deterministic (no draw), scoped to direct hits.
-	// Mirrors the backend `reflectionKillsAttacker` / `reflectionIgnoresDot` / `drawOrderDodgeOnlyAlignsCrit`.
+	// Mirrors the backend `reflectionKillsAttacker` / `reflectionIgnoresDot` / `drawOrderParryDodgeAlignsCrit`.
 
 	// Reflection as a kill condition: a pure tank (no skills, no Toughness — MaxHealth 550 from Strength)
 	// returns 100% of every 25 it takes, so the 100-HP enemy dies to its own reflected damage on its 4th attack
@@ -896,16 +896,16 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: false, playerDied: true, totalMs: 4000 }
 	},
 
-	// Simplified draw order — an enemy attack now draws ONE dodge value (not dodge + block), so the player's
-	// fractional crit draws interleave at EVEN stream positions (the enemy's single dodge draw sits between
-	// consecutive player crit draws). With a real CriticalChance 0.5 against PARITY_SEED the crit draws at
-	// stream indices 0, 2, 4, 6 are crit, no, crit, crit; CriticalDamage base 1.5 + 0.5 = 2.0, so the player
-	// deals 24, 12, 24, 24 (no Toughness) for a cumulative 24, 36, 60, 84. The 80-HP enemy (Str 6) dies on the
-	// tick-40 fire → 1600ms. Had the enemy still drawn TWICE (the old dodge + block), the crit draws would land
-	// at indices 0, 3, 6, 9 — crit, no, crit, no → 24, 12, 24, 12 — pushing the kill to tick 50 (2000ms). So this
-	// row pins the one-draw enemy attack. The enemy chips 5/tick (DodgeChance 0), leaving the 100-HP player at 85.
+	// An enemy attack draws TWO values (parry then dodge, both unconditional — #1457), so the player's
+	// fractional crit draws interleave at every-third stream positions (indices 0, 3, 6, 9, ... — the enemy's
+	// two draws sit between consecutive player crit draws). With a real CriticalChance 0.5 against PARITY_SEED
+	// the crit draws at those indices are crit, no, crit, no; CriticalDamage base 1.5 + 0.5 = 2.0, so the player
+	// deals 24, 12, 24, 12 (no Toughness) for a cumulative 24, 36, 60, 72 — the 80-HP enemy (Str 6) survives the
+	// tick-40 fire and dies on the 5th (tick-50) fire → 2000ms. The enemy chips 5/tick (ParryChance/DodgeChance
+	// both 0, so its two draws are taken but never succeed) across all four of its attacks (ticks 10/20/30/40)
+	// before dying, leaving the 100-HP player at 80.
 	{
-		name: 'drawOrderDodgeOnlyAlignsCrit',
+		name: 'drawOrderParryDodgeAlignsCrit',
 		player: () =>
 			makeBattler(
 				[
@@ -915,7 +915,7 @@ const scenarios: ParityScenario[] = [
 				[makeSkill(12, 400, [], [], undefined, 0.5)]
 			),
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(5, 400)]),
-		expected: { victory: true, playerDied: false, totalMs: 1600 }
+		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
 	// Fractional crit chance against a fixed seed (#941): unlike the forced-1/0 crit rows, CriticalChance is a

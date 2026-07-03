@@ -410,6 +410,28 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task CounterDamage_TrainsTheRiposteePath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Riposte trains from the counter-attack damage a successful parry dealt (#1457) — a direct
+            // output-book event like Retribution, type-neutral and routed straight to its own activity key.
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Riposte", activityKey: EActivityKey.Parry);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Riposte", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(
+                scope, playerId, new BattleStats { PlayerCounterDamageDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
         public async Task HexBonus_TrainsTheHexPath()
         {
             using var scope = CreateScope();

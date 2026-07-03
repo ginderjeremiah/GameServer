@@ -1,5 +1,6 @@
 using Game.Core;
 using Game.Core.Battle;
+using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Skills;
 using Game.Core.TestInfrastructure.Builders;
@@ -289,12 +290,13 @@ namespace Game.Core.Tests.Battle
         // ── DamageTarget: RNG draw order ─────────────────────────────────────
 
         [Fact]
-        public void DamageTarget_DrawsOncePerPlayerHit_OncePerEnemyHit()
+        public void DamageTarget_DrawsOncePerPlayerHit_TwicePerEnemyHit()
         {
             // The draw count is a pure function of the fire sequence: one crit draw when the player attacks,
-            // then one dodge draw when the enemy attacks (Block's second draw was retired, spike #1330).
-            // Verified by comparing the shared stream's position against a reference advanced by exactly two
-            // draws — independent of the seed.
+            // then a parry draw followed by a dodge draw when the enemy attacks — both unconditional (#1457;
+            // Block's second draw was retired earlier, spike #1330). Verified by comparing the shared stream's
+            // position against a reference advanced by exactly three draws — independent of the seed. With
+            // ParryChance at its default 0 the parry never procs, so no third (counter-crit) draw is taken.
             const uint seed = 12345u;
             var rng = new Mulberry32(seed);
             var player = MakeBattlerWith((Endurance, 0));
@@ -303,11 +305,148 @@ namespace Game.Core.Tests.Battle
 
             context.DamageTarget(5, Single(EDamageType.Physical), 0);               // player attacking → 1 draw
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(5, Single(EDamageType.Physical), 0);               // enemy attacking → 1 draw
+            context.DamageTarget(5, Single(EDamageType.Physical), 0);               // enemy attacking → 2 draws
 
             var reference = new Mulberry32(seed);
             reference.Next();
             reference.Next();
+            reference.Next();
+            Assert.Equal(reference.Next(), rng.Next());
+        }
+
+        // ── DamageTarget: parry / riposte (#1457) ────────────────────────────
+
+        [Fact]
+        public void DamageTarget_PlayerParries_NegatesHitAndRecordsParryStatistics()
+        {
+            // No counter skill resolved (MakeBattlerWith carries no items), so the parry negates the hit but
+            // fires no riposte.
+            var player = MakeBattlerWith((ParryChance, 1));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers(); // enemy attacks the player
+            var before = player.CurrentHealth;
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0); // parried ⇒ 0, no Toughness on either side
+
+            Assert.Equal(before, player.CurrentHealth, 0.001);
+            Assert.Equal(0, context.Stats.PlayerDamageTaken, 0.001);
+            Assert.Equal(1, context.Stats.AttacksParried);
+            Assert.Equal(20, context.Stats.DamageParried, 0.001);
+            Assert.Equal(0, context.Stats.AttacksDodged); // parry is checked first — dodge never triggers
+            Assert.Equal(0, context.Stats.PlayerCounterDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_ParryChecksBeforeDodge_BothCommitted_StillParries()
+        {
+            // Both ParryChance and DodgeChance forced to 1: parry wins since it is checked first (the two
+            // avoidance layers don't compete for the same draw — a dodge investment never starves riposte).
+            var player = MakeBattlerWith((ParryChance, 1), (DodgeChance, 1));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(1, context.Stats.AttacksParried);
+            Assert.Equal(0, context.Stats.AttacksDodged);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerParries_FiresCounterThroughWeaponSignature()
+        {
+            var counterSkill = MakeCounterSkill(baseDamage: 10);
+            var player = MakeBattlerWithCounter(counterSkill, (ParryChance, 1));
+            var enemy = MakeBattlerWith((Endurance, 0)); // Toughness 0, no resistance
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers(); // enemy attacks the player
+            var enemyBefore = enemy.CurrentHealth;
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0); // the original hit is parried
+
+            // The counter is the resolved weapon signature's own raw damage (10), routed through the same
+            // player-fire path — no cooldown, no effects, no per-skill attribution.
+            Assert.Equal(enemyBefore - 10, enemy.CurrentHealth, 0.001);
+            Assert.Equal(10, context.Stats.PlayerCounterDamageDealt, 0.001);
+            Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001); // only the counter — the original hit was 0
+            Assert.Empty(context.Stats.SkillStats); // RecordSkillUse is never called for the counter
+        }
+
+        [Fact]
+        public void DamageTarget_ParryCounter_CanCritOnItsOwnAuthoredChance()
+        {
+            var counterSkill = MakeCounterSkill(baseDamage: 10, criticalChance: 1);
+            var player = MakeBattlerWithCounter(counterSkill, (ParryChance, 1), (CriticalDamage, 0.5)); // CriticalDamage 2
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            var enemyBefore = enemy.CurrentHealth;
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(enemyBefore - 20, enemy.CurrentHealth, 0.001); // 10 × 2 (crit)
+            Assert.Equal(1, context.Stats.CriticalHits);
+            Assert.Equal(20, context.Stats.PlayerCounterDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_ParryCounter_EnemyReflectionAppliesToTheCounter()
+        {
+            // The counter is routed through the shared player-fire path, so an enemy's own DamageReflection
+            // reflects the counter back onto the player — "falls out of one code path" rather than a bespoke branch.
+            var counterSkill = MakeCounterSkill(baseDamage: 10);
+            var player = MakeBattlerWithCounter(counterSkill, (ParryChance, 1), (Endurance, 50)); // Toughness 100
+            var enemy = MakeBattlerWith((Endurance, 0), (DamageReflection, 0.5));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+            var playerBefore = player.CurrentHealth;
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(10, context.Stats.PlayerCounterDamageDealt, 0.001);
+            Assert.Equal(playerBefore - 5, player.CurrentHealth, 0.001); // 10 × 0.5 reflected back, unmitigated
+        }
+
+        [Fact]
+        public void DamageTarget_ParryProc_NoCounterSkill_AdvancesStreamByTwoDraws()
+        {
+            // Parry then dodge, both unconditional, is the whole draw cost when there is no counter skill to
+            // fire (no third crit draw) — independent of the seed.
+            const uint seed = 777u;
+            var rng = new Mulberry32(seed);
+            var player = MakeBattlerWith((ParryChance, 1));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, rng);
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            var reference = new Mulberry32(seed);
+            reference.Next(); // parry draw
+            reference.Next(); // dodge draw (unconditional)
+            Assert.Equal(reference.Next(), rng.Next());
+        }
+
+        [Fact]
+        public void DamageTarget_ParryProc_WithCounterSkill_AdvancesStreamByThreeDraws()
+        {
+            // A proc'd parry consumes exactly one more draw than the no-counter case: the counter fire's own
+            // crit draw, taken even at 0 authored chance (mirroring the ordinary per-fire crit draw).
+            const uint seed = 777u;
+            var rng = new Mulberry32(seed);
+            var counterSkill = MakeCounterSkill(baseDamage: 10);
+            var player = MakeBattlerWithCounter(counterSkill, (ParryChance, 1));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, rng);
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            var reference = new Mulberry32(seed);
+            reference.Next(); // parry draw
+            reference.Next(); // dodge draw (unconditional)
+            reference.Next(); // the counter fire's crit draw
             Assert.Equal(reference.Next(), rng.Next());
         }
 
@@ -758,7 +897,7 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_MultiPortion_OneDrawPerFireRegardlessOfPortionCount()
         {
             // The per-fire draw count is independent of portion count: a 3-portion player fire then a 3-portion
-            // enemy fire advance the shared stream by exactly two (one crit draw, one dodge draw).
+            // enemy fire advance the shared stream by exactly three (one crit draw, then a parry + dodge draw, #1457).
             const uint seed = 4242u;
             var rng = new Mulberry32(seed);
             var player = MakeBattlerWith((Endurance, 0));
@@ -768,9 +907,10 @@ namespace Game.Core.Tests.Battle
 
             context.DamageTarget(9, threePortions, 0);              // player attacking → 1 draw
             context.SwapActiveAndTargetBattlers();
-            context.DamageTarget(9, threePortions, 0);              // enemy attacking → 1 draw
+            context.DamageTarget(9, threePortions, 0);              // enemy attacking → 2 draws
 
             var reference = new Mulberry32(seed);
+            reference.Next();
             reference.Next();
             reference.Next();
             Assert.Equal(reference.Next(), rng.Next());
@@ -1641,6 +1781,51 @@ namespace Game.Core.Tests.Battle
                 .ToList();
             var player = new PlayerBuilder().WithStatAllocations(statAllocations).Build();
             return BattlerFactory.FromPlayer(player);
+        }
+
+        // A bare skill for the Parry (#1457) counter-fire tests: single Physical portion, no multipliers/effects.
+        private static Skill MakeCounterSkill(double baseDamage, double criticalChance = 0) => new()
+        {
+            Id = 900,
+            Name = "Counter Skill",
+            Description = "",
+            DamagePortions = Single(EDamageType.Physical),
+            CooldownMs = 1000,
+            BaseDamage = baseDamage,
+            CriticalChance = criticalChance,
+            DamageMultipliers = [],
+            Effects = [],
+        };
+
+        // Builds a player Battler through the snapshot path with a single equipped weapon whose granted
+        // signature is <paramref name="counterSkill"/>, so Battler.CounterSkill resolves it — the Parry (#1457)
+        // riposte source — exactly like BattleSnapshot.ToBattler resolves it in production.
+        private static Battler MakeBattlerWithCounter(Skill counterSkill, params (EAttribute Attribute, double Amount)[] attributes)
+        {
+            var weapon = new Item
+            {
+                Id = 1,
+                Name = "Weapon",
+                Description = string.Empty,
+                Category = EItemCategory.Weapon,
+                Rarity = ERarity.Common,
+                WeaponType = EDamageType.Physical,
+                GrantedSkillId = counterSkill.Id,
+                Attributes = [],
+                ModSlots = [],
+            };
+            var snapshot = new BattleSnapshot
+            {
+                Level = 1,
+                StatAllocations = attributes.Select(a => new StatAllocation { Attribute = a.Attribute, Amount = a.Amount }).ToList(),
+                EquippedItems = [new EquippedItemSnapshot { ItemId = weapon.Id, AppliedModIds = [] }],
+                SkillIds = [],
+            };
+
+            return snapshot.ToBattler(
+                _ => weapon,
+                _ => throw new InvalidOperationException("No mods are applied in the parry scenarios."),
+                id => id == counterSkill.Id ? counterSkill : null);
         }
     }
 }

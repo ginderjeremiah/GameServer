@@ -138,6 +138,14 @@ export class InventoryManager {
 		return this.equippedSlots[EEquipmentSlot.WeaponSlot]?.weaponType ?? EDamageType.Unarmed;
 	}
 
+	/** The Parry (#1457) counter-fire source: the equipped weapon's own granted signature skill id, or the
+	 *  virtual fists' punch ({@link PUNCH_SKILL_ID}) bare-handed — resolved the same way {@link equippedWeaponType}
+	 *  resolves the weapon and {@link grantedSkillIds} resolves the bare-hands fallback, so a successful parry
+	 *  always ripostes with the weapon actually equipped. */
+	public get counterSkillId(): number {
+		return this.equippedSlots[EEquipmentSlot.WeaponSlot]?.grantedSkillId ?? PUNCH_SKILL_ID;
+	}
+
 	/** Rebuilds the memoised {@link equipmentStats} and {@link grantedSkillIds} from the currently equipped
 	 *  items + their mods. Called after every mutation that can change them (and after a rollback restores
 	 *  the prior state). Reassigns both caches so the battle reset's by-reference change detection fires. */

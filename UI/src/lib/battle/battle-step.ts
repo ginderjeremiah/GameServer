@@ -56,11 +56,14 @@ function reflectDamage(attacker: Battler, defender: Battler, netDamage: number):
 /**
  * A single skill activation produced by one battle tick: which skill fired, the
  * final damage it dealt after the defender's mitigation, and whether the
- * player (true) or the enemy (false) was the attacker. The crit/dodged flags
+ * player (true) or the enemy (false) was the attacker. The crit/dodged/parried flags
  * carry the player-only roll outcomes for the combat log: `crit` on a player
- * attack, `dodged` on an incoming enemy attack. `reflected` is the deterministic
+ * attack, `dodged`/`parried` on an incoming enemy attack (#1457 — parry is checked
+ * before dodge, so the two are mutually exclusive). `reflected` is the deterministic
  * damage (#1330) the defender returned to the attacker for this hit (0 when none),
- * so the live engine can log a reflected-damage line. The live BattleEngine turns
+ * so the live engine can log a reflected-damage line. A proc'd parry additionally
+ * pushes a second activation for the counter fire (`byPlayer: true`, `skill` the
+ * riposte's weapon signature) — see {@link fireCounter}. The live BattleEngine turns
  * these into combat-log messages; the headless BattleSimulator ignores them.
  */
 export interface SkillActivation {
@@ -69,7 +72,43 @@ export interface SkillActivation {
 	byPlayer: boolean;
 	crit: boolean;
 	dodged: boolean;
+	parried: boolean;
 	reflected: number;
+}
+
+/**
+ * Fires the defending player's riposte on a proc'd parry (#1457): the counter is the equipped weapon's
+ * signature skill ({@link Battler.counterSkill}, resolved once at battler assembly), fired as damage only —
+ * no cooldown consumed, no effects applied — through the same portioned-damage/reflect helpers a normal
+ * player fire uses, so crit (the counter's own authored `criticalChance`, scaled by `CriticalChanceMultiplier`
+ * like any skill), the Cull execute overlay, and enemy reflection of the counter all mirror the backend's
+ * `BattleContext.FireCounter`/recursive `DamageTarget` call. Returns `undefined` when the player has no
+ * resolvable counter skill (Parry is player-only, and the enemy never fires one).
+ */
+function fireCounter(player: Battler, enemy: Battler, rng: Mulberry32): SkillActivation | undefined {
+	const counterSkill = player.counterSkill;
+	if (!counterSkill) {
+		return undefined;
+	}
+	// One crit draw for the counter fire, taken even at 0 authored chance — mirroring the ordinary per-fire
+	// crit draw so the stream stays in lockstep regardless of whether the counter can crit.
+	const crit =
+		rng.next() < counterSkill.criticalChance * player.attributes.getValue(EAttribute.CriticalChanceMultiplier);
+	const raw = counterSkill.calculateDamage();
+	const critMultiplier = crit ? player.attributes.getValue(EAttribute.CriticalDamage) : 1;
+	const maxHealth = enemy.attributes.getValue(EAttribute.MaxHealth);
+	const missingHpFraction = Math.min(1, Math.max(0, (maxHealth - enemy.currentHealth) / maxHealth));
+	const executeMultiplier = 1 + player.attributes.getValue(EAttribute.ExecuteBonus) * missingHpFraction;
+	const damage = dealPortionedDamage(
+		player,
+		enemy,
+		raw,
+		counterSkill.damagePortions,
+		critMultiplier,
+		executeMultiplier
+	);
+	const reflected = reflectDamage(player, enemy, damage);
+	return { skill: counterSkill, damage, byPlayer: true, crit, dodged: false, parried: false, reflected };
 }
 
 /** A skill effect application that landed during a tick (each application stacks), with the side it
@@ -143,7 +182,8 @@ export function battleStep(
 	// next slot accrues, so an earlier slot's effect (e.g. a self CooldownRecovery buff) influences a
 	// later slot on the same tick, exactly as the backend's per-slot BattleSkill.Update does. Each fire
 	// draws from the shared seeded RNG in a fixed, outcome-independent order (1 crit draw per player fire,
-	// 1 dodge draw per enemy fire — Block's second draw was retired, #1330) so both simulators stay in lockstep.
+	// then a parry draw + a dodge draw per enemy fire, both unconditional — #1457; Block's second draw was
+	// retired, #1330) so both simulators stay in lockstep.
 	player.advanceCooldowns(timeDelta, (skill) => {
 		// Player crit: one draw (always), independent of portion count — rolled against the firing skill's own
 		// base CriticalChance (the per-skill opt-in enabler, #1453) scaled by the player's CriticalChanceMultiplier
@@ -166,7 +206,7 @@ export function battleStep(
 		const damage = dealPortionedDamage(player, enemy, raw, skill.damagePortions, critMultiplier, executeMultiplier);
 		// Direct-hit reflection: the enemy (defender) returns its share of the summed net to the player (attacker).
 		const reflected = reflectDamage(player, enemy, damage);
-		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, reflected });
+		activations.push({ skill, damage, byPlayer: true, crit, dodged: false, parried: false, reflected });
 		skill.applyEffects(enemy, onApplied);
 	});
 
@@ -176,17 +216,28 @@ export function battleStep(
 	// player's turn).
 	if (!enemy.isDead && !player.isDead) {
 		enemy.advanceCooldowns(timeDelta, (skill) => {
-			// A single dodge draw — the only player-only roll left on an enemy attack now that Block is gone
-			// (#1330). A dodge zeroes the WHOLE multi-typed hit. The draw is taken unconditionally so the stream
-			// stays in lockstep regardless of portion count.
+			// Two draws in fixed order — parry, then dodge — both unconditional (#1457), so the stream stays in
+			// lockstep regardless of portion count or outcome. Parry is checked first so a dodge investment never
+			// starves riposte output (the two avoidance layers don't compete for the same draw).
+			const parried =
+				rng.next() <
+				player.attributes.getValue(EAttribute.ParryChance) *
+					player.attributes.getValue(EAttribute.ParryChanceMultiplier);
 			const dodged = rng.next() < player.attributes.getValue(EAttribute.DodgeChance);
 			const raw = skill.calculateDamage();
 			// Split the raw hit across the skill's weighted portions: the enemy (attacker) amplifies each, the
 			// player resists + Toughness-mitigates each (scaled by the enemy's level), and the nets are summed.
-			const damage = dodged ? 0 : dealPortionedDamage(enemy, player, raw, skill.damagePortions, 1);
+			// A parry or a dodge each zero the whole hit; parry additionally fires the counter (below).
+			const damage = parried || dodged ? 0 : dealPortionedDamage(enemy, player, raw, skill.damagePortions, 1);
 			// Direct-hit reflection: the player (defender) returns its share of the summed net to the enemy (attacker).
 			const reflected = reflectDamage(enemy, player, damage);
-			activations.push({ skill, damage, byPlayer: false, crit: false, dodged, reflected });
+			activations.push({ skill, damage, byPlayer: false, crit: false, dodged: !parried && dodged, parried, reflected });
+			if (parried) {
+				const counter = fireCounter(player, enemy, rng);
+				if (counter) {
+					activations.push(counter);
+				}
+			}
 			skill.applyEffects(player, onApplied);
 		});
 	}

@@ -17,6 +17,17 @@ namespace Game.Core.Battle
         public double DamageDodged { get; set; }
 
         /// <summary>
+        /// The number of enemy attacks the player parried this battle (Parry/Riposte, #1457) — recorded
+        /// alongside <see cref="AttacksDodged"/>, its own distinct avoidance layer.
+        /// </summary>
+        public int AttacksParried { get; set; }
+
+        /// <summary>
+        /// The post-mitigation damage a parry avoided this battle (#1457) — mirrors <see cref="DamageDodged"/>.
+        /// </summary>
+        public double DamageParried { get; set; }
+
+        /// <summary>
         /// The Precision (<c>Crit</c> activity key) training signal — distinct from the player-facing
         /// <see cref="CriticalDamageDealt"/> statistic. Each crit books the hit's booked (post-mitigation,
         /// health-capped — #1482) damage × <c>φ(m − 1)</c>, where <c>m</c> is <see cref="EAttribute.CriticalDamage"/>
@@ -38,6 +49,16 @@ namespace Game.Core.Battle
         /// routing.
         /// </summary>
         public double PlayerReflectedDamageDealt { get; set; }
+
+        /// <summary>
+        /// The counter-attack damage the player dealt on a successful parry this battle (Parry/Riposte, #1457)
+        /// — the proficiency Riposte event signal (the <c>Parry</c> activity key). A <b>direct</b> tally like
+        /// <see cref="PlayerReflectedDamageDealt"/>, not a φ-normalized overlay share claim: the counter is new
+        /// damage the parry enabled, not a rider on a hit that would have landed anyway. Also folded into
+        /// <see cref="PlayerDamageDealt"/> (it is genuine damage dealt) but tracked separately here so the
+        /// accrual trains Riposte on the counter alone.
+        /// </summary>
+        public double PlayerCounterDamageDealt { get; set; }
 
         /// <summary>
         /// The Hex (<c>Hex</c> activity key) training signal — the share of the player's landed damage claimed by

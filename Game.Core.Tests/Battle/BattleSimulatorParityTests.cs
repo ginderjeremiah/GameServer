@@ -671,17 +671,16 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: true,
                     ExpectedTotalMs: 4000),
 
-                // Simplified draw order — an enemy attack now draws ONE dodge value (not dodge + block), so the
-                // player's fractional crit draws interleave at EVEN stream positions (the enemy's single dodge
-                // draw sits between consecutive player crit draws). With a real CriticalChance 0.5 against
-                // ParitySeed the crit draws at stream indices 0, 2, 4, 6 are crit, no, crit, crit; CriticalDamage
-                // base 1.5 + 0.5 = 2.0, so the player deals 24, 12, 24, 24 (no Toughness) for a cumulative
-                // 24, 36, 60, 84. The 80-HP enemy (Str 6) dies on the tick-40 fire → 1600ms. Had the enemy still
-                // drawn TWICE (the old dodge + block), the crit draws would land at indices 0, 3, 6, 9 —
-                // crit, no, crit, no → 24, 12, 24, 12 (cumulative 24, 36, 60, 72) — pushing the kill to tick 50
-                // (2000ms). So this row pins the one-draw enemy attack. The enemy chips 5/tick (DodgeChance 0, so
-                // its dodge draw is taken but never succeeds), leaving the 100-HP player at 85.
-                ["drawOrderDodgeOnlyAlignsCrit"] = new ParityScenario(
+                // An enemy attack draws TWO values (parry then dodge, both unconditional — #1457), so the
+                // player's fractional crit draws interleave at every-third stream positions (indices 0, 3, 6, 9,
+                // ... — the enemy's two draws sit between consecutive player crit draws). With a real
+                // CriticalChance 0.5 against ParitySeed the crit draws at those indices are crit, no, crit, no;
+                // CriticalDamage base 1.5 + 0.5 = 2.0, so the player deals 24, 12, 24, 12 (no Toughness) for a
+                // cumulative 24, 36, 60, 72 — the 80-HP enemy (Str 6) survives the tick-40 fire and dies on the
+                // 5th (tick-50) fire → 2000ms. The enemy chips 5/tick (ParryChance/DodgeChance both 0, so its two
+                // draws are taken but never succeed) across all four of its attacks (ticks 10/20/30/40) before
+                // dying, leaving the 100-HP player at 80.
+                ["drawOrderParryDodgeAlignsCrit"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 10, endurance: 0,
                         skills: [MakeSkill(1, baseDamage: 12, cooldownMs: 400, criticalChance: 0.5)],
@@ -691,7 +690,7 @@ namespace Game.Core.Tests.Battle
                         skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 400)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 1600),
+                    ExpectedTotalMs: 2000),
 
                 // Fractional crit chance against a fixed seed (#941): unlike the forced-1/0 crit rows, CriticalChance
                 // is a real 0.5 fraction, so whether each player fire crits depends on the actual Mulberry32 [0,1)
