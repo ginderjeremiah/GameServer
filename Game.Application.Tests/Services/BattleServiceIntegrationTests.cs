@@ -998,6 +998,54 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_AbandoningAWonBattleWithOutOfRangeNewZoneId_CreditsVictoryWithoutThrowing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            // Pin the encounter level so the rolled enemy yields a deterministic, non-zero exp reward (see
+            // StartBattle_AbandoningAWonBattle_GrantsExpForTheVictory).
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            var expBefore = player.Exp;
+
+            // Backdate the battle start so the abandon (triggered below) resolves as a real win.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // Before the #1495 fix, a tampered out-of-range newZoneId reached GetDomainZone and threw
+            // ArgumentOutOfRangeException *after* AbandonBattle had already credited the win in-memory —
+            // stranding the credited-but-unsaved state (the caller's SavePlayerState never runs on a
+            // fault) so a reconnect would re-abandon and re-credit the same victory. The out-of-range
+            // target must now be silently ignored so the command completes normally and the win is
+            // credited exactly once.
+            await battleService.StartBattle(player, state, zoneId: zone.Id, newZoneId: 999);
+
+            Assert.True(player.Exp > expBefore);
+            Assert.True(state.HasActiveBattle);
+            Assert.Equal(zone.Id, player.CurrentZoneId);
+        }
+
+        [Fact]
         public async Task StartBattle_AbandoningAnUnresolvedBattle_RecordsAbandonedNotLost()
         {
             using var scope = CreateScope();
