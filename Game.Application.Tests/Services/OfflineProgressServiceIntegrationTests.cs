@@ -12,16 +12,16 @@ using Xunit;
 namespace Game.Application.Tests.Services
 {
     /// <summary>
-    /// Integration coverage for the offline-rewards orchestration (#1042): a returning player's away window is
-    /// replayed, the rewards (exp, levels, stat points, challenge unlocks) are applied, the away anchor is
-    /// re-stamped, and a stale in-flight battle is settled first. The per-battle reward exp is deterministic
-    /// (the player's power is stationary offline and the enemy is fixed), so a win pays a fixed amount and the
-    /// totals can be asserted exactly.
+    /// Integration coverage for <see cref="OfflineProgressService"/> (#1042, extracted from <c>BattleService</c>
+    /// by #1516): a returning player's away window is replayed, the rewards (exp, levels, stat points, challenge
+    /// unlocks) are applied, the away anchor is re-stamped, and a stale in-flight battle is settled first. The
+    /// per-battle reward exp is deterministic (the player's power is stationary offline and the enemy is fixed),
+    /// so a win pays a fixed amount and the totals can be asserted exactly.
     /// </summary>
     [Collection("Integration")]
-    public class BattleServiceOfflineProgressIntegrationTests : ApplicationIntegrationTestBase
+    public class OfflineProgressServiceIntegrationTests : ApplicationIntegrationTestBase
     {
-        public BattleServiceOfflineProgressIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
+        public OfflineProgressServiceIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
 
         // A win pays exactly this: enemy power (Str 50 + End 50 = 100) matched to the seeded player's power
@@ -35,13 +35,13 @@ namespace Game.Application.Tests.Services
             var setup = await SeedWinningScenarioAsync(scope);
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             var levelBefore = player.Level;
             // A long-enough absence to win many battles.
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.True(summary.BattlesWon > 1, "Expected the away window to win multiple battles.");
             Assert.True(summary.HasProgress);
@@ -65,14 +65,14 @@ namespace Game.Application.Tests.Services
             var setup = await SeedWinningScenarioAsync(scope);
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             var expBefore = player.Exp;
             var levelBefore = player.Level;
             // Under the 5-minute floor: no rewards, just re-anchor.
             player.LastActivity = DateTime.UtcNow.AddMinutes(-1);
 
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.False(summary.HasProgress);
             Assert.Equal(0, summary.BattlesWon);
@@ -92,16 +92,16 @@ namespace Game.Application.Tests.Services
             var setup = await SeedWinningScenarioAsync(scope);
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var first = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var first = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
             Assert.True(first.HasProgress);
 
             // The first claim re-anchored LastActivity to now, so a second immediate claim sees no away time
             // and earns nothing — rewards cannot be double-collected by reconnecting.
-            var second = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var second = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.False(second.HasProgress);
             Assert.Equal(0, second.TotalExp);
@@ -121,12 +121,12 @@ namespace Game.Application.Tests.Services
             await ReloadReferenceCachesAsync();
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
 
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             // The challenge appears once in the summary, is marked completed in progress, and its reward is
             // unlocked on the player.
@@ -172,12 +172,12 @@ namespace Game.Application.Tests.Services
             await ReloadReferenceCachesAsync();
 
             var (player, state) = await LoadAsync(scope, playerEntity.Id);
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
 
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             // The window genuinely mixed wins and losses.
             Assert.True(summary.BattlesWon > 0, "Expected at least one win in the mixed window.");
@@ -214,12 +214,12 @@ namespace Game.Application.Tests.Services
             await ReloadReferenceCachesAsync();
 
             var (player, state) = await LoadAsync(scope, playerEntity.Id);
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
 
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.True(summary.BattlesWon > 1, "Expected the away window to win multiple battles.");
 
@@ -255,6 +255,7 @@ namespace Game.Application.Tests.Services
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             // Leave a battle in-flight (a mid-battle disconnect), backdated so its replay resolves.
             await battleService.StartBattle(player, state, zoneId: setup.ZoneId);
@@ -263,7 +264,7 @@ namespace Game.Application.Tests.Services
 
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             // The stale battle is settled and cleared before the away window simulates, so no battle is left
             // active for the idle loop to re-abandon after the gate.
@@ -295,8 +296,8 @@ namespace Game.Application.Tests.Services
             player.SetAutoChallengeBoss(true);
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.True(summary.AutoChallengeBoss);
             Assert.Equal(zone.Id, summary.ZoneId);
@@ -316,8 +317,8 @@ namespace Game.Application.Tests.Services
             player.SetAutoChallengeBoss(true);
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.False(summary.AutoChallengeBoss);
             // The zone is still viable for idling, so no relocation happens.
@@ -357,8 +358,8 @@ namespace Game.Application.Tests.Services
             player.SetAutoChallengeBoss(true);
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.False(summary.AutoChallengeBoss);
             Assert.Equal(viableZone.Id, summary.ZoneId);
@@ -397,8 +398,8 @@ namespace Game.Application.Tests.Services
             player.SetAutoChallengeBoss(true);
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
-            var summary = await battleService.SimulateOfflineProgress(player, state, CancellationToken);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
             Assert.False(summary.AutoChallengeBoss);
             Assert.Equal(zone.Id, summary.ZoneId);
@@ -414,13 +415,13 @@ namespace Game.Application.Tests.Services
             var setup = await SeedWinningScenarioAsync(scope);
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
-            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             var levelBefore = player.Level;
             // Under the 5-minute login floor, but long enough to win several battles when the floor is dropped.
             player.LastActivity = DateTime.UtcNow.AddMinutes(-2);
 
-            var summary = await battleService.SimulateSwitchProgress(player, state, CancellationToken);
+            var summary = await offlineProgressService.SimulateSwitchProgress(player, state, CancellationToken);
 
             Assert.True(summary.BattlesWon > 1, "Expected the sub-threshold window to still win multiple battles.");
             Assert.True(summary.HasProgress);
@@ -440,6 +441,7 @@ namespace Game.Application.Tests.Services
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             await battleService.StartBattle(player, state, zoneId: setup.ZoneId);
             Assert.True(state.HasActiveBattle);
@@ -449,7 +451,7 @@ namespace Game.Application.Tests.Services
             // switch path resolves it.
             player.LastActivity = DateTime.UtcNow.AddMinutes(-2);
 
-            await battleService.SimulateSwitchProgress(player, state, CancellationToken);
+            await offlineProgressService.SimulateSwitchProgress(player, state, CancellationToken);
 
             Assert.False(state.HasActiveBattle);
         }
