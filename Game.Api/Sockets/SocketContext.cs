@@ -34,12 +34,23 @@ namespace Game.Api.Sockets
         public SessionService Session { get; }
         public WebSocketState State => _socket.State;
 
-        public SocketContext(WebSocket socket, int playerId, SessionService session, ILogger<SocketContext> logger)
+        /// <summary>
+        /// Whether the connected user holds the <see cref="ERole.Admin"/> role, read once from the
+        /// token that authenticated this connection's handshake. Reference-data commands use it to
+        /// decide whether authoring-only fields (e.g. <c>DesignerNotes</c>) belong in the response — see
+        /// <see cref="Commands.AbstractReferenceDataCommand{TModel}"/>. Fixed for the connection's
+        /// lifetime, matching every other claim the handshake token carries (a role change takes effect
+        /// on the next reconnect, not mid-connection).
+        /// </summary>
+        public bool IsAdmin { get; }
+
+        public SocketContext(WebSocket socket, int playerId, SessionService session, bool isAdmin, ILogger<SocketContext> logger)
         {
             _socket = socket;
             SocketId = Guid.NewGuid().ToString();
             PlayerId = playerId;
             Session = session;
+            IsAdmin = isAdmin;
             _logger = logger;
         }
 

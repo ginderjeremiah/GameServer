@@ -155,31 +155,27 @@ describe('battle-formulas', () => {
 		});
 	});
 
-	// Toughness mitigation curve (#1330): mirrors the backend `Battler.ComputeNetDamage`. K = 20.
+	// Toughness mitigation curve (#1330, constant denominator #1487): mirrors the backend
+	// `Battler.ComputeNetDamage`. C = 200.
 	describe('toughnessMitigatedDamage', () => {
-		it('reduces by Toughness / (Toughness + K·attackerLevel)', () => {
-			// Toughness 20 vs a level-1 attacker → 20/(20+20) = 0.5 reduction.
-			expect(toughnessMitigatedDamage(40, 20, 1)).toBeCloseTo(20, 10);
+		it('reduces by Toughness / (Toughness + C)', () => {
+			// Toughness 200 (the curve's half-point) → 200/(200+200) = 0.5 reduction.
+			expect(toughnessMitigatedDamage(40, 200)).toBeCloseTo(20, 10);
 		});
 
 		it('passes the hit through unchanged at zero Toughness', () => {
-			expect(toughnessMitigatedDamage(40, 0, 1)).toBe(40);
+			expect(toughnessMitigatedDamage(40, 0)).toBe(40);
 		});
 
 		it('asymptotes below 100% — overwhelming Toughness still lets a sliver through', () => {
-			// 5 × 20 / (200 + 20) = 0.4545… (never zero, no immunity).
-			expect(toughnessMitigatedDamage(5, 200, 1)).toBeCloseTo((5 * 20) / 220, 10);
-		});
-
-		it('mitigates less against a higher-level attacker (K·level scaling)', () => {
-			// Toughness 20: vs level 3 → 20/(20+60) = 0.25 reduction → 40 × 0.75 = 30.
-			expect(toughnessMitigatedDamage(40, 20, 3)).toBeCloseTo(30, 10);
+			// 5 × 200 / (2000 + 200) = 0.4545… (never zero, no immunity).
+			expect(toughnessMitigatedDamage(5, 2000)).toBeCloseTo((5 * 200) / 2200, 10);
 		});
 
 		it('amplifies the hit for a negative Toughness within the pole (#1478)', () => {
 			// A debuff-driven negative Toughness inverts the curve rather than flooring at 0% mitigation:
-			// -10/(-10+20) = -1 reduction → 40 × (1 − (−1)) = 80.
-			expect(toughnessMitigatedDamage(40, -10, 1)).toBeCloseTo(80, 10);
+			// -100/(-100+200) = -1 reduction → 40 × (1 − (−1)) = 80.
+			expect(toughnessMitigatedDamage(40, -100)).toBeCloseTo(80, 10);
 		});
 	});
 
@@ -210,12 +206,12 @@ describe('battle-formulas', () => {
 
 	describe('mitigateDamage', () => {
 		it('applies percentage resistance before the Toughness curve', () => {
-			// FireResistance 0.5 halves 40 to 20, then Toughness 20 vs a level-1 attacker → 0.5 → 10.
+			// FireResistance 0.5 halves 40 to 20, then Toughness 200 (the half-point) → 0.5 → 10.
 			const attrs = makeAttributes([
-				[EAttribute.Toughness, 20],
+				[EAttribute.Toughness, 200],
 				[EAttribute.FireResistance, 0.5]
 			]);
-			expect(mitigateDamage(40, EDamageType.Fire, attrs, 1)).toBeCloseTo(10, 10);
+			expect(mitigateDamage(40, EDamageType.Fire, attrs)).toBeCloseTo(10, 10);
 		});
 
 		it('sums resistance across the applicable keys (fire + elemental)', () => {
@@ -224,27 +220,27 @@ describe('battle-formulas', () => {
 				[EAttribute.FireResistance, 0.25],
 				[EAttribute.ElementalResistance, 0.25]
 			]);
-			expect(mitigateDamage(40, EDamageType.Fire, attrs, 1)).toBeCloseTo(20, 10);
+			expect(mitigateDamage(40, EDamageType.Fire, attrs)).toBeCloseTo(20, 10);
 		});
 
 		it('treats negative resistance as vulnerability (unclamped)', () => {
 			// 20 × 1.5 = 30; no Toughness leaves it unchanged.
 			const attrs = makeAttributes([[EAttribute.FireResistance, -0.5]]);
-			expect(mitigateDamage(20, EDamageType.Fire, attrs, 1)).toBeCloseTo(30, 10);
+			expect(mitigateDamage(20, EDamageType.Fire, attrs)).toBeCloseTo(30, 10);
 		});
 
 		it('returns a negative (healing) value on absorption and never applies the Toughness curve', () => {
 			// FireResistance 2.0 → 20 × (1 − 2) = −20, with the curve NOT applied.
 			const attrs = makeAttributes([
-				[EAttribute.Toughness, 20],
+				[EAttribute.Toughness, 200],
 				[EAttribute.FireResistance, 2.0]
 			]);
-			expect(mitigateDamage(20, EDamageType.Fire, attrs, 1)).toBeCloseTo(-20, 10);
+			expect(mitigateDamage(20, EDamageType.Fire, attrs)).toBeCloseTo(-20, 10);
 		});
 
 		it('matches toughnessMitigatedDamage for a typed hit with no resistance', () => {
-			const attrs = makeAttributes([[EAttribute.Toughness, 20]]);
-			expect(mitigateDamage(50, EDamageType.Fire, attrs, 1)).toBe(toughnessMitigatedDamage(50, 20, 1));
+			const attrs = makeAttributes([[EAttribute.Toughness, 200]]);
+			expect(mitigateDamage(50, EDamageType.Fire, attrs)).toBe(toughnessMitigatedDamage(50, 200));
 		});
 	});
 
@@ -264,7 +260,7 @@ describe('battle-formulas', () => {
 		it('agrees with the percentage mitigateDamage applies', () => {
 			// The shared helper must report the same fraction the mitigation math used.
 			const attrs = makeAttributes([[EAttribute.FireResistance, 0.4]]);
-			expect(mitigateDamage(100, EDamageType.Fire, attrs, 1)).toBeCloseTo(
+			expect(mitigateDamage(100, EDamageType.Fire, attrs)).toBeCloseTo(
 				100 * (1 - resistanceTotal(EDamageType.Fire, attrs)),
 				10
 			);

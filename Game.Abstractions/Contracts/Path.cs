@@ -5,7 +5,7 @@ namespace Game.Abstractions.Contracts
     /// <summary>Read/authoring contract for a path: an ordered sequence of proficiencies (its tiers) and the
     /// single <see cref="ActivityKey"/> the path trains on. The tiers are <see cref="Proficiency"/> records
     /// carrying this path's id.</summary>
-    public class Path : IModel
+    public class Path : IModel, IHasDesignerNotes
     {
         public int Id { get; set; }
         public required string Name { get; set; }

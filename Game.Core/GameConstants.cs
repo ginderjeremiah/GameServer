@@ -32,13 +32,15 @@ namespace Game.Core
         public const int PunchSkillId = 0;
 
         /// <summary>
-        /// The <c>K</c> in the <see cref="EAttribute.Toughness"/> mitigation curve
-        /// <c>Toughness / (Toughness + K·attackerLevel)</c>. Scaling the denominator by the <em>attacker's</em>
-        /// level keeps a level-appropriate Toughness investment in a stable mitigation band as both Toughness and
-        /// incoming damage grow with content, rather than trending toward useless (high zones) or immune (low
-        /// zones). Must match on both sides for battle parity. A strawman to tune during balancing.
+        /// The constant denominator term in the <see cref="EAttribute.Toughness"/> mitigation curve
+        /// <c>Toughness / (Toughness + C)</c> — the Toughness at which mitigation reaches exactly 50%. A fixed
+        /// constant (replacing the former <c>K·attackerLevel</c> normalization, #1487) means a Toughness
+        /// investment retains its mitigation % across all of progression instead of decaying whenever Toughness
+        /// grows slower than level, and each item's mitigation value is legible independent of enemy level.
+        /// Early-game durability is carried by MaxHealth (which Endurance also provides) rather than a low
+        /// half-point. Must match on both sides for battle parity. A strawman to tune during balancing.
         /// </summary>
-        public const int ToughnessMitigationConstant = 20;
+        public const int ToughnessMitigationConstant = 200;
 
         /// <summary>The experience required to advance a level scales linearly as <c>Level * <see cref="ExpPerLevel"/></c>.</summary>
         public const int ExpPerLevel = 100;

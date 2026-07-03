@@ -75,10 +75,10 @@ describe('battleStep', () => {
 	});
 
 	it('mitigates but never fully blocks a hit, even against huge Toughness', () => {
-		// The curve asymptotes below 100%: Toughness 180 (Endurance 90) vs a level-1 attacker keeps
-		// 20/(180 + 20) = 10% of a 5-damage hit, so 0.5 trickles through — the old flat-Defense clamp to 0 is gone.
+		// The curve asymptotes below 100%: Toughness 1800 (Endurance 900) keeps
+		// 200/(1800 + 200) = 10% of a 5-damage hit, so 0.5 trickles through — the old flat-Defense clamp to 0 is gone.
 		const player = makeBattler(baseStats, [makeSkill(5, 1000)]);
-		const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 90 }], []);
+		const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 900 }], []);
 		const enemyHealth = enemy.currentHealth;
 
 		const activations = battleStep(player, enemy, 1000, noRng());
@@ -238,7 +238,7 @@ describe('battleStep', () => {
 				],
 				[]
 			);
-			player.takeDamage(45, EDamageType.Physical, 1); // no Toughness → 45 damage → currentHealth 5
+			player.takeDamage(45, EDamageType.Physical); // no Toughness → 45 damage → currentHealth 5
 			const enemy = makeBattler(baseStats, []);
 			const log = newLog();
 
@@ -654,10 +654,10 @@ describe('battleStep', () => {
 
 		it('the riposte is mitigated by the enemy', () => {
 			// The counter runs the normal direct-hit pipeline, so the enemy's Toughness curve applies
-			// (Toughness 20 vs K·level 20 ⇒ 50%): a genuine attack, not thorns.
+			// (Toughness 200 vs the 200 constant ⇒ 50%): a genuine attack, not thorns.
 			const counter = makeSkill(30, 100_000, [], [], EDamageType.Sword);
 			const player = makeParryBattler([{ id: EAttribute.ParryChance, amount: 1 }], counter);
-			const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 10 }], [makeSkill(20, 40)]);
+			const enemy = makeBattler([{ id: EAttribute.Endurance, amount: 100 }], [makeSkill(20, 40)]);
 
 			const activations = battleStep(player, enemy, 40, noRng());
 

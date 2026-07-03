@@ -3,7 +3,7 @@ namespace Game.Abstractions.Contracts
     /// <summary>Read/authoring contract for a proficiency in the reference-data catalogue. The child
     /// collections are read projections; the identity save ignores them (they are persisted through the
     /// dedicated relationship setters, mirroring the skill editor).</summary>
-    public class Proficiency : IModel
+    public class Proficiency : IModel, IHasDesignerNotes
     {
         public int Id { get; set; }
         public required string Name { get; set; }

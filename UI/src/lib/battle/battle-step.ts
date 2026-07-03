@@ -30,7 +30,7 @@ function dealPortionedDamage(
 	let totalNet = 0;
 	for (const portion of portions) {
 		const dealt = amplifiedDamage((raw * portion.weight) / totalWeight, portion.type, attacker.attributes);
-		totalNet += defender.takeDamage(dealt * critMultiplier * executeMultiplier, portion.type, attacker.level);
+		totalNet += defender.takeDamage(dealt * critMultiplier * executeMultiplier, portion.type);
 	}
 	return totalNet;
 }
@@ -57,8 +57,8 @@ function resolvePlayerHit(
 	const missingHpFraction = Math.min(1, Math.max(0, (maxHealth - enemy.currentHealth) / maxHealth));
 	const executeMultiplier = 1 + player.attributes.getValue(EAttribute.ExecuteBonus) * missingHpFraction;
 	// Split the raw hit across the skill's weighted portions, each amplified, crit- and execute-scaled, then
-	// run through the typed mitigation pipeline (resistance, Toughness curve scaled by the player's level),
-	// summing the nets. The enemy (defender) then returns its reflection share of the summed net.
+	// run through the typed mitigation pipeline (resistance, then the Toughness curve), summing the nets.
+	// The enemy (defender) then returns its reflection share of the summed net.
 	const damage = dealPortionedDamage(player, enemy, raw, skill.damagePortions, critMultiplier, executeMultiplier);
 	const reflected = reflectDamage(player, enemy, damage);
 	return { damage, crit, reflected };
@@ -207,7 +207,7 @@ export function battleStep(
 			const raw = skill.calculateDamage();
 			// A parry or dodge zeroes the WHOLE multi-typed hit; otherwise the raw hit is split across the
 			// skill's weighted portions: the enemy (attacker) amplifies each, the player resists +
-			// Toughness-mitigates each (scaled by the enemy's level), and the nets are summed.
+			// Toughness-mitigates each, and the nets are summed.
 			const negated = parried || dodged;
 			const damage = negated ? 0 : dealPortionedDamage(enemy, player, raw, skill.damagePortions, 1);
 			// Direct-hit reflection: the player (defender) returns its share of the summed net to the enemy

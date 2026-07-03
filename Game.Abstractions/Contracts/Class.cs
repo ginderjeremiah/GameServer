@@ -6,7 +6,7 @@ namespace Game.Abstractions.Contracts
     /// (starter kit, attribute fingerprint, signature passive) shared by the game client's create-character
     /// screen and the admin Workbench. The signature passive is flattened to scalar fields so the Workbench
     /// edits it through a plain fields section.</summary>
-    public class Class : IModel
+    public class Class : IModel, IHasDesignerNotes
     {
         public int Id { get; set; }
         public required string Name { get; set; }

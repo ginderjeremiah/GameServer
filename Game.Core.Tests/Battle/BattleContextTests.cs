@@ -444,11 +444,11 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_CritAmplifiesBeforeResistanceAndToughness()
         {
-            // Order: amp (none) → crit (× 2) → resist (× 0.5) → Toughness curve. The enemy's Toughness 20 against
-            // the level-1 player halves the post-resistance hit. A normal Fire hit (20 × 0.5 = 10, × 0.5 = 5)
+            // Order: amp (none) → crit (× 2) → resist (× 0.5) → Toughness curve. The enemy's Toughness 200 (the
+            // curve's half-point) halves the post-resistance hit. A normal Fire hit (20 × 0.5 = 10, × 0.5 = 5)
             // deals only 5, but the crit (20 × 2 = 40, × 0.5 = 20, × 0.5 = 10) punches through for 10.
             var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2.0
-            var enemy = MakeBattlerWith((Endurance, 0), (Toughness, 20), (FireResistance, 0.5)); // Toughness 20, MaxHealth 50
+            var enemy = MakeBattlerWith((Endurance, 0), (Toughness, 200), (FireResistance, 0.5)); // Toughness 200, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
 
             context.DamageTarget(20, Single(EDamageType.Fire), 1);
@@ -1387,13 +1387,13 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_AppliedSunder_BooksLandedDamageScaledByInvestment()
         {
             // Sunder books the landed (booked) damage × φ(investment) — the share-claim shape every overlay uses
-            // (#1481). Attacker (player) level 1 ⇒ K·level = 20; a −20 debuff (s = 20) gives investment
-            // 20/20 = 1.0, φ(1.0) = 0.5. The debuff strips the enemy's Toughness 20 to 0, so the hit lands the
-            // full 30 and the claim is 30 × 0.5 = 15.
+            // (#1481). The curve's constant C = 200 normalizes the investment; a −200 debuff (s = 200) gives
+            // investment 200/200 = 1.0, φ(1.0) = 0.5. The debuff strips the enemy's Toughness 200 to 0, so the
+            // hit lands the full 30 and the claim is 30 × 0.5 = 15.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
+            var enemy = MakeBattlerWith((Endurance, 100)); // Toughness 200
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.ApplySkillEffect(SunderDebuff(-20));
+            context.ApplySkillEffect(SunderDebuff(-200));
 
             context.DamageTarget(30, Single(EDamageType.Physical), 0); // Toughness 0 ⇒ no curve ⇒ 30 dealt
 
@@ -1404,14 +1404,14 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_PartialSunder_BooksSmallerProportionalBonus()
         {
-            // A lighter debuff (−10, half of the previous case) gives half the investment (10/20 = 0.5),
-            // φ(0.5) = 1/3 — and the half-stripped Toughness (10) also mitigates the hit to 20 landed, so the
+            // A lighter debuff (−100, half of the previous case) gives half the investment (100/200 = 0.5),
+            // φ(0.5) = 1/3 — and the half-stripped Toughness (100) also mitigates the hit to 20 landed, so the
             // claim is 20/3 ≈ 6.667 — smaller investment, smaller share of a smaller landed hit
             // (strength-proportionality lives in φ; the basis is what actually landed).
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
+            var enemy = MakeBattlerWith((Endurance, 100)); // Toughness 200
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.ApplySkillEffect(SunderDebuff(-10)); // live Toughness 10, live reduction 1/3
+            context.ApplySkillEffect(SunderDebuff(-100)); // live Toughness 100, live reduction 1/3
 
             context.DamageTarget(30, Single(EDamageType.Physical), 0); // 30 × (1 − 1/3) = 20 dealt
 
@@ -1422,15 +1422,15 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_HeavilyInvestedSunder_SaturatesTowardTheLandedHit()
         {
-            // A towering debuff (s = 180) drives the investment to 180/20 = 9, φ(9) = 0.9, so the claim
-            // approaches (but never reaches) the landed hit. The enemy's own Toughness (Endurance 90 → 180)
-            // exactly cancels the debuff to the 0 boundary — the curve's unfloored pole at -20 is deliberately
+            // A towering debuff (s = 1800) drives the investment to 1800/200 = 9, φ(9) = 0.9, so the claim
+            // approaches (but never reaches) the landed hit. The enemy's own Toughness (Endurance 900 → 1800)
+            // exactly cancels the debuff to the 0 boundary — the curve's unfloored pole at -200 is deliberately
             // left unguarded (#1478), so this pins the boundary rather than crossing into it: the hit lands the
             // full 30 and the tally banks 30 × 0.9 = 27 — the same ceiling shape as the other overlays.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 90));
+            var enemy = MakeBattlerWith((Endurance, 900));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.ApplySkillEffect(SunderDebuff(-180));
+            context.ApplySkillEffect(SunderDebuff(-1800));
 
             context.DamageTarget(30, Single(EDamageType.Physical), 0);
 
@@ -1440,28 +1440,28 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void DamageTarget_SunderBonus_ScalesWithTheLandedHit()
         {
-            // The investment (φ side) reads only the player's own debuff and level, but the basis is the landed
-            // hit — so the same −10 debuff claims 20/3 against a soft enemy (Toughness 20 → 10, lands 20) and far
-            // less against a resistant fortress (Toughness 400 → 390, 50% resist ⇒ lands ≈ 0.73). Deliberate
+            // The investment (φ side) reads only the player's own debuff, but the basis is the landed
+            // hit — so the same −100 debuff claims 20/3 against a soft enemy (Toughness 200 → 100, lands 20) and
+            // far less against a resistant fortress (Toughness 4000 → 3900, 50% resist ⇒ lands ≈ 0.73). Deliberate
             // under the #1481 share shape: per battle the booked basis sums to at most the enemy's health pool,
             // so the per-hit difference washes out at the accrual level (where the old per-hit
             // enemy-independence guarantee used to live).
             var softPlayer = MakeBattlerWith((Endurance, 0));
-            var softEnemy = MakeBattlerWith((Endurance, 10)); // Toughness 20, no resistance
+            var softEnemy = MakeBattlerWith((Endurance, 100)); // Toughness 200, no resistance
             var softContext = new BattleContext(softPlayer, softEnemy, timeDelta: 0, new Mulberry32(0));
-            softContext.ApplySkillEffect(SunderDebuff(-10));
+            softContext.ApplySkillEffect(SunderDebuff(-100));
 
             var toughPlayer = MakeBattlerWith((Endurance, 0));
-            var toughEnemy = MakeBattlerWith((Endurance, 200), (PhysicalResistance, 0.5)); // Toughness 400, 50% resist
+            var toughEnemy = MakeBattlerWith((Endurance, 2000), (PhysicalResistance, 0.5)); // Toughness 4000, 50% resist
             var toughContext = new BattleContext(toughPlayer, toughEnemy, timeDelta: 0, new Mulberry32(0));
-            toughContext.ApplySkillEffect(SunderDebuff(-10));
+            toughContext.ApplySkillEffect(SunderDebuff(-100));
 
             softContext.DamageTarget(30, Single(EDamageType.Physical), 0);
             toughContext.DamageTarget(30, Single(EDamageType.Physical), 0);
 
             Assert.Equal(20.0 / 3.0, softContext.Stats.SunderBonusDealt, 0.001);
-            // Tough enemy: 30 × 0.5 resisted = 15, × (1 − 390/410) through the curve = 15 × 20/410 landed, × φ(0.5).
-            Assert.Equal(15.0 * 20.0 / 410.0 / 3.0, toughContext.Stats.SunderBonusDealt, 0.001);
+            // Tough enemy: 30 × 0.5 resisted = 15, × (1 − 3900/4100) through the curve = 15 × 200/4100 landed, × φ(0.5).
+            Assert.Equal(15.0 * 200.0 / 4100.0 / 3.0, toughContext.Stats.SunderBonusDealt, 0.001);
             Assert.NotEqual(softContext.Stats.PlayerDamageDealt, toughContext.Stats.PlayerDamageDealt);
         }
 
@@ -1471,9 +1471,9 @@ namespace Game.Core.Tests.Battle
             // Both overlays claim off the same booked hit: the sundered (Toughness 0) crit lands 60, so Sunder
             // claims 60 × φ(1.0) = 30 and Precision claims 60 × φ(1) = 30 — each φ on its own investment.
             var player = MakeBattlerWith((CriticalDamage, 0.5)); // CriticalDamage 2
-            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20, MaxHealth 250
+            var enemy = MakeBattlerWith((Endurance, 100)); // Toughness 200, MaxHealth 2050
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.ApplySkillEffect(SunderDebuff(-20));
+            context.ApplySkillEffect(SunderDebuff(-200));
 
             context.DamageTarget(30, Single(EDamageType.Physical), 1); // sundered Toughness 0, crit ×2 = 60 dealt
 
@@ -1488,12 +1488,12 @@ namespace Game.Core.Tests.Battle
             // The tracked Sunder debuff rides the effect stack's shared expiry: once it lapses the stack (and its
             // contribution) is gone, so a later hit trains no Sunder and lands at full Toughness again.
             var player = MakeBattlerWith((Endurance, 0));
-            var enemy = MakeBattlerWith((Endurance, 10));
+            var enemy = MakeBattlerWith((Endurance, 100));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.ApplySkillEffect(SunderDebuff(-20)); // DurationMs 10_000
+            context.ApplySkillEffect(SunderDebuff(-200)); // DurationMs 10_000
             enemy.AdvanceEffects(10_001); // past expiry ⇒ the Toughness stack and its contribution are removed
 
-            context.DamageTarget(30, Single(EDamageType.Physical), 0); // Toughness back to 20 ⇒ 15 dealt, no debuff
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // Toughness back to 200 (the half-point) ⇒ 15 dealt, no debuff
 
             Assert.Equal(15, context.Stats.PlayerDamageDealt, 0.001);
             Assert.Equal(0, context.Stats.SunderBonusDealt, 0.001);
@@ -1592,9 +1592,9 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_PlayerParriesWithoutCounterSkill_NegatesAndRecordsAvoidedDamage()
         {
             // A parry negates the whole hit like a dodge, recording the post-mitigation avoided damage
-            // (Toughness 20 vs K·level 20 ⇒ 50% ⇒ 15 of the raw 30). With no resolvable counter skill the
-            // parry stands alone — no riposte, no counter tally.
-            var player = MakeBattlerWith((ParryChance, 1), (Endurance, 10));
+            // (Toughness 200 vs the 200 constant ⇒ 50% ⇒ 15 of the raw 30). With no resolvable counter skill
+            // the parry stands alone — no riposte, no counter tally.
+            var player = MakeBattlerWith((ParryChance, 1), (Endurance, 100));
             var enemy = MakeBattlerWith((Endurance, 0));
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
@@ -1710,10 +1710,10 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_ParryCounter_IsMitigatedByTheEnemy()
         {
             // The counter runs the normal direct-hit pipeline, so the enemy's Toughness curve applies
-            // (Toughness 20 vs K·level 20 ⇒ 50%): a genuine attack, not thorns.
+            // (Toughness 200 vs the 200 constant ⇒ 50%): a genuine attack, not thorns.
             var counter = MakeCounterSkill(30);
             var player = MakeBattlerWithCounter(counter, (ParryChance, 1));
-            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
+            var enemy = MakeBattlerWith((Endurance, 100)); // Toughness 200
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
             context.SwapActiveAndTargetBattlers();
 
@@ -1802,13 +1802,13 @@ namespace Game.Core.Tests.Battle
         public void DamageTarget_ParryCounter_BooksOverlayShareClaims()
         {
             // The counter routes through the shared player-fire pipeline, so the overlay tallies ride it: a
-            // sundered enemy (Toughness 20 stripped to 0 ⇒ investment 20/20 = 1, φ = 0.5) books the counter's
-            // landed 30 × 0.5 = 15 into the Sunder signal exactly as a deliberate fire would.
+            // sundered enemy (Toughness 200 stripped to 0 ⇒ investment 200/200 = 1, φ = 0.5) books the
+            // counter's landed 30 × 0.5 = 15 into the Sunder signal exactly as a deliberate fire would.
             var counter = MakeCounterSkill(30);
             var player = MakeBattlerWithCounter(counter, (ParryChance, 1));
-            var enemy = MakeBattlerWith((Endurance, 10)); // Toughness 20
+            var enemy = MakeBattlerWith((Endurance, 100)); // Toughness 200
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
-            context.ApplySkillEffect(SunderDebuff(-20)); // player-active: lands on the enemy
+            context.ApplySkillEffect(SunderDebuff(-200)); // player-active: lands on the enemy
             context.SwapActiveAndTargetBattlers();
 
             context.DamageTarget(20, Single(EDamageType.Physical), 0);

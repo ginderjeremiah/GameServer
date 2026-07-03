@@ -102,16 +102,18 @@ namespace Game.Core.Battle
         /// mutating health: percentage resistance first (<c>dealt × (1 − Σ applies(type).Resistance)</c>,
         /// <b>unclamped</b> — a negative total amplifies as vulnerability, a total above <c>1</c> drives the
         /// result negative as absorption), then — only while the post-resistance damage is still positive — the
-        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + K·attackerLevel))</c>.
-        /// The toughness curve is a diminishing-returns percentage: effective HP is linear in Toughness while the
-        /// reduction asymptotes below <c>100%</c> (no immunity), and <paramref name="attackerLevel"/> scales the
-        /// denominator so the band stays stable as content scales (spike #1330). The resistance sum is folded in
-        /// the fixed <see cref="DamageTypes.ResistanceAttributes"/> order for parity; with no resistance and no
-        /// Toughness the positive branch reduces to <c>dealt</c>. The whole stack is multiplicative — with Block's
-        /// flat reduction removed (spike #1330 Area B) there is no flat subtraction left, so the only path to a
-        /// negative (absorbing) result is a resistance above <c>1</c>, and no clamp is needed there.
+        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + C))</c>
+        /// (<c>C</c> = <see cref="GameConstants.ToughnessMitigationConstant"/>). The toughness curve is a
+        /// diminishing-returns percentage: effective HP is linear in Toughness while the reduction asymptotes
+        /// below <c>100%</c> (no immunity), and the constant denominator means an investment retains its
+        /// mitigation % across all of progression (#1487, revising spike #1330's level normalization). The
+        /// resistance sum is folded in the fixed <see cref="DamageTypes.ResistanceAttributes"/> order for parity;
+        /// with no resistance and no Toughness the positive branch reduces to <c>dealt</c>. The whole stack is
+        /// multiplicative — with Block's flat reduction removed (spike #1330 Area B) there is no flat subtraction
+        /// left, so the only path to a negative (absorbing) result is a resistance above <c>1</c>, and no clamp
+        /// is needed there.
         /// </summary>
-        public double ComputeNetDamage(double dealt, EDamageType damageType, int attackerLevel)
+        public double ComputeNetDamage(double dealt, EDamageType damageType)
         {
             var mitigated = dealt * (1 - SumTypeResistance(damageType));
             if (mitigated <= 0)
@@ -121,13 +123,13 @@ namespace Game.Core.Battle
                 return mitigated;
             }
 
-            // Toughness mitigation: Toughness / (Toughness + K·attackerLevel) as a multiplier, so EHP is linear in
-            // Toughness and the reduction asymptotes below 100% (a positive hit can never go negative through it).
-            // K·attackerLevel keeps the band stable across content scaling. Both simulators must compute this
-            // expression identically for battle parity.
+            // Toughness mitigation: Toughness / (Toughness + C) as a multiplier, so EHP is linear in Toughness
+            // and the reduction asymptotes below 100% (a positive hit can never go negative through it). The
+            // curve is unclamped below 0 — a debuff-driven negative Toughness amplifies the hit (#1483), with
+            // the pole at Toughness = −C left unguarded per #1478 (unreachable by authored content). Both
+            // simulators must compute this expression identically for battle parity.
             var toughness = _attributes[Toughness];
-            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            var toughnessReduction = toughness / (toughness + scaled);
+            var toughnessReduction = toughness / (toughness + GameConstants.ToughnessMitigationConstant);
 
             return mitigated * (1 - toughnessReduction);
         }
@@ -230,7 +232,7 @@ namespace Game.Core.Battle
         /// at the health it actually removed, #1482) against this (defending) battler — the attacker's Sunder
         /// signal (#1429), booked as <c>bookedNet × φ(investment)</c> (<see cref="NormalizeInvestment"/>), where
         /// the investment is the opponent-applied Toughness reduction (<see cref="AppliedSunder"/>) made
-        /// dimensionless by the curve's own characteristic magnitude <c>K·attackerLevel</c>
+        /// dimensionless by the curve's own characteristic magnitude
         /// (<see cref="GameConstants.ToughnessMitigationConstant"/>) — the same constant the live mitigation curve
         /// divides by. The same share-claim shape as every overlay tally (#1481; Sunder pioneered the
         /// no-counterfactual proxy because the nonlinear Toughness curve has no target-flat marginal). Returns
@@ -238,7 +240,7 @@ namespace Game.Core.Battle
         /// Direct-hit only: DoT bypasses the Toughness curve entirely (a Toughness debuff cannot affect it), so
         /// there is no DoT counterpart to this method.
         /// </summary>
-        public double SunderBonusForHit(double bookedNet, int attackerLevel)
+        public double SunderBonusForHit(double bookedNet)
         {
             var sunder = AppliedSunder();
             if (sunder <= 0)
@@ -246,8 +248,7 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            var scaled = GameConstants.ToughnessMitigationConstant * attackerLevel;
-            return bookedNet * NormalizeInvestment(sunder / scaled);
+            return bookedNet * NormalizeInvestment(sunder / GameConstants.ToughnessMitigationConstant);
         }
 
         /// <summary>
@@ -316,15 +317,15 @@ namespace Game.Core.Battle
         /// <summary>
         /// Applies an incoming hit of <paramref name="dealt"/> (already amplified and crit-multiplied) of the
         /// given <paramref name="damageType"/> via <see cref="ComputeNetDamage"/> — percentage resistance then
-        /// the <see cref="EAttribute.Toughness"/> mitigation curve (scaled by the <paramref name="attackerLevel"/>).
+        /// the <see cref="EAttribute.Toughness"/> mitigation curve.
         /// Returns the net damage dealt; a negative result (absorption) heals this battler, <b>capped at
         /// <see cref="MaxHealth"/></b> — the game has no overheal/shield concept, so this matches
         /// <see cref="ApplyHealOverTime"/> rather than letting the reactive absorption channel bank health above
         /// the cap.
         /// </summary>
-        public double TakeDamage(double dealt, EDamageType damageType, int attackerLevel)
+        public double TakeDamage(double dealt, EDamageType damageType)
         {
-            var net = ComputeNetDamage(dealt, damageType, attackerLevel);
+            var net = ComputeNetDamage(dealt, damageType);
             if (net < 0)
             {
                 // Absorption: cap the heal at the remaining room to MaxHealth (consistent with ApplyHealOverTime),

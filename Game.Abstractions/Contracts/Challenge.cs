@@ -8,7 +8,7 @@ namespace Game.Abstractions.Contracts
     /// (<c>AddEditChallenges</c>). <see cref="StatisticType"/> and <see cref="EntityType"/> are
     /// derived from <see cref="ChallengeTypeId"/> on read and ignored on write.
     /// </summary>
-    public class Challenge : IModel
+    public class Challenge : IModel, IHasDesignerNotes
     {
         public int Id { get; set; }
         public required string Name { get; set; }

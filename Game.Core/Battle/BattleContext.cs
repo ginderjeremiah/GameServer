@@ -175,7 +175,7 @@ namespace Game.Core.Battle
         /// (<see cref="BattleStats.CriticalBonusDealt"/>, #1448, on the whole crit hit's booked total with the
         /// crit-damage investment <c>m − 1</c>), Hex (<see cref="BattleStats.HexBonusDealt"/>, #1427, on the
         /// opponent-applied vulnerability), Sunder (<see cref="BattleStats.SunderBonusDealt"/>, #1429, on the
-        /// opponent-applied Toughness debuff scaled dimensionless by <c>K·level</c>), Momentum
+        /// opponent-applied Toughness debuff scaled dimensionless by the curve's constant), Momentum
         /// (<see cref="BattleStats.MomentumBonusDealt"/>, #1428, on the attacker's own applied ramp), and Cull
         /// (<see cref="BattleStats.CullBonusDealt"/>, #1430, on the sampled execute investment). No tally runs a
         /// counterfactual curve evaluation, none re-reads the target's debuffed mitigation, and an absorbed
@@ -188,8 +188,8 @@ namespace Game.Core.Battle
         /// a parity contract (only reachable through authored absorption — resistance &gt; 1 — on one portion of a
         /// multi-typed hit). <b>Reflection runs once</b> on <c>totalNet</c> (spike #1330): it is linear and
         /// untyped, so once equals per-portion, and once gives a single clean reflection event. The Toughness curve
-        /// scales by the <b>active (attacking) battler's level</b>. Enemies never crit/dodge/parry: the gating
-        /// reads the rolls only on the player's side.
+        /// divides by a <b>tuned constant</b> (#1487/#1489), so it is attacker-level-independent. Enemies never
+        /// crit/dodge/parry: the gating reads the rolls only on the player's side.
         /// </summary>
         /// <returns>
         /// The summed net damage applied across all portions (after amplification, crit, resistance, and the
@@ -239,7 +239,7 @@ namespace Game.Core.Battle
                     for (var i = 0; i < portions.Count; i++)
                     {
                         var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
-                        Stats.DamageParried += _targetBattler.ComputeNetDamage(dealt, portions[i].Type, _activeBattler.Level);
+                        Stats.DamageParried += _targetBattler.ComputeNetDamage(dealt, portions[i].Type);
                     }
 
                     FireParryCounter(counterCritDraw);
@@ -247,13 +247,13 @@ namespace Game.Core.Battle
                 else if (isDodge)
                 {
                     // A dodge zeroes the whole hit; the avoided damage is the sum of each portion's net (resistance
-                    // then the Toughness curve, scaled by the attacking battler's level), computed without mutating
-                    // health. A dodge evaded the hit entirely, so no exposure is recorded (it trains evasion instead).
+                    // then the Toughness curve), computed without mutating health. A dodge evaded the hit
+                    // entirely, so no exposure is recorded (it trains evasion instead).
                     Stats.AttacksDodged++;
                     for (var i = 0; i < portions.Count; i++)
                     {
                         var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
-                        Stats.DamageDodged += _targetBattler.ComputeNetDamage(dealt, portions[i].Type, _activeBattler.Level);
+                        Stats.DamageDodged += _targetBattler.ComputeNetDamage(dealt, portions[i].Type);
                     }
                 }
                 else
@@ -268,7 +268,7 @@ namespace Game.Core.Battle
                         // resist-training split (#1454).
                         Stats.AddTypedDamageExposure(type, dealt);
                         Stats.AddTypedDamageResistanceMitigated(type, _targetBattler.TypeResistanceMitigated(dealt, type));
-                        totalNet += _targetBattler.TakeDamage(dealt, type, _activeBattler.Level);
+                        totalNet += _targetBattler.TakeDamage(dealt, type);
                     }
                 }
 
@@ -314,8 +314,7 @@ namespace Game.Core.Battle
                 var rawPortion = PortionRawDamage(rawDamage, totalWeight, portions[i]);
                 var dealt = _activeBattler.AmplifyDamage(rawPortion, type);
                 var healthBefore = _targetBattler.CurrentHealth;
-                var net = _targetBattler.TakeDamage(
-                    dealt * critMultiplier * executeMultiplier, type, _activeBattler.Level);
+                var net = _targetBattler.TakeDamage(dealt * critMultiplier * executeMultiplier, type);
                 // The typed offense book is capped at the health the portion actually removed (#1482): a
                 // killing swing's overkill tail — and every later portion of it — books nothing, while the
                 // whole-hit stats below keep the full net (feedback like HighestPlayerAttack includes overkill).
@@ -335,8 +334,8 @@ namespace Game.Core.Battle
                 // debuff lowered the target's resistance.
                 Stats.HexBonusDealt += _targetBattler.HexBonusForHit(overlayBasis, type);
                 // Sunder (#1429): the target-side Toughness-debuff share, the investment made dimensionless
-                // by the mitigation curve's own K·level magnitude.
-                Stats.SunderBonusDealt += _targetBattler.SunderBonusForHit(overlayBasis, _activeBattler.Level);
+                // by the mitigation curve's own constant magnitude.
+                Stats.SunderBonusDealt += _targetBattler.SunderBonusForHit(overlayBasis);
                 // Momentum (#1428): the attacker's own applied-ramp share for this portion's type.
                 var rampContribution = _activeBattler.AppliedMomentum(type);
                 if (rampContribution > 0)

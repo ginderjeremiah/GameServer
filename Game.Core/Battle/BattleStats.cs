@@ -96,7 +96,7 @@ namespace Game.Core.Battle
         /// pioneered the no-counterfactual shape, since the nonlinear Toughness curve has no target-flat
         /// marginal). Each direct hit books its booked (health-capped) damage × <c>φ(investment)</c>, where the
         /// investment is the opponent-applied Toughness reduction (<see cref="Battle.Battler.AppliedSunder"/>)
-        /// made dimensionless by the curve's own characteristic magnitude <c>K·attackerLevel</c>
+        /// made dimensionless by the curve's own characteristic magnitude
         /// (see <see cref="Battle.Battler.SunderBonusForHit"/>). Direct-hit only: DoT bypasses the Toughness
         /// curve entirely, so a Toughness debuff cannot affect it. Backend-only like the other overlay tallies.
         /// </summary>
