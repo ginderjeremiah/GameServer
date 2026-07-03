@@ -1,6 +1,7 @@
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 using Game.Core.Players.Inventories;
+using Game.Core.TestInfrastructure.Builders;
 using Xunit;
 
 namespace Game.Core.Tests.Players

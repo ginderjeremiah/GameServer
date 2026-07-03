@@ -105,12 +105,12 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// Reconstructs the player's <see cref="Battler"/> from this snapshot, resolving the captured IDs
-        /// against the in-memory catalogs via the supplied resolvers. The same modifier-composition rules the
-        /// live <see cref="Player.GetAllModifiers"/> path uses are reused here (<see cref="StatAllocation.ToModifier"/>
-        /// and <see cref="Item.GetAttributeModifiers"/>), so a battle validated from a snapshot is guaranteed to
-        /// match the player's live attributes — the frontend/backend battle-parity guarantee. The caller provides
-        /// the resolvers so the domain stays independent of the data-access layer that owns catalog lookups,
-        /// mirroring <see cref="BattleFactory"/>'s enemy resolver.
+        /// against the in-memory catalogs via the supplied resolvers. The same modifier-composition primitives
+        /// production uses (<see cref="StatAllocation.ToModifier"/> and <see cref="Item.GetAttributeModifiers"/>)
+        /// are reused here, so a battle validated from a snapshot is guaranteed to match the player's live
+        /// attributes — the frontend/backend battle-parity guarantee. The caller provides the resolvers so the
+        /// domain stays independent of the data-access layer that owns catalog lookups, mirroring
+        /// <see cref="BattleFactory"/>'s enemy resolver.
         /// </summary>
         public Battler ToBattler(
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill?> resolveSkill,

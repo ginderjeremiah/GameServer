@@ -73,11 +73,6 @@ namespace Game.Infrastructure.Cache.Redis
             await Set(key, value?.Serialize(), expiry, cancellationToken);
         }
 
-        public async Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
-        {
-            await ObserveWrite(Redis.KeyExpireAsync(key, expiry), cancellationToken);
-        }
-
         public void ExpireAndForget(string key, TimeSpan expiry)
         {
             Redis.KeyExpire(key, expiry, CommandFlags.FireAndForget);
@@ -91,11 +86,6 @@ namespace Game.Infrastructure.Cache.Redis
         public void SetAndForget<T>(string key, T value, TimeSpan expiry)
         {
             SetAndForget(key, value?.Serialize(), expiry);
-        }
-
-        public async Task SetNotExists(string key, string value, CancellationToken cancellationToken = default)
-        {
-            await StringSetAsync(key, value, when: When.NotExists, cancellationToken: cancellationToken);
         }
 
         public async Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default)

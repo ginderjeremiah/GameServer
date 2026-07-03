@@ -5,8 +5,9 @@ namespace Game.Abstractions.DataAccess
 {
     /// <summary>
     /// Read access to the cached skill-synthesis recipe catalogue (spike #1125): the contract projection the
-    /// client and admin Workbench read, the lean domain model the synthesis command validates against, and the
-    /// input-skill → recipe-ids reverse index that drives the client's hinted reveal.
+    /// client and admin Workbench read, and the lean domain model the synthesis command validates against. The
+    /// client derives its own hinted-reveal state from the full recipe set (<see cref="AllSkillRecipes"/>) plus
+    /// owned skills/proficiencies rather than a server-computed reverse index.
     /// </summary>
     public interface ISkillRecipes
     {
@@ -19,10 +20,6 @@ namespace Game.Abstractions.DataAccess
         public bool ValidateRecipeId(int recipeId);
 
         public CoreSkillRecipe GetSkillRecipe(int recipeId);
-
-        /// <summary>The (non-retired) recipes the given skill is an input to, or empty if none — the reverse
-        /// index the client hint state consumes when the player owns the skill.</summary>
-        public IReadOnlyList<int> RecipesForInputSkill(int skillId);
 
         /// <inheritdoc cref="IItems.VersionKey"/>
         public object VersionKey { get; }

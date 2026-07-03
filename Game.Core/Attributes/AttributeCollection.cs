@@ -100,6 +100,8 @@ namespace Game.Core.Attributes
 
         /// <summary>
         /// Retrieves all the <see cref="AttributeModifier"/> instances contained in the collection.
+        /// Test-only today (no production caller) — kept as an instance member rather than moved out since
+        /// it needs the private per-attribute node storage.
         /// </summary>
         /// <returns></returns>
         public IEnumerable<AttributeModifier> AllModifiers()

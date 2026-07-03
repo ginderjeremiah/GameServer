@@ -12,8 +12,5 @@ namespace Game.DataAccess.Repositories
     {
         /// <summary>The cached enemy entity at <paramref name="enemyId"/> (its zero-based index), or null if out of range.</summary>
         EnemyEntity? GetEnemy(int enemyId);
-
-        /// <summary>A random enemy entity drawn from the requested zone's spawn table.</summary>
-        EnemyEntity GetRandomEnemy(int zoneId);
     }
 }

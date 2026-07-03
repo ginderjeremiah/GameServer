@@ -16,9 +16,8 @@
         /// as its TTL and returns the previous value (null if the key was unset). The value is required
         /// (non-null): writing a TTL implies writing a value, so unlike <see cref="Set(string, string?,
         /// TimeSpan, CancellationToken)"/> there is no null-means-delete path. Writing the value and its expiry
-        /// in a single operation (rather than a separate set followed by
-        /// <see cref="Expire(string, TimeSpan, CancellationToken)"/>) means a fault between the two can never
-        /// leave the key lingering without a TTL.
+        /// in a single operation (rather than a separate set followed by a TTL reset) means a fault between the
+        /// two can never leave the key lingering without a TTL.
         /// </summary>
         public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default);
         /// <summary>
@@ -28,8 +27,6 @@
         /// </summary>
         public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default);
         public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default);
-        /// <summary>Resets the time-to-live on an existing key. A no-op if the key does not exist.</summary>
-        public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
         /// <summary>
         /// Resets the time-to-live on an existing key without awaiting the result (fire-and-forget).
         /// A no-op if the key does not exist. Lets a hot read path slide a sliding-expiration TTL
@@ -43,7 +40,6 @@
         /// </summary>
         public void SetAndForget(string key, string? value, TimeSpan expiry);
         public void SetAndForget<T>(string key, T value, TimeSpan expiry);
-        public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default);
         public Task Delete(string key, CancellationToken cancellationToken = default);
         public void DeleteAndForget(string key);
         public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default);

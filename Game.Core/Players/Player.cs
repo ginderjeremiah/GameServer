@@ -1,5 +1,3 @@
-using Game.Core.Attributes;
-using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Battle.Events;
 using Game.Core.Enemies;
@@ -450,17 +448,6 @@ namespace Game.Core.Players
         {
             LastActivity = timestamp;
             RaiseCoreUpdated();
-        }
-
-        public IEnumerable<AttributeModifier> GetAllModifiers()
-        {
-            return StatPoints.ToAttributeModifiers()
-                .Concat(Inventory.GetEquippedAttributeModifiers());
-        }
-
-        public AttributeCollection GetAttributes()
-        {
-            return new AttributeCollection(GetAllModifiers());
         }
 
         private void RaiseCoreUpdated()

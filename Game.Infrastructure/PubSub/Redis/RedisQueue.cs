@@ -32,22 +32,6 @@ namespace Game.Infrastructure.PubSub.Redis
             _logger = logger;
         }
 
-        public string? GetNext()
-        {
-            var value = _redis.ListLeftPop(QueueName);
-            if (value.HasValue)
-            {
-                _logger.LogTrace("Retrieved value from RedisQueue: {QueueName}, value: {Value}", QueueName, value);
-            }
-
-            return value;
-        }
-
-        public T? GetNext<T>()
-        {
-            return GetNext().Deserialize<T>();
-        }
-
         public async Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
         {
             // LPOP is a destructive read (it removes the head), so it takes the write path: like RedisService.GetDelete
@@ -144,17 +128,6 @@ namespace Game.Infrastructure.PubSub.Redis
         {
             // LREM count 1 removes a single matching occurrence; returns false (a no-op) when none remain.
             return await ObserveWrite(_redis.ListRemoveAsync(QueueName, value, 1), cancellationToken) > 0;
-        }
-
-        public void AddToQueue(string value)
-        {
-            _logger.LogTrace("Added value to RedisQueue: {QueueName}, value: {Value}", QueueName, value);
-            _redis.ListRightPush(QueueName, value);
-        }
-
-        public void AddToQueue<T>(T value)
-        {
-            AddToQueue(value.Serialize());
         }
 
         public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default)

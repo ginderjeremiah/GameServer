@@ -114,20 +114,6 @@ namespace Game.Infrastructure.PubSub.Redis
             }
         }
 
-        public async Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id)
-        {
-            // Validate the id before creating the worker so a misuse can't leak the worker's wait handle (#954).
-            ArgumentNullException.ThrowIfNull(id);
-            _logger.LogInformation("Creating redis subscriber on channel '{Channel}' with queue '{QueueName}'.", channel, queueName);
-            var queue = GetQueue(queueName);
-            var worker = new BackgroundWorker(_loggerFactory.CreateLogger<BackgroundWorker>(), () => action((queue, channel)))
-            {
-                Name = $"RedisSubWorker_{queueName}"
-            };
-
-            await SubscribeWithWorker(channel, worker, id);
-        }
-
         public async Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id)
         {
             // Validate the id before creating the worker so a misuse can't leak the worker's wait handle (#954).
@@ -170,11 +156,6 @@ namespace Game.Infrastructure.PubSub.Redis
             {
                 worker.Start();
             }
-        }
-
-        public async Task UnSubscribe(string channel)
-        {
-            await Subscriber.UnsubscribeAsync(RedisChannel.Literal(channel));
         }
 
         public async Task UnSubscribe(string channel, string id)

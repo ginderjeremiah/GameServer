@@ -38,7 +38,8 @@ namespace Game.Api.Tests.Integration
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-            await pubsub.Subscribe(ReferenceDataChannel, args => received.TrySetResult(args.message));
+            var subscriptionId = $"broadcast-test-{Guid.NewGuid()}";
+            await pubsub.Subscribe(ReferenceDataChannel, args => received.TrySetResult(args.message), subscriptionId);
             try
             {
                 var changes = new[]
@@ -69,7 +70,7 @@ namespace Game.Api.Tests.Integration
             }
             finally
             {
-                await pubsub.UnSubscribe(ReferenceDataChannel);
+                await pubsub.UnSubscribe(ReferenceDataChannel, subscriptionId);
             }
         }
     }

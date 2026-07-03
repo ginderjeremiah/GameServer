@@ -32,13 +32,6 @@ namespace Game.DataAccess.Repositories
             return Snapshot.CoreRecipes.GetById(recipeId, "skill recipe");
         }
 
-        public IReadOnlyList<int> RecipesForInputSkill(int skillId)
-        {
-            return Snapshot.RecipeIdsByInputSkill.TryGetValue(skillId, out var recipeIds)
-                ? recipeIds
-                : [];
-        }
-
         public SkillRecipe? LookupSkillRecipe(int recipeId)
         {
             return Snapshot.Entities.Lookup(recipeId);

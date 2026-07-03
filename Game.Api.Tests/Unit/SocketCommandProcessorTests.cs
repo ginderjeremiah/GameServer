@@ -333,10 +333,6 @@ namespace Game.Api.Tests.Unit
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public string? GetNext() => throw new NotSupportedException();
-            public T? GetNext<T>() => throw new NotSupportedException();
-            public void AddToQueue(string value) => throw new NotSupportedException();
-            public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -361,10 +357,6 @@ namespace Game.Api.Tests.Unit
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public string? GetNext() => throw new NotSupportedException();
-            public T? GetNext<T>() => throw new NotSupportedException();
-            public void AddToQueue(string value) => throw new NotSupportedException();
-            public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -383,14 +375,12 @@ namespace Game.Api.Tests.Unit
                 return Task.CompletedTask;
             }
 
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
             public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Wake(string channel) => Task.CompletedTask;
-            public Task UnSubscribe(string channel) => Task.CompletedTask;
             public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
             public IPubSubQueue GetQueue(string queueName) => DeadLetterQueue;
         }
@@ -407,8 +397,6 @@ namespace Game.Api.Tests.Unit
                 return Task.CompletedTask;
             }
 
-            public string? GetNext() => throw new NotSupportedException();
-            public T? GetNext<T>() => throw new NotSupportedException();
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -418,8 +406,6 @@ namespace Game.Api.Tests.Unit
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)Added.Count);
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public void AddToQueue(string value) => throw new NotSupportedException();
-            public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
@@ -429,7 +415,6 @@ namespace Game.Api.Tests.Unit
         {
             public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
-            public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -439,7 +424,6 @@ namespace Game.Api.Tests.Unit
             public void ExpireAndForget(string key, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
-            public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -453,7 +437,6 @@ namespace Game.Api.Tests.Unit
         {
             public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw toThrow;
 
-            public override Task UnSubscribe(string channel) => Task.CompletedTask;
             public override Task UnSubscribe(string channel, string id) => Task.CompletedTask;
         }
 
@@ -499,7 +482,6 @@ namespace Game.Api.Tests.Unit
                 Expires.Add((key, expiry));
             }
 
-            public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -508,7 +490,6 @@ namespace Game.Api.Tests.Unit
             public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
-            public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();

@@ -634,12 +634,13 @@ namespace Game.Application.Services
         // out the same way, regardless of how the battle was ended.
         //
         // Anti-cheat note: the two callers gate this payout differently and that asymmetry is intentional.
-        // EndBattleVictory validates the *client-supplied* claimed timestamp (within one logical tick of the
-        // simulated earliest defeat, and not in the future) before paying out. The won-abandon path performs no such
-        // timestamp check because it re-simulates capped at the *server-measured* elapsed wall-clock time
+        // EndBattleVictory validates that enough *server-clock* wall time has elapsed since battle start for
+        // the replayed battle to have actually finished (immune to client/server clock skew, since no
+        // client-supplied timestamp is trusted) before paying out. The won-abandon path performs no such
+        // elapsed-time check because it re-simulates capped at the *server-measured* elapsed wall-clock time
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
-        // observed, so the server-measured cap is the (stronger) control there and a client timestamp adds
-        // nothing. Both paths therefore require a server-validated timeline; neither can be claimed early.
+        // observed, so the server-measured cap is the (stronger) control there and nothing else is needed.
+        // Both paths therefore require a server-validated timeline; neither can be claimed early.
         // internal (not private) so an integration test can assert the live PlayerPower snapshot directly:
         // EndBattleVictory returns only a client-facing DefeatResult, and the BattleStats this mutates is
         // carried on the BattleCompletedEvent, which the dispatcher clears after handling — leaving no other

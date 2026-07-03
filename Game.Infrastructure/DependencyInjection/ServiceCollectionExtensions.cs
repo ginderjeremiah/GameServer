@@ -2,6 +2,7 @@
 using Game.Infrastructure.Database;
 using Game.Infrastructure.PubSub;
 using Game.Infrastructure.Redis;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -15,17 +16,21 @@ namespace Game.Infrastructure.DependencyInjection
     public static class ServiceCollectionExtensions
     {
         /// <summary>
-        /// Adds a <see cref="GameContext"/> to the <see cref="IServiceCollection"/>.  Requires a configured <see cref="InfrastructureOptions"/> service
-        /// to be registered in the <see cref="IServiceCollection"/>.
+        /// Adds a pooled <see cref="GameContext"/> to the <see cref="IServiceCollection"/>.  Requires a configured
+        /// <see cref="InfrastructureOptions"/> service to be registered in the <see cref="IServiceCollection"/>.
+        /// The options builder runs once at startup (not per resolution), and <see cref="GameContext"/> instances
+        /// are rented from a pool rather than allocated fresh — cheaper on the per-scope resolution path
+        /// (including the drain-loop's scope-per-event pattern) since <c>GameContext</c> has no per-scope state
+        /// beyond the pooled options.
         /// </summary>
         /// <param name="services"> The dependency injection container to configure.</param>
         public static IServiceCollection AddGameContext(this IServiceCollection services)
         {
-            return services.AddScoped(sp =>
+            return services.AddDbContextPool<GameContext>((sp, optionsBuilder) =>
             {
                 var options = sp.GetRequiredService<InfrastructureOptions>();
                 var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-                return GameContextFactory.GetGameContext(options, loggerFactory);
+                GameContextFactory.Configure(optionsBuilder, options, loggerFactory);
             });
         }
 

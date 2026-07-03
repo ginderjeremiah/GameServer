@@ -28,13 +28,6 @@ namespace Game.Infrastructure.Tests
         private const string DeadEndpoint = "127.0.0.1:1,abortConnect=false,connectTimeout=500,connectRetry=0";
 
         [Fact]
-        public async Task Subscribe_ActionOverload_WhenSubscribeAsyncFails_RollsBackIdForRetry()
-        {
-            await AssertFailedSubscribeFreesId((service, id) =>
-                service.Subscribe("rollback-channel", "rollback-queue", (Action<(IPubSubQueue queue, string channel)>)(_ => { }), id));
-        }
-
-        [Fact]
         public async Task Subscribe_AsyncOverload_WhenSubscribeAsyncFails_RollsBackIdForRetry()
         {
             await AssertFailedSubscribeFreesId((service, id) =>
@@ -48,17 +41,15 @@ namespace Game.Infrastructure.Tests
                 service.Subscribe("rollback-channel", (Action<(string message, string channel)>)(_ => { }), id));
         }
 
-        // The worker-backed overloads require a non-null id (a worker tracked under no id could never be disposed
+        // The worker-backed overload requires a non-null id (a worker tracked under no id could never be disposed
         // via UnSubscribe and would leak its OS wait handle, #954). A null id is rejected up front — before the
         // worker is even created, so the misuse can't leak it — and the connection is never touched.
         [Fact]
-        public async Task Subscribe_WorkerOverloads_NullId_ThrowAndNeverConnect()
+        public async Task Subscribe_WorkerOverload_NullId_ThrowAndNeverConnect()
         {
             await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(DeadEndpoint);
             var service = new RedisPubSubService(multiplexer, NullLoggerFactory.Instance);
 
-            await Assert.ThrowsAsync<ArgumentNullException>(() =>
-                service.Subscribe("channel", "queue", (Action<(IPubSubQueue queue, string channel)>)(_ => { }), null!));
             await Assert.ThrowsAsync<ArgumentNullException>(() =>
                 service.Subscribe("channel", "queue", (Func<(IPubSubQueue queue, string channel), Task>)(_ => Task.CompletedTask), null!));
         }

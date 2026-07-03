@@ -2,8 +2,6 @@
 {
     public interface IPubSubQueue
     {
-        public string? GetNext();
-        public T? GetNext<T>();
         public Task<string?> GetNextAsync(CancellationToken cancellationToken = default);
         public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default);
 
@@ -47,8 +45,6 @@
         /// </summary>
         public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default);
 
-        public void AddToQueue(string value);
-        public void AddToQueue<T>(T value);
         public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default);
         public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default);
 
