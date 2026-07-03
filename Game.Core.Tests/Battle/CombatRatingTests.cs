@@ -95,6 +95,46 @@ namespace Game.Core.Tests.Battle
             Assert.True(CombatRating.Rate(withDot, isPlayer: true) > CombatRating.Rate(noDot, isPlayer: true));
         }
 
+        [Fact]
+        public void Rate_CoreAttributeScaledDamageMultiplier_RisesWithTheScalingAttribute()
+        {
+            // Every seeded damage skill scales off a core attribute (Punch/Strike/Cleave → Strength, Focus →
+            // Intellect) via DamageMultipliers, read directly off effectiveCaster — pins that the effective
+            // caster snapshot exposes real core values rather than zeroing them.
+            var skill = MakeSkill(cooldownMs: 1000, baseDamage: 10, multipliers:
+            [
+                new DamageMultiplier { Attribute = Strength, Amount = 2.0 },
+            ]);
+            var weak = MakeBattlerWithSkills([], [skill]);
+            var strong = MakeBattlerWithSkills([(Strength, 50)], [skill]);
+
+            Assert.True(CombatRating.Rate(strong, isPlayer: true) > CombatRating.Rate(weak, isPlayer: true));
+        }
+
+        [Fact]
+        public void Rate_DoTEffectScaledByCoreAttribute_RisesWithTheScalingAttribute()
+        {
+            // A DoT effect's ScalingAttributeId is a core attribute in general (mirroring how the live engine
+            // scales an effect's magnitude off the caster) — pins that the DoT term reads it correctly rather
+            // than zeroing it.
+            var dotEffect = new SkillEffect
+            {
+                Id = 1,
+                Target = ESkillEffectTarget.Opponent,
+                AttributeId = BleedDamagePerSecond,
+                ModifierType = EModifierType.Additive,
+                Amount = 0,
+                DurationMs = 5000,
+                ScalingAttributeId = Strength,
+                ScalingAmount = 1.0,
+            };
+            var skill = MakeSkill(cooldownMs: 1000, baseDamage: 0, effects: [dotEffect]);
+            var weak = MakeBattlerWithSkills([], [skill]);
+            var strong = MakeBattlerWithSkills([(Strength, 50)], [skill]);
+
+            Assert.True(CombatRating.Rate(strong, isPlayer: true) > CombatRating.Rate(weak, isPlayer: true));
+        }
+
         // ── Rate: enemy asymmetry (crit/dodge/parry/riposte gated off) ──────
 
         [Fact]
@@ -166,6 +206,22 @@ namespace Game.Core.Tests.Battle
             Assert.True(marginal > 0);
         }
 
+        [Fact]
+        public void Marginal_StrengthOnADamageBuild_RaisesRating()
+        {
+            // A damage build's primary stat must be visible to the marginal — the exact defect a core-stripped
+            // effective-caster snapshot would hide.
+            var skill = MakeSkill(cooldownMs: 1000, baseDamage: 10, multipliers:
+            [
+                new DamageMultiplier { Attribute = Strength, Amount = 2.0 },
+            ]);
+            var battler = MakeBattlerWithSkills([(Strength, 20)], [skill]);
+
+            var marginal = CombatRating.Marginal(battler, isPlayer: true, Strength, delta: 10);
+
+            Assert.True(marginal > 0);
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private static Battler MakeBattler(params (EAttribute Attribute, double Amount)[] attributes)
@@ -190,7 +246,8 @@ namespace Game.Core.Tests.Battle
         }
 
         private static Skill MakeSkill(
-            int cooldownMs, double baseDamage, double criticalChance = 0, List<SkillEffect>? effects = null) => new()
+            int cooldownMs, double baseDamage, double criticalChance = 0,
+            List<SkillEffect>? effects = null, List<DamageMultiplier>? multipliers = null) => new()
             {
                 Id = 1,
                 Name = "Test Skill",
@@ -199,7 +256,7 @@ namespace Game.Core.Tests.Battle
                 CooldownMs = cooldownMs,
                 BaseDamage = baseDamage,
                 CriticalChance = criticalChance,
-                DamageMultipliers = [],
+                DamageMultipliers = multipliers ?? [],
                 Effects = effects ?? [],
             };
     }

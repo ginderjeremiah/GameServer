@@ -55,14 +55,6 @@ namespace Game.Core.Battle
         // zero-survivability battler never divides a downstream consumer (e.g. a rating ratio) by zero.
         private const double Epsilon = 1e-6;
 
-        // The composed value of every attribute when built from no extra modifiers — i.e. just
-        // StaticAttributeModifiers.All with every core attribute at 0. Since every static entry is Additive
-        // (no Multiplicative terms) and no core attributes are seeded into the effective-caster snapshot below,
-        // this is exactly the amount that snapshot's automatic re-application of the static modifiers already
-        // contributes — subtracting it out lets a single explicit BaseValue term set the snapshot's attribute
-        // to the battler's real composed value with no double-counting.
-        private static readonly IReadOnlyDictionary<EAttribute, double> ZeroBaseline = BuildZeroBaseline();
-
         /// <summary>
         /// The rating for <paramref name="battler"/> as assembled — <c>√(OffenseRate × Survivability)</c>
         /// against the fixed reference profiles in <see cref="ServerGameConstants"/>. Pass
@@ -190,8 +182,10 @@ namespace Game.Core.Battle
 
                     // The exact DoT steady-state closed form (spike #1526 Decision 1): magnitude × frozen
                     // amplification × duration ÷ effective cooldown. DoT bypasses the reference Toughness
-                    // (its real property), so no mitigation term applies here.
-                    var magnitude = effect.Amount + effectiveCaster.GetAttributeValue(effect.ScalingAttributeId) * effect.ScalingAmount;
+                    // (its real property), so no mitigation term applies here. The scaling attribute is read
+                    // off the original battler, not effectiveCaster — mirroring FoldedEffectMagnitude's "the
+                    // caster's ORIGINAL attribute" rule, so the two DoT-adjacent reads agree.
+                    var magnitude = effect.Amount + battler.GetAttributeValue(effect.ScalingAttributeId) * effect.ScalingAmount;
                     var ampedMagnitude = effectiveCaster.AmplifyDamage(magnitude, dotType);
                     var durationSec = effect.DurationMs / 1000.0;
                     total += ampedMagnitude * durationSec / effectiveCooldownSec;
@@ -295,24 +289,40 @@ namespace Game.Core.Battle
 
         // A battler equal to the assembled one but with every fielded Self-targeted effect folded in at its
         // uptime-weighted average magnitude — so offense/survivability compute once from one order-free state
-        // rather than simulating the battle. Every other (non-effect) attribute is copied at its exact composed
-        // value.
+        // rather than simulating the battle. Every other attribute is copied at its exact composed value,
+        // INCLUDING the core attributes: BattleSkill.CalculateRawDamage sums DamageMultipliers over core
+        // attributes directly (not through a derived static), so a core-stripped snapshot would zero out every
+        // core-scaled skill's damage. Seeding the real cores lets a core-derived attribute (CooldownRecovery,
+        // Toughness, MaxHealth, the crit/parry/dodge multipliers) re-derive naturally from them via the fresh
+        // AttributeCollection's automatic re-application of StaticAttributeModifiers — so each non-core
+        // attribute's explicit delta below is computed against a "cores-only" baseline (the value the real
+        // cores alone would produce) rather than an all-zero one, crediting only the extra (gear/proficiency/
+        // effect) contribution on top and avoiding double-counting the core-derived share.
         private static Battler BuildEffectiveCaster(Battler battler)
         {
-            var modifiers = new List<AttributeModifier>();
+            var coreModifiers = Attributes.Attribute.CoreAttributes
+                .Select(a => new AttributeModifier
+                {
+                    Attribute = a,
+                    Amount = battler.GetAttributeValue(a),
+                    Type = EModifierType.Additive,
+                    Source = EAttributeModifierSource.BaseValue,
+                })
+                .ToList();
+            var coreOnlyBaseline = new AttributeCollection(coreModifiers);
+
+            var modifiers = new List<AttributeModifier>(coreModifiers);
             foreach (var attribute in Enum.GetValues<EAttribute>())
             {
                 if (Attributes.Attribute.IsCore(attribute))
                 {
-                    // Core attributes are never read directly by the rating — only the attributes they feed
-                    // (via StaticAttributeModifiers) are — so they are simply omitted from the copy.
-                    continue;
+                    continue; // already seeded directly above
                 }
 
                 modifiers.Add(new AttributeModifier
                 {
                     Attribute = attribute,
-                    Amount = battler.GetAttributeValue(attribute) - ZeroBaseline[attribute],
+                    Amount = battler.GetAttributeValue(attribute) - coreOnlyBaseline[attribute],
                     Type = EModifierType.Additive,
                     Source = EAttributeModifierSource.BaseValue,
                 });
@@ -411,12 +421,6 @@ namespace Game.Core.Battle
             }
 
             return (EModifierType.Additive, rawMagnitude * uptime);
-        }
-
-        private static IReadOnlyDictionary<EAttribute, double> BuildZeroBaseline()
-        {
-            var collection = new AttributeCollection([]);
-            return Enum.GetValues<EAttribute>().ToDictionary(a => a, a => collection[a]);
         }
     }
 }
