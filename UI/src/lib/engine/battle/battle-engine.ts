@@ -1,4 +1,11 @@
-import { Battler, battleStep, resistanceTotal, type BattleStepLog, type AttributeModifier } from '$lib/battle';
+import {
+	Battler,
+	battleStep,
+	resistanceTotal,
+	playerBattleModifiers,
+	type BattleStepLog,
+	type AttributeModifier
+} from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData, playerProficiencies } from '$stores';
 import { ELogType, EDamageType, IBattlerAttribute, IEnemyInstance, ISkillDamagePortion } from '$lib/api';
@@ -236,7 +243,7 @@ export class BattleEngine {
 			playerManager,
 			equipmentStats,
 			inventoryManager.grantedSkillIds,
-			[...lockedBaseModifiers, ...proficiencyModifiers],
+			playerBattleModifiers(lockedBaseModifiers, proficiencyModifiers),
 			inventoryManager.equippedWeaponType,
 			inventoryManager.counterSkillId
 		);

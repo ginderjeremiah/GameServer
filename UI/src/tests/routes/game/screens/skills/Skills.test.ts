@@ -9,67 +9,84 @@ import {
 	ESkillEffectTarget,
 	type IChallenge,
 	type IEnemy,
+	type ISignaturePassive,
 	type ISkill,
 	type ISkillEffect,
 	type IZone
 } from '$lib/api';
+import type { AttributeModifier } from '$lib/battle';
+import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
 // Same engine/stores/api mocks as the view-model test: the rendered screen builds
 // its own SkillsView from these at mount.
-const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData, registerTooltipComponent } =
-	vi.hoisted(() => {
-		const playerManager = {
-			unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
-			currentZone: 0,
-			level: 1,
-			attributes: [] as { attributeId: number; amount: number }[],
-			get selectedSkills(): number[] {
-				return playerManager.unlockedSkills
-					.filter((s) => s.selected)
-					.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-					.map((s) => s.skillId);
-			},
-			setSelectedSkills(orderedIds: number[]) {
-				for (const unlockedSkill of playerManager.unlockedSkills) {
-					const order = orderedIds.indexOf(unlockedSkill.skillId);
-					unlockedSkill.selected = order >= 0;
-					unlockedSkill.order = order >= 0 ? order : undefined;
-				}
+const {
+	mockPlayerManager,
+	mockInventoryManager,
+	playerProficiencies,
+	sendSocketCommand,
+	toastError,
+	staticData,
+	registerTooltipComponent
+} = vi.hoisted(() => {
+	const playerManager = {
+		unlockedSkills: [] as { skillId: number; selected: boolean; order?: number }[],
+		currentZone: 0,
+		level: 1,
+		attributes: [] as { attributeId: number; amount: number }[],
+		battleLockedBaseModifiers: [] as AttributeModifier[],
+		battleSignaturePassiveModifier: undefined as unknown as (
+			resolve: (attribute: EAttribute) => number
+		) => AttributeModifier,
+		get selectedSkills(): number[] {
+			return playerManager.unlockedSkills
+				.filter((s) => s.selected)
+				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+				.map((s) => s.skillId);
+		},
+		setSelectedSkills(orderedIds: number[]) {
+			for (const unlockedSkill of playerManager.unlockedSkills) {
+				const order = orderedIds.indexOf(unlockedSkill.skillId);
+				unlockedSkill.selected = order >= 0;
+				unlockedSkill.order = order >= 0 ? order : undefined;
 			}
-		};
-		return {
-			mockPlayerManager: playerManager,
-			mockInventoryManager: {
-				equipmentStats: [] as { attributeId: number; amount: number }[],
-				equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[]
-			},
-			sendSocketCommand: vi.fn(),
-			toastError: vi.fn(),
-			// The shared attribute tooltip (damage-breakdown chips, equipped band) registers through this;
-			// the registration is stubbed since the tooltip wiring itself isn't under test here.
-			registerTooltipComponent: vi.fn(() => ({
-				describedById: 'tooltip-skill',
-				setTooltipPosition: vi.fn(),
-				showTooltip: vi.fn(),
-				hideTooltip: vi.fn()
-			})),
-			staticData: {
-				skills: [] as ISkill[],
-				challenges: [] as IChallenge[],
-				zones: undefined as IZone[] | undefined,
-				enemies: undefined as IEnemy[] | undefined,
-				attributes: undefined as unknown,
-				challengeTypes: undefined as unknown,
-				items: undefined as unknown,
-				itemMods: undefined as unknown
-			}
-		};
-	});
+		}
+	};
+	return {
+		mockPlayerManager: playerManager,
+		mockInventoryManager: {
+			equipmentStats: [] as { attributeId: number; amount: number }[],
+			equippedSlots: [] as ({ grantedSkillId?: number; name: string } | undefined)[],
+			grantedSkillIds: [] as number[]
+		},
+		playerProficiencies: { battleModifiers: [] as AttributeModifier[] },
+		sendSocketCommand: vi.fn(),
+		toastError: vi.fn(),
+		// The shared attribute tooltip (damage-breakdown chips, equipped band) registers through this;
+		// the registration is stubbed since the tooltip wiring itself isn't under test here.
+		registerTooltipComponent: vi.fn(() => ({
+			describedById: 'tooltip-skill',
+			setTooltipPosition: vi.fn(),
+			showTooltip: vi.fn(),
+			hideTooltip: vi.fn()
+		})),
+		staticData: {
+			skills: [] as ISkill[],
+			challenges: [] as IChallenge[],
+			zones: undefined as IZone[] | undefined,
+			enemies: undefined as IEnemy[] | undefined,
+			attributes: undefined as unknown,
+			challengeTypes: undefined as unknown,
+			items: undefined as unknown,
+			itemMods: undefined as unknown
+		}
+	};
+});
 
 vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
 vi.mock('$stores', () => ({
 	staticData,
 	toastError,
+	playerProficiencies,
 	registerTooltipComponent,
 	// The attribute tooltip computes a position from the hover anchor; the value is irrelevant here.
 	anchorPosition: () => ({ x: 0, y: 0 })
@@ -153,6 +170,14 @@ const ENEMIES: IEnemy[] = [
 const rowByName = (container: HTMLElement, name: string): HTMLElement | undefined =>
 	Array.from(container.querySelectorAll<HTMLElement>('.row')).find((r) => r.textContent?.includes(name));
 
+// A flat no-op signature passive — the default a player whose class has no passive carries.
+const noOpPassive: ISignaturePassive = {
+	attributeId: EAttribute.Strength,
+	amount: 0,
+	scalingAmount: 0,
+	modifierType: EModifierType.Additive
+};
+
 beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({});
 	toastError.mockReset();
@@ -168,7 +193,11 @@ beforeEach(() => {
 		{ skillId: 3, selected: false, order: 0 }
 	];
 	mockPlayerManager.attributes = [];
+	mockPlayerManager.battleLockedBaseModifiers = [];
+	mockPlayerManager.battleSignaturePassiveModifier = (resolve) => classSignaturePassiveModifier(noOpPassive, resolve);
 	mockInventoryManager.equipmentStats = [];
+	mockInventoryManager.grantedSkillIds = [];
+	playerProficiencies.battleModifiers = [];
 });
 
 afterEach(() => cleanup());

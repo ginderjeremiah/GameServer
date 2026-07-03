@@ -9,17 +9,17 @@
 
    The display numbers come straight from the shared pure battle formulas
    (`$lib/battle/battle-formulas` — the same functions `Skill.calculateDamage`,
-   `Battler.takeDamage` and `Battler.cdMultiplier` delegate to), computed against the same
-   `BattleAttributes` composition the simulation uses (player allocation + equipped
-   item/mod stats), so the page shows what the game actually fights with by
-   construction (#347). */
+   `Battler.takeDamage` and `Battler.cdMultiplier` delegate to), computed against the player's live
+   `BattleAttributes` from the single shared `composePlayerBattleAttributes` builder the battle engine
+   also consumes (allocation + equipped gear, class locked base, proficiency bonuses, and the class
+   signature passive), so the page shows what the game actually fights with by construction (#347, #1500). */
 
 import { EAttribute, type ISkill, type IZone, apiSocket } from '$lib/api';
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import {
-	BattleAttributes,
 	toughnessMitigatedDamage,
 	calculateSkillDamage,
+	composePlayerBattleAttributes,
 	cooldownMultiplier,
 	expectedCritMultiplier,
 	isSkillDormant,
@@ -28,7 +28,7 @@ import {
 } from '$lib/battle';
 import { damagePerSecond, enemyToughness, SerializedQueue } from '$lib/common';
 import { playerManager, inventoryManager } from '$lib/engine';
-import { staticData, toastError } from '$stores';
+import { staticData, toastError, playerProficiencies } from '$stores';
 
 export type SkillSort = 'dps' | 'dmg' | 'cd' | 'name';
 
@@ -184,10 +184,18 @@ export class SkillsView {
 	 *  the virtual-fists `Unarmed`, exactly as the battle assembly keys the gate. */
 	readonly equippedWeaponType = $derived(inventoryManager.equippedWeaponType);
 
-	/** The player's resolved battle attributes (allocation + equipped item/mod stats),
-	 *  the same composition the battle uses. */
+	/** The player's resolved live battle attributes — allocation + equipped gear, the class locked base
+	 *  and proficiency bonuses, and the class signature passive, assembled by the single shared builder
+	 *  the live battler also consumes ({@link composePlayerBattleAttributes}), so this screen can't drift
+	 *  from what the player actually fights with (#1500). */
 	readonly battleAttributes = $derived(
-		new BattleAttributes([...playerManager.attributes, ...inventoryManager.equipmentStats], true)
+		composePlayerBattleAttributes(
+			playerManager.attributes,
+			inventoryManager.equipmentStats,
+			playerManager.battleLockedBaseModifiers,
+			playerProficiencies.battleModifiers,
+			(resolve) => playerManager.battleSignaturePassiveModifier(resolve)
+		)
 	);
 
 	/** The player's CriticalDamage multiplier (≥1) — still build-wide, unlike the chance itself (#1453),
@@ -195,14 +203,31 @@ export class SkillsView {
 	 *  {@link SkillMetrics.critMultiplier} below. */
 	readonly critDamage = $derived(this.battleAttributes.getValue(EAttribute.CriticalDamage));
 
-	/** Toughness-independent metrics per catalogue skill, keyed by id. Recomputed
+	/** Ids to compute battle metrics for: every unlocked (catalogue) skill plus every skill the equipped
+	 *  gear grants. Innate grants are deliberately never unlocked, so without this the innate band's
+	 *  read-only cards would silently lose their dmg/cd/dps block (#1500). */
+	readonly metricsSkillIds = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const ids = new Set(this.catalogue.map((s) => s.id));
+		for (const id of inventoryManager.grantedSkillIds) {
+			ids.add(id);
+		}
+		return ids;
+	});
+
+	/** Toughness-independent metrics per {@link metricsSkillIds} entry, keyed by id. Recomputed
 	 *  wholesale when attributes/equipment change — read via {@link metric}. */
 	readonly metricsById = $derived.by(() => {
 		const attrs = this.battleAttributes;
 		const cdMultiplier = cooldownMultiplier(attrs);
 		const critChanceMultiplier = attrs.getValue(EAttribute.CriticalChanceMultiplier);
+		const skills = staticData.skills ?? [];
 		const byId: Record<number, SkillMetrics> = {};
-		for (const skill of this.catalogue) {
+		for (const id of this.metricsSkillIds) {
+			const skill = skills[id];
+			if (!skill) {
+				continue;
+			}
 			// Each skill's own base CriticalChance (#1453) is the opt-in enabler; the player's
 			// CriticalChanceMultiplier only scales it, so an unauthored skill (0) stays inert.
 			const critChance = skill.criticalChance * critChanceMultiplier;
@@ -218,7 +243,7 @@ export class SkillsView {
 		return byId;
 	});
 
-	/** Metrics for a single skill id (undefined when not in the catalogue). */
+	/** Metrics for a single skill id (undefined when neither unlocked nor granted by equipped gear). */
 	metric(id: number): SkillMetrics | undefined {
 		return this.metricsById[id];
 	}
