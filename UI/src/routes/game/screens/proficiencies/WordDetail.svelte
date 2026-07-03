@@ -86,7 +86,7 @@ import { buildLadder, decipherReveal, statePill, trainedBy, xpProgressText } fro
 interface Props {
 	/** The selected tier to detail. */
 	tier: TierView;
-	/** The tier's owning path, for the school name and the "Trained by" contributions. */
+	/** The tier's owning path, for the school name and the "Trained by" activity-key chip. */
 	path: PathView;
 	/** Drives the shared decipher tooltip on hover/focus (the same controller the spine cards use). */
 	controller: WordTooltipController;

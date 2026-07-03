@@ -6,8 +6,8 @@
    resolver + the attributes set, mirroring the param-based `$lib/common` helpers) so the whole derivation
    is unit-testable without rendering; `WordDetail.svelte` only wires these to the live stores. */
 
-import { EActivityKey, EModifierType, type IAttribute, type IProficiencyLevelModifier } from '$lib/api';
-import { attributeName, formatAttributeDelta, formatNum } from '$lib/common';
+import { type EActivityKey, EModifierType, type IAttribute, type IProficiencyLevelModifier } from '$lib/api';
+import { activityKeyLabel, attributeName, formatAttributeDelta, formatNum } from '$lib/common';
 import type { TierState, TierView } from './proficiencies-lexicon';
 
 /** A skill-id → display-name resolver (the inspector passes one reading `staticData.skills`). Returns
@@ -124,9 +124,7 @@ export function buildLadder(
 }
 
 /** The activity a path trains on, as the inspector's single "Trained by" chip label — a path earns from
- *  any effect whose key resolves to it (spike #1318). */
+ *  any effect whose key resolves to it (spike #1318). Spelled by the shared activity-key labeller. */
 export function trainedBy(activityKey: EActivityKey): string[] {
-	// TODO(#1341): surface a friendly label (e.g. Dot → "Damage over time") rather than the raw enum name,
-	// as part of the authoring/labels pass.
-	return [EActivityKey[activityKey]];
+	return [activityKeyLabel(activityKey)];
 }

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
 import {
 	activityKeyGroups,
-	activityKeyLabel,
 	cumulativeXp,
 	decipherThresholds,
 	diffCatalogue,
@@ -58,21 +57,6 @@ describe('decipherThresholds', () => {
 });
 
 describe('activity-key picker', () => {
-	it('labels offense keys by their damage-type stem (DoT spelled out)', () => {
-		expect(activityKeyLabel(EActivityKey.Fire)).toBe('Fire');
-		expect(activityKeyLabel(EActivityKey.Dot)).toBe('DoT');
-	});
-
-	it('labels combat events by what they train, and resist keys with a (resist) suffix', () => {
-		expect(activityKeyLabel(EActivityKey.Crit)).toBe('Critical damage');
-		expect(activityKeyLabel(EActivityKey.Hex)).toBe('Vulnerability damage enabled');
-		expect(activityKeyLabel(EActivityKey.Momentum)).toBe('Ramp damage enabled');
-		expect(activityKeyLabel(EActivityKey.Sunder)).toBe('Mitigation damage enabled');
-		expect(activityKeyLabel(EActivityKey.Cull)).toBe('Execute damage enabled');
-		expect(activityKeyLabel(EActivityKey.FireResist)).toBe('Fire (resist)');
-		expect(activityKeyLabel(EActivityKey.DotResist)).toBe('DoT (resist)');
-	});
-
 	it('groups every key into damage-dealt / combat-events / resistance with no leaks or dupes', () => {
 		const keys = (Object.values(EActivityKey).filter((v) => typeof v === 'number') as number[]).sort((a, b) => a - b);
 		const grouped = activityKeyGroups.flatMap((g) => g.options.map((o) => o.value)).sort((a, b) => a - b);
@@ -85,7 +69,15 @@ describe('activity-key picker', () => {
 		const groupOf = (key: number) => activityKeyGroups.find((g) => g.options.some((o) => o.value === key))?.label;
 		expect(groupOf(EActivityKey.Fire)).toBe('Damage dealt');
 		expect(groupOf(EActivityKey.Crit)).toBe('Combat events');
+		expect(groupOf(EActivityKey.Parry)).toBe('Combat events');
 		expect(groupOf(EActivityKey.FireResist)).toBe('Damage taken — resistance');
+	});
+
+	it('labels options through the shared activity-key labeller (bare stems in the resist group)', () => {
+		const textOf = (key: number) => activityKeyGroups.flatMap((g) => g.options).find((o) => o.value === key)?.text;
+		expect(textOf(EActivityKey.Dot)).toBe('DoT');
+		expect(textOf(EActivityKey.Crit)).toBe('Critical damage');
+		expect(textOf(EActivityKey.DotResist)).toBe('DoT');
 	});
 });
 

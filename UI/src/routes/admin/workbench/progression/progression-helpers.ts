@@ -1,5 +1,6 @@
 import type { IProficiencyLevelModifier, IProficiencyLevelReward } from '$lib/api';
 import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
+import { activityKeyDisplay, type ActivityKeyKind } from '$lib/common';
 import { canonicalEqual } from '../save-helpers';
 import type { SelectOption } from '../entities/types';
 import type { WorkbenchPath, WorkbenchProficiency } from './types';
@@ -17,34 +18,6 @@ export const newPath = (id: number): WorkbenchPath => ({
 
 // ── Activity-key picker (path identity) ──
 
-/** Combat-event activity keys (not damage types) — labelled by the quantity they train on. */
-const ACTIVITY_EVENT_LABELS: Partial<Record<EActivityKey, string>> = {
-	[EActivityKey.Crit]: 'Critical damage',
-	[EActivityKey.Dodge]: 'Dodged damage',
-	[EActivityKey.Heal]: 'Healing done',
-	[EActivityKey.Reflect]: 'Reflected damage',
-	[EActivityKey.Hex]: 'Vulnerability damage enabled',
-	[EActivityKey.Momentum]: 'Ramp damage enabled',
-	[EActivityKey.Sunder]: 'Mitigation damage enabled',
-	[EActivityKey.Cull]: 'Execute damage enabled'
-};
-
-/** Spell the damage-type stem of an activity-key name ("Dot" → "DoT"; others read as authored). */
-const typeStemLabel = (stem: string): string => (stem === 'Dot' ? 'DoT' : stem);
-
-/**
- * A path's activity key as a friendly label: a combat event by what it trains ("Critical damage"),
- * an incoming-book key suffixed "(resist)", or the bare damage-type stem for the output book.
- */
-export const activityKeyLabel = (key: EActivityKey): string => {
-	const event = ACTIVITY_EVENT_LABELS[key];
-	if (event) {
-		return event;
-	}
-	const name = EActivityKey[key];
-	return name.endsWith('Resist') ? `${typeStemLabel(name.slice(0, -'Resist'.length))} (resist)` : typeStemLabel(name);
-};
-
 /** A labelled group of select options (rendered as an `<optgroup>`). */
 export interface SelectOptionGroup {
 	label: string;
@@ -53,30 +26,22 @@ export interface SelectOptionGroup {
 
 /**
  * Activity-key options for the path identity picker, grouped into the two books plus the combat events:
- * offense (damage dealt), combat events, and resistance (damage taken). Derived from the enum so an
- * appended offense key (e.g. a weapon-type leaf) shows up automatically under "Damage dealt".
+ * offense (damage dealt), combat events, and resistance (damage taken). Classification and labels come
+ * from the shared `activityKeyDisplay`, so an appended enum key shows up automatically in its group.
  */
 export const activityKeyGroups: SelectOptionGroup[] = (() => {
-	const offense: SelectOption[] = [];
-	const events: SelectOption[] = [];
-	const resist: SelectOption[] = [];
-	for (const [name, value] of Object.entries(EActivityKey)) {
+	const byKind: Record<ActivityKeyKind, SelectOption[]> = { offense: [], event: [], resist: [] };
+	for (const value of Object.values(EActivityKey)) {
 		if (typeof value !== 'number') {
 			continue;
 		}
-		const eventLabel = ACTIVITY_EVENT_LABELS[value as EActivityKey];
-		if (eventLabel !== undefined) {
-			events.push({ value, text: eventLabel });
-		} else if (name.endsWith('Resist')) {
-			resist.push({ value, text: typeStemLabel(name.slice(0, -'Resist'.length)) });
-		} else {
-			offense.push({ value, text: typeStemLabel(name) });
-		}
+		const { kind, label } = activityKeyDisplay(value);
+		byKind[kind].push({ value, text: label });
 	}
 	return [
-		{ label: 'Damage dealt', options: offense },
-		{ label: 'Combat events', options: events },
-		{ label: 'Damage taken — resistance', options: resist }
+		{ label: 'Damage dealt', options: byKind.offense },
+		{ label: 'Combat events', options: byKind.event },
+		{ label: 'Damage taken — resistance', options: byKind.resist }
 	];
 })();
 

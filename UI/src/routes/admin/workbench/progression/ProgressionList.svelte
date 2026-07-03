@@ -57,14 +57,9 @@
 
 <script lang="ts">
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
+import { activityKeyLabel } from '$lib/common';
 import type { ProgressionStore } from './progression-store.svelte';
-import {
-	activityKeyLabel,
-	hasTierCollision,
-	pathWarnings,
-	proficiencyWarnings,
-	tiersOfPath
-} from './progression-helpers';
+import { hasTierCollision, pathWarnings, proficiencyWarnings, tiersOfPath } from './progression-helpers';
 
 interface Props {
 	store: ProgressionStore;
