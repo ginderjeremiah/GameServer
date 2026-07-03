@@ -17,6 +17,5 @@ namespace Game.DataAccess.Repositories
         /// </summary>
         void DeleteByKey<TEntity>(params object[] keyValues) where TEntity : class;
         void Update<TEntity>(TEntity entity) where TEntity : class;
-        void Track<TEntity>(TEntity entity) where TEntity : class;
     }
 }

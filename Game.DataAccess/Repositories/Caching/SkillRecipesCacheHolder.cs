@@ -9,20 +9,12 @@ namespace Game.DataAccess.Repositories.Caching
 {
     /// <summary>
     /// An immutable snapshot of the skill-recipe reference set (spike #1125): the ordered recipe entity list
-    /// (contract projection and admin entity lookups), the pre-materialized lean <see cref="CoreSkillRecipe"/>
-    /// domain models, and the derived input-skill → recipe-ids reverse index. All are built and published
-    /// together so a reader can never observe a new entity list against a stale index.
-    /// <para>
-    /// The reverse index drives the client's conservative hinted reveal (areas D/E): a skill the player owns
-    /// maps to the recipes it feeds. Retired recipes are excluded from the index — a retired recipe is no
-    /// longer offered or hinted — but stay resolvable by id in the entity/core lists (already-synthesized
-    /// results persist).
-    /// </para>
+    /// (contract projection and admin entity lookups) and the pre-materialized lean <see cref="CoreSkillRecipe"/>
+    /// domain models, built and published together so a reader can never observe a torn pair.
     /// </summary>
     internal sealed record SkillRecipeSnapshot(
         IReadOnlyList<SkillRecipe> Entities,
-        IReadOnlyList<CoreSkillRecipe> CoreRecipes,
-        IReadOnlyDictionary<int, IReadOnlyList<int>> RecipeIdsByInputSkill);
+        IReadOnlyList<CoreSkillRecipe> CoreRecipes);
 
     /// <summary>Singleton snapshot holder for the cached skill-recipe entity list and its derived structures.</summary>
     internal sealed class SkillRecipesCacheHolder(IServiceScopeFactory scopeFactory)
@@ -53,20 +45,9 @@ namespace Game.DataAccess.Repositories.Caching
                     $"Skill recipe graph contains a cycle (a skill cannot be synthesized from itself): {string.Join(" -> ", cycle)}.");
             }
 
-            // The reverse index the client hint state consumes: each input skill → the recipes it feeds. Retired
-            // recipes are excluded so a retired recipe is never offered or hinted.
-            var recipeIdsByInputSkill = entities
-                .Where(r => r.RetiredAt is null)
-                .SelectMany(r => r.Inputs.Select(i => (i.SkillId, r.Id)))
-                .GroupBy(x => x.SkillId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => (IReadOnlyList<int>)g.Select(x => x.Id).OrderBy(id => id).ToList());
-
             return new SkillRecipeSnapshot(
                 entities,
-                entities.Select(SkillRecipeMapper.ToCore).ToList(),
-                recipeIdsByInputSkill);
+                entities.Select(SkillRecipeMapper.ToCore).ToList());
         }
     }
 }

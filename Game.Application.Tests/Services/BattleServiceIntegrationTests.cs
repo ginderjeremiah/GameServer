@@ -1581,7 +1581,7 @@ namespace Game.Application.Tests.Services
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
 
             // emptyZone is live but has no enemies assigned, so it has no spawn table — the runtime safety net
-            // relocates rather than throwing on GetRandomEnemy.
+            // relocates rather than throwing on GetRandomDomainEnemy.
             var viableZone = await TestDataSeeder.CreateZoneAsync(context, "Viable", order: 0);
             var emptyZone = await TestDataSeeder.CreateZoneAsync(context, "Empty", order: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, viableZone.Id, enemy.Id);
@@ -1619,7 +1619,7 @@ namespace Game.Application.Tests.Services
             // strippedZone is live, but its only assigned enemy has been retired — a retired enemy is filtered
             // out of the spawn tables, so the zone has no spawnable enemies. This is the exact #1051 trigger
             // (an admin retired every active enemy of a live zone); the runtime safety net must relocate rather
-            // than throw on GetRandomEnemy.
+            // than throw on GetRandomDomainEnemy.
             var retiredEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Retired Foe");
             retiredEnemy.RetiredAt = DateTime.UtcNow;
             await context.SaveChangesAsync(CancellationToken);

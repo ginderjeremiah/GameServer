@@ -36,22 +36,6 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void TypedRoundTripSync_SerializesAndDeserializes_ThenReturnsNullWhenDrained()
-        {
-            using var scope = CreateScope();
-            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
-            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
-
-            var payload = new SamplePayload(9, "world");
-            queue.AddToQueue(payload);
-
-            var roundTripped = queue.GetNext<SamplePayload>();
-            Assert.Equal(payload, roundTripped);
-
-            Assert.Null(queue.GetNext<SamplePayload>());
-        }
-
-        [Fact]
         public async Task PreservesFifoOrder()
         {
             using var scope = CreateScope();

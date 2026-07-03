@@ -71,9 +71,9 @@ namespace Game.Core.Items
         /// <summary>
         /// The attribute modifiers this item contributes when equipped: its own <see cref="Attributes"/>
         /// plus the attributes of the given <paramref name="appliedMods"/>. Single source of truth for the
-        /// item + applied-mods composition rule, shared by the live
-        /// <see cref="Players.Inventories.Inventory.GetEquippedAttributeModifiers"/> path and the
-        /// battle-snapshot reconstruction (<see cref="Battle.BattleSnapshot.ToBattler"/>).
+        /// item + applied-mods composition rule, shared by the live battle-snapshot reconstruction
+        /// (<see cref="Battle.BattleSnapshot.ToBattler"/>) and the test-only <c>GetEquippedAttributeModifiers</c>
+        /// shortcut (<c>Game.Core.TestInfrastructure</c>) used to build a battler straight off a live player.
         /// </summary>
         public IEnumerable<AttributeModifier> GetAttributeModifiers(IEnumerable<ItemMod> appliedMods)
         {

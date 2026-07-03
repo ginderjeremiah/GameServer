@@ -20,14 +20,6 @@ namespace Game.DataAccess.Repositories
             return [.. Snapshot.Entities.Select(ZoneMapper.ToContract)];
         }
 
-        public Contracts.Zone GetZone(int zoneId)
-        {
-            var entities = Snapshot.Entities;
-            return IsValidZoneId(entities, zoneId)
-                ? ZoneMapper.ToContract(entities[zoneId])
-                : throw new ArgumentOutOfRangeException(nameof(zoneId));
-        }
-
         public Core.Zones.Zone GetDomainZone(int zoneId)
         {
             // Hands back the snapshot's shared, pre-materialized domain model rather than mapping a fresh

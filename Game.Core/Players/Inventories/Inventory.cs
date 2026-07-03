@@ -1,4 +1,3 @@
-using Game.Core.Attributes.Modifiers;
 using Game.Core.Items;
 
 namespace Game.Core.Players.Inventories
@@ -53,28 +52,6 @@ namespace Game.Core.Players.Inventories
         public UnlockedItemSlot? GetUnlockedItem(int itemId)
         {
             return _unlockedItems.GetValueOrDefault(itemId);
-        }
-
-        public IEnumerable<AttributeModifier> GetEquippedAttributeModifiers()
-        {
-            return EquipmentSlots.SelectNotNull(slot => slot.Item)
-                .SelectMany(item => item.GetAttributeModifiers(GetAppliedMods(item.Id)));
-        }
-
-        /// <summary>
-        /// Resolves the mods currently applied to the equipped item with the given
-        /// <paramref name="itemId"/>. Applied mods live on the player's <see cref="UnlockedItemSlot"/>
-        /// rather than on the shared, reference-data <see cref="Item.ModSlots"/>.
-        /// </summary>
-        private IEnumerable<ItemMod> GetAppliedMods(int itemId)
-        {
-            var unlocked = GetUnlockedItem(itemId);
-            if (unlocked is null)
-            {
-                return [];
-            }
-
-            return unlocked.AppliedMods.Select(applied => applied.ItemMod);
         }
 
         public bool TryEquipItem(int itemId, EEquipmentSlot slot, IReadOnlyDictionary<int, int> proficiencyLevels)

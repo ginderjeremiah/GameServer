@@ -10,9 +10,9 @@ using Entities = Game.Infrastructure.Entities;
 namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
-    /// Exercises the skill-recipe reference repo against a real database: the contract projection, the shared
-    /// lean core model, and the derived input-skill → recipe-ids reverse index (including its exclusion of
-    /// retired recipes, which stay resolvable by id).
+    /// Exercises the skill-recipe reference repo against a real database: the contract projection and the
+    /// shared lean core model, including a retired recipe's exclusion from live authoring while staying
+    /// resolvable by id.
     /// </summary>
     [Collection("Integration")]
     public class SkillRecipesIntegrationTests : ApplicationIntegrationTestBase
@@ -21,7 +21,7 @@ namespace Game.Application.Tests.DataAccess
             : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task GetSkillRecipe_AssemblesInputsAndConditions_AndReverseIndexIsExposed()
+        public async Task GetSkillRecipe_AssemblesInputsAndConditions()
         {
             int recipeId, resultSkillId, inputA, inputB, proficiencyId;
             using (var seedScope = CreateScope())
@@ -61,12 +61,6 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(proficiencyId, condition.ProficiencyId);
             Assert.Equal(3, condition.MinLevel);
 
-            // The reverse index maps each input skill to the recipes it feeds.
-            Assert.Equal([recipeId], recipes.RecipesForInputSkill(inputA));
-            Assert.Equal([recipeId], recipes.RecipesForInputSkill(inputB));
-            // The result skill is not an input, so it feeds nothing.
-            Assert.Empty(recipes.RecipesForInputSkill(resultSkillId));
-
             var contract = Assert.Single(recipes.AllSkillRecipes());
             Assert.Equal(resultSkillId, contract.ResultSkillId);
             Assert.Equal([inputA, inputB], contract.InputSkillIds.OrderBy(id => id));
@@ -74,7 +68,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task RetiredRecipe_IsExcludedFromReverseIndex_ButResolvableById()
+        public async Task RetiredRecipe_IsExcludedFromLiveAuthoring_ButResolvableById()
         {
             int recipeId, resultSkillId, inputSkillId;
             using (var seedScope = CreateScope())
@@ -96,12 +90,11 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var recipes = scope.ServiceProvider.GetRequiredService<ISkillRecipes>();
 
-            // Out of circulation: a retired recipe is never offered or hinted.
-            Assert.Empty(recipes.RecipesForInputSkill(inputSkillId));
-            // But it stays resolvable by id (already-synthesized results persist).
+            // A retired recipe stays resolvable by id (already-synthesized results persist)...
             var core = recipes.GetSkillRecipe(recipeId);
             Assert.True(core.IsRetired);
             Assert.Equal(resultSkillId, core.ResultSkillId);
+            // ...but is flagged retired rather than silently dropped, so a caller must check IsRetired before offering it.
         }
 
         private async Task<Entities.Skill> SeedSkillAsync(GameContext context, ESkillAcquisition acquisition)

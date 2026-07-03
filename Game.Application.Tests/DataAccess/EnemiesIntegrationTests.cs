@@ -17,7 +17,7 @@ namespace Game.Application.Tests.DataAccess
             : base(containers, testOutputHelper) { }
 
         [Fact]
-        public async Task GetRandomEnemy_OnlyReturnsEnemiesAssignedToTheRequestedZone()
+        public async Task GetRandomDomainEnemy_OnlyReturnsEnemiesAssignedToTheRequestedZone()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -34,15 +34,15 @@ namespace Game.Application.Tests.DataAccess
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zoneB.Id, enemyB.Id, weight: 1);
             await ReloadReferenceCachesAsync();
 
-            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
 
             var zoneAEnemyIds = new HashSet<int> { enemyA1.Id, enemyA2.Id };
 
             // Draw many times; every draw must belong to the requested zone.
             for (int i = 0; i < 100; i++)
             {
-                Assert.Contains(enemies.GetRandomEnemy(zoneA.Id).Id, zoneAEnemyIds);
-                Assert.Equal(enemyB.Id, enemies.GetRandomEnemy(zoneB.Id).Id);
+                Assert.Contains(enemies.GetRandomDomainEnemy(zoneA.Id, level: 1).Id, zoneAEnemyIds);
+                Assert.Equal(enemyB.Id, enemies.GetRandomDomainEnemy(zoneB.Id, level: 1).Id);
             }
         }
 
@@ -50,7 +50,7 @@ namespace Game.Application.Tests.DataAccess
         [InlineData(-1)]
         [InlineData(1)]
         [InlineData(999)]
-        public async Task GetRandomEnemy_InvalidZoneId_ThrowsArgumentOutOfRange(int invalidZoneId)
+        public async Task GetRandomDomainEnemy_InvalidZoneId_ThrowsArgumentOutOfRange(int invalidZoneId)
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -62,13 +62,13 @@ namespace Game.Application.Tests.DataAccess
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
             await ReloadReferenceCachesAsync();
 
-            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
 
-            Assert.Throws<ArgumentOutOfRangeException>(() => enemies.GetRandomEnemy(invalidZoneId));
+            Assert.Throws<ArgumentOutOfRangeException>(() => enemies.GetRandomDomainEnemy(invalidZoneId, level: 1));
         }
 
         [Fact]
-        public async Task GetRandomEnemy_ValidZoneWithNoEnemies_ThrowsInvalidOperation()
+        public async Task GetRandomDomainEnemy_ValidZoneWithNoEnemies_ThrowsInvalidOperation()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -79,13 +79,13 @@ namespace Game.Application.Tests.DataAccess
             await TestDataSeeder.LinkEnemyToZoneAsync(context, populatedZone.Id, enemy.Id);
             await ReloadReferenceCachesAsync();
 
-            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
 
-            Assert.Throws<InvalidOperationException>(() => enemies.GetRandomEnemy(emptyZone.Id));
+            Assert.Throws<InvalidOperationException>(() => enemies.GetRandomDomainEnemy(emptyZone.Id, level: 1));
         }
 
         [Fact]
-        public async Task GetRandomEnemy_ExcludesRetiredEnemiesButKeepsThemResolvable()
+        public async Task GetRandomDomainEnemy_ExcludesRetiredEnemiesButKeepsThemResolvable()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -101,16 +101,17 @@ namespace Game.Application.Tests.DataAccess
             await context.SaveChangesAsync(CancellationToken);
             await ReloadReferenceCachesAsync();
 
-            var enemies = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
+            var enemies = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var enemyEntities = scope.ServiceProvider.GetRequiredService<IEnemyEntityCache>();
 
             // Every random draw avoids the retired enemy...
             for (int i = 0; i < 100; i++)
             {
-                Assert.Equal(active.Id, enemies.GetRandomEnemy(zone.Id).Id);
+                Assert.Equal(active.Id, enemies.GetRandomDomainEnemy(zone.Id, level: 1).Id);
             }
 
             // ...but the retired enemy still resolves by id, so existing references stay valid.
-            Assert.Equal(retired.Id, enemies.GetEnemy(retired.Id)?.Id);
+            Assert.Equal(retired.Id, enemyEntities.GetEnemy(retired.Id)?.Id);
         }
 
         [Fact]

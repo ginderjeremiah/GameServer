@@ -41,11 +41,6 @@ namespace Game.DataAccess.Repositories
             _context.Entry(entity).State = EntityState.Modified;
         }
 
-        public void Track<TEntity>(TEntity entity) where TEntity : class
-        {
-            _context.Entry(entity).State = EntityState.Unchanged;
-        }
-
         // Builds a stub carrying only the primary key. The instance is created uninitialized — `required`
         // is a compile-time guard the runtime doesn't enforce, the same way EF's own materializer
         // constructs entities — so a key-only delete never has to fabricate a value for an unrelated

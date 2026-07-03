@@ -76,9 +76,8 @@ namespace Game.Core.Battle
         /// Sums the additive amounts of the core attributes in <paramref name="modifiers"/>. Both
         /// combatants' power is measured the same way so the difficulty ratio compares like with like:
         /// derived attributes (e.g. MaxHealth) are excluded because they are computed from the core
-        /// attributes and never appear in a player's <see cref="Player.GetAllModifiers"/>, and
-        /// multiplicative modifiers are excluded because their amount is a scaling factor, not a flat
-        /// point total that can be meaningfully summed.
+        /// attributes and never appear as their own modifier, and multiplicative modifiers are excluded
+        /// because their amount is a scaling factor, not a flat point total that can be meaningfully summed.
         /// </summary>
         private static double SumCoreAttributes(IEnumerable<AttributeModifier> modifiers)
         {

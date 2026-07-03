@@ -1135,7 +1135,7 @@ namespace Game.Application.Tests.DataAccess
         {
             // Models the Redis reliable-queue semantics: items wait on _items (head = First), a reserve moves the
             // head onto _processing, and an acknowledge removes it; a reclaim restores the processing list to the
-            // queue head in order. GetNext destructively pops the queue head (used to assert the queue is drained).
+            // queue head in order. GetNextAsync destructively pops the queue head (used to assert the queue is drained).
             private readonly LinkedList<string?> _items;
             private readonly LinkedList<string?> _processing = new();
 
@@ -1144,19 +1144,17 @@ namespace Game.Application.Tests.DataAccess
                 _items = new LinkedList<string?>(items);
             }
 
-            public string? GetNext()
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
                 if (_items.First is null)
                 {
-                    return null;
+                    return Task.FromResult<string?>(null);
                 }
 
                 var value = _items.First.Value;
                 _items.RemoveFirst();
-                return value;
+                return Task.FromResult(value);
             }
-
-            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult(GetNext());
 
             public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
             {
@@ -1212,7 +1210,6 @@ namespace Game.Application.Tests.DataAccess
                 return Task.FromResult(true);
             }
 
-            public void AddToQueue(string value) => _items.AddLast(value);
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default)
             {
                 _items.AddLast(value);
@@ -1229,9 +1226,7 @@ namespace Game.Application.Tests.DataAccess
             }
 
             // Not exercised by DataProviderSynchronizer.ProcessQueue.
-            public T? GetNext<T>() => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -1315,13 +1310,9 @@ namespace Game.Application.Tests.DataAccess
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public string? GetNext() => throw new NotSupportedException();
-            public void AddToQueue(string value) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public T? GetNext<T>() => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -1364,7 +1355,6 @@ namespace Game.Application.Tests.DataAccess
         private sealed class ThrowingPubSubService : NotSupportedPubSubService
         {
             public override Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
-            public override Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
             public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
         }
 
@@ -1382,9 +1372,7 @@ namespace Game.Application.Tests.DataAccess
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => inner.PublishBatch(channel, queueName, queueData, cancellationToken);
             public Task Wake(string channel) => inner.Wake(channel);
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
             public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
-            public Task UnSubscribe(string channel) => inner.UnSubscribe(channel);
             public Task UnSubscribe(string channel, string id) => inner.UnSubscribe(channel, id);
             public IPubSubQueue GetQueue(string queueName) => inner.GetQueue(queueName);
         }
@@ -1401,7 +1389,6 @@ namespace Game.Application.Tests.DataAccess
                 queueName == Constants.PUBSUB_PLAYER_QUEUE ? playerQueue : new InMemoryPubSubQueue();
 
             public override Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
-            public override Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => Task.CompletedTask;
             public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
             public override Task UnSubscribe(string channel, string id) => Task.CompletedTask;
         }
@@ -1459,13 +1446,9 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public string? GetNext() => throw new NotSupportedException();
-            public void AddToQueue(string value) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public T? GetNext<T>() => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -1493,13 +1476,9 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public string? GetNext() => throw new NotSupportedException();
-            public void AddToQueue(string value) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public T? GetNext<T>() => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public void AddToQueue<T>(T value) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 

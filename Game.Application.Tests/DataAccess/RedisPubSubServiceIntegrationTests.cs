@@ -90,7 +90,7 @@ namespace Game.Application.Tests.DataAccess
             var channel = $"pubsub-test-{Guid.NewGuid()}";
             var queueName = $"pubsub-queue-{Guid.NewGuid()}";
             var id = $"handle-{Guid.NewGuid()}";
-            Action<(IPubSubQueue queue, string channel)> handler = _ => { };
+            Func<(IPubSubQueue queue, string channel), Task> handler = _ => Task.CompletedTask;
 
             await pubsub.Subscribe(channel, queueName, handler, id);
             try

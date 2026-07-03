@@ -4,6 +4,7 @@ using Game.Application.Services;
 using Game.Core;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Players;
+using Game.Core.TestInfrastructure.Builders;
 using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;

@@ -24,12 +24,6 @@ namespace Game.DataAccess.Repositories
             return Snapshot.Enemies.Lookup(enemyId);
         }
 
-        public Enemy GetRandomEnemy(int zoneId)
-        {
-            var snapshot = Snapshot;
-            return snapshot.Enemies[GetRandomEnemyId(snapshot, zoneId)];
-        }
-
         public CoreEnemy? GetDomainEnemy(int enemyId, int level)
         {
             // Clones the snapshot's pre-mapped, level-independent template rather than re-mapping the enemy's
