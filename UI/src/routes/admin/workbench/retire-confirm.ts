@@ -1,5 +1,24 @@
-import { dangerModal } from '$stores';
+import { dangerModal, staticData } from '$stores';
 import { computeReferences, formatReferenceBody, type ReferenceSources } from './references';
+
+/**
+ * Builds a {@link ReferenceSources} snapshot from the cached last-saved catalogues in `staticData`
+ * — the one place both retire-confirm call sites (the generic Workbench detail pane and the
+ * progression editor) assemble the full set, so a new reference-carrying catalogue only needs
+ * adding here.
+ */
+export function referenceSourcesFromStatic(): ReferenceSources {
+	return {
+		enemies: staticData.enemies ?? [],
+		zones: staticData.zones ?? [],
+		challenges: staticData.challenges ?? [],
+		items: staticData.items ?? [],
+		classes: staticData.classes ?? [],
+		skillRecipes: staticData.skillRecipes ?? [],
+		proficiencies: staticData.proficiencies ?? [],
+		skills: staticData.skills ?? []
+	};
+}
 
 /**
  * Shared retire flow: compute the referenced-by surface for a record, confirm via a danger modal

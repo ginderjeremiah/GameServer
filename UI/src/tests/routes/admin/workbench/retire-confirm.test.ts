@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const { dangerModal } = vi.hoisted(() => ({ dangerModal: vi.fn() }));
-vi.mock('$stores', () => ({ dangerModal }));
+const { dangerModal, staticData } = vi.hoisted(() => ({
+	dangerModal: vi.fn(),
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	staticData: {} as any
+}));
+vi.mock('$stores', () => ({ dangerModal, staticData }));
 
-import { retireWithConfirm } from '$routes/admin/workbench/retire-confirm';
+import { referenceSourcesFromStatic, retireWithConfirm } from '$routes/admin/workbench/retire-confirm';
 import type { ReferenceSources } from '$routes/admin/workbench/references';
 
 const emptySources: ReferenceSources = {
@@ -17,7 +21,28 @@ const emptySources: ReferenceSources = {
 	skills: []
 };
 
-beforeEach(() => dangerModal.mockReset());
+beforeEach(() => {
+	dangerModal.mockReset();
+	for (const key of ['enemies', 'zones', 'challenges', 'items', 'classes', 'skillRecipes', 'proficiencies', 'skills']) {
+		delete staticData[key];
+	}
+});
+
+describe('referenceSourcesFromStatic', () => {
+	it('falls back to an empty array for every slot before staticData has loaded', () => {
+		expect(referenceSourcesFromStatic()).toEqual(emptySources);
+	});
+
+	it('passes through whatever staticData currently holds for each catalogue', () => {
+		staticData.enemies = [{ id: 0, name: 'Cave Bat' }];
+		staticData.skills = [{ id: 0, name: 'Fire Bolt' }];
+
+		const sources = referenceSourcesFromStatic();
+		expect(sources.enemies).toBe(staticData.enemies);
+		expect(sources.skills).toBe(staticData.skills);
+		expect(sources.zones).toEqual([]);
+	});
+});
 
 describe('retireWithConfirm', () => {
 	it('retires immediately, without prompting, when nothing references the record', async () => {

@@ -58,7 +58,8 @@ import {
 } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
 import { ensureAdminAccess } from './admin-access';
-import { dangerModal, toastError } from '$stores';
+import { confirmDiscard, guardBeforeUnload } from './discard-guard';
+import { toastError } from '$stores';
 
 let active = $state('enemies');
 let sidebarPinned = $state(false);
@@ -80,43 +81,23 @@ onMount(() => {
 	}
 });
 
-/** Prompts to discard pending edits when the active Workbench/Progression surface is dirty. */
-const confirmDiscard = async (): Promise<boolean> => {
-	const pending = workbenchDirty.total;
-	if (pending === 0) {
-		return true;
-	}
-	return dangerModal({
-		title: 'Discard unsaved changes?',
-		body: `You have ${pending} unsaved ${pending === 1 ? 'change' : 'changes'}. Leaving now will discard ${pending === 1 ? 'it' : 'them'}.`,
-		confirmLabel: 'Discard and continue'
-	});
-};
-
 const handleNavigate = async (key: string) => {
 	if (key === active) {
 		return;
 	}
-	if (await confirmDiscard()) {
+	if (await confirmDiscard(workbenchDirty.total)) {
 		active = key;
 	}
 };
 
 const backToGame = async () => {
-	if (await confirmDiscard()) {
+	if (await confirmDiscard(workbenchDirty.total)) {
 		goto(resolve('/game'));
 	}
 };
 
-// Backstop for a full page unload (refresh, close, external link) — client-side navigation away
-// (tool switch, "Return to Game") is guarded by confirmDiscard above instead.
 $effect(() => {
-	const handler = (event: BeforeUnloadEvent) => {
-		if (workbenchDirty.total > 0) {
-			event.preventDefault();
-			event.returnValue = '';
-		}
-	};
+	const handler = (event: BeforeUnloadEvent) => guardBeforeUnload(event, workbenchDirty.total);
 	window.addEventListener('beforeunload', handler);
 	return () => window.removeEventListener('beforeunload', handler);
 });

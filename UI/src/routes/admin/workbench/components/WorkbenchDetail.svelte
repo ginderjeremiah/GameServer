@@ -130,12 +130,10 @@
 {/if}
 
 <script lang="ts">
-import { staticData } from '$stores';
 import { fieldsOf, type EntityConfig, type Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';
-import type { ReferenceSources } from '../references';
-import { retireWithConfirm } from '../retire-confirm';
+import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import { sectionWarnings } from '../validation';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import SectionRenderer from './SectionRenderer.svelte';
@@ -153,18 +151,6 @@ interface Props {
 
 const { entity, store, record, baseline, tab, onTab, onNew }: Props = $props();
 
-/** The cached reference sets used to compute what points at a record being retired (last-saved state). */
-const referenceSources = (): ReferenceSources => ({
-	enemies: staticData.enemies ?? [],
-	zones: staticData.zones ?? [],
-	challenges: staticData.challenges ?? [],
-	items: staticData.items ?? [],
-	classes: staticData.classes ?? [],
-	skillRecipes: staticData.skillRecipes ?? [],
-	proficiencies: staticData.proficiencies ?? [],
-	skills: staticData.skills ?? []
-});
-
 /**
  * Retire a saved reference record, first surfacing what currently references it. The referenced-by
  * surface is computed from the cached reference sets (no backend round-trip); an unreferenced record
@@ -177,7 +163,7 @@ const onRetire = (rec: Identified) =>
 		id: rec.id,
 		name: entity.title?.(rec) || rec.name || entity.blankName,
 		title: `Retire ${entity.singular}?`,
-		sources: referenceSources(),
+		sources: referenceSourcesFromStatic(),
 		onConfirmed: () => store.setRetired(rec.id, true)
 	});
 

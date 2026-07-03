@@ -60,10 +60,8 @@
 {/if}
 
 <script lang="ts">
-import { staticData } from '$stores';
 import { childChanged } from '../save-helpers';
-import type { ReferenceSources } from '../references';
-import { retireWithConfirm } from '../retire-confirm';
+import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, TierTab } from './progression-store.svelte';
 import { payoutLevels, proficiencyWarnings } from './progression-helpers';
 import DetailHeader from './DetailHeader.svelte';
@@ -92,16 +90,7 @@ const onRetire = (rec: WorkbenchProficiency) =>
 		id: rec.id,
 		name: rec.name || 'Unnamed tier',
 		title: 'Retire tier?',
-		sources: {
-			enemies: staticData.enemies ?? [],
-			zones: staticData.zones ?? [],
-			challenges: staticData.challenges ?? [],
-			items: staticData.items ?? [],
-			classes: staticData.classes ?? [],
-			skillRecipes: staticData.skillRecipes ?? [],
-			proficiencies: staticData.proficiencies ?? [],
-			skills: staticData.skills ?? []
-		} satisfies ReferenceSources,
+		sources: referenceSourcesFromStatic(),
 		onConfirmed: () => store.retireProf(rec.id, true)
 	});
 const baseline = $derived(tier ? store.profBaseline(tier.id) : undefined);
