@@ -5,12 +5,11 @@
    seal and marks a zone cleared optimistically the moment its boss is defeated. */
 
 import { fetchSocketData, EStatisticType, type IPlayerStatistic } from '$lib/api';
+import { CoalescedLoader } from '$lib/common/coalesced-loader';
 
 let stats = $state<IPlayerStatistic[]>([]);
 let loaded = $state(false);
 let error = $state(false);
-/** Coalesces concurrent callers (game boot + screen mount) onto one request. */
-let inFlight: Promise<void> | undefined;
 
 const fetchStats = async () => {
 	try {
@@ -24,6 +23,10 @@ const fetchStats = async () => {
 		error = true;
 	}
 };
+
+/** Coalesces concurrent callers (game boot + screen mount) onto one request; a forced load
+ *  issued mid-flight chains a fresh fetch so it never resolves with stale data. */
+const loader = new CoalescedLoader(fetchStats, () => loaded);
 
 export const statistics = {
 	get stats() {
@@ -39,15 +42,7 @@ export const statistics = {
 	/** Fetch the player's statistics. Idempotent — only hits the network the first
 	 *  time unless `force` re-fetches the latest values (e.g. on the stats screen). */
 	async load(force = false) {
-		if (loaded && !force) {
-			return;
-		}
-		if (!inFlight) {
-			inFlight = fetchStats().finally(() => {
-				inFlight = undefined;
-			});
-		}
-		await inFlight;
+		await loader.load(force);
 	},
 
 	/** Whether the given zone has been cleared at least once (per-zone `ZonesCleared` > 0). */
@@ -74,6 +69,6 @@ export const statistics = {
 		stats = [];
 		loaded = false;
 		error = false;
-		inFlight = undefined;
+		loader.reset();
 	}
 };
