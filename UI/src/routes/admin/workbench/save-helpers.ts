@@ -37,6 +37,30 @@ export const listsEqual = canonicalEqual;
 export const childChanged = <T>(current: T, baseline: T | undefined): boolean =>
 	baseline === undefined || !listsEqual(current, baseline);
 
+/**
+ * Map the local (negative) ids of added records to their persisted ids. The backend appends adds in
+ * send order, so the k-th added record maps to the k-th lowest id absent from the pre-save set.
+ */
+export const resolveNewIds = (
+	fresh: { id: number }[],
+	existingIds: Iterable<number>,
+	added: { id: number }[]
+): Map<number, number> => {
+	const existing = new Set(existingIds);
+	const newlyPersisted = fresh.filter((record) => !existing.has(record.id)).sort((a, b) => a.id - b.id);
+	const idFor = new Map<number, number>();
+	added.forEach((record, index) => {
+		const persisted = newlyPersisted[index];
+		if (persisted) {
+			idFor.set(record.id, persisted.id);
+		}
+	});
+	return idFor;
+};
+
+/** Resolve a possibly-local id through the new-id map (returns the input when already persisted). */
+export const resolveId = (id: number, idMap: Map<number, number>): number => idMap.get(id) ?? id;
+
 type ChildSaver<T> = (id: number, record: T, baseline: T | undefined) => Promise<void>;
 
 interface PersistOptions<T extends Identified, D> {
@@ -104,18 +128,8 @@ export async function persistEntity<T extends Identified, D>(opts: PersistOption
 
 		const fresh = await refresh();
 
-		// Records present after save but absent before are the persisted adds; the
-		// backend inserts them in send order, so the k-th added record maps to the
-		// k-th lowest new id.
-		const existing = new Set(diff.existingIds);
-		const newlyPersisted = fresh.filter((record) => !existing.has(record.id)).sort((a, b) => a.id - b.id);
-		const idFor = new Map<number, number>();
-		diff.added.forEach((record, index) => {
-			const persisted = newlyPersisted[index];
-			if (persisted) {
-				idFor.set(record.id, persisted.id);
-			}
-		});
+		// Records present after save but absent before are the persisted adds.
+		const idFor = resolveNewIds(fresh, diff.existingIds, diff.added);
 
 		const childTargets: { id: number; record: T; baseline: T | undefined }[] = [
 			...diff.added.map((record) => ({ id: idFor.get(record.id) ?? record.id, record, baseline: undefined })),

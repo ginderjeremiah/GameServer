@@ -169,6 +169,26 @@ describe('ChallengeRewardSection', () => {
 		expect(container.querySelector('.ch-picker')).toBeNull();
 	});
 
+	it('is not dirty when a local clear (undefined) matches a server baseline stored as null', () => {
+		// The server baseline serializes an unset reward as null; a local clear leaves the field
+		// simply absent. The two must compare equal, not phantom-dirty.
+		const { store, baseline } = setup({ rewardItemId: null as unknown as number });
+		store.patch(1, (d) => ((d as unknown as IChallenge).rewardItemId = undefined));
+		const record = store.items[0];
+
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		expect(container.querySelector('.ch-reward-dot')).toBeNull();
+	});
+
+	it('is dirty when the reward actually differs from baseline', () => {
+		const { store, baseline } = setup({ rewardItemId: 0 });
+		store.patch(1, (d) => ((d as unknown as IChallenge).rewardItemId = 1));
+		const record = store.items[0];
+
+		const { container } = render(ChallengeRewardSection, { props: { record, baseline, store } });
+		expect(container.querySelector('.ch-reward-dot')).toBeTruthy();
+	});
+
 	it('collapses an open picker when the rendered record switches to a different challenge', async () => {
 		// Two sibling challenges in the same store; the section is reused as the detail
 		// pane switches between them, and its $effect must reset the open picker on switch.

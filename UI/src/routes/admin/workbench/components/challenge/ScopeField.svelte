@@ -17,7 +17,8 @@
 	</div>
 {:else}
 	<div class="fld scope-fld">
-		<span class="lbl" class:warn={dirty}>Scope · {entityTypeName(challenge.entityType)}</span>
+		<span class="lbl">Scope · {entityTypeName(challenge.entityType)}</span>
+		{#if dirty}<DirtyDot />{/if}
 		<div class="scope-row">
 			<div class="eswitch">
 				<button type="button" class:active={!specific} onclick={setGlobal}>Global</button>
@@ -50,8 +51,10 @@ import { reference } from '../../reference.svelte';
 import type { EntityStore } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';
 import { entityTypeName, trackedKind, typeBossOnly } from '../../entities/challenge-helpers';
+import { recordsEqual } from '../../entity-store.svelte';
 import SelectCaret from '../SelectCaret.svelte';
 import WorkbenchIcon from '../../WorkbenchIcon.svelte';
+import DirtyDot from '../DirtyDot.svelte';
 
 interface Props {
 	challenge: IChallenge;
@@ -68,7 +71,7 @@ const specific = $derived(challenge.targetEntityId != null);
 const bossOnly = $derived(typeBossOnly(reference.challengeTypes, challenge.challengeTypeId));
 // Pass the current target so a now-retired authored target stays selectable/visible.
 const options = $derived(reference.entityOptions(challenge.entityType, bossOnly, challenge.targetEntityId));
-const dirty = $derived(baseline ? challenge.targetEntityId !== baseline.targetEntityId : false);
+const dirty = $derived(baseline ? !recordsEqual(challenge.targetEntityId, baseline.targetEntityId) : false);
 
 const setGlobal = () => store.patch(challenge.id, (d) => ((d as unknown as IChallenge).targetEntityId = undefined));
 const setSpecific = () =>

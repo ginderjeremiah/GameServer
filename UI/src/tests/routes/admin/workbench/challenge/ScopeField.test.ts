@@ -113,3 +113,28 @@ describe('ScopeField — entity-scoped statistic', () => {
 		expect((store.items[0] as unknown as IChallenge).targetEntityId).toBe(1);
 	});
 });
+
+describe('ScopeField — dirty state', () => {
+	it('is not dirty when a local clear (undefined) matches a server baseline stored as null', () => {
+		// The server baseline serializes an unset optional as null, while `setGlobal` (and a fresh
+		// clone) leaves the field simply absent — the two must read as equal, not phantom-dirty.
+		const { store, baseline } = setup({
+			entityType: EEntityType.Enemy,
+			targetEntityId: null as unknown as number
+		});
+		store.patch(1, (d) => ((d as unknown as IChallenge).targetEntityId = undefined));
+		const challenge = store.items[0] as unknown as IChallenge;
+
+		const { container } = render(ScopeField, { props: { challenge, baseline, store } });
+		expect(container.querySelector('.dirty-dot')).toBeNull();
+	});
+
+	it('is dirty when the target actually differs from baseline', () => {
+		const { store, baseline } = setup({ entityType: EEntityType.Enemy, targetEntityId: 0 });
+		store.patch(1, (d) => ((d as unknown as IChallenge).targetEntityId = 1));
+		const challenge = store.items[0] as unknown as IChallenge;
+
+		const { container } = render(ScopeField, { props: { challenge, baseline, store } });
+		expect(container.querySelector('.dirty-dot')).toBeTruthy();
+	});
+});

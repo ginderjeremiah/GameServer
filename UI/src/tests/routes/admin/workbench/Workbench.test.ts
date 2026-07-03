@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, screen, waitFor } from '@testing-library/svelte';
+import { render, cleanup, screen, waitFor, fireEvent } from '@testing-library/svelte';
 
 vi.mock('$stores', () => ({
 	staticData: {
@@ -85,5 +85,27 @@ describe('Workbench', () => {
 		render(Workbench, { props: { entity: makeConfig(), groupLabel: 'Combat' } });
 		await waitFor(() => expect(screen.getByTestId('workbench-title')).toBeTruthy());
 		expect(screen.getByText('Admin Console · Combat')).toBeTruthy();
+	});
+
+	it('follows a newly-added record to its persisted id after save, instead of jumping to the first record', async () => {
+		const persist = vi.fn(async (diff: { added: Identified[] }) => [
+			...seed,
+			...diff.added.map((record, i) => ({ ...record, id: 3 + i }))
+		]);
+		render(Workbench, { props: { entity: makeConfig({ persist }) } });
+		await waitFor(() => expect(screen.getByTestId('workbench-title')).toBeTruthy());
+
+		await fireEvent.click(screen.getByTestId('workbench-new'));
+		const selectedBeforeSave = screen.getAllByTestId('workbench-row').find((row) => row.classList.contains('selected'));
+		expect(selectedBeforeSave?.textContent).toContain('Unnamed');
+
+		await fireEvent.click(screen.getByText('Save Changes'));
+		await waitFor(() => expect(screen.getByText('Changes saved')).toBeTruthy());
+
+		// The just-created record (now persisted at id 3) stays selected — the temporary negative id
+		// it was selected under no longer matches anything, but the selection must follow the remap
+		// rather than falling back to the first record (Alpha).
+		const selectedAfterSave = screen.getAllByTestId('workbench-row').find((row) => row.classList.contains('selected'));
+		expect(selectedAfterSave?.textContent).toContain('Unnamed');
 	});
 });

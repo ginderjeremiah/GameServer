@@ -40,7 +40,7 @@
 				{t.label}
 				{#if t.count != null}<span class="count-badge">{t.count}</span>{/if}
 				{#if t.warn}<WorkbenchIcon kind="warn" size={11} stroke="var(--warning)" />{/if}
-				{#if t.dirty}<span class="tab-dot" aria-hidden="true"></span>{/if}
+				{#if t.dirty}<span class="tab-dot" aria-hidden="true"></span><span class="sr-only">Unsaved changes</span>{/if}
 			</button>
 		{/each}
 	</div>

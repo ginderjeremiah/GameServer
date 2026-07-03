@@ -16,8 +16,6 @@ import {
 	profIdentityDto,
 	proficiencyWarnings,
 	renumberTiers,
-	resolveId,
-	resolveNewIds,
 	rewardAtLevel,
 	tiersOfPath,
 	xpCostCurve
@@ -166,22 +164,6 @@ describe('diffCatalogue', () => {
 		const diff = diffCatalogue(current, [a, b]);
 		expect(diff.added.map((r) => r.id)).toEqual([-1]);
 		expect(diff.modified.map((m) => m.record.id)).toEqual([1]);
-	});
-});
-
-describe('resolveNewIds & resolveId', () => {
-	it('maps added local ids to the persisted ids absent before the save, in send order', () => {
-		const added = [{ id: -1 }, { id: -2 }];
-		const fresh = [{ id: 0 }, { id: 1 }, { id: 2 }]; // 0 existed; 1,2 are new
-		const map = resolveNewIds(fresh, [0], added);
-		expect(map.get(-1)).toBe(1);
-		expect(map.get(-2)).toBe(2);
-	});
-
-	it('resolveId passes through an already-persisted id', () => {
-		const map = new Map([[-1, 7]]);
-		expect(resolveId(-1, map)).toBe(7);
-		expect(resolveId(3, map)).toBe(3);
 	});
 });
 

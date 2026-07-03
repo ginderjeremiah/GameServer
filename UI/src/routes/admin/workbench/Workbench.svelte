@@ -76,9 +76,17 @@ const flagged = $derived.by(() => {
 	return s ? liveItems.filter((it) => s.stateOf(it).warnings.length > 0).length : 0;
 });
 
-// If the selected record was removed (e.g. deleted then saved), fall back to the first.
+// After a save, a selected-but-unsaved record's temporary negative id no longer matches any
+// item — follow it to its persisted id first, and only fall back to the first record (e.g.
+// the selection was actually deleted then saved) when no remap exists for it.
 $effect(() => {
-	if (store && selected && selected.id !== selId) {
+	if (!store) {
+		return;
+	}
+	const persistedId = store.lastIdMap.get(selId);
+	if (persistedId !== undefined) {
+		selId = persistedId;
+	} else if (selected && selected.id !== selId) {
 		selId = selected.id;
 	}
 });
