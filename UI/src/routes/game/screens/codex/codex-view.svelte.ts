@@ -284,6 +284,9 @@ export class CodexView {
 	stats = $state<IPlayerStatistic[]>([]);
 	statsLoading = $state(true);
 	statsError = $state(false);
+	/** Whether the mount-time challenge-progress fetch failed — surfaced so the enemy dossier's
+	 *  Challenges sub-tab doesn't render zero-progress/sealed as if it were authoritative. */
+	challengesError = $state(false);
 
 	constructor(payload?: CodexNavPayload) {
 		if (payload?.tab) {
@@ -371,14 +374,17 @@ export class CodexView {
 
 	/* ── selected enemy + dossier ──────────────────────────────────────────────── */
 
-	/** The inspected enemy, falling back to the head of the visible rows, then the full list. */
+	/** The inspected enemy: an explicitly-requested id resolves even when retired (retirement keeps a
+	 *  record's slot resolvable by design — see backend.md → _Reference Data_), so a cross-link into a
+	 *  retired enemy opens it rather than silently falling back. With no resolvable explicit id, falls
+	 *  back to the head of the visible rows, then the full live list. */
 	readonly selectedEnemy = $derived.by<IEnemy | undefined>(() => {
-		const explicit = this.enemies.find((e) => e.id === this.selectedEnemyId);
+		const explicit = (staticData.enemies ?? [])[this.selectedEnemyId];
 		if (explicit) {
 			return explicit;
 		}
 		const firstVisible = this.enemyRows[0];
-		return (firstVisible && this.enemies.find((e) => e.id === firstVisible.id)) ?? this.enemies[0];
+		return (firstVisible && (staticData.enemies ?? [])[firstVisible.id]) ?? this.enemies[0];
 	});
 
 	readonly range = $derived.by<LevelRange | undefined>(() => {
@@ -467,23 +473,28 @@ export class CodexView {
 		}
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
 		const progressById = new Map(playerChallenges.all.map((pc) => [pc.challengeId, pc]));
-		return (staticData.challenges ?? [])
-			.filter((c) => c.entityType === EEntityType.Enemy && c.targetEntityId === e.id)
-			.map((c) => {
-				const pc = progressById.get(c.id);
-				const progress = pc?.progress ?? 0;
-				const completed = pc?.completed ?? false;
-				const progressText =
-					c.progressGoal === 1 ? (completed ? 'done' : 'sealed') : `${Math.round(progress)}/${c.progressGoal}`;
-				return {
-					id: c.id,
-					name: c.name,
-					typeLabel: challengeTypeName(c.challengeTypeId, staticData.challengeTypes),
-					accent: challengeTypeColor(c.challengeTypeId),
-					progressText,
-					completed
-				};
-			});
+		return (
+			(staticData.challenges ?? [])
+				.filter((c) => c.entityType === EEntityType.Enemy && c.targetEntityId === e.id)
+				// A retired challenge is out of circulation: hide it unless the player already completed it
+				// (mirrors the Challenges screen's retired-unless-completed rule).
+				.filter((c) => c.retiredAt == null || progressById.get(c.id)?.completed)
+				.map((c) => {
+					const pc = progressById.get(c.id);
+					const progress = pc?.progress ?? 0;
+					const completed = pc?.completed ?? false;
+					const progressText =
+						c.progressGoal === 1 ? (completed ? 'done' : 'sealed') : `${Math.round(progress)}/${c.progressGoal}`;
+					return {
+						id: c.id,
+						name: c.name,
+						typeLabel: challengeTypeName(c.challengeTypeId, staticData.challengeTypes),
+						accent: challengeTypeColor(c.challengeTypeId),
+						progressText,
+						completed
+					};
+				})
+		);
 	});
 
 	/** Dossier sub-tabs — Challenges only when the enemy has related challenges. */
@@ -521,10 +532,9 @@ export class CodexView {
 
 	/* ── selected zone + dossier ────────────────────────────────────────────────── */
 
-	/** The inspected zone, falling back to the head of the rail. */
-	readonly selectedZone = $derived<IZone | undefined>(
-		this.zones.find((z) => z.id === this.selectedZoneId) ?? this.zones[0]
-	);
+	/** The inspected zone: an explicitly-requested id resolves even when retired (see `selectedEnemy`),
+	 *  falling back to the head of the rail otherwise. */
+	readonly selectedZone = $derived<IZone | undefined>((staticData.zones ?? [])[this.selectedZoneId] ?? this.zones[0]);
 
 	/** The selected zone's level band (`11–22`). */
 	readonly zoneBand = $derived.by<string>(() => {
@@ -612,9 +622,10 @@ export class CodexView {
 
 	/* ── selected skill + dossier ─────────────────────────────────────────────────── */
 
-	/** The inspected skill, falling back to the head of the catalogue. */
+	/** The inspected skill: an explicitly-requested id resolves even when retired (see `selectedEnemy`),
+	 *  falling back to the head of the catalogue otherwise. */
 	readonly selectedSkill = $derived<ISkill | undefined>(
-		this.skillsCatalogue.find((s) => s.id === this.selectedSkillId) ?? this.skillsCatalogue[0]
+		(staticData.skills ?? [])[this.selectedSkillId] ?? this.skillsCatalogue[0]
 	);
 
 	/** The selected skill's rarity tier (hue + label) for the dossier header accent. */
@@ -775,22 +786,22 @@ export class CodexView {
 		}));
 	}
 
-	/** Resolve an enemy id against the catalogue, falling back to the head of the list. */
+	/** Resolve an enemy id against the full catalogue (an explicit id resolves even when retired),
+	 *  falling back to the head of the live list. */
 	private resolveEnemy(id: number): IEnemy | undefined {
-		const enemies = liveEnemies(staticData.enemies);
-		return enemies.find((e) => e.id === id) ?? enemies[0];
+		return (staticData.enemies ?? [])[id] ?? liveEnemies(staticData.enemies)[0];
 	}
 
-	/** Resolve a zone id against the rail (authored order), falling back to the head. */
+	/** Resolve a zone id against the full catalogue (an explicit id resolves even when retired),
+	 *  falling back to the head of the rail (authored order). */
 	private resolveZone(id: number): IZone | undefined {
-		const zones = liveZones(staticData.zones);
-		return zones.find((z) => z.id === id) ?? zones[0];
+		return (staticData.zones ?? [])[id] ?? liveZones(staticData.zones)[0];
 	}
 
-	/** Resolve a skill id against the catalogue, falling back to the head. */
+	/** Resolve a skill id against the full catalogue (an explicit id resolves even when retired),
+	 *  falling back to the head of the live catalogue. */
 	private resolveSkill(id: number): ISkill | undefined {
-		const skills = liveSkills(staticData.skills);
-		return skills.find((s) => s.id === id) ?? skills[0];
+		return (staticData.skills ?? [])[id] ?? liveSkills(staticData.skills)[0];
 	}
 
 	/** A zone is locked when it carries an unlock gate the player hasn't completed yet. */

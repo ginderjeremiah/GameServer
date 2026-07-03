@@ -23,7 +23,7 @@
 
 <script lang="ts">
 import { onMount } from 'svelte';
-import { navigation, playerChallenges, statistics } from '$stores';
+import { navigation, playerChallenges, statistics, toastError } from '$stores';
 import { CodexView, type CodexNavPayload } from './codex-view.svelte';
 import CodexTabBar from './CodexTabBar.svelte';
 import EnemiesTab from './EnemiesTab.svelte';
@@ -40,6 +40,12 @@ onMount(async () => {
 	view.stats = statistics.stats;
 	view.statsError = statistics.error;
 	view.statsLoading = false;
+	view.challengesError = playerChallenges.error;
+	if (playerChallenges.error) {
+		// Don't conflate a failed load with genuine sealed/zero-progress challenges — a dropped fetch
+		// would otherwise render every enemy-scoped challenge as if it had no progress.
+		toastError('Your challenge progress could not be loaded. Please try again later.');
+	}
 });
 </script>
 

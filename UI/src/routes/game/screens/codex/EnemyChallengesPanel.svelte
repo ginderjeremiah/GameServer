@@ -1,17 +1,21 @@
 <!-- Challenges sub-tab: the challenges scoped to this enemy, with the player's progress. -->
 <div class="challenges">
 	<div class="label">Related challenges · {view.challenges.length}</div>
-	<div class="list">
-		{#each view.challenges as challenge (challenge.id)}
-			<div class="challenge" style:--ch-accent={challenge.accent}>
-				<div class="text">
-					<div class="name">{challenge.name}</div>
-					<div class="type">{challenge.typeLabel}</div>
+	{#if view.challengesError}
+		<div class="note">Your challenge progress could not be loaded.</div>
+	{:else}
+		<div class="list">
+			{#each view.challenges as challenge (challenge.id)}
+				<div class="challenge" style:--ch-accent={challenge.accent}>
+					<div class="text">
+						<div class="name">{challenge.name}</div>
+						<div class="type">{challenge.typeLabel}</div>
+					</div>
+					<span class="prog" class:done={challenge.completed}>{challenge.progressText}</span>
 				</div>
-				<span class="prog" class:done={challenge.completed}>{challenge.progressText}</span>
-			</div>
-		{/each}
-	</div>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <script lang="ts">
@@ -81,5 +85,12 @@ let { view }: Props = $props();
 	&.done {
 		color: var(--success);
 	}
+}
+
+.note {
+	font-size: 12px;
+	color: var(--text-tertiary);
+	font-style: italic;
+	line-height: 1.5;
 }
 </style>

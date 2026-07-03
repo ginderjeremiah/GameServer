@@ -15,8 +15,9 @@ import { SERVER_STAT_TYPES } from '../stats/stat-fixtures';
 // Codex fetches the player's statistics + challenges over the socket and resolves reference data
 // from staticData. Mock the socket fetch and replace staticData; keep the real statistics /
 // playerChallenges / navigation stores (the screen drives them).
-const { mockFetchSocket, staticData } = vi.hoisted(() => ({
+const { mockFetchSocket, mockToastError, staticData } = vi.hoisted(() => ({
 	mockFetchSocket: vi.fn(),
+	mockToastError: vi.fn(),
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	staticData: {} as any
 }));
@@ -27,7 +28,7 @@ vi.mock('$lib/api', async (importOriginal) => {
 });
 vi.mock('$stores', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$stores')>();
-	return { ...actual, staticData };
+	return { ...actual, staticData, toastError: mockToastError };
 });
 
 import Codex from '$routes/game/screens/codex/Codex.svelte';
@@ -138,6 +139,7 @@ beforeEach(() => {
 	playerChallenges.reset();
 	navigation.clear();
 	navigation.consumePayload();
+	mockToastError.mockClear();
 	mockFetchSocket.mockImplementation((cmd: string) => {
 		if (cmd === 'GetPlayerStatistics') {
 			return Promise.resolve(STATS);
@@ -259,6 +261,16 @@ describe('Codex screen', () => {
 		expect(screen.getByTestId('codex-dossier').textContent).toContain('Cinder Tyrant');
 	});
 
+	it('cross-links a zone boss card into the enemy dossier even when the boss is retired', async () => {
+		// A retired boss stays resolvable by id; the boss card must open its own dossier, not
+		// silently fall back to the head of the (now filtered) enemy table.
+		staticData.enemies[2] = { ...staticData.enemies[2], retiredAt: '2026-01-01T00:00:00Z' };
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
+		await fireEvent.click(screen.getByTestId('codex-zone-boss'));
+		expect(screen.getByTestId('codex-dossier').textContent).toContain('Cinder Tyrant');
+	});
+
 	it('cross-links a zone spawn row into the enemy dossier', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
@@ -326,5 +338,23 @@ describe('Codex screen', () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-subtab-statistics'));
 		expect(await screen.findByText('Your statistics could not be loaded.')).toBeTruthy();
+	});
+
+	it('toasts and surfaces a load error in the challenges sub-tab instead of rendering fake progress', async () => {
+		mockFetchSocket.mockImplementation((cmd: string) =>
+			cmd === 'GetPlayerChallenges' ? Promise.reject(new Error('down')) : Promise.resolve([])
+		);
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-subtab-challenges'));
+		expect(await screen.findByText('Your challenge progress could not be loaded.')).toBeTruthy();
+		expect(screen.queryByText('62/100')).toBeNull();
+		expect(mockToastError).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not toast when challenge progress loads successfully', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-subtab-challenges'));
+		await screen.findByText('Cull the Skitterers');
+		expect(mockToastError).not.toHaveBeenCalled();
 	});
 });
