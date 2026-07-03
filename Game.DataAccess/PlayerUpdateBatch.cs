@@ -1,13 +1,15 @@
+using Game.Abstractions.Infrastructure;
+
 namespace Game.DataAccess
 {
     /// <summary>
     /// Scoped buffer that collects the player persistence events raised during a single
     /// <see cref="Repositories.PlayerRepository.SavePlayer"/> so they can be flushed to the write-behind
     /// queue as one batched LPUSH instead of one round-trip per event. <see cref="PlayerPersistencePublisher"/>
-    /// fills it as each event is dispatched; <c>SavePlayer</c> drains and publishes it after the dispatch
-    /// settles. It is registered scoped so the publisher (constructed per dispatch) and the repository share
-    /// the same instance within a request scope, and <see cref="Drain"/> clears it so a second save in the
-    /// same scope starts fresh.
+    /// fills it as each event is dispatched; <c>SavePlayer</c> flushes and publishes it after the dispatch
+    /// settles via <see cref="FlushAsync"/>. It is registered scoped so the publisher (constructed per dispatch)
+    /// and the repository share the same instance within a request scope, and a successful flush clears it so
+    /// a second save in the same scope starts fresh.
     /// <para>
     /// A progress save raised <em>within</em> a player save — the live battle-completion path, where
     /// <c>SavePlayer</c>'s event dispatch reaches <c>BattleStatisticsEventHandler</c>, which saves progress —
@@ -57,23 +59,24 @@ namespace Game.DataAccess
         }
 
         /// <summary>
-        /// Returns the buffered events and clears the buffer so it is ready for the next save.
+        /// Publishes the buffered batch to the write-behind queue and only then clears it and runs any
+        /// deferred <see cref="OnFlushed"/> callbacks. If the publish throws (a transient Redis blip/timeout),
+        /// the buffered envelopes and callbacks are left exactly as they were — nothing is drained or run —
+        /// so they are carried into the batch's next flush attempt instead of being silently discarded (#1494).
+        /// Passing the live buffer directly (rather than draining a snapshot first) is safe because
+        /// <see cref="Game.Abstractions.Infrastructure.IPubSubService.PublishBatch{T}"/> materializes it
+        /// synchronously before its first await.
         /// </summary>
-        public IReadOnlyList<DomainEventEnvelope> Drain()
+        public async Task FlushAsync(IPubSubService pubsub, CancellationToken cancellationToken = default)
         {
-            if (_events.Count == 0)
-            {
-                return [];
-            }
-
-            var drained = _events.ToArray();
+            await pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, _events, cancellationToken);
             _events.Clear();
-            return drained;
+            RunFlushedCallbacks();
         }
 
         /// <summary>
-        /// Runs and clears the actions registered via <see cref="OnFlushed"/>. <c>SavePlayer</c> calls this
-        /// after its flush so a batched progress save's deferred cache advance lands only once its event is
+        /// Runs and clears the actions registered via <see cref="OnFlushed"/>. <see cref="FlushAsync"/> calls
+        /// this after its flush so a batched progress save's deferred cache advance lands only once its event is
         /// enqueued (publish-before-cache).
         /// </summary>
         public void RunFlushedCallbacks()

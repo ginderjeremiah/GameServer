@@ -182,10 +182,10 @@ namespace Game.Application.Tests.DataAccess
             }
             Assert.Equal(0, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
 
-            // The player save then flushes the shared batch once and runs the deferred cache advance — the event
-            // reaches the queue (collapsed onto that single flush) and the cache serves the snapshot afterwards.
-            await pubsub.PublishBatch(Constants.PUBSUB_PLAYER_CHANNEL, Constants.PUBSUB_PLAYER_QUEUE, batch.Drain());
-            batch.RunFlushedCallbacks();
+            // The player save then flushes the shared batch once (mirroring PlayerRepository.SavePlayer) and
+            // runs the deferred cache advance — the event reaches the queue (collapsed onto that single flush)
+            // and the cache serves the snapshot afterwards.
+            await batch.FlushAsync(pubsub);
 
             Assert.Equal(1, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
             var evt = await DequeueProgressEvent(redis);
