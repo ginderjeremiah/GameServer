@@ -85,23 +85,37 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 				source: EAttributeModifierSource.Derived,
 				derivedSource: EAttribute.Strength
 			},
-			// CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): the enabler is a
-			// skill's own authored CriticalChance (0 by default), and this attribute is only the base-1
-			// multiplier scaling that per-skill base — like CooldownRecovery, a committed skill still crits at
-			// its own rate with zero further investment.
+			// CriticalChanceMultiplier = base 1 + 0.002·LUK (#1525). Crit stays opt-in (crit rework #1425,
+			// per-skill base #1453): the enabler is a skill's own authored CriticalChance (0 by default), and
+			// this attribute only scales that per-skill base — so the Luck derivation is dormant (0 × mult = 0)
+			// until a crit-authored skill is fielded.
 			{
 				attribute: EAttribute.CriticalChanceMultiplier,
 				amount: 1,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.BaseValue
 			},
-			// ParryChanceMultiplier follows the same template (#1457): base 1, no derivation — the enabler is
+			{
+				attribute: EAttribute.CriticalChanceMultiplier,
+				amount: 0.002,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Luck
+			},
+			// ParryChanceMultiplier = base 1 + 0.002·LUK (#1525), the same template (#1457): the enabler is
 			// the authored-only ParryChance (base 0 everywhere, so it has no static modifier).
 			{
 				attribute: EAttribute.ParryChanceMultiplier,
 				amount: 1,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.BaseValue
+			},
+			{
+				attribute: EAttribute.ParryChanceMultiplier,
+				amount: 0.002,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Luck
 			},
 			// CriticalDamage = base 1.5 + 0.0025·LUK
 			{

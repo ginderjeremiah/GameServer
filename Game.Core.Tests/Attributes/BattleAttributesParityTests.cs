@@ -51,14 +51,20 @@ namespace Game.Core.Tests.Attributes
                     [(EAttribute.Agility, 20), (EAttribute.Dexterity, 10)],
                     [EAttribute.CooldownRecovery]),
 
-                // CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): a base of 1 (like
-                // CooldownRecovery) and no attribute derivation, so even a heavy Dexterity/Luck build sits at
-                // exactly 1 — DEX/LUK no longer feed crit, and the enabler is a skill's own authored base chance,
-                // not this attribute. The opt-in-multiplicative math is covered by
-                // AttributeCollectionTests / attribute-collection.test.ts.
+                // CriticalChanceMultiplier = 1 (base) + 0.002·Luck (#1525, LUK the proc-payoff amplifier).
+                // Dexterity deliberately contributes nothing (no crit hook — it would double-dip with damage
+                // scaling), and crit stays opt-in (crit rework #1425, per-skill base #1453): the enabler is a
+                // skill's own authored base chance, which this attribute only scales. The opt-in-multiplicative
+                // math is covered by AttributeCollectionTests / attribute-collection.test.ts.
                 ["criticalChanceMultiplier"] = new DerivedStatScenario(
                     [(EAttribute.Dexterity, 20), (EAttribute.Luck, 10)],
                     [EAttribute.CriticalChanceMultiplier]),
+
+                // ParryChanceMultiplier = 1 (base) + 0.002·Luck (#1525), the same opt-in template (#1457): its
+                // enabler is the authored-only ParryChance, so the Luck-fed multiplier idles until one is fielded.
+                ["parryChanceMultiplier"] = new DerivedStatScenario(
+                    [(EAttribute.Luck, 10)],
+                    [EAttribute.ParryChanceMultiplier]),
 
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 ["criticalDamage"] = new DerivedStatScenario(
@@ -70,16 +76,17 @@ namespace Game.Core.Tests.Attributes
                     [(EAttribute.Agility, 20)],
                     [EAttribute.DodgeChance]),
 
-                // With no allocations every derived stat collapses to just its base: the three with a base carry
-                // it (MaxHealth 50, CriticalDamage 1.5, CriticalChanceMultiplier 1), the pure-derived stats
-                // (Toughness, CooldownRecovery's coefficients aside, and DodgeChance) are 0/base. DamageReflection
-                // is authored-only (no static modifier at all), so it is 0 here too.
+                // With no allocations every derived stat collapses to just its base: the four with a base carry
+                // it (MaxHealth 50, CriticalDamage 1.5, CriticalChanceMultiplier/ParryChanceMultiplier 1), the
+                // pure-derived stats (Toughness, CooldownRecovery's coefficients aside, and DodgeChance) are
+                // 0/base. DamageReflection is authored-only (no static modifier at all), so it is 0 here too.
                 ["zeroBaseStats"] = new DerivedStatScenario(
                     [],
                     [
                         EAttribute.MaxHealth, EAttribute.Toughness, EAttribute.CooldownRecovery,
                         EAttribute.CriticalDamage, EAttribute.DamageReflection,
-                        EAttribute.CriticalChanceMultiplier, EAttribute.DodgeChance,
+                        EAttribute.CriticalChanceMultiplier, EAttribute.ParryChanceMultiplier,
+                        EAttribute.DodgeChance,
                     ]),
             };
 

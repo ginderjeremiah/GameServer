@@ -1012,6 +1012,81 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 2800 }
 	},
 
+	// ── LUK, the proc-payoff amplifier (#1525) ──────────────────────────────
+	// Luck derives the base-1 CriticalChanceMultiplier and ParryChanceMultiplier (+0.002·Luck each)
+	// alongside its existing CriticalDamage derivation. Both targets scale a 0-based enabler (a skill's
+	// authored CriticalChance; the authored-only ParryChance), so LUK is opt-in by construction:
+	// 0 × mult = 0 until a proc enabler is fielded. Mirrors the backend `luckWithoutEnablerIsInert` /
+	// `luckAmplifiedCritChance` / `luckAmplifiedParryChance` scenarios.
+
+	// A heavy-LUK build with NO crit/parry enabler is byte-identical to the 0-LUK multiSkill matchup:
+	// Luck 500 lifts CriticalChanceMultiplier/ParryChanceMultiplier to 2.0 and CriticalDamage to 2.75,
+	// but every skill's authored CriticalChance is 0 (0 × 2 = 0), ParryChance is 0, and DodgeChance is 0
+	// (Agility 0) — so with all draws taken and every proc chance still 0, the exchange resolves exactly
+	// like multiSkill → 6400ms. (The paired "high-LUK build with no proc enabler" case below pins the
+	// equality directly.)
+	{
+		name: 'luckWithoutEnablerIsInert',
+		player: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 30 },
+					{ id: EAttribute.Endurance, amount: 20 },
+					{ id: EAttribute.Luck, amount: 500 }
+				],
+				[makeSkill(20, 800, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }]), makeSkill(25, 1200)]
+			),
+		enemy: () =>
+			makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 20 },
+					{ id: EAttribute.Endurance, amount: 15 }
+				],
+				[makeSkill(30, 1000)]
+			),
+		expected: { victory: true, playerDied: false, totalMs: 6400 }
+	},
+
+	// LUK amplifies an authored per-skill CriticalChance: 0.5 × (1 + 0.002·Luck(500)) = 0.5 × 2 = 1, so
+	// every fire crits regardless of the draw, at Luck-fed CriticalDamage 1.5 + 0.0025·500 = 2.75 →
+	// 20 × 2.75 = 55/hit (no Toughness). The 210-HP enemy (Str 32) dies on hit 4 at tick 40 → 1600ms.
+	// Without the multiplier derivation the effective chance stays 0.5 — the seed's draws run
+	// crit,crit,no,no,crit,crit (55,55,20,20,55,55 → cum 205 after five) for a hit-6 kill at 2400ms —
+	// so 1600ms pins Luck scaling the authored chance, not just the crit damage.
+	{
+		name: 'luckAmplifiedCritChance',
+		player: () => makeBattler([{ id: EAttribute.Luck, amount: 500 }], [makeSkill(20, 400, [], [], undefined, 0.5)]),
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 32 }], []),
+		expected: { victory: true, playerDied: false, totalMs: 1600 }
+	},
+
+	// LUK amplifies an authored ParryChance the same way: 0.5 × (1 + 0.002·Luck(500)) = 1, so every enemy
+	// hit is parried regardless of the draw — the forcedParryRiposte matchup with the "force" supplied by
+	// Luck. Each parry negates the 1000-damage one-shot and counters 30 (the sword signature, authored
+	// CriticalChance 0, so the Luck-doubled crit multiplier scales 0 and the counter never crits); the
+	// 80-HP enemy dies on the tick-30 counter → 1200ms with the player untouched. Without the derivation
+	// the effective 0.5 parries only the seed's first draw and the second 1000-damage hit kills the player
+	// at 800ms — so the outcome pins the multiplication.
+	{
+		name: 'luckAmplifiedParryChance',
+		player: () => {
+			const signature = granted.register(makeSkill(30, 100_000, [], [], EDamageType.Sword));
+			return granted.build(
+				[
+					{ id: EAttribute.Strength, amount: 10 },
+					{ id: EAttribute.ParryChance, amount: 0.5 },
+					{ id: EAttribute.Luck, amount: 500 }
+				],
+				[],
+				[signature],
+				EDamageType.Sword,
+				signature
+			);
+		},
+		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(1000, 400)]),
+		expected: { victory: true, playerDied: false, totalMs: 1200 }
+	},
+
 	// ── Item-granted skills (append + order + dedupe) ────────────────────────────
 	// The player's battler fields its selected skills plus the skills its equipped items grant (the frontend
 	// gathers them via InventoryManager.grantedSkillIds and Battler appends them, de-duplicated). Mirrors the
@@ -1650,6 +1725,31 @@ describe('Battle simulation parity with backend', () => {
 		// Strength 7.5 (the backend's 2.5/level distribution at level 3) → MaxHealth 50 + 5×7.5 = 87.5.
 		expect(enemy.attributes.getValue(EAttribute.Strength)).toBe(7.5);
 		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(87.5);
+	});
+
+	it('a high-LUK build with no proc enabler matches the 0-LUK build exactly', () => {
+		// Pins LUK's opt-in-by-construction contract (#1525) head-on: the Luck-derived
+		// CriticalChanceMultiplier/ParryChanceMultiplier scale 0-based enablers (0 × mult = 0) and
+		// CriticalDamage is inert without a crit, so a heavy-LUK build fielding no crit/parry enabler must
+		// fight identically to the same build at 0 Luck. Mirrors
+		// BattleSimulatorParityTests.Parity_HighLuckWithoutProcEnabler_MatchesZeroLuckBuild.
+		const scenario = scenarios.find((s) => s.name === 'luckWithoutEnablerIsInert');
+		if (!scenario) {
+			throw new Error('luckWithoutEnablerIsInert scenario is missing from the matrix');
+		}
+		const run = (luck: number) => {
+			const player = makeBattler(
+				[
+					{ id: EAttribute.Strength, amount: 30 },
+					{ id: EAttribute.Endurance, amount: 20 },
+					{ id: EAttribute.Luck, amount: luck }
+				],
+				[makeSkill(20, 800, [{ attributeId: EAttribute.Strength, multiplier: 1.0 }]), makeSkill(25, 1200)]
+			);
+			return new BattleSimulator(player, scenario.enemy(), PARITY_SEED).simulate();
+		};
+
+		expect(run(500)).toEqual(run(0));
 	});
 
 	it('ends sooner if the player double-counts derived stats (the historical bug)', () => {

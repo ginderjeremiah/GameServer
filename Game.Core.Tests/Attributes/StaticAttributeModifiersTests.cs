@@ -27,13 +27,15 @@ namespace Game.Core.Tests.Attributes
                 (EAttribute.MaxHealth, 50.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.MaxHealth, 20.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
                 (EAttribute.MaxHealth, 5.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Strength),
-                // CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): a base of 1 (like
-                // CooldownRecovery) and no derivation — the enabler is a skill's own authored CriticalChance, not
-                // this attribute, which only scales it.
+                // CriticalChanceMultiplier = 1 (base) + 0.002·Luck (#1525). Crit stays opt-in (crit rework #1425,
+                // per-skill base #1453): the enabler is a skill's own authored CriticalChance, which this
+                // attribute only scales — so the Luck derivation is dormant until a crit-authored skill fields.
                 (EAttribute.CriticalChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
-                // ParryChanceMultiplier follows the same template (#1457): base 1, no derivation — the enabler is
-                // the authored-only ParryChance (base 0 everywhere, so it has no static modifier).
+                (EAttribute.CriticalChanceMultiplier, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
+                // ParryChanceMultiplier = 1 (base) + 0.002·Luck (#1525), the same template (#1457): the enabler
+                // is the authored-only ParryChance (base 0 everywhere, so it has no static modifier).
                 (EAttribute.ParryChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
+                (EAttribute.ParryChanceMultiplier, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),

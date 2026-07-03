@@ -300,7 +300,7 @@ describe('parity with BattleAttributes', () => {
 		expectEquivalent();
 		apply(strength); // cascades Strength → MaxHealth
 		apply(endurance); // cascades Endurance → MaxHealth + Toughness
-		apply(luck); // cascades Luck → CriticalDamage (crit chance is opt-in, no attribute derivation — #1425)
+		apply(luck); // cascades Luck → CriticalDamage + the crit/parry multipliers (#1525)
 		apply(directHealth); // a non-derived MaxHealth additive alongside its derived contributors
 		apply(multHealth); // a multiplicative on the same attribute, applied after the additives
 		revert(endurance); // drop a shared cascade source mid-stack
