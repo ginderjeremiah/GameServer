@@ -247,27 +247,3 @@ export const diffCatalogue = <T extends { id: number }>(current: T[], baseline: 
 	}
 	return { added, modified };
 };
-
-/**
- * Map the local (negative) ids of added records to their persisted ids. The backend appends adds in
- * send order, so the k-th added record maps to the k-th lowest id absent from the pre-save set.
- */
-export const resolveNewIds = (
-	fresh: { id: number }[],
-	existingIds: Iterable<number>,
-	added: { id: number }[]
-): Map<number, number> => {
-	const existing = new Set(existingIds);
-	const newlyPersisted = fresh.filter((record) => !existing.has(record.id)).sort((a, b) => a.id - b.id);
-	const idFor = new Map<number, number>();
-	added.forEach((record, index) => {
-		const persisted = newlyPersisted[index];
-		if (persisted) {
-			idFor.set(record.id, persisted.id);
-		}
-	});
-	return idFor;
-};
-
-/** Resolve a possibly-local id through the new-id map (returns the input when already persisted). */
-export const resolveId = (id: number, idMap: Map<number, number>): number => idMap.get(id) ?? id;

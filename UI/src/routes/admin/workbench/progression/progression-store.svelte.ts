@@ -1,7 +1,7 @@
 import { ApiRequest, EChangeType, fetchSocketData, type IChange, type IPath, type IProficiency } from '$lib/api';
 import { staticData, toastError } from '$stores';
 import { reference } from '../reference.svelte';
-import { childChanged, canonicalEqual } from '../save-helpers';
+import { childChanged, canonicalEqual, resolveId, resolveNewIds } from '../save-helpers';
 import { firstFree } from '../entities/helpers';
 import {
 	blankModifier,
@@ -11,8 +11,6 @@ import {
 	pathIdentityDto,
 	profIdentityDto,
 	renumberTiers,
-	resolveId,
-	resolveNewIds,
 	tiersOfPath
 } from './progression-helpers';
 import { NO_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types';

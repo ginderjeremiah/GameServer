@@ -1,6 +1,6 @@
-import { SvelteSet } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { toastError } from '$stores';
-import { canonicalEqual, PersistFailedError } from './save-helpers';
+import { canonicalEqual, PersistFailedError, resolveNewIds } from './save-helpers';
 import { entityWarnings } from './validation';
 import type { EntityConfig, Identified, SaveDiff } from './entities/types';
 
@@ -29,6 +29,10 @@ export class EntityStore<T extends Identified> {
 	private deleted = new SvelteSet<number>();
 	saved = $state(false);
 	saving = $state(false);
+	/** Maps a just-saved record's local (negative) id to its persisted id, so a caller tracking a
+	 *  selection by id (the Workbench detail pane) can follow a newly-added record across a save
+	 *  instead of losing it to the "record no longer found" fallback. Replaced wholesale each save. */
+	lastIdMap = $state<SvelteMap<number, number>>(new SvelteMap());
 	private nextId = -1;
 	#flashTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -194,7 +198,9 @@ export class EntityStore<T extends Identified> {
 		}
 		this.saving = true;
 		try {
-			const fresh = await this.config.persist(this.diff());
+			const diff = this.diff();
+			const fresh = await this.config.persist(diff);
+			this.lastIdMap = new SvelteMap(resolveNewIds(fresh, diff.existingIds, diff.added));
 			this.items = fresh.map(clone);
 			this.base = fresh.map(clone);
 			this.deleted.clear();

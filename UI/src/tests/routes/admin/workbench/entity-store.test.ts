@@ -135,6 +135,37 @@ describe('EntityStore', () => {
 		expect(store.saved).toBe(true);
 	});
 
+	it("maps a saved record's temporary negative id to its persisted id", async () => {
+		const fresh: Row[] = [
+			{ id: 0, name: 'Alpha', value: 1 },
+			{ id: 1, name: 'Beta', value: 2 },
+			{ id: 2, name: 'Gamma', value: 3 }
+		];
+		const store = new EntityStore(
+			makeConfig(async () => fresh),
+			seed
+		);
+		const newId = store.addItem();
+
+		await store.save();
+
+		expect(store.lastIdMap.get(newId)).toBe(2);
+	});
+
+	it('replaces the id map wholesale on a later save with no added records', async () => {
+		const fresh: Row[] = [...seed, { id: 2, name: 'Gamma', value: 3 }];
+		const persist = vi.fn(async () => fresh);
+		const store = new EntityStore(makeConfig(persist), seed);
+
+		store.addItem();
+		await store.save();
+		expect(store.lastIdMap.size).toBe(1);
+
+		store.patch(0, (draft) => (draft.value = 42));
+		await store.save();
+		expect(store.lastIdMap.size).toBe(0);
+	});
+
 	it('re-seeds from server truth on a partial (committed) failure, so a retry cannot re-add duplicates', async () => {
 		// A partial failure: the add committed server-side (now id 2) but a child saver then threw,
 		// surfacing as PersistFailedError.

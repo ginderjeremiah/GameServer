@@ -85,6 +85,7 @@ import { ERarity, type IChallenge } from '$lib/api';
 import { Popover } from '$components';
 import { reference } from '../../reference.svelte';
 import type { EntityStore } from '../../entity-store.svelte';
+import { recordsEqual } from '../../entity-store.svelte';
 import type { Identified } from '../../entities/types';
 import { claimedItemMap, claimedModMap } from '../../entities/challenge-helpers';
 import WorkbenchIcon from '../../WorkbenchIcon.svelte';
@@ -116,8 +117,8 @@ const liveChallenges = $derived(store.items.filter((it) => store.status(it) !== 
 const claimedItems = $derived(claimedItemMap(liveChallenges, challenge.id));
 const claimedMods = $derived(claimedModMap(liveChallenges, challenge.id));
 
-const itemDirty = $derived(base ? challenge.rewardItemId !== base.rewardItemId : false);
-const modDirty = $derived(base ? challenge.rewardItemModId !== base.rewardItemModId : false);
+const itemDirty = $derived(base ? !recordsEqual(challenge.rewardItemId, base.rewardItemId) : false);
+const modDirty = $derived(base ? !recordsEqual(challenge.rewardItemModId, base.rewardItemModId) : false);
 const none = $derived(challenge.rewardItemId == null && challenge.rewardItemModId == null);
 
 // Retired records drop out of the pick list (can't be newly granted) unless they're the

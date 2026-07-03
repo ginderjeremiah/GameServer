@@ -63,8 +63,8 @@ const { kind, label, valueId, name, sub, color, retired = false, dirty, open, on
 	height: 5px;
 	margin-left: 7px;
 	border-radius: 50%;
-	background: var(--warning);
-	box-shadow: 0 0 5px var(--warning);
+	background: var(--change-modified);
+	box-shadow: 0 0 5px var(--change-modified);
 }
 .ch-reward-name.retired {
 	text-decoration: line-through;
