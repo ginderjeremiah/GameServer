@@ -8,7 +8,8 @@ namespace Game.Api.Sockets.Commands
 {
     /// <summary>
     /// Applies a set of per-attribute stat-point deltas to the player's allocation and returns the
-    /// resulting allocations. Like the other player-mutating socket commands (e.g.
+    /// resulting allocations plus the authoritative <c>StatPointsUsed</c> (so the client reconciles the
+    /// spend absolutely rather than re-deriving it). Like the other player-mutating socket commands (e.g.
     /// <see cref="SetSelectedSkills"/>), the change is applied to the cached domain player (the source of
     /// truth) and persisted to the database via the write-behind
     /// <see cref="Game.Core.Players.Events.AttributeAllocationsChangedEvent"/>. Living on the socket is
@@ -16,7 +17,7 @@ namespace Game.Api.Sockets.Commands
     /// battle commands, so it can no longer lose a concurrent read-modify-write race against a background
     /// battle save (the cause of issue #432).
     /// </summary>
-    public class UpdatePlayerStats : AbstractSocketCommand<List<BattlerAttribute>, List<AttributeUpdate>>
+    public class UpdatePlayerStats : AbstractSocketCommand<UpdatePlayerStatsResponse, List<AttributeUpdate>>
     {
         private readonly PlayerService _playerService;
 
@@ -27,18 +28,24 @@ namespace Game.Api.Sockets.Commands
             _playerService = playerService;
         }
 
-        public override async Task<ApiSocketResponse<List<BattlerAttribute>>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
+        public override async Task<ApiSocketResponse<UpdatePlayerStatsResponse>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var player = context.Session.Player;
             var success = await _playerService.TryUpdateAttributes(player, Parameters.Cast<IAttributeUpdate>(), cancellationToken);
 
-            var allocations = player.StatPoints.StatAllocations
-                .Select(allocation => BattlerAttribute.From(allocation.Attribute, allocation.Amount))
-                .ToList();
+            // Both outcomes carry the authoritative post-command state (unchanged on the error path), so
+            // the client can always reconcile onto it.
+            var result = new UpdatePlayerStatsResponse
+            {
+                Attributes = player.StatPoints.StatAllocations
+                    .Select(allocation => BattlerAttribute.From(allocation.Attribute, allocation.Amount))
+                    .ToList(),
+                StatPointsUsed = player.StatPoints.StatPointsUsed,
+            };
 
             return success
-                ? Success(allocations)
-                : ErrorWithData("Unable to update player stats.", allocations);
+                ? Success(result)
+                : ErrorWithData("Unable to update player stats.", result);
         }
     }
 }

@@ -1,22 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EAttribute, type IBattlerAttribute } from '$lib/api';
 
-// Mutable player-manager stand-in: `save()` reassigns `attributes` and bumps
-// `statPointsUsed`, so they are plain writable properties. `vi.hoisted` keeps it
-// initialised before the hoisted vi.mock factory runs.
+// Mutable player-manager stand-in: `save()` reassigns `attributes` and adopts the
+// server's `statPointsUsed` absolutely. Declared as a class instance (not an object
+// literal) so `statify` can make its fields reactive — the view derives the
+// stat-point pool from them live, exactly like the real (statified) PlayerManager.
 const { mockPlayerManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
-	mockPlayerManager: {
-		attributes: [] as IBattlerAttribute[],
-		statPointsGained: 0,
-		statPointsUsed: 0
-	},
+	mockPlayerManager: new (class MockPlayerManager {
+		attributes: IBattlerAttribute[] = [];
+		statPointsGained = 0;
+		statPointsUsed = 0;
+	})(),
 	sendSocketCommand: vi.fn(),
 	toastError: vi.fn(),
 	// Reference data is intentionally absent so the view falls back to enum names.
 	staticData: { attributes: undefined as unknown }
 }));
 
-vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
+vi.mock('$lib/engine', async () => {
+	const { statify } = await import('$lib/common');
+	return { playerManager: statify(mockPlayerManager) };
+});
 vi.mock('$stores', () => ({ staticData, toastError }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
@@ -50,7 +54,7 @@ const idx = {
 let view: AttributesView;
 
 beforeEach(() => {
-	sendSocketCommand.mockReset().mockResolvedValue({ data: allFives() });
+	sendSocketCommand.mockReset().mockResolvedValue({ data: { attributes: allFives(), statPointsUsed: 0 } });
 	toastError.mockReset();
 	localStorage.clear();
 	mockPlayerManager.attributes = allFives();
@@ -373,7 +377,7 @@ describe('AttributesView.save', () => {
 			attributeId: id,
 			amount: id === EAttribute.Strength ? 6 : 5
 		}));
-		sendSocketCommand.mockResolvedValue({ data: serverResult });
+		sendSocketCommand.mockResolvedValue({ data: { attributes: serverResult, statPointsUsed: 1 } });
 
 		view.inc(idx.str);
 		await view.save();
@@ -383,7 +387,7 @@ describe('AttributesView.save', () => {
 			{ attributeId: EAttribute.Strength, amount: 1 }
 		]);
 		// Applied to the player manager so battles and other screens see it.
-		expect(mockPlayerManager.attributes).toBe(serverResult);
+		expect(mockPlayerManager.attributes).toEqual(serverResult);
 		expect(mockPlayerManager.statPointsUsed).toBe(1);
 		expect(view.dirty).toBe(false);
 		expect(view.committed[idx.str]).toBe(6);
@@ -392,8 +396,21 @@ describe('AttributesView.save', () => {
 		expect(toastError).not.toHaveBeenCalled();
 	});
 
-	it('warns and keeps the changes when the server rejects the save', async () => {
-		sendSocketCommand.mockResolvedValue({ error: 'Unable to update player stats.', data: undefined });
+	it('adopts the server statPointsUsed absolutely, not as a relative increment (#1548)', async () => {
+		// The server is authoritative: if its post-command total disagrees with the
+		// locally-derivable `+= netSpent` (e.g. a concurrent victory reconcile), its
+		// value must win outright.
+		sendSocketCommand.mockResolvedValue({ data: { attributes: allFives(), statPointsUsed: 6 } });
+
+		view.inc(idx.str);
+		await view.save();
+
+		expect(mockPlayerManager.statPointsUsed).toBe(6);
+		expect(view.savedAvailable).toBe(4);
+	});
+
+	it('warns and keeps the changes when the request fails without data', async () => {
+		sendSocketCommand.mockResolvedValue({ error: 'Socket closed.', data: undefined });
 		view.inc(idx.str);
 		await view.save();
 
@@ -403,9 +420,68 @@ describe('AttributesView.save', () => {
 		expect(mockPlayerManager.statPointsUsed).toBe(0);
 	});
 
+	it('reconciles onto the returned unchanged state when the server rejects the save', async () => {
+		// The rejection response still carries the authoritative (unchanged) state, so the
+		// reconcile applies while the draft stays dirty for retry.
+		sendSocketCommand.mockResolvedValue({
+			error: 'Unable to update player stats.',
+			data: { attributes: allFives(), statPointsUsed: 2 }
+		});
+		view.inc(idx.str);
+		await view.save();
+
+		expect(toastError).toHaveBeenCalledTimes(1);
+		expect(mockPlayerManager.attributes).toEqual(allFives());
+		expect(mockPlayerManager.statPointsUsed).toBe(2);
+		expect(view.dirty).toBe(true);
+		expect(view.values[idx.str]).toBe(6);
+		expect(view.committed[idx.str]).toBe(5); // baseline unadvanced
+		expect(view.saved).toBe(false);
+	});
+
+	it('preserves draft edits made while the save is in flight (#1506)', async () => {
+		const serverResult: IBattlerAttribute[] = CORE_ATTRIBUTES.map((id) => ({
+			attributeId: id,
+			amount: id === EAttribute.Strength ? 6 : 5
+		}));
+		let resolveSend: (value: unknown) => void = () => {};
+		sendSocketCommand.mockReturnValue(new Promise((resolve) => (resolveSend = resolve)));
+
+		view.inc(idx.str);
+		const saving = view.save();
+		// Allocate another point while the request is in flight — it was not sent.
+		view.inc(idx.end);
+		resolveSend({ data: { attributes: serverResult, statPointsUsed: 1 } });
+		await saving;
+
+		// The baseline advanced by exactly the sent delta; the mid-flight edit is still
+		// pending rather than silently wiped, and is exactly what a retry would send.
+		expect(view.committed[idx.str]).toBe(6);
+		expect(view.committed[idx.end]).toBe(5);
+		expect(view.values[idx.end]).toBe(6);
+		expect(view.dirty).toBe(true);
+		expect(view.changedUpdates).toEqual([{ attributeId: EAttribute.Endurance, amount: 1 }]);
+		// Pool 9 after the spend, minus the 1 still-pending point.
+		expect(view.remaining).toBe(8);
+	});
+
 	it('does nothing when there are no changes', async () => {
 		await view.save();
 		expect(sendSocketCommand).not.toHaveBeenCalled();
 		expect(toastError).not.toHaveBeenCalled();
+	});
+});
+
+describe('AttributesView live stat-point pool', () => {
+	it('reflects stat points granted by a background level-up without a remount (#1506)', () => {
+		expect(view.savedAvailable).toBe(10);
+		expect(view.remaining).toBe(10);
+
+		// A background victory levels the player up while the screen is open.
+		mockPlayerManager.statPointsGained += 5;
+
+		expect(view.savedAvailable).toBe(15);
+		expect(view.remaining).toBe(15);
+		expect(view.budget).toBe(15);
 	});
 });

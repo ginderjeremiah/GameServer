@@ -6,7 +6,6 @@ import type {
 	IAttribute,
 	IAttributeUpdate,
 	IBattleLostResponse,
-	IBattlerAttribute,
 	IChallenge,
 	IChallengeBossRequest,
 	IChallengeCompletedModel,
@@ -36,6 +35,7 @@ import type {
 	ISkillRecipe,
 	IStatisticType,
 	ISynthesisResult,
+	IUpdatePlayerStatsResponse,
 	IZone
 } from './';
 
@@ -75,7 +75,7 @@ export type ApiSocketResponseTypes = {
 	'SocketReplaced': undefined;
 	'SynthesizeSkill': ISynthesisResult;
 	'UnequipItem': undefined;
-	'UpdatePlayerStats': IBattlerAttribute[];
+	'UpdatePlayerStats': IUpdatePlayerStatsResponse;
 };
 
 export type ApiSocketRequestTypes = {

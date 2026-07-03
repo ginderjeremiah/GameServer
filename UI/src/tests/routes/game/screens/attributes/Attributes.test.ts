@@ -39,7 +39,7 @@ const refAttributes: IAttribute[] = [
 ];
 
 beforeEach(() => {
-	sendSocketCommand.mockReset().mockResolvedValue({ data: [] });
+	sendSocketCommand.mockReset().mockResolvedValue({ data: { attributes: [], statPointsUsed: 0 } });
 	toastError.mockReset();
 	localStorage.clear();
 	staticData.attributes = refAttributes;
@@ -134,14 +134,17 @@ describe('Attributes screen', () => {
 
 	it('persists the saved allocation deltas when Confirm is clicked', async () => {
 		sendSocketCommand.mockResolvedValue({
-			data: [
-				{ attributeId: EAttribute.Strength, amount: 6 },
-				{ attributeId: EAttribute.Endurance, amount: 5 },
-				{ attributeId: EAttribute.Intellect, amount: 5 },
-				{ attributeId: EAttribute.Agility, amount: 5 },
-				{ attributeId: EAttribute.Dexterity, amount: 5 },
-				{ attributeId: EAttribute.Luck, amount: 5 }
-			]
+			data: {
+				attributes: [
+					{ attributeId: EAttribute.Strength, amount: 6 },
+					{ attributeId: EAttribute.Endurance, amount: 5 },
+					{ attributeId: EAttribute.Intellect, amount: 5 },
+					{ attributeId: EAttribute.Agility, amount: 5 },
+					{ attributeId: EAttribute.Dexterity, amount: 5 },
+					{ attributeId: EAttribute.Luck, amount: 5 }
+				],
+				statPointsUsed: 1
+			}
 		});
 		render(Attributes);
 

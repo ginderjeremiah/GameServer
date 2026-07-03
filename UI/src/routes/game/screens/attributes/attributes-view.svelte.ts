@@ -191,8 +191,6 @@ export class AttributesView {
 	draft = $state<number[]>([]);
 	/** Last-saved allocation; the dirty set is `draft` minus this. */
 	committed = $state<number[]>([]);
-	/** Unspent pool (statPointsGained − statPointsUsed) at the saved baseline. */
-	savedAvailable = $state(0);
 	/** Brief "Attributes saved" confirmation flash. */
 	saved = $state(false);
 	/** True while a save request is in flight (guards against double-submit). */
@@ -205,16 +203,14 @@ export class AttributesView {
 
 	constructor() {
 		this.mode = readStoredMode();
-		this.syncFromPlayer();
-	}
-
-	/** (Re)seed the baseline and working copy from the player manager. */
-	syncFromPlayer(): void {
 		const committed = CORE_ATTRIBUTES.map((id) => readAllocation(id));
 		this.committed = committed;
 		this.draft = [...committed];
-		this.savedAvailable = playerManager.statPointsGained - playerManager.statPointsUsed;
 	}
+
+	/** Unspent pool (statPointsGained − statPointsUsed), derived live from the reactive
+	 *  player manager so points granted by a background level-up appear without a remount. */
+	readonly savedAvailable = $derived(playerManager.statPointsGained - playerManager.statPointsUsed);
 
 	/** Current (pending) value per core attribute. */
 	readonly values = $derived(this.draft);
@@ -327,21 +323,28 @@ export class AttributesView {
 			return;
 		}
 
-		const netSpent = sum(this.draft) - sum(this.committed);
 		this.saving = true;
 		const response = await apiSocket.sendSocketCommand('UpdatePlayerStats', updates);
 		this.saving = false;
+
+		// Any returned payload is the server's authoritative post-command state (the
+		// rejection path returns it unchanged), so adopt the allocations and the spent
+		// total absolutely rather than re-deriving the spend locally (#1548).
+		if (response.data) {
+			playerManager.attributes = response.data.attributes;
+			playerManager.statPointsUsed = response.data.statPointsUsed;
+		}
 
 		if (response.error || !response.data) {
 			toastError('Your attribute changes could not be saved. Please try again.');
 			return;
 		}
 
-		// Persist to the player manager so battles and other screens use the new
-		// allocation, then re-seed the baseline to clear the dirty state.
-		playerManager.attributes = response.data;
-		playerManager.statPointsUsed += netSpent;
-		this.syncFromPlayer();
+		// Advance the baseline by exactly the deltas that were sent, preserving any
+		// draft edits made while the save was in flight instead of wiping them (#1506).
+		this.committed = this.committed.map(
+			(value, i) => value + (updates.find((u) => u.attributeId === CORE_ATTRIBUTES[i])?.amount ?? 0)
+		);
 		this.flashSaved();
 	}
 
