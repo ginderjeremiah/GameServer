@@ -113,6 +113,17 @@ describe('Battler', () => {
 			expect(battler.cdMultiplier).toBeCloseTo(expected, 10);
 		});
 
+		it('adds an authored CooldownBonus verbatim when Agility is zero (base multiplier)', () => {
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [{ attributeId: EAttribute.CooldownBonus, amount: 0.5 }]
+				})
+			);
+
+			// With no Agility the multiplier stays at its base 1, so the bonus adds verbatim: 1 + 0.5·1 = 1.5.
+			expect(battler.cdMultiplier).toBeCloseTo(1.5, 10);
+		});
+
 		it('reads cdMultiplier live, reflecting a mid-battle CooldownRecovery change', () => {
 			const battler = new Battler(makeBattlerData({ attributes: [] }));
 			// No allocations, so CooldownRecovery is just the static base 1.0 → multiplier 1.0.
