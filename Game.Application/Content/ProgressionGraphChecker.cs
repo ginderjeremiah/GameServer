@@ -1,5 +1,6 @@
 using Game.Core;
 using Game.Core.Attributes;
+using Game.Core.Progress;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 
@@ -127,6 +128,13 @@ namespace Game.Application.Content
                         {
                             case EEntityType.Enemy:
                                 CheckRef("ChallengeTarget", "Challenge", challenge.Id, _enemyRetire, "enemy", targetId, ContentGraphSeverity.Error, ContentGraphSeverity.Warning);
+                                // A boss-only statistic records per-boss rows only, so a non-boss target can
+                                // never track progress (mirrors the ZoneBoss non-boss warning above).
+                                if (IsBossOnlyType(challenge.ChallengeTypeId)
+                                    && _enemies.TryGetValue(targetId, out var target) && target.RetiredAt is null && !target.IsBoss)
+                                {
+                                    Warn("ChallengeTarget", "Challenge", challenge.Id, $"is a boss-only challenge targeting enemy {targetId}, which is not flagged as a boss, so it can never track progress.");
+                                }
                                 break;
                             case EEntityType.Zone:
                                 CheckRef("ChallengeTarget", "Challenge", challenge.Id, _zoneRetire, "zone", targetId, ContentGraphSeverity.Error, ContentGraphSeverity.Warning);
@@ -581,6 +589,9 @@ namespace Game.Application.Content
             }
 
             // --- Helpers ----------------------------------------------------------------------------------
+
+            private static bool IsBossOnlyType(EChallengeType challengeTypeId)
+                => new ChallengeType(challengeTypeId).StatisticType is { BossOnly: true };
 
             private bool IsPathRetired(int pathId) => !_pathRetire.TryGetValue(pathId, out var retiredAt) || retiredAt is not null;
 

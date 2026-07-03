@@ -16,8 +16,9 @@ namespace Game.Application.Tests.DataAccess
     /// <summary>
     /// Exercises <see cref="IAdminChallenges"/> <c>SaveChallenges</c>: the zero-based-id Edit-existence
     /// rejection (an out-of-range id is a not-found rejection, not an EF 0-row update), the delete-not-supported
-    /// guard, the duplicate-key rejection, and a successful Add/Edit round-trip. Seeding, the admin write, and
-    /// the assertion each use a separate DI scope so the write runs against an empty change tracker.
+    /// guard, the duplicate-key rejection, the up-front reward/target reference guards, and a successful
+    /// Add/Edit round-trip. Seeding, the admin write, and the assertion each use a separate DI scope so the
+    /// write runs against an empty change tracker.
     /// </summary>
     [Collection("Integration")]
     public class AdminChallengesIntegrationTests : ApplicationIntegrationTestBase
@@ -325,6 +326,78 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.False(result.Succeeded);
             Assert.Equal("Target enemy 99999 does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveChallenges_BossOnlyTypeTargetingNonBossEnemy_ReturnsFailure()
+        {
+            // BossesDefeated records per-boss rows only, so a non-boss target could never track progress.
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                enemyId = (await TestDataSeeder.CreateEnemyAsync(context, name: "Common Slime")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminChallenges>();
+
+            var result = admin.SaveChallenges(
+            [
+                new Change<Contracts.Challenge>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewChallenge(name: "Slime Vanquisher", challengeTypeId: EChallengeType.BossesDefeated, targetEntityId: enemyId),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal($"A 'Bosses Defeated' challenge must target a boss; enemy {enemyId} is not a boss.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveChallenges_BossOnlyTypeTargetingBossEnemy_Succeeds()
+        {
+            int bossId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                bossId = (await TestDataSeeder.CreateEnemyAsync(context, name: "Slime King", isBoss: true)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            var changes = new List<Change<Contracts.Challenge>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewChallenge(name: "King Slayer", challengeTypeId: EChallengeType.BossesDefeated, targetEntityId: bossId),
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminChallenges>();
+            Assert.True(admin.SaveChallenges(changes).Succeeded);
+        }
+
+        [Fact]
+        public void SaveChallenges_BossOnlyTypeWithNoTarget_Succeeds()
+        {
+            // An untargeted BossesDefeated challenge tracks the global boss counter — no dimension to validate.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminChallenges>();
+
+            var result = admin.SaveChallenges(
+            [
+                new Change<Contracts.Challenge>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = NewChallenge(name: "Boss Hunter", challengeTypeId: EChallengeType.BossesDefeated),
+                },
+            ]);
+
+            Assert.True(result.Succeeded);
         }
 
         [Fact]

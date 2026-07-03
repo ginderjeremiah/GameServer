@@ -132,6 +132,69 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ChallengeTarget", ContentGraphSeverity.Error, "Challenge", 0);
         }
 
+        [Fact]
+        public void Challenge_BossOnlyTypeTargetingNonBossEnemy_IsWarning()
+        {
+            // BossesDefeated records per-boss rows only; targeting non-boss enemy 0 can never progress.
+            var graph = HealthyGraph() with
+            {
+                Challenges =
+                [
+                    Challenge(0, challengeTypeId: EChallengeType.BossesDefeated,
+                        entityType: EEntityType.Enemy, targetEntityId: 0),
+                ],
+            };
+            AssertHasFinding(graph, "ChallengeTarget", ContentGraphSeverity.Warning, "Challenge", 0);
+        }
+
+        [Fact]
+        public void Challenge_BossOnlyTypeTargetingBossEnemy_ProducesNoFinding()
+        {
+            // Enemy 1 is a boss; making it zone 0's boss keeps the gate on challenge 0 reachable.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0, bossEnemyId: 1), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                Challenges =
+                [
+                    Challenge(0, challengeTypeId: EChallengeType.BossesDefeated,
+                        entityType: EEntityType.Enemy, targetEntityId: 1),
+                ],
+            };
+            Assert.Empty(_checker.Check(graph));
+        }
+
+        [Fact]
+        public void Challenge_NonBossOnlyTypeTargetingNonBossEnemy_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Challenges =
+                [
+                    Challenge(0, challengeTypeId: EChallengeType.EnemiesKilled,
+                        entityType: EEntityType.Enemy, targetEntityId: 0),
+                ],
+            };
+            Assert.Empty(_checker.Check(graph));
+        }
+
+        [Fact]
+        public void Challenge_BossOnlyTypeTargetingRetiredNonBossEnemy_WarnsOnlyAboutRetirement()
+        {
+            // A retired target already gets its own warning; the boss-ness warning is skipped for it,
+            // mirroring the ZoneBoss precedent.
+            var graph = HealthyGraph() with
+            {
+                Challenges =
+                [
+                    Challenge(0, challengeTypeId: EChallengeType.BossesDefeated,
+                        entityType: EEntityType.Enemy, targetEntityId: 5),
+                ],
+                Enemies = HealthyGraph().Enemies.Append(Enemy(5, retiredAt: Retired)).ToList(),
+            };
+            var finding = Assert.Single(_checker.Check(graph), f => f.Check == "ChallengeTarget");
+            Assert.Contains("retired", finding.Message);
+        }
+
         // --- Enemies ----------------------------------------------------------------------------------
 
         [Fact]

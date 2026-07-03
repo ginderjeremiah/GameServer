@@ -144,7 +144,9 @@ namespace Game.DataAccess.Repositories.Admin
         /// <see cref="EEntityType.Enemy"/>/<see cref="EEntityType.Zone"/>/
         /// <see cref="EEntityType.Skill"/> target must reference an existing record (retirement is tolerated —
         /// unlike a reward, a retired target can't fault the runtime; it only risks an eventually-uncompletable
-        /// challenge, which the content-graph lint already flags post-hoc as a warning), and an
+        /// challenge, which the content-graph lint already flags post-hoc as a warning), a boss-only type's
+        /// enemy target must be flagged as a boss (its statistic records per-boss rows only, so a non-boss
+        /// target could never track progress), and an
         /// <see cref="EEntityType.DamageType"/> target must be a defined <see cref="EDamageTypeKey"/> (a fixed
         /// intrinsic enum, not a DB reference table). <see cref="EEntityType.None"/> carries no dimension to
         /// validate. Deletes are skipped.
@@ -172,11 +174,24 @@ namespace Game.DataAccess.Repositories.Admin
                     continue;
                 }
 
-                var entityType = new ChallengeType(item.ChallengeTypeId).StatisticType?.EntityType ?? EEntityType.None;
-                switch (entityType)
+                var challengeType = new ChallengeType(item.ChallengeTypeId);
+                switch (challengeType.StatisticType?.EntityType ?? EEntityType.None)
                 {
-                    case EEntityType.Enemy when _enemies.GetEnemy(targetId) is null:
-                        return AdminSaveResult.Failure($"Target enemy {targetId} does not exist.");
+                    case EEntityType.Enemy:
+                        var enemy = _enemies.GetEnemy(targetId);
+                        if (enemy is null)
+                        {
+                            return AdminSaveResult.Failure($"Target enemy {targetId} does not exist.");
+                        }
+
+                        // A boss-only statistic records per-boss rows only, so a non-boss target
+                        // could never track progress — an eventually-uncompletable challenge.
+                        if (challengeType.StatisticType is { BossOnly: true } && !enemy.IsBoss)
+                        {
+                            return AdminSaveResult.Failure($"A '{challengeType.Name}' challenge must target a boss; enemy {targetId} is not a boss.");
+                        }
+
+                        break;
                     case EEntityType.Zone when _zones.LookupZone(targetId) is null:
                         return AdminSaveResult.Failure($"Target zone {targetId} does not exist.");
                     case EEntityType.Skill when _skills.LookupSkill(targetId) is null:
