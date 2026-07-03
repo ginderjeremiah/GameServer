@@ -164,6 +164,34 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
+        /// A copy of this battler with <paramref name="delta"/> added to <paramref name="attribute"/> as a
+        /// fresh <see cref="EAttributeModifierSource.BaseValue"/> additive term — full cascade re-derivation
+        /// included, so bumping a core attribute re-derives everything <see cref="StaticAttributeModifiers"/>
+        /// hangs off it exactly like a real allocation would. Used by the combat rating's marginal helper
+        /// (<see cref="CombatRating.Marginal"/>, #1531) to price one point of investment via finite difference;
+        /// not used by the live battle simulation. Excludes any live <see cref="EAttributeModifierSource.SkillEffect"/>
+        /// modifiers (the marginal prices a permanent investment, not an in-battle timed-buff snapshot) and the
+        /// static modifiers themselves — copying those too would double them, since the fresh
+        /// <see cref="AttributeCollection"/> constructor re-adds them automatically.
+        /// </summary>
+        public Battler CloneWithAttributeDelta(EAttribute attribute, double delta)
+        {
+            var staticModifiers = new HashSet<AttributeModifier>(StaticAttributeModifiers.All);
+            var modifiers = _attributes.AllModifiers()
+                .Where(m => m.Source != EAttributeModifierSource.SkillEffect && !staticModifiers.Contains(m))
+                .ToList();
+            modifiers.Add(new AttributeModifier
+            {
+                Attribute = attribute,
+                Amount = delta,
+                Type = EModifierType.Additive,
+                Source = EAttributeModifierSource.BaseValue,
+            });
+
+            return new Battler(new AttributeCollection(modifiers), Skills.Select(s => s.Skill), Level, CounterSkill);
+        }
+
+        /// <summary>
         /// The shared overlay-tally saturation <c>φ(a) = a / (1 + a)</c>, applied to an overlay's own investment
         /// magnitude when booking its share claim (#1481): ~linear at the low end so a token investment trains
         /// proportionally little, asymptoting to <c>1</c> so even a huge investment claims at most the full booked

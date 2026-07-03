@@ -55,5 +55,46 @@ namespace Game.Core
         /// represents.
         /// </summary>
         public const double ResistMitigatedTrainingRate = 1.0;
+
+        /// <summary>
+        /// The reference Toughness the combat rating (<see cref="Battle.CombatRating"/>, #1531) prices offense
+        /// against — nonzero so a Sunder debuff and DoT's real Toughness-bypass premium both price meaningfully
+        /// (a 0 reference would make both inert). A strawman value pending the calibration report (#1533).
+        /// </summary>
+        public const double RefToughness = 50.0;
+
+        /// <summary>
+        /// The reference incoming damage-type mix the combat rating prices survivability's resistance term
+        /// against — the eight resistance-bearing leaf types (the weapon leaves carry no resistance of their
+        /// own; see <see cref="Attributes.DamageTypes"/>), weighted uniformly. Matchup tech (the right resist
+        /// against a specific enemy) is deliberately not priced per-fight — the rating stays intrinsic (spike
+        /// #1526, Decision 3).
+        /// </summary>
+        public static readonly IReadOnlyList<EDamageType> RefIncomingTypeMix =
+        [
+            EDamageType.Physical, EDamageType.Fire, EDamageType.Water, EDamageType.Earth,
+            EDamageType.Wind, EDamageType.Bleed, EDamageType.Poison, EDamageType.Burn,
+        ];
+
+        /// <summary>
+        /// The reference attacks/sec the combat rating assumes for a matched opponent — the incoming attack
+        /// frequency the riposte term prices against (each parry's proc opportunity rate). A strawman value
+        /// pending the calibration report (#1533).
+        /// </summary>
+        public const double RefAttackRate = 1.0;
+
+        /// <summary>
+        /// The reference incoming damage/sec the combat rating assumes for a matched opponent — prices the
+        /// reflect term (<c>DamageReflection × RefDps</c>). A strawman value pending the calibration report
+        /// (#1533).
+        /// </summary>
+        public const double RefDps = 10.0;
+
+        /// <summary>
+        /// The reference fight duration in seconds the combat rating uses for the regen credit
+        /// (<c>regenRate × RefFightDuration</c>) and the effect-uptime ramp horizon
+        /// (<c>min(duration, RefFightDuration / 2)</c>). ~30s per the spike (#1526).
+        /// </summary>
+        public const double RefFightDuration = 30.0;
     }
 }
