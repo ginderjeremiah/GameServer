@@ -321,6 +321,13 @@ namespace Game.Core.Progress
 
         private void Increment(EStatisticType type, int? entityId, decimal amount)
         {
+            // A zero delta carries no information for a Sum statistic (row absence is the "no data" signal),
+            // so skip it outright: no row, no dirty-mark, no touched key re-evaluating the stat's challenges.
+            if (amount == 0m)
+            {
+                return;
+            }
+
             var stat = GetOrCreate(type, entityId, out _);
             stat.Value += amount;
         }
