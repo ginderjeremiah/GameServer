@@ -12,7 +12,6 @@
 	onpointermove={onPointerMove}
 	onpointerup={endDrag}
 	onpointerleave={endDrag}
-	onwheel={onWheel}
 	role="application"
 	aria-label="Recipe graph — drag to pan, scroll to zoom"
 >
@@ -43,8 +42,9 @@
 </div>
 
 <script lang="ts">
+import { onMount } from 'svelte';
 import { recipeStateAccent } from './synthesis';
-import { type SynthesisGraphLayout, type Viewport, zoomAt } from './synthesis-graph';
+import { isDragPastThreshold, type SynthesisGraphLayout, type Viewport, zoomAt } from './synthesis-graph';
 import SynthesisGraphNode from './SynthesisGraphNode.svelte';
 
 type Props = {
@@ -58,8 +58,12 @@ const { layout, selectedRecipeId, onSelect }: Props = $props();
 let container = $state<HTMLDivElement>();
 let vp = $state<Viewport>({ x: 0, y: 0, scale: 1 });
 
-// Drag-to-pan state. The pointer is captured so a drag that leaves the node still pans the canvas.
+// Drag-to-pan state. The pointer is captured only once the drag threshold is crossed — capturing on the
+// bare press would retarget the tail click away from the node/reset buttons and eat their activation.
 let dragging = false;
+let captured = false;
+let startX = 0;
+let startY = 0;
 let lastX = 0;
 let lastY = 0;
 
@@ -88,28 +92,47 @@ const lines = $derived(
 	})
 );
 
+// The content extent as primitive deriveds: the layout object is re-derived (new identity) on every
+// proficiency-XP push, so the recenter effect keys on these values, not the object.
+const layoutWidth = $derived(layout.width);
+const layoutHeight = $derived(layout.height);
+
 /** Centre the content in the container at scale 1 (the initial view + the reset action). */
 function recenter(): void {
-	if (!container || !layout.width) {
+	if (!container || !layoutWidth) {
 		return;
 	}
 	vp = {
 		scale: 1,
-		x: (container.clientWidth - layout.width) / 2,
-		y: (container.clientHeight - layout.height) / 2
+		x: (container.clientWidth - layoutWidth) / 2,
+		y: (container.clientHeight - layoutHeight) / 2
 	};
 }
 
 function onPointerDown(event: PointerEvent): void {
+	if (event.button !== 0) {
+		return;
+	}
 	dragging = true;
+	captured = false;
+	startX = event.clientX;
+	startY = event.clientY;
 	lastX = event.clientX;
 	lastY = event.clientY;
-	container?.setPointerCapture(event.pointerId);
 }
 
 function onPointerMove(event: PointerEvent): void {
 	if (!dragging) {
 		return;
+	}
+	// The press stays a plain click until the threshold; the first pan step then applies the accumulated
+	// delta (lastX/lastY still sit at the press point) so no travel is lost.
+	if (!captured) {
+		if (!isDragPastThreshold(startX, startY, event.clientX, event.clientY)) {
+			return;
+		}
+		captured = true;
+		container?.setPointerCapture(event.pointerId);
 	}
 	vp = { ...vp, x: vp.x + (event.clientX - lastX), y: vp.y + (event.clientY - lastY) };
 	lastX = event.clientX;
@@ -118,6 +141,7 @@ function onPointerMove(event: PointerEvent): void {
 
 function endDrag(event: PointerEvent): void {
 	dragging = false;
+	captured = false;
 	if (container?.hasPointerCapture(event.pointerId)) {
 		container.releasePointerCapture(event.pointerId);
 	}
@@ -135,12 +159,23 @@ function onWheel(event: WheelEvent): void {
 }
 
 // Recentre on mount (this runs once after the initial render, when `container` is bound) and whenever the
-// graph's content extent changes (recipe set / view switched). Reads only the layout dims + container, so
-// writing `vp` here can't loop.
+// graph's content extent *actually* changes (recipe set / view switched). Keying on the primitive dims —
+// never the layout object — keeps a same-extent re-derivation from stomping the user's pan/zoom.
 $effect(() => {
-	void layout.width;
-	void layout.height;
+	void layoutWidth;
+	void layoutHeight;
 	recenter();
+});
+
+// Registered manually with an explicit `passive: false`: the zoom relies on preventDefault to stop
+// ancestor scroll, and Svelte's forced-passive list has included `wheel` before — don't depend on it.
+onMount(() => {
+	const el = container;
+	if (!el) {
+		return;
+	}
+	el.addEventListener('wheel', onWheel, { passive: false });
+	return () => el.removeEventListener('wheel', onWheel);
 });
 </script>
 

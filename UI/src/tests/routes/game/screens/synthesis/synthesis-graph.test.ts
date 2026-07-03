@@ -3,6 +3,8 @@ import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill
 import { buildSynthesis, type RecipeView } from '$routes/game/screens/synthesis/synthesis';
 import {
 	clampScale,
+	DRAG_THRESHOLD_PX,
+	isDragPastThreshold,
 	layoutSynthesisGraph,
 	NODE_SIZE,
 	ZOOM_MAX,
@@ -202,5 +204,27 @@ describe('pan / zoom helpers', () => {
 		const vp = { x: 30, y: -10, scale: ZOOM_MAX };
 		// Already at max — zooming in further is a clamped no-op, so the viewport is unchanged.
 		expect(zoomAt(vp, 2, 100, 100)).toEqual(vp);
+	});
+});
+
+describe('isDragPastThreshold', () => {
+	it('keeps sub-threshold jitter a click', () => {
+		expect(isDragPastThreshold(100, 100, 102, 101)).toBe(false);
+		expect(isDragPastThreshold(100, 100, 100, 100)).toBe(false);
+	});
+
+	it('crosses exactly at the threshold distance', () => {
+		expect(isDragPastThreshold(100, 100, 100 + DRAG_THRESHOLD_PX, 100)).toBe(true);
+	});
+
+	it('measures Euclidean distance so diagonal travel counts fully', () => {
+		// 3px on each axis is ~4.24px of travel — past the threshold even though neither axis alone is.
+		expect(isDragPastThreshold(0, 0, 3, 3)).toBe(true);
+		expect(isDragPastThreshold(0, 0, 2, 2)).toBe(false);
+	});
+
+	it('is direction-agnostic', () => {
+		expect(isDragPastThreshold(10, 10, 10 - DRAG_THRESHOLD_PX, 10)).toBe(true);
+		expect(isDragPastThreshold(10, 10, 10, 10 - DRAG_THRESHOLD_PX)).toBe(true);
 	});
 });
