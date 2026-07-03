@@ -215,10 +215,15 @@ export class OptionsView {
 			return;
 		}
 
-		// Mirror the saved draft onto the player manager so the combat-log filter
-		// reflects the choice, then advance the baseline to clear the dirty state.
-		applyToPlayer(this.draft);
-		this.baseline = { ...this.draft };
+		// Mirror only the entries actually sent onto the player manager and baseline —
+		// a toggle flipped while the save was in flight stays dirty (and unapplied)
+		// instead of being baselined as clean without ever reaching the server (#1506).
+		applyToPlayer(changed);
+		const baseline = { ...this.baseline };
+		for (const pref of changed) {
+			baseline[pref.id] = pref.enabled;
+		}
+		this.baseline = baseline;
 		this.flashSaved();
 	}
 
@@ -249,7 +254,12 @@ function readPlayerPrefs(): LogPrefMap {
 	return prefs;
 }
 
-/** Push the draft map onto the player manager so `log.ts` filters by it live. */
-function applyToPlayer(draft: LogPrefMap): void {
-	playerManager.logPreferences = LOG_TYPES.map((lt) => ({ id: lt.id, enabled: !!draft[lt.id] }));
+/** Merge the saved preference entries onto the player manager so `log.ts` filters by
+ *  them live, leaving every preference that was not sent at its current value. */
+function applyToPlayer(saved: ILogPreference[]): void {
+	const merged = readPlayerPrefs();
+	for (const pref of saved) {
+		merged[pref.id] = pref.enabled;
+	}
+	playerManager.logPreferences = LOG_TYPES.map((lt) => ({ id: lt.id, enabled: !!merged[lt.id] }));
 }

@@ -176,6 +176,53 @@ describe('OptionsView.save', () => {
 		expect(view.saved).toBe(true);
 	});
 
+	it('keeps a toggle flipped while the save is in flight dirty instead of baselining it (#1506)', async () => {
+		let resolveSend: (value: unknown) => void = () => {};
+		mockSendSocketCommand.mockReturnValue(new Promise((resolve) => (resolveSend = resolve)));
+
+		view.setOne(ELogType.Damage, false);
+		const saving = view.save();
+		// Flipped while the request is in flight — not part of the sent diff.
+		view.setOne(ELogType.Exp, false);
+		resolveSend({});
+		await saving;
+
+		// The sent entry is committed to the baseline and the player manager...
+		expect(view.isDirtyId(ELogType.Damage)).toBe(false);
+		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Damage)?.enabled).toBe(false);
+		// ...but the mid-flight flip stays dirty and unapplied, so it can still be saved.
+		expect(view.isDirtyId(ELogType.Exp)).toBe(true);
+		expect(view.isDirty).toBe(true);
+		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Exp)?.enabled).toBe(true);
+
+		// A follow-up save sends exactly the still-dirty entry.
+		mockSendSocketCommand.mockResolvedValue({});
+		await view.save();
+		expect(mockSendSocketCommand).toHaveBeenLastCalledWith('SaveLogPreferences', [
+			{ id: ELogType.Exp, enabled: false }
+		]);
+		expect(view.isDirty).toBe(false);
+	});
+
+	it('keeps a sent toggle that was flipped back mid-flight dirty at its new value', async () => {
+		let resolveSend: (value: unknown) => void = () => {};
+		mockSendSocketCommand.mockReturnValue(new Promise((resolve) => (resolveSend = resolve)));
+
+		view.setOne(ELogType.Damage, false);
+		const saving = view.save();
+		// The same type flips back while its disable is in flight.
+		view.setOne(ELogType.Damage, true);
+		resolveSend({});
+		await saving;
+
+		// The server now holds the sent value (false), so the flip back reads as a new
+		// pending change against that baseline rather than being lost.
+		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Damage)?.enabled).toBe(false);
+		expect(view.isOn(ELogType.Damage)).toBe(true);
+		expect(view.isDirtyId(ELogType.Damage)).toBe(true);
+		expect(view.changedPreferences).toEqual([{ id: ELogType.Damage, enabled: true }]);
+	});
+
 	it('does nothing when there are no changes', async () => {
 		await view.save();
 

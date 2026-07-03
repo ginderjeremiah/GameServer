@@ -1,5 +1,4 @@
-using Game.Abstractions.Contracts;
-using Game.Api.Models.Player;
+using Game.Api.Models.Attributes;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
@@ -49,11 +48,13 @@ namespace Game.Api.Tests.Integration
             await socketClient.ConnectAsync(wsClient, userId);
 
             var updates = new[] { new { attributeId = (int)EAttribute.Strength, amount = 3 } };
-            var response = await socketClient.SendCommandAsync<List<BattlerAttribute>>("UpdatePlayerStats", updates);
+            var response = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>("UpdatePlayerStats", updates);
 
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
-            Assert.Equal(53m, response.Data.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+            Assert.Equal(53m, response.Data.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+            // The response carries the authoritative post-spend total so the client adopts it absolutely.
+            Assert.Equal(103, response.Data.StatPointsUsed);
 
             // The save writes the cached player fire-and-forget, so poll the player snapshot until the
             // new allocation lands (this is the persistence the bug report said could silently revert).
@@ -73,9 +74,13 @@ namespace Game.Api.Tests.Integration
             await socketClient.ConnectAsync(wsClient, userId);
 
             var updates = new[] { new { attributeId = (int)EAttribute.Strength, amount = 999 } };
-            var response = await socketClient.SendCommandAsync<List<BattlerAttribute>>("UpdatePlayerStats", updates);
+            var response = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>("UpdatePlayerStats", updates);
 
             Assert.NotNull(response.Error);
+            // The rejection still returns the unchanged authoritative state for the client to reconcile onto.
+            Assert.NotNull(response.Data);
+            Assert.Equal(50m, response.Data.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+            Assert.Equal(100, response.Data.StatPointsUsed);
         }
 
         [Fact]
@@ -96,11 +101,12 @@ namespace Game.Api.Tests.Integration
                 new { attributeId = (int)EAttribute.Strength, amount = 3 },
                 new { attributeId = (int)EAttribute.Luck, amount = 2 },
             };
-            var response = await socketClient.SendCommandAsync<List<BattlerAttribute>>("UpdatePlayerStats", updates);
+            var response = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>("UpdatePlayerStats", updates);
 
             Assert.NotNull(response.Error);
             Assert.NotNull(response.Data);
-            Assert.Equal(50m, response.Data.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+            Assert.Equal(50m, response.Data.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
+            Assert.Equal(100, response.Data.StatPointsUsed);
         }
 
         /// <summary>
