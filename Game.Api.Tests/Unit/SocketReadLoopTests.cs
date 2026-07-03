@@ -161,8 +161,10 @@ namespace Game.Api.Tests.Unit
         /// <summary>
         /// A <see cref="WebSocket"/> stand-in that scripts a single receive step (a thrown receive or a client
         /// close frame) and records the close frame, so the read loop's terminal-fault and clean-close paths can
-        /// be driven deterministically. A throw leaves <see cref="State"/> Open — exactly the case that would
-        /// spin the loop — and counts every receive so a test can assert the loop did not retry.
+        /// be driven deterministically. A throw defaults to leaving <see cref="State"/> Open — the case that
+        /// would spin the loop — or can be scripted to leave it Aborted via <see cref="QueueThrow"/>'s
+        /// <c>resultingState</c>, mirroring a hard disconnect. Counts every receive so a test can assert the
+        /// loop did not retry.
         /// </summary>
         private sealed class ScriptedReadWebSocket : WebSocket
         {
