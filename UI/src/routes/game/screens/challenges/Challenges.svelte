@@ -1,4 +1,4 @@
-<div class="challenges-frame" data-testid="challenges-screen" bind:this={frame}>
+<div class="challenges-frame" data-testid="challenges-screen">
 	<!-- Header -->
 	<div class="chal-header">
 		<div>
@@ -73,7 +73,6 @@ import TypeRail from './TypeRail.svelte';
 
 const view = new ChallengesView();
 
-let frame: HTMLDivElement;
 let tooltip = $state<TooltipComponent>();
 let hoveredReward = $state<ResolvedReward>();
 

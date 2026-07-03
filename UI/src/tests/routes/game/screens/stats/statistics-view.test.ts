@@ -25,9 +25,9 @@ const statTypes: StatType[] = buildStatTypes(SERVER_STAT_TYPES);
 const entities: Record<StatBreakdownKind, StatEntity[]> = {
 	enemy: [
 		{ id: 0, name: 'Cave Bat' },
-		{ id: 1, name: 'Goblin', boss: true }
+		{ id: 1, name: 'Goblin' }
 	],
-	zone: [{ id: 0, name: 'Verdant Hollow', zoneNum: 1 }],
+	zone: [{ id: 0, name: 'Verdant Hollow' }],
 	skill: [{ id: 0, name: 'Cleave' }],
 	damageType: [
 		{ id: EDamageTypeKey.Physical, name: 'Physical' },
@@ -52,10 +52,10 @@ const data = () => new StatisticsData(statTypes, stats, entities);
 function seedStaticData(): void {
 	staticData.statisticTypes = SERVER_STAT_TYPES;
 	staticData.enemies = [
-		{ id: 0, name: 'Cave Bat', isBoss: false },
-		{ id: 1, name: 'Goblin', isBoss: true }
+		{ id: 0, name: 'Cave Bat' },
+		{ id: 1, name: 'Goblin' }
 	];
-	staticData.zones = [{ id: 0, name: 'Verdant Hollow', order: 1 }];
+	staticData.zones = [{ id: 0, name: 'Verdant Hollow' }];
 	staticData.skills = [{ id: 0, name: 'Cleave' }];
 }
 
@@ -140,20 +140,30 @@ describe('buildStatTypes', () => {
 	});
 });
 
-describe('StatisticsData.rowsForStat', () => {
+describe('StatisticsData.summaryFor', () => {
+	it('bundles the rows, bar max, and headline for a statistic', () => {
+		const summary = data().summaryFor(EStatisticType.EnemiesKilled);
+		expect(summary.rows.map((r) => r.entityId)).toEqual([0, 1]);
+		expect(summary.maxVal).toBe(100); // the leading row's value
+		expect(summary.headline).toBe(120); // null-entity grand total
+	});
+
 	it('sorts a sum/max statistic best-first (descending)', () => {
-		const rows = data().rowsForStat(EStatisticType.EnemiesKilled);
+		const rows = data().summaryFor(EStatisticType.EnemiesKilled).rows;
 		expect(rows.map((r) => r.entityId)).toEqual([0, 1]);
 		expect(rows[0].entity.name).toBe('Cave Bat');
 	});
 
 	it('sorts a min statistic best-first (ascending — lower is better)', () => {
-		const rows = data().rowsForStat(EStatisticType.FastestVictory);
+		const rows = data().summaryFor(EStatisticType.FastestVictory).rows;
 		expect(rows.map((r) => r.value)).toEqual([2.0, 5.0]);
 	});
 
-	it('returns no rows for a total-only (none) statistic', () => {
-		expect(data().rowsForStat(EStatisticType.PlayerDeaths)).toEqual([]);
+	it('returns an empty (rows-less) summary for a total-only statistic', () => {
+		const summary = data().summaryFor(EStatisticType.PlayerDeaths);
+		expect(summary.rows).toEqual([]);
+		expect(summary.maxVal).toBe(1);
+		expect(summary.headline).toBe(7);
 	});
 
 	it('drops rows whose entity cannot be resolved', () => {
@@ -162,20 +172,13 @@ describe('StatisticsData.rowsForStat', () => {
 			[{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 99, value: 5 }],
 			entities
 		);
-		expect(d.rowsForStat(EStatisticType.EnemiesKilled)).toEqual([]);
+		expect(d.summaryFor(EStatisticType.EnemiesKilled).rows).toEqual([]);
 	});
 
 	it('resolves a damage-type breakdown by key, sorted best-first', () => {
-		const rows = data().rowsForStat(EStatisticType.KillsByDamageType);
+		const rows = data().summaryFor(EStatisticType.KillsByDamageType).rows;
 		expect(rows.map((r) => r.entityId)).toEqual([EDamageTypeKey.Fire, EDamageTypeKey.Physical]);
 		expect(rows[0].entity.name).toBe('Fire');
-	});
-});
-
-describe('StatisticsData.statHeadline', () => {
-	it('uses the null-entity grand-total row when present', () => {
-		expect(data().statHeadline(EStatisticType.EnemiesKilled)).toBe(120);
-		expect(data().statHeadline(EStatisticType.PlayerDeaths)).toBe(7);
 	});
 
 	it('falls back to aggregating per-entity rows when there is no total row', () => {
@@ -187,23 +190,7 @@ describe('StatisticsData.statHeadline', () => {
 			],
 			entities
 		);
-		expect(d.statHeadline(EStatisticType.EnemiesKilled)).toBe(120); // summed
-	});
-});
-
-describe('StatisticsData.summaryFor', () => {
-	it('bundles the rows, bar max, and headline for a statistic', () => {
-		const summary = data().summaryFor(EStatisticType.EnemiesKilled);
-		expect(summary.rows.map((r) => r.entityId)).toEqual([0, 1]);
-		expect(summary.maxVal).toBe(100); // the leading row's value
-		expect(summary.headline).toBe(120); // null-entity grand total
-	});
-
-	it('returns an empty (rows-less) summary for a total-only statistic', () => {
-		const summary = data().summaryFor(EStatisticType.PlayerDeaths);
-		expect(summary.rows).toEqual([]);
-		expect(summary.maxVal).toBe(1);
-		expect(summary.headline).toBe(7);
+		expect(d.summaryFor(EStatisticType.EnemiesKilled).headline).toBe(120); // summed
 	});
 
 	it('memoises a single summary instance per statistic', () => {
@@ -276,17 +263,15 @@ describe('StatisticsView data wiring', () => {
 	it('builds the catalogue + entities from staticData once stats arrive', () => {
 		const view = seededView();
 		expect(view.data.statTypes).toHaveLength(20);
-		expect(view.data.entityList('enemy').map((e) => e.name)).toEqual(['Cave Bat', 'Goblin']);
-		// isBoss / order are resolved from the raw reference data.
-		expect(view.data.entity('enemy', 1)?.boss).toBe(true);
-		expect(view.data.entity('zone', 0)?.zoneNum).toBe(1);
-		expect(view.data.statHeadline(EStatisticType.EnemiesKilled)).toBe(120);
+		expect(view.data.entities.enemy.map((e) => e.name)).toEqual(['Cave Bat', 'Goblin']);
+		expect(view.data.entity('zone', 0)?.name).toBe('Verdant Hollow');
+		expect(view.data.summaryFor(EStatisticType.EnemiesKilled).headline).toBe(120);
 	});
 
 	it('builds the damage-type breakdown from the fixed enum, not staticData', () => {
 		const view = seededView();
-		expect(view.data.entityList('damageType')).toHaveLength(16);
+		expect(view.data.entities.damageType).toHaveLength(16);
 		expect(view.data.entity('damageType', EDamageTypeKey.Fire)?.name).toBe('Fire');
-		expect(view.data.statHeadline(EStatisticType.KillsByDamageType)).toBe(40);
+		expect(view.data.summaryFor(EStatisticType.KillsByDamageType).headline).toBe(40);
 	});
 });

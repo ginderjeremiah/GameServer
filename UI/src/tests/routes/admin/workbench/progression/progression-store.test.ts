@@ -14,11 +14,6 @@ const { postMock, fetchMock, staticDataMock, toastErrorMock, referenceMock } = v
 	staticDataMock: {} as any,
 	toastErrorMock: vi.fn(),
 	referenceMock: {
-		skillOptions: () => [
-			{ value: 0, text: 's0' },
-			{ value: 1, text: 's1' },
-			{ value: 2, text: 's2' }
-		],
 		attributeOptions: () => [
 			{ value: 0, text: 'a0' },
 			{ value: 1, text: 'a1' }

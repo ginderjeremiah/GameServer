@@ -187,8 +187,6 @@ class WorkbenchReference {
 	};
 
 	// ── Progression (paths & proficiencies) ──
-	/** Any active skill (plus the current value if retired) — the contribution skill picker. */
-	skillOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.skills ?? [], keep);
 	/**
 	 * Player-acquirable skills, with a "None" sentinel (-1). Backs the milestone-reward picker, which the
 	 * backend restricts to `ESkillAcquisition.Player` skills. The current value stays visible even if it
