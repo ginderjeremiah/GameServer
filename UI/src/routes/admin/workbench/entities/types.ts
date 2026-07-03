@@ -1,4 +1,11 @@
+import type { AdminGlyphKind } from '../../AdminGlyph.svelte';
 import type { WorkbenchIconKind } from '../WorkbenchIcon.svelte';
+
+/**
+ * An entity's headline glyph is drawn by both the sidebar ({@link AdminGlyphKind}) and the
+ * detail header ({@link WorkbenchIconKind}), so it must be a member of both glyph sets.
+ */
+export type EntityGlyphKind = Extract<WorkbenchIconKind, AdminGlyphKind>;
 
 /** Every workbench record is keyed by a numeric id (negative while unsaved). */
 export interface Identified {
@@ -223,7 +230,7 @@ export interface EntityConfig<T extends Identified> {
 	key: string;
 	label: string;
 	singular: string;
-	glyph: WorkbenchIconKind;
+	glyph: EntityGlyphKind;
 	blankName: string;
 	/**
 	 * Zero-based-id reference entity: records are <em>retired</em> (kept at their slot, resolvable by id)

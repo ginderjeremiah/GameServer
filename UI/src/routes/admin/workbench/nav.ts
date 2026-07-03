@@ -37,7 +37,7 @@ const workbenchToolDefs: AdminToolDef[] = workbenchGroups.flatMap((group) =>
 			key: entity.key,
 			label: entity.label,
 			group: group.key,
-			glyph: entity.glyph as AdminGlyphKind
+			glyph: entity.glyph
 		}))
 );
 

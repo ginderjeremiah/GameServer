@@ -30,7 +30,8 @@ interface Props {
 const { typeId, color, size = 16, strokeWidth = 1.3 }: Props = $props();
 
 // Abstract line glyphs, one per challenge type (TimeTrial draws a clock above).
-const GLYPH_PATH: Record<number, string> = {
+// Keyed exhaustively so a new EChallengeType member without a glyph fails typecheck.
+const GLYPH_PATH: Record<Exclude<EChallengeType, EChallengeType.TimeTrial>, string> = {
 	[EChallengeType.EnemiesKilled]: 'M3.5 3.5l9 9M12.5 3.5l-9 9',
 	[EChallengeType.BossesDefeated]: 'M2.5 11.5h11M3.5 11.5l.6-5.5 2.4 3L8 5l1.5 4 2.4-3 .6 5.5',
 	[EChallengeType.ZonesCleared]: 'M4 2.5v11M4 3.5h7l-1.8 2.2L11 8H4',
@@ -38,6 +39,8 @@ const GLYPH_PATH: Record<number, string> = {
 	[EChallengeType.DamageDealt]:
 		'M8 2.2v2.4M8 11.4v2.4M2.2 8h2.4M11.4 8h2.4M4.2 4.2l1.7 1.7M10.1 10.1l1.7 1.7M11.8 4.2L10.1 5.9M5.9 10.1l-1.7 1.7',
 	[EChallengeType.BattlesWon]: 'M8 2.4l5 1.8v3.6c0 3-2.4 5-5 5.8-2.6-.8-5-2.8-5-5.8V4.2zM5.8 7.9l1.7 1.7L10.4 6',
-	[EChallengeType.SkillsUsed]: 'M8 1.8l1.6 4.6 4.6 1.6-4.6 1.6L8 14.2l-1.6-4.6L1.8 8l4.6-1.6z'
+	[EChallengeType.SkillsUsed]: 'M8 1.8l1.6 4.6 4.6 1.6-4.6 1.6L8 14.2l-1.6-4.6L1.8 8l4.6-1.6z',
+	[EChallengeType.KillsByDamageType]:
+		'M8 2.4c2.5 2.9 3.8 4.9 3.8 7.1a3.8 3.8 0 11-7.6 0C4.2 7.3 5.5 5.3 8 2.4zM6.7 8.2l2.6 2.6M9.3 8.2l-2.6 2.6'
 };
 </script>
