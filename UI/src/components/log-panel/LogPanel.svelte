@@ -33,9 +33,9 @@
 		<span class="log-count">{eventCount} events</span>
 	</div>
 
-	<div class="log-body" bind:this={scrollEl} onscroll={onScroll}>
+	<div class="log-body" data-testid="log-body" bind:this={scrollEl} onscroll={onScroll}>
 		{#each allLogs as log, i (log.id)}
-			<LogRow {log} index={i} isLatest={i === 0} animate={i === 0 && isNew && atTop} {rowHeight} />
+			<LogRow {log} index={i} isLatest={i === 0} animate={ready && atTop} {rowHeight} />
 		{/each}
 		{#if allLogs.length === 0}
 			<div class="log-empty">No combat activity yet.</div>
@@ -98,10 +98,11 @@ let scrollEl: HTMLDivElement | undefined;
 // `atTop` is read inside the effect via `untrack` so scroll changes don't
 // re-run the pinning effect — we only want it to react to new entries.
 let atTop = $state(true);
-// Tracks the id we've already processed, so the entrance animation plays only
-// for a freshly-arrived top row — not every time the list re-renders.
-let seenId = $state(0);
-const isNew = $derived(newestId !== seenId);
+// False during the first render so rows already in the store mount without the
+// entrance animation; keyed rows mounted afterwards are genuinely new entries.
+let ready = $state(false);
+// Newest id the pinning effect has already positioned for (plain — nothing reacts to it).
+let seenId = 0;
 
 const onScroll = () => {
 	if (scrollEl) {
@@ -109,22 +110,29 @@ const onScroll = () => {
 	}
 };
 
-// When a new entry arrives: if the user is pinned at the top, keep them there
-// and let the new row animate in (the stack slides down). If they've scrolled
-// back to read history, nudge scrollTop by one row so their view stays put.
+// When new entries arrive: if the user is pinned at the top, keep them there and
+// let the new rows animate in (the stack slides down). If they've scrolled back
+// to read history, nudge scrollTop one row per entry so their view stays put.
 $effect(() => {
 	const el = scrollEl;
+	const id = newestId;
 	if (el) {
 		if (untrack(() => atTop)) {
 			el.scrollTop = 0;
 		} else {
-			el.scrollTop += rowHeight;
+			// Ids are monotonic, so the delta counts this flush's new entries (one battle
+			// tick can append several); clamped because resetLogs() restarts the counter.
+			el.scrollTop += rowHeight * Math.max(0, id - seenId);
 		}
 	}
-	seenId = newestId; // mark this entry consumed (after positioning)
+	seenId = id;
 });
 
 onMount(() => {
+	// Mounted rows sample `animate` at creation, so flipping this after the first
+	// render arms the entrance animation for new rows only.
+	ready = true;
+
 	// Restore the persisted height after mount so SSR markup and the first client
 	// render agree (no hydration mismatch on the inline height). Clamp it against
 	// the live container so a height saved on a larger viewport can't overflow here.

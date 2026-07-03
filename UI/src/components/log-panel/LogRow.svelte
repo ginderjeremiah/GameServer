@@ -1,7 +1,7 @@
 <div
 	class="manifest-row"
 	class:latest={isLatest}
-	class:animate-in={animate}
+	class:animate-in={playEntrance}
 	style:height="{rowHeight}px"
 	style:opacity={rowOpacity}
 	style:background={isLatest
@@ -34,12 +34,17 @@ interface Props {
 	/** Position from the top (0 = newest). */
 	index: number;
 	isLatest: boolean;
-	/** Play the slide/grow entrance (only the newest row when pinned at top). */
+	/** Play the slide/grow entrance. Sampled once at mount — the animation is a
+	 *  mount-time effect, so later prop changes neither cancel nor replay it. */
 	animate: boolean;
 	rowHeight: number;
 }
 
 const { log, index, isLatest, animate, rowHeight }: Props = $props();
+
+// Deliberately non-reactive: captures whether this row was new when it appeared.
+// svelte-ignore state_referenced_locally
+const playEntrance = animate;
 
 const kind = $derived(logKind(log));
 // Newest row is fully prominent; older rows fade gently so the top reads as "now".
