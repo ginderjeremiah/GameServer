@@ -19,6 +19,7 @@ vi.mock('$stores', () => ({
 }));
 
 import Workbench from '$routes/admin/workbench/Workbench.svelte';
+import { workbenchDirty } from '$routes/admin/workbench/dirty.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
 
 const seed: Identified[] = [
@@ -49,6 +50,27 @@ const makeConfig = (overrides: Partial<EntityConfig<Identified>> = {}): EntityCo
 });
 
 afterEach(cleanup);
+
+describe('Workbench — unsaved-change reporting', () => {
+	it("reports the store's pending-change count to the shared workbenchDirty tracker", async () => {
+		render(Workbench, { props: { entity: makeConfig() } });
+		await waitFor(() => expect(screen.getByTestId('workbench-title')).toBeTruthy());
+		expect(workbenchDirty.total).toBe(0);
+
+		await fireEvent.click(screen.getByTestId('workbench-new'));
+		await waitFor(() => expect(workbenchDirty.total).toBe(1));
+	});
+
+	it('resets the tracker on unmount so a stale count cannot block navigation elsewhere', async () => {
+		const { unmount } = render(Workbench, { props: { entity: makeConfig() } });
+		await waitFor(() => expect(screen.getByTestId('workbench-title')).toBeTruthy());
+		await fireEvent.click(screen.getByTestId('workbench-new'));
+		await waitFor(() => expect(workbenchDirty.total).toBe(1));
+
+		unmount();
+		expect(workbenchDirty.total).toBe(0);
+	});
+});
 
 describe('Workbench', () => {
 	it('does not show workbench content before the entity data is fetched', () => {

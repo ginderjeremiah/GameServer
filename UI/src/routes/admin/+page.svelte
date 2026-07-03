@@ -48,6 +48,7 @@ import DeadLetterConsole from './ops/DeadLetterConsole.svelte';
 import ContentHealthConsole from './ops/ContentHealthConsole.svelte';
 import Progression from './workbench/progression/Progression.svelte';
 import { entityByKey, groupLabelFor } from './workbench/entities';
+import { workbenchDirty } from './workbench/dirty.svelte';
 import {
 	adminGroups,
 	adminTools,
@@ -57,6 +58,7 @@ import {
 } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
 import { ensureAdminAccess } from './admin-access';
+import { confirmDiscard, guardBeforeUnload } from './discard-guard';
 import { toastError } from '$stores';
 
 let active = $state('enemies');
@@ -79,11 +81,26 @@ onMount(() => {
 	}
 });
 
-const handleNavigate = (key: string) => {
-	active = key;
+const handleNavigate = async (key: string) => {
+	if (key === active) {
+		return;
+	}
+	if (await confirmDiscard(workbenchDirty.total)) {
+		active = key;
+	}
 };
 
-const backToGame = () => goto(resolve('/game'));
+const backToGame = async () => {
+	if (await confirmDiscard(workbenchDirty.total)) {
+		goto(resolve('/game'));
+	}
+};
+
+$effect(() => {
+	const handler = (event: BeforeUnloadEvent) => guardBeforeUnload(event, workbenchDirty.total);
+	window.addEventListener('beforeunload', handler);
+	return () => window.removeEventListener('beforeunload', handler);
+});
 </script>
 
 <style lang="scss">
