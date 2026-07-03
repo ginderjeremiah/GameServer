@@ -115,4 +115,34 @@ describe('focusTrap', () => {
 		expect(FOCUSABLE_SELECTOR).toContain('input:not([disabled])');
 		expect(FOCUSABLE_SELECTOR).toContain('[tabindex]:not([tabindex="-1"])');
 	});
+
+	it('routes keydown to only the top-most trap while stacked, resuming the outer when the inner unmounts', () => {
+		const outerEscape = vi.fn();
+		const innerEscape = vi.fn();
+		const outer = mount('<button data-testid="o">o</button>', { onEscape: outerEscape });
+
+		// A second trap layered above the first (e.g. a confirm modal over the trapped item drawer).
+		const innerNode = document.createElement('div');
+		innerNode.innerHTML = '<button data-testid="i">i</button>';
+		document.body.appendChild(innerNode);
+		const innerHandle = focusTrap(innerNode, { onEscape: innerEscape });
+
+		// Escape dismisses the inner overlay only — no double-dismiss of the one beneath.
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+		expect(innerEscape).toHaveBeenCalledTimes(1);
+		expect(outerEscape).not.toHaveBeenCalled();
+
+		// Tab is pulled into the inner trap; the outer trap doesn't fight it for focus.
+		(outer.querySelector('button') as HTMLElement).focus();
+		tab();
+		expect(document.activeElement).toBe(innerNode.querySelector('button'));
+
+		innerHandle.destroy();
+		innerNode.remove();
+
+		// With the inner trap gone, the outer trap owns Escape again.
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+		expect(outerEscape).toHaveBeenCalledTimes(1);
+		expect(innerEscape).toHaveBeenCalledTimes(1);
+	});
 });

@@ -1,12 +1,13 @@
 <!-- A monospace attribute pill (icon + code) tinted by the attribute's colour. Opens the shared
      attribute tooltip on hover or focus whenever a screen provides a controller via `setAttributeTooltip`;
-     otherwise it is purely presentational. -->
+     otherwise it is purely presentational and stays out of the tab order (a tab stop that surfaces
+     nothing would be a dead stop — e.g. the class-picker fingerprint chips). -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <span
 	class="achip"
 	class:wide
 	role="img"
-	tabindex="0"
+	tabindex={attrTip ? 0 : undefined}
 	aria-label={attributeName(attributeId, staticData.attributes)}
 	style:--ac={attributeColor(attributeId)}
 	use:tooltipHover={{ controller: attrTip, payload: attributeId }}

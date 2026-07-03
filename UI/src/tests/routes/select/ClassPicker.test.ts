@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/svelte';
 
-// AttributeChip is stubbed to a countable marker so fingerprint rendering can be asserted without the
-// icon/tooltip machinery.
-vi.mock('$components/AttributeChip.svelte', () => ({ default: ChipStub }));
-import ChipStub from '../game/screens/skills/AttributeChipStub.svelte';
-
+// The real AttributeChip is rendered (not stubbed) so the picker's controller-less surface is
+// exercised: with no attribute-tooltip context here, the chips must stay out of the tab order.
 import ClassPicker from '$routes/select/ClassPicker.svelte';
 import { staticData } from '$stores/static-data.svelte';
 import { EEquipmentSlot, EModifierType, type ICreatableClass } from '$lib/api';
@@ -81,7 +78,7 @@ describe('ClassPicker', () => {
 				]
 			})
 		];
-		render(ClassPicker, { classes, selectedClassId: 0, onSelect: vi.fn() });
+		const { container } = render(ClassPicker, { classes, selectedClassId: 0, onSelect: vi.fn() });
 
 		expect(screen.getByTestId('class-preview')).toBeTruthy();
 		expect(screen.getByText('A frontline fighter.')).toBeTruthy();
@@ -91,6 +88,26 @@ describe('ClassPicker', () => {
 		// Weapon leads the equipment list (its name renders).
 		expect(screen.getByText('Iron Sword')).toBeTruthy();
 		// A fingerprint chip per attribute distribution.
-		expect(screen.getAllByTestId('attr-chip')).toHaveLength(2);
+		expect(container.querySelectorAll('.achip')).toHaveLength(2);
+	});
+
+	it('keeps the fingerprint chips out of the tab order (no tooltip controller on this surface)', () => {
+		const classes = [
+			cls({
+				id: 0,
+				attributeDistributions: [
+					{ attributeId: 1, baseAmount: 10, amountPerLevel: 1 },
+					{ attributeId: 2, baseAmount: 4, amountPerLevel: 0 }
+				]
+			})
+		];
+		const { container } = render(ClassPicker, { classes, selectedClassId: 0, onSelect: vi.fn() });
+
+		// The picker publishes no attribute tooltip, so a focusable chip would be a dead tab stop.
+		const chips = [...container.querySelectorAll('.achip')];
+		expect(chips).toHaveLength(2);
+		for (const chip of chips) {
+			expect(chip.hasAttribute('tabindex')).toBe(false);
+		}
 	});
 });
