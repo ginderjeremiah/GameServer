@@ -178,28 +178,13 @@ namespace Game.Application.Services
         /// </summary>
         public async Task<BattleStartResult?> StartBossBattle(Player player, PlayerState state, int zoneId, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
-            // Out-of-range is a true no-op, same as the bossless/locked/retired checks below: validate before
-            // touching the active battle (abandoning is not a cheap no-op) and before resolving the domain
-            // zone, which throws on an out-of-range id.
-            if (!_zones.ValidateZoneId(zoneId))
-            {
-                return null;
-            }
-
-            var zone = _zones.GetDomainZone(zoneId);
-
-            // Validate the challenge before touching the active battle: abandoning is not a cheap no-op
-            // (it force-resolves and persists the current battle), so a challenge against a bossless or
-            // locked zone must be a true no-op rather than silently ending the player's in-progress fight.
-            if (zone.BossEnemyId is not int bossEnemyId)
-            {
-                return null;
-            }
-
-            // Anti-cheat / out of circulation: a locked or retired zone's boss cannot be challenged. A
-            // legitimate client can never be in a locked or retired zone to begin with (the idle loop
-            // relocates out of a retired one), so this only blocks tampered requests.
-            if (_zones.IsZoneRetired(zoneId) || !await IsZoneUnlocked(player.Id, zone, cancellationToken))
+            // Validate the whole challenge before touching the active battle: abandoning is not a cheap no-op
+            // (it force-resolves and persists the current battle), so a challenge against an out-of-range,
+            // bossless, retired, or locked zone must be a true no-op rather than silently ending the player's
+            // in-progress fight. A legitimate client can never be in a locked or retired zone to begin with
+            // (the idle loop relocates out of a retired one), so those gates only block tampered requests.
+            var zone = await ResolveChallengeableBossZone(player.Id, zoneId, cancellationToken);
+            if (zone is null)
             {
                 return null;
             }
@@ -212,11 +197,7 @@ namespace Game.Application.Services
             var now = DateTime.UtcNow;
             var seed = CreateBattleSeed();
 
-            var enemy = _battleFactory.CreateBossEnemy(
-                zone,
-                level => _enemies.GetDomainEnemy(bossEnemyId, level)
-                    ?? throw new InvalidOperationException(
-                        $"Zone {zone.Id} references boss enemy {bossEnemyId}, which does not exist."));
+            var enemy = _battleFactory.CreateBossEnemy(zone, BossEnemyResolver(zone));
 
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
             var snapshot = BattleSnapshot.FromPlayer(player, await CaptureProficiencyLevels(player.Id, cancellationToken));
@@ -251,14 +232,7 @@ namespace Game.Application.Services
             // Anti-cheat: a retired, locked, or bossless current zone cannot be boss-farmed. The zone is the
             // player's own CurrentZoneId (not client-supplied), so a tampered client can't farm a zone it
             // isn't in; the meaningful gate is that the current zone actually has a challengeable boss.
-            var zoneId = player.CurrentZoneId;
-            if (!_zones.ValidateZoneId(zoneId) || _zones.IsZoneRetired(zoneId))
-            {
-                return false;
-            }
-
-            var zone = _zones.GetDomainZone(zoneId);
-            if (zone.BossEnemyId is null || !await IsZoneUnlocked(player.Id, zone, cancellationToken))
+            if (await ResolveChallengeableBossZone(player.Id, player.CurrentZoneId, cancellationToken) is null)
             {
                 return false;
             }
@@ -492,14 +466,9 @@ namespace Game.Application.Services
         {
             var currentZoneId = player.CurrentZoneId;
             if (player.AutoChallengeBoss
-                && _zones.ValidateZoneId(currentZoneId)
-                && !_zones.IsZoneRetired(currentZoneId))
+                && ResolveChallengeableBossZone(currentZoneId, completedChallengeIds) is { } bossZone)
             {
-                var bossZone = _zones.GetDomainZone(currentZoneId);
-                if (bossZone.BossEnemyId is not null && bossZone.IsUnlocked(completedChallengeIds))
-                {
-                    return (OfflineLoopMode.Boss, bossZone);
-                }
+                return (OfflineLoopMode.Boss, bossZone);
             }
 
             var idleZoneId = await EnsureViableZone(player, currentZoneId, completedChallengeIds, cancellationToken);
@@ -540,13 +509,14 @@ namespace Game.Application.Services
             };
         }
 
-        // The boss resolver for a boss-mode run: the zone's dedicated boss at the requested (fixed boss) level.
-        // ResolveOfflineLoop only selects boss mode for a zone whose BossEnemyId is set, so the null check here
-        // is a defensive invariant rather than a reachable state.
+        // The dedicated-boss resolver shared by the live boss challenge and the offline boss loop: the zone's
+        // authored boss at the requested (fixed boss) level. Callers only reach this for a zone the
+        // challengeable-boss gate resolved (BossEnemyId set), so the null check here is a defensive invariant
+        // rather than a reachable state.
         private Func<int, CoreEnemy> BossEnemyResolver(CoreZone zone)
         {
             var bossEnemyId = zone.BossEnemyId
-                ?? throw new InvalidOperationException($"Boss offline loop for zone {zone.Id} has no boss enemy.");
+                ?? throw new InvalidOperationException($"Zone {zone.Id} has no dedicated boss enemy authored.");
             return level => _enemies.GetDomainEnemy(bossEnemyId, level)
                 ?? throw new InvalidOperationException(
                     $"Zone {zone.Id} references boss enemy {bossEnemyId}, which does not exist.");
@@ -761,6 +731,42 @@ namespace Game.Application.Services
             }
 
             return newZoneId;
+        }
+
+        // Shared challengeable-boss gate (StartBossBattle / SetAutoChallengeBoss / ResolveOfflineLoop): resolves
+        // the zone iff its boss can actually be challenged — the id is in range (checked before GetDomainZone,
+        // which throws on an out-of-range id), the zone is in circulation, and a dedicated boss is authored.
+        // The unlock check differs per caller, so it lives on the two overloads below.
+        private CoreZone? ResolveBossZone(int zoneId)
+        {
+            if (!_zones.ValidateZoneId(zoneId) || _zones.IsZoneRetired(zoneId))
+            {
+                return null;
+            }
+
+            var zone = _zones.GetDomainZone(zoneId);
+            return zone.BossEnemyId is null ? null : zone;
+        }
+
+        // Live-path gate: the unlock check reads the player's completed challenges through IsZoneUnlocked,
+        // incurred only once the cheaper range/retired/boss checks have passed.
+        private async Task<CoreZone?> ResolveChallengeableBossZone(int playerId, int zoneId, CancellationToken cancellationToken)
+        {
+            var zone = ResolveBossZone(zoneId);
+            if (zone is null || !await IsZoneUnlocked(playerId, zone, cancellationToken))
+            {
+                return null;
+            }
+
+            return zone;
+        }
+
+        // Offline-pass gate: unlocks against a completed-challenge set the caller already holds (the loaded
+        // progress aggregate), so the check re-reads no progress cache key.
+        private CoreZone? ResolveChallengeableBossZone(int zoneId, IReadOnlySet<int> completedChallengeIds)
+        {
+            var zone = ResolveBossZone(zoneId);
+            return zone is not null && zone.IsUnlocked(completedChallengeIds) ? zone : null;
         }
 
         // Whether a zone is unlocked for the player. An ungated zone is always open and pays no read cost;
