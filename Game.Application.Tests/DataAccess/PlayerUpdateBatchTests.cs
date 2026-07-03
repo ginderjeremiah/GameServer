@@ -12,38 +12,6 @@ namespace Game.Application.Tests.DataAccess
     public class PlayerUpdateBatchTests
     {
         [Fact]
-        public void Drain_ReturnsBufferedEnvelopesInInsertionOrder()
-        {
-            var batch = new PlayerUpdateBatch();
-            var first = new DomainEventEnvelope { Type = "First", Payload = "1" };
-            var second = new DomainEventEnvelope { Type = "Second", Payload = "2" };
-
-            batch.Add(first);
-            batch.Add(second);
-
-            Assert.Equal(new[] { first, second }, batch.Drain());
-        }
-
-        [Fact]
-        public void Drain_ClearsTheBuffer_SoASecondDrainIsEmpty()
-        {
-            var batch = new PlayerUpdateBatch();
-            batch.Add(new DomainEventEnvelope { Type = "Only", Payload = "x" });
-
-            Assert.Single(batch.Drain());
-            // A second save in the same scope must not re-publish the first save's events.
-            Assert.Empty(batch.Drain());
-        }
-
-        [Fact]
-        public void Drain_WithNothingBuffered_ReturnsEmpty()
-        {
-            var batch = new PlayerUpdateBatch();
-
-            Assert.Empty(batch.Drain());
-        }
-
-        [Fact]
         public void PlayerSaveInProgress_IsFalseUntilBegun_AndResetOnScopeDisposal()
         {
             var batch = new PlayerUpdateBatch();
@@ -85,18 +53,20 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task FlushAsync_PublishSucceeds_ClearsTheBufferAndRunsFlushedCallbacksOnlyOnce()
+        public async Task FlushAsync_PublishSucceeds_PublishesInInsertionOrder_ThenClearsTheBufferAndRunsFlushedCallbacksOnlyOnce()
         {
             var batch = new PlayerUpdateBatch();
-            batch.Add(new DomainEventEnvelope { Type = "Only", Payload = "x" });
+            var first = new DomainEventEnvelope { Type = "First", Payload = "1" };
+            var second = new DomainEventEnvelope { Type = "Second", Payload = "2" };
+            batch.Add(first);
+            batch.Add(second);
             var flushCount = 0;
             batch.OnFlushed(() => flushCount++);
             var pubsub = new RecordingPubSubService();
 
             await batch.FlushAsync(pubsub);
 
-            Assert.Single(pubsub.Calls);
-            Assert.Single(pubsub.Calls[0]);
+            Assert.Equal([first, second], pubsub.Calls[0]);
             Assert.Equal(1, flushCount);
 
             // A second flush in the same scope must not re-publish the first flush's event or re-run its callback.

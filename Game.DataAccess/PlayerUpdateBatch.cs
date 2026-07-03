@@ -6,10 +6,10 @@ namespace Game.DataAccess
     /// Scoped buffer that collects the player persistence events raised during a single
     /// <see cref="Repositories.PlayerRepository.SavePlayer"/> so they can be flushed to the write-behind
     /// queue as one batched LPUSH instead of one round-trip per event. <see cref="PlayerPersistencePublisher"/>
-    /// fills it as each event is dispatched; <c>SavePlayer</c> drains and publishes it after the dispatch
-    /// settles. It is registered scoped so the publisher (constructed per dispatch) and the repository share
-    /// the same instance within a request scope, and <see cref="Drain"/> clears it so a second save in the
-    /// same scope starts fresh.
+    /// fills it as each event is dispatched; <c>SavePlayer</c> flushes and publishes it after the dispatch
+    /// settles via <see cref="FlushAsync"/>. It is registered scoped so the publisher (constructed per dispatch)
+    /// and the repository share the same instance within a request scope, and a successful flush clears it so
+    /// a second save in the same scope starts fresh.
     /// <para>
     /// A progress save raised <em>within</em> a player save — the live battle-completion path, where
     /// <c>SavePlayer</c>'s event dispatch reaches <c>BattleStatisticsEventHandler</c>, which saves progress —
@@ -56,21 +56,6 @@ namespace Game.DataAccess
         {
             PlayerSaveInProgress = true;
             return new PlayerSaveScope(this);
-        }
-
-        /// <summary>
-        /// Returns the buffered events and clears the buffer so it is ready for the next save.
-        /// </summary>
-        public IReadOnlyList<DomainEventEnvelope> Drain()
-        {
-            if (_events.Count == 0)
-            {
-                return [];
-            }
-
-            var drained = _events.ToArray();
-            _events.Clear();
-            return drained;
         }
 
         /// <summary>
