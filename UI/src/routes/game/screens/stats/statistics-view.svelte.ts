@@ -36,10 +36,6 @@ export type StatCategory = 'combat' | 'survival' | 'exploration' | 'time';
 export interface StatEntity {
 	id: number;
 	name: string;
-	/** Boss flag (enemies only). */
-	boss?: boolean;
-	/** Zone order number (zones only). */
-	zoneNum?: number;
 }
 
 export interface StatType {
@@ -146,8 +142,8 @@ export function buildStatTypes(statisticTypes: IStatisticType[]): StatType[] {
  *  damage-type keys (a fixed enum, not reference data) using the shared player-facing labels. */
 export function buildStatEntities(): Record<StatBreakdownKind, StatEntity[]> {
 	return {
-		enemy: (staticData.enemies ?? []).filter(Boolean).map((e) => ({ id: e.id, name: e.name, boss: e.isBoss })),
-		zone: (staticData.zones ?? []).filter(Boolean).map((z) => ({ id: z.id, name: z.name, zoneNum: z.order })),
+		enemy: (staticData.enemies ?? []).filter(Boolean).map((e) => ({ id: e.id, name: e.name })),
+		zone: (staticData.zones ?? []).filter(Boolean).map((z) => ({ id: z.id, name: z.name })),
 		skill: (staticData.skills ?? []).filter(Boolean).map((s) => ({ id: s.id, name: s.name })),
 		damageType: DAMAGE_TYPE_KEYS.map((key) => ({ id: key, name: damageTypeKeyName(key) }))
 	};
@@ -232,10 +228,6 @@ export class StatisticsData {
 		return cat === 'all' ? this.statTypes : this.statTypes.filter((s) => s.cat === cat);
 	}
 
-	entityList(kind: StatBreakdownKind): StatEntity[] {
-		return this.entities[kind] ?? [];
-	}
-
 	entity(kind: StatBreakdownKind, id: number): StatEntity | undefined {
 		return this.entityById[kind]?.get(id);
 	}
@@ -243,18 +235,6 @@ export class StatisticsData {
 	/** The memoised display summary for a statistic (rows + bar max + headline). */
 	summaryFor(type: EStatisticType): StatSummary {
 		return this.summaries.get(type) ?? EMPTY_SUMMARY;
-	}
-
-	/** Per-entity rows for a statistic, resolved and sorted best-first (ascending
-	 *  for "min" aggregates, where lower is better). Empty for `none` stats. */
-	rowsForStat(type: EStatisticType): StatRow[] {
-		return this.summaryFor(type).rows;
-	}
-
-	/** The grand-total headline for a statistic: the backend's null-entity row if
-	 *  present, otherwise the aggregate of its per-entity rows. */
-	statHeadline(type: EStatisticType): number {
-		return this.summaryFor(type).headline;
 	}
 
 	/** Every statistic that references the given entity, with the entity's value

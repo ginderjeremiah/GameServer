@@ -10,16 +10,9 @@ interface HookTracker<T extends unknown[]> {
 export const createHook = <T extends unknown[] = []>() => {
 	let dispatching = false;
 	let hasPendingRemovals = false;
-	let promiseResolvers: Action<[T]>[] = [];
 	const trackers: HookTracker<T>[] = [];
 
 	const notify = (...data: T) => {
-		for (const resolve of promiseResolvers) {
-			resolve(data);
-		}
-
-		promiseResolvers = [];
-
 		// Iterate by index without allocating a snapshot (this is one of the hottest
 		// game-loop paths). Removals and additions during dispatch are both deferred so
 		// the index walk isn't disturbed: an unhook only tombstones (`removed`) instead
@@ -83,15 +76,8 @@ export const createHook = <T extends unknown[] = []>() => {
 		return unhook;
 	};
 
-	const nextNotification = () => {
-		const { promise, resolve } = Promise.withResolvers<T>();
-		promiseResolvers.push(resolve);
-		return promise;
-	};
-
 	return {
 		notify,
-		onNotified,
-		nextNotification
+		onNotified
 	};
 };

@@ -105,38 +105,6 @@ describe('createHook', () => {
 		expect(onDestroy).toHaveBeenCalledWith(expect.any(Function));
 	});
 
-	it('nextNotification resolves on next notify', async () => {
-		const hook = createHook<[string]>();
-
-		const promise = hook.nextNotification();
-		hook.notify('result');
-
-		const value = await promise;
-		expect(value).toEqual(['result']);
-	});
-
-	it('nextNotification only resolves once', async () => {
-		const hook = createHook<[number]>();
-
-		const promise = hook.nextNotification();
-		hook.notify(1);
-		hook.notify(2);
-
-		const value = await promise;
-		expect(value).toEqual([1]);
-	});
-
-	it('multiple nextNotification promises all resolve on same notify', async () => {
-		const hook = createHook<[number]>();
-
-		const p1 = hook.nextNotification();
-		const p2 = hook.nextNotification();
-		hook.notify(99);
-
-		expect(await p1).toEqual([99]);
-		expect(await p2).toEqual([99]);
-	});
-
 	it('works with zero-arg hooks', () => {
 		const hook = createHook();
 		const cb = vi.fn();

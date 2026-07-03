@@ -1,6 +1,5 @@
-<!-- The shared underline tab bar used by both the category tabs ("by statistic")
-     and the entity-kind tabs ("by entity"), so the two views read as one system.
-     Each tab carries its own accent colour and an optional count pill / glyph. -->
+<!-- The Statistics screen's underline tab bar (the category tabs). Each tab
+     carries its own accent colour and an optional count pill. -->
 <div class="tabs" role="tablist">
 	{#each tabs as tab (tab.key)}
 		{@const on = tab.key === active}
@@ -16,9 +15,6 @@
 			style:--tab-color={tab.color}
 			onclick={() => onChange(tab.key)}
 		>
-			{#if tab.glyphKind}
-				<StatGlyph kind={tab.glyphKind} size={13} color={on ? tab.color : 'var(--text-tertiary)'} />
-			{/if}
 			<span class="label">{tab.label}</span>
 			{#if tab.count != null}
 				<span class="count">{tab.count}</span>
@@ -31,17 +27,12 @@
 </div>
 
 <script lang="ts">
-import StatGlyph from './StatGlyph.svelte';
-import type { StatEntityKind } from './statistics-view.svelte';
-
 export interface Tab {
 	key: string;
 	label: string;
 	count?: number;
 	/** Accent colour (a `var(--…)` token). */
 	color: string;
-	/** Optional entity glyph rendered before the label. */
-	glyphKind?: StatEntityKind;
 }
 
 interface Props {
