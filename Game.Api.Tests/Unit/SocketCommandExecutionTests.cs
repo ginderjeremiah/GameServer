@@ -138,7 +138,7 @@ namespace Game.Api.Tests.Unit
         {
             // SetParameters (invoked from CreateCommand) throws on unparseable/missing Parameters JSON — a bad
             // request, not a server fault (#1498).
-            var (socket, handler) = CreateHandler(_ => null, throwOnCreate: name => name == "BadParams" ? new JsonException("bad json") : null);
+            var (socket, handler) = CreateHandler(_ => null, throwOnCreate: name => name == "BadParams" ? new MalformedSocketCommandParametersException(name, new JsonException("bad json")) : null);
 
             await handler.ExecuteCommand(new SocketCommandInfo("BadParams") { Id = "c1" });
 
@@ -154,7 +154,7 @@ namespace Game.Api.Tests.Unit
         {
             // A malformed server-push payload is server-authored, so it's a genuine bug — classified distinctly
             // from a client bad-request but still escalate-worthy, unlike ExecuteCommand's client-facing path.
-            var (socket, handler) = CreateHandler(_ => null, throwOnCreate: name => name == "BadParams" ? new JsonException("bad json") : null);
+            var (socket, handler) = CreateHandler(_ => null, throwOnCreate: name => name == "BadParams" ? new MalformedSocketCommandParametersException(name, new JsonException("bad json")) : null);
 
             var outcome = await handler.ExecuteServerCommand(new SocketCommandInfo("BadParams") { Id = "c1" });
 
@@ -226,8 +226,9 @@ namespace Game.Api.Tests.Unit
 
         /// <summary>A command factory that produces a command which either succeeds or throws the exception
         /// the supplied selector returns for the command name. <paramref name="throwOnCreate"/> optionally
-        /// throws directly from <see cref="CreateCommand"/> instead — mirroring how the real factory's
-        /// SetParameters throws on malformed/missing Parameters JSON, before a command is ever constructed.</summary>
+        /// throws directly from <see cref="CreateCommand"/> instead — simulating what the real factory's
+        /// <c>SetParameters</c> call already throws (a classified <see cref="MalformedSocketCommandParametersException"/>)
+        /// once parameter binding fails, before a command is ever fully constructed.</summary>
         private sealed class StubCommandFactory(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null) : SocketCommandFactory
         {
             public override AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)

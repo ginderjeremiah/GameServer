@@ -257,20 +257,11 @@ namespace Game.Api.Sockets
         private async Task<ApiSocketResponse> RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
         {
             using var scope = _scopeFactory.CreateScope();
-            AbstractSocketCommand command;
-            try
-            {
-                // CreateCommand binds Parameters (SetParameters), which throws on malformed/missing JSON. That
-                // is a bad request, not a server fault, so it is wrapped and classified distinctly rather than
-                // falling into the generic fault path below (which would log at error and reply "Internal
-                // Server Error").
-                command = _commandFactory.CreateCommand(commandInfo, scope);
-            }
-            catch (Exception ex) when (ex is JsonException or ArgumentNullException)
-            {
-                throw new MalformedSocketCommandParametersException(commandInfo.Name, ex);
-            }
-
+            // CreateCommand binds Parameters (SetParameters), which throws MalformedSocketCommandParametersException
+            // on malformed/missing JSON — thrown right at the deserialize call inside SetParameters (not guessed
+            // here from the exception's type), so it propagates precisely rather than also catching an unrelated
+            // JsonException/ArgumentNullException a command's DI construction happened to throw.
+            var command = _commandFactory.CreateCommand(commandInfo, scope);
             var response = await command.ExecuteAsync(_context, cancellationToken);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             return response;

@@ -1,5 +1,6 @@
 ﻿using Game.Api.Models.Common;
 using Game.Core;
+using System.Text.Json;
 
 namespace Game.Api.Sockets.Commands
 {
@@ -14,6 +15,24 @@ namespace Game.Api.Sockets.Commands
         public abstract Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken);
 
         public virtual void SetParameters(string? parameters) { }
+
+        /// <summary>
+        /// Shared by the two parameter-bearing base classes below: deserializes <paramref name="parameters"/>,
+        /// wrapping a malformed/missing-JSON failure as <see cref="MalformedSocketCommandParametersException"/>
+        /// right where the malformed-params semantics are actually known — a bad request, not a server fault —
+        /// rather than a caller further up guessing from the exception's type (#1498).
+        /// </summary>
+        protected TParams DeserializeParameters<TParams>(string? parameters)
+        {
+            try
+            {
+                return parameters.Deserialize<TParams>() ?? throw new ArgumentNullException(nameof(parameters));
+            }
+            catch (Exception ex) when (ex is JsonException or ArgumentNullException)
+            {
+                throw new MalformedSocketCommandParametersException(Name, ex);
+            }
+        }
 
         public ApiSocketResponse Success()
         {
@@ -42,7 +61,7 @@ namespace Game.Api.Sockets.Commands
 
         public override void SetParameters(string? parameters)
         {
-            Parameters = parameters.Deserialize<TParams>() ?? throw new ArgumentNullException(nameof(parameters));
+            Parameters = DeserializeParameters<TParams>(parameters);
         }
     }
 
@@ -52,7 +71,7 @@ namespace Game.Api.Sockets.Commands
 
         public override void SetParameters(string? parameters)
         {
-            Parameters = parameters.Deserialize<T>() ?? throw new ArgumentNullException(nameof(parameters));
+            Parameters = DeserializeParameters<T>(parameters);
         }
     }
 
