@@ -69,6 +69,9 @@ services:
       Jwt__SigningKey: local-dev-jwt-signing-key-change-me-at-least-32-bytes-long
       Jwt__Issuer: game-server-api
       Jwt__Audience: game-server-api
+      # Origin of the SvelteKit dev server that fronts this stack (UI/vite.config.ts). Required:
+      # startup validation fails fast when no CORS origin is configured.
+      Cors__AllowedOrigins__0: "http://localhost:5174"
       # 1 = Postgres, 0 = Redis (see Game.Abstractions/Infrastructure/Enums.cs).
       DataAccessOptions__DatabaseSystem: "1"
       DataAccessOptions__CacheSystem: "0"
