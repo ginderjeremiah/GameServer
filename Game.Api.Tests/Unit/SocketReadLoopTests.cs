@@ -63,6 +63,31 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task ReadLoop_ReceiveThrowsWithSocketAborted_StillSettlesWaitSocketClosed()
+        {
+            // A hard disconnect (TCP reset, killed browser) throws from ReceiveAsync AND transitions the
+            // WebSocket to Aborted — unlike the still-Open throw above. The read loop must still call Close()
+            // so WaitSocketClosed settles (issue #1496): otherwise SocketInterceptorMiddleware awaits it
+            // forever and the socket registration, pub/sub subscription, and middleware task leak.
+            var socket = new ScriptedReadWebSocket();
+            socket.QueueThrow(new WebSocketException("hard disconnect"), resultingState: WebSocketState.Aborted);
+            var (context, handler) = CreateHandler(socket);
+
+            using var inactivityStop = new CancellationTokenSource();
+            handler.Listen(hostStopping: inactivityStop.Token);
+
+            await context.WaitSocketClosed().WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
+            inactivityStop.Cancel();
+            await handler.Completion.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
+
+            // Close() re-checks state and does not send a close frame on an already-Aborted socket, but
+            // WaitSocketClosed above still had to complete for this assertion to be reached.
+            Assert.Equal(1, socket.ReceiveAttempts);
+            Assert.False(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketState.Aborted, socket.State);
+        }
+
+        [Fact]
         public async Task ReadLoop_ClientCloseFrame_CompletesTheClosingHandshake()
         {
             // A client-initiated close still drives the read loop out of the CloseReceived state and completes
@@ -136,8 +161,10 @@ namespace Game.Api.Tests.Unit
         /// <summary>
         /// A <see cref="WebSocket"/> stand-in that scripts a single receive step (a thrown receive or a client
         /// close frame) and records the close frame, so the read loop's terminal-fault and clean-close paths can
-        /// be driven deterministically. A throw leaves <see cref="State"/> Open — exactly the case that would
-        /// spin the loop — and counts every receive so a test can assert the loop did not retry.
+        /// be driven deterministically. A throw defaults to leaving <see cref="State"/> Open — the case that
+        /// would spin the loop — or can be scripted to leave it Aborted via <see cref="QueueThrow"/>'s
+        /// <c>resultingState</c>, mirroring a hard disconnect. Counts every receive so a test can assert the
+        /// loop did not retry.
         /// </summary>
         private sealed class ScriptedReadWebSocket : WebSocket
         {
@@ -154,7 +181,16 @@ namespace Game.Api.Tests.Unit
             /// <summary>Completes when the loop calls receive with no scripted input left — i.e. it looped back to read again.</summary>
             public Task IdleReadReached => _idleReadReached.Task;
 
-            public void QueueThrow(Exception toThrow) => _throwOnReceive = toThrow;
+            /// <param name="resultingState">
+            /// The state the socket transitions to as part of the throw. Defaults to <see cref="WebSocketState.Open"/>
+            /// (a throw that does NOT transition state — the terminal-fault case); pass <see cref="WebSocketState.Aborted"/>
+            /// to script a hard disconnect, where the underlying WebSocket transitions itself before the read loop observes it.
+            /// </param>
+            public void QueueThrow(Exception toThrow, WebSocketState resultingState = WebSocketState.Open)
+            {
+                _throwOnReceive = toThrow;
+                _state = resultingState;
+            }
             public void QueueClose() => _closeFrameQueued = true;
             public void QueueMessage(string message) => _messageQueued = Encoding.UTF8.GetBytes(message);
 
@@ -163,8 +199,6 @@ namespace Game.Api.Tests.Unit
                 ReceiveAttempts++;
                 if (_throwOnReceive is not null)
                 {
-                    // State deliberately stays Open: the receive throws without transitioning the socket, the
-                    // exact case the read loop must treat as terminal rather than re-looping.
                     return Task.FromException<WebSocketReceiveResult>(_throwOnReceive);
                 }
 
