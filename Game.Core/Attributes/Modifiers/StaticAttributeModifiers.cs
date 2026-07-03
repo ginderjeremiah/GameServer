@@ -43,28 +43,31 @@ namespace Game.Core.Attributes.Modifiers
 
             // The remaining chance-based combat attributes. All use the decimal convention — a chance is
             // compared directly against the [0,1) battle RNG draw — and the coefficients are a conservative
-            // strawman expected to be tuned during balancing. Two of them are deliberately NOT derived from a
-            // core attribute here:
-            //   • CriticalChanceMultiplier is opt-in (crit rework #1425, per-skill base #1453): the ENABLER is a
-            //     skill's own authored CriticalChance (0 by default, so an un-authored skill never crits) — this
-            //     attribute is only the base-1 MULTIPLIER scaling that per-skill base, exactly like
-            //     CooldownRecovery scales the tick rate. A base of 1 (not 0) is deliberate: a committed skill
-            //     still crits at its own authored rate with zero further investment, and a Precision/gear/mod
-            //     bonus scales it up (or a debuff below 1). This makes crit a committed per-skill build identity
-            //     rather than a stat every Dexterity/Luck build accrues for free. CriticalDamage keeps its Luck
-            //     derivation + base below: inert without a crit, it stays opt-in-gated and pays off the moment a
-            //     skill with a base chance fires.
-            //   • DamageReflection (spike #1330) is authored-only — granted by gear/mod/proficiency/class rather
-            //     than derived from a core attribute — so it too has no entry here (base 0 everywhere).
+            // strawman expected to be tuned during balancing. One of them is deliberately NOT derived from a
+            // core attribute here: DamageReflection (spike #1330) is authored-only — granted by
+            // gear/mod/proficiency/class rather than derived — so it has no entry (base 0 everywhere).
             // DodgeChance, by contrast, stays Agility-derived (its entry is last, below), so evasion is live
             // from raw allocations; the value is also grantable by gear/item-mods/skill-effects.
-            new() { Attribute = CriticalChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
 
-            // ParryChanceMultiplier follows the CriticalChanceMultiplier template (#1457): the ENABLER is the
-            // authored-only ParryChance attribute (base 0 everywhere, granted by stance effects/items — no
-            // entry here), and this base-1 multiplier is what the Riposte proficiency path grants bonuses to,
-            // so path investment scales an authored chance while staying inert for the uncommitted.
+            // CriticalChanceMultiplier = 1 (base) + 0.002·Luck. Crit is opt-in (crit rework #1425, per-skill
+            // base #1453): the ENABLER is a skill's own authored CriticalChance (0 by default, so an
+            // un-authored skill never crits) — this attribute is only the base-1 MULTIPLIER scaling that
+            // per-skill base, exactly like CooldownRecovery scales the tick rate. A base of 1 (not 0) is
+            // deliberate: a committed skill still crits at its own authored rate with zero further investment,
+            // and a Luck/Precision/gear/mod bonus scales it up (or a debuff below 1). The Luck derivation
+            // (#1525, LUK the proc-payoff amplifier) preserves the opt-in by construction — 0 × mult = 0, so
+            // LUK stays dormant until a crit-authored skill is fielded. CriticalDamage keeps its Luck
+            // derivation + base below: inert without a crit, it pays off the moment a base-chance skill fires.
+            new() { Attribute = CriticalChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
+            new() { Attribute = CriticalChanceMultiplier, Amount = 0.002, Source = Derived, DerivedSource = Luck, Type = Additive },
+
+            // ParryChanceMultiplier = 1 (base) + 0.002·Luck, following the CriticalChanceMultiplier template
+            // (#1457): the ENABLER is the authored-only ParryChance attribute (base 0 everywhere, granted by
+            // stance effects/items — no entry here), and this base-1 multiplier is what Luck (#1525) and the
+            // Riposte proficiency path feed, so investment scales an authored chance while staying inert
+            // for the uncommitted.
             new() { Attribute = ParryChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
+            new() { Attribute = ParryChanceMultiplier, Amount = 0.002, Source = Derived, DerivedSource = Luck, Type = Additive },
 
             // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
             // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.

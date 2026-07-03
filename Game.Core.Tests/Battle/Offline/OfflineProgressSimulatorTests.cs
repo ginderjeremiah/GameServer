@@ -569,11 +569,10 @@ namespace Game.Core.Tests.Battle.Offline
         {
             Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: 7, bossLevel: 1),
             // Crit is a per-skill opt-in enabler (crit rework #1425, per-skill base #1453): the fired skill's own
-            // CriticalChance (0.3, on SlowHeavySkill below) is the enabler, scaled by the base-1
-            // CriticalChanceMultiplier (untouched here). Luck 100 still drives the 1.75x crit multiplier
-            // (CriticalDamage keeps its Luck derivation), and Dexterity 100 preserves the CooldownRecovery that
-            // sets the ~4-fire cadence — so the fight tuning and its outcome mix are identical to the pre-#1453
-            // gear-derived setup.
+            // CriticalChance (0.3, on SlowHeavySkill below) is the enabler, scaled by the Luck-fed
+            // CriticalChanceMultiplier (1 + 0.002·Luck(100) = 1.2 → an effective 0.36/fire — #1525). Luck 100
+            // also drives the 1.75x crit multiplier (CriticalDamage keeps its Luck derivation), and Dexterity 100
+            // preserves the CooldownRecovery that sets the ~4-fire cadence — the fight stays a genuine coin flip.
             Snapshot = PlayerSnapshot(strength: 50, endurance: 10, dexterity: 100, luck: 100),
             // A long cooldown → only ~4 fires across the 120s cap, so crit count (and thus the outcome)
             // swings battle to battle.

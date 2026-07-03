@@ -774,6 +774,68 @@ namespace Game.Core.Tests.Battle
                     ExpectedPlayerDied: false,
                     ExpectedTotalMs: 2800),
 
+                // ── LUK, the proc-payoff amplifier (#1525) ────────────────────────────────────
+                // Luck derives the base-1 CriticalChanceMultiplier and ParryChanceMultiplier (+0.002·Luck each)
+                // alongside its existing CriticalDamage derivation. Both targets scale a 0-based enabler (a
+                // skill's authored CriticalChance; the authored-only ParryChance), so LUK is opt-in by
+                // construction: 0 × mult = 0 until a proc enabler is fielded.
+
+                // A heavy-LUK build with NO crit/parry enabler is byte-identical to the 0-LUK multiSkill
+                // matchup: Luck 500 lifts CriticalChanceMultiplier/ParryChanceMultiplier to 2.0 and
+                // CriticalDamage to 2.75, but every skill's authored CriticalChance is 0 (0 × 2 = 0),
+                // ParryChance is 0, and DodgeChance is 0 (Agility 0) — so with all draws taken and every
+                // proc chance still 0, the exchange resolves exactly like multiSkill → 6400ms. (The paired
+                // Parity_HighLuckWithoutProcEnabler_MatchesZeroLuckBuild fact pins the equality directly.)
+                ["luckWithoutEnablerIsInert"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 30, endurance: 20, luck: 500,
+                        skills:
+                        [
+                            MakeSkill(1, baseDamage: 20, cooldownMs: 800, mult: EAttribute.Strength, multAmount: 1.0),
+                            MakeSkill(2, baseDamage: 25, cooldownMs: 1200),
+                        ]),
+                    Enemy: () => MakeEnemy(
+                        strength: 20, endurance: 15,
+                        skills: [MakeSkill(3, baseDamage: 30, cooldownMs: 1000)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 6400),
+
+                // LUK amplifies an authored per-skill CriticalChance: 0.5 × (1 + 0.002·Luck(500)) = 0.5 × 2 = 1,
+                // so every fire crits regardless of the draw, at Luck-fed CriticalDamage 1.5 + 0.0025·500 = 2.75
+                // → 20 × 2.75 = 55/hit (no Toughness). The 210-HP enemy (Str 32) dies on hit 4 at tick 40 →
+                // 1600ms. Without the multiplier derivation the effective chance stays 0.5 — the seed's draws
+                // run crit,crit,no,no,crit,crit (55,55,20,20,55,55 → cum 205 after five) for a hit-6 kill at
+                // 2400ms — so 1600ms pins Luck scaling the authored chance, not just the crit damage.
+                ["luckAmplifiedCritChance"] = new ParityScenario(
+                    Player: () => MakeBattler(
+                        strength: 0, endurance: 0, luck: 500,
+                        skills: [MakeSkill(1, baseDamage: 20, cooldownMs: 400, criticalChance: 0.5)]),
+                    Enemy: () => MakeEnemy(strength: 32, endurance: 0, skills: []),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1600),
+
+                // LUK amplifies an authored ParryChance the same way: 0.5 × (1 + 0.002·Luck(500)) = 1, so every
+                // enemy hit is parried regardless of the draw — the forcedParryRiposte matchup with the "force"
+                // supplied by Luck. Each parry negates the 1000-damage one-shot and counters 30 (the sword
+                // signature, authored CriticalChance 0, so the Luck-doubled crit multiplier scales 0 and the
+                // counter never crits); the 80-HP enemy dies on the tick-30 counter → 1200ms with the player
+                // untouched. Without the derivation the effective 0.5 parries only the seed's first draw and the
+                // second 1000-damage hit kills the player at 800ms — so the outcome pins the multiplication.
+                ["luckAmplifiedParryChance"] = new ParityScenario(
+                    Player: () => MakeBattlerWithWeapon(
+                        strength: 10, weaponType: EDamageType.Sword, weaponGrantedSkillId: 5,
+                        selectedSkillIds: [],
+                        skillPool: [MakeSkill(5, baseDamage: 30, cooldownMs: 100_000, damageType: EDamageType.Sword)],
+                        extra: [(EAttribute.ParryChance, 0.5), (EAttribute.Luck, 500)]),
+                    Enemy: () => MakeEnemy(
+                        strength: 6, endurance: 0,
+                        skills: [MakeSkill(2, baseDamage: 1000, cooldownMs: 400)]),
+                    ExpectedVictory: true,
+                    ExpectedPlayerDied: false,
+                    ExpectedTotalMs: 1200),
+
                 // ── Item-granted skills (append + order + dedupe) ─────────────────────────────
                 // The player's battler fields its selected skills plus the skills its equipped items grant
                 // (BattleSnapshot.ToBattler appends them, de-duplicated, in EEquipmentSlot order). Each scenario
@@ -1325,6 +1387,36 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(87.5, enemy.GetAttributeValue(EAttribute.MaxHealth));
         }
 
+        /// <summary>
+        /// Pins LUK's opt-in-by-construction contract (#1525) head-on: a heavy-LUK build fielding NO crit/parry
+        /// enabler must fight identically to the same build at 0 Luck — the Luck-derived
+        /// CriticalChanceMultiplier/ParryChanceMultiplier scale 0-based enablers (0 × mult = 0) and
+        /// CriticalDamage is inert without a crit. Mirrors the frontend "a high-LUK build with no proc enabler
+        /// matches the 0-LUK build exactly" expectation.
+        /// </summary>
+        [Fact]
+        public void Parity_HighLuckWithoutProcEnabler_MatchesZeroLuckBuild()
+        {
+            var scenario = Scenarios["luckWithoutEnablerIsInert"];
+            BattleResult Run(double luck) => new BattleSimulator(
+                MakeBattler(
+                    strength: 30, endurance: 20, luck: luck,
+                    skills:
+                    [
+                        MakeSkill(1, baseDamage: 20, cooldownMs: 800, mult: EAttribute.Strength, multAmount: 1.0),
+                        MakeSkill(2, baseDamage: 25, cooldownMs: 1200),
+                    ]),
+                scenario.Enemy(),
+                ParitySeed).Simulate();
+
+            var withLuck = Run(500);
+            var withoutLuck = Run(0);
+
+            Assert.Equal(withoutLuck.Victory, withLuck.Victory);
+            Assert.Equal(withoutLuck.PlayerDied, withLuck.PlayerDied);
+            Assert.Equal(withoutLuck.TotalMs, withLuck.TotalMs);
+        }
+
         private static Skill MakeSkill(
             int id, double baseDamage, int cooldownMs,
             EAttribute? mult = null, double multAmount = 0,
@@ -1387,15 +1479,15 @@ namespace Game.Core.Tests.Battle
             };
 
         private static Battler MakeBattler(
-            double strength, double endurance, double agility = 0, double dexterity = 0,
+            double strength, double endurance, double agility = 0, double dexterity = 0, double luck = 0,
             List<Skill>? skills = null,
             (EAttribute Attribute, double Amount)[]? extra = null)
         {
-            return BattlerFactory.FromPlayer(MakePlayer(strength, endurance, agility, dexterity, skills, extra));
+            return BattlerFactory.FromPlayer(MakePlayer(strength, endurance, agility, dexterity, luck, skills, extra));
         }
 
         private static Player MakePlayer(
-            double strength, double endurance, double agility = 0, double dexterity = 0,
+            double strength, double endurance, double agility = 0, double dexterity = 0, double luck = 0,
             List<Skill>? skills = null,
             (EAttribute Attribute, double Amount)[]? extra = null)
         {
@@ -1406,7 +1498,7 @@ namespace Game.Core.Tests.Battle
                 new() { Attribute = EAttribute.Intellect, Amount = 0 },
                 new() { Attribute = EAttribute.Agility,   Amount = agility },
                 new() { Attribute = EAttribute.Dexterity, Amount = dexterity },
-                new() { Attribute = EAttribute.Luck,      Amount = 0 },
+                new() { Attribute = EAttribute.Luck,      Amount = luck },
             };
 
             // Extra non-core attributes (e.g. forced crit/dodge chances, DamageReflection) ride in as additive
@@ -1421,7 +1513,7 @@ namespace Game.Core.Tests.Battle
                 }
             }
 
-            var totalUsed = (int)(strength + endurance + agility + dexterity);
+            var totalUsed = (int)(strength + endurance + agility + dexterity + luck);
             var defaultSkills = skills ?? [];
 
             return new PlayerBuilder()
