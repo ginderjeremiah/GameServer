@@ -17,7 +17,9 @@
 		</div>
 	</div>
 
-	<!-- Detail drawer: right-side slide-over with dimmed backdrop + click-outside close -->
+	<!-- Detail drawer: right-side slide-over with dimmed backdrop + click-outside/Escape close. The shell
+	     stays mounted so its slide transform can transition, so the shared focusTrap (Tab trap, Escape,
+	     focus restore) rides the {#if}-mounted content — its lifetime is the drawer's open lifetime. -->
 	<div class="drawer-layer" style:pointer-events={view.selected ? 'auto' : 'none'}>
 		<button
 			class="backdrop"
@@ -29,7 +31,17 @@
 		></button>
 		<div class="drawer" class:open={!!view.selected}>
 			{#if view.selected}
-				<ItemDrawer item={view.selected} {view} />
+				<div
+					class="drawer-content"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Item details"
+					tabindex="-1"
+					bind:this={drawerShell}
+					use:focusTrap={{ onEscape: () => view.select(null) }}
+				>
+					<ItemDrawer item={view.selected} {view} />
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -41,6 +53,7 @@
 
 <script lang="ts">
 import { type TooltipComponent } from '$stores';
+import { focusTrap, FOCUSABLE_SELECTOR } from '$components/focus-trap';
 import EquippedRail from './EquippedRail.svelte';
 import InventoryGrid from './InventoryGrid.svelte';
 import EquippedTotals from './EquippedTotals.svelte';
@@ -54,6 +67,17 @@ const view = new InventoryView();
 let tooltip = $state<TooltipComponent>();
 const tip = createItemTooltip(() => tooltip);
 setItemTooltip(tip.controller);
+
+let drawerShell = $state<HTMLElement | null>(null);
+
+// On open, capture focus onto the drawer's first focusable (mirroring Popover) so the trap has an
+// anchor; the trap itself, Escape, and focus restore are owned by the shared focusTrap action.
+$effect(() => {
+	if (view.selected && drawerShell) {
+		const target = drawerShell.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+		(target ?? drawerShell).focus();
+	}
+});
 </script>
 
 <style lang="scss">
@@ -161,5 +185,13 @@ setItemTooltip(tip.controller);
 	&.open {
 		transform: translateX(0);
 	}
+}
+
+.drawer-content {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	outline: none;
 }
 </style>

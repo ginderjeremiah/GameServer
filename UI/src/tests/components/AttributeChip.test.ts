@@ -6,9 +6,11 @@ import { EAttribute } from '$lib/api';
 const controller = { describedById: 'tooltip-1', show: vi.fn(), move: vi.fn(), hide: vi.fn() };
 
 // The chip resolves the screen-level controller via context; the action/controller wiring is
-// covered elsewhere, so here we stub it to assert the chip drives it on hover and focus.
+// covered elsewhere, so here we stub it to assert the chip drives it on hover and focus. The stub
+// is swappable to `undefined` so the controller-less (purely presentational) surface is covered too.
+let contextController: typeof controller | undefined = controller;
 vi.mock('$components/tooltip/attribute-tooltip.svelte', () => ({
-	getAttributeTooltip: () => controller
+	getAttributeTooltip: () => contextController
 }));
 
 vi.mock('$stores', () => ({
@@ -20,6 +22,7 @@ import AttributeChip from '$components/AttributeChip.svelte';
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	contextController = controller;
 });
 
 describe('AttributeChip', () => {
@@ -39,12 +42,22 @@ describe('AttributeChip', () => {
 		expect(wide.container.querySelector('.achip')?.classList.contains('wide')).toBe(true);
 	});
 
-	it('is keyboard-reachable with tabindex, role, and an aria-label', () => {
+	it('is keyboard-reachable with tabindex, role, and an aria-label when a tooltip controller is present', () => {
 		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
 		const chip = container.querySelector('.achip') as HTMLElement;
 		expect(chip.getAttribute('tabindex')).toBe('0');
 		expect(chip.getAttribute('role')).toBe('img');
 		expect(chip.getAttribute('aria-label')).toBe('Strength');
+	});
+
+	it('renders no tab stop when no screen provides a tooltip controller (focus would surface nothing)', () => {
+		contextController = undefined;
+		const { container } = render(AttributeChip, { props: { attributeId: EAttribute.Strength } });
+		const chip = container.querySelector('.achip') as HTMLElement;
+		expect(chip.hasAttribute('tabindex')).toBe(false);
+		expect(chip.hasAttribute('aria-describedby')).toBe(false);
+		// The presentational rendering is unaffected.
+		expect(chip.textContent).toContain('STR');
 	});
 
 	it('drives the shared attribute tooltip across hover (enter/move/leave)', async () => {

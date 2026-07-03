@@ -8,7 +8,13 @@
  * Initial focus is deliberately NOT owned here: the two consumers place it differently (the modal aims
  * at its kind-appropriate action and must re-aim per queued modal; the popover takes the first
  * focusable), so each keeps its own one-shot focus step and reuses `FOCUSABLE_SELECTOR` for it.
+ *
+ * Traps stack: when overlays layer (e.g. a confirm modal above the inventory item drawer), only the
+ * most recently mounted trap handles Tab/Escape, so the outer trap can't steal focus or double-dismiss.
  */
+
+/** Active traps in mount order; the last entry is the top-most overlay and owns the keydown handling. */
+const trapStack: HTMLElement[] = [];
 
 /**
  * Tab-reachable elements. Intentionally broader than a bare `button` so a modal/popover containing a
@@ -30,6 +36,10 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
 	const restoreFocus = document.activeElement as HTMLElement | null;
 
 	const onKeydown = (event: KeyboardEvent) => {
+		// Only the top-most trap responds while overlays are stacked.
+		if (trapStack[trapStack.length - 1] !== node) {
+			return;
+		}
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			opts.onEscape?.();
@@ -57,6 +67,7 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
 		}
 	};
 
+	trapStack.push(node);
 	window.addEventListener('keydown', onKeydown);
 	if (opts.scrollLockClass) {
 		document.body.classList.add(opts.scrollLockClass);
@@ -76,6 +87,10 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
 			opts = next;
 		},
 		destroy() {
+			const index = trapStack.indexOf(node);
+			if (index !== -1) {
+				trapStack.splice(index, 1);
+			}
 			window.removeEventListener('keydown', onKeydown);
 			if (opts.scrollLockClass) {
 				document.body.classList.remove(opts.scrollLockClass);
