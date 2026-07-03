@@ -23,13 +23,16 @@ namespace Game.Core
         Intellect = 2,
 
         /// <summary>
-        /// One of the core game attributes. Primarily determines a character's <see cref="CooldownRecovery"/> and,
-        /// as the tempo &amp; evasion amplifier (spike #1426), <see cref="DodgeChanceMultiplier"/>.
+        /// One of the core game attributes. The tempo &amp; evasion amplifier (spike #1426): it sources
+        /// <see cref="CooldownBonusMultiplier"/> and <see cref="DodgeChanceMultiplier"/>, opt-in multipliers that
+        /// idle at <c>0</c> until a matching enabler (<see cref="CooldownBonus"/>/<see cref="DodgeChance"/>) is fielded.
         /// </summary>
         Agility = 3,
 
         /// <summary>
-        /// One of the core game attributes. Primarily determines the damage of some physical skills and contributes to <see cref="CooldownRecovery"/>.
+        /// One of the core game attributes. A finesse magnitude anchor: it primarily determines the damage of some
+        /// physical skills. It sheds its former <see cref="CooldownRecovery"/> sliver in spike #1426 (cadence became
+        /// an opt-in <see cref="CooldownBonus"/> × <see cref="CooldownBonusMultiplier"/> channel).
         /// </summary>
         Dexterity = 4,
 
@@ -53,7 +56,12 @@ namespace Game.Core
         Toughness = 7,
 
         /// <summary>
-        /// A derived game attribute. Represents a % multiplier to the rate that skills become available again after being used.
+        /// A derived game attribute. A base-<c>1</c> multiplier (like <see cref="CriticalDamage"/>) read directly at
+        /// the charge site as the rate skills recharge (<c>1.0</c> = normal speed). Since spike #1426 it is
+        /// <b>no longer sourced from any core attribute</b> — it keeps its functional <c>1.0</c> base and is moved
+        /// only by authored/effect modifiers (items, skill effects). The committed, opt-in cadence channel is the
+        /// <see cref="CooldownBonus"/> × <see cref="CooldownBonusMultiplier"/> pair, added to this base at the charge
+        /// site: the effective rate is <c>CooldownRecovery + CooldownBonus × CooldownBonusMultiplier</c>.
         /// </summary>
         CooldownRecovery = 8,
 
@@ -260,6 +268,24 @@ namespace Game.Core
         /// inert for the uncommitted (<c>0 × mult = 0</c>).
         /// </summary>
         DodgeChanceMultiplier = 49,
+
+        /// <summary>
+        /// A derived game attribute. The committed cadence <b>enabler</b> (spike #1426): a base-<c>0</c>,
+        /// <b>authored-only</b> additive to the charge rate — granted by items/skill effects, never derived from a
+        /// core attribute — scaled by <see cref="CooldownBonusMultiplier"/> and added to <see cref="CooldownRecovery"/>
+        /// at the charge site (<c>CooldownRecovery + CooldownBonus × CooldownBonusMultiplier</c>). Because it idles at
+        /// <c>0</c>, the whole cadence channel is inert (<c>0 × mult = 0</c>) until an enabler is fielded — a committed
+        /// build identity like <see cref="DodgeChance"/>/<see cref="ParryChance"/>.
+        /// </summary>
+        CooldownBonus = 50,
+
+        /// <summary>
+        /// A derived game attribute. A base-1 multiplier (like <see cref="DodgeChanceMultiplier"/>) applied against
+        /// <see cref="CooldownBonus"/> — derived from Agility (spike #1426), the Frequency proficiency path's bonus
+        /// target, so path/attribute investment scales an authored cadence bonus while remaining inert for the
+        /// uncommitted (<c>0 × mult = 0</c>).
+        /// </summary>
+        CooldownBonusMultiplier = 51,
     }
 
     /// <summary>
@@ -568,7 +594,8 @@ namespace Game.Core
 
         /// <summary>
         /// An aggregate stat computed from a base/derived formula (MaxHealth, Toughness, CooldownRecovery,
-        /// the crit/dodge set), plus the authored-only DamageReflection and ExecuteBonus (base 0, no derivation).
+        /// the crit/dodge/cadence multiplier set), plus the authored-only enablers DamageReflection, ExecuteBonus,
+        /// and CooldownBonus (base 0, no derivation).
         /// </summary>
         Secondary = 2,
 

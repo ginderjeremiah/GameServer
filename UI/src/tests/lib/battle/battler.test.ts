@@ -81,19 +81,36 @@ describe('Battler', () => {
 			expect(battler.currentHealth).toBe(expectedMaxHealth);
 		});
 
-		it('calculates cdMultiplier from CooldownRecovery (a base-1 multiplier read directly)', () => {
+		// cdMultiplier = CooldownRecovery + CooldownBonus × CooldownBonusMultiplier (#1426). Mirrors the backend
+		// BattlerTests GetCooldownMultiplier cases with the same scenarios and results.
+		it('charges at the base rate regardless of Agility with no CooldownBonus enabler', () => {
 			const battler = new Battler(
 				makeBattlerData({
 					attributes: [
-						{ attributeId: EAttribute.Agility, amount: 20 },
-						{ attributeId: EAttribute.Dexterity, amount: 10 }
+						{ attributeId: EAttribute.Agility, amount: 50 },
+						{ attributeId: EAttribute.Dexterity, amount: 20 }
 					]
 				})
 			);
 
-			// CooldownRecovery = base 1 + 0.004·AGI + 0.001·DEX, read directly as the multiplier.
-			const cdRecovery = 1 + 0.004 * 20 + 0.001 * 10;
-			expect(battler.cdMultiplier).toBeCloseTo(cdRecovery, 10);
+			// CDR is severed from the core attributes: with no authored CooldownBonus, Agility only lifts the
+			// (idle) CooldownBonusMultiplier, so the effective rate is exactly the base-1 CooldownRecovery.
+			expect(battler.cdMultiplier).toBeCloseTo(1, 10);
+		});
+
+		it('scales an authored CooldownBonus by the Agility-amplified CooldownBonusMultiplier', () => {
+			const battler = new Battler(
+				makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.CooldownBonus, amount: 0.5 },
+						{ attributeId: EAttribute.Agility, amount: 20 }
+					]
+				})
+			);
+
+			// CooldownBonus 0.5 × CooldownBonusMultiplier (1 + 0.002·AGI(20) = 1.04) on the base-1 CDR → 1.52.
+			const expected = 1 + 0.5 * (1 + 0.002 * 20);
+			expect(battler.cdMultiplier).toBeCloseTo(expected, 10);
 		});
 
 		it('reads cdMultiplier live, reflecting a mid-battle CooldownRecovery change', () => {

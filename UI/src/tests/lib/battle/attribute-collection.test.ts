@@ -217,7 +217,8 @@ describe('parity with BattleAttributes', () => {
 		EAttribute.Luck,
 		EAttribute.MaxHealth,
 		EAttribute.Toughness,
-		EAttribute.CooldownRecovery
+		EAttribute.CooldownRecovery,
+		EAttribute.CooldownBonusMultiplier
 	];
 
 	const cases: { name: string; contribs: IBattlerAttribute[] }[] = [

@@ -35,26 +35,13 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 		// Each entry corresponds 1:1 to a property in the C# StaticAttributeModifiers,
 		// kept in the order AttributeCollection.AddStaticModifiers adds them.
 		expect(STATIC_ATTRIBUTE_MODIFIERS).toEqual([
-			// CooldownRecovery = base 1 + 0.004·AGI + 0.001·DEX
+			// CooldownRecovery = base 1. Its 0.004·AGI + 0.001·DEX derivations were severed in spike #1426 —
+			// cadence is now the opt-in CooldownBonus × CooldownBonusMultiplier channel (CooldownBonusMultiplier below).
 			{
 				attribute: EAttribute.CooldownRecovery,
 				amount: 1,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.BaseValue
-			},
-			{
-				attribute: EAttribute.CooldownRecovery,
-				amount: 0.004,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Agility
-			},
-			{
-				attribute: EAttribute.CooldownRecovery,
-				amount: 0.001,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.Derived,
-				derivedSource: EAttribute.Dexterity
 			},
 			// Toughness = 2·Endurance (no base, Endurance-only)
 			{
@@ -127,6 +114,21 @@ describe('STATIC_ATTRIBUTE_MODIFIERS', () => {
 			},
 			{
 				attribute: EAttribute.DodgeChanceMultiplier,
+				amount: 0.002,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.Derived,
+				derivedSource: EAttribute.Agility
+			},
+			// CooldownBonusMultiplier = base 1 + 0.002·AGI (#1426), the same template: the enabler is the
+			// authored-only CooldownBonus (base 0 everywhere, so it has no static modifier).
+			{
+				attribute: EAttribute.CooldownBonusMultiplier,
+				amount: 1,
+				type: EModifierType.Additive,
+				source: EAttributeModifierSource.BaseValue
+			},
+			{
+				attribute: EAttribute.CooldownBonusMultiplier,
 				amount: 0.002,
 				type: EModifierType.Additive,
 				source: EAttributeModifierSource.Derived,

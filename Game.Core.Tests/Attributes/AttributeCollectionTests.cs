@@ -74,8 +74,11 @@ namespace Game.Core.Tests.Attributes
         }
 
         [Fact]
-        public void Indexer_CooldownRecovery_DerivedFromAgilityAndDexterity()
+        public void Indexer_CooldownRecovery_IsBaseOne_SeveredFromAgilityAndDexterity()
         {
+            // CDR's 0.004·Agility + 0.001·Dexterity derivations were severed in spike #1426: the attribute keeps its
+            // functional 1.0 base and no longer moves with core-attribute allocations (cadence is now the opt-in
+            // CooldownBonus × CooldownBonusMultiplier channel — CooldownBonusMultiplier below).
             var modifiers = new List<AttributeModifier>
             {
                 Additive(EAttribute.Agility, 10),
@@ -84,8 +87,18 @@ namespace Game.Core.Tests.Attributes
 
             var collection = new AttributeCollection(modifiers);
 
-            // CooldownRecovery = 1 (base) + Agility(10)*0.004 + Dexterity(20)*0.001 = 1 + 0.04 + 0.02 = 1.06
-            Assert.Equal(1.06, collection[EAttribute.CooldownRecovery], 10);
+            Assert.Equal(1.0, collection[EAttribute.CooldownRecovery], 10);
+        }
+
+        [Fact]
+        public void Indexer_CooldownBonusMultiplier_DerivedFromAgilityOnBaseOne()
+        {
+            var collection = new AttributeCollection([Additive(EAttribute.Agility, 20)]);
+
+            // CooldownBonusMultiplier = 1 (base) + Agility(20)*0.002 = 1.04, the opt-in multiplier scaling an
+            // authored CooldownBonus (0 without an enabler, so the cadence channel stays inert).
+            Assert.Equal(1.04, collection[EAttribute.CooldownBonusMultiplier], 10);
+            Assert.Equal(0.0, collection[EAttribute.CooldownBonus], 10);
         }
 
         // Crit is a per-skill opt-in enabler (crit rework #1425, per-skill base #1453): the ENABLER is a skill's

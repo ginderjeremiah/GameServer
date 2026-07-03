@@ -5,8 +5,6 @@ import { EAttribute, EAttributeModifierSource, EModifierType } from './enums.ts'
 
 export const STATIC_ATTRIBUTE_MODIFIERS = [
 	{ attribute: EAttribute.CooldownRecovery, amount: 1, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
-	{ attribute: EAttribute.CooldownRecovery, amount: 0.004, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },
-	{ attribute: EAttribute.CooldownRecovery, amount: 0.001, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Dexterity },
 	{ attribute: EAttribute.Toughness, amount: 2, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance },
 	{ attribute: EAttribute.MaxHealth, amount: 50, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
 	{ attribute: EAttribute.MaxHealth, amount: 20, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Endurance },
@@ -17,6 +15,8 @@ export const STATIC_ATTRIBUTE_MODIFIERS = [
 	{ attribute: EAttribute.ParryChanceMultiplier, amount: 0.002, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Luck },
 	{ attribute: EAttribute.DodgeChanceMultiplier, amount: 1, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
 	{ attribute: EAttribute.DodgeChanceMultiplier, amount: 0.002, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },
+	{ attribute: EAttribute.CooldownBonusMultiplier, amount: 1, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
+	{ attribute: EAttribute.CooldownBonusMultiplier, amount: 0.002, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Agility },
 	{ attribute: EAttribute.CriticalDamage, amount: 1.5, type: EModifierType.Additive, source: EAttributeModifierSource.BaseValue },
 	{ attribute: EAttribute.CriticalDamage, amount: 0.0025, type: EModifierType.Additive, source: EAttributeModifierSource.Derived, derivedSource: EAttribute.Luck },
 ] as const;

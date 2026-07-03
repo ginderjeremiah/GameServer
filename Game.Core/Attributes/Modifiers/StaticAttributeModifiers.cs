@@ -22,13 +22,13 @@ namespace Game.Core.Attributes.Modifiers
         /// </summary>
         public static IReadOnlyList<AttributeModifier> All { get; } =
         [
-            // CooldownRecovery = 1 (base) + 0.004·Agility + 0.001·Dexterity. The attribute is the cooldown
-            // multiplier read directly (a base-1 multiplier, so a ×2 modifier genuinely doubles charge speed),
-            // hence the base 1 and the derived coefficients scaled ÷100 from the legacy 1 + CDR/100 form
-            // (AGI 20, DEX 10 → 1.09, identical to before the rebase).
+            // CooldownRecovery = 1 (base), read directly at the charge site as a base-1 multiplier (so a ×2
+            // modifier genuinely doubles charge speed). Its former 0.004·Agility + 0.001·Dexterity derivations were
+            // severed in spike #1426: the functional 1.0 base blocks the multiplicative-of-zero opt-in trick, so
+            // cadence was de-universalized by removing the derivations outright and rebuilding the committed channel
+            // as the CooldownBonus × CooldownBonusMultiplier pair (below). The attribute keeps its 1.0 base and stays
+            // the directly-read multiplier for authored/effect modifiers.
             new() { Attribute = CooldownRecovery, Amount = 1.0, Source = BaseValue, Type = Additive },
-            new() { Attribute = CooldownRecovery, Amount = 0.004, Source = Derived, DerivedSource = Agility, Type = Additive },
-            new() { Attribute = CooldownRecovery, Amount = 0.001, Source = Derived, DerivedSource = Dexterity, Type = Additive },
 
             // Toughness = 2·Endurance (no base, Endurance-only). It feeds the diminishing mitigation curve
             // (Toughness / (Toughness + C)), so a non-Endurance build simply has no Toughness and
@@ -44,9 +44,9 @@ namespace Game.Core.Attributes.Modifiers
             // The remaining chance-based combat attributes. All use the decimal convention — a chance is
             // compared directly against the [0,1) battle RNG draw — and the coefficients are a conservative
             // strawman expected to be tuned during balancing. Several are deliberately NOT derived from a
-            // core attribute here: DamageReflection (spike #1330) and DodgeChance (spike #1426, dodge rework
-            // #1523) are authored-only — granted by gear/mod/proficiency/class/skill-effects rather than
-            // derived — so they have no entry (base 0 everywhere).
+            // core attribute here: DamageReflection (spike #1330), DodgeChance (spike #1426, dodge rework #1523),
+            // and CooldownBonus (spike #1426, the cadence enabler below) are authored-only — granted by
+            // gear/mod/proficiency/class/skill-effects rather than derived — so they have no entry (base 0 everywhere).
 
             // CriticalChanceMultiplier = 1 (base) + 0.002·Luck. Crit is opt-in (crit rework #1425, per-skill
             // base #1453): the ENABLER is a skill's own authored CriticalChance (0 by default, so an
@@ -75,6 +75,15 @@ namespace Game.Core.Attributes.Modifiers
             // investment scales an authored dodge chance while staying inert for the uncommitted.
             new() { Attribute = DodgeChanceMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
             new() { Attribute = DodgeChanceMultiplier, Amount = 0.002, Source = Derived, DerivedSource = Agility, Type = Additive },
+
+            // CooldownBonusMultiplier = 1 (base) + 0.002·Agility, following the same opt-in-multiplier template
+            // (spike #1426): the ENABLER is the authored-only CooldownBonus attribute (base 0 everywhere, granted by
+            // items/skill-effects — no entry here), and this base-1 multiplier is what Agility (the tempo & evasion
+            // amplifier) and the Frequency proficiency path feed. The charge site reads
+            // CooldownRecovery + CooldownBonus × CooldownBonusMultiplier, so investment scales an authored cadence
+            // bonus while staying inert for the uncommitted (0 × mult = 0).
+            new() { Attribute = CooldownBonusMultiplier, Amount = 1.0, Source = BaseValue, Type = Additive },
+            new() { Attribute = CooldownBonusMultiplier, Amount = 0.002, Source = Derived, DerivedSource = Agility, Type = Additive },
 
             // CriticalDamage = 1.5 (base) + 0.0025·Luck. A base-1.5 multiplier read directly (like
             // CooldownRecovery), so a crit is worth ×1.5 before any crit-damage gear and a ×2 modifier doubles it.

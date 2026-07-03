@@ -40,17 +40,37 @@ namespace Game.Core.Tests.Battle
             Assert.False(battler.IsDead);
         }
 
-        // ── GetCooldownMultiplier ─────────────────────────────────────────────
+        // ── GetCooldownMultiplier: CooldownRecovery + CooldownBonus × CooldownBonusMultiplier (#1426) ──
+        // Mirrors the frontend battler.test.ts cdMultiplier cases with the same scenarios and results.
 
         [Fact]
-        public void GetCooldownMultiplier_CalculatedFromCooldownRecovery()
+        public void GetCooldownMultiplier_NoEnabler_ChargesAtBaseRateRegardlessOfAgility()
         {
-            // CooldownRecovery = 1 (base) + 0.004·Agility(20) + 0.001·Dexterity(10) = 1.09, read directly
-            // as the cooldown multiplier (no 1 + x/100 transform).
-            var battler = MakeBattler((EAttribute.Agility, 20), (EAttribute.Dexterity, 10));
+            // CDR is severed from the core attributes (#1426): with no authored CooldownBonus, Agility only lifts
+            // the (idle) CooldownBonusMultiplier, so the effective rate is exactly the base-1 CooldownRecovery.
+            var battler = MakeBattler((EAttribute.Agility, 50), (EAttribute.Dexterity, 20));
 
-            var expected = 1 + 0.004 * 20 + 0.001 * 10;
+            Assert.Equal(1.0, battler.GetCooldownMultiplier(), 10);
+        }
+
+        [Fact]
+        public void GetCooldownMultiplier_AuthoredBonus_ScalesByAgilityAmplifiedMultiplier()
+        {
+            // CooldownBonus 0.5 (authored enabler) × CooldownBonusMultiplier (1 + 0.002·Agility(20) = 1.04), added
+            // to the base-1 CooldownRecovery → 1 + 0.5·1.04 = 1.52.
+            var battler = MakeBattler((EAttribute.CooldownBonus, 0.5), (EAttribute.Agility, 20));
+
+            var expected = 1.0 + 0.5 * (1 + 0.002 * 20);
             Assert.Equal(expected, battler.GetCooldownMultiplier(), 10);
+        }
+
+        [Fact]
+        public void GetCooldownMultiplier_AuthoredBonus_NoAgility_UsesBaseMultiplier()
+        {
+            // With no Agility the multiplier stays at its base 1, so the bonus adds verbatim: 1 + 0.5·1 = 1.5.
+            var battler = MakeBattler((EAttribute.CooldownBonus, 0.5));
+
+            Assert.Equal(1.5, battler.GetCooldownMultiplier(), 10);
         }
 
         // ── TakeDamage: Toughness mitigation curve ─────────────────────────────

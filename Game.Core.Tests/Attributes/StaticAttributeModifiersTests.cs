@@ -17,10 +17,9 @@ namespace Game.Core.Tests.Attributes
         {
             var expected = new (EAttribute Attribute, double Amount, EModifierType Type, EAttributeModifierSource Source, EAttribute? DerivedSource)[]
             {
-                // CooldownRecovery = 1 (base) + 0.004·Agility + 0.001·Dexterity
+                // CooldownRecovery = 1 (base). Its former 0.004·Agility + 0.001·Dexterity derivations were severed
+                // in spike #1426 — cadence is now the opt-in CooldownBonus × CooldownBonusMultiplier channel below.
                 (EAttribute.CooldownRecovery, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
-                (EAttribute.CooldownRecovery, 0.004, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
-                (EAttribute.CooldownRecovery, 0.001, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Dexterity),
                 // Toughness = 2·Endurance (no base, Endurance-only)
                 (EAttribute.Toughness, 2.0, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Endurance),
                 // MaxHealth = 50 (base) + 20·Endurance + 5·Strength
@@ -41,6 +40,11 @@ namespace Game.Core.Tests.Attributes
                 // is the other authored-only attribute with no static modifier).
                 (EAttribute.DodgeChanceMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.DodgeChanceMultiplier, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
+                // CooldownBonusMultiplier = 1 (base) + 0.002·Agility (#1426), the same opt-in template: its enabler
+                // is the authored-only CooldownBonus (base 0 everywhere, so it has no static modifier), and this
+                // base-1 multiplier is what Agility and the Frequency proficiency path feed.
+                (EAttribute.CooldownBonusMultiplier, 1.0, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
+                (EAttribute.CooldownBonusMultiplier, 0.002, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Agility),
                 // CriticalDamage = 1.5 (base) + 0.0025·Luck
                 (EAttribute.CriticalDamage, 1.5, EModifierType.Additive, EAttributeModifierSource.BaseValue, null),
                 (EAttribute.CriticalDamage, 0.0025, EModifierType.Additive, EAttributeModifierSource.Derived, EAttribute.Luck),

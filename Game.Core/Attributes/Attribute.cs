@@ -101,8 +101,8 @@ namespace Game.Core.Attributes
                 Strength => "A measure of one's raw physical force. Increases the damage of some physical skills and contributes to maximum health.",
                 Endurance => "A measure of one's resilience and physical fortitude. Contributes to maximum health and toughness.",
                 Intellect => "A measure of one's mental acuity and command of the arcane. Increases the damage of magical skills.",
-                Agility => "A measure of one's speed and reflexes. Improves cooldown recovery and amplifies dodge chance.",
-                Dexterity => "A measure of one's precision and finesse. Increases the damage of some physical skills and improves cooldown recovery.",
+                Agility => "A measure of one's speed and reflexes. Amplifies your cooldown bonus and dodge chance.",
+                Dexterity => "A measure of one's precision and finesse. Increases the damage of some physical skills.",
                 Luck => "A measure of one's fortune, influencing various chance-based outcomes.",
                 MaxHealth => "The amount of health a character has at the start of a battle.",
                 Toughness => "Reduces all incoming direct damage by a percentage that grows with diminishing returns, never reaching full immunity.",
@@ -116,6 +116,8 @@ namespace Game.Core.Attributes
                 ParryChance => "The percentage chance to parry an incoming attack, negating it and striking back with the equipped weapon's signature skill.",
                 ParryChanceMultiplier => "A multiplier applied to your parry chance.",
                 DodgeChanceMultiplier => "A multiplier applied to your dodge chance.",
+                CooldownBonus => "Additional cooldown recovery granted by items and skill effects, amplified by your cooldown bonus multiplier.",
+                CooldownBonusMultiplier => "A multiplier applied to your cooldown bonus.",
                 BleedDamagePerSecond => "The amount of bleed damage taken each second from damage-over-time effects.",
                 PoisonDamagePerSecond => "The amount of poison damage taken each second from damage-over-time effects.",
                 BurnDamagePerSecond => "The amount of burn damage taken each second from damage-over-time effects.",
@@ -177,6 +179,11 @@ namespace Game.Core.Attributes
                 ParryChance => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY", 47, 0),
                 ParryChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "PRY MULT", 48, 0),
                 DodgeChanceMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "DOD MULT", 49, 0),
+                // The cadence pair (spike #1426) appends after the parry/dodge multipliers like the accumulators
+                // above (display order = enum value): CooldownBonus is the authored-only enabler, CooldownBonusMultiplier
+                // its base-1 multiplier — both combat secondaries rendered as percentages like CooldownRecovery.
+                CooldownBonus => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CDB", 50, 0),
+                CooldownBonusMultiplier => new(EAttributeType.Secondary, IsPercentage: true, IsHarmful: false, "CDB MULT", 51, 0),
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, "No display metadata defined for the given attribute.")
             };
 #pragma warning restore CS0618
