@@ -447,39 +447,22 @@ namespace Game.Api.Tests.Unit
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
         }
 
-        /// <summary>A pub/sub whose <c>Subscribe</c> throws, to drive the registration-rollback path.</summary>
-        private sealed class ThrowingSubscribePubSubService(Exception toThrow) : IPubSubService
+        /// <summary>A pub/sub whose <c>Subscribe</c> throws, to drive the registration-rollback path
+        /// (whose best-effort unsubscribe steps are tolerated as no-ops).</summary>
+        private sealed class ThrowingSubscribePubSubService(Exception toThrow) : NotSupportedPubSubService
         {
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw toThrow;
+            public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw toThrow;
 
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new NotSupportedException();
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Wake(string channel) => throw new NotSupportedException();
-            public Task UnSubscribe(string channel) => Task.CompletedTask;
-            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
-            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
+            public override Task UnSubscribe(string channel) => Task.CompletedTask;
+            public override Task UnSubscribe(string channel, string id) => Task.CompletedTask;
         }
 
         /// <summary>A pub/sub whose <c>Subscribe</c> succeeds but <c>UnSubscribe</c> throws, to drive the
         /// guarded-teardown path where the presence-key release must still run after an unsubscribe fault.</summary>
-        private sealed class ThrowingUnsubscribePubSubService(Exception toThrow) : IPubSubService
+        private sealed class ThrowingUnsubscribePubSubService(Exception toThrow) : NotSupportedPubSubService
         {
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
-            public Task UnSubscribe(string channel, string id) => throw toThrow;
-
-            public Task Subscribe(string channel, string queueName, Action<(IPubSubQueue queue, string channel)> action, string id) => throw new NotSupportedException();
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Wake(string channel) => throw new NotSupportedException();
-            public Task UnSubscribe(string channel) => throw new NotSupportedException();
-            public IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
+            public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
+            public override Task UnSubscribe(string channel, string id) => throw toThrow;
         }
 
         /// <summary>Records the presence-key writes and releases so a rollback test can assert the exact
