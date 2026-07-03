@@ -26,6 +26,19 @@ namespace Game.Api.Services
         /// </summary>
         private static readonly TimeSpan SocketPresenceTtl = TimeSpan.FromSeconds(30);
 
+        /// <summary>
+        /// Backstop TTL applied to a per-socket command queue (<see cref="SocketQueueName"/>) on every push.
+        /// The queue is a plain Redis list with no expiry of its own, so a push that races a disconnect (the
+        /// presence key not yet released), lands after <see cref="UnRegisterSocketCommandListener"/>, or
+        /// arrives after the processor abandoned its drain loop (<see cref="MaxConsecutiveDequeueFailures"/>)
+        /// would otherwise strand a permanent, TTL-less key. <see cref="TeardownSocketRegistration"/> deletes
+        /// the key outright on the common graceful-disconnect path; this TTL is the fallback for every path
+        /// that skips teardown (a crash, a hard disconnect) — generous enough that it never bites a queue a
+        /// live socket is still draining (drain latency is milliseconds), since it only needs to bound the
+        /// worst case rather than track a live connection's lifetime.
+        /// </summary>
+        private static readonly TimeSpan SocketQueueTtl = TimeSpan.FromHours(1);
+
         public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory, SocketConnectionRegistry socketRegistry)
         {
             _pubSub = pubSub;
@@ -107,6 +120,18 @@ namespace Game.Api.Services
 
             try
             {
+                // Prompt cleanup for the common graceful-disconnect path — the socket's own queue key, unlike
+                // the shared presence key, is never contended by another socket, so a plain delete (rather than
+                // a compare-and-delete) is safe. SocketQueueTtl is only the fallback for paths that skip teardown.
+                await _cache.Delete(SocketQueueName(context.SocketId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete the command queue for socket {SocketId} while {Reason}.", context.SocketId, reason);
+            }
+
+            try
+            {
                 // Compare-and-delete so we only release the key while it is still ours — a newer connection may
                 // have taken it over, and that key must be left intact.
                 await _cache.CompareAndDelete(CurrentSocketKey(context.PlayerId), context.SocketId);
@@ -155,6 +180,9 @@ namespace Game.Api.Services
         public async Task EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
         {
             await _pubSub.Publish(SocketChannel(socketId), SocketQueueName(socketId), commandInfo);
+            // Best-effort backstop (see SocketQueueTtl): the queue key normally drains in milliseconds and is
+            // deleted outright on graceful teardown, so a missed refresh here just means the next push retries it.
+            _cache.ExpireAndForget(SocketQueueName(socketId), SocketQueueTtl);
         }
 
         public async Task EmitSocketCommand(SocketCommandInfo commandInfo, int playerId)
@@ -162,7 +190,7 @@ namespace Game.Api.Services
             var socketId = await CurrentSocketId(playerId);
             if (socketId is not null)
             {
-                await _pubSub.Publish(SocketChannel(socketId), SocketQueueName(socketId), commandInfo);
+                await EmitSocketCommand(commandInfo, socketId);
             }
             else
             {
@@ -239,10 +267,12 @@ namespace Game.Api.Services
 
                     // ExecuteServerCommand contains every fault and reports the outcome (it never throws), so a
                     // genuine fault no longer silently drops the push: escalate it (dead-letter + client
-                    // re-sync notice) while the queue keeps draining. A teardown cancellation and a timeout are
-                    // not command defects and need no escalation.
+                    // re-sync notice) while the queue keeps draining. A malformed server push is a genuine bug
+                    // (the payload is server-authored) and escalates the same as a fault. A teardown
+                    // cancellation, a timeout, and a failed delivery (the command ran; only the send failed) are
+                    // not poisoned payloads and need no escalation.
                     var outcome = await socket.ExecuteServerCommand(nextCommandInfo);
-                    if (outcome is SocketCommandOutcome.Faulted)
+                    if (outcome is SocketCommandOutcome.Faulted or SocketCommandOutcome.MalformedParameters)
                     {
                         await EscalateFailedServerCommand(socket, nextCommandInfo);
                     }
@@ -254,14 +284,19 @@ namespace Game.Api.Services
         /// Escalates a persistently-failing server-initiated command: dead-letters the poisoned payload so it
         /// is preserved for inspection/replay rather than silently dropped, then pushes a
         /// <see cref="ServerCommandFailed"/> notice to the affected socket so the client re-syncs the
-        /// authoritative state the failed push would have updated instead of silently diverging (#671).
+        /// authoritative state the failed push would have updated instead of silently diverging (#671). Unlike
+        /// the player write-behind dead-letter queue, nothing yet drains or replays this one — the depth is
+        /// logged on every escalation (rather than only on growth, since an escalation is already rare) so an
+        /// accumulating backlog is at least visible to alerting instead of piling up unseen.
         /// </summary>
         private async Task EscalateFailedServerCommand(SocketHandler socket, SocketCommandInfo commandInfo)
         {
+            long? deadLetterDepth = null;
             try
             {
                 var deadLetterQueue = _pubSub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE);
                 await deadLetterQueue.AddToQueueAsync(commandInfo.Serialize());
+                deadLetterDepth = await deadLetterQueue.GetLengthAsync();
             }
             catch (Exception ex)
             {
@@ -284,7 +319,7 @@ namespace Game.Api.Services
                 }
             }
 
-            _logger.LogWarning("Dead-lettered a failing server-initiated command and notified the client: {CommandInfo} on socket: {Id}", commandInfo, socket.Id);
+            _logger.LogWarning("Dead-lettered a failing server-initiated command and notified the client: {CommandInfo} on socket: {Id}. Dead-letter queue depth: {Depth}", commandInfo, socket.Id, deadLetterDepth);
         }
 
         private async Task<string?> CurrentSocketId(int playerId)

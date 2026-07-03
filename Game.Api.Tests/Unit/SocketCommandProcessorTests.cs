@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
+using Game.Api;
 using Game.Api.Services;
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
@@ -208,6 +209,28 @@ namespace Game.Api.Tests.Unit
             Assert.Contains("77", release.Key);
             Assert.Equal(context.SocketId, release.DeleteIfValue);
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("unsubscribe"));
+
+            // ...and the socket's own command queue was deleted too, so a graceful disconnect never strands a
+            // permanent queue key waiting out its backstop TTL (#1498).
+            Assert.Contains($"{Constants.PUBSUB_SOCKET_QUEUE_PREFIX}_{context.SocketId}", cache.Deletes);
+        }
+
+        [Fact]
+        public async Task EmitSocketCommand_BySocketId_RefreshesTheQueueKeyTtlAfterPublishing()
+        {
+            // Every push refreshes the per-socket queue key's TTL — a backstop against a permanent, TTL-less
+            // Redis key for a push that races a disconnect or is never drained (#1498). The refresh happens
+            // after the durable publish, not instead of it.
+            var cache = new RecordingCacheService();
+            var pubSub = new CapturingPubSubService();
+            var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
+            var registry = new SocketConnectionRegistry(new NoOpHostLifetime(), NullLogger<SocketConnectionRegistry>.Instance);
+            var manager = new SocketManagerService(
+                pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry);
+
+            await manager.EmitSocketCommand(new SocketCommandInfo("ChallengeCompleted"), socketId: "socket-42");
+
+            Assert.Equal($"{Constants.PUBSUB_SOCKET_QUEUE_PREFIX}_socket-42", Assert.Single(cache.Expires).Key);
         }
 
         private (Func<IPubSubQueue, Task> Processor, CapturingPubSubService PubSub) BuildProcessor(CapturingCommandFactory commandFactory)
@@ -391,7 +414,8 @@ namespace Game.Api.Tests.Unit
             public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            // The escalation path reads the depth right after adding, to log it alongside the escalation.
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)Added.Count);
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void AddToQueue(string value) => throw new NotSupportedException();
@@ -464,6 +488,8 @@ namespace Game.Api.Tests.Unit
         {
             public List<(string Key, string? Value)> GetSetWithExpiries { get; } = [];
             public List<(string Key, string DeleteIfValue)> CompareAndDeletes { get; } = [];
+            public List<string> Deletes { get; } = [];
+            public List<(string Key, TimeSpan Expiry)> Expires { get; } = [];
 
             public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
             {
@@ -477,6 +503,19 @@ namespace Game.Api.Tests.Unit
                 return Task.CompletedTask;
             }
 
+            // The socket command queue delete during teardown is unconditional (unlike the compare-and-delete
+            // presence key), so it just needs to succeed rather than be asserted on by every test here.
+            public Task Delete(string key, CancellationToken cancellationToken = default)
+            {
+                Deletes.Add(key);
+                return Task.CompletedTask;
+            }
+
+            public void ExpireAndForget(string key, TimeSpan expiry)
+            {
+                Expires.Add((key, expiry));
+            }
+
             public Task Expire(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -484,11 +523,9 @@ namespace Game.Api.Tests.Unit
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public void ExpireAndForget(string key, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
             public Task SetNotExists(string key, string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
