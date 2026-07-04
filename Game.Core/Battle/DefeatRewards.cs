@@ -43,7 +43,12 @@ namespace Game.Core.Battle
             ExpReward = ToIntReward(enemyAttTotal * DifficultyMultiplier);
         }
 
-        private static double GetDifficultyMultiplier(double enemyAttTotal, double playerAttTotal)
+        /// <summary>
+        /// The <c>ratio²</c> band/clamp factor the exp reward scales by (<see cref="DifficultyMultiplier"/>) —
+        /// public so the combat-rating calibration report (#1533) can fold the real old-curve multiplier into
+        /// its anchor XP rather than assuming a matched (multiplier-1) anchor.
+        /// </summary>
+        public static double GetDifficultyMultiplier(double enemyAttTotal, double playerAttTotal)
         {
             // No player investment yet: fall back to a neutral multiplier (the reward is then the floored
             // enemy total), matching the original guard before the curve was factored out.
@@ -73,13 +78,15 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Sums the additive amounts of the core attributes in <paramref name="modifiers"/>. Both
-        /// combatants' power is measured the same way so the difficulty ratio compares like with like:
-        /// derived attributes (e.g. MaxHealth) are excluded because they are computed from the core
-        /// attributes and never appear as their own modifier, and multiplicative modifiers are excluded
-        /// because their amount is a scaling factor, not a flat point total that can be meaningfully summed.
+        /// Sums the additive amounts of the core attributes in <paramref name="modifiers"/> — the "old"
+        /// power measure this class is named for, and the one the combat-rating calibration report (#1533)
+        /// compares the new <see cref="CombatRating"/> against. Both combatants' power is measured the same
+        /// way so the difficulty ratio compares like with like: derived attributes (e.g. MaxHealth) are
+        /// excluded because they are computed from the core attributes and never appear as their own
+        /// modifier, and multiplicative modifiers are excluded because their amount is a scaling factor, not
+        /// a flat point total that can be meaningfully summed.
         /// </summary>
-        private static double SumCoreAttributes(IEnumerable<AttributeModifier> modifiers)
+        public static double SumCoreAttributes(IEnumerable<AttributeModifier> modifiers)
         {
             return modifiers
                 .Where(mod => mod.Type == EModifierType.Additive && Attribute.IsCore(mod.Attribute))
