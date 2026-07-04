@@ -1398,6 +1398,71 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_ReportedClientBattleMsUnderCapButRealElapsedPastCap_RecordsGenuineDrawNotHandoff()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Both combatants wield a skill with an effectively infinite cooldown, so no window (however
+            // large) ever concludes the fight — isolating the still-in-progress-vs-draw classification to
+            // real elapsed time alone.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+            var abandonedEnemyId = state.ActiveEnemyId;
+            var abandonedSeed = state.BattleSeed;
+            var expBefore = player.Exp;
+
+            // Real elapsed time since BattleStartTime is well past the 2-minute cap...
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-3);
+
+            // ...but the client under-reports a much smaller clientBattleMs, well under the cap. The
+            // still-in-progress classification must key off the real elapsed time (wallClockMs), not this
+            // client-bounded figure — otherwise a small enough report would turn an already-expired battle
+            // into a false "still in progress" handoff.
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id, clientBattleMs: 50_000);
+
+            // A fresh battle was started — not a handoff of the old one (same enemy is the only one seeded in
+            // the zone, so freshness is asserted via the new random seed and reset BattleStartTime instead).
+            Assert.Null(result.ElapsedOffsetMs);
+            Assert.NotEqual(abandonedSeed, state.BattleSeed);
+            Assert.True(DateTime.UtcNow - state.BattleStartTime < TimeSpan.FromMinutes(1));
+
+            await unitOfWork.CommitAsync();
+            var stats = await progressRepo.GetStatistics(playerEntity.Id);
+
+            decimal StatValue(EStatisticType type, int? entityId) =>
+                stats.FirstOrDefault(s => s.Type == type && s.EntityId == entityId)?.Value ?? 0m;
+
+            // The genuinely-expired battle is booked as a draw (abandoned), not silently handed back.
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, null));
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, abandonedEnemyId));
+            Assert.Equal(0m, StatValue(EStatisticType.BattlesWon, null));
+            Assert.Equal(expBefore, player.Exp);
+        }
+
+        [Fact]
         public async Task StartBattle_WithNewZoneId_ChangesPlayerZone()
         {
             using var scope = CreateScope();

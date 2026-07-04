@@ -395,13 +395,17 @@ namespace Game.Application.Services
                 // earned exp (#206).
                 RecordVictory(player, enemy, result, state, now);
             }
-            else if (!result.PlayerDied && elapsedMs < GameConstants.DefaultMaxBattleMs)
+            else if (!result.PlayerDied && wallClockMs < GameConstants.DefaultMaxBattleMs)
             {
-                // Neither battler died and the replay fell short of the cap: this is not a stalemate, it is a
-                // battle genuinely still in progress (#1595) — not enough real server time has elapsed since
-                // BattleStartTime for it to have concluded. Leave it active (same enemy/seed/snapshot,
-                // BattleStartTime unchanged) and hand it back with its elapsed offset instead of booking a
-                // phantom draw. Only a replay that reaches the cap with both battlers alive is a genuine draw.
+                // Neither battler died and real server time since BattleStartTime is still under the cap:
+                // this is not a stalemate, it is a battle genuinely still in progress (#1595). Gated on
+                // wallClockMs (not the client-bounded elapsedMs used for simulateMs above) deliberately: a
+                // client that under-reports clientBattleMs must not turn an already-expired battle (real
+                // elapsed time past the cap) into a false "still in progress" with an ElapsedOffsetMs that
+                // itself exceeds the cap it was just classified under. Leave it active (same enemy/seed/
+                // snapshot, BattleStartTime unchanged) and hand it back with its elapsed offset instead of
+                // booking a phantom draw. Only a battle whose real elapsed time reaches the cap is a genuine
+                // draw, regardless of what the client claims to have simulated.
                 return new BattleStartResult
                 {
                     Enemy = enemy,
