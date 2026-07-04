@@ -31,7 +31,7 @@
 			{/if}
 		</div>
 		{#if inert}
-			<span class="dormant-note">⊘ {hint}</span>
+			<DormantNote text={hint ?? ''} block fontSize={8} marginTop={3} marginLeft={15} />
 		{/if}
 	</div>
 
@@ -57,6 +57,7 @@
 import { formatAttributeDelta, attributeColor, attributeCode, attributeName } from '$lib/common';
 import { staticData } from '$stores';
 import AttributeIcon from '$components/AttributeIcon.svelte';
+import DormantNote from '$components/DormantNote.svelte';
 import { getAttributeTooltip } from '$components/tooltip/attribute-tooltip.svelte';
 import { tooltipHover } from '$components/tooltip/tooltip-hover';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
@@ -160,19 +161,6 @@ const deltaWidth = $derived((Math.abs(value - saved) / view.hexMax) * 100);
 	letter-spacing: 0.8px;
 	text-transform: uppercase;
 	color: color-mix(in srgb, var(--text-primary) 30%, transparent);
-}
-
-// Neutral muted tone matching the Skills screen's off-weapon dormancy note (DormantNote.svelte) —
-// --warning is reserved for validation, and this is a read-only signal, not a problem to fix.
-.dormant-note {
-	display: block;
-	margin-top: 3px;
-	margin-left: 15px;
-	font-family: var(--mono);
-	font-size: 8px;
-	letter-spacing: 0.5px;
-	text-transform: uppercase;
-	color: var(--text-tertiary);
 }
 
 .yield {
