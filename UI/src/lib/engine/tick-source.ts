@@ -13,6 +13,7 @@ export function createTickSource(onTick: () => void): TickSource {
 	if (typeof Worker !== 'undefined') {
 		const worker = new Worker(new URL('./tick-worker.ts', import.meta.url), { type: 'module' });
 		worker.onmessage = () => onTick();
+		worker.onerror = (ev) => console.error('The logical engine tick worker failed', ev);
 		return {
 			stop: () => worker.terminate()
 		};
