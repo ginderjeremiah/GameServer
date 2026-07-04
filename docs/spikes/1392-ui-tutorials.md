@@ -62,16 +62,16 @@ All three issues ultimately watch the same underlying events (page reachability,
 - #1395 (badges) should consume the same layer rather than re-deriving "did X just unlock" a second time — flagged there as a coordination point when it's picked up, not decided unilaterally here since #1395 is separately scoped and owned.
 - #1393 (per-page unlock conditions) is the eventual upgrade path for screen-anchored triggers (see decision 1); #1392 doesn't need to wait for it to ship a first version.
 
-## The one open call for the owner
+## The content-events scoping call — resolved
 
-Building the shared content-events layer as part of #1392 is a deliberate scope choice: it makes #1392 slightly bigger than "just tutorials" so that #1395 (and future badge/notification work) doesn't duplicate the same before/after-diff logic a third time. The alternative is scoping content-events out as its own standalone issue that both #1392 and #1395 depend on, landing it first. Low-risk either way (it's the same code, just different issue boundaries), but it's a real sequencing/ownership call rather than an implementation detail — flagging rather than deciding unilaterally.
+Building the shared content-events layer as part of #1392 was flagged as a sequencing/ownership call rather than decided unilaterally. Resolved via PR #1585 review: keep it under #1392 as proposed, rather than splitting it into a standalone dependency issue — it's the same code either way, and the split only pays off if #1395 gets picked up before #1392 ships, which isn't the current ordering.
 
-## Candidate implementation issues (not yet filed — pending sign-off on the above)
+## Implementation issues
 
-- **A. Content-events derivation layer** — shared before/after-diff module for mechanic-occurrence detection (crit landed, dodge occurred, cooldown charged, proficiency/skill/item/challenge unlocked), reusing/consolidating the existing `challenge-unlocks.ts`/`synthesis-feedback.ts`/`proficiency-feedback.ts` family. Pure, unit-testable, no UI.
-- **B. Lesson registry + trigger evaluation** — the static lesson list (id, anchor kind + target, copy, `View` action target), a screen-activation hook for screen-anchored triggers, and wiring content-events output into mechanic-anchored triggers. Delivers via the existing toast store; no new presentation component required for v1.
-- **C. Dismissal persistence** — `localStorage`-backed per-lesson dismissal, mirroring `BackgroundThrottleMonitor`'s write-before-show ordering.
-- **D. Help screen** — build out the reserved `help` screen key (`built: false` today) listing every lesson with its dismissed/undismissed state and a way to re-trigger its toast.
+- **#1586 — Content-events derivation layer** — shared before/after-diff module for mechanic-occurrence detection (crit landed, dodge occurred, cooldown charged, proficiency/skill/item/challenge unlocked), reusing/consolidating the existing `challenge-unlocks.ts`/`synthesis-feedback.ts`/`proficiency-feedback.ts` family. Pure, unit-testable, no UI.
+- **#1587 — Lesson registry + trigger evaluation** — the static lesson list (id, anchor kind + target, copy, `View` action target), a screen-activation hook for screen-anchored triggers, and wiring content-events output into mechanic-anchored triggers. Delivers via the existing toast store; no new presentation component required for v1.
+- **#1588 — Dismissal persistence** — `localStorage`-backed per-lesson dismissal, mirroring `BackgroundThrottleMonitor`'s write-before-show ordering.
+- **#1589 — Help screen** — build out the reserved `help` screen key (`built: false` today) listing every lesson with its dismissed/undismissed state and a way to re-trigger its toast.
 
 ## Documentation to update on landing
 
