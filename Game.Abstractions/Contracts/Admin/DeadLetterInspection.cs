@@ -1,8 +1,9 @@
 namespace Game.Abstractions.Contracts.Admin
 {
     /// <summary>
-    /// A read-only snapshot of the player write-behind dead-letter queue: its full depth plus a head-first
-    /// page of inspected entries (capped by the requested limit). Inspecting never removes anything.
+    /// A read-only snapshot of a dead-letter queue (player write-behind or socket command, #1542): its full
+    /// depth plus a head-first page of inspected entries (capped by the requested limit). Inspecting never
+    /// removes anything.
     /// </summary>
     public class DeadLetterInspection : IModel
     {
