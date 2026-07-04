@@ -176,7 +176,10 @@ export function inertHint(id: EAttribute): string | undefined {
 /** Whether any fielded source — an equipped item/mod's static stat line, or a fielded skill's own
  *  self-targeted effect — authors a nonzero base amount of `attributeId`. Only the *authored* amount is
  *  checked (an effect's own base `amount`, not its live in-combat scaled value), matching the "committed
- *  enabler" framing the crit/dodge/parry/cadence template already uses. */
+ *  enabler" framing the crit/dodge/parry/cadence template already uses. This is exactly the source set
+ *  `StaticAttributeModifiers`' "granted by items/item-mods/skill-effects" convention documents for
+ *  DodgeChance/CooldownBonus/ParryChance — a future source authoring one of them outside that convention
+ *  (e.g. a class/proficiency payout) would need a matching scan added here. */
 function hasFieldedEnabler(
 	attributeId: EAttribute,
 	equipmentStats: readonly IBattlerAttribute[],
