@@ -73,13 +73,15 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Sums the additive amounts of the core attributes in <paramref name="modifiers"/>. Both
-        /// combatants' power is measured the same way so the difficulty ratio compares like with like:
-        /// derived attributes (e.g. MaxHealth) are excluded because they are computed from the core
-        /// attributes and never appear as their own modifier, and multiplicative modifiers are excluded
-        /// because their amount is a scaling factor, not a flat point total that can be meaningfully summed.
+        /// Sums the additive amounts of the core attributes in <paramref name="modifiers"/> — the "old"
+        /// power measure this class is named for, and the one the combat-rating calibration report (#1533)
+        /// compares the new <see cref="CombatRating"/> against. Both combatants' power is measured the same
+        /// way so the difficulty ratio compares like with like: derived attributes (e.g. MaxHealth) are
+        /// excluded because they are computed from the core attributes and never appear as their own
+        /// modifier, and multiplicative modifiers are excluded because their amount is a scaling factor, not
+        /// a flat point total that can be meaningfully summed.
         /// </summary>
-        private static double SumCoreAttributes(IEnumerable<AttributeModifier> modifiers)
+        public static double SumCoreAttributes(IEnumerable<AttributeModifier> modifiers)
         {
             return modifiers
                 .Where(mod => mod.Type == EModifierType.Additive && Attribute.IsCore(mod.Attribute))

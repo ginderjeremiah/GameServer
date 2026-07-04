@@ -1,5 +1,6 @@
 ﻿using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
+using Game.Core.Battle;
 using Game.Core.Skills;
 
 namespace Game.Core.Enemies
@@ -29,6 +30,16 @@ namespace Game.Core.Enemies
         public IEnumerable<AttributeModifier> GetAttributeModifiers()
         {
             return AttributeDistributions.Select(d => d.GetDistributionModifier(Level));
+        }
+
+        /// <summary>
+        /// Builds this enemy's <see cref="Battler"/> from its fielded <see cref="BattleSkills"/> loadout —
+        /// the single construction the live battle path (<c>BattleService</c>), the offline simulator
+        /// (<c>OfflineProgressSimulator</c>), and the combat-rating calibration report all need.
+        /// </summary>
+        public Battler ToBattler()
+        {
+            return new Battler(new AttributeCollection(GetAttributeModifiers()), BattleSkills, Level);
         }
 
         /// <summary>
