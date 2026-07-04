@@ -75,8 +75,10 @@ export type ApiResponseTypes = {
 	'AdminTools/GetContentHealth': IContentHealthReport;
 	'AdminTools/GetPlayerUpdateDeadLetters': IDeadLetterInspection;
 	'AdminTools/GetRoles': IRole[];
+	'AdminTools/GetSocketCommandDeadLetters': IDeadLetterInspection;
 	'AdminTools/GetUsers': IAdminUserSearchResults;
 	'AdminTools/ReplayPlayerUpdateDeadLetters': IDeadLetterReplayResult;
+	'AdminTools/ReplaySocketCommandDeadLetters': IDeadLetterReplayResult;
 	'AdminTools/SetClassAttributeDistributions': undefined;
 	'AdminTools/SetClassStarterEquipment': undefined;
 	'AdminTools/SetClassStarterSkills': undefined;
@@ -129,8 +131,10 @@ export type ApiRequestTypes = {
 	'AdminTools/ArchiveUser': IUserActionData;
 	'AdminTools/BanUser': IUserActionData;
 	'AdminTools/GetPlayerUpdateDeadLetters': { max?: number } | undefined;
+	'AdminTools/GetSocketCommandDeadLetters': { max?: number } | undefined;
 	'AdminTools/GetUsers': { search?: string, roleId?: number, archived?: boolean, page?: number, pageSize?: number } | undefined;
 	'AdminTools/ReplayPlayerUpdateDeadLetters': IReplayDeadLettersData;
+	'AdminTools/ReplaySocketCommandDeadLetters': IReplayDeadLettersData;
 	'AdminTools/SetClassAttributeDistributions': ISetClassAttributeDistributionsData;
 	'AdminTools/SetClassStarterEquipment': ISetClassStarterEquipmentData;
 	'AdminTools/SetClassStarterSkills': ISetClassStarterSkillsData;

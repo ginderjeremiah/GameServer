@@ -5,6 +5,8 @@
 		<div class="admin-workspace">
 			{#if active === DEAD_LETTERS_TOOL_KEY}
 				<DeadLetterConsole />
+			{:else if active === SOCKET_DEAD_LETTERS_TOOL_KEY}
+				<DeadLetterConsole variant="socket-command" />
 			{:else if active === CONTENT_HEALTH_TOOL_KEY}
 				{#if reference.loaded}
 					<ContentHealthConsole />
@@ -54,7 +56,8 @@ import {
 	adminTools,
 	CONTENT_HEALTH_TOOL_KEY,
 	DEAD_LETTERS_TOOL_KEY,
-	PROGRESSION_TOOL_KEY
+	PROGRESSION_TOOL_KEY,
+	SOCKET_DEAD_LETTERS_TOOL_KEY
 } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
 import { ensureAdminAccess } from './admin-access';

@@ -10,6 +10,7 @@ using Game.Api.Forwarding;
 using Game.Api.Middleware;
 using Game.Api.RateLimiting;
 using Game.Api.Services;
+using Game.Api.Services.Admin;
 using Game.Api.Sockets.Commands;
 using Game.Application.Auth;
 using Game.Application.DependencyInjection;
@@ -146,6 +147,7 @@ namespace Game.Api
                 .AddSingleton<SocketConnectionRegistry>()
                 .AddTransient<SocketManagerService>()
                 .AddTransient<SocketCommandFactory>()
+                .AddTransient<SocketCommandDeadLetters>()
                 .AddReferenceDataCommands()
                 .AddSingleton<ApiCodeGenerator>()
                 .AddScoped<AdminCacheReloadFilter>()

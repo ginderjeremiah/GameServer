@@ -156,3 +156,42 @@ describe('DeadLetterConsole', () => {
 		expect(body).toContain('1 of them is non-replayable');
 	});
 });
+
+describe('DeadLetterConsole (socket-command variant)', () => {
+	it('targets the socket command routes, title, and column label', async () => {
+		getMock.mockResolvedValue(inspection([entry({ index: 0, eventType: 'ChallengeCompleted' })], 1));
+		postMock.mockResolvedValue({ replayedCount: 1, remainingCount: 0 });
+		confirmModalMock.mockResolvedValue(true);
+		render(DeadLetterConsole, { props: { variant: 'socket-command' } });
+
+		await waitFor(() => expect(screen.getByTestId('dl-table')).toBeTruthy());
+		expect(getMock).toHaveBeenCalledWith('AdminTools/GetSocketCommandDeadLetters', expect.anything());
+		expect(screen.getByTestId('dl-title').textContent).toBe('Socket Dead Letters');
+		expect(screen.getByText('Command')).toBeTruthy();
+
+		await fireEvent.click(screen.getByTestId('dl-replay-all'));
+
+		await waitFor(() =>
+			expect(postMock).toHaveBeenCalledWith('AdminTools/ReplaySocketCommandDeadLetters', {
+				all: true,
+				payloads: undefined
+			})
+		);
+	});
+
+	it('warns with command-specific poison wording in the replay-selected confirmation', async () => {
+		getMock.mockResolvedValue(
+			inspection([entry({ index: 0, reason: EDeadLetterReason.UnknownEventType, rawPayload: 'p0' })])
+		);
+		confirmModalMock.mockResolvedValue(false);
+		render(DeadLetterConsole, { props: { variant: 'socket-command' } });
+
+		await waitFor(() => expect(screen.getByTestId('dl-table')).toBeTruthy());
+		await fireEvent.click(screen.getByTestId('dl-select-all'));
+		await fireEvent.click(screen.getByTestId('dl-replay-selected'));
+
+		await waitFor(() => expect(confirmModalMock).toHaveBeenCalled());
+		const body = confirmModalMock.mock.calls[0][0].body as string;
+		expect(body).toContain('unknown command type');
+	});
+});

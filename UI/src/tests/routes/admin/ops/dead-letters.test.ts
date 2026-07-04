@@ -228,3 +228,22 @@ describe('DeadLetterConsoleState.replay', () => {
 		expect(state.replaying).toBe(false);
 	});
 });
+
+describe('DeadLetterConsoleState (socket-command variant)', () => {
+	it('inspects and replays against the socket command routes instead of the player-update ones', async () => {
+		getMock.mockResolvedValue(inspection([entry({ index: 0, rawPayload: 'p0' })], 1));
+		postMock.mockResolvedValue(replayResult(1, 0));
+		const state = new DeadLetterConsoleState('socket-command');
+
+		await state.load();
+		expect(getMock).toHaveBeenCalledWith('AdminTools/GetSocketCommandDeadLetters', {
+			max: DEAD_LETTER_PAGE_SIZE
+		});
+
+		await state.replay('all');
+		expect(postMock).toHaveBeenCalledWith('AdminTools/ReplaySocketCommandDeadLetters', {
+			all: true,
+			payloads: undefined
+		});
+	});
+});

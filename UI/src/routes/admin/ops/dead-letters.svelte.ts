@@ -4,6 +4,29 @@ import { SvelteSet } from 'svelte/reactivity';
 /** Head-first page size requested per inspection (the backend clamps at 500). */
 export const DEAD_LETTER_PAGE_SIZE = 200;
 
+/**
+ * Which dead-letter queue a console instance targets. Both queues share the same backend contracts
+ * (`DeadLetterEntry`/`DeadLetterInspection`/`DeadLetterReplayResult`) and this same state class — only the
+ * routes differ, so a new queue is a new variant here rather than a duplicated component (#1542).
+ */
+export type DeadLetterQueueVariant = 'player-update' | 'socket-command';
+
+interface QueueRoutes {
+	inspect: 'AdminTools/GetPlayerUpdateDeadLetters' | 'AdminTools/GetSocketCommandDeadLetters';
+	replay: 'AdminTools/ReplayPlayerUpdateDeadLetters' | 'AdminTools/ReplaySocketCommandDeadLetters';
+}
+
+const QUEUE_ROUTES: Record<DeadLetterQueueVariant, QueueRoutes> = {
+	'player-update': {
+		inspect: 'AdminTools/GetPlayerUpdateDeadLetters',
+		replay: 'AdminTools/ReplayPlayerUpdateDeadLetters'
+	},
+	'socket-command': {
+		inspect: 'AdminTools/GetSocketCommandDeadLetters',
+		replay: 'AdminTools/ReplaySocketCommandDeadLetters'
+	}
+};
+
 /** How a classified dead-letter reason is surfaced to an operator. */
 export interface ReasonMeta {
 	label: string;
@@ -18,19 +41,19 @@ export interface ReasonMeta {
 const REASON_META: Record<EDeadLetterReason, ReasonMeta> = {
 	[EDeadLetterReason.Malformed]: {
 		label: 'Malformed',
-		hint: 'Could not be parsed into an event — replaying it will just re-fail.',
+		hint: 'Could not be parsed — replaying it will just re-fail.',
 		replayable: false,
 		tone: 'poison'
 	},
 	[EDeadLetterReason.UnknownEventType]: {
 		label: 'Unknown event type',
-		hint: 'No handler for this event type — replaying it will just re-fail.',
+		hint: 'Nothing recognizes this type — replaying it will just re-fail.',
 		replayable: false,
 		tone: 'warn'
 	},
 	[EDeadLetterReason.Replayable]: {
 		label: 'Replayable',
-		hint: 'A known event that exhausted its retries — safe to replay once the cause is fixed.',
+		hint: 'Exhausted its retries or delivery attempts — safe to replay once the cause is fixed.',
 		replayable: true,
 		tone: 'ok'
 	}
@@ -67,6 +90,12 @@ export class DeadLetterConsoleState {
 	loaded = $state(false);
 	error = $state<string | null>(null);
 	readonly selected = new SvelteSet<number>();
+
+	private readonly routes: QueueRoutes;
+
+	constructor(variant: DeadLetterQueueVariant = 'player-update') {
+		this.routes = QUEUE_ROUTES[variant];
+	}
 
 	get selectedCount(): number {
 		return this.selected.size;
@@ -126,7 +155,7 @@ export class DeadLetterConsoleState {
 		this.loading = true;
 		this.error = null;
 		try {
-			const inspection = await ApiRequest.get('AdminTools/GetPlayerUpdateDeadLetters', {
+			const inspection = await ApiRequest.get(this.routes.inspect, {
 				max: DEAD_LETTER_PAGE_SIZE
 			});
 			this.totalCount = inspection.totalCount;
@@ -143,14 +172,14 @@ export class DeadLetterConsoleState {
 	}
 
 	/**
-	 * Replays either every queued entry or just the current selection back onto the player update queue,
-	 * then refreshes the snapshot. Returns the backend's replayed/remaining counts, or null on failure.
+	 * Replays either every queued entry or just the current selection, then refreshes the snapshot.
+	 * Returns the backend's replayed/remaining counts, or null on failure.
 	 */
 	async replay(scope: 'all' | 'selected'): Promise<IDeadLetterReplayResult | null> {
 		this.replaying = true;
 		this.error = null;
 		try {
-			const result = await ApiRequest.post('AdminTools/ReplayPlayerUpdateDeadLetters', {
+			const result = await ApiRequest.post(this.routes.replay, {
 				all: scope === 'all',
 				payloads: scope === 'selected' ? this.selectedPayloads : undefined
 			});

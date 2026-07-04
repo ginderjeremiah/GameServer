@@ -1,9 +1,9 @@
 namespace Game.Abstractions.Contracts.Admin
 {
     /// <summary>
-    /// Selects which dead-letter entries to replay back onto the player update queue: either every entry
-    /// (<see cref="All"/>) or a specific set identified by their exact raw payloads (<see cref="Payloads"/>,
-    /// as returned by the inspection surface).
+    /// Selects which dead-letter entries to redeliver (player write-behind or socket command, #1542): either
+    /// every entry (<see cref="All"/>) or a specific set identified by their exact raw payloads
+    /// (<see cref="Payloads"/>, as returned by the inspection surface).
     /// </summary>
     public class ReplayDeadLettersData
     {

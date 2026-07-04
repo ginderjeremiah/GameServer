@@ -177,24 +177,33 @@ namespace Game.Api.Services
             return TeardownSocketRegistration(context, "tearing down the socket");
         }
 
-        public async Task EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
+        public async Task<bool> EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
         {
             await _pubSub.Publish(SocketChannel(socketId), SocketQueueName(socketId), commandInfo);
             // Best-effort backstop (see SocketQueueTtl): the queue key normally drains in milliseconds and is
             // deleted outright on graceful teardown, so a missed refresh here just means the next push retries it.
             _cache.ExpireAndForget(SocketQueueName(socketId), SocketQueueTtl);
+            return true;
         }
 
-        public async Task EmitSocketCommand(SocketCommandInfo commandInfo, int playerId)
+        /// <summary>
+        /// Publishes to whatever socket is currently live for <paramref name="playerId"/>, returning whether
+        /// one was found to publish to (not whether the client actually received it — the push itself is
+        /// fire-and-forget). The Ops dead-letter replay (#1542) uses this to gate its queue removal on a
+        /// single presence lookup rather than a separate check-then-act pair.
+        /// </summary>
+        public async Task<bool> EmitSocketCommand(SocketCommandInfo commandInfo, int playerId)
         {
             var socketId = await CurrentSocketId(playerId);
             if (socketId is not null)
             {
                 await EmitSocketCommand(commandInfo, socketId);
+                return true;
             }
             else
             {
                 _logger.LogWarning("Attempted to emit command: {CommandInfo} to player with no active socket: {PlayerId}", commandInfo, playerId);
+                return false;
             }
         }
 
@@ -284,10 +293,11 @@ namespace Game.Api.Services
         /// Escalates a persistently-failing server-initiated command: dead-letters the poisoned payload so it
         /// is preserved for inspection/replay rather than silently dropped, then pushes a
         /// <see cref="ServerCommandFailed"/> notice to the affected socket so the client re-syncs the
-        /// authoritative state the failed push would have updated instead of silently diverging (#671). Unlike
-        /// the player write-behind dead-letter queue, nothing yet drains or replays this one — the depth is
-        /// logged on every escalation (rather than only on growth, since an escalation is already rare) so an
-        /// accumulating backlog is at least visible to alerting instead of piling up unseen.
+        /// authoritative state the failed push would have updated instead of silently diverging (#671). The
+        /// dead-lettered payload carries the player id it was addressed to (<see cref="SocketCommandDeadLetterEnvelope"/>)
+        /// so the Ops replay surface (#1542) can redeliver it to whatever socket is currently live for that
+        /// player — the depth is logged on every escalation (rather than only on growth, since an escalation
+        /// is already rare) so an accumulating backlog is at least visible to alerting.
         /// </summary>
         private async Task EscalateFailedServerCommand(SocketHandler socket, SocketCommandInfo commandInfo)
         {
@@ -295,7 +305,8 @@ namespace Game.Api.Services
             try
             {
                 var deadLetterQueue = _pubSub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE);
-                await deadLetterQueue.AddToQueueAsync(commandInfo.Serialize());
+                var envelope = new SocketCommandDeadLetterEnvelope { PlayerId = socket.PlayerId, Command = commandInfo };
+                await deadLetterQueue.AddToQueueAsync(envelope.Serialize());
                 deadLetterDepth = await deadLetterQueue.GetLengthAsync();
             }
             catch (Exception ex)

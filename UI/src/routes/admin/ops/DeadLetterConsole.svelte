@@ -2,7 +2,7 @@
 	<div class="dl-head">
 		<div class="eyebrow">Admin Console · Ops</div>
 		<div class="title-row">
-			<h1 class="title" data-testid="dl-title">Dead Letters</h1>
+			<h1 class="title" data-testid="dl-title">{title}</h1>
 			<div class="summary">
 				<span class="depth" data-testid="dl-depth">{queue.totalCount} in queue</span>
 				{#if queue.selectedCount > 0}
@@ -14,10 +14,16 @@
 			</div>
 		</div>
 		<p class="blurb">
-			Player write-behind events that failed to apply. Inspect the classified failure reason before replaying — <em
-				>malformed</em
-			>
-			and <em>unknown event type</em> entries are poison and will return to the queue immediately.
+			{#if isSocket}
+				Server-initiated socket pushes (challenge/proficiency notices) that failed to deliver. Replay redelivers to
+				whatever socket is currently live for the player — <em>malformed</em> and
+				<em>unknown command type</em> entries are poison and will return to the queue immediately.
+			{:else}
+				Player write-behind events that failed to apply. Inspect the classified failure reason before replaying — <em
+					>malformed</em
+				>
+				and <em>unknown event type</em> entries are poison and will return to the queue immediately.
+			{/if}
 		</p>
 	</div>
 
@@ -76,7 +82,11 @@
 					</svg>
 				</div>
 				<div class="et">The dead-letter queue is empty</div>
-				<div class="es">Failed player updates will appear here for inspection and replay.</div>
+				<div class="es">
+					{isSocket
+						? 'Failed socket pushes will appear here for inspection and replay.'
+						: 'Failed player updates will appear here for inspection and replay.'}
+				</div>
 			</div>
 		{:else if queue.entries.length > 0}
 			<table class="dl-table" data-testid="dl-table">
@@ -95,7 +105,7 @@
 						</th>
 						<th class="r">#</th>
 						<th>Reason</th>
-						<th>Event type</th>
+						<th>{isSocket ? 'Command' : 'Event type'}</th>
 						<th class="r">Player</th>
 						<th class="c">Payload</th>
 					</tr>
@@ -122,15 +132,29 @@
 </div>
 
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount, untrack } from 'svelte';
 import Loading from '$components/Loading.svelte';
 import { confirmModal, toastError, toastSuccess } from '$stores';
 import DeadLetterRow from './DeadLetterRow.svelte';
-import { DeadLetterConsoleState } from './dead-letters.svelte';
+import { DeadLetterConsoleState, type DeadLetterQueueVariant } from './dead-letters.svelte';
+
+interface Props {
+	variant?: DeadLetterQueueVariant;
+}
+
+const { variant = 'player-update' }: Props = $props();
+const isSocket = $derived(variant === 'socket-command');
+const title = $derived(isSocket ? 'Socket Dead Letters' : 'Dead Letters');
+const destinationLabel = $derived(isSocket ? "the player's live socket" : 'the player update queue');
+const poisonLabel = $derived(isSocket ? 'malformed / unknown command type' : 'malformed / unknown event type');
 
 const COLUMN_COUNT = 6;
 
-const queue = new DeadLetterConsoleState();
+// The queue targets whichever variant this instance was mounted with; the caller re-mounts the whole
+// component (a nav switch) rather than swapping variants on a live instance, so only the initial value
+// matters here — untrack() makes that intentional rather than tripping the "state referenced locally"
+// warning a bare read of a reactive prop would.
+const queue = new DeadLetterConsoleState(untrack(() => variant));
 let selectAllEl = $state<HTMLInputElement>();
 
 onMount(() => {
@@ -165,11 +189,11 @@ const replaySelected = async () => {
 	const poison = queue.nonReplayableSelectedCount;
 	const poisonNote =
 		poison > 0
-			? ` ${poison} of them ${poison === 1 ? 'is' : 'are'} non-replayable (malformed / unknown event type) and will return to the queue immediately.`
+			? ` ${poison} of them ${poison === 1 ? 'is' : 'are'} non-replayable (${poisonLabel}) and will return to the queue immediately.`
 			: '';
 	const confirmed = await confirmModal({
 		title: 'Replay selected entries',
-		body: `Replay ${count} selected ${plural(count)} back onto the player update queue?${poisonNote}`,
+		body: `Replay ${count} selected ${plural(count)} back onto ${destinationLabel}?${poisonNote}`,
 		confirmLabel: 'Replay'
 	});
 	if (!confirmed) {
@@ -192,7 +216,7 @@ const replayAll = async () => {
 
 	const confirmed = await confirmModal({
 		title: 'Replay all entries',
-		body: `Replay all ${count} ${plural(count)} in the dead-letter queue? Poison entries (malformed / unknown event type) will return to the queue immediately.`,
+		body: `Replay all ${count} ${plural(count)} in the dead-letter queue? Poison entries (${poisonLabel}) will return to the queue immediately.`,
 		confirmLabel: 'Replay all'
 	});
 	if (!confirmed) {

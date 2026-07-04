@@ -103,4 +103,18 @@ namespace Game.Api.Sockets.Commands
             return $"{{ Id: {Id}, Name: {Name}, Parameters: {Parameters} }}";
         }
     }
+
+    /// <summary>
+    /// Wraps a command dead-lettered onto <see cref="Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE"/> with the
+    /// player id it was addressed to (#1542). A bare <see cref="SocketCommandInfo"/> carries no addressing
+    /// info once dequeued, and the specific socket it originally failed on may no longer even exist by the
+    /// time an operator replays it — so <see cref="PlayerId"/>, not the socket id, is what a replay targets
+    /// (<c>SocketManagerService.EmitSocketCommand(SocketCommandInfo, int)</c> resolves whatever socket is
+    /// currently live for that player).
+    /// </summary>
+    internal class SocketCommandDeadLetterEnvelope
+    {
+        public required int PlayerId { get; set; }
+        public required SocketCommandInfo Command { get; set; }
+    }
 }
