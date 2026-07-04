@@ -5,6 +5,7 @@ export * from './tag-color';
 export * from './challenge-unlocks';
 export * from './proficiency-feedback';
 export * from './synthesis-feedback';
+export * from './content-events';
 export * from './zone-progression';
 export * from './enemy-attributes';
 export * from './attribute-display';
