@@ -146,6 +146,34 @@ namespace Game.TestInfrastructure.Helpers
             return recipe;
         }
 
+        /// <summary>
+        /// Seeds a screen-visit-triggered <see cref="Lesson"/> (#1591) with the given ordered step texts.
+        /// </summary>
+        public static async Task<Lesson> CreateLessonAsync(
+            GameContext context,
+            string key,
+            string hostScreenKey,
+            IEnumerable<string> stepTexts)
+        {
+            var lesson = new Lesson
+            {
+                Key = key,
+                Name = key,
+                TriggerType = ELessonTriggerType.ScreenVisit,
+                TriggerScreenKey = hostScreenKey,
+                HostScreenKey = hostScreenKey,
+                DisplayOrder = 0,
+            };
+            context.Lessons.Add(lesson);
+            await context.SaveChangesAsync();
+
+            context.LessonSteps.AddRange(stepTexts.Select((text, i) =>
+                new LessonStep { LessonId = lesson.Id, Order = i, Text = text }));
+            await context.SaveChangesAsync();
+
+            return lesson;
+        }
+
         public static async Task<Item> CreateItemAsync(
             GameContext context,
             string name = "Test Item",

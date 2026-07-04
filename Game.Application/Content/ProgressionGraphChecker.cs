@@ -84,6 +84,7 @@ namespace Game.Application.Content
                 CheckSingleHomeZone();
                 CheckEmptyCombatZones();
                 CheckEnemyAttributeConsumption();
+                CheckMechanicEventLessonCoverage();
             }
 
             // --- Zones ------------------------------------------------------------------------------------
@@ -653,6 +654,31 @@ namespace Game.Application.Content
                     if (!spawnZoneIds.Contains(zone.Id))
                     {
                         Warn("EmptyCombatZone", "Zone", zone.Id, "is a live combat zone with no spawnable enemies; players are relocated out of it.");
+                    }
+                }
+            }
+
+            // --- Mechanic-event lesson coverage ------------------------------------------------------------
+
+            /// <summary>Warns when a live intrinsic <see cref="EMechanicEvent"/> has no live lesson triggering on
+            /// it — the "crit/dodge variance" and "cooldown charging" taught-by-blurb candidates from
+            /// docs/content-design.md §2 map 1:1 onto the three mechanic events, so an uncovered event is a
+            /// content gap, not a break (the runtime tolerates a mechanic firing with no lesson attached — it's
+            /// simply undocumented for the player). Screen-anchored triggers are NOT cross-checked here: screen
+            /// keys are a frontend-only registry (UI/src/routes/game/screens/screen-defs.ts) with no backend
+            /// source of truth to validate against.</summary>
+            private void CheckMechanicEventLessonCoverage()
+            {
+                var coveredEvents = Live(_graph.Lessons, l => l.RetiredAt)
+                    .Where(l => l.TriggerMechanicEvent is not null)
+                    .Select(l => l.TriggerMechanicEvent!.Value)
+                    .ToHashSet();
+
+                foreach (var mechanicEvent in Enum.GetValues<EMechanicEvent>())
+                {
+                    if (!coveredEvents.Contains(mechanicEvent))
+                    {
+                        Warn("MechanicEventLessonGap", "MechanicEvent", (int)mechanicEvent, $"No live lesson triggers on mechanic event '{mechanicEvent}'.");
                     }
                 }
             }

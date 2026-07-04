@@ -47,7 +47,11 @@ namespace Game.TestInfrastructure.Helpers
                     "Proficiencies",
                     "ProficiencyLevelModifiers",
                     "ProficiencyLevelRewards",
-                    "ProficiencyPrerequisites"
+                    "ProficiencyPrerequisites",
+                    -- Lessons only references the intrinsic (never-truncated) MechanicEvents table, so nothing
+                    -- above cascades to it; listed explicitly so lesson content doesn't leak across tests.
+                    -- LessonSteps cascades from here.
+                    "Lessons"
                 RESTART IDENTITY CASCADE
                 """);
         }

@@ -156,6 +156,7 @@ namespace Game.Application.Tests.Content
                 Paths = [],
                 Proficiencies = [],
                 SkillRecipes = [],
+                Lessons = [],
             };
         }
     }

@@ -23,9 +23,17 @@ namespace Game.Application.Tests.Content
         /// <summary>
         /// Warnings on the committed content that are a consciously-accepted, documented work-in-progress gap.
         /// Each entry is the finding's <see cref="ContentGraphFinding.ToString"/> value; add one only with a
-        /// comment saying why it is tolerated. Empty today — the seed slice is fully lint-clean (#1435).
+        /// comment saying why it is tolerated.
         /// </summary>
-        private static readonly HashSet<string> AcceptedWarnings = [];
+        private static readonly HashSet<string> AcceptedWarnings =
+        [
+            // #1591: Lesson is a brand-new reference set and content/lessons.json starts empty (no lesson copy
+            // authored yet — that's a follow-up content-authoring pass). Every intrinsic EMechanicEvent is
+            // therefore uncovered until lessons are authored.
+            "[Warning] MechanicEvent 1 (MechanicEventLessonGap): No live lesson triggers on mechanic event 'FirstCrit'.",
+            "[Warning] MechanicEvent 2 (MechanicEventLessonGap): No live lesson triggers on mechanic event 'FirstDodge'.",
+            "[Warning] MechanicEvent 3 (MechanicEventLessonGap): No live lesson triggers on mechanic event 'FirstCooldownRecharge'.",
+        ];
 
         [Fact]
         public async Task CommittedContent_HasNoReachabilityErrors()

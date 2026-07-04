@@ -22,7 +22,8 @@ namespace Game.Application.Content
                 await ReadAsync<Contracts.Class>(contentDirectory, "classes.json", cancellationToken),
                 await ReadAsync<Contracts.Path>(contentDirectory, "paths.json", cancellationToken),
                 await ReadAsync<Contracts.Proficiency>(contentDirectory, "proficiencies.json", cancellationToken),
-                await ReadAsync<Contracts.SkillRecipe>(contentDirectory, "skill-recipes.json", cancellationToken));
+                await ReadAsync<Contracts.SkillRecipe>(contentDirectory, "skill-recipes.json", cancellationToken),
+                await ReadAsync<Contracts.Lesson>(contentDirectory, "lessons.json", cancellationToken));
         }
 
         private static async Task<IReadOnlyList<T>> ReadAsync<T>(string contentDirectory, string fileName, CancellationToken cancellationToken)

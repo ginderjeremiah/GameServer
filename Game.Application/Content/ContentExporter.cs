@@ -16,6 +16,7 @@ namespace Game.Application.Content
         private readonly IClasses _classes;
         private readonly IProficiencies _proficiencies;
         private readonly ISkillRecipes _skillRecipes;
+        private readonly ILessons _lessons;
 
         public ContentExporter(
             ISkills skills,
@@ -27,7 +28,8 @@ namespace Game.Application.Content
             IChallenges challenges,
             IClasses classes,
             IProficiencies proficiencies,
-            ISkillRecipes skillRecipes)
+            ISkillRecipes skillRecipes,
+            ILessons lessons)
         {
             _skills = skills;
             _tags = tags;
@@ -39,6 +41,7 @@ namespace Game.Application.Content
             _classes = classes;
             _proficiencies = proficiencies;
             _skillRecipes = skillRecipes;
+            _lessons = lessons;
         }
 
         public async Task<IReadOnlyList<ContentExportFile>> ExportAllAsync(CancellationToken cancellationToken = default)
@@ -67,6 +70,7 @@ namespace Game.Application.Content
                 File("paths.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_proficiencies.AllPaths()))),
                 File("proficiencies.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_proficiencies.AllProficiencies()))),
                 File("skill-recipes.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_skillRecipes.AllSkillRecipes()))),
+                File("lessons.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_lessons.AllLessons()))),
             ];
         }
 

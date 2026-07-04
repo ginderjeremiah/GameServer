@@ -1086,4 +1086,26 @@ namespace Game.Core
         /// </summary>
         Admin = 1,
     }
+
+    /// <summary>
+    /// The kind of trigger that fires a tutorial <c>Lesson</c> (#1591, spike #1392): either the player's first
+    /// visit to a given frontend screen, or a mechanic-anchored content event.
+    /// </summary>
+    public enum ELessonTriggerType
+    {
+        ScreenVisit = 0,
+        MechanicEvent = 1,
+    }
+
+    /// <summary>
+    /// The fixed set of content-events detectors (UI/src/lib/common/content-events.ts) a mechanic-anchored
+    /// <c>Lesson</c> (#1591, spike #1392) can trigger on. Intrinsic reference data: fixed by the application,
+    /// not authored, so it need not be 0-based/contiguous like static reference data.
+    /// </summary>
+    public enum EMechanicEvent
+    {
+        FirstCrit = 1,
+        FirstDodge = 2,
+        FirstCooldownRecharge = 3,
+    }
 }

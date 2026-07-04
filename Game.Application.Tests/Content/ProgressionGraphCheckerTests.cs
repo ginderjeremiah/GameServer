@@ -871,6 +871,39 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ZoneReachability", ContentGraphSeverity.Warning, "Zone", 1);
         }
 
+        // --- Mechanic-event lesson coverage (Warning) --------------------------------------------------
+
+        [Fact]
+        public void MechanicEvent_CoveredByLiveLesson_ProducesNoFinding()
+        {
+            // HealthyGraph already covers every EMechanicEvent with a live lesson.
+            var findings = _checker.Check(HealthyGraph());
+            Assert.DoesNotContain(findings, f => f.Check == "MechanicEventLessonGap");
+        }
+
+        [Fact]
+        public void MechanicEvent_WithNoLiveLesson_IsWarning()
+        {
+            var graph = HealthyGraph() with { Lessons = [Lesson(0, EMechanicEvent.FirstCrit)] };
+            AssertHasFinding(graph, "MechanicEventLessonGap", ContentGraphSeverity.Warning, "MechanicEvent", (int)EMechanicEvent.FirstDodge);
+            AssertHasFinding(graph, "MechanicEventLessonGap", ContentGraphSeverity.Warning, "MechanicEvent", (int)EMechanicEvent.FirstCooldownRecharge);
+        }
+
+        [Fact]
+        public void MechanicEvent_OnlyCoveredByRetiredLesson_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Lessons =
+                [
+                    Lesson(0, EMechanicEvent.FirstCrit, retiredAt: Retired),
+                    Lesson(1, EMechanicEvent.FirstDodge),
+                    Lesson(2, EMechanicEvent.FirstCooldownRecharge),
+                ],
+            };
+            AssertHasFinding(graph, "MechanicEventLessonGap", ContentGraphSeverity.Warning, "MechanicEvent", (int)EMechanicEvent.FirstCrit);
+        }
+
         [Fact]
         public void Finding_ToString_IsHumanReadable()
         {
@@ -909,7 +942,13 @@ namespace Game.Application.Tests.Content
                 Classes: [Class(0, starterSkills: [1])],
                 Paths: [Path(0)],
                 Proficiencies: [Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(5, 5)])],
-                SkillRecipes: []);
+                SkillRecipes: [],
+                Lessons:
+                [
+                    Lesson(0, EMechanicEvent.FirstCrit),
+                    Lesson(1, EMechanicEvent.FirstDodge),
+                    Lesson(2, EMechanicEvent.FirstCooldownRecharge),
+                ]);
         }
 
         private static Contracts.Skill Skill(
@@ -1095,6 +1134,20 @@ namespace Game.Application.Tests.Content
             RetiredAt = retiredAt,
             InputSkillIds = inputs ?? [],
             Conditions = (conditions ?? []).Select(c => new Contracts.SkillRecipeCondition { ProficiencyId = c.proficiencyId, MinLevel = c.minLevel }).ToList(),
+        };
+
+        private static Contracts.Lesson Lesson(int id, EMechanicEvent? triggerMechanicEvent = null, DateTime? retiredAt = null) => new()
+        {
+            Id = id,
+            Key = $"lesson-{id}",
+            Name = $"Lesson {id}",
+            TriggerType = triggerMechanicEvent is null ? ELessonTriggerType.ScreenVisit : ELessonTriggerType.MechanicEvent,
+            TriggerScreenKey = triggerMechanicEvent is null ? "some-screen" : null,
+            TriggerMechanicEvent = triggerMechanicEvent,
+            HostScreenKey = "some-screen",
+            DisplayOrder = id,
+            RetiredAt = retiredAt,
+            Steps = [new Contracts.LessonStep { Text = "Step" }],
         };
     }
 }

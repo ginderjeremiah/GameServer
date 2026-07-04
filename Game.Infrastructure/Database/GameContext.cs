@@ -42,8 +42,11 @@ namespace Game.Infrastructure.Database
         public DbSet<Item> Items { get; set; }
         public DbSet<ItemModSlot> ItemModSlots { get; set; }
         public DbSet<ItemTag> ItemTags { get; set; }
+        public DbSet<Lesson> Lessons { get; set; }
+        public DbSet<LessonStep> LessonSteps { get; set; }
         public DbSet<LogPreference> LogPreferences { get; set; }
         public DbSet<LogType> LogTypes { get; set; }
+        public DbSet<MechanicEvent> MechanicEvents { get; set; }
         public DbSet<Player> Players { get; set; }
         public DbSet<PlayerAttribute> PlayerAttributes { get; set; }
         public DbSet<PlayerChallenge> PlayerChallenges { get; set; }
@@ -341,6 +344,47 @@ namespace Game.Infrastructure.Database
                     .HasPrecision(18, 3);
             });
 
+            modelBuilder.Entity<Lesson>(entity =>
+            {
+                entity.Property(l => l.Id)
+                    .HasIdentityOptions(0, 1, 0);
+
+                entity.Property(l => l.Key)
+                    .HasMaxLength(100);
+
+                entity.Property(l => l.Name)
+                    .HasMaxLength(100);
+
+                entity.Property(l => l.TriggerScreenKey)
+                    .HasMaxLength(50);
+
+                entity.Property(l => l.HostScreenKey)
+                    .HasMaxLength(50);
+
+                entity.HasIndex(l => l.Key).IsUnique();
+
+                entity.HasOne(l => l.TriggerMechanicEvent)
+                    .WithMany()
+                    .HasForeignKey(l => l.TriggerMechanicEventId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<LessonStep>(entity =>
+            {
+                entity.Property(s => s.Text)
+                    .HasMaxLength(1000);
+
+                entity.Property(s => s.AnchorKey)
+                    .HasMaxLength(100);
+
+                entity.HasOne(s => s.Lesson)
+                    .WithMany(l => l.Steps)
+                    .HasForeignKey(s => s.LessonId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(s => new { s.LessonId, s.Order }).IsUnique();
+            });
+
             modelBuilder.Entity<LogPreference>()
                 .HasKey(lp => new { lp.PlayerId, lp.LogTypeId });
 
@@ -355,6 +399,24 @@ namespace Game.Infrastructure.Database
                 entity.HasData(Enum.GetValues<ELogType>().Select(a =>
                 {
                     return new LogType
+                    {
+                        Id = (int)a,
+                        Name = a.ToString().Capitalize().SpaceWords(),
+                    };
+                }));
+            });
+
+            modelBuilder.Entity<MechanicEvent>(entity =>
+            {
+                entity.Property(e => e.Id)
+                    .ValueGeneratedNever();
+
+                entity.Property(e => e.Name)
+                    .HasMaxLength(50);
+
+                entity.HasData(Enum.GetValues<EMechanicEvent>().Select(a =>
+                {
+                    return new MechanicEvent
                     {
                         Id = (int)a,
                         Name = a.ToString().Capitalize().SpaceWords(),
