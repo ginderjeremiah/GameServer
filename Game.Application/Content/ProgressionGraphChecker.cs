@@ -1,8 +1,10 @@
 using Game.Core;
 using Game.Core.Attributes;
+using Game.Core.Attributes.Modifiers;
 using Game.Core.Progress;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
+using GameAttribute = Game.Core.Attributes.Attribute;
 
 namespace Game.Application.Content
 {
@@ -81,6 +83,7 @@ namespace Game.Application.Content
                 CheckZoneReachability();
                 CheckSingleHomeZone();
                 CheckEmptyCombatZones();
+                CheckEnemyAttributeConsumption();
             }
 
             // --- Zones ------------------------------------------------------------------------------------
@@ -193,6 +196,69 @@ namespace Game.Application.Content
                     }
                 }
             }
+
+            /// <summary>
+            /// Flags a live enemy's core-attribute distribution points that nothing in its kit consumes (#1529):
+            /// dead weight that still counts into <c>DefeatRewards.SumCoreAttributes</c>, inflating XP payout
+            /// without adding threat. A v1 heuristic map, not the exact per-attribute marginal spike #1526's
+            /// <see cref="Game.Core.Battle.CombatRating.Marginal"/> now computes — see the follow-up filed
+            /// alongside this check to migrate onto that once the calibration work (#1533) lands.
+            /// </summary>
+            private void CheckEnemyAttributeConsumption()
+            {
+                foreach (var enemy in Live(_graph.Enemies, e => e.RetiredAt))
+                {
+                    var kit = new List<Contracts.Skill>();
+                    foreach (var skillId in enemy.SkillPool)
+                    {
+                        if (_skills.TryGetValue(skillId, out var skill) && skill.RetiredAt is null)
+                        {
+                            kit.Add(skill);
+                        }
+                    }
+
+                    foreach (var distribution in enemy.AttributeDistribution)
+                    {
+                        if (distribution.BaseAmount == 0 && distribution.AmountPerLevel == 0)
+                        {
+                            continue;
+                        }
+
+                        // Only the six core (directly-allocatable) attributes feed SumCoreAttributes; a
+                        // directly-authored secondary (e.g. a fast enemy's own CooldownBonus) is its own
+                        // enabler, not a distribution point this check polices.
+                        if (!GameAttribute.CoreAttributes.Contains(distribution.AttributeId) || IsConsumedByKit(distribution.AttributeId, kit))
+                        {
+                            continue;
+                        }
+
+                        Warn("EnemyInertAttribute", "Enemy", enemy.Id,
+                            $"distributes {distribution.AttributeId} points that nothing in its kit consumes, inflating its XP payout without adding threat.");
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Consumed = a static derivation targets it (Endurance/Strength feed the always-live
+            /// Toughness/MaxHealth), a pooled skill's <c>DamageMultipliers</c> scales off it, or a pooled skill
+            /// effect's <c>ScalingAttributeId</c> does. Agility and Luck are excepted from the static-derivation
+            /// half: their only derivations (the crit/dodge/parry-multiplier family) gate behind mechanics the
+            /// engine never rolls for an enemy (<c>BattleContext.DamageTarget</c>'s parry/dodge/crit draws are
+            /// player-only), so — until enemy proc parity exists — they're consumed only by a direct kit hit.
+            /// </summary>
+            private static bool IsConsumedByKit(EAttribute attribute, IReadOnlyList<Contracts.Skill> kit)
+            {
+                if (attribute != EAttribute.Agility && attribute != EAttribute.Luck && HasStaticDerivation(attribute))
+                {
+                    return true;
+                }
+
+                return kit.Any(skill => skill.DamageMultipliers.Any(m => m.AttributeId == attribute)
+                    || skill.Effects.Any(e => e.ScalingAttributeId == attribute && e.ScalingAmount != 0));
+            }
+
+            private static bool HasStaticDerivation(EAttribute attribute)
+                => StaticAttributeModifiers.All.Any(m => m.Source == EAttributeModifierSource.Derived && m.DerivedSource == attribute);
 
             // --- Classes ----------------------------------------------------------------------------------
 

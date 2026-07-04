@@ -228,6 +228,126 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "EnemySpawn", ContentGraphSeverity.Warning, "Enemy", 0);
         }
 
+        // --- Enemy attribute consumption (dead-stat XP inflation, #1529) ------------------------------
+
+        [Fact]
+        public void Enemy_DistributesStrengthAndEndurance_ProducesNoFinding()
+        {
+            // Both feed the always-live MaxHealth/Toughness static derivation, regardless of the kit.
+            var graph = HealthyGraph() with
+            {
+                Enemies =
+                [
+                    Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)],
+                        attributeDistribution: [(EAttribute.Strength, 5, 1), (EAttribute.Endurance, 5, 1)]),
+                    Enemy(1, isBoss: true),
+                ],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
+        [Fact]
+        public void Enemy_DistributesAgilityWithNoKitConsumer_IsWarning()
+        {
+            // Agility's only static derivations feed the crit/dodge/parry-multiplier family, which the engine
+            // never rolls for an enemy — dead weight absent a direct kit consumer.
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Agility, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_DistributesLuckWithNoKitConsumer_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Luck, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_DistributesIntellectWithNoKitConsumer_IsWarning()
+        {
+            // Intellect (like Dexterity) has no static derivation at all, so it needs a direct kit consumer.
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Intellect, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_DistributesAgilityConsumedByPooledDamageMultiplier_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, damageMultiplierAttributes: [EAttribute.Agility])).ToList(),
+                Enemies = [Enemy(0, skillPool: [6], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Agility, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
+        [Fact]
+        public void Enemy_DistributesLuckConsumedByPooledEffectScaling_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, effectScaling: [(EAttribute.Luck, 0.5m)])).ToList(),
+                Enemies = [Enemy(0, skillPool: [6], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Luck, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
+        [Fact]
+        public void Enemy_DistributesAttributeConsumedOnlyByZeroScalingEffect_IsWarning()
+        {
+            // ScalingAmount 0 means the effect doesn't actually scale off the attribute (the field is just unset).
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, effectScaling: [(EAttribute.Intellect, 0m)])).ToList(),
+                Enemies = [Enemy(0, skillPool: [6], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Intellect, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_DistributesAttributeConsumedOnlyByRetiredPooledSkill_IsWarning()
+        {
+            // Skill 6 is retired, so it's out of circulation and can't excuse the distribution point.
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, retiredAt: Retired, damageMultiplierAttributes: [EAttribute.Intellect])).ToList(),
+                Enemies = [Enemy(0, skillPool: [6], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Intellect, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_DistributesZeroAmountAttribute_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Agility, 0, 0)]), Enemy(1, isBoss: true)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
+        [Fact]
+        public void Enemy_RetiredWithInertAttribute_ProducesNoFinding()
+        {
+            // A retired enemy is out of circulation, so its dead stat isn't worth flagging.
+            var graph = HealthyGraph() with
+            {
+                Enemies = HealthyGraph().Enemies
+                    .Append(Enemy(9, skillPool: [2], spawns: [(0, 1)], retiredAt: Retired, attributeDistribution: [(EAttribute.Luck, 5, 1)]))
+                    .ToList(),
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
         // --- Classes ----------------------------------------------------------------------------------
 
         [Fact]
@@ -780,25 +900,35 @@ namespace Game.Application.Tests.Content
                 SkillRecipes: []);
         }
 
-        private static Contracts.Skill Skill(int id, ESkillAcquisition acquisition, DateTime? retiredAt = null, EDamageType primaryType = EDamageType.Physical) => new()
-        {
-            Id = id,
-            Name = $"Skill {id}",
-            BaseDamage = 1,
-            DamageMultipliers = [],
-            Effects = [],
-            DamagePortions = [new Contracts.SkillDamagePortion { Type = primaryType, Weight = 1 }],
-            Description = "",
-            CooldownMs = 1000,
-            IconPath = "",
-            RarityId = ERarity.Common,
-            Word = "",
-            Pronunciation = "",
-            Translation = "",
-            Acquisition = acquisition,
-            DesignerNotes = "",
-            RetiredAt = retiredAt,
-        };
+        private static Contracts.Skill Skill(
+            int id,
+            ESkillAcquisition acquisition,
+            DateTime? retiredAt = null,
+            EDamageType primaryType = EDamageType.Physical,
+            EAttribute[]? damageMultiplierAttributes = null,
+            (EAttribute attributeId, decimal scalingAmount)[]? effectScaling = null) => new()
+            {
+                Id = id,
+                Name = $"Skill {id}",
+                BaseDamage = 1,
+                DamageMultipliers = (damageMultiplierAttributes ?? [])
+                .Select(a => new Contracts.AttributeMultiplier { AttributeId = a, Multiplier = 1 })
+                .ToList(),
+                Effects = (effectScaling ?? [])
+                .Select(e => new Contracts.SkillEffect { AttributeId = EAttribute.MaxHealth, ScalingAttributeId = e.attributeId, ScalingAmount = e.scalingAmount })
+                .ToList(),
+                DamagePortions = [new Contracts.SkillDamagePortion { Type = primaryType, Weight = 1 }],
+                Description = "",
+                CooldownMs = 1000,
+                IconPath = "",
+                RarityId = ERarity.Common,
+                Word = "",
+                Pronunciation = "",
+                Translation = "",
+                Acquisition = acquisition,
+                DesignerNotes = "",
+                RetiredAt = retiredAt,
+            };
 
         private static Contracts.Item Item(
             int id,
@@ -831,12 +961,15 @@ namespace Game.Application.Tests.Content
             bool isBoss = false,
             int[]? skillPool = null,
             (int zoneId, int weight)[]? spawns = null,
-            DateTime? retiredAt = null) => new()
+            DateTime? retiredAt = null,
+            (EAttribute attributeId, decimal baseAmount, decimal amountPerLevel)[]? attributeDistribution = null) => new()
             {
                 Id = id,
                 Name = $"Enemy {id}",
                 IsBoss = isBoss,
-                AttributeDistribution = [],
+                AttributeDistribution = (attributeDistribution ?? [])
+                    .Select(d => new Contracts.AttributeDistribution { AttributeId = d.attributeId, BaseAmount = d.baseAmount, AmountPerLevel = d.amountPerLevel })
+                    .ToList(),
                 SkillPool = skillPool ?? [],
                 Spawns = (spawns ?? []).Select(s => new Contracts.EnemySpawn { ZoneId = s.zoneId, Weight = s.weight }).ToList(),
                 DesignerNotes = "",
