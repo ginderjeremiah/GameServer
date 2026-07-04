@@ -241,10 +241,13 @@ namespace Game.Application.Content
             /// <summary>
             /// Consumed = a static derivation targets it (Endurance/Strength feed the always-live
             /// Toughness/MaxHealth), a pooled skill's <c>DamageMultipliers</c> scales off it, or a pooled skill
-            /// effect's <c>ScalingAttributeId</c> does. Agility and Luck are excepted from the static-derivation
-            /// half: their only derivations (the crit/dodge/parry-multiplier family) gate behind mechanics the
-            /// engine never rolls for an enemy (<c>BattleContext.DamageTarget</c>'s parry/dodge/crit draws are
-            /// player-only), so — until enemy proc parity exists — they're consumed only by a direct kit hit.
+            /// effect's <c>ScalingAttributeId</c> does. Luck and Agility are excepted from the static-derivation
+            /// half, for different reasons: Luck's derivations (the crit/parry-multiplier family) gate behind
+            /// mechanics the engine never rolls for an enemy (<c>BattleContext.DamageTarget</c>'s crit/parry/dodge
+            /// draws are player-only); Agility's <c>DodgeChanceMultiplier</c> is equally never-rolled, but its
+            /// <c>CooldownBonusMultiplier</c> is symmetric (enemies cycle too) and only bites when the enemy
+            /// co-authors a <c>CooldownBonus</c> distribution point (0 × mult = 0) — dead for Agility alone. So
+            /// until an enemy fields such a kit, both are consumed only by a direct kit hit.
             /// </summary>
             private static bool IsConsumedByKit(EAttribute attribute, IReadOnlyList<Contracts.Skill> kit)
             {
@@ -253,7 +256,7 @@ namespace Game.Application.Content
                     return true;
                 }
 
-                return kit.Any(skill => skill.DamageMultipliers.Any(m => m.AttributeId == attribute)
+                return kit.Any(skill => skill.DamageMultipliers.Any(m => m.AttributeId == attribute && m.Multiplier != 0)
                     || skill.Effects.Any(e => e.ScalingAttributeId == attribute && e.ScalingAmount != 0));
             }
 

@@ -284,7 +284,7 @@ namespace Game.Application.Tests.Content
         {
             var graph = HealthyGraph() with
             {
-                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, damageMultiplierAttributes: [EAttribute.Agility])).ToList(),
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, damageMultipliers: [(EAttribute.Agility, 1.5m)])).ToList(),
                 Enemies = [Enemy(0, skillPool: [6], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Agility, 5, 1)]), Enemy(1, isBoss: true)],
             };
             Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
@@ -314,12 +314,24 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Enemy_DistributesAttributeConsumedOnlyByZeroDamageMultiplier_IsWarning()
+        {
+            // Multiplier 0 is equally inert, mirroring the zero-ScalingAmount effect case above.
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, damageMultipliers: [(EAttribute.Intellect, 0m)])).ToList(),
+                Enemies = [Enemy(0, skillPool: [6], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Intellect, 5, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
         public void Enemy_DistributesAttributeConsumedOnlyByRetiredPooledSkill_IsWarning()
         {
             // Skill 6 is retired, so it's out of circulation and can't excuse the distribution point.
             var graph = HealthyGraph() with
             {
-                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, retiredAt: Retired, damageMultiplierAttributes: [EAttribute.Intellect])).ToList(),
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Enemy, retiredAt: Retired, damageMultipliers: [(EAttribute.Intellect, 1)])).ToList(),
                 Enemies = [Enemy(0, skillPool: [6], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Intellect, 5, 1)]), Enemy(1, isBoss: true)],
             };
             AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 0);
@@ -905,14 +917,14 @@ namespace Game.Application.Tests.Content
             ESkillAcquisition acquisition,
             DateTime? retiredAt = null,
             EDamageType primaryType = EDamageType.Physical,
-            EAttribute[]? damageMultiplierAttributes = null,
+            (EAttribute attributeId, decimal multiplier)[]? damageMultipliers = null,
             (EAttribute attributeId, decimal scalingAmount)[]? effectScaling = null) => new()
             {
                 Id = id,
                 Name = $"Skill {id}",
                 BaseDamage = 1,
-                DamageMultipliers = (damageMultiplierAttributes ?? [])
-                .Select(a => new Contracts.AttributeMultiplier { AttributeId = a, Multiplier = 1 })
+                DamageMultipliers = (damageMultipliers ?? [])
+                .Select(m => new Contracts.AttributeMultiplier { AttributeId = m.attributeId, Multiplier = m.multiplier })
                 .ToList(),
                 Effects = (effectScaling ?? [])
                 .Select(e => new Contracts.SkillEffect { AttributeId = EAttribute.MaxHealth, ScalingAttributeId = e.attributeId, ScalingAmount = e.scalingAmount })
