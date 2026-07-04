@@ -291,6 +291,24 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Enemy_DistributesAgilityWithCoAuthoredCooldownBonus_ProducesNoFinding()
+        {
+            // Agility has no direct kit consumer here, but co-authoring CooldownBonus makes its derived
+            // CooldownBonusMultiplier live (CooldownBonus × CooldownBonusMultiplier feeds the cooldown rate),
+            // so Agility is no longer dead weight — the exact case #1581 moved off the heuristic for.
+            var graph = HealthyGraph() with
+            {
+                Enemies =
+                [
+                    Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)],
+                        attributeDistribution: [(EAttribute.Agility, 5, 1), (EAttribute.CooldownBonus, 5, 1)]),
+                    Enemy(1, isBoss: true),
+                ],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
+        [Fact]
         public void Enemy_DistributesLuckConsumedByPooledEffectScaling_ProducesNoFinding()
         {
             var graph = HealthyGraph() with
