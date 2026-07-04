@@ -360,6 +360,20 @@ namespace Game.Application.Tests.Content
             Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
         }
 
+        [Fact]
+        public void Enemy_NotPlacedInAnyLiveZone_ProducesNoFinding()
+        {
+            // No spawn table entry and no dedicated-boss slot means no representative level to rate at, so the
+            // check is skipped rather than rating at a made-up level.
+            var graph = HealthyGraph() with
+            {
+                Enemies = HealthyGraph().Enemies
+                    .Append(Enemy(9, skillPool: [2], spawns: [], attributeDistribution: [(EAttribute.Luck, 5, 1)]))
+                    .ToList(),
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
         // --- Classes ----------------------------------------------------------------------------------
 
         [Fact]
@@ -927,7 +941,14 @@ namespace Game.Application.Tests.Content
                 .Select(m => new Contracts.AttributeMultiplier { AttributeId = m.attributeId, Multiplier = m.multiplier })
                 .ToList(),
                 Effects = (effectScaling ?? [])
-                .Select(e => new Contracts.SkillEffect { AttributeId = EAttribute.MaxHealth, ScalingAttributeId = e.attributeId, ScalingAmount = e.scalingAmount })
+                .Select(e => new Contracts.SkillEffect
+                {
+                    Target = ESkillEffectTarget.Self,
+                    AttributeId = EAttribute.MaxHealth,
+                    DurationMs = 1000,
+                    ScalingAttributeId = e.attributeId,
+                    ScalingAmount = e.scalingAmount,
+                })
                 .ToList(),
                 DamagePortions = [new Contracts.SkillDamagePortion { Type = primaryType, Weight = 1 }],
                 Description = "",
