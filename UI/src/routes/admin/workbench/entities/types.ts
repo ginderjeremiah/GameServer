@@ -208,6 +208,18 @@ export interface ChallengeRewardSectionConfig<T> extends BaseSection<T> {
 	kind: 'challenge-reward';
 }
 
+/** A lesson's trigger: the host screen it's authored for, plus either a screen-visit or
+ *  mechanic-event trigger (mutually exclusive). Carries no extra config — screen options come
+ *  from the frontend-only {@link GAME_SCREENS} registry the component reads directly. */
+export interface LessonTriggerSectionConfig<T> extends BaseSection<T> {
+	kind: 'lesson-trigger';
+}
+
+/** A lesson's ordered tutorial steps; array position is the step order. */
+export interface LessonStepsSectionConfig<T> extends BaseSection<T> {
+	kind: 'lesson-steps';
+}
+
 export type SectionConfig<T> =
 	| FieldsSectionConfig<T>
 	| TableSectionConfig<T>
@@ -215,7 +227,9 @@ export type SectionConfig<T> =
 	| TagsSectionConfig<T>
 	| UsageSectionConfig<T>
 	| ChallengeConditionSectionConfig<T>
-	| ChallengeRewardSectionConfig<T>;
+	| ChallengeRewardSectionConfig<T>
+	| LessonTriggerSectionConfig<T>
+	| LessonStepsSectionConfig<T>;
 
 /** The per-record diff handed to an entity's persist routine. */
 export interface SaveDiff<T> {

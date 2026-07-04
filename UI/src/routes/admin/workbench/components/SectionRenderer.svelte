@@ -12,6 +12,10 @@
 	<ChallengeConditionSection {record} {baseline} {store} />
 {:else if section.kind === 'challenge-reward'}
 	<ChallengeRewardSection {record} {baseline} {store} />
+{:else if section.kind === 'lesson-trigger'}
+	<LessonTriggerSection {record} {baseline} {store} />
+{:else if section.kind === 'lesson-steps'}
+	<LessonStepsSection {record} {baseline} {store} />
 {/if}
 
 <script lang="ts">
@@ -25,6 +29,8 @@ import TagsSection from './TagsSection.svelte';
 import UsageSection from './UsageSection.svelte';
 import ChallengeConditionSection from './challenge/ChallengeConditionSection.svelte';
 import ChallengeRewardSection from './challenge/ChallengeRewardSection.svelte';
+import LessonTriggerSection from './lesson/LessonTriggerSection.svelte';
+import LessonStepsSection from './lesson/LessonStepsSection.svelte';
 
 interface Props {
 	section: SectionConfig<Identified>;
