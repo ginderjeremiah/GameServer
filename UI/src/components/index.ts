@@ -16,3 +16,4 @@ export { default as WordOfPower } from './WordOfPower.svelte';
 export { default as XpBar } from './XpBar.svelte';
 export * from './log-panel';
 export * from './nav-menu';
+export * from './tour';
