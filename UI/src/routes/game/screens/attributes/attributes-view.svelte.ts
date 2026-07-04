@@ -22,11 +22,18 @@
    freely — any attribute can be decremented back to 0, refunding its points to
    the pool — so there is no respec cost or locked baseline here. */
 
-import { apiSocket, EAttribute, type IAttributeUpdate, type IBattlerAttribute } from '$lib/api';
-import { BattleAttributes } from '$lib/battle';
+import {
+	apiSocket,
+	EAttribute,
+	ESkillEffectTarget,
+	type IAttributeUpdate,
+	type IBattlerAttribute,
+	type ISkill
+} from '$lib/api';
+import { BattleAttributes, isSkillDormant } from '$lib/battle';
 import { attributeName } from '$lib/common';
 import { safeLocalStorage } from '$lib/common/local-storage';
-import { playerManager } from '$lib/engine';
+import { inventoryManager, playerManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
 
 export type AttributeMode = 'guided' | 'theory';
@@ -147,6 +154,87 @@ export function contributorsFor(derivedId: EAttribute): EAttribute[] {
 	return CONTRIBUTORS_BY_DERIVED[derivedId] ?? [];
 }
 
+/* ── amplifier inert-signal (spike #1426 Decision 5) ──────────────────────
+   AGI and LUK are pure amplifiers: their `*Multiplier` targets scale a `0`-based enabler
+   (`DodgeChance`/`CooldownBonus`/`ParryChance`/a skill's own authored `criticalChance`), so a build with no
+   matching enabler fielded gets nothing from the points invested there — dormant, not dead. This section
+   answers whether that's the case for the *current* loadout, purely as a read-only signal (no allocation
+   gating; free-pool points stay a legitimate pre-commitment). */
+
+/** Hint copy for an inert amplifier, keyed by the attribute it describes. Absent for every attribute
+ *  that always contributes (see {@link isAttributeInert}). */
+const INERT_HINT: Partial<Record<EAttribute, string>> = {
+	[EAttribute.Agility]: 'Dormant — no dodge or cadence enabler fielded',
+	[EAttribute.Luck]: 'Dormant — no crit or parry enabler fielded'
+};
+
+/** The hint text for an inert core attribute, or `undefined` if it isn't a candidate for the signal at all. */
+export function inertHint(id: EAttribute): string | undefined {
+	return INERT_HINT[id];
+}
+
+/** Whether any fielded source — an equipped item/mod's static stat line, or a fielded skill's own
+ *  self-targeted effect — authors a nonzero base amount of `attributeId`. Only the *authored* amount is
+ *  checked (an effect's own base `amount`, not its live in-combat scaled value), matching the "committed
+ *  enabler" framing the crit/dodge/parry/cadence template already uses. This is exactly the source set
+ *  `StaticAttributeModifiers`' "granted by items/item-mods/skill-effects" convention documents for
+ *  DodgeChance/CooldownBonus/ParryChance — a future source authoring one of them outside that convention
+ *  (e.g. a class/proficiency payout) would need a matching scan added here. */
+function hasFieldedEnabler(
+	attributeId: EAttribute,
+	equipmentStats: readonly IBattlerAttribute[],
+	fieldedSkills: readonly ISkill[]
+): boolean {
+	if (equipmentStats.some((a) => a.attributeId === attributeId && a.amount > 0)) {
+		return true;
+	}
+	return fieldedSkills.some((skill) =>
+		skill.effects.some((e) => e.target === ESkillEffectTarget.Self && e.attributeId === attributeId && e.amount > 0)
+	);
+}
+
+/** Whether the core attribute at `id` is inert for the current loadout: AGI only amplifies a fielded
+ *  `DodgeChance`/`CooldownBonus` enabler, LUK only a fielded skill's own authored `criticalChance` or a
+ *  fielded `ParryChance` enabler (spike #1426 Decision 5). Every other core attribute always contributes,
+ *  so this is unconditionally `false` for them. */
+export function isAttributeInert(
+	id: EAttribute,
+	equipmentStats: readonly IBattlerAttribute[],
+	fieldedSkills: readonly ISkill[]
+): boolean {
+	if (id === EAttribute.Luck) {
+		return (
+			!fieldedSkills.some((s) => s.criticalChance > 0) &&
+			!hasFieldedEnabler(EAttribute.ParryChance, equipmentStats, fieldedSkills)
+		);
+	}
+	if (id === EAttribute.Agility) {
+		return (
+			!hasFieldedEnabler(EAttribute.DodgeChance, equipmentStats, fieldedSkills) &&
+			!hasFieldedEnabler(EAttribute.CooldownBonus, equipmentStats, fieldedSkills)
+		);
+	}
+	return false;
+}
+
+/** The player's live fielded skill set — the selected loadout plus equipped-gear grants, de-duplicated
+ *  and passed through the weapon-match gate ({@link isSkillDormant}) — mirroring `Battler.fillSkills`'s
+ *  assembly (without allocating battle `Skill` instances) so the amplifier check never disagrees with
+ *  what the battler actually fields. */
+function fieldedPlayerSkills(): ISkill[] {
+	const catalogue = staticData.skills ?? [];
+	const weaponType = inventoryManager.equippedWeaponType;
+	const ids = new Set<number>([...playerManager.selectedSkills, ...inventoryManager.grantedSkillIds]);
+	const result: ISkill[] = [];
+	for (const id of ids) {
+		const skill = catalogue[id];
+		if (skill && !isSkillDormant(skill, weaponType)) {
+			result.push(skill);
+		}
+	}
+	return result;
+}
+
 /** Maps a pointer position (in the radar's SVG user space) to the attribute
  *  value its axis vertex would represent if dragged there: projects the pointer
  *  onto the axis direction (so sideways drift is ignored and only the radial
@@ -234,6 +322,15 @@ export class AttributesView {
 	 *  a fixed value for the duration of a drag so allocating points mid-gesture
 	 *  can't rescale the radar (see {@link lockScale}). */
 	readonly hexMax = $derived(this.#lockedHexMax ?? computeHexMax(this.draft, this.committed));
+
+	/** The player's live fielded skill set (selected loadout + equipped-gear grants, weapon-gated),
+	 *  recomputed when the loadout or equipped gear changes — see {@link isInert}. */
+	readonly fieldedSkills = $derived.by<ISkill[]>(() => fieldedPlayerSkills());
+
+	/** Whether the core attribute at `i` is inert under the current loadout — see {@link isAttributeInert}. */
+	isInert(i: number): boolean {
+		return isAttributeInert(CORE_ATTRIBUTES[i], inventoryManager.equipmentStats, this.fieldedSkills);
+	}
 
 	/** Whether any attribute can still be incremented (points remain). */
 	canInc(): boolean {

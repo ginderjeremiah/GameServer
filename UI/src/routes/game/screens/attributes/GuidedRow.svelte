@@ -28,6 +28,9 @@
 				{/each}
 			{/if}
 		</div>
+		{#if inert}
+			<span class="dormant-note">⊘ {hint}</span>
+		{/if}
 	</div>
 
 	<Delta from={view.savedValues[i]} to={view.values[i]} />
@@ -43,7 +46,7 @@ import { tooltipHover } from '$components/tooltip/tooltip-hover';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
 import Delta from './Delta.svelte';
 import Stepper from './Stepper.svelte';
-import { CORE_ATTRIBUTES, DERIVED_STATS, feedsFor, type AttributesView } from './attributes-view.svelte';
+import { CORE_ATTRIBUTES, DERIVED_STATS, feedsFor, inertHint, type AttributesView } from './attributes-view.svelte';
 
 interface Props {
 	i: number;
@@ -57,6 +60,10 @@ const color = $derived(attributeColor(id));
 const code = $derived(attributeCode(id, staticData.attributes));
 const name = $derived(attributeName(id, staticData.attributes));
 const feeds = $derived(feedsFor(i));
+// Read-only "dormant, not dead" signal for the amplifier attributes (AGI/LUK, spike #1426 Decision 5) —
+// no matching enabler is fielded, so the current build gets nothing from points spent here.
+const inert = $derived(view.isInert(i));
+const hint = $derived(inertHint(id));
 
 // Hover explainer for the attribute, driven through the screen-level controller.
 const attrTip = getAttributeTooltip();
@@ -150,5 +157,17 @@ const changed = $derived(
 		color: var(--text-muted);
 		border-style: dashed;
 	}
+}
+
+// Neutral muted tone matching the Skills screen's off-weapon dormancy note (DormantNote.svelte) —
+// --warning is reserved for validation, and this is a read-only signal, not a problem to fix.
+.dormant-note {
+	display: block;
+	margin-top: 4px;
+	font-family: var(--mono);
+	font-size: 8.5px;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+	color: var(--text-tertiary);
 }
 </style>

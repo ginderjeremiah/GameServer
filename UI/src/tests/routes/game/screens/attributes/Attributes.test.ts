@@ -1,23 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EAttribute, type IAttribute, type IBattlerAttribute } from '$lib/api';
+import { EAttribute, EDamageType, type IAttribute, type IBattlerAttribute, type ISkill } from '$lib/api';
 import { makeAttribute } from '../../../../fixtures/attributes';
 
-const { mockPlayerManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
+const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
 	mockPlayerManager: {
 		attributes: [] as IBattlerAttribute[],
 		statPointsGained: 0,
 		statPointsUsed: 0,
 		level: 0,
 		exp: 0,
-		nextLevelThreshold: 0
+		nextLevelThreshold: 0,
+		selectedSkills: [] as number[]
+	},
+	mockInventoryManager: {
+		equipmentStats: [] as IBattlerAttribute[],
+		grantedSkillIds: [] as number[],
+		equippedWeaponType: 13 as EDamageType // EDamageType.Unarmed, a numeric literal (hoisted before the import)
 	},
 	sendSocketCommand: vi.fn(),
 	toastError: vi.fn(),
-	staticData: { attributes: [] as IAttribute[] }
+	staticData: { attributes: [] as IAttribute[], skills: [] as ISkill[] }
 }));
 
-vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
+vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
 vi.mock('$stores', () => ({ staticData, toastError }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
