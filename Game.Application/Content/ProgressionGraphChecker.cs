@@ -1,6 +1,7 @@
 using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
+using Game.Core.Battle;
 using Game.Core.Progress;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
@@ -198,17 +199,29 @@ namespace Game.Application.Content
                 }
             }
 
+            // Below this finite-difference magnitude, CombatRating.Marginal is treated as "no matching enabler
+            // fielded" rather than genuine (if tiny) capability — matching the tolerance CombatRatingTests uses
+            // to assert an exactly-dead marginal (Assert.Equal(0, marginal, 6)).
+            private const double DeadStatMarginalEpsilon = 1e-6;
+
             /// <summary>
             /// Flags a live enemy's core-attribute distribution points that nothing in its kit consumes (#1529):
             /// dead weight that still counts into <c>DefeatRewards.SumCoreAttributes</c>, inflating XP payout
-            /// without adding threat. A v1 heuristic map, not the exact per-attribute marginal spike #1526's
-            /// <see cref="Game.Core.Battle.CombatRating.Marginal"/> now computes — see the follow-up filed
-            /// alongside this check to migrate onto that once the calibration work (#1533) lands.
+            /// without adding threat. Exact, via spike #1526's <see cref="CombatRating.Marginal"/> (#1581) rather
+            /// than a heuristic — an attribute whose fielded kit has no matching enabler marginals to ~0.
             /// </summary>
             private void CheckEnemyAttributeConsumption()
             {
                 foreach (var enemy in Live(_graph.Enemies, e => e.RetiredAt))
                 {
+                    // No live placement (spawn table or dedicated boss slot) means no representative encounter
+                    // level to rate the enemy at — mirrors the combat-rating calibration report's own omission
+                    // of unplaced enemies from its pricing pass.
+                    if (ResolveRatingLevel(enemy) is not int level)
+                    {
+                        continue;
+                    }
+
                     var kit = new List<Contracts.Skill>();
                     foreach (var skillId in enemy.SkillPool)
                     {
@@ -217,6 +230,8 @@ namespace Game.Application.Content
                             kit.Add(skill);
                         }
                     }
+
+                    var battler = BuildRatingBattler(enemy, kit, level);
 
                     foreach (var distribution in enemy.AttributeDistribution)
                     {
@@ -228,7 +243,13 @@ namespace Game.Application.Content
                         // Only the six core (directly-allocatable) attributes feed SumCoreAttributes; a
                         // directly-authored secondary (e.g. a fast enemy's own CooldownBonus) is its own
                         // enabler, not a distribution point this check polices.
-                        if (!GameAttribute.CoreAttributes.Contains(distribution.AttributeId) || IsConsumedByKit(distribution.AttributeId, kit))
+                        if (!GameAttribute.CoreAttributes.Contains(distribution.AttributeId))
+                        {
+                            continue;
+                        }
+
+                        var marginal = CombatRating.Marginal(battler, isPlayer: false, distribution.AttributeId);
+                        if (Math.Abs(marginal) >= DeadStatMarginalEpsilon)
                         {
                             continue;
                         }
@@ -240,29 +261,78 @@ namespace Game.Application.Content
             }
 
             /// <summary>
-            /// Consumed = a static derivation targets it (Endurance/Strength feed the always-live
-            /// Toughness/MaxHealth), a pooled skill's <c>DamageMultipliers</c> scales off it, or a pooled skill
-            /// effect's <c>ScalingAttributeId</c> does. Luck and Agility are excepted from the static-derivation
-            /// half, for different reasons: Luck's derivations (the crit/parry-multiplier family) gate behind
-            /// mechanics the engine never rolls for an enemy (<c>BattleContext.DamageTarget</c>'s crit/parry/dodge
-            /// draws are player-only); Agility's <c>DodgeChanceMultiplier</c> is equally never-rolled, but its
-            /// <c>CooldownBonusMultiplier</c> is symmetric (enemies cycle too) and only bites when the enemy
-            /// co-authors a <c>CooldownBonus</c> distribution point (0 × mult = 0) — dead for Agility alone. So
-            /// until an enemy fields such a kit, both are consumed only by a direct kit hit.
+            /// The representative level to rate a live enemy at for <see cref="CheckEnemyAttributeConsumption"/>:
+            /// the arc midpoint of the first live zone it spawns in, or that zone's fixed <c>BossLevel</c> if
+            /// it's the dedicated boss there — the same placement precedent the combat-rating calibration report
+            /// (#1533) uses. <c>Contracts.Enemy</c> carries no level of its own; one only exists at an encounter.
             /// </summary>
-            private static bool IsConsumedByKit(EAttribute attribute, IReadOnlyList<Contracts.Skill> kit)
+            private int? ResolveRatingLevel(Contracts.Enemy enemy)
             {
-                if (attribute != EAttribute.Agility && attribute != EAttribute.Luck && HasStaticDerivation(attribute))
+                foreach (var zone in Live(_graph.Zones, z => z.RetiredAt))
                 {
-                    return true;
+                    if (enemy.Spawns.Any(s => s.ZoneId == zone.Id))
+                    {
+                        return (zone.LevelMin + zone.LevelMax) / 2;
+                    }
+
+                    if (zone.BossEnemyId == enemy.Id)
+                    {
+                        return zone.BossLevel;
+                    }
                 }
 
-                return kit.Any(skill => skill.DamageMultipliers.Any(m => m.AttributeId == attribute && m.Multiplier != 0)
-                    || skill.Effects.Any(e => e.ScalingAttributeId == attribute && e.ScalingAmount != 0));
+                return null;
             }
 
-            private static bool HasStaticDerivation(EAttribute attribute)
-                => StaticAttributeModifiers.All.Any(m => m.Source == EAttributeModifierSource.Derived && m.DerivedSource == attribute);
+            /// <summary>
+            /// Assembles a rating <see cref="Battler"/> for a live enemy's full authored kit (every live skill in
+            /// <see cref="Contracts.Enemy.SkillPool"/>, not a random per-encounter draw — the check asks whether
+            /// anything in the <em>kit</em> consumes the attribute) at <paramref name="level"/>. Mirrors
+            /// <see cref="Enemies.Enemy.ToBattler"/>, but built directly from the source-agnostic
+            /// <c>Contracts</c> DTOs this lint works from: <c>Game.Application</c> has no reach into the data
+            /// tier's entity↔domain mapping (<c>Game.DataAccess.Mapping.SkillMapper</c>), and <c>Game.Core</c>
+            /// itself has no dependency on <c>Game.Abstractions.Contracts</c> to host this mapping instead.
+            /// </summary>
+            private static Battler BuildRatingBattler(Contracts.Enemy enemy, IReadOnlyList<Contracts.Skill> kit, int level)
+            {
+                var modifiers = enemy.AttributeDistribution.Select(d => new AttributeModifier
+                {
+                    Attribute = d.AttributeId,
+                    Amount = (double)d.BaseAmount + (double)d.AmountPerLevel * level,
+                    Type = EModifierType.Additive,
+                    Source = EAttributeModifierSource.AttributeDistribution,
+                });
+
+                return new Battler(new AttributeCollection(modifiers), kit.Select(ToRatingSkill), level);
+            }
+
+            private static Skill ToRatingSkill(Contracts.Skill skill) => new()
+            {
+                Id = skill.Id,
+                Name = skill.Name,
+                BaseDamage = (double)skill.BaseDamage,
+                Description = skill.Description,
+                CooldownMs = skill.CooldownMs,
+                CriticalChance = (double)skill.CriticalChance,
+                DamagePortions = skill.DamagePortions
+                    .Select(p => new SkillDamagePortion { Type = p.Type, Weight = (double)p.Weight })
+                    .ToList(),
+                DamageMultipliers = skill.DamageMultipliers
+                    .Select(m => new DamageMultiplier { Attribute = m.AttributeId, Amount = (double)m.Multiplier })
+                    .ToList(),
+                Effects = skill.Effects
+                    .Select(e => new SkillEffect
+                    {
+                        Id = e.Id,
+                        Target = e.Target,
+                        AttributeId = e.AttributeId,
+                        ModifierType = e.ModifierTypeId,
+                        Amount = (double)e.Amount,
+                        DurationMs = e.DurationMs,
+                        ScalingAttributeId = e.ScalingAttributeId,
+                        ScalingAmount = (double)e.ScalingAmount,
+                    }).ToList(),
+            };
 
             // --- Classes ----------------------------------------------------------------------------------
 

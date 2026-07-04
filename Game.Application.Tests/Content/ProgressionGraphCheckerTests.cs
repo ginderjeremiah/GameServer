@@ -291,6 +291,24 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Enemy_DistributesAgilityWithCoAuthoredCooldownBonus_ProducesNoFinding()
+        {
+            // Agility has no direct kit consumer here, but co-authoring CooldownBonus makes its derived
+            // CooldownBonusMultiplier live (CooldownBonus × CooldownBonusMultiplier feeds the cooldown rate),
+            // so Agility is no longer dead weight — the exact case #1581 moved off the heuristic for.
+            var graph = HealthyGraph() with
+            {
+                Enemies =
+                [
+                    Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)],
+                        attributeDistribution: [(EAttribute.Agility, 5, 1), (EAttribute.CooldownBonus, 5, 1)]),
+                    Enemy(1, isBoss: true),
+                ],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
+        [Fact]
         public void Enemy_DistributesLuckConsumedByPooledEffectScaling_ProducesNoFinding()
         {
             var graph = HealthyGraph() with
@@ -355,6 +373,20 @@ namespace Game.Application.Tests.Content
             {
                 Enemies = HealthyGraph().Enemies
                     .Append(Enemy(9, skillPool: [2], spawns: [(0, 1)], retiredAt: Retired, attributeDistribution: [(EAttribute.Luck, 5, 1)]))
+                    .ToList(),
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
+        }
+
+        [Fact]
+        public void Enemy_NotPlacedInAnyLiveZone_ProducesNoFinding()
+        {
+            // No spawn table entry and no dedicated-boss slot means no representative level to rate at, so the
+            // check is skipped rather than rating at a made-up level.
+            var graph = HealthyGraph() with
+            {
+                Enemies = HealthyGraph().Enemies
+                    .Append(Enemy(9, skillPool: [2], spawns: [], attributeDistribution: [(EAttribute.Luck, 5, 1)]))
                     .ToList(),
             };
             Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
@@ -971,7 +1003,14 @@ namespace Game.Application.Tests.Content
                 .Select(m => new Contracts.AttributeMultiplier { AttributeId = m.attributeId, Multiplier = m.multiplier })
                 .ToList(),
                 Effects = (effectScaling ?? [])
-                .Select(e => new Contracts.SkillEffect { AttributeId = EAttribute.MaxHealth, ScalingAttributeId = e.attributeId, ScalingAmount = e.scalingAmount })
+                .Select(e => new Contracts.SkillEffect
+                {
+                    Target = ESkillEffectTarget.Self,
+                    AttributeId = EAttribute.MaxHealth,
+                    DurationMs = 1000,
+                    ScalingAttributeId = e.attributeId,
+                    ScalingAmount = e.scalingAmount,
+                })
                 .ToList(),
                 DamagePortions = [new Contracts.SkillDamagePortion { Type = primaryType, Weight = 1 }],
                 Description = "",
