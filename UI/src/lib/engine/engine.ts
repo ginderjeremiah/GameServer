@@ -11,7 +11,8 @@ import {
 	proficiencyMilestoneMessage,
 	proficiencyOpenedMessage,
 	creatableRecipeIds,
-	recipeAvailableMessage
+	recipeAvailableMessage,
+	newlyInSet
 } from '$lib/common';
 import { RenderEngine } from './render-engine';
 import { LogicalEngine } from './logical-engine';
@@ -192,19 +193,20 @@ const currentCreatableRecipeIds = (): Set<number> =>
 
 /**
  * Toasts each recipe that became creatable as a result of the just-applied proficiency gain, comparing the
- * current creatable set against the pre-push snapshot. Mirrors the milestone/challenge feedback — a success
- * toast with a "View" action into the Synthesis screen — so the player learns a new recipe opened up even
- * while idling on another screen. Synthesizing is player-driven and stays un-toasted (spike #1125 area F);
- * this only fires for an availability change driven by background progress. Unknown reference ids are skipped.
+ * current creatable set against the pre-push snapshot (the shared content-events set-diff, #1586). Mirrors
+ * the milestone/challenge feedback — a success toast with a "View" action into the Synthesis screen — so
+ * the player learns a new recipe opened up even while idling on another screen. Synthesizing is
+ * player-driven and stays un-toasted (spike #1125 area F); this only fires for an availability change
+ * driven by background progress. Unknown reference ids are skipped.
  */
 const notifyNewlyCreatableRecipes = (creatableBefore: ReadonlySet<number>) => {
 	const recipes = staticData.skillRecipes;
 	if (!recipes) {
 		return;
 	}
-	const creatableNow = currentCreatableRecipeIds();
+	const newlyCreatable = new Set(newlyInSet(creatableBefore, currentCreatableRecipeIds()));
 	for (const recipe of recipes) {
-		if (!creatableNow.has(recipe.id) || creatableBefore.has(recipe.id)) {
+		if (!newlyCreatable.has(recipe.id)) {
 			continue;
 		}
 		const result = staticData.skills?.[recipe.resultSkillId];
