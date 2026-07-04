@@ -1,3 +1,4 @@
+using Game.Api.Models.Enemies;
 using Game.Application.Services;
 
 namespace Game.Api.Models.Progress
@@ -25,6 +26,12 @@ namespace Game.Api.Models.Progress
         public required List<ChallengeCompletedModel> CompletedChallenges { get; set; }
         public required List<ProficiencyXpResultModel> ProficiencyGains { get; set; }
         public required List<ProficiencyOpenedModel> OpenedProficiencies { get; set; }
+
+        /// <summary>Non-null when the player's pre-existing battle was still genuinely in progress rather than
+        /// concluded (#1595): the still-active battle to resume — the client's replay-to-offset fast-forward
+        /// (#1597) is a separate follow-up. When set, every other field above is at its empty/default value.
+        /// </summary>
+        public EnemyInstance? ActiveBattle { get; set; }
 
         public static OfflineProgressModel FromSource(OfflineProgressSummary source)
         {
@@ -65,6 +72,7 @@ namespace Game.Api.Models.Progress
                         ProficiencyId = o.ProficiencyId,
                     })
                     .ToList(),
+                ActiveBattle = source.ActiveBattle is not null ? EnemyInstance.FromSource(source.ActiveBattle) : null,
             };
         }
     }

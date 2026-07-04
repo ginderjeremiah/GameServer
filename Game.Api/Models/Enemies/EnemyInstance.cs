@@ -12,6 +12,13 @@ namespace Game.Api.Models.Enemies
         public required List<int> SelectedSkills { get; set; }
 
         /// <summary>
+        /// Non-null when this battle was already in progress rather than freshly started (#1595): the real
+        /// elapsed time (ms) since it began, which the client must fast-forward through — replay-to-offset,
+        /// #1597 — before continuing live. Null for a freshly started battle.
+        /// </summary>
+        public int? ElapsedOffsetMs { get; set; }
+
+        /// <summary>
         /// Projects a battle-start result onto the wire model. The single source of truth for the
         /// enemy-instance projection shared by the <c>NewEnemy</c> and <c>ChallengeBoss</c> socket commands,
         /// keeping the two from drifting (#492).
@@ -27,6 +34,7 @@ namespace Game.Api.Models.Enemies
                 SelectedSkills = enemy.BattleSkills.Select(skill => skill.Id).ToList(),
                 Attributes = enemy.GetAttributeModifiers()
                     .Select(modifier => BattlerAttribute.From(modifier.Attribute, modifier.Amount)),
+                ElapsedOffsetMs = source.ElapsedOffsetMs,
             };
         }
     }

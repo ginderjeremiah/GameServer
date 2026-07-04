@@ -115,8 +115,16 @@ namespace Game.Application.Services
             }
 
             // Settle the disconnected battle before simulating the away window, so its outcome is credited once
-            // (here) rather than being re-abandoned by the first live StartBattle after the gate.
-            await _battleService.ResolveStaleBattle(player, state, cancellationToken);
+            // (here) rather than being re-abandoned by the first live StartBattle after the gate. When the
+            // battle is instead handed back still in progress (#1595) there is no settled outcome and no
+            // leftover budget beyond it to spend on new battles — hand it back as-is rather than crediting a
+            // window that hasn't actually elapsed for this fight. LastActivity is deliberately left untouched
+            // (nothing was persisted), so the away clock keeps counting against the original disconnect until
+            // real server time actually resolves the fight.
+            if (await _battleService.ResolveStaleBattle(player, state, cancellationToken) is { } handoff)
+            {
+                return OfflineProgressSummary.StillInProgress(handoff, cappedAwayMs, player.AutoChallengeBoss, player.CurrentZoneId);
+            }
 
             // Load the progress aggregate once for the whole offline pass. Its completed challenges (loop/zone
             // gating), proficiency levels (battle snapshot), and statistics (reward application) all read the
@@ -334,13 +342,22 @@ namespace Game.Application.Services
         public required IReadOnlyList<ProficiencyOpened> OpenedProficiencies { get; init; }
 
         /// <summary>
+        /// Non-null when the player's pre-existing battle was still genuinely in progress rather than concluded
+        /// (#1595): the still-active battle's enemy/seed and elapsed offset the client must resume from
+        /// (replay-to-offset, #1597). When set, no away-window battles were simulated — there was no leftover
+        /// budget beyond this unconcluded fight — and every other field is at its default/empty value.
+        /// </summary>
+        public BattleStartResult? ActiveBattle { get; init; }
+
+        /// <summary>
         /// Whether the window produced anything worth gating on. The frontend skips the welcome-back gate for
         /// an empty summary (a sub-threshold absence, or one that earned nothing) and enters the game directly.
         /// A window that only advanced proficiencies (e.g. a maxed-XP-level character) still reports progress.
         /// </summary>
         public bool HasProgress =>
             BattlesWon > 0 || BattlesLost > 0 || BattlesDrawn > 0
-            || CompletedChallenges.Count > 0 || ProficiencyGains.Count > 0 || OpenedProficiencies.Count > 0;
+            || CompletedChallenges.Count > 0 || ProficiencyGains.Count > 0 || OpenedProficiencies.Count > 0
+            || ActiveBattle is not null;
 
         /// <summary>An empty summary: away time recorded but nothing simulated (a sub-threshold return).</summary>
         public static OfflineProgressSummary Empty(long awayMs, bool autoChallengeBoss, int zoneId) => new()
@@ -358,6 +375,26 @@ namespace Game.Application.Services
             ProficiencyGains = [],
             OpenedProficiencies = [],
         };
+
+        /// <summary>A summary for a still-in-progress hand-back (#1595): no battles were simulated, only the
+        /// active battle to resume is carried.</summary>
+        public static OfflineProgressSummary StillInProgress(
+            BattleStartResult activeBattle, long awayMs, bool autoChallengeBoss, int zoneId) => new()
+            {
+                AwayMs = awayMs,
+                AutoChallengeBoss = autoChallengeBoss,
+                ZoneId = zoneId,
+                BattlesWon = 0,
+                BattlesLost = 0,
+                BattlesDrawn = 0,
+                TotalExp = 0,
+                LevelsGained = 0,
+                StatPointsGained = 0,
+                CompletedChallenges = [],
+                ProficiencyGains = [],
+                OpenedProficiencies = [],
+                ActiveBattle = activeBattle,
+            };
     }
 
     /// <summary>

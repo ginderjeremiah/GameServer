@@ -5,7 +5,8 @@ import type {
 	EChallengeGoalComparison,
 	EChallengeType,
 	EEntityType,
-	EStatisticType
+	EStatisticType,
+	IEnemyInstance
 } from '../';
 
 export interface IChallengeCompletedModel {
@@ -35,6 +36,7 @@ export interface IOfflineProgressModel {
 	completedChallenges: IChallengeCompletedModel[];
 	proficiencyGains: IProficiencyXpResultModel[];
 	openedProficiencies: IProficiencyOpenedModel[];
+	activeBattle?: IEnemyInstance;
 }
 
 export interface IPlayerChallenge {

@@ -57,7 +57,12 @@ namespace Game.Application.Services
         {
             if (state.HasActiveBattle)
             {
-                await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+                // A still-in-progress handoff (#1595) means the existing battle hasn't concluded yet — hand
+                // it back instead of abandoning it for a fresh spawn.
+                if (await AbandonBattle(player, state, clientBattleMs, cancellationToken) is { } handoff)
+                {
+                    return handoff;
+                }
             }
 
             // A real zone change is gated on the target being in range, unlocked, in circulation, and a combat
@@ -174,6 +179,11 @@ namespace Game.Application.Services
 
             if (state.HasActiveBattle)
             {
+                // Deliberate override: challenging the boss always abandons whatever idle battle is running
+                // (even one still genuinely in progress, #1595) and proceeds — unlike NewEnemy, this is an
+                // explicit different action, not "give my existing battle back," so the handoff is discarded.
+                // Nothing was cleared or persisted for a still-in-progress abandon, so overwriting the
+                // in-memory state below with the boss battle is safe either way.
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
             }
 
@@ -330,18 +340,25 @@ namespace Game.Application.Services
         /// <summary>
         /// Resolves a stale in-flight battle left by a mid-battle disconnect, crediting it exactly like an
         /// abandon (re-simulate capped at the elapsed wall-clock, pay a win out in full, else record the
-        /// loss/draw) and clearing it. A no-op when no battle is active. Used by the offline-rewards flow to
-        /// settle the disconnected battle before it simulates the away window — so the window's simulation, and
-        /// the idle loop that follows the welcome-back gate, both start from a clean state.
+        /// loss/draw) and clearing it — or, when the replay hasn't concluded within the 2-minute cap, handing
+        /// it back still active with its elapsed offset (#1595) instead of booking a phantom draw. Returns
+        /// null when the battle was resolved (or there was none to resolve); returns the handoff otherwise.
+        /// Used by the offline-rewards flow to settle the disconnected battle before it simulates the away
+        /// window — so the window's simulation, and the idle loop that follows the welcome-back gate, both
+        /// start from a clean state.
         /// </summary>
-        public Task ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        public Task<BattleStartResult?> ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             // No client elapsed for an offline/disconnect resolution — the abandon falls back to wall-clock
             // (capped at DefaultMaxBattleMs), exactly as before.
             return AbandonBattle(player, state, cancellationToken: cancellationToken);
         }
 
-        private async Task AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
+        // Returns null when the stale battle was resolved (win/loss/draw, or nothing to resolve) and has
+        // already been cleared/persisted. Returns a non-null BattleStartResult — the same enemy/seed, plus
+        // the real elapsed offset since BattleStartTime — when the battle is instead handed back still active
+        // (#1595): the caller must leave PlayerState untouched in that case (nothing was cleared or saved).
+        private async Task<BattleStartResult?> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
             var wallClockMs = (int)(now - state.BattleStartTime).TotalMilliseconds;
@@ -367,7 +384,7 @@ namespace Game.Application.Services
             if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, simulateMs))
             {
                 state.ClearBattle();
-                return;
+                return null;
             }
 
             if (result.Victory)
@@ -378,6 +395,20 @@ namespace Game.Application.Services
                 // earned exp (#206).
                 RecordVictory(player, enemy, result, state, now);
             }
+            else if (!result.PlayerDied && elapsedMs < GameConstants.DefaultMaxBattleMs)
+            {
+                // Neither battler died and the replay fell short of the cap: this is not a stalemate, it is a
+                // battle genuinely still in progress (#1595) — not enough real server time has elapsed since
+                // BattleStartTime for it to have concluded. Leave it active (same enemy/seed/snapshot,
+                // BattleStartTime unchanged) and hand it back with its elapsed offset instead of booking a
+                // phantom draw. Only a replay that reaches the cap with both battlers alive is a genuine draw.
+                return new BattleStartResult
+                {
+                    Enemy = enemy,
+                    Seed = state.BattleSeed ?? 0,
+                    ElapsedOffsetMs = wallClockMs,
+                };
+            }
             else
             {
                 player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
@@ -386,6 +417,7 @@ namespace Game.Application.Services
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
+            return null;
         }
 
         // Books a victory: grants the earned exp and records the win (kills, zone clears, and the
@@ -519,6 +551,13 @@ namespace Game.Application.Services
     {
         public required CoreEnemy Enemy { get; set; }
         public required uint Seed { get; set; }
+
+        /// <summary>
+        /// Non-null when this battle was already in progress rather than freshly started (#1595): the real
+        /// elapsed time (ms) since it began, which the client must fast-forward through — replay-to-offset,
+        /// #1597 — before continuing live. Null for a freshly started battle.
+        /// </summary>
+        public int? ElapsedOffsetMs { get; set; }
     }
 
 }
