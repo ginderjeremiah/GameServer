@@ -13,6 +13,7 @@
 	/>
 {:else}
 	<div class="steps-list">
+		<!-- Keyed by index intentionally: there is no stable step id, and array position IS the order. -->
 		{#each lesson.steps as step, i (i)}
 			<div class="step-row">
 				<div class="step-index">{i + 1}</div>

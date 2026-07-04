@@ -29,7 +29,7 @@ export const lessonEntity: EntityConfig<ILesson> = {
 		key: '',
 		name: '',
 		triggerType: ELessonTriggerType.ScreenVisit,
-		triggerScreenKey: GAME_SCREENS[0]?.key,
+		triggerScreenKey: GAME_SCREENS[0]?.key ?? '',
 		triggerMechanicEvent: undefined,
 		hostScreenKey: GAME_SCREENS[0]?.key ?? '',
 		displayOrder: 0,
