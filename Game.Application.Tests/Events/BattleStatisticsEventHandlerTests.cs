@@ -204,7 +204,7 @@ namespace Game.Application.Tests.Events
             var handler = MakeHandler(scope);
 
             // The skill dealt damage equal to the player's power, so its path claims the full pie
-            // (clamp(activity ÷ power) = 1); below the first threshold it accrues without leveling.
+            // (activity ÷ power = 1); below the first threshold it accrues without leveling.
             const double power = 100.0;
             var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
             stats.AddTypedDamageDealt(EDamageType.Physical, power); // the offense book the accrual consumes
@@ -269,7 +269,7 @@ namespace Game.Application.Tests.Events
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = await progressRepo.GetProficiencies(player.Id);
 
-            // The frontier tier banks the full pie (activity ÷ power = 1, no discount).
+            // The frontier tier banks the full pie (activity ÷ rating = 1, no discount).
             var frontier = Assert.Single(stored, p => p.ProficiencyId == tierOne.Id);
             Assert.Equal(0, frontier.Level);
             // The persisted gain is rounded to the numeric(18,3) XP scale, so compare against the same rounding.
@@ -289,8 +289,8 @@ namespace Game.Application.Tests.Events
             var user = await TestDataSeeder.CreateUserAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
-            // Two single-tier paths trained by two distinct-typed skills. Each path claims pie × clamp(its own
-            // damage ÷ power) independently — the claims overlap and need not sum to 1 (no shared pie). Fire
+            // Two single-tier paths trained by two distinct-typed skills. Each path claims pie × (its own
+            // damage ÷ rating) independently — the claims overlap and need not sum to 1 (no shared pie). Fire
             // deals the full power in damage (claims the full pie); Earth deals half (claims half the pie).
             var fireSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt", damageType: EDamageType.Fire);
             var earthSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Stoneskin", damageType: EDamageType.Earth);
@@ -399,8 +399,8 @@ namespace Game.Application.Tests.Events
             // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
             loadedEnemy.SelectBattleSkills();
 
-            // The skill dealt 1.5× the player's power, so each path claims pie × clamp(1.5) = pie × 1.5 — the
-            // same on both the live and the offline path.
+            // The skill dealt 1.5× the player's rating, so each path claims pie × 1.5 — the same on both the
+            // live and the offline path.
             const double power = 100.0;
             var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power * 1.5 } } };
             stats.AddTypedDamageDealt(EDamageType.Physical, power * 1.5); // the offense book the accrual consumes

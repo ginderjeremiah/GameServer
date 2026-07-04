@@ -267,12 +267,12 @@ namespace Game.Application.Tests.Services
 
         // ── Assertion helpers ───────────────────────────────────────────────────
 
-        // The XP a path claims for an activity quantity: pie × clamp(activity ÷ power), rounded to the persisted
-        // scale exactly as the reward service does — the calculator's formula, with the test's fixed power.
+        // The XP a path claims for an activity quantity: pie × activity ÷ max(playerRating, enemyRating), rounded
+        // to the persisted scale exactly as the reward service does — the calculator's formula, with the test's
+        // fixed (and equal) player/enemy rating.
         private static decimal ExpectedXp(double activity) =>
             Math.Round(
-                (decimal)(ServerGameConstants.ProficiencyXpPerVictory
-                    * Math.Min(activity / Power, ServerGameConstants.MaxExpRewardMultiplier)),
+                (decimal)(ServerGameConstants.ProficiencyXpPerVictory * activity / Power),
                 3,
                 MidpointRounding.AwayFromZero);
 
