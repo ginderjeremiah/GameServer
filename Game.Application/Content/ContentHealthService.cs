@@ -16,6 +16,7 @@ namespace Game.Application.Content
         private readonly IClasses _classes;
         private readonly IProficiencies _proficiencies;
         private readonly ISkillRecipes _skillRecipes;
+        private readonly ILessons _lessons;
 
         public ContentHealthService(
             IProgressionGraphChecker checker,
@@ -27,7 +28,8 @@ namespace Game.Application.Content
             IChallenges challenges,
             IClasses classes,
             IProficiencies proficiencies,
-            ISkillRecipes skillRecipes)
+            ISkillRecipes skillRecipes,
+            ILessons lessons)
         {
             _checker = checker;
             _skills = skills;
@@ -39,6 +41,7 @@ namespace Game.Application.Content
             _classes = classes;
             _proficiencies = proficiencies;
             _skillRecipes = skillRecipes;
+            _lessons = lessons;
         }
 
         public ContentHealthReport GetReport()
@@ -61,7 +64,8 @@ namespace Game.Application.Content
                 Classes: _classes.All(),
                 Paths: _proficiencies.AllPaths(),
                 Proficiencies: _proficiencies.AllProficiencies(),
-                SkillRecipes: _skillRecipes.AllSkillRecipes());
+                SkillRecipes: _skillRecipes.AllSkillRecipes(),
+                Lessons: _lessons.AllLessons());
         }
 
         /// <summary>Projects the checker's domain findings onto the admin report contract and tallies the

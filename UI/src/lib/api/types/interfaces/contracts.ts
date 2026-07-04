@@ -10,6 +10,8 @@ import type {
 	EEquipmentSlot,
 	EItemCategory,
 	EItemModType,
+	ELessonTriggerType,
+	EMechanicEvent,
 	EModifierType,
 	ERarity,
 	ESkillAcquisition,
@@ -146,6 +148,25 @@ export interface IItemModSlot {
 	id: number;
 	itemId: number;
 	itemModSlotTypeId: EItemModType;
+}
+
+export interface ILesson {
+	id: number;
+	key: string;
+	name: string;
+	triggerType: ELessonTriggerType;
+	screenKey: string;
+	triggerMechanicEvent?: EMechanicEvent;
+	ordinal: number;
+	designerNotes: string;
+	retiredAt?: string;
+	steps: ILessonStep[];
+}
+
+export interface ILessonStep {
+	ordinal: number;
+	text: string;
+	anchorKey?: string;
 }
 
 export interface IPath {

@@ -871,6 +871,47 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ZoneReachability", ContentGraphSeverity.Warning, "Zone", 1);
         }
 
+        // --- Lessons ----------------------------------------------------------------------------------
+
+        [Fact]
+        public void Lesson_MechanicEventTrigger_WithNoMechanicEvent_IsError()
+        {
+            var graph = HealthyGraph() with { Lessons = TaughtByBlurbLessons(critDodgeMechanicEvent: null) };
+            AssertHasFinding(graph, "LessonTrigger", ContentGraphSeverity.Error, "Lesson", 0);
+        }
+
+        [Fact]
+        public void Lesson_ScreenVisitTrigger_WithMechanicEvent_IsWarning()
+        {
+            var graph = HealthyGraph() with { Lessons = TaughtByBlurbLessons(idleLoopMechanicEvent: EMechanicEvent.FirstDodge) };
+            AssertHasFinding(graph, "LessonTrigger", ContentGraphSeverity.Warning, "Lesson", 1);
+        }
+
+        [Fact]
+        public void Lesson_BlankScreenKey_IsError()
+        {
+            var graph = HealthyGraph() with { Lessons = TaughtByBlurbLessons(idleLoopScreenKey: " ") };
+            AssertHasFinding(graph, "LessonTrigger", ContentGraphSeverity.Error, "Lesson", 1);
+        }
+
+        [Fact]
+        public void Lesson_MissingTaughtByBlurbCandidate_IsWarning()
+        {
+            // Drop the "idle-loop-basics" lesson: content-design.md §2 still names it as a taught-by-blurb
+            // candidate, so its absence should surface rather than pass silently.
+            var graph = HealthyGraph() with { Lessons = TaughtByBlurbLessons(includeIdleLoop: false) };
+            AssertHasFinding(graph, "LessonCoverage", ContentGraphSeverity.Warning, "Lesson", -1);
+        }
+
+        [Fact]
+        public void Lesson_RetiredCandidateLesson_StillCountsAsMissingCoverage()
+        {
+            // A retired lesson is out of circulation, so it no longer satisfies the candidate's coverage —
+            // mirroring how a retired boss/challenge/etc. no longer satisfies the reference it once did.
+            var graph = HealthyGraph() with { Lessons = TaughtByBlurbLessons(idleLoopRetiredAt: Retired) };
+            AssertHasFinding(graph, "LessonCoverage", ContentGraphSeverity.Warning, "Lesson", -1);
+        }
+
         [Fact]
         public void Finding_ToString_IsHumanReadable()
         {
@@ -909,7 +950,10 @@ namespace Game.Application.Tests.Content
                 Classes: [Class(0, starterSkills: [1])],
                 Paths: [Path(0)],
                 Proficiencies: [Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(5, 5)])],
-                SkillRecipes: []);
+                SkillRecipes: [],
+                // A healthy graph must also cover the taught-by-blurb candidates, or CheckLessons's coverage
+                // warning would fire on every other test's otherwise-clean graph too.
+                Lessons: TaughtByBlurbLessons());
         }
 
         private static Contracts.Skill Skill(
@@ -1096,5 +1140,43 @@ namespace Game.Application.Tests.Content
             InputSkillIds = inputs ?? [],
             Conditions = (conditions ?? []).Select(c => new Contracts.SkillRecipeCondition { ProficiencyId = c.proficiencyId, MinLevel = c.minLevel }).ToList(),
         };
+
+        private static Contracts.Lesson Lesson(
+            int id,
+            string key,
+            ELessonTriggerType triggerType,
+            EMechanicEvent? mechanicEvent = null,
+            string screenKey = "fight",
+            DateTime? retiredAt = null) => new()
+            {
+                Id = id,
+                Key = key,
+                Name = $"Lesson {id}",
+                TriggerType = triggerType,
+                ScreenKey = screenKey,
+                TriggerMechanicEvent = mechanicEvent,
+                Ordinal = id,
+                DesignerNotes = "",
+                RetiredAt = retiredAt,
+                Steps = [new Contracts.LessonStep { Ordinal = 0, Text = "Step", AnchorKey = null }],
+            };
+
+        /// <summary>The three taught-by-blurb candidates, healthy by default; a test overrides one entry to
+        /// craft a specific violation.</summary>
+        private static List<Contracts.Lesson> TaughtByBlurbLessons(
+            EMechanicEvent? critDodgeMechanicEvent = EMechanicEvent.FirstCrit,
+            ELessonTriggerType idleLoopTriggerType = ELessonTriggerType.ScreenVisit,
+            EMechanicEvent? idleLoopMechanicEvent = null,
+            string idleLoopScreenKey = "fight",
+            DateTime? idleLoopRetiredAt = null,
+            bool includeIdleLoop = true) =>
+            [
+                Lesson(0, "crit-dodge-variance", ELessonTriggerType.MechanicEvent, mechanicEvent: critDodgeMechanicEvent),
+                .. includeIdleLoop
+                    ? (Contracts.Lesson[])
+                        [Lesson(1, "idle-loop-basics", idleLoopTriggerType, mechanicEvent: idleLoopMechanicEvent, screenKey: idleLoopScreenKey, retiredAt: idleLoopRetiredAt)]
+                    : [],
+                Lesson(2, "cooldown-charging", ELessonTriggerType.MechanicEvent, mechanicEvent: EMechanicEvent.FirstCooldownRecharge),
+            ];
     }
 }

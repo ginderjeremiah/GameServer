@@ -11,6 +11,7 @@ using System.Net.Http.Json;
 using System.Net.WebSockets;
 using Xunit;
 using Attribute = Game.Api.Models.Attributes.Attribute;
+using Lesson = Game.Abstractions.Contracts.Lesson;
 using Path = Game.Abstractions.Contracts.Path;
 
 namespace Game.Api.Tests.Integration
@@ -424,6 +425,32 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetLessons_ReturnsSeededLessons()
+        {
+            int userId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateLessonAsync(context, key: "ref-lesson", name: "RefLesson");
+
+                var user = await TestDataSeeder.CreateUserAsync(context, "lessonsocketuser", "lessonsocketpass");
+                await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                userId = user.Id;
+            }
+
+            await ReloadReferenceCachesAsync();
+            await LoginAsync("lessonsocketuser", "lessonsocketpass");
+
+            await using var socketClient = await ConnectAsync(userId);
+
+            var response = await socketClient.SendCommandAsync<List<Lesson>>("GetLessons");
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.Contains(response.Data, l => l.Name == "RefLesson");
+        }
+
+        [Fact]
         public async Task GetStatisticTypes_ReturnsIntrinsicStatisticTypes()
         {
             var userId = await SeedReferenceDataAndLoginAsync();
@@ -454,7 +481,7 @@ namespace Game.Api.Tests.Integration
             // One entry per Get* reference-data command the loading screen pulls.
             Assert.Equal(
                 ["GetAttributes", "GetChallengeTypes", "GetChallenges", "GetClasses", "GetEnemies", "GetItemMods",
-                 "GetItems", "GetPaths", "GetProficiencies", "GetSkillRecipes", "GetSkills", "GetStatisticTypes", "GetZones"],
+                 "GetItems", "GetLessons", "GetPaths", "GetProficiencies", "GetSkillRecipes", "GetSkills", "GetStatisticTypes", "GetZones"],
                 response.Data.Select(v => v.Command).OrderBy(c => c, StringComparer.Ordinal));
             Assert.All(response.Data, v => Assert.False(string.IsNullOrEmpty(v.Version)));
         }

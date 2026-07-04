@@ -38,7 +38,8 @@ const SOCKET_SETS: Record<string, { id: number; name: string }[]> = {
 	GetChallengeTypes: [{ id: 1, name: 'Enemies Killed' }],
 	GetChallenges: [{ id: 0, name: 'First Blood' }],
 	GetPaths: [{ id: 0, name: 'Fire Magic' }],
-	GetProficiencies: [{ id: 0, name: 'Fire' }]
+	GetProficiencies: [{ id: 0, name: 'Fire' }],
+	GetLessons: [{ id: 0, name: 'Idle Combat' }]
 };
 const TAGS = [{ id: 10, name: 'Fire', tagCategoryId: 100 }];
 const TAG_CATEGORIES = [{ id: 100, name: 'Element' }];
@@ -72,12 +73,13 @@ describe('WorkbenchReference.load', () => {
 			'GetChallengeTypes',
 			'GetChallenges',
 			'GetPaths',
-			'GetProficiencies'
+			'GetProficiencies',
+			'GetLessons'
 		]) {
 			expect(mockFetchSocket).toHaveBeenCalledWith(command);
 		}
-		// Only tags + categories use HTTP — the transport split is exactly 10 socket / 2 HTTP.
-		expect(mockFetchSocket).toHaveBeenCalledTimes(10);
+		// Only tags + categories use HTTP — the transport split is exactly 11 socket / 2 HTTP.
+		expect(mockFetchSocket).toHaveBeenCalledTimes(11);
 		expect(mockGet).toHaveBeenCalledTimes(2);
 		expect(mockGet).toHaveBeenCalledWith('Tags');
 		expect(mockGet).toHaveBeenCalledWith('Tags/TagCategories');
@@ -92,6 +94,7 @@ describe('WorkbenchReference.load', () => {
 		expect(staticData.challenges).toBe(SOCKET_SETS.GetChallenges);
 		expect(staticData.paths).toBe(SOCKET_SETS.GetPaths);
 		expect(staticData.proficiencies).toBe(SOCKET_SETS.GetProficiencies);
+		expect(staticData.lessons).toBe(SOCKET_SETS.GetLessons);
 		// …and the tags/categories/challenge-types the singleton owns onto its own fields
 		// (these are $state-wrapped reactive proxies, so compare by value, not identity).
 		expect(reference.tags).toEqual(TAGS);

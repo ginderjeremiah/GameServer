@@ -168,6 +168,16 @@ namespace Game.Application.Content
             return ordered;
         }
 
+        public static IReadOnlyList<Contracts.Lesson> Canonicalize(IEnumerable<Contracts.Lesson> lessons)
+        {
+            var ordered = lessons.OrderBy(l => l.Id).ToList();
+            foreach (var lesson in ordered)
+            {
+                lesson.Steps = lesson.Steps.OrderBy(s => s.Ordinal).ToList();
+            }
+            return ordered;
+        }
+
         /// <summary>
         /// Writes a <see cref="DateTime"/> as a stable UTC ISO-8601 instant so a retire timestamp's serialized
         /// form never depends on the reader's locale or the value's <see cref="DateTimeKind"/>. An Unspecified

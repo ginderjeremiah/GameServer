@@ -42,6 +42,8 @@ namespace Game.Infrastructure.Database
         public DbSet<Item> Items { get; set; }
         public DbSet<ItemModSlot> ItemModSlots { get; set; }
         public DbSet<ItemTag> ItemTags { get; set; }
+        public DbSet<Lesson> Lessons { get; set; }
+        public DbSet<LessonStep> LessonSteps { get; set; }
         public DbSet<LogPreference> LogPreferences { get; set; }
         public DbSet<LogType> LogTypes { get; set; }
         public DbSet<Player> Players { get; set; }
@@ -672,6 +674,42 @@ namespace Game.Infrastructure.Database
                     .WithMany()
                     .HasForeignKey(p => p.PrerequisiteProficiencyId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Lesson>(entity =>
+            {
+                entity.Property(l => l.Id)
+                    .HasIdentityOptions(0, 1, 0);
+
+                entity.Property(l => l.Key)
+                    .HasMaxLength(100);
+
+                entity.Property(l => l.Name)
+                    .HasMaxLength(100);
+
+                entity.Property(l => l.ScreenKey)
+                    .HasMaxLength(50);
+
+                entity.Property(l => l.DesignerNotes)
+                    .HasMaxLength(2000);
+
+                // A lesson's stable authoring slug is how the progression-graph lint matches it against
+                // content-design's taught-by-blurb candidates, so two lessons must never share one.
+                entity.HasIndex(l => l.Key)
+                    .IsUnique();
+            });
+
+            modelBuilder.Entity<LessonStep>(entity =>
+            {
+                entity.HasKey(s => new { s.LessonId, s.Ordinal });
+
+                entity.Property(s => s.AnchorKey)
+                    .HasMaxLength(100);
+
+                entity.HasOne(s => s.Lesson)
+                    .WithMany(l => l.Steps)
+                    .HasForeignKey(s => s.LessonId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<StatisticType>(entity =>

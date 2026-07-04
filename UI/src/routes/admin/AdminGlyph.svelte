@@ -43,6 +43,9 @@
 	{:else if kind === 'inbox'}
 		<path d="M2.5 3.5h11v9h-11z" stroke-linejoin="round" />
 		<path d="M2.5 9h3l1 1.5h3l1-1.5h3" stroke-linejoin="round" />
+	{:else if kind === 'book'}
+		<path d="M2.5 3.5c1.5-.8 3.7-.8 5.5.3v9c-1.8-1.1-4-1.1-5.5-.3z" stroke-linejoin="round" stroke-linecap="round" />
+		<path d="M13.5 3.5c-1.5-.8-3.7-.8-5.5.3v9c1.8-1.1 4-1.1 5.5-.3z" stroke-linejoin="round" stroke-linecap="round" />
 	{/if}
 </svg>
 
@@ -61,7 +64,8 @@ export const ADMIN_GLYPH_KINDS = [
 	'gauge',
 	'back',
 	'trophy',
-	'inbox'
+	'inbox',
+	'book'
 ] as const;
 
 export type AdminGlyphKind = (typeof ADMIN_GLYPH_KINDS)[number];

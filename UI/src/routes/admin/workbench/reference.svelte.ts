@@ -7,6 +7,8 @@ import {
 	EEquipmentSlot,
 	EItemCategory,
 	EItemModType,
+	ELessonTriggerType,
+	EMechanicEvent,
 	EModifierType,
 	ERarity,
 	ESkillAcquisition,
@@ -61,7 +63,8 @@ class WorkbenchReference {
 			challengeTypes,
 			challenges,
 			paths,
-			proficiencies
+			proficiencies,
+			lessons
 		] = await Promise.all([
 			fetchSocketData('GetEnemies'),
 			fetchSocketData('GetSkills'),
@@ -76,7 +79,8 @@ class WorkbenchReference {
 			fetchSocketData('GetChallengeTypes'),
 			fetchSocketData('GetChallenges'),
 			fetchSocketData('GetPaths'),
-			fetchSocketData('GetProficiencies')
+			fetchSocketData('GetProficiencies'),
+			fetchSocketData('GetLessons')
 		]);
 		staticData.enemies = enemies;
 		staticData.skills = skills;
@@ -87,6 +91,7 @@ class WorkbenchReference {
 		staticData.challenges = challenges;
 		staticData.paths = paths;
 		staticData.proficiencies = proficiencies;
+		staticData.lessons = lessons;
 		this.tags = tags;
 		this.tagCategories = tagCategories;
 		this.challengeTypes = challengeTypes;
@@ -130,6 +135,8 @@ class WorkbenchReference {
 	modTypeOptions = (): SelectOption[] => toOptions(enumPairs(EItemModType));
 	skillEffectTargetOptions = (): SelectOption[] => toOptions(enumPairs(ESkillEffectTarget));
 	modifierTypeOptions = (): SelectOption[] => toOptions(enumPairs(EModifierType));
+	lessonTriggerTypeOptions = (): SelectOption[] => toOptions(enumPairs(ELessonTriggerType));
+	mechanicEventOptions = (): SelectOption[] => toOptions(enumPairs(EMechanicEvent));
 	tagCategoryOptions = (): SelectOption[] => this.tagCategories.map((c) => ({ value: c.id, text: c.name }));
 	zoneOptions = (keep?: number): SelectOption[] =>
 		this.retireableOptions(staticData.zones ?? [], keep, (z) => `${z.name} · L${z.levelMin}–${z.levelMax}`);

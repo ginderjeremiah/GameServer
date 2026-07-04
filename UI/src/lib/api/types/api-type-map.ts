@@ -20,6 +20,7 @@ import type {
 	IItem,
 	IItemMod,
 	IItemModSlot,
+	ILesson,
 	ILoginCredentials,
 	ILoginResult,
 	IPath,
@@ -37,6 +38,7 @@ import type {
 	ISetEnemyAttributeDistributions,
 	ISetEnemySkillsData,
 	ISetEnemySpawnsData,
+	ISetLessonStepsData,
 	ISetProficiencyModifiersData,
 	ISetProficiencyPrerequisitesData,
 	ISetProficiencyRewardsData,
@@ -64,6 +66,7 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditItemMods': undefined;
 	'AdminTools/AddEditItemModSlots': undefined;
 	'AdminTools/AddEditItems': undefined;
+	'AdminTools/AddEditLessons': undefined;
 	'AdminTools/AddEditPaths': undefined;
 	'AdminTools/AddEditProficiencies': undefined;
 	'AdminTools/AddEditSkillRecipes': undefined;
@@ -85,6 +88,7 @@ export type ApiResponseTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': undefined;
 	'AdminTools/SetEnemySkills': undefined;
 	'AdminTools/SetEnemySpawns': undefined;
+	'AdminTools/SetLessonSteps': undefined;
 	'AdminTools/SetProficiencyModifiers': undefined;
 	'AdminTools/SetProficiencyPrerequisites': undefined;
 	'AdminTools/SetProficiencyRewards': undefined;
@@ -122,6 +126,7 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditItemMods': IChange<IItemMod>[];
 	'AdminTools/AddEditItemModSlots': IChange<IItemModSlot>[];
 	'AdminTools/AddEditItems': IChange<IItem>[];
+	'AdminTools/AddEditLessons': IChange<ILesson>[];
 	'AdminTools/AddEditPaths': IChange<IPath>[];
 	'AdminTools/AddEditProficiencies': IChange<IProficiency>[];
 	'AdminTools/AddEditSkillRecipes': IChange<ISkillRecipe>[];
@@ -141,6 +146,7 @@ export type ApiRequestTypes = {
 	'AdminTools/SetEnemyAttributeDistributions': ISetEnemyAttributeDistributions;
 	'AdminTools/SetEnemySkills': ISetEnemySkillsData;
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
+	'AdminTools/SetLessonSteps': ISetLessonStepsData;
 	'AdminTools/SetProficiencyModifiers': ISetProficiencyModifiersData;
 	'AdminTools/SetProficiencyPrerequisites': ISetProficiencyPrerequisitesData;
 	'AdminTools/SetProficiencyRewards': ISetProficiencyRewardsData;

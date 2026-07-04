@@ -16,7 +16,8 @@ const SLOTS = [
 	'proficiencies',
 	'paths',
 	'classes',
-	'skillRecipes'
+	'skillRecipes',
+	'lessons'
 ] as const;
 
 const clearAll = () => {

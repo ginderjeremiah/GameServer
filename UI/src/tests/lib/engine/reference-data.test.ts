@@ -43,7 +43,8 @@ const SETS = [
 	'proficiencies',
 	'paths',
 	'classes',
-	'skillRecipes'
+	'skillRecipes',
+	'lessons'
 ];
 
 const COMMANDS = [
@@ -59,7 +60,8 @@ const COMMANDS = [
 	'GetProficiencies',
 	'GetPaths',
 	'GetClasses',
-	'GetSkillRecipes'
+	'GetSkillRecipes',
+	'GetLessons'
 ];
 
 /** Builds the GetReferenceDataVersions payload, defaulting every set to "v1". */

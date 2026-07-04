@@ -603,6 +603,32 @@ namespace Game.TestInfrastructure.Helpers
             return path;
         }
 
+        public static async Task<Lesson> CreateLessonAsync(
+            GameContext context,
+            string key = "test-lesson",
+            string name = "Test Lesson",
+            ELessonTriggerType triggerType = ELessonTriggerType.ScreenVisit,
+            string screenKey = "fight",
+            EMechanicEvent? triggerMechanicEvent = null,
+            DateTime? retiredAt = null)
+        {
+            var lesson = new Lesson
+            {
+                Key = key,
+                Name = name,
+                TriggerType = (int)triggerType,
+                ScreenKey = screenKey,
+                TriggerMechanicEvent = (int?)triggerMechanicEvent,
+                Ordinal = 0,
+                DesignerNotes = "",
+                RetiredAt = retiredAt,
+            };
+
+            context.Lessons.Add(lesson);
+            await context.SaveChangesAsync();
+            return lesson;
+        }
+
         // A proficiency is a tier of a path. When no path is supplied, a fresh standalone single-tier path is
         // created so the proficiency is always well-formed.
         public static async Task<Proficiency> CreateProficiencyAsync(

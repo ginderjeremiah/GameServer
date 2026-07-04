@@ -333,6 +333,29 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Canonicalize_Lessons_OrdersStepsByOrdinal()
+        {
+            var lesson = new Contracts.Lesson
+            {
+                Id = 0,
+                Key = "idle-loop-basics",
+                Name = "Idle Combat",
+                TriggerType = ELessonTriggerType.ScreenVisit,
+                ScreenKey = "fight",
+                DesignerNotes = "",
+                Steps =
+                [
+                    new Contracts.LessonStep { Ordinal = 2, Text = "Third" },
+                    new Contracts.LessonStep { Ordinal = 0, Text = "First" },
+                ],
+            };
+
+            var canonical = ContentExportSerializer.Canonicalize([lesson]).Single();
+
+            Assert.Equal(["First", "Third"], canonical.Steps.Select(s => s.Text));
+        }
+
+        [Fact]
         public void Canonicalize_PathsAndZonesAndChallenges_OrderTopLevelById()
         {
             var paths = ContentExportSerializer.Canonicalize(new[]
