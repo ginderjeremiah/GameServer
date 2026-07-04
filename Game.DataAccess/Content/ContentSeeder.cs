@@ -41,6 +41,7 @@ namespace Game.DataAccess.Content
             var paths = content.Paths.Select(PathMapper.ToEntity).ToList();
             var proficiencies = content.Proficiencies.Select(ProficiencyMapper.ToEntity).ToList();
             var recipes = content.SkillRecipes.Select(SkillRecipeMapper.ToEntity).ToList();
+            var lessons = content.Lessons.Select(LessonMapper.ToEntity).ToList();
 
             // Tag assignments are join rows over the Tag catalogue (seeded below, ahead of the join rows) rather
             // than child entities of the item/mod graph, so they are built straight from the contracts here.
@@ -108,6 +109,10 @@ namespace Game.DataAccess.Content
             await Insert(recipes);
             await Insert(recipes.SelectMany(r => r.Inputs).ToList());
             await Insert(recipes.SelectMany(r => r.Conditions).ToList());
+
+            // Lessons have no static-content dependencies of their own.
+            await Insert(lessons);
+            await Insert(lessons.SelectMany(l => l.Steps).ToList());
 
             // Advance every seeded identity table's sequence past its highest explicit id (the guard filters
             // the composite-key join tables out, so passing every inserted type is safe and stays in sync).

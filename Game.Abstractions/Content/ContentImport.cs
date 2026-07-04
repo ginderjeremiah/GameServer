@@ -21,5 +21,6 @@ namespace Game.Abstractions.Content
         public required IReadOnlyList<Contracts.Path> Paths { get; init; }
         public required IReadOnlyList<Contracts.Proficiency> Proficiencies { get; init; }
         public required IReadOnlyList<Contracts.SkillRecipe> SkillRecipes { get; init; }
+        public required IReadOnlyList<Contracts.Lesson> Lessons { get; init; }
     }
 }

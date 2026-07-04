@@ -84,6 +84,7 @@ namespace Game.Application.Content
                 CheckSingleHomeZone();
                 CheckEmptyCombatZones();
                 CheckEnemyAttributeConsumption();
+                CheckLessons();
             }
 
             // --- Zones ------------------------------------------------------------------------------------
@@ -653,6 +654,55 @@ namespace Game.Application.Content
                     if (!spawnZoneIds.Contains(zone.Id))
                     {
                         Warn("EmptyCombatZone", "Zone", zone.Id, "is a live combat zone with no spawnable enemies; players are relocated out of it.");
+                    }
+                }
+            }
+
+            // --- Lessons ----------------------------------------------------------------------------------
+
+            /// <summary>Every taught-by-blurb candidate content-design.md §2 names (crit/dodge variance, the
+            /// idle-loop/UI basics, cooldown charging) — kept in sync with that doc by hand, mirroring how the
+            /// zone-arc/proficiency-rollout tables are three views of one progression graph kept in sync by
+            /// review rather than by a shared source.</summary>
+            private static readonly string[] RequiredTaughtByBlurbKeys =
+            [
+                "crit-dodge-variance",
+                "idle-loop-basics",
+                "cooldown-charging",
+            ];
+
+            private void CheckLessons()
+            {
+                foreach (var lesson in Live(_graph.Lessons, l => l.RetiredAt))
+                {
+                    // A lesson's trigger fields are structurally complete: a mechanic-event lesson must name
+                    // one, and a screen-visit lesson must not carry a dangling one (dead data the runtime
+                    // ignores). Screen-key existence is not checked here — screens are a frontend-only registry
+                    // (screen-defs.ts) with no backend representation; a FE test owns that, mirroring how the
+                    // anchorKey-resolves-to-a-registered-anchor check is FE-only (#1592).
+                    if (lesson.TriggerType == ELessonTriggerType.MechanicEvent && lesson.TriggerMechanicEvent is null)
+                    {
+                        Error("LessonTrigger", "Lesson", lesson.Id, "is a mechanic-event lesson but names no mechanic event.");
+                    }
+                    else if (lesson.TriggerType == ELessonTriggerType.ScreenVisit && lesson.TriggerMechanicEvent is not null)
+                    {
+                        Warn("LessonTrigger", "Lesson", lesson.Id, "is a screen-visit lesson but also carries a mechanic-event trigger target, which is ignored.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(lesson.ScreenKey))
+                    {
+                        Error("LessonTrigger", "Lesson", lesson.Id, "names no host screen.");
+                    }
+                }
+
+                var liveKeys = Live(_graph.Lessons, l => l.RetiredAt).Select(l => l.Key).ToHashSet();
+                foreach (var key in RequiredTaughtByBlurbKeys)
+                {
+                    if (!liveKeys.Contains(key))
+                    {
+                        // No real lesson backs this finding (that's the point), so there is no id to attach it
+                        // to; -1 marks a graph-wide finding rather than a specific row.
+                        Warn("LessonCoverage", "Lesson", -1, $"content-design.md's taught-by-blurb candidate '{key}' has no live lesson.");
                     }
                 }
             }

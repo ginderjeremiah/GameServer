@@ -1,4 +1,11 @@
-import { EChangeType, type IChange, type IItemModSlot, type ISkillDamagePortion, type ISkillEffect } from '$lib/api';
+import {
+	EChangeType,
+	type IChange,
+	type IItemModSlot,
+	type ILessonStep,
+	type ISkillDamagePortion,
+	type ISkillEffect
+} from '$lib/api';
 import type { Identified, SaveDiff } from './entities/types';
 
 /**
@@ -214,6 +221,32 @@ export function damagePortionChanges(
 	for (const row of base) {
 		if (!currentTypes.has(row.type)) {
 			changes.push({ changeType: EChangeType.Delete, item: { type: row.type, weight: row.weight } });
+		}
+	}
+	return changes;
+}
+
+/**
+ * Diffs a lesson's tour steps (keyed by ordinal, like {@link damagePortionChanges} is keyed by leaf
+ * type) into Add/Edit/Delete changes of `{ ordinal, text, anchorKey }`.
+ */
+export function lessonStepChanges(current: ILessonStep[], baseline: ILessonStep[] | undefined): IChange<ILessonStep>[] {
+	const base = baseline ?? [];
+	const baseByOrdinal = new Map(base.map((row) => [row.ordinal, row]));
+	const currentOrdinals = new Set(current.map((row) => row.ordinal));
+	const changes: IChange<ILessonStep>[] = [];
+
+	for (const row of current) {
+		const previous = baseByOrdinal.get(row.ordinal);
+		if (!previous) {
+			changes.push({ changeType: EChangeType.Add, item: row });
+		} else if (previous.text !== row.text || previous.anchorKey !== row.anchorKey) {
+			changes.push({ changeType: EChangeType.Edit, item: row });
+		}
+	}
+	for (const row of base) {
+		if (!currentOrdinals.has(row.ordinal)) {
+			changes.push({ changeType: EChangeType.Delete, item: row });
 		}
 	}
 	return changes;

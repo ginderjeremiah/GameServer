@@ -215,6 +215,11 @@ export enum EItemModType {
 	Suffix = 3,
 }
 
+export enum ELessonTriggerType {
+	ScreenVisit = 0,
+	MechanicEvent = 1,
+}
+
 export enum ELogType {
 	Damage = 1,
 	Debug = 2,
@@ -224,6 +229,12 @@ export enum ELogType {
 	EnemyDefeated = 6,
 	SkillEffect = 7,
 	Proficiency = 8,
+}
+
+export enum EMechanicEvent {
+	FirstCrit = 0,
+	FirstDodge = 1,
+	FirstCooldownRecharge = 2,
 }
 
 export enum EModifierType {

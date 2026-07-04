@@ -17,6 +17,7 @@ import type {
 	IEquipRequest,
 	IItem,
 	IItemMod,
+	ILesson,
 	ILogPreference,
 	INewEnemyModel,
 	INewEnemyRequest,
@@ -53,6 +54,7 @@ export type ApiSocketResponseTypes = {
 	'GetEnemies': IEnemy[];
 	'GetItemMods': IItemMod[];
 	'GetItems': IItem[];
+	'GetLessons': ILesson[];
 	'GetOfflineProgress': IOfflineProgressModel;
 	'GetPaths': IPath[];
 	'GetPlayerChallenges': IPlayerChallenge[];

@@ -6,6 +6,7 @@ import {
 	IEnemy,
 	IItem,
 	IItemMod,
+	ILesson,
 	IPath,
 	IProficiency,
 	ISkill,
@@ -27,6 +28,7 @@ let proficiencies = $state<IProficiency[]>();
 let paths = $state<IPath[]>();
 let classes = $state<IClass[]>();
 let skillRecipes = $state<ISkillRecipe[]>();
+let lessons = $state<ILesson[]>();
 
 /* The backing `$state` slots are genuinely `undefined` until the loading screen (or the silent
    session-resume path) populates them, so the getters honestly expose `T[] | undefined` rather than
@@ -112,6 +114,12 @@ export const staticData = {
 	set skillRecipes(value: ISkillRecipe[] | undefined) {
 		skillRecipes = value;
 	},
+	get lessons(): ILesson[] | undefined {
+		return lessons;
+	},
+	set lessons(value: ILesson[] | undefined) {
+		lessons = value;
+	},
 	get loaded(): boolean {
 		return [
 			zones,
@@ -126,7 +134,8 @@ export const staticData = {
 			proficiencies,
 			paths,
 			classes,
-			skillRecipes
+			skillRecipes,
+			lessons
 		].every((set) => set != null);
 	}
 };

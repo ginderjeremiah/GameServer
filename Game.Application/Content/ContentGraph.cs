@@ -18,5 +18,6 @@ namespace Game.Application.Content
         IReadOnlyList<Contracts.Class> Classes,
         IReadOnlyList<Contracts.Path> Paths,
         IReadOnlyList<Contracts.Proficiency> Proficiencies,
-        IReadOnlyList<Contracts.SkillRecipe> SkillRecipes);
+        IReadOnlyList<Contracts.SkillRecipe> SkillRecipes,
+        IReadOnlyList<Contracts.Lesson> Lessons);
 }

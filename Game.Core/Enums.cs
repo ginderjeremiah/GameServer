@@ -1086,4 +1086,38 @@ namespace Game.Core
         /// </summary>
         Admin = 1,
     }
+
+    /// <summary>
+    /// What fires a tutorial lesson's tour (spike #1392, Decision 1): the two lesson-anchor kinds, one
+    /// lifecycle. A screen-anchored lesson's target <em>is</em> its <c>ScreenKey</c> (no separate target
+    /// field); a mechanic-anchored lesson additionally names a <see cref="EMechanicEvent"/>.
+    /// </summary>
+    public enum ELessonTriggerType
+    {
+        /// <summary>Fires the first time the lesson's <c>ScreenKey</c> becomes the active screen. The player
+        /// just navigated there, so the tour plays immediately.</summary>
+        ScreenVisit = 0,
+
+        /// <summary>Fires when a content-events detector (<c>UI/src/lib/common/content-events.ts</c>) flips
+        /// false→true. The player may be AFK, so the lesson queues as unread instead of playing immediately.</summary>
+        MechanicEvent = 1,
+    }
+
+    /// <summary>
+    /// An intrinsic, client-detected battle-mechanic occurrence a <see cref="ELessonTriggerType.MechanicEvent"/>
+    /// lesson can trigger on — one member per detector in <c>content-events.ts</c> (spike #1392). Client-detected
+    /// and client-reported only (trusted: nothing is rewarded, so a dishonest client can only unlock its own
+    /// tutorials early); the server never evaluates these itself.
+    /// </summary>
+    public enum EMechanicEvent
+    {
+        /// <summary>The player's first landed critical hit.</summary>
+        FirstCrit = 0,
+
+        /// <summary>The first hit dodged by the player.</summary>
+        FirstDodge = 1,
+
+        /// <summary>The first time a player skill visibly finishes recharging (fires again after its cooldown).</summary>
+        FirstCooldownRecharge = 2,
+    }
 }

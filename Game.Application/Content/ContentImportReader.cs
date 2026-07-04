@@ -28,6 +28,7 @@ namespace Game.Application.Content
                 Paths = ReadSet<Contracts.Path>(directory, "paths.json"),
                 Proficiencies = ReadSet<Contracts.Proficiency>(directory, "proficiencies.json"),
                 SkillRecipes = ReadSet<Contracts.SkillRecipe>(directory, "skill-recipes.json"),
+                Lessons = ReadSet<Contracts.Lesson>(directory, "lessons.json"),
             };
         }
 

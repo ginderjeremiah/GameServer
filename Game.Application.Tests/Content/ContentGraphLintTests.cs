@@ -23,9 +23,18 @@ namespace Game.Application.Tests.Content
         /// <summary>
         /// Warnings on the committed content that are a consciously-accepted, documented work-in-progress gap.
         /// Each entry is the finding's <see cref="ContentGraphFinding.ToString"/> value; add one only with a
-        /// comment saying why it is tolerated. Empty today — the seed slice is fully lint-clean (#1435).
+        /// comment saying why it is tolerated.
         /// </summary>
-        private static readonly HashSet<string> AcceptedWarnings = [];
+        private static readonly HashSet<string> AcceptedWarnings =
+        [
+            // #1591 built the Lesson reference-data plumbing (entity, cache, Workbench CRUD, this lint rule)
+            // but deliberately left authoring the actual tutorial copy to a follow-up content-authoring issue —
+            // writing the taught-by-blurb lessons is a content-design task, not a code-infra one. Remove each
+            // entry as its lesson is authored.
+            "[Warning] Lesson -1 (LessonCoverage): content-design.md's taught-by-blurb candidate 'crit-dodge-variance' has no live lesson.",
+            "[Warning] Lesson -1 (LessonCoverage): content-design.md's taught-by-blurb candidate 'idle-loop-basics' has no live lesson.",
+            "[Warning] Lesson -1 (LessonCoverage): content-design.md's taught-by-blurb candidate 'cooldown-charging' has no live lesson.",
+        ];
 
         [Fact]
         public async Task CommittedContent_HasNoReachabilityErrors()

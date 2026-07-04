@@ -6,6 +6,8 @@ import {
 	EEntityType,
 	EItemCategory,
 	EItemModType,
+	ELessonTriggerType,
+	EMechanicEvent,
 	EModifierType,
 	ERarity,
 	ESkillAcquisition,
@@ -112,6 +114,19 @@ describe('enum-backed select options', () => {
 		expect(reference.modifierTypeOptions().find((o) => o.value === EModifierType.Additive)?.text).toBe('Additive');
 		expect(reference.modifierTypeOptions().find((o) => o.value === EModifierType.Multiplicative)?.text).toBe(
 			'Multiplicative'
+		);
+	});
+
+	it('builds lesson-trigger-type and mechanic-event options from their enums', () => {
+		expect(reference.lessonTriggerTypeOptions().find((o) => o.value === ELessonTriggerType.ScreenVisit)?.text).toBe(
+			'Screen Visit'
+		);
+		expect(reference.lessonTriggerTypeOptions().find((o) => o.value === ELessonTriggerType.MechanicEvent)?.text).toBe(
+			'Mechanic Event'
+		);
+		expect(reference.mechanicEventOptions().find((o) => o.value === EMechanicEvent.FirstCrit)?.text).toBe('First Crit');
+		expect(reference.mechanicEventOptions().find((o) => o.value === EMechanicEvent.FirstDodge)?.text).toBe(
+			'First Dodge'
 		);
 	});
 });

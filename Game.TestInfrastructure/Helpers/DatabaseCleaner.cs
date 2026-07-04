@@ -47,7 +47,11 @@ namespace Game.TestInfrastructure.Helpers
                     "Proficiencies",
                     "ProficiencyLevelModifiers",
                     "ProficiencyLevelRewards",
-                    "ProficiencyPrerequisites"
+                    "ProficiencyPrerequisites",
+                    -- Lessons carry no FK to any table above (ScreenKey/TriggerMechanicEvent are plain values,
+                    -- not references), so nothing cascades into them; listed explicitly so lesson content
+                    -- doesn't leak across tests. LessonSteps cascades from here.
+                    "Lessons"
                 RESTART IDENTITY CASCADE
                 """);
         }
