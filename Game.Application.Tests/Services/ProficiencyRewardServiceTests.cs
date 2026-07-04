@@ -575,6 +575,47 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task CadenceBonus_TrainsTheFrequencyPath()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Frequency trains from the cadence pseudo-overlay share (#1527) — an output-book event, type-neutral
+            // like the other overlays (routed straight to the single Cadence activity key with no applies() split).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Frequency", activityKey: EActivityKey.Cadence);
+            var tier = await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Frequency", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, new BattleStats { CadenceBonusDealt = FiredDamage });
+
+            var result = Assert.Single(accrual.Results);
+            Assert.Equal(tier.Id, result.ProficiencyId);
+            Assert.True(result.NewLevel >= 1);
+        }
+
+        [Fact]
+        public async Task NoCadenceBonus_TrainsNoFrequency()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The AddEvent amount > 0 guard: a battle with other events but no cadence-enabled damage routes no
+            // Cadence activity, so a Cadence-keyed path is never reached (an uncommitted build books nothing).
+            var path = await TestDataSeeder.CreatePathAsync(context, name: "Frequency", activityKey: EActivityKey.Cadence);
+            await TestDataSeeder.CreateProficiencyAsync(
+                context, name: "Frequency", maxLevel: 10, baseXp: 1m, xpGrowth: 1m, pathId: path.Id, pathOrdinal: 0);
+            var playerId = await SeedPlayerAsync(context);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var stats = new BattleStats { CriticalBonusDealt = FiredDamage, PlayerDamageHealed = FiredDamage };
+            var (_, accrual) = await AccrueStatsAsync(scope, playerId, stats);
+
+            Assert.Empty(accrual.Results);
+        }
+
+        [Fact]
         public async Task NoReflectedDamage_TrainsNoRetribution()
         {
             using var scope = CreateScope();

@@ -102,6 +102,24 @@ namespace Game.Core.Battle
         /// </summary>
         public double SunderBonusDealt { get; set; }
 
+        /// <summary>
+        /// The Frequency (<c>Cadence</c> activity key) training signal — the share of the player's landed damage
+        /// claimed by the battler's effective charge rate (#1426/#1527, the uniform share claim of #1481). Cadence
+        /// is a <b>pseudo-overlay</b>: unlike Hex/Sunder/Momentum/Cull — whose enablers ride a per-hit
+        /// debuff/ramp/execute state — its "investment" is the whole build's cadence, so faster cycling <em>is</em>
+        /// more hits and every landed player hit rides it. Each fire books its booked (health-capped) damage ×
+        /// <c>φ(investment)</c>, where <c>investment = effective cadence − 1</c>
+        /// (<see cref="Battle.Battler.GetCooldownMultiplier"/> − 1 =
+        /// <c>CooldownRecovery + CooldownBonus × CooldownBonusMultiplier − 1</c>) sampled at hit time — like Cull
+        /// samples the execute investment. An uncommitted build sits at exactly the base-1 rate, so
+        /// <c>investment = 0</c> and it books nothing; difficulty is self-supplied by the landed basis (bounded by
+        /// the enemy's health pool) and the power denominator of the accrual. Backend-only like the other overlay
+        /// tallies — no health mutation, no parity surface (the effective-rate read it samples is already parity
+        /// pinned as the tick-loop charge rate, #1524). Direct-hit only (including the parry riposte, which routes
+        /// through the same player-fire pipeline).
+        /// </summary>
+        public double CadenceBonusDealt { get; set; }
+
         public Dictionary<int, SkillStats> SkillStats { get; set; } = [];
 
         /// <summary>

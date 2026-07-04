@@ -1421,6 +1421,141 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, context.Stats.CullBonusDealt, 0.001);
         }
 
+        // ── DamageTarget: Cadence frequency tally (#1527) ─────────────────────
+
+        [Fact]
+        public void DamageTarget_NoCadenceInvestment_BooksNoCadenceBonus()
+        {
+            // An uncommitted build charges at exactly the base-1 rate (CooldownRecovery 1, CooldownBonus 0), so
+            // the effective-cadence − 1 investment is 0 and Frequency trains on nothing (φ(0) = 0).
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(0, context.Stats.CadenceBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_CooldownBonusInvestment_BooksShareOfLandedDamage()
+        {
+            // The committed cadence channel: CooldownBonus 0.5 × CooldownBonusMultiplier 1 (base, Agility 0) lifts
+            // the effective cadence to 1.5, so investment = 0.5. The pseudo-overlay share (#1481) is the booked
+            // (landed) 10 × φ(0.5) = 10 × 0.5/1.5 = 10/3. The real damage is untouched — cadence only scales the tally.
+            var player = MakeBattlerWith((Endurance, 0), (CooldownBonus, 0.5));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(10, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(10.0 * 0.5 / 1.5, context.Stats.CadenceBonusDealt, 0.001); // 10/3
+        }
+
+        [Fact]
+        public void DamageTarget_CooldownRecoveryBoost_AlsoTrainsCadence()
+        {
+            // The investment is the WHOLE effective cadence − 1, not just the committed channel: a CooldownRecovery
+            // above its base 1 (an authored / effect cooldown buff, authored-only post-#1426) lifts it too. Here
+            // CooldownRecovery 1.5 with no CooldownBonus gives investment 0.5, so the claim is 10 × φ(0.5) = 10/3 —
+            // identical to the CooldownBonus case (an uncommitted build still sits at exactly 1.0 = 0 investment).
+            var player = MakeBattlerWith((Endurance, 0), (CooldownRecovery, 0.5)); // base 1 + 0.5 = 1.5
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(10.0 * 0.5 / 1.5, context.Stats.CadenceBonusDealt, 0.001); // 10/3
+        }
+
+        [Fact]
+        public void DamageTarget_OverkillHit_ClaimsAtMostTheHealthRemoved()
+        {
+            // The share claim's basis is the health actually removed (#1482), so an overkill fire trains only on the
+            // sliver of health that existed. CooldownBonus 1 → effective cadence 2 → investment 1, φ(1) = 0.5. The
+            // enemy has 5 health left; a 20 hit removes only 5, so the booked basis is 5 and the claim is 5 × 0.5 =
+            // 2.5, while PlayerDamageDealt keeps the full uncapped 20.
+            var player = MakeBattlerWith((Endurance, 0), (CooldownBonus, 1.0));
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            enemy.TakeReflectedDamage(45); // CurrentHealth 5
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(5.0 * 0.5, context.Stats.CadenceBonusDealt, 0.001); // 2.5
+        }
+
+        [Fact]
+        public void DamageTarget_CritAndCadence_ClaimSharesOfTheSameLandedHit()
+        {
+            // Cadence rides the same booked hit as crit. The crit doubles the real damage (10 × 2 = 20 booked),
+            // then Cadence claims 20 × φ(0.5) = 20/3 and Precision claims 20 × φ(1) = 10, each φ on its own investment.
+            var player = MakeBattlerWith(
+                (Endurance, 0), (CriticalDamage, 0.5), (CooldownBonus, 0.5)); // CriticalDamage 2, cadence 1.5
+            var enemy = MakeBattlerWith((Endurance, 0)); // MaxHealth 50, Toughness 0
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(10, Single(EDamageType.Physical), 1); // baseCriticalChance 1 → always crits
+
+            Assert.Equal(20, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(20.0 * 0.5 / 1.5, context.Stats.CadenceBonusDealt, 0.001); // 20/3
+            Assert.Equal(20.0 * 0.5, context.Stats.CriticalBonusDealt, 0.001); // 10
+        }
+
+        [Fact]
+        public void DamageTarget_MultiTypedHit_BooksCadenceOnTheSummedLandedDamage()
+        {
+            // Cadence samples once per fire and claims a share of the whole hit's booked damage, so a multi-typed
+            // hit books φ(investment) on the sum of its portions (not per-portion φ). CooldownBonus 0.5 → investment
+            // 0.5; the 12 raw splits 8 physical + 4 fire (both Toughness/resist 0), booked 12, claim 12 × φ(0.5) = 4.
+            var player = MakeBattlerWith((Endurance, 0), (CooldownBonus, 0.5));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(12, Portions((EDamageType.Physical, 2), (EDamageType.Fire, 1)), 0);
+
+            Assert.Equal(12, context.Stats.PlayerDamageDealt, 0.001);
+            Assert.Equal(12.0 * 0.5 / 1.5, context.Stats.CadenceBonusDealt, 0.001); // 4
+        }
+
+        [Fact]
+        public void DamageTarget_TimedCadenceEffect_IsSampledAtHitTimeAndExpires()
+        {
+            // Cadence is sampled at hit time, so a timed CooldownBonus buff amplifies the claim only while it is
+            // live. A self-applied +1 CooldownBonus lifts the effective cadence to 2 (investment 1, φ(1) = 0.5): the
+            // first hit books 10 × 0.5 = 5. After the buff lapses the build is back to the base rate and a later hit
+            // books nothing (the running total is unchanged).
+            var player = MakeBattlerWith((Endurance, 0)); // MaxHealth 50 — neither 10 hit overkills
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 1000, new Mulberry32(0));
+            context.ApplySkillEffect(CadenceBuff(1.0)); // player-active: Self buff, DurationMs 1000 → 1 tick
+
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
+            Assert.Equal(5, context.Stats.CadenceBonusDealt, 0.001);
+
+            player.AdvanceEffects(1000); // the buff lapses
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
+            Assert.Equal(5, context.Stats.CadenceBonusDealt, 0.001); // unchanged — no cadence investment left
+        }
+
+        [Fact]
+        public void DamageTarget_EnemyAttacking_BooksNoCadenceBonus()
+        {
+            // Cadence is a player-offense signal like the other overlays. Even if the enemy cycles fast, an enemy
+            // hit never trains the player's Frequency — only the player-active branch accrues it.
+            var player = MakeBattlerWith((Endurance, 0));
+            var enemy = MakeBattlerWith((Endurance, 0), (CooldownBonus, 1.0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers(); // enemy attacks
+
+            context.DamageTarget(10, Single(EDamageType.Physical), 0);
+
+            Assert.Equal(0, context.Stats.CadenceBonusDealt, 0.001);
+        }
+
         // ── DamageTarget: Sunder mitigation tally (#1429) ─────────────────────
 
         [Fact]
@@ -1989,6 +2124,21 @@ namespace Game.Core.Tests.Battle
             ModifierType = EModifierType.Additive,
             Amount = perSecond,
             DurationMs = 10_000,
+            ScalingAttributeId = EAttribute.Strength,
+            ScalingAmount = 0,
+        };
+
+        // A player-cast Self-targeted CooldownBonus buff (positive additive) — a timed cadence enabler for the
+        // per-hit sampling test (#1527). Applied via BattleContext.ApplySkillEffect so it lands on the active
+        // (casting) battler and raises its effective charge rate for the buff's duration.
+        private static SkillEffect CadenceBuff(double amount) => new()
+        {
+            Id = 6,
+            Target = ESkillEffectTarget.Self,
+            AttributeId = EAttribute.CooldownBonus,
+            ModifierType = EModifierType.Additive,
+            Amount = amount,
+            DurationMs = 1000,
             ScalingAttributeId = EAttribute.Strength,
             ScalingAmount = 0,
         };

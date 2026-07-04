@@ -577,6 +577,21 @@ namespace Game.Core
         /// (the enum grows append-only).
         /// </summary>
         Parry = 34,
+
+        /// <summary>
+        /// Cadence damage enabled (the Frequency mastery — spike #1426, #1527). The share of the player's landed
+        /// damage claimed by the battler's effective charge rate: faster cycling <em>is</em> more hits, so cadence
+        /// rides every landed player hit, booking its booked (health-capped) damage × <c>φ(investment)</c> with
+        /// <c>investment = effective cadence − 1</c> (<see cref="EAttribute.CooldownRecovery"/> +
+        /// <see cref="EAttribute.CooldownBonus"/> × <see cref="EAttribute.CooldownBonusMultiplier"/>, sampled at
+        /// hit time like the Cull execute investment). A <b>pseudo-overlay</b> share claim — the enabler is not a
+        /// per-hit debuff/ramp but the whole build's charge rate, so an uncommitted build sits at exactly the
+        /// base-1 rate and books nothing (<c>φ(0) = 0</c>), while the Frequency path's bonuses target
+        /// <see cref="EAttribute.CooldownBonusMultiplier"/> so they idle on build abandonment. A combat-event key
+        /// — type-neutral, routed straight to a single activity key with no
+        /// <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after Parry (the enum grows append-only).
+        /// </summary>
+        Cadence = 35,
     }
 
     /// <summary>
