@@ -36,7 +36,7 @@
 			style:left={calloutPos ? `${calloutPos.left}px` : undefined}
 			use:focusTrap={{ onEscape: onDismiss, scrollLockClass: 'tour-open' }}
 		>
-			<div class="tour-callout__body" bind:this={calloutEl} aria-live="polite">
+			<div class="tour-callout__body" aria-live="polite">
 				<p class="tour-callout__step">{stepIndex + 1} of {steps.length}</p>
 				<p class="tour-callout__text">{currentStep.text}</p>
 			</div>
@@ -77,7 +77,6 @@ const { open, steps, label, onDismiss, onComplete }: Props = $props();
 
 let stepIndex = $state(0);
 let shell = $state<HTMLElement | null>(null);
-let calloutEl = $state<HTMLElement | null>(null);
 let calloutPos = $state<{ top: number; left: number } | null>(null);
 let spotlightRect = $state<{ top: number; left: number; width: number; height: number } | null>(null);
 
@@ -137,11 +136,13 @@ $effect(() => {
 		height: rect.height + SPOTLIGHT_PADDING * 2
 	};
 
-	if (!calloutEl) {
+	if (!shell) {
 		return;
 	}
-	const calloutWidth = calloutEl.offsetWidth;
-	const calloutHeight = calloutEl.offsetHeight;
+	// Measure the positioned shell itself (padding + border included), not the inner text body —
+	// otherwise the box is under-reported by the shell's own padding/border on every side.
+	const calloutWidth = shell.offsetWidth;
+	const calloutHeight = shell.offsetHeight;
 
 	let top = rect.bottom + GAP;
 	if (top + calloutHeight + EDGE_PADDING > window.innerHeight) {
