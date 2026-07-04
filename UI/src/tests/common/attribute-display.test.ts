@@ -185,12 +185,15 @@ describe('attributeIcon', () => {
 	});
 
 	it('returns "" for attributes with no art and for unknown ids', () => {
-		// DropBonus is obsolete and the typed DoT accumulators have no art yet (#1320 Area F); an
-		// out-of-range id resolves the same way so the AttributeIcon component renders nothing.
+		// DropBonus is obsolete, the typed DoT accumulators have no art yet (#1320 Area F), and the parry/dodge
+		// (#1457/#1523) and cadence (#1426) multiplier pairs are art-pending; an out-of-range id resolves the
+		// same way so the AttributeIcon component renders nothing.
 		expect(attributeIcon(EAttribute.DropBonus)).toBe('');
 		expect(attributeIcon(EAttribute.BleedDamagePerSecond)).toBe('');
 		expect(attributeIcon(EAttribute.PoisonDamagePerSecond)).toBe('');
 		expect(attributeIcon(EAttribute.BurnDamagePerSecond)).toBe('');
+		expect(attributeIcon(EAttribute.CooldownBonus)).toBe('');
+		expect(attributeIcon(EAttribute.CooldownBonusMultiplier)).toBe('');
 		expect(attributeIcon(999 as EAttribute)).toBe('');
 	});
 });

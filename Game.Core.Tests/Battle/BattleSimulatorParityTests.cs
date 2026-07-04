@@ -42,22 +42,25 @@ namespace Game.Core.Tests.Battle
         public static readonly IReadOnlyDictionary<string, ParityScenario> Scenarios =
             new Dictionary<string, ParityScenario>
             {
-                // Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
-                //   Player: MaxHealth=900, Toughness=60 (2·End30), CDR=1.09 → cdMult=1.09
-                //     charge/tick = 40*1.09 = 43.6, fires every 28 ticks (28*43.6=1220.8≥1200)
-                //     damage = 10 + 50*1.5 = 85; enemy Toughness 30 → 85×200/(30+200) = 73.913/hit
-                //   Enemy:  MaxHealth=400, Toughness=30; damage = 5 × 200/(60+200) = 3.846/hit (player survives)
-                //   6 hits to kill (6×73.913=443.5>400), at ticks 28..168 → 6720ms
+                // Single skill, the committed cadence channel (#1426) — exercises the cdMultiplier path through
+                // CooldownBonus × CooldownBonusMultiplier now that CDR is severed from the core attributes.
+                //   Player: MaxHealth=900, Toughness=60 (2·End30). CDR=1 (base), CooldownBonus=0.25 (authored),
+                //     CooldownBonusMultiplier=1+0.002·Agi20=1.04 → cdMult = 1 + 0.25·1.04 = 1.26.
+                //     charge/tick = 40*1.26 = 50.4, fires every 24 ticks (24*50.4=1209.6≥1200).
+                //     damage = 10 + 50*1.5 = 85; enemy Toughness 30 → 85×200/(30+200) = 73.913/hit.
+                //   Enemy:  MaxHealth=400, Toughness=30; damage = 5 × 200/(60+200) = 3.846/hit (player survives).
+                //   6 hits to kill (6×73.913=443.5>400), at ticks 24..144 → 5760ms.
                 ["cooldownRecovery"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 50, endurance: 30, agility: 20, dexterity: 10,
-                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)]),
+                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)],
+                        extra: [(EAttribute.CooldownBonus, 0.25)]),
                     Enemy: () => MakeEnemy(
                         strength: 10, endurance: 15,
                         skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 6720),
+                    ExpectedTotalMs: 5760),
 
                 // Two player skills firing on different cooldowns against an enemy that takes real damage — a
                 // genuine multi-skill exchange. Both defenders have Toughness now.
@@ -138,7 +141,8 @@ namespace Game.Core.Tests.Battle
                 ["maxMsCap"] = new ParityScenario(
                     Player: () => MakeBattler(
                         strength: 50, endurance: 30, agility: 20, dexterity: 10,
-                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)]),
+                        skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)],
+                        extra: [(EAttribute.CooldownBonus, 0.25)]),
                     Enemy: () => MakeEnemy(
                         strength: 10, endurance: 15,
                         skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]),
@@ -150,19 +154,20 @@ namespace Game.Core.Tests.Battle
                 // The only scenario whose player is built through the equipped-item + applied-mod
                 // attribute-composition path (the rest build the player from raw stat allocations).
                 // An item and two mods (prefix + suffix) each contribute Strength, so dropping any
-                // one source changes the kill count; the item's Agility and the prefix's Dexterity
-                // additionally feed CooldownRecovery, so the whole merge is exercised end to end.
-                //   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
-                //   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Toughness=40, CDR=1.10 → cdMult=1.10.
+                // one source changes the kill count; the item additionally grants the CooldownBonus enabler and
+                // Agility (which lifts CooldownBonusMultiplier), so the merge drives cadence end to end (#1426).
+                //   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi, +0.25 CooldownBonus.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
+                //   Merged: Str=45, End=20, Agi=20, Dex=20, CooldownBonus=0.25 → MaxHealth=675, Toughness=40.
+                //     CooldownBonusMultiplier = 1+0.002·20 = 1.04 → cdMult = 1 + 0.25·1.04 = 1.26.
                 //   Player skill: 10 + 45*1.5 = 77.5 raw → enemy Toughness 30 → 77.5×200/230 = 67.391/hit, fires every
-                //     28 ticks (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
+                //     24 ticks (charge/tick = 40*1.26 = 50.4, 50.4*24=1209.6 ≥ 1200).
                 //   Enemy: MaxHealth=400, Toughness=30; attack 5 → player Toughness 40 → 5×200/240 = 4.17/hit (the player never dies).
-                //   6 hits reach 404 ≥ 400 at tick 168 → 6720ms (proof the merged attributes drive the outcome).
+                //   6 hits reach 404 ≥ 400 at tick 144 → 5760ms (proof the merged attributes drive the outcome).
                 ["equippedItemWithMods"] = new ParityScenario(
                     Player: () => MakeBattlerWithEquipment(
                         strength: 20, endurance: 20,
                         skills: [MakeSkill(1, baseDamage: 10, cooldownMs: 1200, mult: EAttribute.Strength, multAmount: 1.5)],
-                        itemAttributes: [ItemAttr(EAttribute.Strength, 10), ItemAttr(EAttribute.Agility, 20)],
+                        itemAttributes: [ItemAttr(EAttribute.Strength, 10), ItemAttr(EAttribute.Agility, 20), ItemAttr(EAttribute.CooldownBonus, 0.25)],
                         mods:
                         [
                             MakeMod(10, EItemModType.Prefix, [ItemAttr(EAttribute.Strength, 8), ItemAttr(EAttribute.Dexterity, 20)]),
@@ -173,7 +178,7 @@ namespace Game.Core.Tests.Battle
                         skills: [MakeSkill(2, baseDamage: 5, cooldownMs: 2000)]),
                     ExpectedVictory: true,
                     ExpectedPlayerDied: false,
-                    ExpectedTotalMs: 6720),
+                    ExpectedTotalMs: 5760),
 
                 // Fractional enemy attribute distribution (#941): the only scenario whose enemy attribute is
                 // built from a FRACTIONAL per-level AttributeDistribution (BaseAmount 0 + 2.5/level at level 3
@@ -1323,11 +1328,12 @@ namespace Game.Core.Tests.Battle
 
         /// <summary>
         /// Demonstrates what happens if the player's derived stats are double-counted
-        /// (the bug the frontend used to have). CooldownRecovery doubles from 1.09→2.18
-        /// (the base-1 multiplier counted twice), so skills fire every 14 ticks instead of 28,
-        /// ending the same matchup as the <c>cooldownRecovery</c> scenario (6720ms) much sooner.
-        /// Kept separate from the matrix because it builds the player from already-final
-        /// attribute values rather than raw allocations.
+        /// (the bug the frontend used to have). Post-#1426 the cadence-driving derived stat is
+        /// <see cref="EAttribute.CooldownBonusMultiplier"/> (CDR itself is severed from the core attributes),
+        /// so the double-count doubles that multiplier from 1.04→2.08. With the same authored CooldownBonus (0.25)
+        /// the effective rate rises from 1.26 to 1.52, so the skill fires every 20 ticks instead of 24, ending the
+        /// same matchup as the <c>cooldownRecovery</c> scenario (5760ms) sooner. Kept separate from the matrix
+        /// because it builds the player from already-final attribute values rather than raw allocations.
         /// </summary>
         [Fact]
         public void Parity_DoubleDerivedStats_ProducesShorterBattle()
@@ -1344,10 +1350,11 @@ namespace Game.Core.Tests.Battle
             var result = sim.Simulate();
 
             Assert.True(result.Victory);
-            // With doubled CDR (2.18 instead of 1.09), cdMult=2.18, charge/tick = 87.2, so the skill fires every
-            // 14 ticks instead of 28 — 6 hits (73.913 each vs the enemy's Toughness 30) land in half the ticks → 3360ms.
-            Assert.Equal(3360, result.TotalMs);
-            Assert.True(result.TotalMs < 6720, "Double-counted stats should end the battle sooner.");
+            // With the doubled CooldownBonusMultiplier (2.08 instead of 1.04), cdMult = 1 + 0.25·2.08 = 1.52 (vs
+            // 1.26), charge/tick = 60.8, so the skill fires every 20 ticks instead of 24 — 6 hits (73.913 each vs
+            // the enemy's Toughness 30) land at ticks 20..120 → 4800ms.
+            Assert.Equal(4800, result.TotalMs);
+            Assert.True(result.TotalMs < 5760, "Double-counted stats should end the battle sooner.");
         }
 
         /// <summary>
@@ -1368,8 +1375,12 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(20, player.GetAttributeValue(EAttribute.Dexterity));
             Assert.Equal(675, player.GetAttributeValue(EAttribute.MaxHealth));
             Assert.Equal(40, player.GetAttributeValue(EAttribute.Toughness));
-            Assert.Equal(1.10, player.GetAttributeValue(EAttribute.CooldownRecovery), 10);
-            Assert.Equal(1.10, player.GetCooldownMultiplier(), 10);
+            // CDR is severed from the core attributes (#1426): it stays the base 1, and cadence rides the
+            // committed CooldownBonus (0.25, from the item) × CooldownBonusMultiplier (1 + 0.002·Agi20 = 1.04).
+            Assert.Equal(1.0, player.GetAttributeValue(EAttribute.CooldownRecovery), 10);
+            Assert.Equal(0.25, player.GetAttributeValue(EAttribute.CooldownBonus), 10);
+            Assert.Equal(1.04, player.GetAttributeValue(EAttribute.CooldownBonusMultiplier), 10);
+            Assert.Equal(1.26, player.GetCooldownMultiplier(), 10);
         }
 
         /// <summary>
@@ -1712,7 +1723,10 @@ namespace Game.Core.Tests.Battle
         /// <summary>
         /// Creates a player whose attributes mimic the frontend double-counting bug:
         /// stat allocations include FINAL values (with derived stats baked in),
-        /// and the AttributeCollection adds derived stats again on top.
+        /// and the AttributeCollection adds derived stats again on top. Post-#1426 the cadence-driving derived
+        /// stat is <see cref="EAttribute.CooldownBonusMultiplier"/> (CDR is severed), so the multiplier — not
+        /// CooldownRecovery — is the one baked-in-then-re-derived; a fixed authored CooldownBonus enabler (not
+        /// derived, so not doubled) makes the doubled multiplier actually move the cadence.
         /// </summary>
         private static Player MakePlayerWithDoubleDerivedStats(
             double strength, double endurance, double agility = 0, double dexterity = 0,
@@ -1721,21 +1735,23 @@ namespace Game.Core.Tests.Battle
             // First, compute the correct final values (as the API would send them).
             double maxHealth = 50 + 20 * endurance + 5 * strength;
             double toughness = 2 * endurance;
-            double cooldownRecovery = 1 + 0.004 * agility + 0.001 * dexterity;
+            double cooldownBonusMultiplier = 1 + 0.002 * agility;
 
             // These allocations include both raw stats AND derived values,
-            // mimicking what PlayerData.FromPlayer sends to the frontend.
+            // mimicking what PlayerData.FromPlayer sends to the frontend. CooldownBonus is the authored-only
+            // enabler (base 0, no derivation), so it is a single raw allocation rather than a doubled derived value.
             var allocations = new List<StatAllocation>
             {
-                new() { Attribute = EAttribute.Strength,        Amount = strength },
-                new() { Attribute = EAttribute.Endurance,       Amount = endurance },
-                new() { Attribute = EAttribute.Intellect,       Amount = 0 },
-                new() { Attribute = EAttribute.Agility,         Amount = agility },
-                new() { Attribute = EAttribute.Dexterity,       Amount = dexterity },
-                new() { Attribute = EAttribute.Luck,            Amount = 0 },
-                new() { Attribute = EAttribute.MaxHealth,       Amount = maxHealth },
-                new() { Attribute = EAttribute.Toughness,       Amount = toughness },
-                new() { Attribute = EAttribute.CooldownRecovery,Amount = cooldownRecovery },
+                new() { Attribute = EAttribute.Strength,               Amount = strength },
+                new() { Attribute = EAttribute.Endurance,              Amount = endurance },
+                new() { Attribute = EAttribute.Intellect,              Amount = 0 },
+                new() { Attribute = EAttribute.Agility,                Amount = agility },
+                new() { Attribute = EAttribute.Dexterity,              Amount = dexterity },
+                new() { Attribute = EAttribute.Luck,                   Amount = 0 },
+                new() { Attribute = EAttribute.MaxHealth,              Amount = maxHealth },
+                new() { Attribute = EAttribute.Toughness,              Amount = toughness },
+                new() { Attribute = EAttribute.CooldownBonus,          Amount = 0.25 },
+                new() { Attribute = EAttribute.CooldownBonusMultiplier,Amount = cooldownBonusMultiplier },
             };
 
             var totalUsed = (int)(strength + endurance + agility + dexterity);

@@ -105,12 +105,15 @@ describe('perPointYields', () => {
 		]);
 	});
 
-	it('AGI yields +0.004 Cooldown Recovery per point', () => {
-		expect(perPointYields(idx.agi)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.004 }]);
+	// CDR was severed from the core attributes (#1426): Agility now feeds only the opt-in cadence/evasion
+	// multipliers (inert without an enabler, not surfaced in DERIVED_STATS) and Dexterity shed its CDR sliver,
+	// so neither yields a surfaced derived stat any longer.
+	it('AGI has no surfaced derived yield (its cadence/evasion multipliers are opt-in)', () => {
+		expect(perPointYields(idx.agi)).toEqual([]);
 	});
 
-	it('DEX yields +0.001 Cooldown Recovery per point (a small multiplier increment, not rounded away)', () => {
-		expect(perPointYields(idx.dex)).toEqual([{ id: EAttribute.CooldownRecovery, delta: 0.001 }]);
+	it('DEX has no surfaced derived yield (its Cooldown Recovery sliver was severed, #1426)', () => {
+		expect(perPointYields(idx.dex)).toEqual([]);
 	});
 
 	it('INT and LUK have no surfaced derived yield yet', () => {
@@ -152,8 +155,11 @@ describe('feedsFor', () => {
 	it('reports the derived stats each attribute drives', () => {
 		expect(feedsFor(idx.str)).toEqual([EAttribute.MaxHealth]);
 		expect(feedsFor(idx.end)).toEqual([EAttribute.MaxHealth, EAttribute.Toughness]);
-		expect(feedsFor(idx.agi)).toEqual([EAttribute.CooldownRecovery]);
-		expect(feedsFor(idx.dex)).toEqual([EAttribute.CooldownRecovery]);
+		// CDR is severed from the core attributes (#1426): Agility now feeds only the opt-in cadence/evasion
+		// multipliers (not surfaced here, inert without an enabler) and Dexterity feeds nothing surfaced, so
+		// neither drives a stat in the DERIVED_STATS panel any longer.
+		expect(feedsFor(idx.agi)).toEqual([]);
+		expect(feedsFor(idx.dex)).toEqual([]);
 		expect(feedsFor(idx.int)).toEqual([]);
 		expect(feedsFor(idx.luk)).toEqual([]);
 	});
@@ -163,12 +169,13 @@ describe('contributorsFor', () => {
 	it('reports the core attributes feeding each derived stat (inverse of feedsFor)', () => {
 		expect(contributorsFor(EAttribute.MaxHealth)).toEqual([EAttribute.Strength, EAttribute.Endurance]);
 		expect(contributorsFor(EAttribute.Toughness)).toEqual([EAttribute.Endurance]);
-		expect(contributorsFor(EAttribute.CooldownRecovery)).toEqual([EAttribute.Agility, EAttribute.Dexterity]);
 	});
 
 	it('returns no contributors for an attribute no core stat derives', () => {
 		expect(contributorsFor(EAttribute.Strength)).toEqual([]);
 		expect(contributorsFor(EAttribute.Luck)).toEqual([]);
+		// CDR keeps its base 1.0 but is no longer fed by any core attribute (#1426).
+		expect(contributorsFor(EAttribute.CooldownRecovery)).toEqual([]);
 	});
 });
 

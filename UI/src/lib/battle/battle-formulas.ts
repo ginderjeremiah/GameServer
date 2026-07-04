@@ -106,10 +106,16 @@ export function mitigateDamage(dealt: number, damageType: EDamageType, defenderA
 	return toughnessMitigatedDamage(mitigated, defenderAttributes.getValue(EAttribute.Toughness));
 }
 
-/** The cooldown multiplier — the CooldownRecovery attribute read directly. It is a base-1 multiplier
- *  (1.0 = normal charge speed, 1.09 = +9%), so a multiplicative buff scales it intuitively. */
+/** The effective cooldown multiplier read at the charge site: the base-1 CooldownRecovery multiplier
+ *  (1.0 = normal charge speed) plus the committed cadence channel CooldownBonus × CooldownBonusMultiplier,
+ *  the product computed here at consumption like crit/parry/dodge (spike #1426). CooldownBonus is an
+ *  authored-only enabler that idles at 0, so an uncommitted build charges at exactly CooldownRecovery
+ *  regardless of Agility. Mirrors the backend `Battler.GetCooldownMultiplier`. */
 export function cooldownMultiplier(attributes: BattleAttributes): number {
-	return attributes.getValue(EAttribute.CooldownRecovery);
+	return (
+		attributes.getValue(EAttribute.CooldownRecovery) +
+		attributes.getValue(EAttribute.CooldownBonus) * attributes.getValue(EAttribute.CooldownBonusMultiplier)
+	);
 }
 
 /** The long-run average damage multiplier from critical hits: a crit (probability `critChance`, a

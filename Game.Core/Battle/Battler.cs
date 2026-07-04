@@ -67,9 +67,12 @@ namespace Game.Core.Battle
 
         public double GetCooldownMultiplier()
         {
-            // CooldownRecovery is a base-1 multiplier read directly (1.0 = normal charge speed); see
-            // StaticAttributeModifiers for the base/derived formula.
-            return _attributes[CooldownRecovery];
+            // The effective charge rate: the base-1 CooldownRecovery multiplier plus the committed cadence channel
+            // CooldownBonus × CooldownBonusMultiplier, the product computed here at consumption like crit/parry/dodge
+            // (spike #1426). CooldownBonus idles at 0 (authored-only enabler), so an uncommitted build charges at
+            // exactly CooldownRecovery regardless of Agility. See StaticAttributeModifiers for the base/derived formulas.
+            return _attributes[CooldownRecovery]
+                + _attributes[CooldownBonus] * _attributes[CooldownBonusMultiplier];
         }
 
         public double GetAttributeValue(EAttribute attribute)

@@ -141,15 +141,15 @@ namespace Game.Core.Tests.Battle.Performance
 
         // Effects rotate across the core attributes that actually have derived dependents, so a churn
         // invalidation cascades into the attributes read on the hot path: Strength→MaxHealth,
-        // Endurance→MaxHealth/Toughness, Agility→CooldownRecovery/DodgeChanceMultiplier,
-        // Dexterity→CooldownRecovery. A 4-skill loadout therefore churns every derived attribute read each
-        // tick (MaxHealth for the death check, CooldownRecovery for charge, the dodge multiplier on each fire).
-        // CriticalChance/DodgeChance are no longer attribute-derived (both opt-in: crit rework #1425, dodge
-        // rework #1523), so they never churn here. Intellect/Luck are omitted because nothing the hot path
-        // reads derives from them. The buffs are
+        // Endurance→MaxHealth/Toughness, Agility→CooldownBonusMultiplier/DodgeChanceMultiplier. A full loadout
+        // therefore churns every derived attribute read each tick (MaxHealth for the death check, the cadence
+        // multiplier for charge, the dodge multiplier on each fire). CriticalChance/DodgeChance and cadence are
+        // no longer core-attribute-derived (all opt-in: crit rework #1425, dodge rework #1523, CDR severing
+        // #1426), so their enablers never churn here. Dexterity/Intellect/Luck are omitted because nothing the
+        // hot path reads derives from them (Dexterity shed its CooldownRecovery sliver in #1426). The buffs are
         // additive and Self-targeted, so they only ever raise those stats — and the skills
         // deal no damage regardless, so the combatant stays immortal and the battle runs to the tick cap.
-        private static readonly EAttribute[] BuffableCoreAttributes = [Strength, Endurance, Agility, Dexterity];
+        private static readonly EAttribute[] BuffableCoreAttributes = [Strength, Endurance, Agility];
 
         private enum EffectMode
         {

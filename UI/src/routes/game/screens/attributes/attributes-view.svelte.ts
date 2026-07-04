@@ -35,8 +35,8 @@ const MODE_STORAGE_KEY = 'ttf.attr.mode';
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 /** Rounds a per-point yield to clean floating-point noise while preserving the small increments a
- *  base-1 multiplier attribute contributes (e.g. CooldownRecovery's +0.004 per Agility point), which a
- *  coarser 2-decimal round would collapse to zero and drop from the surfaced yields. */
+ *  base-1 multiplier attribute contributes (e.g. an Agility point's +0.002 to a cadence/evasion multiplier),
+ *  which a coarser 2-decimal round would collapse to zero and drop from the surfaced yields. */
 const roundYield = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 /** The six core attributes that accept stat-point allocation (EAttribute 0..5), in display order.

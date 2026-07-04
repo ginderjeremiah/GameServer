@@ -268,11 +268,31 @@ describe('battle-formulas', () => {
 	});
 
 	describe('cooldownMultiplier', () => {
-		// CooldownRecovery is a base-1 multiplier read directly, so the attribute value IS the multiplier
-		// (these raw attributes skip the static base; a real battler's base 1.0 is exercised in battler.test).
-		it('reads the CooldownRecovery attribute directly as the multiplier', () => {
+		// Effective rate = CooldownRecovery + CooldownBonus × CooldownBonusMultiplier (#1426). These raw
+		// attributes skip the static base, so CooldownBonus is 0 unless set (product 0); a real battler's base
+		// 1.0 CDR and the Agility-derived multiplier are exercised in battler.test.
+		it('reads CooldownRecovery directly as the base rate when no CooldownBonus is authored', () => {
 			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 1.09]]))).toBeCloseTo(1.09, 10);
 			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 2]]))).toBe(2);
+		});
+
+		it('adds the CooldownBonus × CooldownBonusMultiplier product to CooldownRecovery', () => {
+			// 1 + 0.5 × 1.04 = 1.52 — the committed cadence channel composed at the charge site.
+			const attrs = makeAttributes([
+				[EAttribute.CooldownRecovery, 1],
+				[EAttribute.CooldownBonus, 0.5],
+				[EAttribute.CooldownBonusMultiplier, 1.04]
+			]);
+			expect(cooldownMultiplier(attrs)).toBeCloseTo(1.52, 10);
+		});
+
+		it('leaves the rate at CooldownRecovery when the bonus is zero (idle channel)', () => {
+			// 0 × mult = 0, so a high multiplier with no enabler contributes nothing.
+			const attrs = makeAttributes([
+				[EAttribute.CooldownRecovery, 1],
+				[EAttribute.CooldownBonusMultiplier, 2]
+			]);
+			expect(cooldownMultiplier(attrs)).toBeCloseTo(1, 10);
 		});
 
 		it('slows cooldowns for a CooldownRecovery below 1', () => {

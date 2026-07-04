@@ -294,9 +294,9 @@ describe('AttributeBreakdownView', () => {
 		// The engine base/derived aggregates always contribute, so they stay in Secondary. Unlike the other
 		// chance attributes, CriticalChanceMultiplier carries a base of 1 (crit rework #1425, per-skill base
 		// #1453 — the enabler moved to the skill's own CriticalChance, so this attribute is always present).
-		// CriticalDamage (base 1.5), ParryChanceMultiplier, and DodgeChanceMultiplier (both base 1, the same
-		// template — #1457/#1523; display order tracks enum value, so they sort last) remain too. DodgeChance
-		// itself is now authored-only (base 0, dodge rework #1523) and self-excludes like ParryChance.
+		// CriticalDamage (base 1.5), ParryChanceMultiplier, DodgeChanceMultiplier, and CooldownBonusMultiplier
+		// (all base 1, the same template — #1457/#1523/#1426; display order tracks enum value, so they sort last)
+		// remain too. DodgeChance/CooldownBonus are now authored-only (base 0) and self-exclude like ParryChance.
 		expect(secondary?.attrs.map((a) => a.meta.id)).toEqual([
 			EAttribute.MaxHealth,
 			EAttribute.Toughness,
@@ -304,7 +304,8 @@ describe('AttributeBreakdownView', () => {
 			EAttribute.CriticalChanceMultiplier,
 			EAttribute.CriticalDamage,
 			EAttribute.ParryChanceMultiplier,
-			EAttribute.DodgeChanceMultiplier
+			EAttribute.DodgeChanceMultiplier,
+			EAttribute.CooldownBonusMultiplier
 		]);
 		// CooldownRecovery carries its reference-data precision (0 decimals) and percentage flag.
 		const cdrMeta = secondary?.attrs.find((a) => a.meta.id === EAttribute.CooldownRecovery)?.meta;
@@ -315,9 +316,10 @@ describe('AttributeBreakdownView', () => {
 	it('self-selects only attributes with a real (non-combat) contributor', () => {
 		// No allocations or gear: only the engine base/derived formulas contribute. The Secondary aggregates
 		// surface — MaxHealth/Toughness/CooldownRecovery, plus CriticalChanceMultiplier (base 1, #1453),
-		// CriticalDamage (base 1.5), ParryChanceMultiplier (base 1, #1457), and DodgeChanceMultiplier
-		// (base 1, #1523) — alongside the obsolete attribute and the combat-only Status channels staying
-		// excluded. DodgeChance/ParryChance (both base 0, authored-only) self-exclude. No Primary group is shown.
+		// CriticalDamage (base 1.5), ParryChanceMultiplier (base 1, #1457), DodgeChanceMultiplier (base 1, #1523),
+		// and CooldownBonusMultiplier (base 1, #1426) — alongside the obsolete attribute and the combat-only Status
+		// channels staying excluded. DodgeChance/ParryChance/CooldownBonus (all base 0, authored-only) self-exclude.
+		// No Primary group is shown.
 		const view = new AttributeBreakdownView();
 		const ids = view.groups.flatMap((g) => g.attrs.map((a) => a.meta.id));
 		expect(ids).toEqual([
@@ -327,7 +329,8 @@ describe('AttributeBreakdownView', () => {
 			EAttribute.CriticalChanceMultiplier,
 			EAttribute.CriticalDamage,
 			EAttribute.ParryChanceMultiplier,
-			EAttribute.DodgeChanceMultiplier
+			EAttribute.DodgeChanceMultiplier,
+			EAttribute.CooldownBonusMultiplier
 		]);
 		expect(view.groups.some((g) => g.type === EAttributeType.Primary)).toBe(false);
 		expect(ids).not.toContain(EAttribute.DropBonus);

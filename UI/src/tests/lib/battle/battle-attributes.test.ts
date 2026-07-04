@@ -97,13 +97,22 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.Toughness]
 			},
 
-			// CooldownRecovery = 1 (base) + 0.004*Agility + 0.001*Dexterity
+			// CooldownRecovery = 1 (base). Its Agility/Dexterity derivations were severed in spike #1426, so the
+			// allocations here deliberately do NOT move it — it stays the base-1 multiplier (cadence is now the
+			// opt-in CooldownBonus × CooldownBonusMultiplier channel, whose product is composed at the charge site).
 			cooldownRecovery: {
 				allocations: [
 					[EAttribute.Agility, 20],
 					[EAttribute.Dexterity, 10]
 				],
 				derivedAttributes: [EAttribute.CooldownRecovery]
+			},
+
+			// CooldownBonusMultiplier = 1 (base) + 0.002*Agility (#1426), the same opt-in template as dodge: its
+			// enabler is the authored-only CooldownBonus, so the Agility-fed multiplier idles until one is fielded.
+			cooldownBonusMultiplier: {
+				allocations: [[EAttribute.Agility, 20]],
+				derivedAttributes: [EAttribute.CooldownBonusMultiplier]
 			},
 
 			// CriticalChanceMultiplier = 1 (base) + 0.002*Luck (#1525, LUK the proc-payoff amplifier).
@@ -140,11 +149,10 @@ describe('BattleAttributes', () => {
 				derivedAttributes: [EAttribute.CriticalDamage]
 			},
 
-			// With no allocations every derived stat collapses to just its base: the five with a base carry
-			// it (MaxHealth 50, CriticalDamage 1.5, CriticalChanceMultiplier/ParryChanceMultiplier/
-			// DodgeChanceMultiplier 1), the pure-derived stats (Toughness, CooldownRecovery's coefficients
-			// aside) are 0/base. DamageReflection and DodgeChance are authored-only (no static modifier at
-			// all), so they are 0 here too.
+			// With no allocations every derived stat collapses to just its base: the ones with a base carry it
+			// (MaxHealth 50, CriticalDamage 1.5, CooldownRecovery 1, and the CriticalChance/ParryChance/
+			// DodgeChance/CooldownBonus multipliers 1), the pure-derived Toughness is 0. DamageReflection,
+			// DodgeChance and CooldownBonus are authored-only (no static modifier at all), so they are 0 here too.
 			zeroBaseStats: {
 				allocations: [],
 				derivedAttributes: [
@@ -156,7 +164,9 @@ describe('BattleAttributes', () => {
 					EAttribute.CriticalChanceMultiplier,
 					EAttribute.ParryChanceMultiplier,
 					EAttribute.DodgeChanceMultiplier,
-					EAttribute.DodgeChance
+					EAttribute.DodgeChance,
+					EAttribute.CooldownBonusMultiplier,
+					EAttribute.CooldownBonus
 				]
 			}
 		};

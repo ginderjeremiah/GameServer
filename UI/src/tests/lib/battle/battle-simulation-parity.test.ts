@@ -70,10 +70,12 @@ interface ParityScenario {
 }
 
 const scenarios: ParityScenario[] = [
-	// Single skill, CooldownRecovery > 0 — exercises the cdMultiplier path.
-	//   Player: MaxHealth=900, Toughness=60, CDR=1.09 → cdMult=1.09; damage 85 → enemy Toughness 30 → 73.913/hit.
+	// Single skill, the committed cadence channel (#1426) — exercises the cdMultiplier path through
+	// CooldownBonus × CooldownBonusMultiplier now that CDR is severed from the core attributes.
+	//   Player: MaxHealth=900, Toughness=60. CDR=1 (base), CooldownBonus=0.25, CooldownBonusMultiplier=1+0.002·20=1.04
+	//     → cdMult = 1 + 0.25·1.04 = 1.26; damage 85 → enemy Toughness 30 → 73.913/hit.
 	//   Enemy:  MaxHealth=400, Toughness=30; damage 5 → player Toughness 60 → 3.846/hit.
-	//   6 hits at ticks 28,56,84,112,140,168 → 6720ms.
+	//   6 hits at ticks 24,48,72,96,120,144 → 5760ms.
 	{
 		name: 'cooldownRecovery',
 		player: () =>
@@ -82,7 +84,8 @@ const scenarios: ParityScenario[] = [
 					{ id: EAttribute.Strength, amount: 50 },
 					{ id: EAttribute.Endurance, amount: 30 },
 					{ id: EAttribute.Agility, amount: 20 },
-					{ id: EAttribute.Dexterity, amount: 10 }
+					{ id: EAttribute.Dexterity, amount: 10 },
+					{ id: EAttribute.CooldownBonus, amount: 0.25 }
 				],
 				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])]
 			),
@@ -94,7 +97,7 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(5, 2000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 6720 }
+		expected: { victory: true, playerDied: false, totalMs: 5760 }
 	},
 
 	// Two player skills on different cooldowns vs an enemy that deals real damage.
@@ -191,7 +194,8 @@ const scenarios: ParityScenario[] = [
 					{ id: EAttribute.Strength, amount: 50 },
 					{ id: EAttribute.Endurance, amount: 30 },
 					{ id: EAttribute.Agility, amount: 20 },
-					{ id: EAttribute.Dexterity, amount: 10 }
+					{ id: EAttribute.Dexterity, amount: 10 },
+					{ id: EAttribute.CooldownBonus, amount: 0.25 }
 				],
 				[makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])]
 			),
@@ -210,14 +214,15 @@ const scenarios: ParityScenario[] = [
 	// The only scenario whose player is built through the equipped-item + applied-mod
 	// attribute-composition path (the rest build the player from raw stat allocations).
 	// An item and two mods (prefix + suffix) each contribute Strength, so dropping any
-	// one source changes the kill count; the item's Agility and the prefix's Dexterity
-	// additionally feed CooldownRecovery, so the whole merge is exercised end to end.
-	//   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
-	//   Merged: Str=45, End=20, Agi=20, Dex=20 → MaxHealth=675, Toughness=40, CDR=1.10 → cdMult=1.10.
-	//   Player skill: 10 + 45*1.5 = 77.5 raw → enemy Toughness 30 → 67.391/hit, fires every 28 ticks
-	//     (charge/tick = 40*1.10 = 44, 44*28=1232 ≥ 1200).
+	// one source changes the kill count; the item additionally grants the CooldownBonus enabler and Agility
+	// (which lifts CooldownBonusMultiplier), so the merge drives cadence end to end (#1426).
+	//   Allocations: Str=20, End=20.  Item: +10 Str, +20 Agi, +0.25 CooldownBonus.  Prefix: +8 Str, +20 Dex.  Suffix: +7 Str.
+	//   Merged: Str=45, End=20, Agi=20, Dex=20, CooldownBonus=0.25 → MaxHealth=675, Toughness=40.
+	//     CooldownBonusMultiplier = 1+0.002·20 = 1.04 → cdMult = 1 + 0.25·1.04 = 1.26.
+	//   Player skill: 10 + 45*1.5 = 77.5 raw → enemy Toughness 30 → 67.391/hit, fires every 24 ticks
+	//     (charge/tick = 40*1.26 = 50.4, 50.4*24=1209.6 ≥ 1200).
 	//   Enemy: MaxHealth=400, Toughness=30; attack 5 → 4.17/hit, so the player never dies.
-	//   6 hits reach 404 ≥ 400 at tick 168 → 6720ms (proof the merged attributes drive the outcome).
+	//   6 hits reach 404 ≥ 400 at tick 144 → 5760ms (proof the merged attributes drive the outcome).
 	{
 		name: 'equippedItemWithMods',
 		player: () =>
@@ -230,7 +235,8 @@ const scenarios: ParityScenario[] = [
 				makeEquipment({
 					attributes: [
 						{ attributeId: EAttribute.Strength, amount: 10 },
-						{ attributeId: EAttribute.Agility, amount: 20 }
+						{ attributeId: EAttribute.Agility, amount: 20 },
+						{ attributeId: EAttribute.CooldownBonus, amount: 0.25 }
 					],
 					mods: [
 						{
@@ -255,7 +261,7 @@ const scenarios: ParityScenario[] = [
 				],
 				[makeSkill(5, 2000)]
 			),
-		expected: { victory: true, playerDied: false, totalMs: 6720 }
+		expected: { victory: true, playerDied: false, totalMs: 5760 }
 	},
 
 	// Fractional enemy attribute distribution (#941): the only scenario whose enemy attribute is a FRACTIONAL
@@ -1683,8 +1689,12 @@ describe('Battle simulation parity with backend', () => {
 
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(900);
 		expect(player.attributes.getValue(EAttribute.Toughness)).toBe(60); // 2·Endurance(30)
-		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1.09, 10);
-		expect(player.cdMultiplier).toBeCloseTo(1.09, 10);
+		// CDR is severed from the core attributes (#1426): it stays the base 1, and cadence rides the committed
+		// CooldownBonus (0.25, authored) × CooldownBonusMultiplier (1 + 0.002·Agi20 = 1.04) → cdMultiplier 1.26.
+		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1, 10);
+		expect(player.attributes.getValue(EAttribute.CooldownBonus)).toBeCloseTo(0.25, 10);
+		expect(player.attributes.getValue(EAttribute.CooldownBonusMultiplier)).toBeCloseTo(1.04, 10);
+		expect(player.cdMultiplier).toBeCloseTo(1.26, 10);
 
 		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(400);
 		expect(enemy.attributes.getValue(EAttribute.Toughness)).toBe(30); // 2·Endurance(15)
@@ -1707,8 +1717,11 @@ describe('Battle simulation parity with backend', () => {
 		expect(player.attributes.getValue(EAttribute.Dexterity)).toBe(20);
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(675);
 		expect(player.attributes.getValue(EAttribute.Toughness)).toBe(40); // 2·Endurance(20)
-		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1.1, 10);
-		expect(player.cdMultiplier).toBeCloseTo(1.1, 10);
+		// CDR stays base 1 (#1426); cadence rides the item's CooldownBonus (0.25) × CooldownBonusMultiplier (1.04).
+		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(1, 10);
+		expect(player.attributes.getValue(EAttribute.CooldownBonus)).toBeCloseTo(0.25, 10);
+		expect(player.attributes.getValue(EAttribute.CooldownBonusMultiplier)).toBeCloseTo(1.04, 10);
+		expect(player.cdMultiplier).toBeCloseTo(1.26, 10);
 	});
 
 	it('derives the fractionalEnemyDistribution enemy MaxHealth to the expected fractional value', () => {
@@ -1754,17 +1767,20 @@ describe('Battle simulation parity with backend', () => {
 
 	it('ends sooner if the player double-counts derived stats (the historical bug)', () => {
 		// The frontend used to pass the API's already-final attribute values to
-		// BattleAttributes with calcDerivedStats=true, adding derived stats AGAIN.
+		// BattleAttributes with calcDerivedStats=true, adding derived stats AGAIN. Post-#1426 the
+		// cadence-driving derived stat is CooldownBonusMultiplier (CDR is severed), so the double-count doubles
+		// it while the authored CooldownBonus enabler (not derived) is fed once.
 		// Mirrors BattleSimulatorParityTests.Parity_DoubleDerivedStats_ProducesShorterBattle.
 		const playerFinalAttrs = [
 			{ id: EAttribute.Strength, amount: 50 },
 			{ id: EAttribute.Endurance, amount: 30 },
 			{ id: EAttribute.Agility, amount: 20 },
 			{ id: EAttribute.Dexterity, amount: 10 },
+			{ id: EAttribute.CooldownBonus, amount: 0.25 }, // the authored enabler (base 0, not doubled)
 			// The FINAL values including derived stats, re-fed into the derived pipeline:
 			{ id: EAttribute.MaxHealth, amount: 900 }, // 50 + 20*30 + 5*50
 			{ id: EAttribute.Toughness, amount: 60 }, // 2*30
-			{ id: EAttribute.CooldownRecovery, amount: 1.09 } // 1 + 0.004*20 + 0.001*10
+			{ id: EAttribute.CooldownBonusMultiplier, amount: 1.04 } // 1 + 0.002*20
 		];
 		const player = makeBattler(playerFinalAttrs, [
 			makeSkill(10, 1200, [{ attributeId: EAttribute.Strength, multiplier: 1.5 }])
@@ -1774,11 +1790,12 @@ describe('Battle simulation parity with backend', () => {
 		// Derived stats are now DOUBLED.
 		expect(player.attributes.getValue(EAttribute.MaxHealth)).toBe(1800);
 		expect(player.attributes.getValue(EAttribute.Toughness)).toBe(120); // injected 60 + derived 2·30
-		expect(player.attributes.getValue(EAttribute.CooldownRecovery)).toBeCloseTo(2.18, 10);
-		expect(player.cdMultiplier).toBeCloseTo(2.18, 10);
+		expect(player.attributes.getValue(EAttribute.CooldownBonusMultiplier)).toBeCloseTo(2.08, 10); // injected 1.04 + derived 1.04
+		// cdMultiplier = 1 (base CDR) + 0.25·2.08 = 1.52 (vs the correct 1.26).
+		expect(player.cdMultiplier).toBeCloseTo(1.52, 10);
 
 		const result = new BattleSimulator(player, enemy, PARITY_SEED).simulate();
-		expect(result.totalMs).toBe(3360);
-		expect(result.totalMs).toBeLessThan(6720);
+		expect(result.totalMs).toBe(4800);
+		expect(result.totalMs).toBeLessThan(5760);
 	});
 });

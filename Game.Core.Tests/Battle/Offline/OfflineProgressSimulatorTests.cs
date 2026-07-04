@@ -571,8 +571,10 @@ namespace Game.Core.Tests.Battle.Offline
             // Crit is a per-skill opt-in enabler (crit rework #1425, per-skill base #1453): the fired skill's own
             // CriticalChance (0.3, on SlowHeavySkill below) is the enabler, scaled by the Luck-fed
             // CriticalChanceMultiplier (1 + 0.002·Luck(100) = 1.2 → an effective 0.36/fire — #1525). Luck 100
-            // also drives the 1.75x crit multiplier (CriticalDamage keeps its Luck derivation), and Dexterity 100
-            // preserves the CooldownRecovery that sets the ~4-fire cadence — the fight stays a genuine coin flip.
+            // also drives the 1.75x crit multiplier (CriticalDamage keeps its Luck derivation). CDR is severed
+            // from the core attributes (#1426), so the few-fire cadence now rides the skill's long cooldown at the
+            // base rate; Dexterity 100 no longer feeds cadence and is kept purely as a power allocation — the
+            // fight stays a genuine coin flip.
             Snapshot = PlayerSnapshot(strength: 50, endurance: 10, dexterity: 100, luck: 100),
             // A long cooldown → only ~4 fires across the 120s cap, so crit count (and thus the outcome)
             // swings battle to battle.

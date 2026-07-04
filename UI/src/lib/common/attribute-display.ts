@@ -38,8 +38,9 @@ export const attributeColor = (id: EAttribute): string => {
  *  damage-type amplification/resistance family (#1320/#1340) uses the type's base icon plus an
  *  `amp` (up-arrow) or `resist` (shield) badge. All badges are composited by `badge.py` so each
  *  badged variant is identical to its base bar the badge. Only the obsolete `DropBonus`, the typed
- *  DoT accumulators (Bleed/Poison/Burn DamagePerSecond, owned by the #1320 Area F UX work), and the
- *  parry/dodge multiplier pair (#1457/#1523 — art pending) have no art and degrade to an empty icon. */
+ *  DoT accumulators (Bleed/Poison/Burn DamagePerSecond, owned by the #1320 Area F UX work), the
+ *  parry/dodge multiplier pair (#1457/#1523 — art pending), and the cadence pair (CooldownBonus /
+ *  CooldownBonusMultiplier, #1426 — art pending) have no art and degrade to an empty icon. */
 const ATTRIBUTE_ICON: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Strength]: 'Strength',
 	[EAttribute.Endurance]: 'Endurance',

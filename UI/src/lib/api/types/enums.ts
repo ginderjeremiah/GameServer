@@ -89,6 +89,8 @@ export enum EAttribute {
 	ParryChance = 47,
 	ParryChanceMultiplier = 48,
 	DodgeChanceMultiplier = 49,
+	CooldownBonus = 50,
+	CooldownBonusMultiplier = 51,
 }
 
 export enum EAttributeModifierSource {
