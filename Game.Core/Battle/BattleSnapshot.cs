@@ -185,10 +185,11 @@ namespace Game.Core.Battle
         /// large flat-core passive could not under-report its power and inflate rewards). The live reward path
         /// no longer calls this: <see cref="DefeatRewards"/> now rates the <see cref="Battler"/> from
         /// <see cref="ToBattler"/> directly, which already composes the signature passive as its own final step
-        /// (spike #1526). Retained because the combat-rating calibration report's old-measure comparison
-        /// (#1533) and tests still need the legacy modifier-list shape. A transient <see cref="AttributeCollection"/>
-        /// resolves the passive's scaling against the same fully-assembled attributes <see cref="ToBattler"/>
-        /// uses, so the two stay consistent.
+        /// (spike #1526). It has no remaining production caller — retained because the combat-rating
+        /// calibration report's integration test (#1533) still builds its old-measure reference builds from
+        /// this legacy modifier-list shape, and the snapshot unit tests exercise it directly. A transient
+        /// <see cref="AttributeCollection"/> resolves the passive's scaling against the same fully-assembled
+        /// attributes <see cref="ToBattler"/> uses, so the two stay consistent.
         /// </summary>
         public IEnumerable<AttributeModifier> GetModifiersWithSignaturePassive(
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod,

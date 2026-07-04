@@ -17,5 +17,5 @@ namespace Game.Core.Battle.Offline
     /// <c>BattleCompletedEvent</c>, so offline and live accrue identically (spike #1318, #1526 Decision 5).
     /// </para>
     /// </summary>
-    public record OfflineBattleOutcome(Enemy Enemy, BattleResult Result, int ExpReward, double PlayerRating, double EnemyRating = 0);
+    public record OfflineBattleOutcome(Enemy Enemy, BattleResult Result, int ExpReward, double PlayerRating, double EnemyRating);
 }
