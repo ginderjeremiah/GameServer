@@ -45,9 +45,10 @@ namespace Game.Api.Services.Admin
         /// Redelivers each targeted entry via <see cref="SocketManagerService.EmitSocketCommand(SocketCommandInfo, int)"/>
         /// — which resolves whatever socket is currently live for the envelope's player, since the original
         /// socket id is never preserved and may no longer exist — then removes it from the dead-letter queue.
-        /// An entry with no addressable player (malformed, or the player has no live socket right now) is left
-        /// queued rather than silently discarded: there is no destination queue to "reserve onto" first the
-        /// way the player write-behind replay does, so redelivery only proceeds once it can actually happen.
+        /// An entry that is not genuinely replayable (malformed, an unrecognized command name, or the player
+        /// has no live socket right now) is left queued rather than silently discarded: there is no
+        /// destination queue to "reserve onto" first the way the player write-behind replay does, so a
+        /// redelivery only counts once it has actually happened.
         /// </summary>
         private async Task<DeadLetterReplayResult> ReplayAsync(IReadOnlyList<string>? requested, bool all)
         {
@@ -62,12 +63,20 @@ namespace Game.Api.Services.Admin
             foreach (var payload in targets)
             {
                 var envelope = TryDeserialize(payload);
-                if (envelope is null || !await _socketManager.HasActiveSocket(envelope.PlayerId))
+                // Malformed and UnknownEventType entries are poison — the same classification Classify
+                // computes — so they stay queued rather than being delivered and dropped; only Replayable
+                // (a known server-initiated command) reaches EmitSocketCommand, whose bool result gates the
+                // removal on the same live-socket lookup rather than a separate check-then-act pair.
+                if (envelope is null || !_commandFactory.IsServerInitiatedOnly(envelope.Command.Name))
                 {
                     continue;
                 }
 
-                await _socketManager.EmitSocketCommand(envelope.Command, envelope.PlayerId);
+                if (!await _socketManager.EmitSocketCommand(envelope.Command, envelope.PlayerId))
+                {
+                    continue;
+                }
+
                 if (await deadLetterQueue.RemoveAsync(payload))
                 {
                     replayed++;
@@ -128,7 +137,10 @@ namespace Game.Api.Services.Admin
             try
             {
                 var envelope = raw.Deserialize<SocketCommandDeadLetterEnvelope>();
-                return string.IsNullOrEmpty(envelope?.Command.Name) ? null : envelope;
+                // `required` only guarantees the "command" key is present, not that its value is non-null
+                // (a {"command":null} payload deserializes fine) — guard it explicitly rather than letting an
+                // NRE on envelope.Command.Name escape this method uncaught.
+                return envelope?.Command is null || string.IsNullOrEmpty(envelope.Command.Name) ? null : envelope;
             }
             catch (JsonException)
             {

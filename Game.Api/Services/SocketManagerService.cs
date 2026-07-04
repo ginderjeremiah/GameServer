@@ -177,24 +177,33 @@ namespace Game.Api.Services
             return TeardownSocketRegistration(context, "tearing down the socket");
         }
 
-        public async Task EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
+        public async Task<bool> EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
         {
             await _pubSub.Publish(SocketChannel(socketId), SocketQueueName(socketId), commandInfo);
             // Best-effort backstop (see SocketQueueTtl): the queue key normally drains in milliseconds and is
             // deleted outright on graceful teardown, so a missed refresh here just means the next push retries it.
             _cache.ExpireAndForget(SocketQueueName(socketId), SocketQueueTtl);
+            return true;
         }
 
-        public async Task EmitSocketCommand(SocketCommandInfo commandInfo, int playerId)
+        /// <summary>
+        /// Publishes to whatever socket is currently live for <paramref name="playerId"/>, returning whether
+        /// one was found to publish to (not whether the client actually received it — the push itself is
+        /// fire-and-forget). The Ops dead-letter replay (#1542) uses this to gate its queue removal on a
+        /// single presence lookup rather than a separate check-then-act pair.
+        /// </summary>
+        public async Task<bool> EmitSocketCommand(SocketCommandInfo commandInfo, int playerId)
         {
             var socketId = await CurrentSocketId(playerId);
             if (socketId is not null)
             {
                 await EmitSocketCommand(commandInfo, socketId);
+                return true;
             }
             else
             {
                 _logger.LogWarning("Attempted to emit command: {CommandInfo} to player with no active socket: {PlayerId}", commandInfo, playerId);
+                return false;
             }
         }
 

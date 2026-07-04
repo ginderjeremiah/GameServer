@@ -178,6 +178,52 @@ namespace Game.Api.Tests.Integration
             Assert.Equal([malformed, noLiveSocket], await pubsub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE).PeekAsync(10));
         }
 
+        [Fact]
+        public async Task ReplayAllAsync_LeavesAnUnknownCommandEntryQueued_EvenWithALiveSocket()
+        {
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            const int playerId = 501;
+            var socketId = Guid.NewGuid().ToString();
+            await cache.Set(PresenceKey(playerId), socketId, TimeSpan.FromMinutes(1));
+
+            // Well-formed, addressed to a player with a live socket right now — but the command name isn't a
+            // registered server-initiated command (e.g. dead-lettered, then renamed/removed in a later
+            // deploy). Replaying it would ship a command the client can't recognize and, unlike the player
+            // write-behind queue, there is no re-processing round-trip that lets it come back — so it must
+            // stay queued rather than being delivered and dropped.
+            var unknown = Envelope(playerId, new SocketCommandInfo("RetiredCommand"));
+            await SeedDeadLettersAsync(scope, unknown);
+
+            var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
+            var result = await deadLetters.ReplayAllAsync();
+
+            Assert.Equal(0, result.ReplayedCount);
+            Assert.Equal(1, result.RemainingCount);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            Assert.Equal([unknown], await pubsub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE).PeekAsync(10));
+            Assert.Empty(await pubsub.GetQueue(SocketQueueName(socketId)).PeekAsync(10));
+        }
+
+        [Fact]
+        public async Task InspectAsync_ClassifiesANullCommandEnvelopeAsMalformed_WithoutThrowing()
+        {
+            using var scope = CreateScope();
+            // `required` only guarantees the "command" key is present, not that its value is non-null — a
+            // payload like this deserializes without error but must still classify as Malformed rather than
+            // NRE-ing out of InspectAsync.
+            await SeedDeadLettersAsync(scope, "{\"playerId\":5,\"command\":null}");
+
+            var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
+            var inspection = await deadLetters.InspectAsync(50);
+
+            var entry = Assert.Single(inspection.Entries);
+            Assert.Equal(EDeadLetterReason.Malformed, entry.Reason);
+            Assert.Null(entry.EventType);
+            Assert.Null(entry.PlayerId);
+        }
+
         private static async Task SeedDeadLettersAsync(IServiceScope scope, params string[] messages)
         {
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
