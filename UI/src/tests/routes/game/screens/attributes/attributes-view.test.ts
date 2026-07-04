@@ -1,25 +1,40 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EAttribute, type IBattlerAttribute } from '$lib/api';
+import {
+	EAttribute,
+	EDamageType,
+	EModifierType,
+	ERarity,
+	ESkillAcquisition,
+	ESkillEffectTarget,
+	type IBattlerAttribute,
+	type ISkill
+} from '$lib/api';
 
 // Mutable player-manager stand-in: `save()` reassigns `attributes` and adopts the
 // server's `statPointsUsed` absolutely. Declared as a class instance (not an object
 // literal) so `statify` can make its fields reactive — the view derives the
 // stat-point pool from them live, exactly like the real (statified) PlayerManager.
-const { mockPlayerManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
+const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
 	mockPlayerManager: new (class MockPlayerManager {
 		attributes: IBattlerAttribute[] = [];
 		statPointsGained = 0;
 		statPointsUsed = 0;
+		selectedSkills: number[] = [];
 	})(),
+	mockInventoryManager: {
+		equipmentStats: [] as IBattlerAttribute[],
+		grantedSkillIds: [] as number[],
+		equippedWeaponType: 13 as EDamageType // EDamageType.Unarmed, a numeric literal (hoisted before the import)
+	},
 	sendSocketCommand: vi.fn(),
 	toastError: vi.fn(),
 	// Reference data is intentionally absent so the view falls back to enum names.
-	staticData: { attributes: undefined as unknown }
+	staticData: { attributes: undefined as unknown, skills: [] as ISkill[] }
 }));
 
 vi.mock('$lib/engine', async () => {
 	const { statify } = await import('$lib/common');
-	return { playerManager: statify(mockPlayerManager) };
+	return { playerManager: statify(mockPlayerManager), inventoryManager: mockInventoryManager };
 });
 vi.mock('$stores', () => ({ staticData, toastError }));
 vi.mock('$lib/api', async (importOriginal) => {
@@ -37,6 +52,8 @@ import {
 	feedsFor,
 	contributorsFor,
 	derivedShortLabel,
+	inertHint,
+	isAttributeInert,
 	radarValueAtPointer
 } from '$routes/game/screens/attributes/attributes-view.svelte';
 
@@ -53,11 +70,45 @@ const idx = {
 
 let view: AttributesView;
 
+/** Places skills at their id index — the zero-based-id catalogue convention `staticData.skills` mirrors. */
+const skillsById = (skills: ISkill[]): ISkill[] => {
+	const catalogue: ISkill[] = [];
+	for (const s of skills) {
+		catalogue[s.id] = s;
+	}
+	return catalogue;
+};
+
+/* A skill with sensible defaults so each test only states what matters. */
+const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
+	name: `Skill ${over.id}`,
+	baseDamage: 0,
+	criticalChance: 0,
+	damageMultipliers: [],
+	effects: [],
+	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
+	description: '',
+	cooldownMs: 1000,
+	iconPath: '',
+	rarityId: ERarity.Common,
+	word: '',
+	pronunciation: '',
+	translation: '',
+	acquisition: ESkillAcquisition.Player,
+	designerNotes: '',
+	...over
+});
+
 beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({ data: { attributes: allFives(), statPointsUsed: 0 } });
 	toastError.mockReset();
 	localStorage.clear();
 	mockPlayerManager.attributes = allFives();
+	mockPlayerManager.selectedSkills = [];
+	mockInventoryManager.equipmentStats = [];
+	mockInventoryManager.grantedSkillIds = [];
+	mockInventoryManager.equippedWeaponType = EDamageType.Unarmed;
+	staticData.skills = [];
 	mockPlayerManager.statPointsGained = 10;
 	mockPlayerManager.statPointsUsed = 0;
 	view = new AttributesView();
@@ -176,6 +227,162 @@ describe('contributorsFor', () => {
 		expect(contributorsFor(EAttribute.Luck)).toEqual([]);
 		// CDR keeps its base 1.0 but is no longer fed by any core attribute (#1426).
 		expect(contributorsFor(EAttribute.CooldownRecovery)).toEqual([]);
+	});
+});
+
+describe('isAttributeInert', () => {
+	it('is always false for an attribute that is not an amplifier', () => {
+		expect(isAttributeInert(EAttribute.Strength, [], [])).toBe(false);
+		expect(isAttributeInert(EAttribute.Endurance, [], [])).toBe(false);
+		expect(isAttributeInert(EAttribute.Intellect, [], [])).toBe(false);
+		expect(isAttributeInert(EAttribute.Dexterity, [], [])).toBe(false);
+	});
+
+	it('AGI is inert with no fielded skills or gear', () => {
+		expect(isAttributeInert(EAttribute.Agility, [], [])).toBe(true);
+	});
+
+	it('AGI is not inert once gear grants DodgeChance', () => {
+		const stats = [{ attributeId: EAttribute.DodgeChance, amount: 0.1 }];
+		expect(isAttributeInert(EAttribute.Agility, stats, [])).toBe(false);
+	});
+
+	it('AGI is not inert once gear grants CooldownBonus', () => {
+		const stats = [{ attributeId: EAttribute.CooldownBonus, amount: 0.05 }];
+		expect(isAttributeInert(EAttribute.Agility, stats, [])).toBe(false);
+	});
+
+	it('AGI stays inert when the granted attribute amount is zero', () => {
+		const stats = [{ attributeId: EAttribute.DodgeChance, amount: 0 }];
+		expect(isAttributeInert(EAttribute.Agility, stats, [])).toBe(true);
+	});
+
+	it('AGI stays inert when only an unrelated attribute is granted', () => {
+		const stats = [{ attributeId: EAttribute.MaxHealth, amount: 50 }];
+		expect(isAttributeInert(EAttribute.Agility, stats, [])).toBe(true);
+	});
+
+	it('AGI is not inert once a fielded skill self-effects DodgeChance', () => {
+		const fielded = [
+			skill({
+				id: 1,
+				effects: [
+					{
+						id: 1,
+						target: ESkillEffectTarget.Self,
+						attributeId: EAttribute.DodgeChance,
+						modifierTypeId: EModifierType.Additive,
+						amount: 0.2,
+						durationMs: 3000,
+						scalingAttributeId: EAttribute.Agility,
+						scalingAmount: 0
+					}
+				]
+			})
+		];
+		expect(isAttributeInert(EAttribute.Agility, [], fielded)).toBe(false);
+	});
+
+	it('AGI stays inert when the DodgeChance effect targets the opponent, not self', () => {
+		const fielded = [
+			skill({
+				id: 1,
+				effects: [
+					{
+						id: 1,
+						target: ESkillEffectTarget.Opponent,
+						attributeId: EAttribute.DodgeChance,
+						modifierTypeId: EModifierType.Additive,
+						amount: 0.2,
+						durationMs: 3000,
+						scalingAttributeId: EAttribute.Agility,
+						scalingAmount: 0
+					}
+				]
+			})
+		];
+		expect(isAttributeInert(EAttribute.Agility, [], fielded)).toBe(true);
+	});
+
+	it('LUK is inert with no fielded skills or gear', () => {
+		expect(isAttributeInert(EAttribute.Luck, [], [])).toBe(true);
+	});
+
+	it('LUK is not inert once a fielded skill authors its own CriticalChance', () => {
+		const fielded = [skill({ id: 1, criticalChance: 0.1 })];
+		expect(isAttributeInert(EAttribute.Luck, [], fielded)).toBe(false);
+	});
+
+	it('LUK is not inert once gear grants ParryChance', () => {
+		const stats = [{ attributeId: EAttribute.ParryChance, amount: 0.15 }];
+		expect(isAttributeInert(EAttribute.Luck, stats, [])).toBe(false);
+	});
+
+	it('LUK stays inert when a fielded skill has zero CriticalChance and nothing grants ParryChance', () => {
+		const fielded = [skill({ id: 1, criticalChance: 0 })];
+		expect(isAttributeInert(EAttribute.Luck, [], fielded)).toBe(true);
+	});
+});
+
+describe('inertHint', () => {
+	it('describes the AGI and LUK amplifiers', () => {
+		expect(inertHint(EAttribute.Agility)).toMatch(/dodge|cadence/i);
+		expect(inertHint(EAttribute.Luck)).toMatch(/crit|parry/i);
+	});
+
+	it('is undefined for a non-amplifier attribute', () => {
+		expect(inertHint(EAttribute.Strength)).toBeUndefined();
+	});
+});
+
+describe('AttributesView.isInert', () => {
+	it('AGI/LUK are inert by default (no equipped gear or skills grant an enabler)', () => {
+		expect(view.isInert(idx.agi)).toBe(true);
+		expect(view.isInert(idx.luk)).toBe(true);
+	});
+
+	it('every non-amplifier attribute is never inert', () => {
+		expect(view.isInert(idx.str)).toBe(false);
+		expect(view.isInert(idx.end)).toBe(false);
+		expect(view.isInert(idx.int)).toBe(false);
+		expect(view.isInert(idx.dex)).toBe(false);
+	});
+
+	it('AGI stops being inert once the equipped weapon field grants DodgeChance', () => {
+		mockInventoryManager.equipmentStats = [{ attributeId: EAttribute.DodgeChance, amount: 0.1 }];
+		view = new AttributesView();
+		expect(view.isInert(idx.agi)).toBe(false);
+	});
+
+	it('LUK stops being inert once the selected loadout includes a crit-authored skill', () => {
+		staticData.skills = skillsById([skill({ id: 7, criticalChance: 0.25 })]);
+		mockPlayerManager.selectedSkills = [7];
+		view = new AttributesView();
+		expect(view.isInert(idx.luk)).toBe(false);
+	});
+
+	it('ignores a crit-authored skill that is unlocked but not fielded (not selected/granted)', () => {
+		staticData.skills = skillsById([skill({ id: 7, criticalChance: 0.25 })]);
+		mockPlayerManager.selectedSkills = [];
+		view = new AttributesView();
+		expect(view.isInert(idx.luk)).toBe(true);
+	});
+
+	it('ignores a fielded skill dimmed by the weapon-match gate', () => {
+		staticData.skills = skillsById([
+			skill({ id: 7, criticalChance: 0.25, damagePortions: [{ type: EDamageType.Sword, weight: 1 }] })
+		]);
+		mockPlayerManager.selectedSkills = [7];
+		mockInventoryManager.equippedWeaponType = EDamageType.Bow; // Sword skill is dormant while a Bow is equipped
+		view = new AttributesView();
+		expect(view.isInert(idx.luk)).toBe(true);
+	});
+
+	it('counts a skill granted by equipped gear (e.g. a weapon signature) as fielded', () => {
+		staticData.skills = skillsById([skill({ id: 7, criticalChance: 0.25 })]);
+		mockInventoryManager.grantedSkillIds = [7];
+		view = new AttributesView();
+		expect(view.isInert(idx.luk)).toBe(false);
 	});
 });
 
