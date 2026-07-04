@@ -43,7 +43,12 @@ namespace Game.Core.Battle
             ExpReward = ToIntReward(enemyAttTotal * DifficultyMultiplier);
         }
 
-        private static double GetDifficultyMultiplier(double enemyAttTotal, double playerAttTotal)
+        /// <summary>
+        /// The <c>ratio²</c> band/clamp factor the exp reward scales by (<see cref="DifficultyMultiplier"/>) —
+        /// public so the combat-rating calibration report (#1533) can fold the real old-curve multiplier into
+        /// its anchor XP rather than assuming a matched (multiplier-1) anchor.
+        /// </summary>
+        public static double GetDifficultyMultiplier(double enemyAttTotal, double playerAttTotal)
         {
             // No player investment yet: fall back to a neutral multiplier (the reward is then the floored
             // enemy total), matching the original guard before the curve was factored out.

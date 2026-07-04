@@ -134,6 +134,22 @@ namespace Game.Application.Tests.Content.Calibration
         }
 
         [Fact]
+        public void RecommendConstants_AnchorOutsideTheMatchedBand_FoldsInTheOldDifficultyMultiplier()
+        {
+            // oldRatio 0.5 sits below the ±20% band, so the outgoing curve's real payout here is
+            // spawnOld × ratio² = 50 × 0.25 = 12.5 — not the bare 50 an assumed-matched anchor would use.
+            var belowBand = MakeZonePlacementRow(
+                level: 5, oldRatio: 0.5, newRatio: 0.6,
+                playerOld: 100, spawnOld: 50, playerNew: 50, spawnNew: 30);
+
+            var recommended = CombatRatingCalibrator.RecommendConstants([belowBand]);
+
+            var expectedOldXp = 50 * DefeatRewards.GetDifficultyMultiplier(50, 100);
+            var expectedK = expectedOldXp / (30 * Math.Pow(Math.Min(0.6, 1.0), 2));
+            Assert.Equal(expectedK, recommended.XpScaleK, 6);
+        }
+
+        [Fact]
         public void RecommendConstants_ProficiencyPie_RescalesByThePlayerMeasureRatio()
         {
             var matched = MakeZonePlacementRow(

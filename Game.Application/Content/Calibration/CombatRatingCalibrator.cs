@@ -112,12 +112,17 @@ namespace Game.Application.Content.Calibration
             IReadOnlyList<ZonePlacementRow> zonePlacement,
             double currentProficiencyPie = ServerGameConstants.ProficiencyXpPerVictory)
         {
-            if (zonePlacement.Count == 0)
+            // MinBy over an empty sequence returns null rather than throwing — folding the empty check into
+            // this null check (rather than a separate Count == 0 guard) keeps the "no samples" rejection and
+            // the null-forgiving-operator avoidance in one place. A zero OldRatio (a degenerate all-zero old
+            // measure) logs Math.Log(0) = -Infinity, which just makes that row maximally unattractive as an
+            // anchor rather than throwing — not worth guarding for real content.
+            var anchorRow = zonePlacement.MinBy(row => Math.Abs(Math.Log(row.OldRatio)));
+            if (anchorRow is null)
             {
                 throw new ArgumentException("Cannot recommend constants with no zone-placement samples.", nameof(zonePlacement));
             }
 
-            var anchorRow = zonePlacement.MinBy(row => Math.Abs(Math.Log(row.OldRatio)))!;
             if (anchorRow.PlayerOldMeasure <= 0)
             {
                 throw new InvalidOperationException(
@@ -125,9 +130,11 @@ namespace Game.Application.Content.Calibration
                     + "non-positive old power measure — a degenerate reference build, not a value to divide by.");
             }
 
-            // The old curve pays exactly the enemy's old measure at a matched ratio (DifficultyMultiplier == 1),
-            // so that is the "today" XP the new curve is anchored to reproduce at this sample.
-            var xpUnderOldCurveAtAnchor = anchorRow.SpawnTableOldMeasure;
+            // The anchor is only the *closest* sample to a matched ratio — it may still sit outside the ±20%
+            // band, so the old curve's actual payout there folds in the real DifficultyMultiplier (not an
+            // assumed 1) rather than the bare old measure.
+            var oldMultiplierAtAnchor = DefeatRewards.GetDifficultyMultiplier(anchorRow.SpawnTableOldMeasure, anchorRow.PlayerOldMeasure);
+            var xpUnderOldCurveAtAnchor = anchorRow.SpawnTableOldMeasure * oldMultiplierAtAnchor;
             var clampedNewRatio = Math.Min(anchorRow.NewRatio, 1.0);
             var xpScaleK = xpUnderOldCurveAtAnchor / (anchorRow.SpawnTableNewRating * clampedNewRatio * clampedNewRatio);
             var proficiencyPie = currentProficiencyPie * (anchorRow.PlayerNewRating / anchorRow.PlayerOldMeasure);
