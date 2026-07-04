@@ -415,15 +415,19 @@ namespace Game.Core.Players
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
         }
 
-        // A victory caller MUST pass the battle's real player power — the effect-based accrual normalizes each
-        // path's activity by it, so the default 0 disables the accrual entirely (the power-normalization guard
-        // treats non-positive power as no claim). Defaulting to 0 is correct only for the loss/abandon paths
-        // (no XP on a non-victory); a future victory path that forgets to thread it would silently accrue zero
-        // XP. Today both victory paths route through RecordVictory, which passes it.
-        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp, double playerPower = 0)
+        // A victory caller MUST pass the battle's real combat ratings — the effect-based accrual normalizes each
+        // path's activity by max(playerRating, enemyRating), so the default 0/0 disables the accrual entirely
+        // (the normalization guard treats a non-positive denominator as no claim). Defaulting to 0 is correct
+        // only for the loss/abandon paths (no XP on a non-victory); a future victory path that forgets to thread
+        // them would silently accrue zero XP. Today both victory paths route through RecordVictory, which passes
+        // them.
+        public void RecordBattleCompleted(
+            Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
+            double playerRating = 0, double enemyRating = 0)
         {
             RaiseEvent(new BattleCompletedEvent(
-                this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId, playerPower));
+                this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId,
+                playerRating, enemyRating));
 
             // Backstop mirroring the online auto-fight-off: a recorded dedicated-boss loss or draw drops the
             // persisted loop back to idle, so the offline sim doesn't resume boss-farming a loop the player has

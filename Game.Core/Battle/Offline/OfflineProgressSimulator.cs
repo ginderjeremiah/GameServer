@@ -1,4 +1,3 @@
-using Game.Core.Attributes;
 using Game.Core.Enemies;
 
 namespace Game.Core.Battle.Offline
@@ -33,11 +32,13 @@ namespace Game.Core.Battle.Offline
             // empty result without simulating anything — the whole away period is skipped.
             var remainingMs = Math.Min(parameters.AwayBudgetMs, parameters.CapMs);
 
-            // The player's power is stationary offline, so the modifier set that measures each victory's exp
-            // reward never changes — materialize it once and reuse it for every battle's DefeatRewards.
-            var playerModifiers = parameters.Snapshot
-                .GetModifiersWithSignaturePassive(parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveProficiency, parameters.ResolveClass)
-                .ToList();
+            // The player's rating is stationary offline (their combat power never changes while away), so the
+            // battler that measures each victory's exp reward never changes — build it once and reuse it for
+            // every battle's DefeatRewards. It is never simulated (CombatRating.Rate only reads it), so reusing
+            // the same instance across battles is safe even though a Battler is otherwise single-use.
+            var playerBattlerForRating = parameters.Snapshot.ToBattler(
+                parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
+                parameters.ResolveProficiency, parameters.ResolveClass);
 
             // Tracks whether any battle has produced progress (a win or a loss). A run that is nothing but
             // draws is a stalemate the player can neither win nor lose; the cutoff below stops it early.
@@ -51,19 +52,20 @@ namespace Game.Core.Battle.Offline
                 var result = SimulateBattle(parameters, enemy);
 
                 // Rewards are earned only on a victory, measured from the stationary snapshot like the live
-                // path. The same DefeatRewards yields both the exp and the player power the offline
+                // path. The same DefeatRewards yields both the exp and the combat ratings the offline
                 // proficiency-XP accrual normalizes each path's activity by, so the two payouts share one
                 // evaluation.
-                var rewards = result.Victory ? new DefeatRewards(playerModifiers, enemy) : null;
+                var rewards = result.Victory ? new DefeatRewards(playerBattlerForRating, enemy) : null;
                 if (rewards is not null)
                 {
-                    // Snapshot the player's power onto this battle's stats so the offline accrual normalizes by
-                    // the identical measure the live path does (spike #1318) — victory-only, like the rewards.
-                    result.Stats.PlayerPower = rewards.PlayerPower;
+                    // Snapshot the player's rating onto this battle's stats so the offline accrual normalizes by
+                    // the identical measure the live path does (spike #1526 Decision 5) — victory-only, like the
+                    // rewards.
+                    result.Stats.PlayerRating = rewards.PlayerRating;
                 }
 
                 outcomes.Add(new OfflineBattleOutcome(
-                    enemy, result, rewards?.ExpReward ?? 0, rewards?.PlayerPower ?? 0));
+                    enemy, result, rewards?.ExpReward ?? 0, rewards?.PlayerRating ?? 0, rewards?.EnemyRating ?? 0));
 
                 madeProgress |= result.Victory || result.PlayerDied;
 
@@ -110,10 +112,8 @@ namespace Game.Core.Battle.Offline
             var playerBattler = parameters.Snapshot.ToBattler(
                 parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
                 parameters.ResolveProficiency, parameters.ResolveClass);
-            var enemyBattler = new Battler(
-                new AttributeCollection(enemy.GetAttributeModifiers()), enemy.BattleSkills, enemy.Level);
 
-            return new BattleSimulator(playerBattler, enemyBattler, parameters.SeedSource()).Simulate();
+            return new BattleSimulator(playerBattler, enemy.ToBattler(), parameters.SeedSource()).Simulate();
         }
     }
 }

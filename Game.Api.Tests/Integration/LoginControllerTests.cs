@@ -329,11 +329,14 @@ namespace Game.Api.Tests.Integration
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             // A winning idle scenario so the departed character actually earns over its credited away window:
-            // the player one-shots a fixed-power enemy in a single-zone loop.
+            // the player one-shots a fixed-power enemy in a single-zone loop. The enemy's authored skill deals
+            // the same raw DPS as the player's (4000 dmg / 2000ms = 1000 dmg / 500ms) so their combat ratings
+            // come out roughly matched (a non-trivial exp payout); its 2000ms cooldown is far longer than the
+            // ~500ms fight, so it never actually fires and the one-shot-kill determinism is unaffected.
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 4000m, cooldownMs: 2000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);

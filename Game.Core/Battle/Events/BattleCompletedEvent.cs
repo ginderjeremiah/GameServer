@@ -13,12 +13,12 @@ namespace Game.Core.Battle.Events
         BattleStats Stats,
         bool IsBossBattle,
         int ZoneId,
-        // The player's power for this battle (DefeatRewards.PlayerPower — the sum of core additive attribute
-        // modifiers), carried so the progress handler can normalize each path's activity by it for the
-        // effect-based proficiency accrual (spike #1318). Meaningful only on a victory — XP accrues on wins —
-        // so the loss/abandon paths leave it at the default, and a default of 0 yields no accrual (the
-        // power-normalization guard treats non-positive power as no claim).
-        double PlayerPower = 0) : IDomainEvent, ILoggableDomainEvent
+        // The combatants' combat ratings for this battle (DefeatRewards.PlayerRating/EnemyRating, spike #1526),
+        // carried so the progress handler can normalize each path's activity by max(PlayerRating, EnemyRating)
+        // for the effect-based proficiency accrual (spike #1526 Decision 5, #1532). Meaningful only on a
+        // victory — XP accrues on wins — so the loss/abandon paths leave both at the default, and a default of
+        // 0/0 yields no accrual (the normalization guard treats a non-positive denominator as no claim).
+        double PlayerRating = 0, double EnemyRating = 0) : IDomainEvent, ILoggableDomainEvent
     {
         // Curated safe scalars only — never the Player/Enemy aggregates, stats, or inventory.
         public IReadOnlyList<KeyValuePair<string, object?>> GetLogProperties() =>

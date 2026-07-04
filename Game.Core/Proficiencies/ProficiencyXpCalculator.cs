@@ -1,15 +1,21 @@
 namespace Game.Core.Proficiencies
 {
     /// <summary>
-    /// The effect-based proficiency-XP claim for a won battle (spike #1318). Each path independently claims
-    /// <c>pie × clamp(activity ÷ power)</c> of XP, routed to its frontier tier — the claims overlap and need
-    /// <em>not</em> sum to 1, because there is no shared pie to split (different paths and axes train in
-    /// parallel). <c>activity ÷ power</c> is the continuous difficulty ratio (a quantity relative to the
-    /// player's total attributes), so power-normalization <em>subsumes</em> the banded difficulty multiplier:
-    /// it is deliberately not applied again, which would put power in the denominator twice and open a
-    /// strip-power exploit. The clamp mirrors <see cref="ServerGameConstants.MaxExpRewardMultiplier"/>. Pure and
-    /// reference-data-free: the caller resolves each path's frontier tier and summed activity, so the math here
-    /// is the testable core.
+    /// The effect-based proficiency-XP claim for a won battle (spike #1318, max-normalized per spike #1526
+    /// Decision 5). Each path independently claims <c>pie × activity ÷ ratingDenominator</c> of XP, routed to its
+    /// frontier tier — the claims overlap and need <em>not</em> sum to 1, because there is no shared pie to split
+    /// (different paths and axes train in parallel). <paramref name="ratingDenominator"/> is
+    /// <c>max(playerRating, enemyRating)</c>: above your weight the claim rate is what a matched player would
+    /// earn, at or below it the treadmill is unchanged (spike #1526 Decision 5) — so max-normalization
+    /// <em>subsumes</em> the enemy-bounty reward curve's own difficulty shaping without applying it twice.
+    /// <para>
+    /// There is deliberately no clamp on the ratio (unlike the pre-#1532 <c>MaxExpRewardMultiplier</c>-mirroring
+    /// clamp): a path's per-battle activity is itself bounded by the enemy's health pool (a killing blow's
+    /// overkill trains nothing, #1482), so <c>activity ≤ enemyHP</c> already bounds the claim without a separate
+    /// safety cap.
+    /// </para>
+    /// Pure and reference-data-free: the caller resolves each path's frontier tier and summed activity, so the
+    /// math here is the testable core.
     /// </summary>
     public static class ProficiencyXpCalculator
     {
@@ -24,17 +30,17 @@ namespace Game.Core.Proficiencies
 
         /// <summary>
         /// The per-path XP claims for the battle: each path earns <paramref name="pie"/> ×
-        /// <c>min(activity ÷ power, </c><paramref name="maxMultiplier"/><c>)</c>, independent of the others
-        /// (no shared pie — the claims overlap and need not sum to 1). Returns slices ascending by proficiency
-        /// id (a stable order so the live and offline paths, and their tests, agree). A path with non-positive
-        /// activity earns nothing and is omitted; a non-positive <paramref name="power"/> — a degenerate state,
-        /// since a real character always carries positive locked-base attributes — yields no slices rather than
-        /// dividing by zero.
+        /// <c>activity ÷ ratingDenominator</c>, independent of the others (no shared pie — the claims overlap and
+        /// need not sum to 1). Returns slices ascending by proficiency id (a stable order so the live and offline
+        /// paths, and their tests, agree). A path with non-positive activity earns nothing and is omitted; a
+        /// non-positive <paramref name="ratingDenominator"/> — a degenerate state, since a real battler's rating
+        /// is always strictly positive (<see cref="Battle.CombatRating.Rate"/>'s own floor) — yields no slices
+        /// rather than dividing by zero.
         /// </summary>
         public static IReadOnlyList<ProficiencyXpSlice> Split(
-            double pie, double power, double maxMultiplier, IEnumerable<PathActivity> activities)
+            double pie, double ratingDenominator, IEnumerable<PathActivity> activities)
         {
-            if (power <= 0)
+            if (ratingDenominator <= 0)
             {
                 return [];
             }
@@ -43,7 +49,7 @@ namespace Game.Core.Proficiencies
                 .Where(activity => activity.Activity > 0)
                 .OrderBy(activity => activity.ProficiencyId)
                 .Select(activity => new ProficiencyXpSlice(
-                    activity.ProficiencyId, pie * Math.Min(activity.Activity / power, maxMultiplier)))];
+                    activity.ProficiencyId, pie * activity.Activity / ratingDenominator))];
         }
     }
 }

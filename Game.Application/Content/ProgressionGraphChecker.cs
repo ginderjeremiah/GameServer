@@ -206,9 +206,9 @@ namespace Game.Application.Content
 
             /// <summary>
             /// Flags a live enemy's core-attribute distribution points that nothing in its kit consumes (#1529):
-            /// dead weight that still counts into <c>DefeatRewards.SumCoreAttributes</c>, inflating XP payout
-            /// without adding threat. Exact, via spike #1526's <see cref="CombatRating.Marginal"/> (#1581) rather
-            /// than a heuristic — an attribute whose fielded kit has no matching enabler marginals to ~0.
+            /// authored dead weight that adds no threat — and, now that reward is combat-rating-based (#1532), no
+            /// bounty either, since an attribute the fielded kit can't use marginals to ~0 in the rating. Exact,
+            /// via spike #1526's <see cref="CombatRating.Marginal"/> (#1581) rather than a heuristic.
             /// </summary>
             private void CheckEnemyAttributeConsumption()
             {
@@ -240,7 +240,7 @@ namespace Game.Application.Content
                             continue;
                         }
 
-                        // Only the six core (directly-allocatable) attributes feed SumCoreAttributes; a
+                        // Only the six core (directly-allocatable) attributes are policed here; a
                         // directly-authored secondary (e.g. a fast enemy's own CooldownBonus) is its own
                         // enabler, not a distribution point this check polices.
                         if (!GameAttribute.CoreAttributes.Contains(distribution.AttributeId))

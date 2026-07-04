@@ -246,7 +246,7 @@ namespace Game.Application.Tests.Services
             var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerId);
             Assert.NotNull(player);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            return service.AccrueAndApply(progress, stats, totalAttributes: Power, player, notify: false);
+            return service.AccrueAndApply(progress, stats, ratingDenominator: Power, player, notify: false);
         }
 
         private static async Task<int> SeedPlayerAsync(GameContext context)
@@ -267,12 +267,12 @@ namespace Game.Application.Tests.Services
 
         // ── Assertion helpers ───────────────────────────────────────────────────
 
-        // The XP a path claims for an activity quantity: pie × clamp(activity ÷ power), rounded to the persisted
-        // scale exactly as the reward service does — the calculator's formula, with the test's fixed power.
+        // The XP a path claims for an activity quantity: pie × activity ÷ ratingDenominator, rounded to the
+        // persisted scale exactly as the reward service does — the calculator's formula, with the test's fixed
+        // rating denominator (no clamp, spike #1526 Decision 5).
         private static decimal ExpectedXp(double activity) =>
             Math.Round(
-                (decimal)(ServerGameConstants.ProficiencyXpPerVictory
-                    * Math.Min(activity / Power, ServerGameConstants.MaxExpRewardMultiplier)),
+                (decimal)(ServerGameConstants.ProficiencyXpPerVictory * activity / Power),
                 3,
                 MidpointRounding.AwayFromZero);
 

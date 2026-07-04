@@ -11,42 +11,58 @@ namespace Game.Core.Battle
         public int ExpReward { get; set; }
 
         /// <summary>
-        /// The difficulty curve factor for this battle — the <c>ratio²</c> band/clamp the exp reward scales by.
-        /// 1 when the enemy is within ±20% of the player's power, quadratically smaller for a trivial enemy
-        /// (anti-grind) and quadratically larger (clamped at
-        /// <see cref="ServerGameConstants.MaxExpRewardMultiplier"/>) for an over-level one. Drives the exp
-        /// reward only; the effect-based proficiency accrual no longer reads it (power-normalization subsumes
-        /// it — see <see cref="PlayerPower"/>).
+        /// The enemy-authored bounty curve factor the exp reward scales by (spike #1526 Decision 4):
+        /// <c>min(EnemyRating ÷ PlayerRating, 1)²</c>. It is <c>1</c> at or above a matched fight (the reward
+        /// saturates at the enemy's bounty rather than paying an upward premium for punching up) and quadratically
+        /// smaller for a trivial enemy (anti-grind). The old ±20% flat band, the upward quadratic premium, and the
+        /// <see cref="ServerGameConstants.MaxExpRewardMultiplier"/> cap all dissolve into this one continuous,
+        /// self-capping curve. Drives the exp reward only; the effect-based proficiency accrual normalizes by
+        /// <c>max(PlayerRating, EnemyRating)</c> directly (spike #1526 Decision 5) rather than reading this factor.
         /// </summary>
         public double DifficultyMultiplier { get; }
 
         /// <summary>
-        /// The player's measured power for this battle — the sum of their core additive attribute modifiers
-        /// (the same measure the difficulty ratio normalizes by). The effect-based proficiency accrual
-        /// normalizes each path's activity by it (spike #1318): <c>XP = pie × clamp(activity ÷ power)</c>, so
-        /// power-normalization is the continuous difficulty curve that subsumes <see cref="DifficultyMultiplier"/>.
+        /// The player's combat-rating capability measure for this battle (<see cref="CombatRating.Rate"/> against
+        /// the battle-simulated <see cref="Battler"/>), superseding the old <c>SumCoreAttributes</c> sum (spike
+        /// #1526). Always strictly positive (the rating's own degenerate-guard floor).
         /// </summary>
-        public double PlayerPower { get; }
+        public double PlayerRating { get; }
 
         /// <summary>
-        /// Computes the rewards for defeating <paramref name="enemy"/>. The player's power is measured from
-        /// <paramref name="playerModifiers"/> — the modifier set reconstructed from the battle snapshot
-        /// (<see cref="BattleSnapshot.GetModifiers"/>) — rather than the live player aggregate, so the reward
-        /// is consistent with the snapshot the battle was actually simulated against.
+        /// The enemy's combat-rating capability measure for this battle, rated on its <em>fielded</em>
+        /// <see cref="Enemy.BattleSkills"/> loadout (the draw actually fought, spike #1526 Decision 6) rather than
+        /// its full authored pool. Always strictly positive.
         /// </summary>
-        public DefeatRewards(IEnumerable<AttributeModifier> playerModifiers, Enemy enemy)
+        public double EnemyRating { get; }
+
+        /// <summary>
+        /// Computes the rewards for defeating <paramref name="enemy"/>. Both combatants are rated from the
+        /// assembled <see cref="Battler"/>s actually fought: <paramref name="playerBattler"/> reconstructed from
+        /// the battle snapshot (<see cref="BattleSnapshot.ToBattler"/>) rather than the live player aggregate, so
+        /// the reward is consistent with the snapshot the battle was simulated against; <paramref name="enemy"/>'s
+        /// rating is read via <see cref="Enemy.ToBattler"/>, which requires its battle loadout to already be
+        /// selected (<see cref="Enemy.SelectBattleSkills"/>/<see cref="Enemy.SetBattleSkills"/>) — true for every
+        /// production call site by the time a victory is recorded.
+        /// </summary>
+        public DefeatRewards(Battler playerBattler, Enemy enemy)
         {
-            var enemyAttTotal = SumCoreAttributes(enemy.GetAttributeModifiers());
-            var playerAttTotal = SumCoreAttributes(playerModifiers);
-            PlayerPower = playerAttTotal;
-            DifficultyMultiplier = GetDifficultyMultiplier(enemyAttTotal, playerAttTotal);
-            ExpReward = ToIntReward(enemyAttTotal * DifficultyMultiplier);
+            EnemyRating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+            PlayerRating = CombatRating.Rate(playerBattler, isPlayer: true);
+
+            // (enemyRating / playerRating)² is the time-to-kill ratio (spike #1526 Decision 1), so clamping the
+            // ratio at 1 before squaring is what makes the curve saturate at a matched-or-easier fight rather than
+            // paying an upward premium for punching up.
+            var ratio = EnemyRating / PlayerRating;
+            DifficultyMultiplier = Math.Pow(Math.Min(ratio, 1.0), 2);
+            ExpReward = ToIntReward(ServerGameConstants.XpScaleK * EnemyRating * DifficultyMultiplier);
         }
 
         /// <summary>
-        /// The <c>ratio²</c> band/clamp factor the exp reward scales by (<see cref="DifficultyMultiplier"/>) —
-        /// public so the combat-rating calibration report (#1533) can fold the real old-curve multiplier into
-        /// its anchor XP rather than assuming a matched (multiplier-1) anchor.
+        /// The legacy <c>ratio²</c> band/clamp factor the old <c>SumCoreAttributes</c>-based exp reward used to
+        /// scale by — no longer called by this class's own constructor (superseded by the combat-rating bounty
+        /// curve, spike #1526 Decision 4). Retained public and unchanged so the combat-rating calibration report
+        /// (#1533) can fold the real old-curve payout into its anchor XP when comparing the outgoing measure
+        /// against the incoming <see cref="CombatRating"/>.
         /// </summary>
         public static double GetDifficultyMultiplier(double enemyAttTotal, double playerAttTotal)
         {
@@ -66,11 +82,10 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Floors <paramref name="reward"/> and clamps it into <see cref="int"/> range. The
-        /// <see cref="ServerGameConstants.MaxExpRewardMultiplier"/> cap bounds the multiplier but not
-        /// <c>enemyAttTotal</c> itself (a sum over core attributes scaled by author-controlled enemy level
-        /// and per-level slopes), so a large authored enemy can push the product past <see cref="int.MaxValue"/>.
-        /// Clamping before the cast avoids the unchecked overflow that would wrap to a negative reward.
+        /// Floors <paramref name="reward"/> and clamps it into <see cref="int"/> range. <c>EnemyRating</c> is
+        /// bounded by authored content (unlike the old unbounded core-attribute sum), but a large authored enemy
+        /// times <see cref="ServerGameConstants.XpScaleK"/> can still in principle approach <see cref="int.MaxValue"/>;
+        /// clamping before the cast avoids the unchecked overflow that would wrap to a negative reward.
         /// </summary>
         private static int ToIntReward(double reward)
         {
@@ -78,12 +93,13 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// Sums the additive amounts of the core attributes in <paramref name="modifiers"/> — the "old"
-        /// power measure this class is named for, and the one the combat-rating calibration report (#1533)
-        /// compares the new <see cref="CombatRating"/> against. Both combatants' power is measured the same
-        /// way so the difficulty ratio compares like with like: derived attributes (e.g. MaxHealth) are
-        /// excluded because they are computed from the core attributes and never appear as their own
-        /// modifier, and multiplicative modifiers are excluded because their amount is a scaling factor, not
+        /// Sums the additive amounts of the core attributes in <paramref name="modifiers"/> — the legacy "old"
+        /// power measure this class was originally named for. No longer used by this class's own constructor;
+        /// retained public and unchanged because the combat-rating calibration report (#1533) compares it against
+        /// the incoming <see cref="CombatRating"/> to flag enemies/zones the swap re-prices. Both combatants' power
+        /// was measured the same way so the difficulty ratio compared like with like: derived attributes (e.g.
+        /// MaxHealth) are excluded because they are computed from the core attributes and never appear as their
+        /// own modifier, and multiplicative modifiers are excluded because their amount is a scaling factor, not
         /// a flat point total that can be meaningfully summed.
         /// </summary>
         public static double SumCoreAttributes(IEnumerable<AttributeModifier> modifiers)

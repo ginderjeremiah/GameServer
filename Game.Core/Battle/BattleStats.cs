@@ -155,13 +155,11 @@ namespace Game.Core.Battle
         public Dictionary<EDamageType, double> TypedDamageResistanceMitigated { get; set; } = [];
 
         /// <summary>
-        /// The player's power for this battle — the sum of core additive attribute modifiers, the same measure
-        /// <see cref="DefeatRewards"/> uses for the difficulty curve. The effect-based proficiency accrual
-        /// normalizes each activity by this (spike #1318), so it must be the identical measure to avoid
-        /// double-counting power. Populated at battle completion from <see cref="DefeatRewards.PlayerPower"/>
-        /// (victory-only, like the rewards); <c>0</c> until then.
+        /// The player's combat rating for this battle (<see cref="Battle.CombatRating.Rate"/>), superseding the
+        /// old core-attribute sum (spike #1526). Populated at battle completion from
+        /// <see cref="DefeatRewards.PlayerRating"/> (victory-only, like the rewards); <c>0</c> until then.
         /// </summary>
-        public double PlayerPower { get; set; }
+        public double PlayerRating { get; set; }
 
         /// <summary>Accumulates a direct hit's or DoT tick's booked <paramref name="amount"/> (already capped at
         /// the health it removed by the caller — #1482) into the typed offense book.</summary>

@@ -70,13 +70,13 @@ namespace Game.Core.Tests.Battle.Offline
         // ── Builders ─────────────────────────────────────────────────────────
 
         private static OfflineBattleOutcome Win(int enemyId, int totalMs, int exp) =>
-            new(MakeEnemy(enemyId), new BattleResult(Victory: true, PlayerDied: false, totalMs, new BattleStats()), exp, PlayerPower: 100.0);
+            new(MakeEnemy(enemyId), new BattleResult(Victory: true, PlayerDied: false, totalMs, new BattleStats()), exp, PlayerRating: 100.0, EnemyRating: 50.0);
 
         private static OfflineBattleOutcome Loss(int enemyId, int totalMs) =>
-            new(MakeEnemy(enemyId), new BattleResult(Victory: false, PlayerDied: true, totalMs, new BattleStats()), ExpReward: 0, PlayerPower: 0);
+            new(MakeEnemy(enemyId), new BattleResult(Victory: false, PlayerDied: true, totalMs, new BattleStats()), ExpReward: 0, PlayerRating: 0, EnemyRating: 0);
 
         private static OfflineBattleOutcome Draw(int enemyId, int totalMs) =>
-            new(MakeEnemy(enemyId), new BattleResult(Victory: false, PlayerDied: false, totalMs, new BattleStats()), ExpReward: 0, PlayerPower: 0);
+            new(MakeEnemy(enemyId), new BattleResult(Victory: false, PlayerDied: false, totalMs, new BattleStats()), ExpReward: 0, PlayerRating: 0, EnemyRating: 0);
 
         private static Enemy MakeEnemy(int id) => new()
         {

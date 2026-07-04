@@ -2,8 +2,10 @@ using Game.Abstractions.DataAccess;
 using Game.Application;
 using Game.Application.Services;
 using Game.Core;
+using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Players;
+using Game.Core.TestInfrastructure.Builders;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -246,8 +248,6 @@ namespace Game.Application.Tests.Services
 
             // A one-shot player skill makes the victory certain regardless of stats; the enemy's hit is negligible.
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
-            // Fixed enemy power of 100 (Strength 50 + Endurance 50, no per-level scaling) matches the seeded
-            // player's power (Strength 50 + Endurance 50), so the difficulty ratio is exactly 1 → reward = 100.
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
             var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
@@ -273,10 +273,28 @@ namespace Game.Application.Tests.Services
             await battleService.StartBattle(player, state, zoneId: zone.Id);
             Assert.True(state.HasActiveBattle);
 
+            // Independently compute the expected reward from the pristine snapshot before deflating live state
+            // below — mirroring exactly what RecordVictory does internally, so a regression sourcing the reward
+            // from the live aggregate instead of the snapshot produces a detectably different value.
+            var snapshot = state.Snapshot;
+            Assert.NotNull(snapshot);
+            var classesRepo = scope.ServiceProvider.GetRequiredService<IClasses>();
+            Game.Core.Classes.Class ResolveClass(int id) => classesRepo.GetClass(id)
+                ?? throw new InvalidOperationException($"Class {id} could not be resolved.");
+            var playerBattler = snapshot.ToBattler(
+                scope.ServiceProvider.GetRequiredService<IItems>().GetItem,
+                scope.ServiceProvider.GetRequiredService<IItemMods>().GetItemMod,
+                scope.ServiceProvider.GetRequiredService<ISkills>().TryGetSkill,
+                scope.ServiceProvider.GetRequiredService<IProficiencies>().GetProficiency,
+                ResolveClass);
+            var ratedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(ratedEnemy);
+            ratedEnemy.SelectAllBattleSkills(); // the enemy has only one authored skill ("Poke")
+            var expectedReward = new DefeatRewards(playerBattler, ratedEnemy).ExpReward;
+
             // After the snapshot is frozen, deflate the LIVE player's power (a valid mid-battle stat
-            // reallocation). The bug keyed the reward off this live aggregate: ratio 100/2 caps the
-            // multiplier at MaxExpRewardMultiplier (4), inflating the payout to 400. The fix measures power
-            // from the snapshot, so the reward stays the snapshot-era 100.
+            // reallocation). The fix measures power from the snapshot, so the reward must stay at the
+            // pristine-snapshot value above rather than reading (and shrinking with) the deflated live aggregate.
             foreach (var allocation in player.StatPoints.StatAllocations)
             {
                 allocation.Amount = 1;
@@ -289,16 +307,16 @@ namespace Game.Application.Tests.Services
             var result = await battleService.EndBattleVictory(player, state);
 
             Assert.NotNull(result);
-            Assert.Equal(100, result.ExpReward);
+            Assert.Equal(expectedReward, result.ExpReward);
         }
 
         [Fact]
-        public async Task RecordVictory_SnapshotsPlayerPowerOntoStats_FromSnapshotNotLiveAggregate()
+        public async Task RecordVictory_SnapshotsPlayerRatingOntoStats_FromSnapshotNotLiveAggregate()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // Player power 100 (Strength 50 + Endurance 50) is frozen into the battle snapshot at StartBattle.
+            // Strength 50 + Endurance 50 is frozen into the battle snapshot at StartBattle.
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
@@ -318,9 +336,9 @@ namespace Game.Application.Tests.Services
             var state = new PlayerState();
             await battleService.StartBattle(player, state, zoneId: zone.Id);
 
-            // Deflate the LIVE player's power to ~2 after the snapshot is frozen (a valid mid-battle stat
-            // reallocation). The accrual must normalize by the snapshot-era power (100), so a regression
-            // sourcing PlayerPower from the live aggregate — or dropping the assignment — would read 2 or 0.
+            // Deflate the LIVE player's power to almost nothing after the snapshot is frozen (a valid mid-battle
+            // stat reallocation). The accrual must normalize by the snapshot-era rating, so a regression sourcing
+            // PlayerRating from the live aggregate — or dropping the assignment — would read a far lower value.
             foreach (var allocation in player.StatPoints.StatAllocations)
             {
                 allocation.Amount = 1;
@@ -328,38 +346,40 @@ namespace Game.Application.Tests.Services
 
             var coreEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(coreEnemy);
+            // RecordVictory is called directly here (bypassing TryResolveActiveBattle's SimulateBattle call), so
+            // the enemy's battle loadout must be selected explicitly before DefeatRewards can rate it.
+            coreEnemy.SelectAllBattleSkills();
             var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, new BattleStats());
 
             var rewards = battleService.RecordVictory(player, coreEnemy, result, state, DateTime.UtcNow);
 
-            // The reward measures the snapshot-era power (the full pre-deflation spread, ≥ 100), not the
-            // deflated live aggregate (a handful of 1s) — so sourcing PlayerPower from live state would read
-            // far below 100, and dropping the assignment would leave the stats at the default 0.
-            Assert.True(rewards.PlayerPower >= 100, $"Expected the snapshot power, got {rewards.PlayerPower}.");
-            Assert.Equal(rewards.PlayerPower, result.Stats.PlayerPower, precision: 9);
+            // The reward rates the snapshot-era attributes (Strength 50 + Endurance 50), not the deflated live
+            // aggregate (a handful of 1s) — a live-sourced rating would be measurably lower.
+            var deflatedRating = CombatRating.Rate(
+                new Battler(new AttributeCollection(player.GetAllModifiers()), [], player.Level), isPlayer: true);
+            Assert.True(rewards.PlayerRating > deflatedRating,
+                $"Expected the snapshot-era rating ({rewards.PlayerRating}) to exceed the deflated live rating ({deflatedRating}).");
+            Assert.Equal(rewards.PlayerRating, result.Stats.PlayerRating, precision: 9);
         }
 
         [Fact]
-        public async Task EndBattleVictory_RewardIncludesClassLockedBaseInPlayerPower()
+        public async Task RecordVictory_RewardIncludesClassLockedBaseInPlayerRating()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // The class's locked base (#1223) feeds the player's battle power, so it must count in the
-            // snapshot-measured difficulty ratio. A one-shot skill makes the victory certain.
+            // The class's locked base (#1223) feeds the player's battle rating, so it must count in the
+            // snapshot-measured CombatRating. A one-shot skill makes the victory certain.
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
-            // Enemy power 200 (Strength 100 + Endurance 100, no per-level scaling).
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
-                strengthBase: 100m, strengthPerLevel: 0m, enduranceBase: 100m, endurancePerLevel: 0m);
+                strengthBase: 10m, strengthPerLevel: 0m, enduranceBase: 10m, endurancePerLevel: 0m);
             var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
 
-            // A class whose locked base adds Strength 50 + Endurance 50 (level-independent here). The seeded
-            // free pool is Strength 50 + Endurance 50 = 100, so the locked base lifts the player's measured
-            // power to 200 — matching the enemy's 200 for a difficulty ratio of 1 (reward = enemy total = 200).
-            // Without the locked base the ratio would be 200/100 = 2, paying the capped 800.
+            // A class whose locked base adds Strength 50 + Endurance 50 (level-independent here) on top of the
+            // seeded free pool (Strength 50 + Endurance 50).
             var lockedBaseClass = await TestDataSeeder.CreateClassWithKitAsync(context,
                 starterSkillIds: [],
                 attributeDistributions:
@@ -381,39 +401,44 @@ namespace Game.Application.Tests.Services
 
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
             var state = new PlayerState();
-
             await battleService.StartBattle(player, state, zoneId: zone.Id);
-            Assert.True(state.HasActiveBattle);
-            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            var result = await battleService.EndBattleVictory(player, state);
+            var coreEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(coreEnemy);
+            coreEnemy.SelectAllBattleSkills();
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, new BattleStats());
 
-            Assert.NotNull(result);
-            Assert.Equal(200, result.ExpReward);
+            var rewards = battleService.RecordVictory(player, coreEnemy, result, state, DateTime.UtcNow);
+
+            // The free-pool-only counterfactual (no locked base) must rate strictly lower than the actual
+            // reward — proving the locked base is folded into the rated battler, not silently dropped.
+            var resolvedSkill = scope.ServiceProvider.GetRequiredService<ISkills>().TryGetSkill(playerSkill.Id);
+            Assert.NotNull(resolvedSkill);
+            var freePoolOnlyRating = CombatRating.Rate(
+                new Battler(new AttributeCollection(player.GetAllModifiers()), [resolvedSkill], player.Level), isPlayer: true);
+            Assert.True(rewards.PlayerRating > freePoolOnlyRating,
+                $"Expected the locked base to raise the rating above the free-pool-only baseline ({freePoolOnlyRating}), got {rewards.PlayerRating}.");
         }
 
         [Fact]
-        public async Task EndBattleVictory_RewardIncludesClassSignaturePassiveInPlayerPower()
+        public async Task RecordVictory_RewardIncludesClassSignaturePassiveInPlayerRating()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            // The class signature passive (#1126 area E) is folded into the player's battle power via
-            // GetModifiersWithSignaturePassive, so a flat-core passive must count in the snapshot-measured
-            // difficulty ratio exactly like the locked base. A one-shot skill makes the victory certain.
+            // The class signature passive (#1126 area E) is composed into the battler last by
+            // BattleSnapshot.ToBattler, so a flat-core passive must count in the snapshot-measured CombatRating
+            // exactly like the locked base. A one-shot skill makes the victory certain.
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
-            // Enemy power 200 (Strength 100 + Endurance 100, no per-level scaling).
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
-                strengthBase: 100m, strengthPerLevel: 0m, enduranceBase: 100m, endurancePerLevel: 0m);
+                strengthBase: 10m, strengthPerLevel: 0m, enduranceBase: 10m, endurancePerLevel: 0m);
             var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
 
-            // A class with no locked-base distribution but a flat Strength 100 signature passive. The seeded
-            // free pool is Strength 50 + Endurance 50 = 100, so the passive lifts the player's measured power
-            // to 200 — matching the enemy's 200 for a difficulty ratio of 1 (reward = enemy total = 200).
-            // Without the passive counting, the ratio would be 200/100 = 2, paying the capped 800.
+            // A class with no locked-base distribution but a flat Strength 100 signature passive, on top of the
+            // seeded free pool (Strength 50 + Endurance 50).
             var passiveClass = await TestDataSeeder.CreateClassAsync(context,
                 passiveAttribute: EAttribute.Strength, passiveAmount: 100m);
 
@@ -430,15 +455,23 @@ namespace Game.Application.Tests.Services
 
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
             var state = new PlayerState();
-
             await battleService.StartBattle(player, state, zoneId: zone.Id);
-            Assert.True(state.HasActiveBattle);
-            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            var result = await battleService.EndBattleVictory(player, state);
+            var coreEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(coreEnemy);
+            coreEnemy.SelectAllBattleSkills();
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, new BattleStats());
 
-            Assert.NotNull(result);
-            Assert.Equal(200, result.ExpReward);
+            var rewards = battleService.RecordVictory(player, coreEnemy, result, state, DateTime.UtcNow);
+
+            // The free-pool-only counterfactual (no signature passive) must rate strictly lower than the actual
+            // reward — proving the passive is folded into the rated battler, not silently dropped.
+            var resolvedSkill = scope.ServiceProvider.GetRequiredService<ISkills>().TryGetSkill(playerSkill.Id);
+            Assert.NotNull(resolvedSkill);
+            var freePoolOnlyRating = CombatRating.Rate(
+                new Battler(new AttributeCollection(player.GetAllModifiers()), [resolvedSkill], player.Level), isPlayer: true);
+            Assert.True(rewards.PlayerRating > freePoolOnlyRating,
+                $"Expected the signature passive to raise the rating above the free-pool-only baseline ({freePoolOnlyRating}), got {rewards.PlayerRating}.");
         }
 
         [Fact]
