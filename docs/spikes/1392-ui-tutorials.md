@@ -1,86 +1,89 @@
 # Spike #1392 — UI tutorials (teaching-lane blurbs)
 
+> **Revision (2026-07-04):** the first draft of this doc (PR #1585) recommended toast-delivered, hardcoded, `localStorage`-dismissed blurbs and was merged — and its first implementation issue picked up — without collaborator review, which the repo's spike conventions require before planning begins. On review, the delivery, authoring, and persistence calls were revised; the trigger model survived intact. The superseded direction is documented under "Directions considered" rather than erased.
+
 ## The question, as filed
 
 "Plan out UI tutorials for each page and develop a robust system for displaying tutorials," with four questions folded in from `docs/content-design.md` §2 (which treats tutorial blurbs as one of two teaching lanes, alongside zone design, for mechanics a player can grasp from one good explanation rather than sustained pressure):
 
 - **Trigger model** — what fires a blurb?
 - **Authoring** — reference data (riding #1390's export/seed + Workbench) or hardcoded?
-- **Per-page vs. per-mechanic** — the issue frames "tutorials for each page," but content-design.md's named candidates (crit/dodge variance, cooldown charging, idle-loop basics) are mechanic-level, not page-level. Reconcile the two axes.
+- **Per-page vs. per-mechanic** — the issue frames "tutorials for each page," but content-design.md's named candidates (crit/dodge variance, cooldown charging, idle-loop basics) are mechanic-level, not page-level.
 - **Dismissal/replay** — one-shot or revisitable, and how does dismissal state persist?
 
-content-design.md §2 already calls this "a dependency of the content arc, not just UX polish" — the planned zone arc assumes blurbs exist to carry lessons that don't warrant a whole zone. Its parking lot points back here explicitly, including the reference-data-vs-hardcoded question.
+content-design.md §2 calls this "a dependency of the content arc, not just UX polish" — the planned zone arc assumes blurbs exist to carry lessons that don't warrant a whole zone.
 
 ## Current state (what already exists)
 
-No tutorial/blurb system exists today. But three adjacent pieces of infrastructure do, and they change the shape of this spike from "design a system from scratch" to "wire an existing pattern up one more way":
+- **Screens aren't routes.** `UI/src/routes/game/screens/` is a config-driven registry (`screen-defs.ts`); the active screen is local state in `routes/game/+page.svelte`, not a URL. "First visit to a page" must hook the screen-activation point, not `afterNavigate`. A **reserved-but-unbuilt `help` screen** (`key: 'help', built: false`, settings group) is an already-registered slot with no component.
+- **The content-events derivation layer is merged** (#1586, `UI/src/lib/common/content-events.ts`): pure before/after-diff primitives (`newlyTrue`, `newlyInSet`, `crossedThreshold`) plus first-crit / first-dodge / first-cooldown-recharge detectors, consolidating the pattern previously duplicated across `challenge-unlocks.ts` / `synthesis-feedback.ts` / `proficiency-feedback.ts`. This is the mechanic-trigger detection surface, and it is presentation-agnostic — it survives unchanged across the revision.
+- **Overlay primitives**: `Popover.svelte` is a non-blocking overlay that covers its nearest positioned ancestor — it is *not* target-anchored, so a point-at-this-control tour is new component work in the same family (shared `focus-trap` chrome), not a straight reuse. The toast store (`toast.svelte.ts`) carries type/dismissible/action, and `requestScreen(key, payload?)` provides one-shot cross-screen deep-linking.
+- **#1390 (content export/seed + progression-graph lint) is closed and real** — Workbench-authored reference data with lint coverage is the established, DB-primary content strategy, not an aspiration.
+- **Sibling spikes share this event surface**: #1393 (per-page unlock conditions) is a natural future upgrade for "first time this page is reachable"; #1395 (notification badges) watches the same unlock events and wants the same "unread" affordance.
 
-- **Screens aren't routes.** `UI/src/routes/game/screens/` is a config-driven registry (`screen-defs.ts`), not SvelteKit pages — the active screen is local state in `routes/game/+page.svelte` driving a lookup, not a URL. "First visit to a page" therefore can't be `afterNavigate`; it has to hook the same screen-activation point cross-screen navigation already uses. There are 12 built screens today (`fight`, `cardGame`, `challenges`, `inventory`, `skills`, `synthesis`, `attributes`, `proficiencies`, `attributeBreakdown`, `stats`, `codex`, `options`), plus a **reserved-but-unbuilt `help` screen** (`key: 'help', built: false`, settings group) — an already-registered slot with no component yet, and the obvious home for a tutorial replay affordance.
-- **A one-shot dismissible notice already exists, and it's a close cousin of a tutorial blurb.** `BackgroundThrottleMonitor` (`UI/src/lib/engine/background-throttle-notice.ts`) watches a domain event (`onIdleTimeLost`) for a mechanic crossing a threshold, persists a single `localStorage` flag (`safeLocalStorage()`, written *before* showing so a crash mid-toast can't re-arm it), and shows a sticky toast (`toastWarning(msg, { duration: 0 })`) exactly once, ever. Its content is a hardcoded string, browser-sniffed even. This is today's only working example of "mechanic happened → one-time educational nudge," and it's built entirely from existing primitives (an engine event hook, `safeLocalStorage`, the toast store) — no bespoke component.
-- **A recurring "diff what changed → toast" pattern already exists**, independent of which screen the player is on: `challenge-unlocks.ts` (`zonesUnlockedBy`, `resolveUnlockReward`), `synthesis-feedback.ts` (`isRecipeCreatable`/`creatableRecipeIds`), and `proficiency-feedback.ts` are all pure before/after-state diff helpers feeding a completion toast. This is the natural home for "first crit landed," "first dodge occurred," "cooldown visibly charged" style mechanic triggers — event-driven, not screen-driven, and already decoupled from presentation.
-- **The toast primitive already carries most of what a short blurb needs**: type, `dismissible`, an inline `action: { label, onClick }` button, and an `onDismiss` callback (`UI/src/stores/toast.svelte.ts`). Combined with the existing navigation-intent store (`requestScreen(key, payload?)`, one-shot deep-linking consumed via `consumePayload()`), a toast's action button can already say "View" and land the player on the relevant screen. What doesn't exist is an anchored, persistent, in-context explanation (pointing at a specific control on a specific screen) — that would extend `Popover` (`components/Popover.svelte`, the non-blocking anchored-overlay primitive), not the toast.
-- **#1390 (content export/seed pipeline + progression-graph lint) is closed and real**, not aspirational — so "ride the Workbench" is a genuinely available option, not a leap. Its own body floated a per-entity `DesignerNotes` field (Workbench-authored, never sent to the client) as a precedent for attaching authored prose to reference entities.
-- **Two sibling spikes share this event surface.** #1393 ("unlock conditions for each page") explicitly floats itself as the natural stagger point for tutorials ("this will also provide an opportunity to stagger feature tutorials") — a page's unlock condition flipping false→true is close to a free "first time this page is even reachable" hook. #1395 ("notification badges on unlock") lists proficiency/challenge/item/skill unlock events — the same events a mechanic-triggered blurb would key off — but commits to **client-only, no-recovery** persistence and accepts that as fine for a "come look" badge.
+## Directions considered
+
+**Delivery** —
+- *Toast-only* (original recommendation): cheapest, but rejected — toasts are already the unlock/reward noise channel, so lessons compete with the feed they're supposed to explain; and in an idle game, mechanic triggers ("first crit") fire within seconds of idling, plausibly while the player is AFK, making fire-and-forget delivery structurally missable.
+- *First-visit modal*: unmissable and cheap, but not in-context — it tells rather than shows, and a modal interrupting mid-battle is wrong for mechanic triggers anyway.
+- *Anchored popover tour + unread queue* (**chosen**): screen lessons play in-context at the moment the player is provably present; mechanic lessons queue as unread behind a persistent indicator instead of being shown into the void.
+
+**Authoring** —
+- *Hardcoded frontend registry* (original recommendation): mirrors `BackgroundThrottleMonitor`, but that precedent is a browser-quirk warning, not game content. The strings were never the issue — the **existence and linkage** of lessons is what the content arc depends on, and hardcoded lessons are invisible to the graph lint and the Workbench.
+- *Hybrid* (hardcoded copy, server-side state only): saves the entity/CRUD work but keeps the lint blind spot.
+- *Full reference data* (**chosen**): consistent with the DB-primary strategy everything else follows.
+
+**Persistence** —
+- *`localStorage`* (original recommendation): device-scoped state for what is account-scoped data; every new device re-prompts everything. The #1395 badge analogy justified accepted data loss for low-stakes badges while conceding tutorials are higher-stakes.
+- *Server-side per-player state* (**chosen**): the server already syncs player state; two timestamps per lesson is cheap.
 
 ## Decisions
 
-### 1. Trigger model: two anchor kinds, one shared event layer
+### 1. Trigger model: two anchor kinds, one lesson lifecycle
 
-Model every blurb as a **lesson** with a **trigger**, not "a page's tutorial." A trigger is one of:
+Every blurb is a **lesson** with a trigger of one of two kinds, and a per-player lifecycle of `locked → unread → read`:
 
-- **Screen-anchored** — fires the first time a given `ScreenDef.key` becomes the active screen. Hooks the same activation point `routes/game/+page.svelte` already uses for cross-screen navigation; does not depend on SvelteKit routing. Right for onboarding-shaped lessons content-design.md already named as page-adjacent (idle-loop/UI basics on first landing on Fight).
-- **Mechanic-anchored** — fires the first time a pure predicate over player/battle state flips from false to true (first crit landed, first dodge occurred, a skill's cooldown visibly recharged). Detected by extending the existing `*-feedback.ts`/`*-unlocks.ts` before/after-diff family into a small shared **content-events** module, rather than writing a fourth bespoke diff helper. This module is the natural point to also serve #1395's badge triggers — see the open call below.
+- **Screen-anchored** — fires the first time a given `ScreenDef.key` becomes the active screen, hooked at the same activation point cross-screen navigation uses. Because the player just navigated there, the lesson **plays immediately** (its tour runs, then it's marked read). Once #1393 lands per-screen unlock predicates, this trigger should reuse them (fire when a screen transitions unlocked *and* active); until then "first time ever active" is well-defined on its own.
+- **Mechanic-anchored** — fires when a content-events detector (#1586) flips false→true (first crit, first dodge, first cooldown recharge, future unlock events). The player may be AFK or mid-fight, so the lesson does **not** display at trigger time — it becomes **unread**, surfaced by a persistent indicator (a badge on the Help nav entry / HUD affordance, deliberately distinct from the toast channel). Opening it navigates to the lesson's screen via `requestScreen` and plays its tour, marking it read.
 
-Both anchor kinds resolve to the same delivery primitive (a toast, optionally with a `View` action via `requestScreen`), so "per-page vs. per-mechanic" isn't a fork to pick a winner from — it's two trigger evaluators feeding one presentation path. A lesson can also declare *both* (e.g. gate the cooldown-charging blurb on having first reached the Fight screen, so it never fires while the player is elsewhere).
+"Per-page vs. per-mechanic" is therefore not a fork: two trigger evaluators, one lifecycle, one presentation path. Queue-always for mechanic lessons is a deliberate v1 simplification; playing immediately when the player happens to be on the lesson's screen is a possible refinement, not a requirement.
 
-Once #1393 lands a per-screen unlock predicate, screen-anchored triggers should reuse it directly (fire the blurb the moment a screen transitions unlocked **and** becomes active) rather than maintaining an independent "has this page been visited" check that can drift from "is this page reachable yet." Until then, screen-anchored triggers degrade gracefully to "first time ever set active," which is already a well-defined, useful trigger on its own.
+### 2. Authoring: lessons are reference data
 
-### 2. Authoring: hardcode the copy, reference-data the trigger
+A `Lesson` entity (key, trigger kind + target, host screen, ordered steps of text + optional `anchorKey`, Help-screen ordering) plus a small intrinsic mechanic-event enum, riding the reference-data cache, the #1390 seed/export, and Workbench CRUD like every other content entity. This buys the lint coverage the content arc needs — every taught-by-blurb candidate in content-design.md §2 has a live lesson, and no trigger references retired content — and keeps copy iteration in the Workbench where content iteration already happens. `anchorKey`s are validated on the frontend side (a test that every seeded key resolves to a registered anchor), since the backend lint can't see the DOM.
 
-Split the two halves of a lesson rather than forcing an all-or-nothing call:
+### 3. Delivery: anchored tour, in v1
 
-- **Trigger condition** (screen key, or a mechanic id referencing existing ids — an attribute, a skill, an activity key) needs no new authored entity. It's expressed by referencing content that's already reference data.
-- **Blurb copy** is hardcoded frontend content — a single lesson registry (`.ts`, mirroring `backgroundThrottleGuidance()`'s shape but as static per-lesson strings rather than one browser-sniffed function). Tutorial copy is UI microcopy iterated alongside the frontend, not a cross-referenced content-graph node needing #1390's reachability lint, diffable seed export, or Workbench round-trip. This mirrors the one precedent that exists today (`BackgroundThrottleMonitor`'s hardcoded, non-authored message) rather than introducing a new Workbench entity + DB round-trip for a few dozen short strings.
+A coach-mark tour component (new, in the `Popover`/`ModalHost` overlay family, reusing the `focus-trap` chrome): highlight the target control, position a callout with the step text and next/back/done. Anchors are registered by key via a Svelte action; a missing anchor degrades to a centered callout. Toasts are not used for lessons at all.
 
-This isn't a permanent wall — if the lesson roster grows large enough to want lint coverage (e.g. "every content-design.md blurb candidate has a live trigger, and no trigger references a retired lesson"), that can ride the existing progression-graph lint as a follow-on, keyed off the same trigger ids. Not core to landing the feature.
+### 4. Persistence: server-side player state
 
-### 3. Per-page vs. per-mechanic: resolved by decision 1
-
-Not a fork — see above. Every lesson has an anchor; "page" and "mechanic" are two anchor kinds feeding the same trigger→toast pipeline. content-design.md's phrasing ("tutorials for each page") describes the screen-anchored subset, not the whole system.
-
-### 4. Dismissal/replay: one-shot locally, always-available via Help
-
-Dismissal state is `localStorage`-backed (`safeLocalStorage()`), one entry per lesson id, mirroring `BackgroundThrottleMonitor` and consistent with #1395's own accepted client-only/no-recovery stance for the same event surface.
-
-This is only defensible for tutorials — a strictly higher-stakes case than a badge — if losing the flag has a low-stakes failure mode. It does: build out the already-reserved, currently-stubbed **`help` screen** (`screen-defs.ts`, `built: false` today) as a plain list of every lesson (dismissed or not), so a cleared `localStorage` or a first-time load never means "this explanation is gone" — worst case the player sees a blurb again, or has to open Help to find something they'd already dismissed. That reframes local-only persistence from "accepted data loss" (as #1395 explicitly is) to "harmless re-prompt," which is the right tradeoff for a teaching mechanism without taking on a server round-trip (`logPreferences`/`SaveLogPreferences` is the available precedent if that judgment ever changes, but nothing here calls for it).
+A `PlayerLesson` row per player+lesson (absent = locked; `unlockedAt`, `readAt`), included in the player load payload, updated by socket commands (unlock on client-detected trigger, mark-read on tour completion). Client-side trigger detection is trusted — a dishonest client can only show itself tutorials early; nothing is rewarded. Server-side trigger detection is deferred until something rides on it.
 
 ## Relationship to #1393 and #1395
 
-All three issues ultimately watch the same underlying events (page reachability, mechanic/unlock occurrence). This spike's recommendation:
-
-- #1392 (this spike) owns the **content-events** derivation layer (extending the `*-feedback.ts`/`*-unlocks.ts` pattern) as part of its own implementation, since it needs it regardless.
-- #1395 (badges) should consume the same layer rather than re-deriving "did X just unlock" a second time — flagged there as a coordination point when it's picked up, not decided unilaterally here since #1395 is separately scoped and owned.
-- #1393 (per-page unlock conditions) is the eventual upgrade path for screen-anchored triggers (see decision 1); #1392 doesn't need to wait for it to ship a first version.
-
-## The content-events scoping call — resolved
-
-Building the shared content-events layer as part of #1392 was flagged as a sequencing/ownership call rather than decided unilaterally. Resolved via PR #1585 review: keep it under #1392 as proposed, rather than splitting it into a standalone dependency issue — it's the same code either way, and the split only pays off if #1395 gets picked up before #1392 ships, which isn't the current ordering.
+- **#1395 (badges)** should consume the same content-events layer (#1586, merged) and can share the unread-indicator affordance this spike introduces, rather than inventing a parallel one — flagged there as a coordination point.
+- **#1393 (per-page unlock conditions)** remains the upgrade path for screen-anchored triggers; #1392 doesn't wait for it.
 
 ## Implementation issues
 
-- **#1586 — Content-events derivation layer** — shared before/after-diff module for mechanic-occurrence detection (crit landed, dodge occurred, cooldown charged, proficiency/skill/item/challenge unlocked), reusing/consolidating the existing `challenge-unlocks.ts`/`synthesis-feedback.ts`/`proficiency-feedback.ts` family. Pure, unit-testable, no UI.
-- **#1587 — Lesson registry + trigger evaluation** — the static lesson list (id, anchor kind + target, copy, `View` action target), a screen-activation hook for screen-anchored triggers, and wiring content-events output into mechanic-anchored triggers. Delivers via the existing toast store; no new presentation component required for v1.
-- **#1588 — Dismissal persistence** — `localStorage`-backed per-lesson dismissal, mirroring `BackgroundThrottleMonitor`'s write-before-show ordering.
-- **#1589 — Help screen** — build out the reserved `help` screen key (`built: false` today) listing every lesson with its dismissed/undismissed state and a way to re-trigger its toast.
+- **#1586 — Content-events derivation layer** — merged (PR #1590); survives the revision unchanged as the mechanic-trigger detection surface.
+- **#1591 — Lesson reference data** — `Lesson`/`LessonStep` entities, mechanic-event intrinsic enum (+ EF migration), reference cache, seed/export, Workbench CRUD, graph lint rules.
+- **#1592 — Anchored tutorial tour component** — coach-mark tour player, anchor registration action, degraded (unanchored) fallback, seeded-anchor resolution test.
+- **#1588 — Lesson state persistence (server)** — `PlayerLesson` state, socket commands, player-load payload, client store sync. *(Rescoped from the superseded localStorage approach.)*
+- **#1587 — Trigger evaluation + unread lesson flow (client)** — screen-activation hook, content-events wiring, unread indicator, open→navigate→play→mark-read flow. *(Rescoped from the superseded toast approach.)*
+- **#1589 — Help screen** — build the reserved `help` slot as the reading room: all lessons with locked/unread/read state, open/replay.
+
+Rough dependency order: #1591 → (#1588, #1592) → #1587 → #1589.
 
 ## Documentation to update on landing
 
-- `docs/content-design.md` §2 and the parking-lot entry — drop the "not-yet-built feature" caveat once landed; document the lesson-anchor split (screen vs. mechanic) so future zone-arc planning knows which lane a new lesson can use.
-- `docs/frontend.md` — add a short "Tutorials" note alongside the overlay-systems summary, pointing at `docs/frontend-overlays.md` for the toast mechanics reused and noting the content-events layer's existence for future consumers (e.g. #1395).
+- `docs/content-design.md` §2 and the parking-lot entry — drop the "not-yet-built feature" caveat; document the lesson-anchor split so zone-arc planning knows which lane a new lesson uses.
+- `docs/frontend.md` — short "Tutorials" note alongside the overlay-systems summary (tour component, anchor action, unread indicator); note the content-events layer for future consumers (#1395).
+- `docs/backend.md` — nothing expected; `Lesson`/`PlayerLesson` follow standard reference-data and player-state patterns.
 
 ## Out of scope / deferred
 
-- Workbench-authored blurb copy (revisit only if the lesson roster grows enough to want lint coverage — see decision 2).
-- Server-persisted dismissal state (revisit only if local-only proves insufficient in practice — see decision 4).
-- Anchored/in-context overlays pointing at a specific control (a `Popover`-based presentation beyond the toast); v1 ships toast-only.
-- #1393's per-page unlock predicate and #1395's badge system themselves — each is its own spike/issue; this doc only defines the shared seam.
+- Server-side trigger detection (client-detected, server-recorded is enough while nothing is rewarded).
+- Immediate display of mechanic lessons when the player is already on the relevant screen (refinement over queue-always).
+- #1393's unlock predicates and #1395's badge system — each its own issue; this doc only defines the shared seams.
