@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.Application.Services;
 using Game.Core;
+using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -24,10 +25,6 @@ namespace Game.Application.Tests.Services
         public OfflineProgressServiceIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
 
-        // A win pays exactly this: enemy power (Str 50 + End 50 = 100) matched to the seeded player's power
-        // (Str 50 + End 50 = 100) gives a difficulty ratio of 1, so DefeatRewards yields the enemy total, 100.
-        private const int ExpPerWin = 100;
-
         [Fact]
         public async Task SimulateOfflineProgress_MultiBattleAway_AppliesExpLevelsAndStatPoints()
         {
@@ -38,6 +35,7 @@ namespace Game.Application.Tests.Services
             var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             var levelBefore = player.Level;
+            var expPerWin = await ComputeExpPerWinAsync(scope, setup);
             // A long-enough absence to win many battles.
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
@@ -46,7 +44,7 @@ namespace Game.Application.Tests.Services
             Assert.True(summary.BattlesWon > 1, "Expected the away window to win multiple battles.");
             Assert.True(summary.HasProgress);
             // Every win pays the same fixed reward, so the total is exact.
-            Assert.Equal((long)summary.BattlesWon * ExpPerWin, summary.TotalExp);
+            Assert.Equal((long)summary.BattlesWon * expPerWin, summary.TotalExp);
             // The exp drove real level gain, and the summary's deltas match the player aggregate.
             Assert.True(player.Level > levelBefore);
             Assert.Equal(player.Level - levelBefore, summary.LevelsGained);
@@ -418,6 +416,7 @@ namespace Game.Application.Tests.Services
             var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
 
             var levelBefore = player.Level;
+            var expPerWin = await ComputeExpPerWinAsync(scope, setup);
             // Under the 5-minute login floor, but long enough to win several battles when the floor is dropped.
             player.LastActivity = DateTime.UtcNow.AddMinutes(-2);
 
@@ -425,7 +424,7 @@ namespace Game.Application.Tests.Services
 
             Assert.True(summary.BattlesWon > 1, "Expected the sub-threshold window to still win multiple battles.");
             Assert.True(summary.HasProgress);
-            Assert.Equal((long)summary.BattlesWon * ExpPerWin, summary.TotalExp);
+            Assert.Equal((long)summary.BattlesWon * expPerWin, summary.TotalExp);
             Assert.True(player.Level > levelBefore);
             // The away anchor is re-stamped to ~now, so the parked window starts fresh from the switch.
             Assert.True(DateTime.UtcNow - player.LastActivity < TimeSpan.FromMinutes(1));
@@ -458,8 +457,12 @@ namespace Game.Application.Tests.Services
 
         /// <summary>
         /// Seeds a player who reliably one-shots a fixed-power enemy in a single-zone idle loop, so an away
-        /// window produces a deterministic run of victories (each worth <see cref="ExpPerWin"/>). The enemy's
-        /// power equals the seeded player's, so the exp reward is exactly the enemy total.
+        /// window produces a deterministic run of victories (each worth what <see cref="ComputeExpPerWinAsync"/>
+        /// computes). Both battlers share the same Strength/Endurance (50/50); the enemy's authored skill deals
+        /// the same raw DPS as the player's (4000 dmg / 2000ms = 1000 dmg / 500ms), so their combat ratings —
+        /// and hence the difficulty ratio — come out roughly matched. The enemy's 2000ms cooldown is far longer
+        /// than the ~500ms fight, so it never actually fires — its authored damage only feeds the static rating,
+        /// not the simulated outcome, keeping the one-shot-kill determinism intact.
         /// </summary>
         private async Task<Setup> SeedWinningScenarioAsync(IServiceScope scope, bool reload = true)
         {
@@ -468,7 +471,7 @@ namespace Game.Application.Tests.Services
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 4000m, cooldownMs: 2000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
@@ -482,7 +485,7 @@ namespace Game.Application.Tests.Services
                 await ReloadReferenceCachesAsync();
             }
 
-            return new Setup(playerEntity.Id, zone.Id);
+            return new Setup(playerEntity.Id, zone.Id, enemy.Id);
         }
 
         private async Task<(Player Player, PlayerState State)> LoadAsync(IServiceScope scope, int playerId)
@@ -493,6 +496,35 @@ namespace Game.Application.Tests.Services
             return (player, new PlayerState { PlayerId = playerId });
         }
 
-        private sealed record Setup(int PlayerId, int ZoneId);
+        private sealed record Setup(int PlayerId, int ZoneId, int EnemyId);
+
+        // The per-victory reward a SeedWinningScenarioAsync scenario pays, computed via the same DefeatRewards
+        // path production uses (CombatRating has no simple closed form a test can re-derive by hand) — built
+        // from the player's pristine (pre-battle) snapshot and the enemy's resolved loadout, exactly mirroring
+        // OfflineProgressSimulator/BattleService. Call before running the simulation, since the reward is
+        // stationary at the player's starting level/attributes for the whole away window.
+        private static async Task<int> ComputeExpPerWinAsync(IServiceScope scope, Setup setup)
+        {
+            var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(setup.PlayerId);
+            Assert.NotNull(player);
+
+            var itemsRepo = scope.ServiceProvider.GetRequiredService<IItems>();
+            var itemModsRepo = scope.ServiceProvider.GetRequiredService<IItemMods>();
+            var skillsRepo = scope.ServiceProvider.GetRequiredService<ISkills>();
+            var proficienciesRepo = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+            var classesRepo = scope.ServiceProvider.GetRequiredService<IClasses>();
+
+            Game.Core.Classes.Class ResolveClass(int id) => classesRepo.GetClass(id)
+                ?? throw new InvalidOperationException($"Class {id} could not be resolved.");
+
+            var playerBattler = BattleSnapshot.FromPlayer(player, []).ToBattler(
+                itemsRepo.GetItem, itemModsRepo.GetItemMod, skillsRepo.TryGetSkill, proficienciesRepo.GetProficiency, ResolveClass);
+
+            var enemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(setup.EnemyId, level: 1);
+            Assert.NotNull(enemy);
+            enemy.SelectAllBattleSkills();
+
+            return new DefeatRewards(playerBattler, enemy).ExpReward;
+        }
     }
 }

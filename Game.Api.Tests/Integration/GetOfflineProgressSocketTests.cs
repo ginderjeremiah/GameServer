@@ -29,7 +29,11 @@ namespace Game.Api.Tests.Integration
         }
 
         // Seeds a user + player who reliably one-shots a fixed-power enemy in a single idle zone, optionally
-        // backdating LastActivity so the player counts as "away" by the requested amount.
+        // backdating LastActivity so the player counts as "away" by the requested amount. Both battlers share
+        // the same Strength/Endurance (50/50); the enemy's authored skill deals the same raw DPS as the
+        // player's (4000 dmg / 2000ms = 1000 dmg / 500ms), so their combat ratings come out roughly matched
+        // (a non-trivial exp payout) — the enemy's 2000ms cooldown is far longer than the ~500ms fight, so it
+        // never actually fires and the one-shot-kill determinism is unaffected.
         private async Task<int> SeedWinningPlayerAsync(string username, string password, TimeSpan awayFor)
         {
             using var scope = CreateScope();
@@ -38,7 +42,7 @@ namespace Game.Api.Tests.Integration
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 4000m, cooldownMs: 2000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);

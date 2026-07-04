@@ -134,9 +134,10 @@ namespace Game.DataAccess.Repositories.Admin
             // Authoring guard: these distributions become the class's level-scaled locked base, folded into the
             // battler's AttributeCollection at assembly (BattleSnapshot.GetModifiers), which sums per-attribute
             // modifiers. A duplicate attribute would silently double-count its locked-base modifier, and a
-            // non-core attribute's modifier would silently take effect (while being omitted from the
-            // reward-power heuristic, DefeatRewards.SumCoreAttributes) — neither is intended, so both are
-            // rejected here at save time.
+            // non-core attribute's modifier is authoring intent this catalogue doesn't otherwise validate —
+            // neither is intended, so both are rejected here at save time. (The combat-rating reward measure,
+            // DefeatRewards/CombatRating, prices every classified attribute, not just the core ones, so this
+            // guard is no longer about what the reward heuristic can see — just about clean authoring.)
             if (FindAttributeDistributionViolation(data.AttributeDistributions) is { } rejection)
             {
                 return rejection;

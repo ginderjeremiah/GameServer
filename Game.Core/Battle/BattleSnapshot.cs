@@ -180,13 +180,15 @@ namespace Game.Core.Battle
         }
 
         /// <summary>
-        /// The snapshot's battle modifiers (<see cref="GetModifiers"/>) <b>plus</b> the resolved signature passive
-        /// — the set the <see cref="DefeatRewards"/> power measurement reads. Including the passive here keeps a
-        /// flat (or core-additive-scaled) signature passive counted toward power exactly like the class locked
-        /// base, rather than silently dropping a class-identity bonus from the reward heuristic (so a class built
-        /// around a large flat-core passive can't under-report its power and inflate rewards). A transient
-        /// <see cref="AttributeCollection"/> resolves the passive's scaling against the same fully-assembled
-        /// attributes <see cref="ToBattler"/> uses, so power reads the identical passive value the battle simulated.
+        /// The snapshot's battle modifiers (<see cref="GetModifiers"/>) <b>plus</b> the resolved signature
+        /// passive — the legacy <c>SumCoreAttributes</c> power measurement read this (so a class built around a
+        /// large flat-core passive could not under-report its power and inflate rewards). The live reward path
+        /// no longer calls this: <see cref="DefeatRewards"/> now rates the <see cref="Battler"/> from
+        /// <see cref="ToBattler"/> directly, which already composes the signature passive as its own final step
+        /// (spike #1526). Retained because the combat-rating calibration report's old-measure comparison
+        /// (#1533) and tests still need the legacy modifier-list shape. A transient <see cref="AttributeCollection"/>
+        /// resolves the passive's scaling against the same fully-assembled attributes <see cref="ToBattler"/>
+        /// uses, so the two stay consistent.
         /// </summary>
         public IEnumerable<AttributeModifier> GetModifiersWithSignaturePassive(
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod,

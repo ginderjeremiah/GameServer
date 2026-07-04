@@ -36,9 +36,10 @@ namespace Game.Application.Tests.Services
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var (playerId, firedSkillId, proficiency) = await SeedSingleTierAsync(
-                context, maxLevel: 10, baseXp: 2m, xpGrowth: 1m);
-            // 10 XP over a flat cost-2 curve reaches level 5 (well short of the cap), crossing the level-3
-            // milestone without maxing — isolating the milestone grant from the open trigger.
+                context, maxLevel: 10, baseXp: 5m, xpGrowth: 1m);
+            // The full pie (ServerGameConstants.ProficiencyXpPerVictory, 29.247) over a flat cost-5 curve
+            // reaches level 5 (well short of the cap), crossing the level-3 milestone without maxing —
+            // isolating the milestone grant from the open trigger.
             var rewardSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Milestone Reward");
             await TestDataSeeder.AddProficiencyLevelRewardAsync(context, proficiency.Id, level: 3, rewardSkill.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
@@ -292,8 +293,8 @@ namespace Game.Application.Tests.Services
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
             var stats = FireSkill(firedSkillId);
 
-            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
-            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
+            service.AccrueAndApply(progress, stats, ratingDenominator: FiredDamage, player, notify: false);
+            service.AccrueAndApply(progress, stats, ratingDenominator: FiredDamage, player, notify: false);
 
             Assert.Single(player.Skills, s => s.Id == rewardSkill.Id);
         }
@@ -805,7 +806,7 @@ namespace Game.Application.Tests.Services
             var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
             var player = await LoadPlayerAsync(scope, playerId);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), totalAttributes: FiredDamage, player, notify);
+            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), ratingDenominator: FiredDamage, player, notify);
             return (player, accrual);
         }
 
@@ -817,7 +818,7 @@ namespace Game.Application.Tests.Services
             var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
             var player = await LoadPlayerAsync(scope, playerId);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            var accrual = service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify);
+            var accrual = service.AccrueAndApply(progress, stats, ratingDenominator: FiredDamage, player, notify);
             return (player, accrual);
         }
 

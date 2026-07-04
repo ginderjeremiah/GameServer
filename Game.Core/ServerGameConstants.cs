@@ -10,13 +10,25 @@ namespace Game.Core
     public static class ServerGameConstants
     {
         /// <summary>
-        /// Upper clamp on the exp-reward difficulty multiplier (the quadratic <c>ratio²</c> in
-        /// <c>DefeatRewards</c>). The multiplier saturates here so an enemy far above the player's power
-        /// can't mint an unbounded single-battle payout. A cap of 4 saturates at a power ratio of 2× —
-        /// an enemy twice the player's power already pays the maximum bonus, and ratios beyond that
-        /// plateau instead of scaling quadratically without bound.
+        /// Upper clamp on the legacy <c>SumCoreAttributes</c>-based exp-reward difficulty multiplier (the
+        /// quadratic <c>ratio²</c> band <see cref="Battle.DefeatRewards.GetDifficultyMultiplier"/> computes). The
+        /// live reward path no longer applies this — the combat-rating bounty curve (<see cref="XpScaleK"/>)
+        /// replaced the band/premium/cap with one continuous, self-capping curve (spike #1526 Decision 4). This
+        /// constant is retained solely because <c>GetDifficultyMultiplier</c>/<c>SumCoreAttributes</c> still back
+        /// the combat-rating calibration report's old-vs-new comparison (#1533).
         /// </summary>
         public const double MaxExpRewardMultiplier = 4.0;
+
+        /// <summary>
+        /// The XP scale <c>k</c> in the enemy-authored bounty curve <c>XP/kill = k × enemyRating ×
+        /// min(enemyRating ÷ playerRating, 1)²</c> (spike #1526 Decision 4, #1532) that replaced the old ±20%
+        /// band/quadratic-premium/cap. Calibrated by <c>CombatRatingCalibrator</c> (#1533) against the current
+        /// seeded content, anchored at the zone/level/build sample the old curve already treated as matched
+        /// (Ashen Wastes L8, Offense build) so the swap pays continuously with the old curve at that reference
+        /// point. Re-run the calibration report and update this value after a significant content or
+        /// reference-constant change.
+        /// </summary>
+        public const double XpScaleK = 0.3262;
 
         /// <summary>
         /// Defensive ceiling on the experience a single <c>Player.GrantExp</c> call applies. Legitimate
@@ -29,15 +41,19 @@ namespace Game.Core
 
         /// <summary>
         /// The base pie (<c>basePie</c>) each proficiency path independently claims against on a won battle:
-        /// <c>XP_path = basePie × clamp(pathActivity ÷ totalAttributes)</c> (spike #1318). Power-normalization
-        /// is the difficulty curve, so the banded <c>DefeatRewards</c> difficulty multiplier is deliberately
-        /// <em>not</em> applied again. Claims across axes (offense/defense/proc) don't share a pie — they are
-        /// independent, overlapping claims — so a multi-axis loadout mints <em>more</em> total proficiency XP
-        /// rather than diluting each track. Computed server-side at battle completion (never in the seeded
-        /// simulation), so it is server-authoritative and not mirrored to the client. A strawman magnitude,
-        /// tunable against the authored per-proficiency XP curves.
+        /// <c>XP_path = basePie × pathActivity ÷ max(playerRating, enemyRating)</c> (spike #1526 Decision 5,
+        /// #1532 — supersedes the #1318 <c>SumCoreAttributes</c>-normalized formula). Max-normalization is the
+        /// difficulty curve: above your weight the claim rate is what a matched player would earn, at or below it
+        /// the treadmill is unchanged, and <c>activity ≤ enemyHP</c> bounds the claim naturally, so there is no
+        /// separate clamp. Claims across axes (offense/defense/proc) don't share a pie — they are independent,
+        /// overlapping claims — so a multi-axis loadout mints <em>more</em> total proficiency XP rather than
+        /// diluting each track. Computed server-side at battle completion (never in the seeded simulation), so it
+        /// is server-authoritative and not mirrored to the client. Calibrated by <c>CombatRatingCalibrator</c>
+        /// (#1533) alongside <see cref="XpScaleK"/>, at the same anchor point; rounded to the persisted XP scale
+        /// (numeric(18,3), matching <see cref="Proficiencies.Proficiency.XpForLevel"/>) so a full-pie claim
+        /// round-trips through storage exactly rather than drifting by a fraction of a thousandth.
         /// </summary>
-        public const double ProficiencyXpPerVictory = 10.0;
+        public const double ProficiencyXpPerVictory = 29.247;
 
         /// <summary>
         /// The resist-training rate applied to the portion of a resist path's pre-mitigation exposure that
@@ -59,7 +75,9 @@ namespace Game.Core
         /// <summary>
         /// The reference Toughness the combat rating (<see cref="Battle.CombatRating"/>, #1531) prices offense
         /// against — nonzero so a Sunder debuff and DoT's real Toughness-bypass premium both price meaningfully
-        /// (a 0 reference would make both inert). A strawman value pending the calibration report (#1533).
+        /// (a 0 reference would make both inert). A strawman value — the #1533 calibration report tunes
+        /// <see cref="XpScaleK"/> and <see cref="ProficiencyXpPerVictory"/> against it rather than solving for it;
+        /// open to future retuning.
         /// </summary>
         public const double RefToughness = 50.0;
 
@@ -78,15 +96,14 @@ namespace Game.Core
 
         /// <summary>
         /// The reference attacks/sec the combat rating assumes for a matched opponent — the incoming attack
-        /// frequency the riposte term prices against (each parry's proc opportunity rate). A strawman value
-        /// pending the calibration report (#1533).
+        /// frequency the riposte term prices against (each parry's proc opportunity rate). A strawman value,
+        /// open to future retuning.
         /// </summary>
         public const double RefAttackRate = 1.0;
 
         /// <summary>
         /// The reference incoming damage/sec the combat rating assumes for a matched opponent — prices the
-        /// reflect term (<c>DamageReflection × RefDps</c>). A strawman value pending the calibration report
-        /// (#1533).
+        /// reflect term (<c>DamageReflection × RefDps</c>). A strawman value, open to future retuning.
         /// </summary>
         public const double RefDps = 10.0;
 

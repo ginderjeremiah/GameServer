@@ -199,7 +199,7 @@ namespace Game.Application.Tests.Events
             const double power = 100.0;
             var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
             stats.AddTypedDamageDealt(EDamageType.Physical, power); // the offense book the accrual consumes
-            await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
+            await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = Assert.Single(await progressRepo.GetProficiencies(player.Id));
@@ -250,7 +250,7 @@ namespace Game.Application.Tests.Events
             var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
             stats.AddTypedDamageDealt(EDamageType.Physical, power); // the offense book the accrual consumes
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = await progressRepo.GetProficiencies(player.Id);
@@ -307,7 +307,7 @@ namespace Game.Application.Tests.Events
             stats.AddTypedDamageDealt(EDamageType.Fire, power);
             stats.AddTypedDamageDealt(EDamageType.Earth, power / 2);
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = await progressRepo.GetProficiencies(player.Id);
@@ -342,7 +342,7 @@ namespace Game.Application.Tests.Events
             // A victory with empty battle stats (no skill dealt damage): no activity, so no path is trained —
             // the effect (damage), not the victory itself, is what accrues XP.
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, new BattleStats(), playerPower: 100.0), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, new BattleStats(), playerRating: 100.0), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             Assert.Empty(await progressRepo.GetProficiencies(player.Id));
@@ -384,21 +384,22 @@ namespace Game.Application.Tests.Events
             var liveLoaded = await playerRepo.GetPlayer(livePlayer.Id);
             Assert.NotNull(liveLoaded);
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(liveLoaded, loadedEnemy, stats, playerPower: power), CancellationToken);
+                VictoryEvent(liveLoaded, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var offlineLoaded = await playerRepo.GetPlayer(offlinePlayer.Id);
             Assert.NotNull(offlineLoaded);
             var offlineProgress = await progressRepo.Load(offlineLoaded);
             scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>()
-                .AccrueAndApply(offlineProgress, stats, totalAttributes: power, offlineLoaded, notify: false);
+                .AccrueAndApply(offlineProgress, stats, ratingDenominator: power, offlineLoaded, notify: false);
             await progressRepo.Save(offlineProgress);
 
             var live = Assert.Single(await progressRepo.GetProficiencies(livePlayer.Id));
             var offline = Assert.Single(await progressRepo.GetProficiencies(offlinePlayer.Id));
             Assert.Equal(live.Level, offline.Level);
             Assert.Equal(live.Xp, offline.Xp);
-            // Sanity: the shared accrual actually produced XP (pie × 1.5), so the equality isn't vacuous.
-            Assert.Equal((decimal)(ServerGameConstants.ProficiencyXpPerVictory * 1.5), live.Xp);
+            // Sanity: the shared accrual actually produced XP (pie × 1.5, rounded to the persisted XP scale like
+            // production does), so the equality isn't vacuous.
+            Assert.Equal(Math.Round((decimal)(ServerGameConstants.ProficiencyXpPerVictory * 1.5), 3, MidpointRounding.AwayFromZero), live.Xp);
         }
 
         private BattleStatisticsEventHandler MakeHandler(IServiceScope scope) => new(
@@ -406,9 +407,9 @@ namespace Game.Application.Tests.Events
             scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
             scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>());
 
-        private static BattleCompletedEvent VictoryEvent(Player player, Game.Core.Enemies.Enemy enemy, BattleStats stats, double playerPower) =>
+        private static BattleCompletedEvent VictoryEvent(Player player, Game.Core.Enemies.Enemy enemy, BattleStats stats, double playerRating) =>
             new(player, enemy, Victory: true, PlayerDied: false, TotalMs: 5000,
-                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, PlayerPower: playerPower);
+                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, PlayerRating: playerRating);
 
         /// <summary>
         /// Seeds a fresh player (with one starter, equipped skill), an enemy, and one candidate of each

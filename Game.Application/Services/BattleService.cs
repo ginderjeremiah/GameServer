@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
 using Game.Abstractions.DataAccess;
 using Game.Core;
-using Game.Core.Attributes;
 using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Core.Proficiencies;
@@ -402,38 +401,39 @@ namespace Game.Application.Services
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
         // observed, so the server-measured cap is the (stronger) control there and nothing else is needed.
         // Both paths therefore require a server-validated timeline; neither can be claimed early.
-        // internal (not private) so an integration test can assert the live PlayerPower snapshot directly:
+        // internal (not private) so an integration test can assert the live PlayerRating snapshot directly:
         // EndBattleVictory returns only a client-facing DefeatResult, and the BattleStats this mutates is
         // carried on the BattleCompletedEvent, which the dispatcher clears after handling — leaving no other
-        // seam to observe that result.Stats.PlayerPower is set from the snapshot rather than the live aggregate.
+        // seam to observe that result.Stats.PlayerRating is set from the snapshot rather than the live aggregate.
         internal DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp)
         {
-            // Measure the player's power for the reward from the same frozen snapshot the battle was simulated
-            // against, not the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps)
-            // can shift live power between battle start and the victory claim — which would both diverge from
-            // the fought battle and let a client deflate its power right before claiming to inflate the payout.
-            // RecordVictory only runs after TryResolveActiveBattle has confirmed an active snapshot, so a null
-            // here is a broken invariant rather than a reachable state.
+            // Rate the player for the reward from the same frozen snapshot the battle was simulated against, not
+            // the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps) can shift live
+            // power between battle start and the victory claim — which would both diverge from the fought battle
+            // and let a client deflate its power right before claiming to inflate the payout. RecordVictory only
+            // runs after TryResolveActiveBattle has confirmed an active snapshot, so a null here is a broken
+            // invariant rather than a reachable state.
             if (state.Snapshot is not { } snapshot)
             {
                 throw new InvalidOperationException("Cannot record a victory without an active battle snapshot.");
             }
 
-            var rewards = new DefeatRewards(
-                snapshot.GetModifiersWithSignaturePassive(_items.GetItem, _itemMods.GetItemMod, _proficiencies.GetProficiency, ResolveClass), enemy);
+            var playerBattler = snapshot.ToBattler(
+                _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
+            var rewards = new DefeatRewards(playerBattler, enemy);
 
-            // Snapshot the player's power onto the battle stats so the proficiency accrual normalizes activity
-            // by the identical measure the difficulty curve uses (spike #1318) — captured here from the same
-            // snapshot modifiers, not the live aggregate.
-            result.Stats.PlayerPower = rewards.PlayerPower;
+            // Snapshot the player's rating onto the battle stats so the proficiency accrual normalizes activity
+            // by the identical measure the reward curve uses (spike #1526 Decision 5) — captured here from the
+            // same snapshot-built battler, not the live aggregate.
+            result.Stats.PlayerRating = rewards.PlayerRating;
 
             player.GrantExp(rewards.ExpReward);
-            // Thread the player's power onto the battle-completed event so the progress handler can normalize
-            // each path's activity by it for the effect-based proficiency accrual (spike #1318) — the same
-            // snapshot-measured power the exp reward above used.
+            // Thread both combat ratings onto the battle-completed event so the progress handler can normalize
+            // each path's activity by max(playerRating, enemyRating) for the effect-based proficiency accrual
+            // (spike #1526 Decision 5) — the same snapshot-measured ratings the exp reward above used.
             player.RecordBattleCompleted(
                 enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp,
-                rewards.PlayerPower);
+                rewards.PlayerRating, rewards.EnemyRating);
 
             return rewards;
         }
@@ -507,14 +507,10 @@ namespace Game.Application.Services
 
             var playerBattler = snapshot.ToBattler(
                 _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
-            var enemyBattler = new Battler(
-                new AttributeCollection(enemy.GetAttributeModifiers()),
-                enemy.BattleSkills,
-                enemy.Level);
 
             // The same seed shipped to the client at battle start, so the server's anti-cheat replay draws
             // the crit/dodge/block rolls from the identical RNG stream the client simulated.
-            var simulator = new BattleSimulator(playerBattler, enemyBattler, seed);
+            var simulator = new BattleSimulator(playerBattler, enemy.ToBattler(), seed);
             return simulator.Simulate(maxMs);
         }
     }
