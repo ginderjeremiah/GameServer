@@ -143,6 +143,11 @@ namespace Game.Core.Battle
                 ParryChance => ECombatRatingClassification.AsymmetryGated,
                 ParryChanceMultiplier => ECombatRatingClassification.AsymmetryGated,
                 DodgeChanceMultiplier => ECombatRatingClassification.AsymmetryGated,
+                // The cadence pair (#1524/#1526): both feed the offense rate through GetCooldownMultiplier
+                // (faster cycling = more DPS), like CooldownRecovery — the committed CooldownBonus enabler and the
+                // Agility-derived multiplier that scales it. Symmetric (enemies cycle too), so not asymmetry-gated.
+                CooldownBonus => ECombatRatingClassification.Offense,
+                CooldownBonusMultiplier => ECombatRatingClassification.Offense,
                 _ => throw new ArgumentOutOfRangeException(
                     nameof(attribute), attribute, "No combat-rating classification defined for the given attribute."),
             };

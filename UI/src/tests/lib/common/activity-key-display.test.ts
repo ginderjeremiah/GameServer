@@ -24,6 +24,7 @@ describe('activityKeyLabel', () => {
 		expect(activityKeyLabel(EActivityKey.Sunder)).toBe('Mitigation damage enabled');
 		expect(activityKeyLabel(EActivityKey.Cull)).toBe('Execute damage enabled');
 		expect(activityKeyLabel(EActivityKey.Parry)).toBe('Counter damage');
+		expect(activityKeyLabel(EActivityKey.Cadence)).toBe('Cadence damage enabled');
 	});
 
 	it('labels resist keys with a (resist) suffix on the spelled stem', () => {

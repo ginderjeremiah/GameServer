@@ -308,6 +308,13 @@ namespace Game.Core.Battle
             var executeInvestment = _activeBattler.GetAttributeValue(ExecuteBonus) * missingHpFraction;
             var executeMultiplier = 1.0 + executeInvestment;
 
+            // The Frequency cadence pseudo-overlay (#1426/#1527): the player's effective charge rate above the
+            // base-1 normal cadence — CooldownRecovery + CooldownBonus × CooldownBonusMultiplier − 1 — sampled once
+            // per fire (like the execute investment), since faster cycling IS more hits and so every landed hit
+            // rides it. Unlike the enabler multiplier it does NOT touch the real damage — it only scales the tally
+            // below. An uncommitted build sits at exactly 1.0, so the investment is 0 and it books nothing.
+            var cadenceInvestment = _activeBattler.GetCooldownMultiplier() - 1.0;
+
             var totalNet = 0.0;
             var totalBooked = 0.0;
             for (var i = 0; i < portions.Count; i++)
@@ -350,6 +357,16 @@ namespace Game.Core.Battle
                 {
                     Stats.CullBonusDealt += overlayBasis * Battler.NormalizeInvestment(executeInvestment);
                 }
+            }
+
+            // Frequency (#1426/#1527): the cadence pseudo-overlay share claim — the whole fire's booked
+            // (health-capped) damage × φ(effective cadence − 1). Books on every landed hit whose cadence is above
+            // the base-1 rate (φ is constant per fire, so booking totalBooked once equals booking each portion),
+            // so a faster-cycling build's per-battle claim scales with its cadence investment while still summing
+            // to at most the enemy's health pool — the same enemy-authored share every overlay tally holds.
+            if (cadenceInvestment > 0)
+            {
+                Stats.CadenceBonusDealt += totalBooked * Battler.NormalizeInvestment(cadenceInvestment);
             }
 
             Stats.PlayerDamageDealt += totalNet;

@@ -37,6 +37,7 @@ export enum EActivityKey {
 	Cull = 32,
 	Sunder = 33,
 	Parry = 34,
+	Cadence = 35,
 }
 
 export enum EAttribute {

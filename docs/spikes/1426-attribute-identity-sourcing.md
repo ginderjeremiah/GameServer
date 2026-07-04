@@ -62,7 +62,7 @@ Created as sub-issues of #1426:
 ## Documentation to update on landing
 
 - **[content-design.md](../content-design.md)** — Evasion/Frequency rollout rows firmed up; parking-lot entry resolved; §5 AGI/LUK note updated. _(Done as part of this spike.)_
-- **[game-design.md](../game-design.md)** — the dodge portion of *Critical hits, dodge, parry & damage reflection*, the attribute-conventions CDR example, and the Proficiency XP overlay list update as [#1523](https://github.com/ginderjeremiah/GameServer/issues/1523)/[#1524](https://github.com/ginderjeremiah/GameServer/issues/1524)/[#1527](https://github.com/ginderjeremiah/GameServer/issues/1527) land. _(Rides those issues, not done here.)_
+- **[game-design.md](../game-design.md)** — the dodge portion of *Critical hits, dodge, parry & damage reflection* and the attribute-conventions CDR example rode [#1523](https://github.com/ginderjeremiah/GameServer/issues/1523)/[#1524](https://github.com/ginderjeremiah/GameServer/issues/1524); the Proficiency XP overlay list's cadence pseudo-overlay entry (plus the *Cadence* channel's Frequency-training note) landed with [#1527](https://github.com/ginderjeremiah/GameServer/issues/1527).
 
 ## Out of scope / deferred
 

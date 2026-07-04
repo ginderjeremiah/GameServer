@@ -185,11 +185,27 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void Marginal_AgilityRaisesRating_EvenWithNoDodgeOrCadenceEnabler()
+        public void Marginal_AgilityWithNoDodgeOrCadenceEnabler_IsZero()
         {
-            // AGI always feeds CooldownRecovery (a universal tempo identity, not an enabler-gated one), so
-            // it is never fully dead the way Luck is above.
+            // AGI is an opt-in amplifier post-#1426/#1524: its CooldownRecovery derivation was severed, leaving it
+            // to feed only CooldownBonusMultiplier and DodgeChanceMultiplier — both 0 × mult = 0 with no fielded
+            // cadence or dodge enabler. So with neither enabler AGI is dead exactly like Luck, and the marginal is
+            // 0 (matching the dead-stat detector the enemy content lint #1529 relies on).
             var battler = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+
+            var marginal = CombatRating.Marginal(battler, isPlayer: true, Agility, delta: 100);
+
+            Assert.Equal(0, marginal, 6);
+        }
+
+        [Fact]
+        public void Marginal_AgilityWithCadenceEnabler_RaisesRating()
+        {
+            // A fielded CooldownBonus (the cadence enabler) lights AGI up: more Agility scales
+            // CooldownBonusMultiplier, raising the effective charge rate
+            // (CooldownRecovery + CooldownBonus × CooldownBonusMultiplier) and thus the offense rate — the
+            // dormant-not-dead amplifier turning live once its enabler is present (spike #1426/#1527).
+            var battler = MakeBattlerWithSkills([(CooldownBonus, 0.5)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
 
             var marginal = CombatRating.Marginal(battler, isPlayer: true, Agility, delta: 100);
 
