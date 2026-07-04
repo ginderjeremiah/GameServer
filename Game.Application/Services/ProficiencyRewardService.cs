@@ -10,14 +10,15 @@ using static Game.Core.Proficiencies.ProficiencyXpCalculator;
 namespace Game.Application.Services
 {
     /// <summary>
-    /// The shared proficiency-XP accrual step for a won battle (effect-based model, spike #1318). Given the
-    /// battle's skill stats and the player's total attributes (power), it sums each path's activity for its
-    /// <see cref="EActivityKey"/>, routes it to the path's current frontier tier, and has each path
-    /// independently claim <c>pie × clamp(activity ÷ power)</c> of XP — power-normalization is the continuous
-    /// difficulty curve (it subsumes the banded difficulty multiplier, which is deliberately not applied
-    /// again). It then applies the leveling against each proficiency's authored curve and writes the absolute
-    /// result through the progress aggregate. Both the live battle-completion handler and the offline-rewards
-    /// batch run it, so the accrual is computed identically on both paths (the "offline == live" invariant).
+    /// The shared proficiency-XP accrual step for a won battle (effect-based model, spike #1318, max-normalized
+    /// per spike #1526 Decision 5). Given the battle's skill stats and both combatants' combat ratings, it sums
+    /// each path's activity for its <see cref="EActivityKey"/>, routes it to the path's current frontier tier,
+    /// and has each path independently claim <c>pie × activity ÷ max(playerRating, enemyRating)</c> of XP —
+    /// max-normalization is the continuous difficulty curve (it subsumes <see cref="Game.Core.Battle.DefeatRewards.DifficultyMultiplier"/>,
+    /// which is deliberately not applied again). It then applies the leveling against each proficiency's
+    /// authored curve and writes the absolute result through the progress aggregate. Both the live
+    /// battle-completion handler and the offline-rewards batch run it, so the accrual is computed identically
+    /// on both paths (the "offline == live" invariant).
     /// <para>
     /// Every avenue is wired here, folded across each leaf type's applicable keys
     /// (<see cref="DamageTypes.Applies"/>): the <b>offense</b> book trains offense keys on the typed damage the
@@ -48,17 +49,17 @@ namespace Game.Application.Services
         /// <summary>
         /// Accrues a won battle's proficiency XP onto <paramref name="progress"/> and returns the per-proficiency
         /// results plus any nodes opened. Call only for a victory — XP is earned on victory.
-        /// <paramref name="totalAttributes"/> is the player's power (the sum of core additive attribute
-        /// modifiers, <c>DefeatRewards.PlayerPower</c>) each path's activity is normalized by; pass
-        /// <paramref name="notify"/> <c>true</c> on the live path to raise the client push, or <c>false</c>
-        /// for the offline batch (which folds the returned results onto the welcome-back summary instead).
+        /// <paramref name="playerRating"/> and <paramref name="enemyRating"/> are the combatants'
+        /// <see cref="Game.Core.Battle.CombatRating"/> for this battle; each path's activity is normalized by
+        /// whichever is larger (spike #1526 Decision 5). Pass <paramref name="notify"/> <c>true</c> on the live
+        /// path to raise the client push, or <c>false</c> for the offline batch (which folds the returned
+        /// results onto the welcome-back summary instead).
         /// </summary>
         public ProficiencyAccrualResult AccrueAndApply(
-            PlayerProgress progress, BattleStats stats, double totalAttributes, Player player, bool notify)
+            PlayerProgress progress, BattleStats stats, double playerRating, double enemyRating, Player player, bool notify)
         {
             var slices = ProficiencyXpCalculator.Split(
-                ServerGameConstants.ProficiencyXpPerVictory, totalAttributes,
-                ServerGameConstants.MaxExpRewardMultiplier, BuildActivities(stats, progress));
+                ServerGameConstants.ProficiencyXpPerVictory, playerRating, enemyRating, BuildActivities(stats, progress));
             if (slices.Count == 0)
             {
                 return ProficiencyAccrualResult.Empty;

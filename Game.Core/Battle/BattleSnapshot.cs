@@ -181,12 +181,13 @@ namespace Game.Core.Battle
 
         /// <summary>
         /// The snapshot's battle modifiers (<see cref="GetModifiers"/>) <b>plus</b> the resolved signature passive
-        /// — the set the <see cref="DefeatRewards"/> power measurement reads. Including the passive here keeps a
-        /// flat (or core-additive-scaled) signature passive counted toward power exactly like the class locked
-        /// base, rather than silently dropping a class-identity bonus from the reward heuristic (so a class built
-        /// around a large flat-core passive can't under-report its power and inflate rewards). A transient
-        /// <see cref="AttributeCollection"/> resolves the passive's scaling against the same fully-assembled
-        /// attributes <see cref="ToBattler"/> uses, so power reads the identical passive value the battle simulated.
+        /// — the modifier set the retired <c>SumCoreAttributes</c> power measure summed over. Production reward
+        /// math no longer calls this (spike #1526 rates the fully-assembled <see cref="ToBattler"/> battler
+        /// instead, which folds the signature passive in automatically); it is kept for the combat-rating
+        /// calibration report (#1533), which still models the old measure for its old-vs-new comparison. A
+        /// transient <see cref="AttributeCollection"/> resolves the passive's scaling against the same
+        /// fully-assembled attributes <see cref="ToBattler"/> uses, so the old-measure comparison reads the
+        /// identical passive value the battle simulated.
         /// </summary>
         public IEnumerable<AttributeModifier> GetModifiersWithSignaturePassive(
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod,
@@ -238,9 +239,9 @@ namespace Game.Core.Battle
         /// Composes the player's battle attribute modifiers from this snapshot — the captured stat
         /// allocations, each equipped item's attributes and those of its applied mods, and the per-level/
         /// milestone bonuses of the captured proficiency levels — resolving the captured ids against the
-        /// in-memory catalogs. Shared by <see cref="ToBattler"/> (the simulation) and the exp-reward power
-        /// measurement (<see cref="DefeatRewards"/>), so both read the player's power from the same frozen
-        /// snapshot rather than the live aggregate.
+        /// in-memory catalogs. Feeds <see cref="ToBattler"/>, which the exp reward and proficiency accrual both
+        /// rate via <see cref="CombatRating"/> (spike #1526), so the reward reads the player's power from the
+        /// same frozen snapshot rather than the live aggregate.
         /// <para>
         /// The composition order is part of the frontend/backend parity contract: stat allocations (the free
         /// pool), then gear, then the class locked base, then the proficiency bonuses — all additive, but

@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Application.Services;
+using Game.Core.Battle;
 using Game.Core.Battle.Events;
 using Game.Core.Events;
 
@@ -31,13 +32,16 @@ namespace Game.Application.Events
             // offline-rewards batch runs this same step with the push suppressed.
             _challengeRewards.EvaluateAndApply(progress, touchedStatistics, domainEvent.Player, notify: true);
 
-            // Accrue proficiency XP on a victory: each path claims pie × clamp(activity ÷ player power), routed
-            // to its frontier tier (the effect-based model, spike #1318). Raises the live per-battle push; the
-            // offline batch runs the same accrual with it suppressed.
+            // Accrue proficiency XP on a victory: each path claims pie × activity ÷ max(playerRating,
+            // enemyRating), routed to its frontier tier (the effect-based model, spike #1318, max-normalized
+            // per spike #1526 Decision 5). The enemy is rated fresh from its fielded loadout — cheap,
+            // closed-form. Raises the live per-battle push; the offline batch runs the same accrual with it
+            // suppressed.
             if (domainEvent.Victory)
             {
+                var enemyRating = CombatRating.Rate(domainEvent.Enemy.ToBattler(), isPlayer: false);
                 _proficiencyRewards.AccrueAndApply(
-                    progress, domainEvent.Stats, domainEvent.PlayerPower, domainEvent.Player, notify: true);
+                    progress, domainEvent.Stats, domainEvent.PlayerRating, enemyRating, domainEvent.Player, notify: true);
             }
 
             await _progressRepo.Save(progress, cancellationToken);

@@ -246,7 +246,7 @@ namespace Game.Application.Tests.Services
             var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerId);
             Assert.NotNull(player);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            return service.AccrueAndApply(progress, stats, totalAttributes: Power, player, notify: false);
+            return service.AccrueAndApply(progress, stats, playerRating: Power, enemyRating: Power, player, notify: false);
         }
 
         private static async Task<int> SeedPlayerAsync(GameContext context)

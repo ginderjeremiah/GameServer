@@ -35,10 +35,13 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            // The skills are close enough in output that neither combatant's CombatRating dwarfs the other's —
+            // a curve match, not just a raw power match — so the bounty curve (spike #1526 Decision 4) pays a
+            // real reward instead of collapsing it toward zero for a wildly one-sided fight.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 50m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 25m, cooldownMs: 500);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);

@@ -199,10 +199,10 @@ namespace Game.Application.Content
 
             /// <summary>
             /// Flags a live enemy's core-attribute distribution points that nothing in its kit consumes (#1529):
-            /// dead weight that still counts into <c>DefeatRewards.SumCoreAttributes</c>, inflating XP payout
-            /// without adding threat. A v1 heuristic map, not the exact per-attribute marginal spike #1526's
+            /// dead weight that inflates the enemy's rated threat (and thus its priced bounty) without adding
+            /// real capability. A v1 heuristic map, not the exact per-attribute marginal spike #1526's
             /// <see cref="Game.Core.Battle.CombatRating.Marginal"/> now computes — see the follow-up filed
-            /// alongside this check to migrate onto that once the calibration work (#1533) lands.
+            /// alongside this check to migrate onto that now that the calibration work (#1533) has landed.
             /// </summary>
             private void CheckEnemyAttributeConsumption()
             {

@@ -248,11 +248,13 @@ namespace Game.Application.Services
                     victoryExpRewards.Add(battle.ExpReward);
 
                     // Accrue proficiency XP per won battle, exactly as the live handler does — same inputs
-                    // (this battle's skill stats + player power), same service — so the offline accrual matches
-                    // what the player would have earned live (the "offline == live" invariant). The push is
+                    // (this battle's skill stats + both combat ratings), same service — so the offline accrual
+                    // matches what the player would have earned live (the "offline == live" invariant). The
+                    // enemy rating is recomputed fresh per outcome (cheap, closed-form). The push is
                     // suppressed; the folded results ride the welcome-back summary instead.
+                    var enemyRating = CombatRating.Rate(battle.Enemy.ToBattler(), isPlayer: false);
                     proficiencyGains.Add(_proficiencyRewards.AccrueAndApply(
-                        progress, battle.Result.Stats, battle.PlayerPower, player, notify: false));
+                        progress, battle.Result.Stats, battle.PlayerRating, enemyRating, player, notify: false));
                 }
             }
 

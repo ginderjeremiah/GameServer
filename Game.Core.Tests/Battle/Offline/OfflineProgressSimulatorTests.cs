@@ -329,13 +329,15 @@ namespace Game.Core.Tests.Battle.Offline
             var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
 
             // Each victory's exp is exactly what DefeatRewards computes from the same snapshot/enemy — the
-            // reward is consistent with the battle it was earned in.
-            var playerModifiers = scenario.Snapshot
-                .GetModifiers(scenario.ResolveItem, scenario.ResolveMod)
-                .ToList();
+            // reward is consistent with the battle it was earned in. The player is rated once (stationary
+            // across the window, like the simulator's own computation); each enemy is rated fresh from its
+            // fielded loadout.
+            var playerBattler = scenario.Snapshot.ToBattler(scenario.ResolveItem, scenario.ResolveMod, scenario.ResolveSkill);
+            var playerRating = CombatRating.Rate(playerBattler, isPlayer: true);
             Assert.All(result.Battles, battle =>
             {
-                var expected = new DefeatRewards(playerModifiers, battle.Enemy).ExpReward;
+                var enemyRating = CombatRating.Rate(battle.Enemy.ToBattler(), isPlayer: false);
+                var expected = new DefeatRewards(playerRating, enemyRating).ExpReward;
                 Assert.Equal(expected, battle.ExpReward);
             });
         }
@@ -358,28 +360,32 @@ namespace Game.Core.Tests.Battle.Offline
         }
 
         [Fact]
-        public void Simulate_SnapshotsPlayerPowerOntoEachVictoryStats()
+        public void Simulate_SnapshotsPlayerRatingOntoEachVictoryStats()
         {
-            // The effect-based proficiency accrual normalizes activity by the player's power, so the simulator
-            // snapshots it onto each won battle's stats — the same core-additive sum DefeatRewards measures
-            // from the stationary modifiers (here Strength 100 + Endurance 100 = 200).
-            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), StrongPlayerWinScenario()));
+            // The effect-based proficiency accrual max-normalizes activity against the player's rating, so the
+            // simulator snapshots it onto each won battle's stats — the same CombatRating DefeatRewards
+            // measures from the stationary snapshot (computed once and reused across the whole away window).
+            var scenario = StrongPlayerWinScenario();
+            var playerBattler = scenario.Snapshot.ToBattler(scenario.ResolveItem, scenario.ResolveMod, scenario.ResolveSkill);
+            var expectedRating = CombatRating.Rate(playerBattler, isPlayer: true);
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
 
             Assert.True(result.Wins > 1);
             Assert.Equal(result.BattlesSimulated, result.Wins); // the strong player wins every battle
-            Assert.All(result.Battles, battle => Assert.Equal(200, battle.Result.Stats.PlayerPower, precision: 9));
+            Assert.All(result.Battles, battle => Assert.Equal(expectedRating, battle.Result.Stats.PlayerRating, precision: 9));
         }
 
         [Fact]
-        public void Simulate_LeavesPlayerPowerAtZeroForLosses()
+        public void Simulate_LeavesPlayerRatingAtZeroForLosses()
         {
-            // A loss earns no DefeatRewards, so (like the live path) its stats carry no power snapshot — the
-            // default 0. Accrual is victory-only, so a loss's power is never read.
+            // A loss earns no DefeatRewards, so (like the live path) its stats carry no rating snapshot — the
+            // default 0. Accrual is victory-only, so a loss's rating is never read.
             var result = _simulator.Simulate(BossParameters(ManyStepsBudget(), AlwaysLoseBossScenario()));
 
             Assert.True(result.Losses > 1);
             Assert.Equal(result.BattlesSimulated, result.Losses);
-            Assert.All(result.Battles, battle => Assert.Equal(0, battle.Result.Stats.PlayerPower));
+            Assert.All(result.Battles, battle => Assert.Equal(0, battle.Result.Stats.PlayerRating));
         }
 
         // ── Cancellation ─────────────────────────────────────────────────────

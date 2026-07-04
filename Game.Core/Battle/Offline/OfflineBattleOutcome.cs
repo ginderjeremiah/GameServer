@@ -7,13 +7,13 @@ namespace Game.Core.Battle.Offline
     /// reward-application sub-issue) can grant exp per victory and feed each battle's stats through the same
     /// per-battle recording path the live battle-completion handler uses (rather than re-deriving the stat
     /// logic — see spike #879, decision 7). The simulator computes <see cref="ExpReward"/> and
-    /// <see cref="PlayerPower"/> from the player's (stationary) snapshot at simulation time so the values match
-    /// the battle they were earned in; both are <c>0</c> for a non-victory.
+    /// <see cref="PlayerRating"/> at simulation time so the values match the battle they were earned in; both
+    /// are <c>0</c> for a non-victory.
     /// <para>
-    /// <see cref="PlayerPower"/> is the <c>DefeatRewards</c> player-power measure the offline effect-based
-    /// proficiency accrual normalizes each path's activity by — the same input the live path threads through
-    /// <c>BattleCompletedEvent</c>, so offline and live accrue identically (spike #1318).
+    /// <see cref="PlayerRating"/> is the <c>DefeatRewards</c> player combat-rating the offline effect-based
+    /// proficiency accrual max-normalizes each path's activity against — the same input the live path threads
+    /// through <c>BattleCompletedEvent</c>, so offline and live accrue identically (spike #1526 Decision 5/6).
     /// </para>
     /// </summary>
-    public record OfflineBattleOutcome(Enemy Enemy, BattleResult Result, int ExpReward, double PlayerPower);
+    public record OfflineBattleOutcome(Enemy Enemy, BattleResult Result, int ExpReward, double PlayerRating);
 }

@@ -134,9 +134,13 @@ namespace Game.DataAccess.Repositories.Admin
             // Authoring guard: these distributions become the class's level-scaled locked base, folded into the
             // battler's AttributeCollection at assembly (BattleSnapshot.GetModifiers), which sums per-attribute
             // modifiers. A duplicate attribute would silently double-count its locked-base modifier, and a
-            // non-core attribute's modifier would silently take effect (while being omitted from the
-            // reward-power heuristic, DefeatRewards.SumCoreAttributes) — neither is intended, so both are
-            // rejected here at save time.
+            // non-core attribute's modifier would silently take effect as an unauthored secondary bonus — the
+            // locked base is meant to be a core-attribute fingerprint only (a secondary belongs on the class's
+            // signature passive instead) — neither is intended, so both are rejected here at save time. Reward
+            // math no longer runs through DefeatRewards.SumCoreAttributes (spike #1526 rates the fully-assembled
+            // Battler via CombatRating instead), which would price a non-core distribution same as any other
+            // attribute rather than silently dropping it — the core-only restriction here is purely an authoring
+            // convention now, not a reward-visibility concern.
             if (FindAttributeDistributionViolation(data.AttributeDistributions) is { } rejection)
             {
                 return rejection;

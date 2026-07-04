@@ -330,10 +330,10 @@ namespace Game.Api.Tests.Integration
 
             // A winning idle scenario so the departed character actually earns over its credited away window:
             // the player one-shots a fixed-power enemy in a single-zone loop.
-            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 50m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 25m, cooldownMs: 500);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
@@ -387,10 +387,10 @@ namespace Game.Api.Tests.Integration
 
             // The same winning idle setup as the credit test, so the departed character *would* level up over
             // its credited away window — making a skipped credit observable as "no level gained".
-            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 50m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 25m, cooldownMs: 500);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);

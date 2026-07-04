@@ -35,10 +35,12 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            var (playerId, firedSkillId, proficiency) = await SeedSingleTierAsync(
-                context, maxLevel: 10, baseXp: 2m, xpGrowth: 1m);
-            // 10 XP over a flat cost-2 curve reaches level 5 (well short of the cap), crossing the level-3
+            // A flat per-level cost of pie/5.5 lands the single full-pie claim at exactly level 5 (well short
+            // of the cap) regardless of the calibrated ProficiencyXpPerVictory magnitude, crossing the level-3
             // milestone without maxing — isolating the milestone grant from the open trigger.
+            var baseXp = (decimal)(ServerGameConstants.ProficiencyXpPerVictory / 5.5);
+            var (playerId, firedSkillId, proficiency) = await SeedSingleTierAsync(
+                context, maxLevel: 10, baseXp, xpGrowth: 1m);
             var rewardSkill = await TestDataSeeder.CreateSkillAsync(context, name: "Milestone Reward");
             await TestDataSeeder.AddProficiencyLevelRewardAsync(context, proficiency.Id, level: 3, rewardSkill.Id);
             await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
@@ -292,8 +294,8 @@ namespace Game.Application.Tests.Services
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
             var stats = FireSkill(firedSkillId);
 
-            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
-            service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify: false);
+            service.AccrueAndApply(progress, stats, playerRating: FiredDamage, enemyRating: FiredDamage, player, notify: false);
+            service.AccrueAndApply(progress, stats, playerRating: FiredDamage, enemyRating: FiredDamage, player, notify: false);
 
             Assert.Single(player.Skills, s => s.Id == rewardSkill.Id);
         }
@@ -741,8 +743,10 @@ namespace Game.Application.Tests.Services
 
             var offense = Assert.Single(accrual.Results, r => r.ProficiencyId == fireOffense.Id);
             var resist = Assert.Single(accrual.Results, r => r.ProficiencyId == fireResist.Id);
-            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, offense.XpGained);
-            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, resist.XpGained);
+            // The persisted gain is rounded to the numeric(18,3) XP scale, so compare against the same rounding.
+            var expectedPie = Math.Round((decimal)ServerGameConstants.ProficiencyXpPerVictory, 3, MidpointRounding.AwayFromZero);
+            Assert.Equal(expectedPie, offense.XpGained);
+            Assert.Equal(expectedPie, resist.XpGained);
         }
 
         [Fact]
@@ -805,19 +809,21 @@ namespace Game.Application.Tests.Services
             var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
             var player = await LoadPlayerAsync(scope, playerId);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            var accrual = service.AccrueAndApply(progress, FireSkill(firedSkillId), totalAttributes: FiredDamage, player, notify);
+            var accrual = service.AccrueAndApply(
+                progress, FireSkill(firedSkillId), playerRating: FiredDamage, enemyRating: FiredDamage, player, notify);
             return (player, accrual);
         }
 
         // Accrues an arbitrary battle's stats (the event bindings build their own BattleStats rather than firing a
-        // skill), normalized by the default power so a full-power activity claims the whole pie.
+        // skill), normalized by the default rating so a full-power activity claims the whole pie.
         private async Task<(Player Player, ProficiencyAccrualResult Accrual)> AccrueStatsAsync(
             IServiceScope scope, int playerId, BattleStats stats, bool notify = false)
         {
             var service = scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>();
             var player = await LoadPlayerAsync(scope, playerId);
             var progress = await scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>().Load(player);
-            var accrual = service.AccrueAndApply(progress, stats, totalAttributes: FiredDamage, player, notify);
+            var accrual = service.AccrueAndApply(
+                progress, stats, playerRating: FiredDamage, enemyRating: FiredDamage, player, notify);
             return (player, accrual);
         }
 

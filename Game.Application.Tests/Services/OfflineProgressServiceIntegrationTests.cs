@@ -1,6 +1,8 @@
 using Game.Abstractions.DataAccess;
 using Game.Application.Services;
 using Game.Core;
+using Game.Core.Battle;
+using Game.Core.Classes;
 using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -24,9 +26,6 @@ namespace Game.Application.Tests.Services
         public OfflineProgressServiceIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
 
-        // A win pays exactly this: enemy power (Str 50 + End 50 = 100) matched to the seeded player's power
-        // (Str 50 + End 50 = 100) gives a difficulty ratio of 1, so DefeatRewards yields the enemy total, 100.
-        private const int ExpPerWin = 100;
 
         [Fact]
         public async Task SimulateOfflineProgress_MultiBattleAway_AppliesExpLevelsAndStatPoints()
@@ -36,6 +35,7 @@ namespace Game.Application.Tests.Services
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
             var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var expPerWin = ComputeExpectedExpPerWin(scope, player, setup.EnemyId);
 
             var levelBefore = player.Level;
             // A long-enough absence to win many battles.
@@ -45,8 +45,9 @@ namespace Game.Application.Tests.Services
 
             Assert.True(summary.BattlesWon > 1, "Expected the away window to win multiple battles.");
             Assert.True(summary.HasProgress);
-            // Every win pays the same fixed reward, so the total is exact.
-            Assert.Equal((long)summary.BattlesWon * ExpPerWin, summary.TotalExp);
+            // Every win pays the same fixed reward (the player's rating is stationary offline, and the enemy is
+            // fixed), so the total is exact.
+            Assert.Equal((long)summary.BattlesWon * expPerWin, summary.TotalExp);
             // The exp drove real level gain, and the summary's deltas match the player aggregate.
             Assert.True(player.Level > levelBefore);
             Assert.Equal(player.Level - levelBefore, summary.LevelsGained);
@@ -416,6 +417,7 @@ namespace Game.Application.Tests.Services
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
             var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var expPerWin = ComputeExpectedExpPerWin(scope, player, setup.EnemyId);
 
             var levelBefore = player.Level;
             // Under the 5-minute login floor, but long enough to win several battles when the floor is dropped.
@@ -425,7 +427,7 @@ namespace Game.Application.Tests.Services
 
             Assert.True(summary.BattlesWon > 1, "Expected the sub-threshold window to still win multiple battles.");
             Assert.True(summary.HasProgress);
-            Assert.Equal((long)summary.BattlesWon * ExpPerWin, summary.TotalExp);
+            Assert.Equal((long)summary.BattlesWon * expPerWin, summary.TotalExp);
             Assert.True(player.Level > levelBefore);
             // The away anchor is re-stamped to ~now, so the parked window starts fresh from the switch.
             Assert.True(DateTime.UtcNow - player.LastActivity < TimeSpan.FromMinutes(1));
@@ -457,18 +459,23 @@ namespace Game.Application.Tests.Services
         }
 
         /// <summary>
-        /// Seeds a player who reliably one-shots a fixed-power enemy in a single-zone idle loop, so an away
-        /// window produces a deterministic run of victories (each worth <see cref="ExpPerWin"/>). The enemy's
-        /// power equals the seeded player's, so the exp reward is exactly the enemy total.
+        /// Seeds a player who reliably (if not instantly) beats a fixed-power enemy in a single-zone idle loop,
+        /// so an away window produces a deterministic run of victories (each worth
+        /// <see cref="ComputeExpectedExpPerWin"/>'s result — the player's rating is stationary offline and the
+        /// enemy is fixed, so every win pays the same amount). The skills are close enough in output that
+        /// neither combatant's <see cref="Battle.CombatRating"/> dwarfs the other's — a curve match, not just a
+        /// power match — so the bounty curve (spike #1526 Decision 4) doesn't collapse the reward toward zero;
+        /// a wildly one-sided skill (e.g. a 1000-damage one-shot against a 10-damage poke) rates as fighting far
+        /// below the player's weight and pays almost nothing.
         /// </summary>
         private async Task<Setup> SeedWinningScenarioAsync(IServiceScope scope, bool reload = true)
         {
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
-            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 50m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context,
                 strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 25m, cooldownMs: 500);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
@@ -482,7 +489,7 @@ namespace Game.Application.Tests.Services
                 await ReloadReferenceCachesAsync();
             }
 
-            return new Setup(playerEntity.Id, zone.Id);
+            return new Setup(playerEntity.Id, zone.Id, enemy.Id);
         }
 
         private async Task<(Player Player, PlayerState State)> LoadAsync(IServiceScope scope, int playerId)
@@ -493,6 +500,33 @@ namespace Game.Application.Tests.Services
             return (player, new PlayerState { PlayerId = playerId });
         }
 
-        private sealed record Setup(int PlayerId, int ZoneId);
+        // Computes the exp reward the production reward math (CombatRating + DefeatRewards) would pay for
+        // defeating the fixed enemy from the player's current (stationary, pre-simulation) state — the same
+        // construction OfflineProgressSimulator uses. Lets these tests assert against the real bounty-curve
+        // output rather than a hand-derived number, so they stay valid across a recalibration of the XP-scale
+        // constant.
+        private static int ComputeExpectedExpPerWin(IServiceScope scope, Player player, int enemyId)
+        {
+            var items = scope.ServiceProvider.GetRequiredService<IItems>();
+            var itemMods = scope.ServiceProvider.GetRequiredService<IItemMods>();
+            var skills = scope.ServiceProvider.GetRequiredService<ISkills>();
+            var proficiencies = scope.ServiceProvider.GetRequiredService<IProficiencies>();
+            var classes = scope.ServiceProvider.GetRequiredService<IClasses>();
+            Class ResolveClass(int classId) => classes.GetClass(classId)
+                ?? throw new InvalidOperationException($"Class {classId} could not be resolved from the catalogue.");
+
+            var snapshot = BattleSnapshot.FromPlayer(player);
+            var playerBattler = snapshot.ToBattler(items.GetItem, itemMods.GetItemMod, skills.TryGetSkill, proficiencies.GetProficiency, ResolveClass);
+            var playerRating = CombatRating.Rate(playerBattler, isPlayer: true);
+
+            var enemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemyId, level: 1);
+            Assert.NotNull(enemy);
+            enemy.SelectBattleSkills();
+            var enemyRating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+
+            return new DefeatRewards(playerRating, enemyRating).ExpReward;
+        }
+
+        private sealed record Setup(int PlayerId, int ZoneId, int EnemyId);
     }
 }

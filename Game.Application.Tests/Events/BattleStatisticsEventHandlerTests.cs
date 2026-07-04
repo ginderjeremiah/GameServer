@@ -120,6 +120,9 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedPlayer);
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            loadedEnemy.SelectBattleSkills();
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
@@ -157,6 +160,9 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedPlayer);
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            loadedEnemy.SelectBattleSkills();
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
@@ -191,6 +197,9 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedPlayer);
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            loadedEnemy.SelectBattleSkills();
 
             var handler = MakeHandler(scope);
 
@@ -199,20 +208,22 @@ namespace Game.Application.Tests.Events
             const double power = 100.0;
             var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
             stats.AddTypedDamageDealt(EDamageType.Physical, power); // the offense book the accrual consumes
-            await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
+            await handler.HandleAsync(VictoryEvent(loadedPlayer, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = Assert.Single(await progressRepo.GetProficiencies(player.Id));
             Assert.Equal(proficiency.Id, stored.ProficiencyId);
             Assert.Equal(0, stored.Level);
-            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, stored.Xp);
+            // The persisted gain is rounded to the numeric(18,3) XP scale, so compare against the same rounding.
+            var expectedPie = Math.Round((decimal)ServerGameConstants.ProficiencyXpPerVictory, 3, MidpointRounding.AwayFromZero);
+            Assert.Equal(expectedPie, stored.Xp);
 
             // The accrual is announced for the live client push, carrying the per-proficiency result.
             var evt = Assert.Single(loadedPlayer.DomainEvents.OfType<ProficiencyXpGainedEvent>());
             Assert.Equal(player.Id, evt.PlayerId);
             var result = Assert.Single(evt.Results);
             Assert.Equal(proficiency.Id, result.ProficiencyId);
-            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, result.XpGained);
+            Assert.Equal(expectedPie, result.XpGained);
             Assert.Equal(0, result.NewLevel);
         }
 
@@ -246,11 +257,14 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedPlayer);
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            loadedEnemy.SelectBattleSkills();
 
             var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
             stats.AddTypedDamageDealt(EDamageType.Physical, power); // the offense book the accrual consumes
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = await progressRepo.GetProficiencies(player.Id);
@@ -258,7 +272,8 @@ namespace Game.Application.Tests.Events
             // The frontier tier banks the full pie (activity ÷ power = 1, no discount).
             var frontier = Assert.Single(stored, p => p.ProficiencyId == tierOne.Id);
             Assert.Equal(0, frontier.Level);
-            Assert.Equal((decimal)ServerGameConstants.ProficiencyXpPerVictory, frontier.Xp);
+            // The persisted gain is rounded to the numeric(18,3) XP scale, so compare against the same rounding.
+            Assert.Equal(Math.Round((decimal)ServerGameConstants.ProficiencyXpPerVictory, 3, MidpointRounding.AwayFromZero), frontier.Xp);
 
             var maxed = Assert.Single(stored, p => p.ProficiencyId == tierZero.Id);
             Assert.Equal(maxLevel, maxed.Level);
@@ -293,6 +308,9 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedPlayer);
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            loadedEnemy.SelectBattleSkills();
 
             const double power = 100.0;
             var stats = new BattleStats
@@ -307,7 +325,7 @@ namespace Game.Application.Tests.Events
             stats.AddTypedDamageDealt(EDamageType.Fire, power);
             stats.AddTypedDamageDealt(EDamageType.Earth, power / 2);
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerPower: power), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stored = await progressRepo.GetProficiencies(player.Id);
@@ -338,11 +356,14 @@ namespace Game.Application.Tests.Events
             Assert.NotNull(loadedPlayer);
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            loadedEnemy.SelectBattleSkills();
 
             // A victory with empty battle stats (no skill dealt damage): no activity, so no path is trained —
             // the effect (damage), not the victory itself, is what accrues XP.
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(loadedPlayer, loadedEnemy, new BattleStats(), playerPower: 100.0), CancellationToken);
+                VictoryEvent(loadedPlayer, loadedEnemy, new BattleStats(), playerRating: 100.0), CancellationToken);
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             Assert.Empty(await progressRepo.GetProficiencies(player.Id));
@@ -374,6 +395,9 @@ namespace Game.Application.Tests.Events
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var loadedEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
             Assert.NotNull(loadedEnemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            loadedEnemy.SelectBattleSkills();
 
             // The skill dealt 1.5× the player's power, so each path claims pie × clamp(1.5) = pie × 1.5 — the
             // same on both the live and the offline path.
@@ -384,21 +408,25 @@ namespace Game.Application.Tests.Events
             var liveLoaded = await playerRepo.GetPlayer(livePlayer.Id);
             Assert.NotNull(liveLoaded);
             await MakeHandler(scope).HandleAsync(
-                VictoryEvent(liveLoaded, loadedEnemy, stats, playerPower: power), CancellationToken);
+                VictoryEvent(liveLoaded, loadedEnemy, stats, playerRating: power), CancellationToken);
 
             var offlineLoaded = await playerRepo.GetPlayer(offlinePlayer.Id);
             Assert.NotNull(offlineLoaded);
             var offlineProgress = await progressRepo.Load(offlineLoaded);
+            // The same enemy rating the live handler computed internally, so both paths accrue against an
+            // identical normalizer.
+            var enemyRating = CombatRating.Rate(loadedEnemy.ToBattler(), isPlayer: false);
             scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>()
-                .AccrueAndApply(offlineProgress, stats, totalAttributes: power, offlineLoaded, notify: false);
+                .AccrueAndApply(offlineProgress, stats, playerRating: power, enemyRating, offlineLoaded, notify: false);
             await progressRepo.Save(offlineProgress);
 
             var live = Assert.Single(await progressRepo.GetProficiencies(livePlayer.Id));
             var offline = Assert.Single(await progressRepo.GetProficiencies(offlinePlayer.Id));
             Assert.Equal(live.Level, offline.Level);
             Assert.Equal(live.Xp, offline.Xp);
-            // Sanity: the shared accrual actually produced XP (pie × 1.5), so the equality isn't vacuous.
-            Assert.Equal((decimal)(ServerGameConstants.ProficiencyXpPerVictory * 1.5), live.Xp);
+            // Sanity: the shared accrual actually produced XP (pie × 1.5), so the equality isn't vacuous. The
+            // persisted gain is rounded to the numeric(18,3) XP scale, so compare against the same rounding.
+            Assert.Equal(Math.Round((decimal)(ServerGameConstants.ProficiencyXpPerVictory * 1.5), 3, MidpointRounding.AwayFromZero), live.Xp);
         }
 
         private BattleStatisticsEventHandler MakeHandler(IServiceScope scope) => new(
@@ -406,9 +434,9 @@ namespace Game.Application.Tests.Events
             scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
             scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>());
 
-        private static BattleCompletedEvent VictoryEvent(Player player, Game.Core.Enemies.Enemy enemy, BattleStats stats, double playerPower) =>
+        private static BattleCompletedEvent VictoryEvent(Player player, Game.Core.Enemies.Enemy enemy, BattleStats stats, double playerRating) =>
             new(player, enemy, Victory: true, PlayerDied: false, TotalMs: 5000,
-                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, PlayerPower: playerPower);
+                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, PlayerRating: playerRating);
 
         /// <summary>
         /// Seeds a fresh player (with one starter, equipped skill), an enemy, and one candidate of each
@@ -461,6 +489,9 @@ namespace Game.Application.Tests.Events
 
             var enemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(setup.EnemyId, level: 1);
             Assert.NotNull(enemy);
+            // The handler rates the enemy's fielded loadout on a victory (CombatRating), so it must have a
+            // selected battle-skill loadout, exactly as a live battle's SimulateBattle would leave it.
+            enemy.SelectBattleSkills();
 
             var handler = new BattleStatisticsEventHandler(
                 scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),

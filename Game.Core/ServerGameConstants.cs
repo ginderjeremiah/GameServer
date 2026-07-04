@@ -28,16 +28,28 @@ namespace Game.Core
         public const int MaxExpPerGrant = 100_000;
 
         /// <summary>
-        /// The base pie (<c>basePie</c>) each proficiency path independently claims against on a won battle:
-        /// <c>XP_path = basePie × clamp(pathActivity ÷ totalAttributes)</c> (spike #1318). Power-normalization
-        /// is the difficulty curve, so the banded <c>DefeatRewards</c> difficulty multiplier is deliberately
-        /// <em>not</em> applied again. Claims across axes (offense/defense/proc) don't share a pie — they are
-        /// independent, overlapping claims — so a multi-axis loadout mints <em>more</em> total proficiency XP
-        /// rather than diluting each track. Computed server-side at battle completion (never in the seeded
-        /// simulation), so it is server-authoritative and not mirrored to the client. A strawman magnitude,
-        /// tunable against the authored per-proficiency XP curves.
+        /// The base pie (<c>pie</c>) each proficiency path independently claims against on a won battle:
+        /// <c>XP_path = pie × pathActivity ÷ max(playerRating, enemyRating)</c> (spike #1526 Decision 5) — no
+        /// clamp, since <c>pathActivity ≤ enemyHP</c> already bounds the claim naturally. Max-normalization
+        /// <em>is</em> the difficulty curve, so <see cref="Battle.DefeatRewards.DifficultyMultiplier"/> is
+        /// deliberately <em>not</em> applied again. Claims across axes (offense/defense/proc) don't share a
+        /// pie — they are independent, overlapping claims — so a multi-axis loadout mints <em>more</em> total
+        /// proficiency XP rather than diluting each track. Computed server-side at battle completion (never in
+        /// the seeded simulation), so it is server-authoritative and not mirrored to the client. Calibrated by
+        /// the combat-rating calibration report (#1533) against authored content — re-run the report and
+        /// update this constant after a significant content pass.
         /// </summary>
-        public const double ProficiencyXpPerVictory = 10.0;
+        public const double ProficiencyXpPerVictory = 29.2469;
+
+        /// <summary>
+        /// The XP scale (<c>k</c>) in the enemy-authored bounty curve: <c>XP/kill = k × enemyRating ×
+        /// min(r, 1)²</c>, where <c>r = enemyRating ÷ playerRating</c> (spike #1526 Decision 4/10). Replaces
+        /// the retired <c>SumCoreAttributes</c>-keyed reward with a curve that peaks at a matched fight and
+        /// saturates (rather than jackpots) against a far-stronger enemy — see <see cref="Battle.DefeatRewards"/>.
+        /// Calibrated by the combat-rating calibration report (#1533) against authored content — re-run the
+        /// report and update this constant after a significant content pass.
+        /// </summary>
+        public const double CombatRatingXpScale = 0.3262;
 
         /// <summary>
         /// The resist-training rate applied to the portion of a resist path's pre-mitigation exposure that
