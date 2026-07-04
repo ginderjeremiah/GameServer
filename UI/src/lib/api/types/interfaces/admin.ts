@@ -9,6 +9,7 @@ import type {
 	IBattlerAttribute,
 	IClassStarterEquipment,
 	IEnemySpawn,
+	ILessonStep,
 	IProficiencyLevelModifier,
 	IProficiencyLevelReward,
 	ISkillDamagePortion,
@@ -92,6 +93,11 @@ export interface ISetEnemySkillsData {
 export interface ISetEnemySpawnsData {
 	enemyId: number;
 	spawns: IEnemySpawn[];
+}
+
+export interface ISetLessonStepsData {
+	id: number;
+	steps: ILessonStep[];
 }
 
 export interface ISetProficiencyModifiersData {
