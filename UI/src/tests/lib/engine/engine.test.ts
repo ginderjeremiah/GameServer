@@ -178,9 +178,13 @@ const challengeCompletedResponse = (
 ): IApiSocketResponse<'ChallengeCompleted'> =>
 	({ id: '', name: 'ChallengeCompleted', data }) as IApiSocketResponse<'ChallengeCompleted'>;
 
+let hidden = false;
+
 beforeEach(() => {
 	vi.clearAllMocks();
 	clearModals();
+	hidden = false;
+	Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
 	staticDataStub.loaded = true;
 	staticDataStub.challenges = undefined;
 	staticDataStub.items = undefined;
@@ -218,6 +222,9 @@ beforeEach(() => {
 
 afterEach(() => {
 	clearModals();
+	// vi.unstubAllGlobals doesn't undo a defineProperty, so drop the own-property override of
+	// document.hidden and let it fall back to the jsdom prototype getter.
+	delete (document as unknown as Record<string, unknown>).hidden;
 });
 
 describe('handleSocketReplaced', () => {
@@ -391,6 +398,17 @@ describe('handleChallengeCompleted', () => {
 		options.action.onClick();
 		expect(navigation.requestScreen).toHaveBeenCalledWith('challenges');
 	});
+
+	it('does not toast while the tab is hidden (#1598), but still marks the challenge completed', () => {
+		staticDataStub.challenges = [];
+		staticDataStub.challenges[7] = { id: 7, name: 'First Blood' };
+		hidden = true;
+
+		handleChallengeCompleted(challengeCompletedResponse({ challengeId: 7 }));
+
+		expect(toastSuccess).not.toHaveBeenCalled();
+		expect(playerChallengesStub.markCompleted).toHaveBeenCalledWith(7);
+	});
 });
 
 /** Builds a ProficiencyXpGained push response with the given results / opened nodes. */
@@ -446,7 +464,7 @@ describe('handleProficiencyXpGained', () => {
 		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 2 })]));
 
 		expect(logMessage).toHaveBeenCalledWith(ELogType.Proficiency, 'Fire Magic reached level 2');
-		expect(toastSuccess).toHaveBeenCalledWith('Fire Magic reached level 2');
+		expect(toastSuccess).toHaveBeenCalledWith('Fire Magic reached level 2', undefined);
 	});
 
 	it('does not announce a level-up when the level is unchanged', () => {
@@ -465,9 +483,9 @@ describe('handleProficiencyXpGained', () => {
 		);
 
 		const milestone = 'Fire Magic milestone reached: level 5 — unlocked Fireball';
-		expect(toastSuccess).toHaveBeenCalledWith(milestone);
+		expect(toastSuccess).toHaveBeenCalledWith(milestone, undefined);
 		expect(logMessage).toHaveBeenCalledWith(ELogType.Proficiency, milestone);
-		expect(toastSuccess).not.toHaveBeenCalledWith('Fire Magic reached level 5');
+		expect(toastSuccess).not.toHaveBeenCalledWith('Fire Magic reached level 5', undefined);
 	});
 
 	it('unlocks milestone-granted skills so they are usable immediately', () => {
@@ -484,7 +502,7 @@ describe('handleProficiencyXpGained', () => {
 
 		handleProficiencyXpGained(proficiencyXpGainedResponse([], [{ proficiencyId: 3 }]));
 
-		expect(toastSuccess).toHaveBeenCalledWith('New proficiency unlocked: Inferno Magic');
+		expect(toastSuccess).toHaveBeenCalledWith('New proficiency unlocked: Inferno Magic', undefined);
 		expect(addUnlockedSkill).not.toHaveBeenCalled();
 	});
 
@@ -501,6 +519,35 @@ describe('handleProficiencyXpGained', () => {
 
 		expect(toastSuccess).not.toHaveBeenCalled();
 		expect(playerProficienciesStub.applyXpGained).toHaveBeenCalledWith(response.data);
+	});
+
+	it('does not toast a milestone while the tab is hidden (#1598), but still logs it and applies the grant', () => {
+		hidden = true;
+		playerProficienciesStub.levelOf.mockReturnValueOnce(4);
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([
+				proficiencyXpResult({ proficiencyId: 0, newLevel: 5, milestonesCrossed: [5], grantedSkillIds: [12] })
+			])
+		);
+
+		expect(toastSuccess).not.toHaveBeenCalled();
+		expect(logMessage).toHaveBeenCalledWith(
+			ELogType.Proficiency,
+			'Fire Magic milestone reached: level 5 — unlocked Fireball'
+		);
+		expect(addUnlockedSkill).toHaveBeenCalledWith(12);
+	});
+
+	it('does not toast a plain level-up or a newly-opened proficiency while the tab is hidden (#1598)', () => {
+		hidden = true;
+		playerProficienciesStub.levelOf.mockReturnValueOnce(1);
+		staticDataStub.proficiencies![3] = { id: 3, name: 'Inferno Magic', levelRewards: [] };
+
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 2 })], [{ proficiencyId: 3 }])
+		);
+
+		expect(toastSuccess).not.toHaveBeenCalled();
 	});
 });
 
@@ -604,6 +651,20 @@ describe('handleProficiencyXpGained — new-recipe-available toast', () => {
 		const options = recipeToast?.[1] as { action: { onClick: () => void } };
 		options.action.onClick();
 		expect(navigation.requestScreen).toHaveBeenCalledWith('synthesis');
+	});
+
+	it('does not toast a newly-available recipe while the tab is hidden (#1598)', () => {
+		hidden = true;
+		staticDataStub.skillRecipes = [skillRecipe(0, 4, [0, 1])];
+		playerManagerStub.unlockedSkills = [{ skillId: 0, selected: false }];
+
+		handleProficiencyXpGained(
+			proficiencyXpGainedResponse([
+				proficiencyXpResult({ proficiencyId: 0, newLevel: 5, milestonesCrossed: [5], grantedSkillIds: [1] })
+			])
+		);
+
+		expect(toastSuccess).not.toHaveBeenCalled();
 	});
 });
 
