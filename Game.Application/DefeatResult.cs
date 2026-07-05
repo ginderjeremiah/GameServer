@@ -13,8 +13,11 @@ namespace Game.Application
 
         /// <summary>
         /// The player's combat-rating capability measure for this battle (<see cref="Game.Core.Battle.DefeatRewards.PlayerRating"/>,
-        /// spike #1526 Decision 7) — carried through so the client's displayed power number updates immediately
-        /// on a level-up, without waiting for the next player-state refresh.
+        /// spike #1526 Decision 7) — carried through so the client's displayed power number reflects this
+        /// battle's outcome without waiting for the next player-state refresh. This is the rating of the
+        /// frozen snapshot the battle actually ran against (the same anti-tamper measure the reward used),
+        /// so a level-up this battle granted lags by one battle — it shows up once the following battle's
+        /// snapshot is rated, not on this response.
         /// </summary>
         public required double PlayerRating { get; set; }
     }
