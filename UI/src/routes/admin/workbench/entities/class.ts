@@ -1,5 +1,6 @@
 import { ApiRequest, EAttribute, EModifierType, ESkillAcquisition, fetchSocketData, type IClass } from '$lib/api';
 import { hasFlag } from '$lib/common';
+import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
@@ -15,10 +16,13 @@ export interface WorkbenchClass extends Omit<IClass, 'passiveScalingAttributeId'
 
 // Classes load over the socket; the admin filter invalidates this cache on every write server-side, so a
 // plain refetch returns the freshly-saved list. The optional scaling attribute is normalised to the select's
-// "None" sentinel (-1) for the editable copy.
+// "None" sentinel (-1) for the editable copy. Written through to staticData.classes so retire-confirm's
+// reference computation (starter-skill/starter-equipment groups) sees post-save edits (#1633).
 const refresh = async (): Promise<WorkbenchClass[]> => {
 	const classes = await fetchSocketData('GetClasses');
-	return classes.map((c) => ({ ...c, passiveScalingAttributeId: c.passiveScalingAttributeId ?? -1 }));
+	const workbenchClasses = classes.map((c) => ({ ...c, passiveScalingAttributeId: c.passiveScalingAttributeId ?? -1 }));
+	staticData.classes = workbenchClasses;
+	return workbenchClasses;
 };
 
 export const classEntity: EntityConfig<WorkbenchClass> = {

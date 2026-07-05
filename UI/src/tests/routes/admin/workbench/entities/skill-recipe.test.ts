@@ -85,6 +85,16 @@ beforeEach(() => {
 });
 
 describe('skillRecipeEntity', () => {
+	it('refresh writes the fetched recipes through to staticData.skillRecipes (#1633 — needed for retire-confirm)', async () => {
+		const fetched = [recipe({ id: 0 }), recipe({ id: 1, resultSkillId: 4 })];
+		socket.recipes = fetched;
+
+		const result = await skillRecipeEntity.refresh();
+
+		expect(result).toBe(fetched);
+		expect(staticData.skillRecipes).toBe(fetched);
+	});
+
 	it('newItem defaults to the first Synthesis result with empty input/condition collections', () => {
 		expect(skillRecipeEntity.newItem(7)).toEqual({
 			id: 7,
