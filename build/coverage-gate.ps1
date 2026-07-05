@@ -23,6 +23,7 @@ param(
   [string]$FloorsPath
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'coverage-lib.ps1')
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
 if (-not $SummaryPath) { $SummaryPath = Join-Path $repoRoot 'coverage/backend-report/Summary.json' }
@@ -46,33 +47,6 @@ $rows = New-Object System.Collections.Generic.List[object]
 function Format-Pct($v) {
   if ($null -eq $v) { return 'n/a' }
   return ("{0}%" -f $v)
-}
-
-# Aggregate line/branch coverage for the classes of an assembly whose names fall under any of the
-# given namespace prefixes. Returns the summed counts and the recomputed percentages (rounded to
-# one decimal to match ReportGenerator's own figures); a percentage is $null when its denominator is
-# zero (nothing to cover), so the gate skips that dimension rather than failing on a 0/0.
-function Get-NamespaceCoverage($assembly, $namespaces) {
-  $coveredLines = 0; $coverableLines = 0; $coveredBranches = 0; $totalBranches = 0
-  foreach ($c in $assembly.classesinassembly) {
-    $inScope = $false
-    foreach ($ns in $namespaces) {
-      if ($c.name.StartsWith("$ns.")) { $inScope = $true; break }
-    }
-    if (-not $inScope) { continue }
-    $coveredLines += $c.coveredlines
-    $coverableLines += $c.coverablelines
-    $coveredBranches += $c.coveredbranches
-    $totalBranches += $c.totalbranches
-  }
-  $linePct = $null
-  if ($coverableLines -gt 0) { $linePct = [math]::Round(100.0 * $coveredLines / $coverableLines, 1) }
-  $branchPct = $null
-  if ($totalBranches -gt 0) { $branchPct = [math]::Round(100.0 * $coveredBranches / $totalBranches, 1) }
-  return [pscustomobject]@{
-    CoveredLines = $coveredLines; CoverableLines = $coverableLines
-    LinePct = $linePct; BranchPct = $branchPct
-  }
 }
 
 foreach ($name in $gatedNames) {
