@@ -11,5 +11,12 @@ namespace Game.Api.Models.Attributes
     {
         public required List<BattlerAttribute> Attributes { get; set; }
         public required int StatPointsUsed { get; set; }
+
+        /// <summary>
+        /// The player's post-reallocation combat-rating capability measure (spike #1526 Decision 7) — the
+        /// synergy with the inert-stat signal (#1528): a point spent on an enabler-less amplifier visibly
+        /// doesn't move this number. Display-only, never recomputed client-side (no parity surface).
+        /// </summary>
+        public required double PlayerRating { get; set; }
     }
 }

@@ -20,12 +20,14 @@ namespace Game.Api.Sockets.Commands
     public class UpdatePlayerStats : AbstractSocketCommand<UpdatePlayerStatsResponse, List<AttributeUpdate>>
     {
         private readonly PlayerService _playerService;
+        private readonly BattleService _battleService;
 
         public override string Name { get; set; } = nameof(UpdatePlayerStats);
 
-        public UpdatePlayerStats(PlayerService playerService)
+        public UpdatePlayerStats(PlayerService playerService, BattleService battleService)
         {
             _playerService = playerService;
+            _battleService = battleService;
         }
 
         public override async Task<ApiSocketResponse<UpdatePlayerStatsResponse>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
@@ -41,6 +43,7 @@ namespace Game.Api.Sockets.Commands
                     .Select(allocation => BattlerAttribute.From(allocation.Attribute, allocation.Amount))
                     .ToList(),
                 StatPointsUsed = player.StatPoints.StatPointsUsed,
+                PlayerRating = await _battleService.RatePlayer(player, cancellationToken),
             };
 
             return success

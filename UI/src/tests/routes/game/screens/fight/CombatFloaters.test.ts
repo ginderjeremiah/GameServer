@@ -256,6 +256,32 @@ describe('CombatFloaters', () => {
 		expect(getByTestId('enemy-floaters').style.getPropertyValue('--float-duration')).toBe('1500ms');
 	});
 
+	describe('hidden tab (#1598)', () => {
+		afterEach(() => {
+			delete (document as unknown as Record<string, unknown>).hidden;
+		});
+
+		it('skips spawning a floater while the tab is hidden', () => {
+			Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'hit', amount: 247 });
+
+			expect(getByTestId('enemy-floaters').querySelectorAll('.floater')).toHaveLength(0);
+		});
+
+		it('resumes spawning once the tab is visible again', () => {
+			let hidden = true;
+			Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({ target: 'enemy', kind: 'hit', amount: 247 });
+			expect(getByTestId('enemy-floaters').querySelectorAll('.floater')).toHaveLength(0);
+
+			hidden = false;
+			emit({ target: 'enemy', kind: 'hit', amount: 99 });
+			expect(getByTestId('enemy-floaters').querySelectorAll('.floater')).toHaveLength(1);
+		});
+	});
+
 	it('clears pending removal timers and unsubscribes on unmount (no write-after-destroy)', () => {
 		vi.useFakeTimers();
 		const clearSpy = vi.spyOn(globalThis, 'clearTimeout');

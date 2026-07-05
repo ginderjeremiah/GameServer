@@ -34,6 +34,7 @@ export interface IPlayerData {
 	inventoryData: IInventoryData;
 	lockedBaseDistribution: IAttributeDistribution[];
 	signaturePassive: ISignaturePassive;
+	playerRating: number;
 }
 
 export interface IPlayerLesson {

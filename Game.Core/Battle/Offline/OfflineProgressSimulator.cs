@@ -1,4 +1,5 @@
 using Game.Core.Enemies;
+using Game.Core.Players;
 
 namespace Game.Core.Battle.Offline
 {
@@ -8,9 +9,12 @@ namespace Game.Core.Battle.Offline
     /// <see cref="BattleSimulator"/> and resolves catalog data through caller-supplied funcs, so it touches
     /// no persistence or application layer (applying the rewards is the orchestration sub-issue's job).
     /// <para>
-    /// Full simulation is exact and cheap because offline battles are <em>stationary</em> (spike #879): a
-    /// player's combat power and reward distribution never change while away, and the post-battle cooldown
-    /// throttles the battle count, so the whole away period is replayed battle-by-battle rather than sampled.
+    /// The away period is replayed battle-by-battle rather than sampled — the post-battle cooldown throttles
+    /// the battle count, so this stays cheap. It is <b>not</b> otherwise stationary: everything that grows
+    /// automatically in live play (level, and through it the class locked base and reward power) grows across
+    /// the away window too (#1601), so offline play is neither better nor worse than the live idle loop it
+    /// stands in for. What requires player action — stat allocations, gear, loadout — stays frozen on the
+    /// captured snapshot, exactly as it would while the player is away.
     /// </para>
     /// </summary>
     public class OfflineProgressSimulator(BattleFactory battleFactory)
@@ -42,13 +46,21 @@ namespace Game.Core.Battle.Offline
             // empty result without simulating anything — the whole away period is skipped.
             var remainingMs = Math.Min(parameters.AwayBudgetMs, parameters.CapMs);
 
-            // The player's rating is stationary offline (their combat power never changes while away), so the
-            // battler that measures each victory's exp reward never changes — build it once and reuse it for
-            // every battle's DefeatRewards. It is never simulated (CombatRating.Rate only reads it), so reusing
-            // the same instance across battles is safe even though a Battler is otherwise single-use.
-            var playerBattlerForRating = parameters.Snapshot.ToBattler(
-                parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
-                parameters.ResolveProficiency, parameters.ResolveClass);
+            // A private, mutable-level copy of the snapshot carries the in-loop level growth (#1601); every
+            // other captured field (gear, allocations, proficiency levels) stays frozen on the caller's own
+            // snapshot instance, since those require player action. Exp is tracked alongside it so a
+            // level-up lands on the same battle it would live — a player already partway to their next level
+            // doesn't get an extra free battle's grace.
+            var workingSnapshot = CloneForGrowth(parameters.Snapshot);
+            var currentExp = parameters.StartingExp;
+
+            // The battler that measures each victory's exp reward is re-derived whenever a level-up grows the
+            // class locked base (and, through it, the signature passive) — rebuilding it eagerly here and again
+            // after every level-up, rather than lazily on next use, keeps the "current rating battler" a single
+            // invariant read at each DefeatRewards call below. It is never simulated (CombatRating.Rate only
+            // reads it), so reusing the same instance across battles between level-ups is safe even though a
+            // Battler is otherwise single-use.
+            var playerBattlerForRating = BuildRatingBattler(workingSnapshot, parameters);
 
             // Tracks whether any battle has produced progress (a win or a loss). A run that is nothing but
             // draws is a stalemate the player can neither win nor lose; the cutoff below stops it early.
@@ -62,7 +74,7 @@ namespace Game.Core.Battle.Offline
 
                 var enemy = BuildEnemy(parameters);
                 var seed = parameters.SeedSource();
-                var result = SimulateBattle(parameters, enemy, seed);
+                var result = SimulateBattle(workingSnapshot, parameters, enemy, seed);
 
                 if (result.TotalMs > remainingMs)
                 {
@@ -74,10 +86,10 @@ namespace Game.Core.Battle.Offline
                     break;
                 }
 
-                // Rewards are earned only on a victory, measured from the stationary snapshot like the live
-                // path. The same DefeatRewards yields both the exp and the combat ratings the offline
-                // proficiency-XP accrual normalizes each path's activity by, so the two payouts share one
-                // evaluation.
+                // Rewards are earned only on a victory, measured from the current (possibly mid-window-grown)
+                // rating battler like the live path. The same DefeatRewards yields both the exp and the combat
+                // ratings the offline proficiency-XP accrual normalizes each path's activity by, so the two
+                // payouts share one evaluation.
                 var rewards = result.Victory ? new DefeatRewards(playerBattlerForRating, enemy) : null;
                 if (rewards is not null)
                 {
@@ -85,6 +97,19 @@ namespace Game.Core.Battle.Offline
                     // the identical measure the live path does (spike #1526 Decision 5) — victory-only, like the
                     // rewards.
                     result.Stats.PlayerRating = rewards.PlayerRating;
+
+                    // Apply the victory's exp in-loop, between battles — matching live, where exp lands on
+                    // battle completion — via the same clamp/threshold loop Player.ApplyExp runs (#1601). A
+                    // level gained here re-derives the battler at the new level for every subsequent battle, so
+                    // the locked base, signature passive, and reward power measurement all grow, and the
+                    // anti-grind treadmill decays offline exactly as live.
+                    var progression = ExpProgression.ApplyExp(workingSnapshot.Level, currentExp, rewards.ExpReward);
+                    currentExp = progression.Exp;
+                    if (progression.LevelsGained > 0)
+                    {
+                        workingSnapshot.Level = progression.Level;
+                        playerBattlerForRating = BuildRatingBattler(workingSnapshot, parameters);
+                    }
                 }
 
                 outcomes.Add(new OfflineBattleOutcome(
@@ -115,8 +140,34 @@ namespace Game.Core.Battle.Offline
             // different reason — a CPU-waste guard, not an overshoot).
             var remainderMs = pendingBattle is null && outcomes.Count > 0 ? Math.Max(0, -remainingMs) : 0;
 
-            return new OfflineProgressResult(parameters.Mode, parameters.Zone.Id, outcomes, remainderMs, pendingBattle);
+            return new OfflineProgressResult(
+                parameters.Mode, parameters.Zone.Id, outcomes, remainderMs, pendingBattle,
+                workingSnapshot.Level, currentExp);
         }
+
+        /// <summary>
+        /// A copy of <paramref name="snapshot"/> whose <see cref="BattleSnapshot.Level"/> the simulation loop
+        /// grows independently of the caller's own instance — every other field is shared by reference (never
+        /// mutated by growth), since only the level changes mid-window.
+        /// </summary>
+        private static BattleSnapshot CloneForGrowth(BattleSnapshot snapshot) => new()
+        {
+            Level = snapshot.Level,
+            ClassId = snapshot.ClassId,
+            StatAllocations = snapshot.StatAllocations,
+            EquippedItems = snapshot.EquippedItems,
+            SkillIds = snapshot.SkillIds,
+            ProficiencyLevels = snapshot.ProficiencyLevels,
+        };
+
+        /// <summary>
+        /// Builds the battler <see cref="DefeatRewards"/> measures the player's power from — reused across
+        /// battles until the next level-up requires rebuilding it.
+        /// </summary>
+        private static Battler BuildRatingBattler(BattleSnapshot snapshot, OfflineSimulationParameters parameters) =>
+            snapshot.ToBattler(
+                parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
+                parameters.ResolveProficiency, parameters.ResolveClass);
 
         /// <summary>
         /// Builds the enemy for the next battle according to the loop mode: a random idle encounter in the
@@ -136,13 +187,14 @@ namespace Game.Core.Battle.Offline
 
         /// <summary>
         /// Runs one battle with the given seed (the caller draws it up front so it can carry the same seed
-        /// forward on a pending-battle hand-back, #1596). Both battlers are rebuilt per battle because the
-        /// simulation mutates battler health/effects (a battler is single-use); rebuilding the player from the
-        /// stationary snapshot mirrors the live replay path.
+        /// forward on a pending-battle hand-back, #1596), rebuilding the player from
+        /// <paramref name="snapshot"/> — the current, possibly mid-window-grown level (#1601) — which mirrors
+        /// the live replay path. Both battlers are rebuilt per battle because the simulation mutates battler
+        /// health/effects (a battler is single-use).
         /// </summary>
-        private static BattleResult SimulateBattle(OfflineSimulationParameters parameters, Enemy enemy, uint seed)
+        private static BattleResult SimulateBattle(BattleSnapshot snapshot, OfflineSimulationParameters parameters, Enemy enemy, uint seed)
         {
-            var playerBattler = parameters.Snapshot.ToBattler(
+            var playerBattler = snapshot.ToBattler(
                 parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
                 parameters.ResolveProficiency, parameters.ResolveClass);
 

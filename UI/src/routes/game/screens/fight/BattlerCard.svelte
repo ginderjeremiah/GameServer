@@ -10,7 +10,12 @@
 		{#if side === 'player'}
 			<!-- The player's level + XP progress toward the next level (gold track). -->
 			<div class="player-progress">
-				<span class="player-level">LV {playerManager.level}</span>
+				<div class="level-row">
+					<span class="player-level">LV {playerManager.level}</span>
+					<span class="power-readout" data-testid="player-power"
+						>⚡ {formatNum(Math.round(playerManager.playerRating))}</span
+					>
+				</div>
 				<div class="xp-bar-slot">
 					<XpBar
 						level={playerManager.level}
@@ -22,7 +27,16 @@
 				</div>
 			</div>
 		{:else}
-			<span class="battler-level">LV · {battler.level}</span>
+			<div class="enemy-progress">
+				<span class="battler-level">LV · {battler.level}</span>
+				{#if enemyManager.currentEnemy}
+					<!-- The matched/trivial cue makes the anti-grind curve legible ("you've outgrown this
+					     zone") instead of a bare number (spike #1526 Decision 7). -->
+					<span class="power-readout" data-testid="enemy-power" style:color="var({ratingCueColorVar(cue)})">
+						⚡ {formatNum(Math.round(enemyManager.currentEnemy.enemyRating))} · {ratingCueLabel(cue)}
+					</span>
+				{/if}
+			</div>
 		{/if}
 	</div>
 
@@ -44,12 +58,13 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
-import { tintColor } from '$lib/common';
-import { playerManager } from '$lib/engine';
+import { formatNum, tintColor } from '$lib/common';
+import { enemyManager, playerManager } from '$lib/engine';
 import { HpBar, XpBar } from '$components';
 import ActiveEffectChips from './ActiveEffectChips.svelte';
 import CombatFloaters from './CombatFloaters.svelte';
 import Skills from './Skills.svelte';
+import { ratingCue, ratingCueColorVar, ratingCueLabel } from './rating-cue';
 
 type Props = {
 	battler: Battler;
@@ -60,6 +75,7 @@ const { battler, side }: Props = $props();
 
 const accent = $derived(side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)');
 const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
+const cue = $derived(ratingCue(enemyManager.currentEnemy?.enemyRating ?? 0, playerManager.playerRating));
 </script>
 
 <style lang="scss">
@@ -112,11 +128,34 @@ const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 	gap: 3px;
 }
 
+.level-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.enemy-progress {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 3px;
+}
+
 .player-level {
 	font-family: var(--mono);
 	font-size: 9.5px;
 	color: var(--accent-light);
 	letter-spacing: 0.8px;
+}
+
+// The combat-power readout (spike #1526 Decision 7): a shared style for both sides, with the enemy's
+// colour driven inline by its matched/trivial cue (see rating-cue.ts).
+.power-readout {
+	font-family: var(--mono);
+	font-size: 9.5px;
+	letter-spacing: 0.6px;
+	color: var(--accent-light);
+	white-space: nowrap;
 }
 
 .xp-bar-slot {

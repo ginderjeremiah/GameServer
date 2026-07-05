@@ -26,6 +26,7 @@ namespace Game.Api.Controllers
         SocketManagerService socketManager,
         PlayerService playerService,
         OfflineProgressService offlineProgressService,
+        BattleService battleService,
         IClasses classes,
         ILogger<LoginController> logger) : ControllerBase
     {
@@ -36,6 +37,7 @@ namespace Game.Api.Controllers
         private readonly SocketManagerService _socketManager = socketManager;
         private readonly PlayerService _playerService = playerService;
         private readonly OfflineProgressService _offlineProgressService = offlineProgressService;
+        private readonly BattleService _battleService = battleService;
         private readonly IClasses _classes = classes;
         private readonly ILogger<LoginController> _logger = logger;
 
@@ -44,7 +46,7 @@ namespace Game.Api.Controllers
         // does. A player's ClassId is validated at creation, so an unresolvable class here is a corrupt cache,
         // not a bad request — fail loudly (matching BattleService.ResolveClass and AccountService's creatable-
         // class resolve) rather than serving an empty fingerprint, which would load fine but 500 every battle.
-        private PlayerData BuildPlayerData(Player player)
+        private async Task<PlayerData> BuildPlayerData(Player player, CancellationToken cancellationToken)
         {
             var @class = _classes.GetClass(player.ClassId)
                 ?? throw new InvalidOperationException(
@@ -68,7 +70,8 @@ namespace Game.Api.Controllers
                 ScalingAmount = passive.ScalingAmount,
                 ModifierType = passive.ModifierType,
             };
-            return PlayerData.FromPlayer(player, lockedBaseDistribution, signaturePassive);
+            var rating = await _battleService.RatePlayer(player, cancellationToken);
+            return PlayerData.FromPlayer(player, lockedBaseDistribution, signaturePassive, rating);
         }
 
         [AllowAnonymous]
@@ -127,7 +130,7 @@ namespace Game.Api.Controllers
             return ApiResponse.Success(new SelectPlayerResult
             {
                 Tokens = ToAuthTokens(result.Tokens),
-                Player = BuildPlayerData(result.Player),
+                Player = await BuildPlayerData(result.Player, HttpContext.RequestAborted),
             });
         }
 
@@ -175,7 +178,7 @@ namespace Game.Api.Controllers
             return ApiResponse.Success(new SelectPlayerResult
             {
                 Tokens = ToAuthTokens(result.Tokens),
-                Player = BuildPlayerData(result.Player),
+                Player = await BuildPlayerData(result.Player, HttpContext.RequestAborted),
             });
         }
 
@@ -302,7 +305,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error("Player data not found", ApiErrorCategory.NotFound);
             }
 
-            return ApiResponse.Success(BuildPlayerData(player));
+            return ApiResponse.Success(await BuildPlayerData(player, HttpContext.RequestAborted));
         }
 
         /// <summary>

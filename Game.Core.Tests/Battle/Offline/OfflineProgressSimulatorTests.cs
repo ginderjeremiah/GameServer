@@ -9,6 +9,7 @@ using Game.Core.Items;
 using Game.Core.Players;
 using Game.Core.Proficiencies;
 using Game.Core.Skills;
+using Game.Core.TestInfrastructure.Builders;
 using Game.Core.Zones;
 using Xunit;
 using static Game.Core.EAttribute;
@@ -520,32 +521,205 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(42, result.ZoneId);
         }
 
-        // ── Class locked base ────────────────────────────────────────────────
+        // ── Mid-window level growth (#1601) ──────────────────────────────────
+        //
+        // Offline play must be neither better nor worse than the live idle loop: everything that grows
+        // automatically in live play (level, and through it the class locked base and reward power) grows
+        // across the away window too, rather than freezing at the window-start snapshot. FreeFarmEnemy funds
+        // the leveling below without ever risking the player (0 core attributes, and its one skill's 6s
+        // cooldown exceeds the ~5s it takes to kill it — it never lands a hit), isolating growth from any
+        // win/loss confound except in the flip test, which deliberately exercises one.
 
         [Fact]
-        public void Simulate_AppliesClassLockedBase_FromTheFrozenSnapshotLevel()
+        public void Simulate_MidWindowLevelUps_GrowClassLockedBaseAndPlayerRating()
         {
-            // The player's free pool is empty, so the class locked base is its entire attribute spread. With a
-            // strong fingerprint the player wins idle battles it wins none of without one — proving the offline
-            // path composes the locked base. The base is derived from the snapshot's frozen level, so (like
-            // every other captured input) it is stationary across the away window.
-            var zone = MakeZone(levelMin: 1, levelMax: 1);
+            // The locked base is BaseAmount + AmountPerLevel × level (#1223); with Endurance's AmountPerLevel
+            // nonzero, each simulated level-up re-derives a bigger locked base — and, through MaxHealth, a
+            // bigger CombatRating.Rate — for every subsequent battle (the original #1223 acceptance criterion).
             var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
-
-            OfflineProgressResult Run(params AttributeDistribution[] distributions)
+            var scenario = new Scenario
             {
-                var scenario = new Scenario { Zone = zone, Snapshot = snapshot, ResolveEnemy = level => WeakEnemy(level) };
-                return _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario) with
+                Zone = MakeZone(levelMin: 1, levelMax: 1),
+                Snapshot = snapshot,
+                ResolveEnemy = FreeFarmEnemy,
+            };
+
+            var result = _simulator.Simulate(IdleParameters(TenHoursMs, scenario, capMs: TenHoursMs) with
+            {
+                ResolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m)),
+            });
+
+            var wins = result.Battles.Where(b => b.Result.Victory).ToList();
+            Assert.True(result.EndingLevel > snapshot.Level, "The window produced no level-ups.");
+            Assert.True(wins[0].PlayerRating < wins[^1].PlayerRating,
+                "The locked base's growth did not raise the player's measured rating.");
+        }
+
+        [Fact]
+        public void Simulate_MidWindowLeveling_FlipsInitialLossesIntoWins()
+        {
+            // A threshold matchup (WeakEnemy, the zone's level-2 roll) the player loses at the frozen starting
+            // locked base but wins once leveling — funded by the zone's other, permanently-free level-1 roll —
+            // grows it enough. Proves mid-window growth changes a real battle outcome, not just the measured
+            // rating.
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 2),
+                Snapshot = snapshot,
+                ResolveEnemy = level => level == 1 ? FreeFarmEnemy(level) : WeakEnemy(level),
+            };
+
+            var result = _simulator.Simulate(IdleParameters(TenHoursMs, scenario, capMs: TenHoursMs) with
+            {
+                ResolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m)),
+            });
+
+            var thresholdBattles = result.Battles.Where(b => b.Enemy.Id == EnemyId).ToList();
+            var firstWinIndex = thresholdBattles.FindIndex(b => b.Result.Victory);
+
+            Assert.True(thresholdBattles.Any(b => b.Result.PlayerDied), "The threshold matchup never lost early on.");
+            Assert.True(firstWinIndex > 0, "The threshold matchup never flipped to a win.");
+            // The flip is one-way: every threshold battle before the first win is a loss, every one from the
+            // first win on is a win — leveling only ever helps, it never regresses a won matchup back to a loss.
+            Assert.All(thresholdBattles.Take(firstWinIndex), b => Assert.True(b.Result.PlayerDied));
+            Assert.All(thresholdBattles.Skip(firstWinIndex), b => Assert.True(b.Result.Victory));
+        }
+
+        [Fact]
+        public void Simulate_PlayerOutgrowsZone_DifficultyMultiplierDecaysAcrossLevelUps()
+        {
+            // As the locked base grows the player's rating past the (fixed, zone-static) enemy's, the bounty
+            // curve's min(enemyRating/playerRating, 1)² difficulty multiplier shrinks — the anti-grind
+            // treadmill decays offline exactly as it would live, rather than holding at its window-start value
+            // for the whole away period.
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1),
+                Snapshot = snapshot,
+                ResolveEnemy = FreeFarmEnemy,
+            };
+
+            var result = _simulator.Simulate(IdleParameters(TenHoursMs, scenario, capMs: TenHoursMs) with
+            {
+                ResolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m)),
+            });
+
+            var wins = result.Battles.Where(b => b.Result.Victory).ToList();
+            var firstRatio = wins[0].EnemyRating / wins[0].PlayerRating;
+            var lastRatio = wins[^1].EnemyRating / wins[^1].PlayerRating;
+
+            Assert.True(lastRatio < firstRatio, "The difficulty ratio did not shrink as the player leveled past the enemy.");
+        }
+
+        [Fact]
+        public void Simulate_BossMode_LevelUps_GrowPlayerRatingAcrossTheWindow()
+        {
+            // Mid-window growth applies to the boss loop too — the same fixed dedicated boss is fought every
+            // battle, so a rising PlayerRating across the run is attributable only to the growing locked base
+            // (boss-mode growth, per #1601's scope).
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1, bossEnemyId: 2, bossLevel: 1),
+                Snapshot = snapshot,
+                ResolveEnemy = FreeFarmEnemy,
+            };
+
+            var result = _simulator.Simulate(BossParameters(TenHoursMs, scenario, capMs: TenHoursMs) with
+            {
+                ResolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m)),
+            });
+
+            var wins = result.Battles.Where(b => b.Result.Victory).ToList();
+            Assert.True(result.EndingLevel > snapshot.Level, "The boss window produced no level-ups.");
+            Assert.True(wins[0].PlayerRating < wins[^1].PlayerRating,
+                "The locked base's growth did not raise the player's measured rating in boss mode.");
+        }
+
+        [Fact]
+        public void Simulate_EndingLevelAndExp_MatchWhatPlayerGrantOfflineExpWouldApply()
+        {
+            // Player.GrantOfflineExp stays the single authority for applying the window's exp post-loop; this
+            // pins that its applied end state agrees with the simulator's own in-loop accounting exposed via
+            // OfflineProgressResult — both run the shared ExpProgression.ApplyExp loop, so a real Player fed
+            // the identical victory-exp sequence from the identical starting level/exp must land on it exactly.
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1),
+                Snapshot = snapshot,
+                ResolveEnemy = FreeFarmEnemy,
+            };
+
+            var result = _simulator.Simulate(IdleParameters(TenHoursMs, scenario, capMs: TenHoursMs) with
+            {
+                ResolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m)),
+            });
+
+            Assert.True(result.EndingLevel > snapshot.Level, "The window produced no level-ups to pin.");
+
+            var player = new PlayerBuilder().WithLevel(snapshot.Level).WithExp(0).Build();
+            player.GrantOfflineExp(result.Battles.Where(b => b.Result.Victory).Select(b => b.ExpReward));
+
+            Assert.Equal(result.EndingLevel, player.Level);
+            Assert.Equal(result.EndingExp, player.Exp);
+        }
+
+        [Fact]
+        public void Simulate_NonZeroStartingExp_CarriesIntoTheFirstLevelThreshold()
+        {
+            // StartingExp exists so a player already partway to their next level doesn't get an extra free
+            // battle's grace (#1601) — pin that the simulator's in-loop growth actually starts from it, by
+            // making a single win's own (small) reward cross the level-1 threshold only because of exp already
+            // banked pre-window, never when starting from a fresh 0.
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+            var zone = MakeZone(levelMin: 1, levelMax: 1);
+            var resolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m));
+
+            OfflineProgressResult Run(int startingExp, long awayMs)
+            {
+                var scenario = new Scenario
                 {
-                    ResolveClass = ClassResolver(2, distributions),
-                });
+                    Zone = zone,
+                    Snapshot = snapshot,
+                    ResolveEnemy = FreeFarmEnemy,
+                    StartingExp = startingExp,
+                };
+                return _simulator.Simulate(IdleParameters(awayMs, scenario) with { ResolveClass = resolveClass });
             }
 
-            var withoutFingerprint = Run();
-            var withFingerprint = Run(Distribution(Strength, 100m), Distribution(Endurance, 100m));
+            // Size the budget to exactly one completed battle. A battle whose own duration exceeds the
+            // remaining budget is carried forward uncredited as a pending battle (#1596), never counted as a
+            // win, so the budget must be at least one full battle's duration. All battles use the fixed seed,
+            // so a generous-budget probe's first (level-1) outcome gives that per-battle duration; a budget
+            // equal to it then fits exactly that one battle and nothing after it.
+            var battleMs = Run(startingExp: 0, awayMs: ManyStepsBudget()).Battles[0].Result.TotalMs;
 
-            Assert.Equal(0, withoutFingerprint.Wins);
-            Assert.True(withFingerprint.Wins > 0);
+            OfflineProgressResult RunOneBattle(int startingExp) => Run(startingExp, awayMs: battleMs);
+
+            var fromZero = RunOneBattle(startingExp: 0);
+            var win = Assert.Single(fromZero.Battles);
+            Assert.True(win.Result.Victory);
+            var firstWinExp = win.ExpReward;
+
+            // Starting from a fresh 0, the single win's own reward alone does not cross the level-1 threshold
+            // (100 exp) — FreeFarmEnemy's reward is far below it.
+            Assert.Equal(1, fromZero.EndingLevel);
+            Assert.Equal(firstWinExp, fromZero.EndingExp);
+
+            // The identical single win, but with just enough pre-window exp banked that this same reward
+            // crosses the threshold.
+            var carried = RunOneBattle(startingExp: 100 - firstWinExp);
+            Assert.Equal(2, carried.EndingLevel);
+            Assert.Equal(0, carried.EndingExp);
+
+            // The GrantOfflineExp parity pin must hold from the same non-zero starting exp too.
+            var player = new PlayerBuilder().WithLevel(snapshot.Level).WithExp(100 - firstWinExp).Build();
+            player.GrantOfflineExp(carried.Battles.Where(b => b.Result.Victory).Select(b => b.ExpReward));
+            Assert.Equal(carried.EndingLevel, player.Level);
+            Assert.Equal(carried.EndingExp, player.Exp);
         }
 
         [Fact]
@@ -583,6 +757,7 @@ namespace Game.Core.Tests.Battle.Offline
         {
             public required Zone Zone { get; set; }
             public BattleSnapshot Snapshot { get; init; } = EmptySnapshot();
+            public int StartingExp { get; init; }
             public required Func<int, Enemy> ResolveEnemy { get; init; }
             public Func<int, Item> ResolveItem { get; init; } = ThrowItem;
             public Func<int, ItemMod> ResolveMod { get; init; } = ThrowMod;
@@ -596,6 +771,7 @@ namespace Game.Core.Tests.Battle.Offline
             new()
             {
                 Snapshot = scenario.Snapshot,
+                StartingExp = scenario.StartingExp,
                 Mode = OfflineLoopMode.Idle,
                 Zone = scenario.Zone,
                 AwayBudgetMs = awayMs,
@@ -790,7 +966,7 @@ namespace Game.Core.Tests.Battle.Offline
 
         private static Enemy MakeEnemy(int level, double strength, double endurance, int skillCount)
         {
-            var skills = Enumerable.Range(0, skillCount).Select(EnemyAttackSkill).ToList();
+            var skills = Enumerable.Range(0, skillCount).Select(id => EnemyAttackSkill(id)).ToList();
             return new Enemy
             {
                 Id = EnemyId,
@@ -854,17 +1030,40 @@ namespace Game.Core.Tests.Battle.Offline
             AvailableSkills = [EnemyAttackSkill(0)],
         };
 
-        private static Skill EnemyAttackSkill(int id) => new()
+        private static Skill EnemyAttackSkill(int id, double baseDamage = 5, int cooldownMs = 1500) => new()
         {
             Id = id,
             Name = $"Scratch {id}",
             Description = string.Empty,
             DamagePortions = [new SkillDamagePortion { Type = EDamageType.Physical, Weight = 1.0 }],
-            CooldownMs = 1500,
-            BaseDamage = 5,
+            CooldownMs = cooldownMs,
+            BaseDamage = baseDamage,
             CriticalChance = 0,
             DamageMultipliers = [],
             Effects = [],
+        };
+
+        /// <summary>
+        /// A permanently free win: 0 core attributes (so it never out-scales the player, regardless of
+        /// level), and its one skill's 6s cooldown exceeds the ~5s it takes the player to kill it, so it
+        /// never lands a single hit — the player takes zero real damage no matter how many times this
+        /// enemy is fought. Its skill still carries a real (if slow) 30 base damage so its own
+        /// <c>CombatRating</c> — rated on continuous DPS, not discretized hits landed — is high enough to
+        /// mint a nonzero exp reward per kill (used by the mid-window-growth tests below to fund leveling
+        /// without ever risking the player).
+        /// </summary>
+        private static Enemy FreeFarmEnemy(int level) => new()
+        {
+            Id = 2,
+            Name = "Training Dummy",
+            IsBoss = false,
+            Level = level,
+            AttributeDistributions =
+            [
+                new AttributeDistribution { AttributeId = Strength, BaseAmount = 0, AmountPerLevel = 0 },
+                new AttributeDistribution { AttributeId = Endurance, BaseAmount = 0, AmountPerLevel = 0 },
+            ],
+            AvailableSkills = [EnemyAttackSkill(0, baseDamage: 30, cooldownMs: 6000)],
         };
 
         private static readonly Func<int, Item> ThrowItem =

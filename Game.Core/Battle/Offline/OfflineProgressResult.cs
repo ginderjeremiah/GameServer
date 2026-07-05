@@ -59,15 +59,31 @@ namespace Game.Core.Battle.Offline
         /// </summary>
         public OfflinePendingBattle? PendingBattle { get; }
 
+        /// <summary>
+        /// The player's level at the end of the simulated window, per the simulator's own in-loop growth
+        /// accounting (#1601) — <see cref="Game.Core.Players.Player.GrantOfflineExp"/> applying the same
+        /// victory rewards from the same starting level/exp must land on this exact value, since both paths
+        /// run the shared <see cref="Game.Core.Players.ExpProgression.ApplyExp"/> loop. Defaults to <c>0</c>
+        /// for a result built without a simulated run (e.g. a hand-built test fixture).
+        /// </summary>
+        public int EndingLevel { get; }
+
+        /// <summary>The player's residual exp at the end of the simulated window, alongside
+        /// <see cref="EndingLevel"/>.</summary>
+        public int EndingExp { get; }
+
         public OfflineProgressResult(
             OfflineLoopMode mode, int zoneId, IReadOnlyList<OfflineBattleOutcome> battles,
-            long remainderMs = 0, OfflinePendingBattle? pendingBattle = null)
+            long remainderMs = 0, OfflinePendingBattle? pendingBattle = null,
+            int endingLevel = 0, int endingExp = 0)
         {
             Mode = mode;
             ZoneId = zoneId;
             Battles = battles;
             RemainderMs = remainderMs;
             PendingBattle = pendingBattle;
+            EndingLevel = endingLevel;
+            EndingExp = endingExp;
 
             // Fold the per-battle outcomes into the run-level aggregates in a single pass, keeping the
             // outcome list the one source of truth (the summary is a materialized view of it).

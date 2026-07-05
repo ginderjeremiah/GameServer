@@ -250,6 +250,24 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SelectPlayer_DeliversTheLivePlayerRating()
+        {
+            // The logged-in player payload carries the player's combat-rating capability measure (spike #1526
+            // Decision 7) — a numeric companion to the attributes screen, recomputed fresh from current state.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "ratingdelivery", "ratingpass");
+            await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("ratingdelivery", "ratingpass");
+            var summary = Assert.Single(login.PlayerSummaries);
+            var select = await SelectPlayerAsync(login.Tokens, summary.Id);
+
+            Assert.True(select.Player.PlayerRating > 0);
+        }
+
+        [Fact]
         public async Task SelectPlayer_CharacterOfAnotherAccount_IsRejected()
         {
             using var scope = CreateScope();

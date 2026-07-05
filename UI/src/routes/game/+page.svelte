@@ -22,18 +22,27 @@
 		<NavSidebar bind:pinned={sidebarPinned} {screens} active={currentScreen} onNavigate={handleNavigate} />
 
 		<CharacterSwitcher open={showSwitcher} onClose={() => (showSwitcher = false)} />
+
+		<TourPlayer
+			open={!!tutorialTour.activeLesson}
+			steps={tourSteps}
+			label={tutorialTour.activeLesson?.name ?? ''}
+			onDismiss={closeTutorialTour}
+			onComplete={closeTutorialTour}
+		/>
 	</div>
 {:else}
 	<BootSplash />
 {/if}
 
 <script lang="ts">
-import { NavSidebar, LogPanel } from '$components';
+import { NavSidebar, LogPanel, TourPlayer } from '$components';
 import { GAME_SCREENS, visibleScreens } from './screens/screen-defs';
 import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
 import { startGame, stopEngines, enemyManager } from '$lib/engine';
 import { refreshPlayer } from '$lib/engine/session';
-import { navigation, requiresRemount } from '$stores';
+import { evaluateScreenTrigger, closeTutorialTour } from '$lib/engine/tutorials';
+import { navigation, requiresRemount, tutorialTour } from '$stores';
 import { apiSocket, getRoles } from '$lib/api';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
@@ -128,6 +137,21 @@ $effect(() => {
 		navigation.clear();
 	}
 });
+
+// Screen-anchored tutorial trigger (#1587): the single screen-activation point cross-screen
+// navigation uses. Gated on `entered` so a lesson can't fire against the default screen before the
+// welcome-back gate passes (the player hasn't "navigated" anywhere yet at that point).
+$effect(() => {
+	if (welcome.phase === 'entered') {
+		evaluateScreenTrigger(currentScreen);
+	}
+});
+
+const tourSteps = $derived(
+	[...(tutorialTour.activeLesson?.steps ?? [])]
+		.sort((a, b) => a.ordinal - b.ordinal)
+		.map((step) => ({ text: step.text, anchorKey: step.anchorKey }))
+);
 </script>
 
 <style lang="scss">

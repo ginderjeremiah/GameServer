@@ -76,6 +76,7 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 		],
 		unlockedMods: [10, 11, 12]
 	},
+	playerRating: 100,
 	...overrides
 });
 
@@ -196,11 +197,19 @@ describe('PlayerManager', () => {
 		it('grants exp and adopts the server-authoritative post-grant fields', () => {
 			manager.initialize(makePlayerData({ level: 1, exp: 0, statPointsGained: 0, statPointsUsed: 0 }));
 
-			manager.applyVictoryRewards({ expReward: 100, newLevel: 2, newExp: 0, statPointsGained: 2, statPointsUsed: 0 });
+			manager.applyVictoryRewards({
+				expReward: 100,
+				newLevel: 2,
+				newExp: 0,
+				statPointsGained: 2,
+				statPointsUsed: 0,
+				playerRating: 150
+			});
 
 			expect(manager.level).toBe(2);
 			expect(manager.exp).toBe(0);
 			expect(manager.statPointsGained).toBe(2);
+			expect(manager.playerRating).toBe(150);
 			expect(logMessage).toHaveBeenCalledWith(ELogType.Exp, 'Earned 100 exp.');
 			expect(logMessage).toHaveBeenCalledWith(ELogType.LevelUp, 'Congratulations, you leveled up!');
 		});
@@ -215,7 +224,8 @@ describe('PlayerManager', () => {
 				newLevel: 3,
 				newExp: 40,
 				statPointsGained: 4,
-				statPointsUsed: 5
+				statPointsUsed: 5,
+				playerRating: 200
 			});
 
 			expect(manager.level).toBe(3);

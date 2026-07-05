@@ -37,6 +37,9 @@ export class PlayerManager implements IPlayerData {
 		modifierType: EModifierType.Additive
 	};
 	public unlockedSkills: IUnlockedSkill[] = [];
+	/** The player's combat-rating capability measure (spike #1526 Decision 7) — server-computed, display-only,
+	 *  never recomputed locally (no parity surface). Refreshed on player load, stat reallocation, and victory. */
+	public playerRating = 0;
 	private logPreferenceList: ILogPreference[] = [];
 	/** Per-lesson tutorial state (spike #1392): absent = locked, `readAt` unset = unread, set = read. The
 	 *  trigger-evaluation/tour-playback consumer (#1587) reads this; this class only syncs it with the
@@ -147,6 +150,7 @@ export class PlayerManager implements IPlayerData {
 		this.name = data.name;
 		this.level = data.level;
 		this.exp = data.exp;
+		this.playerRating = data.playerRating;
 		this.currentZone = data.currentZone;
 		this.statPointsGained = data.statPointsGained;
 		this.statPointsUsed = data.statPointsUsed;
@@ -256,6 +260,7 @@ export class PlayerManager implements IPlayerData {
 		this.exp = rewards.newExp;
 		this.statPointsGained = rewards.statPointsGained;
 		this.statPointsUsed = rewards.statPointsUsed;
+		this.playerRating = rewards.playerRating;
 	}
 }
 
