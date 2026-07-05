@@ -184,9 +184,11 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			refresh,
 			childSavers: [
 				async (id, record, baseline) => {
-					if (childChanged(record.zoneEnemies, baseline?.zoneEnemies)) {
-						await ApiRequest.post('AdminTools/SetZoneEnemies', { zoneId: id, zoneEnemies: record.zoneEnemies });
+					if (!childChanged(record.zoneEnemies, baseline?.zoneEnemies)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetZoneEnemies', { zoneId: id, zoneEnemies: record.zoneEnemies });
+					return true;
 				}
 			]
 		})

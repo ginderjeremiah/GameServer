@@ -158,14 +158,18 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			refresh,
 			childSavers: [
 				async (id, record, baseline) => {
-					if (childChanged(record.inputSkillIds, baseline?.inputSkillIds)) {
-						await ApiRequest.post('AdminTools/SetSkillRecipeInputs', { id, skillIds: record.inputSkillIds });
+					if (!childChanged(record.inputSkillIds, baseline?.inputSkillIds)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetSkillRecipeInputs', { id, skillIds: record.inputSkillIds });
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.conditions, baseline?.conditions)) {
-						await ApiRequest.post('AdminTools/SetSkillRecipeConditions', { id, conditions: record.conditions });
+					if (!childChanged(record.conditions, baseline?.conditions)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetSkillRecipeConditions', { id, conditions: record.conditions });
+					return true;
 				}
 			]
 		})

@@ -244,28 +244,34 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			refresh,
 			childSavers: [
 				async (id, record, baseline) => {
-					if (childChanged(record.starterSkillIds, baseline?.starterSkillIds)) {
-						await ApiRequest.post('AdminTools/SetClassStarterSkills', {
-							classId: id,
-							skillIds: record.starterSkillIds
-						});
+					if (!childChanged(record.starterSkillIds, baseline?.starterSkillIds)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetClassStarterSkills', {
+						classId: id,
+						skillIds: record.starterSkillIds
+					});
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.starterEquipment, baseline?.starterEquipment)) {
-						await ApiRequest.post('AdminTools/SetClassStarterEquipment', {
-							classId: id,
-							equipment: record.starterEquipment
-						});
+					if (!childChanged(record.starterEquipment, baseline?.starterEquipment)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetClassStarterEquipment', {
+						classId: id,
+						equipment: record.starterEquipment
+					});
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.attributeDistributions, baseline?.attributeDistributions)) {
-						await ApiRequest.post('AdminTools/SetClassAttributeDistributions', {
-							classId: id,
-							attributeDistributions: record.attributeDistributions
-						});
+					if (!childChanged(record.attributeDistributions, baseline?.attributeDistributions)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetClassAttributeDistributions', {
+						classId: id,
+						attributeDistributions: record.attributeDistributions
+					});
+					return true;
 				}
 			]
 		})

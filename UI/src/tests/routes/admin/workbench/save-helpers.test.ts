@@ -197,6 +197,7 @@ describe('persistEntity', () => {
 			childSavers: [
 				async (id, record, baseline) => {
 					childCalls.push({ id, name: record.name, hasBaseline: baseline !== undefined });
+					return true;
 				}
 			]
 		});
@@ -261,6 +262,7 @@ describe('persistEntity', () => {
 			childSavers: [
 				async (id) => {
 					childIds.push(id);
+					return true;
 				}
 			]
 		});
@@ -299,6 +301,39 @@ describe('persistEntity', () => {
 				]
 			})
 		).rejects.toBeInstanceOf(PersistFailedError);
+	});
+
+	it('propagates a child-saver failure raw when every saver ahead of it no-op’d (nothing actually written)', async () => {
+		interface ChildRow extends Identified {
+			id: number;
+			name: string;
+			kids: number[];
+		}
+		// Identity and the first child collection are unchanged; only a second, unrelated child
+		// collection differs. The saver for that second collection fails before writing anything.
+		// Since neither the primary call nor the first (no-op) saver wrote, nothing has committed —
+		// the caller must be able to keep the user's edit for a clean retry.
+		const diff: SaveDiff<ChildRow> = {
+			added: [],
+			modified: [{ record: { id: 0, name: 'X', kids: [1, 2] }, baseline: { id: 0, name: 'X', kids: [1] } }],
+			deleted: [],
+			existingIds: [0]
+		};
+		const cause = new Error('child saver 500');
+		await expect(
+			persistEntity<ChildRow, { id: number; name: string }>({
+				diff,
+				toPrimaryDto: (r) => ({ id: r.id, name: r.name }),
+				postPrimary: async () => undefined,
+				refresh: async () => [{ id: 0, name: 'X', kids: [1, 2] }],
+				childSavers: [
+					async () => false,
+					async () => {
+						throw cause;
+					}
+				]
+			})
+		).rejects.toBe(cause);
 	});
 
 	it('wraps a post-commit refresh failure as PersistFailedError', async () => {

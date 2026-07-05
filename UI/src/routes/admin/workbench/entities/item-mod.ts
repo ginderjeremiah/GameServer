@@ -118,14 +118,18 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 			childSavers: [
 				async (id, record, baseline) => {
 					const changes = attributeChanges(record.attributes, baseline?.attributes, 'amount');
-					if (changes.length) {
-						await ApiRequest.post('AdminTools/AddEditItemModAttributes', { id, changes });
+					if (!changes.length) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/AddEditItemModAttributes', { id, changes });
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.tags, baseline?.tags)) {
-						await ApiRequest.post('AdminTools/SetTagsForItemMod', { id, tagIds: record.tags });
+					if (!childChanged(record.tags, baseline?.tags)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetTagsForItemMod', { id, tagIds: record.tags });
+					return true;
 				}
 			]
 		})

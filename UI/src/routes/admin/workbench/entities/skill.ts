@@ -259,21 +259,27 @@ export const skillEntity: EntityConfig<ISkill> = {
 			childSavers: [
 				async (id, record, baseline) => {
 					const changes = damagePortionChanges(record.damagePortions, baseline?.damagePortions);
-					if (changes.length) {
-						await ApiRequest.post('AdminTools/SetSkillPortions', { id, changes });
+					if (!changes.length) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetSkillPortions', { id, changes });
+					return true;
 				},
 				async (id, record, baseline) => {
 					const changes = attributeChanges(record.damageMultipliers, baseline?.damageMultipliers, 'multiplier');
-					if (changes.length) {
-						await ApiRequest.post('AdminTools/SetSkillMultipliers', { id, changes });
+					if (!changes.length) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetSkillMultipliers', { id, changes });
+					return true;
 				},
 				async (id, record, baseline) => {
 					const changes = skillEffectChanges(record.effects, baseline?.effects);
-					if (changes.length) {
-						await ApiRequest.post('AdminTools/SetSkillEffects', { id, changes });
+					if (!changes.length) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetSkillEffects', { id, changes });
+					return true;
 				}
 			]
 		})

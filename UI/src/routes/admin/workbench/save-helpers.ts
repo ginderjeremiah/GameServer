@@ -61,7 +61,8 @@ export const resolveNewIds = (
 /** Resolve a possibly-local id through the new-id map (returns the input when already persisted). */
 export const resolveId = (id: number, idMap: Map<number, number>): number => idMap.get(id) ?? id;
 
-type ChildSaver<T> = (id: number, record: T, baseline: T | undefined) => Promise<void>;
+/** Returns whether it actually wrote — a no-op (unchanged collection) must report `false`. */
+type ChildSaver<T> = (id: number, record: T, baseline: T | undefined) => Promise<boolean>;
 
 interface PersistOptions<T extends Identified, D> {
 	diff: SaveDiff<T>;
@@ -139,8 +140,8 @@ export async function persistEntity<T extends Identified, D>(opts: PersistOption
 		if (childSavers.length && childTargets.length) {
 			for (const target of childTargets) {
 				for (const saver of childSavers) {
-					await saver(target.id, target.record, target.baseline);
-					committed = true;
+					const wrote = await saver(target.id, target.record, target.baseline);
+					committed ||= wrote;
 				}
 			}
 			return await refresh();
