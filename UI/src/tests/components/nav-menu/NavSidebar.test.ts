@@ -2,12 +2,20 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/svelte';
 import NavSidebar from '../../../components/nav-menu/NavSidebar.svelte';
 
-vi.mock('$lib/engine', () => ({
-	logicEngine: { tickRate: 0 },
-	renderEngine: { tickRate: 0 }
+const { mockPlayerManager } = vi.hoisted(() => ({
+	mockPlayerManager: { lessons: [] as { lessonId: number; unlockedAt: string; readAt?: string }[] }
 }));
 
-afterEach(cleanup);
+vi.mock('$lib/engine', () => ({
+	logicEngine: { tickRate: 0 },
+	renderEngine: { tickRate: 0 },
+	playerManager: mockPlayerManager
+}));
+
+afterEach(() => {
+	cleanup();
+	mockPlayerManager.lessons = [];
+});
 
 const screens = [
 	{ key: 'fight', label: 'Fight', group: 'combat', built: true },
@@ -89,5 +97,37 @@ describe('NavSidebar', () => {
 
 		// Unpinning while not hovering collapses the rail back to the spacer width.
 		expect(sidebar.classList.contains('expanded')).toBe(false);
+	});
+
+	describe('unread lesson badge', () => {
+		it('shows no badge and the wip badge when there are no unread lessons', () => {
+			render(NavSidebar, { props: { screens, active: 'fight', onNavigate: vi.fn() } });
+
+			const helpItem = screen.getByTestId('sidebar-item-help');
+			expect(helpItem.textContent).toContain('wip');
+		});
+
+		it('shows the unread count on the Help item, superseding the wip badge, when lessons are unread', () => {
+			mockPlayerManager.lessons = [
+				{ lessonId: 1, unlockedAt: '2026-01-01T00:00:00Z' },
+				{ lessonId: 2, unlockedAt: '2026-01-01T00:00:00Z', readAt: '2026-01-01T00:05:00Z' },
+				{ lessonId: 3, unlockedAt: '2026-01-01T00:00:00Z' }
+			];
+
+			render(NavSidebar, { props: { screens, active: 'fight', onNavigate: vi.fn() } });
+
+			const helpItem = screen.getByTestId('sidebar-item-help');
+			expect(helpItem.textContent).toContain('2');
+			expect(helpItem.textContent).not.toContain('wip');
+		});
+
+		it('does not show a badge on other wip screens', () => {
+			mockPlayerManager.lessons = [{ lessonId: 1, unlockedAt: '2026-01-01T00:00:00Z' }];
+
+			render(NavSidebar, { props: { screens, active: 'fight', onNavigate: vi.fn() } });
+
+			const optionsItem = screen.getByTestId('sidebar-item-options');
+			expect(optionsItem.textContent).toContain('wip');
+		});
 	});
 });
