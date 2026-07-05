@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Api;
 using Game.Api.Models.Common;
 using Game.Api.Services;
 using Game.Api.Sockets;
@@ -193,6 +194,32 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task ExecuteServerCommand_SelfDeliveringCommand_ReturnsSucceededWithoutASecondSendOrDeliveryWarning()
+        {
+            // Mirrors SocketReplaced: the command sends its own response and closes the socket before
+            // returning. The runner must not attempt (and then misclassify as NotDelivered) a follow-up send
+            // on the now-closed socket (#1636).
+            var (socket, handler) = CreateHandler(_ => null, selfDelivering: name => name == "SelfDelivers");
+
+            var outcome = await handler.ExecuteServerCommand(new SocketCommandInfo("SelfDelivers") { Id = "c1" });
+
+            Assert.Equal(SocketCommandOutcome.Succeeded, outcome);
+            Assert.Single(socket.SentMessages, m => m.Contains("c1"));
+            Assert.DoesNotContain(_logs.Entries, e => e.Message.Contains("Failed to deliver"));
+        }
+
+        [Fact]
+        public async Task ExecuteCommand_SelfDeliveringCommand_DoesNotAttemptASecondSend()
+        {
+            var (socket, handler) = CreateHandler(_ => null, selfDelivering: name => name == "SelfDelivers");
+
+            await handler.ExecuteCommand(new SocketCommandInfo("SelfDelivers") { Id = "c1" });
+
+            Assert.Single(socket.SentMessages, m => m.Contains("c1"));
+            Assert.DoesNotContain(_logs.Entries, e => e.Message.Contains("Failed to deliver"));
+        }
+
+        [Fact]
         public async Task HandleMessage_UnparseableJson_ClosesTheSocketInsteadOfLeavingTheClientToTimeOut()
         {
             // An invalid-JSON frame carries no request id to correlate a structured rejection to, so closing
@@ -207,13 +234,13 @@ namespace Game.Api.Tests.Unit
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Failed to deserialize"));
         }
 
-        private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null)
+        private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
             session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
-            var handler = new SocketHandler(context, new StubCommandFactory(throwOn, throwOnCreate), _scopeFactory,
+            var handler = new SocketHandler(context, new StubCommandFactory(throwOn, throwOnCreate, selfDelivering), _scopeFactory,
                 _loggerFactory.CreateLogger<SocketHandler>(), () => { });
             return (socket, handler);
         }
@@ -229,13 +256,18 @@ namespace Game.Api.Tests.Unit
         /// throws directly from <see cref="CreateCommand"/> instead — simulating what the real factory's
         /// <c>SetParameters</c> call already throws (a classified <see cref="MalformedSocketCommandParametersException"/>)
         /// once parameter binding fails, before a command is ever fully constructed.</summary>
-        private sealed class StubCommandFactory(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null) : SocketCommandFactory
+        private sealed class StubCommandFactory(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null) : SocketCommandFactory
         {
             public override AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
             {
                 if (throwOnCreate?.Invoke(commandInfo.Name) is { } creationFault)
                 {
                     throw creationFault;
+                }
+
+                if (selfDelivering?.Invoke(commandInfo.Name) is true)
+                {
+                    return new SelfDeliveringStubCommand(commandInfo.Name) { Id = commandInfo.Id };
                 }
 
                 return new StubCommand(commandInfo.Name, throwOn(commandInfo.Name)) { Id = commandInfo.Id };
@@ -258,6 +290,19 @@ namespace Game.Api.Tests.Unit
                 }
 
                 return Task.FromResult(Success());
+            }
+        }
+
+        /// <summary>Mirrors SocketReplaced's send-then-close-then-return-Success shape for #1636 coverage.</summary>
+        private sealed class SelfDeliveringStubCommand(string name) : AbstractSocketCommand, ISelfDeliveringCommand
+        {
+            public override string Name { get; set; } = name;
+
+            public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
+            {
+                await context.SendData(Success());
+                await context.Close(ESocketCloseReason.SocketReplaced);
+                return Success();
             }
         }
 
