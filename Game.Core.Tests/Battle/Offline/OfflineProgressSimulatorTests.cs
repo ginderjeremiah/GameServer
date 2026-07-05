@@ -67,38 +67,41 @@ namespace Game.Core.Tests.Battle.Offline
             // A single deterministic battle (fixed enemy + fixed seed) tells us the exact per-battle duration.
             var battleMs = SingleBattleDurationMs(scenario);
             var stepMs = battleMs + CooldownMs;
-            var awayMs = (stepMs * 4) + 1; // 4 full steps plus a sliver → a 5th battle starts
+            // 4 full steps plus a one-tick sliver of a 5th battle: too little for that 5th battle to fit, so
+            // it is carried forward as PendingBattle (#1596) rather than credited as a 5th completed outcome.
+            var awayMs = (stepMs * 4) + 1;
 
             var result = _simulator.Simulate(IdleParameters(awayMs, scenario));
 
-            // Every battle is identical, so each consumes the same duration.
+            // Every credited battle is identical, so each consumes the same duration.
             Assert.All(result.Battles, battle => Assert.Equal(battleMs, battle.Result.TotalMs));
 
-            // The loop keeps fighting while any budget remains, consuming duration + cooldown per battle, and
-            // stops once the budget is exhausted: the run is the fewest battles whose total cost covers the
-            // budget (the last battle overshoots by at most one step).
+            // The loop credits only battles that genuinely fit the remaining budget: the fewest whole cycles
+            // whose total cost stays within it, never crediting the one straddling the boundary.
             var count = result.BattlesSimulated;
-            Assert.True((count - 1L) * stepMs < awayMs, "The run stopped before the budget was exhausted.");
-            Assert.True(count * stepMs >= awayMs, "The run continued past an already-exhausted budget.");
-            Assert.Equal(5, count);
+            Assert.True(count * stepMs <= awayMs, "A credited battle's cycle must fit the budget it was drawn against.");
+            Assert.True((count + 1L) * stepMs > awayMs, "The run stopped before the budget was exhausted.");
+            Assert.Equal(4, count);
         }
 
         // ── Trailing remainder (#1596) ───────────────────────────────────────
 
         [Fact]
-        public void Simulate_RemainderMs_EqualsOvershootPastTheAwayBudget()
+        public void Simulate_RemainderMs_EqualsOvershootPastTheAwayBudget_WhenBoundaryFallsInACompletedBattlesCooldown()
         {
             var scenario = StrongPlayerWinScenario();
             var battleMs = SingleBattleDurationMs(scenario);
             var stepMs = battleMs + CooldownMs;
-            // 4 full steps plus a sliver: the 5th (and last) credited battle+cooldown cycle overshoots the
-            // budget by exactly stepMs - 1.
-            var awayMs = (stepMs * 4) + 1;
+            // Comfortably within the cooldown window, regardless of the measured battle duration, so the 5th
+            // (and last) battle still fits and is credited — only its cooldown overshoots.
+            var remainderWanted = CooldownMs / 2;
+            var awayMs = (stepMs * 5) - remainderWanted;
 
             var result = _simulator.Simulate(IdleParameters(awayMs, scenario));
 
             Assert.Equal(5, result.BattlesSimulated);
-            Assert.Equal(stepMs - 1, result.RemainderMs);
+            Assert.Equal(remainderWanted, result.RemainderMs);
+            Assert.Null(result.PendingBattle);
         }
 
         [Fact]
@@ -113,6 +116,7 @@ namespace Game.Core.Tests.Battle.Offline
 
             Assert.Equal(4, result.BattlesSimulated);
             Assert.Equal(0, result.RemainderMs);
+            Assert.Null(result.PendingBattle);
         }
 
         [Theory]
@@ -124,6 +128,7 @@ namespace Game.Core.Tests.Battle.Offline
 
             Assert.Equal(0, result.BattlesSimulated);
             Assert.Equal(0, result.RemainderMs);
+            Assert.Null(result.PendingBattle);
         }
 
         [Fact]
@@ -140,17 +145,61 @@ namespace Game.Core.Tests.Battle.Offline
 
             Assert.Equal(5, result.BattlesSimulated);
             Assert.Equal(0, result.RemainderMs);
+            Assert.Null(result.PendingBattle);
         }
 
         [Fact]
-        public void Simulate_AwayBudgetBelowOneStep_RunsExactlyOneBattle()
+        public void Simulate_PendingBattle_CarriesTheBoundaryBattleUncredited_WhenItDoesNotFitTheRemainingBudget()
+        {
+            // The away window ends mid-fight (not in a completed battle's cooldown): the straddling battle's
+            // own duration exceeds the remaining budget, so it must not be credited as a win, and must be
+            // carried forward at its true elapsed-so-far offset — not the complement of it (a prior, buggy
+            // version of this fix inverted the offset by deriving it from the whole cycle's overshoot instead
+            // of checking whether the battle itself fit).
+            var scenario = StrongPlayerWinScenario();
+            var battleMs = SingleBattleDurationMs(scenario);
+            var stepMs = battleMs + CooldownMs;
+            var elapsedWanted = battleMs / 2;
+            var awayMs = (stepMs * 4) + elapsedWanted;
+
+            var result = _simulator.Simulate(IdleParameters(awayMs, scenario));
+
+            Assert.Equal(4, result.BattlesSimulated);
+            Assert.Equal(0, result.RemainderMs);
+            Assert.NotNull(result.PendingBattle);
+            Assert.Equal(elapsedWanted, result.PendingBattle.ElapsedOffsetMs);
+            Assert.Equal(EnemyId, result.PendingBattle.Enemy.Id);
+        }
+
+        [Fact]
+        public void Simulate_PendingBattle_IsNeverAlsoCreditedAsAWin()
+        {
+            // The double-count the review caught: the boundary battle must appear in at most one of
+            // "credited outcomes" or "pending battle", never both.
+            var scenario = StrongPlayerWinScenario();
+            var battleMs = SingleBattleDurationMs(scenario);
+            var awayMs = battleMs / 2; // far too little for even one battle to fit — the very first attempt is pending.
+
+            var result = _simulator.Simulate(IdleParameters(awayMs, scenario));
+
+            Assert.Empty(result.Battles);
+            Assert.Equal(0, result.Wins);
+            Assert.Equal(0, result.TotalExp);
+            Assert.NotNull(result.PendingBattle);
+            Assert.Equal(awayMs, result.PendingBattle.ElapsedOffsetMs);
+        }
+
+        [Fact]
+        public void Simulate_AwayBudgetBelowOneStep_HandsBackAPendingBattleRatherThanCreditingAWin()
         {
             var scenario = StrongPlayerWinScenario();
 
-            // Any positive budget fights at least one battle; the battle (plus cooldown) then exhausts it.
+            // A budget far shorter than even one battle's own duration cannot have genuinely completed one.
             var result = _simulator.Simulate(IdleParameters(awayMs: 1, scenario));
 
-            Assert.Single(result.Battles);
+            Assert.Empty(result.Battles);
+            Assert.NotNull(result.PendingBattle);
+            Assert.Equal(1, result.PendingBattle.ElapsedOffsetMs);
         }
 
         [Fact]

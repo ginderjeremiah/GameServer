@@ -30,8 +30,8 @@ namespace Game.Api.Models.Progress
         /// <summary>Non-null when there is a battle to resume from a non-zero elapsed offset — the client's
         /// replay-to-offset fast-forward (#1597): either the player's pre-existing battle was still genuinely
         /// in progress rather than concluded (#1595), in which case every other field above is at its
-        /// empty/default value, or the away window's trailing remainder spilled into a fresh next battle
-        /// (#1596), alongside whatever battles the window did credit.
+        /// empty/default value, or the away window's boundary fell inside a battle the crediting loop could
+        /// not credit as completed (#1596), alongside whatever battles the window did credit before it.
         /// </summary>
         public EnemyInstance? ActiveBattle { get; set; }
 

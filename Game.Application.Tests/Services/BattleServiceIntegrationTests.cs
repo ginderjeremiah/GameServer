@@ -2121,7 +2121,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task SetupBackdatedBattle_Idle_SetsActiveBattleBackdatedByElapsedOffset()
+        public async Task HandBackPendingBattle_Idle_SetsActiveBattleBackdatedByElapsedOffset()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -2142,30 +2142,32 @@ namespace Game.Application.Tests.Services
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var zonesRepo = scope.ServiceProvider.GetRequiredService<IZones>();
             var enemiesRepo = scope.ServiceProvider.GetRequiredService<IEnemies>();
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
             var state = new PlayerState();
 
-            var domainZone = zonesRepo.GetDomainZone(zone.Id);
+            var pendingEnemy = enemiesRepo.GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(pendingEnemy);
+            pendingEnemy.SelectAllBattleSkills();
             var snapshot = BattleSnapshot.FromPlayer(player, []);
             var now = DateTime.UtcNow;
+            var pending = new OfflinePendingBattle(pendingEnemy, Seed: 42, ElapsedOffsetMs: 45_000);
 
-            var result = battleService.SetupBackdatedBattle(
-                state, OfflineLoopMode.Idle, domainZone, snapshot,
-                level => enemiesRepo.GetRandomDomainEnemy(zone.Id, level), now, elapsedOffsetMs: 45_000);
+            var result = battleService.HandBackPendingBattle(state, pending, snapshot, zone.Id, isBossBattle: false, now);
 
             Assert.Equal(enemy.Id, result.Enemy.Id);
+            Assert.Equal(42u, result.Seed);
             Assert.Equal(45_000, result.ElapsedOffsetMs);
             Assert.True(state.HasActiveBattle);
             Assert.False(state.IsBossBattle);
             Assert.Equal(zone.Id, state.BattleZoneId);
+            Assert.Equal(42u, state.BattleSeed);
             Assert.Equal(now.AddMilliseconds(-45_000), state.BattleStartTime);
-            Assert.Equal(result.Enemy.BattleSkills.Select(s => s.Id), state.ActiveEnemySkillIds);
+            Assert.Equal(pendingEnemy.BattleSkills.Select(s => s.Id), state.ActiveEnemySkillIds);
         }
 
         [Fact]
-        public async Task SetupBackdatedBattle_Boss_BuildsDeterministicBossAndSetsBossFlag()
+        public async Task HandBackPendingBattle_Boss_SetsBossFlag()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -2187,21 +2189,20 @@ namespace Game.Application.Tests.Services
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var zonesRepo = scope.ServiceProvider.GetRequiredService<IZones>();
-            var zoneResolution = scope.ServiceProvider.GetRequiredService<ZoneResolutionService>();
+            var enemiesRepo = scope.ServiceProvider.GetRequiredService<IEnemies>();
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
             var state = new PlayerState();
 
-            var domainZone = zonesRepo.GetDomainZone(zone.Id);
+            var pendingBoss = enemiesRepo.GetDomainEnemy(boss.Id, level: 18);
+            Assert.NotNull(pendingBoss);
+            pendingBoss.SelectAllBattleSkills();
             var snapshot = BattleSnapshot.FromPlayer(player, []);
             var now = DateTime.UtcNow;
+            var pending = new OfflinePendingBattle(pendingBoss, Seed: 7, ElapsedOffsetMs: 10_000);
 
-            var result = battleService.SetupBackdatedBattle(
-                state, OfflineLoopMode.Boss, domainZone, snapshot,
-                zoneResolution.BossEnemyResolver(domainZone), now, elapsedOffsetMs: 10_000);
+            var result = battleService.HandBackPendingBattle(state, pending, snapshot, zone.Id, isBossBattle: true, now);
 
             Assert.Equal(boss.Id, result.Enemy.Id);
-            // Deterministic: fought at the fixed boss level with its full authored loadout.
             Assert.Equal(18, result.Enemy.Level);
             Assert.True(state.HasActiveBattle);
             Assert.True(state.IsBossBattle);
@@ -2210,7 +2211,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task SetupBackdatedBattle_ZeroOffset_StartsExactlyAtNow()
+        public async Task HandBackPendingBattle_ZeroOffset_StartsExactlyAtNow()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -2231,18 +2232,18 @@ namespace Game.Application.Tests.Services
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var zonesRepo = scope.ServiceProvider.GetRequiredService<IZones>();
             var enemiesRepo = scope.ServiceProvider.GetRequiredService<IEnemies>();
             var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
             var state = new PlayerState();
 
-            var domainZone = zonesRepo.GetDomainZone(zone.Id);
+            var pendingEnemy = enemiesRepo.GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(pendingEnemy);
+            pendingEnemy.SelectAllBattleSkills();
             var snapshot = BattleSnapshot.FromPlayer(player, []);
             var now = DateTime.UtcNow;
+            var pending = new OfflinePendingBattle(pendingEnemy, Seed: 1, ElapsedOffsetMs: 0);
 
-            var result = battleService.SetupBackdatedBattle(
-                state, OfflineLoopMode.Idle, domainZone, snapshot,
-                level => enemiesRepo.GetRandomDomainEnemy(zone.Id, level), now, elapsedOffsetMs: 0);
+            var result = battleService.HandBackPendingBattle(state, pending, snapshot, zone.Id, isBossBattle: false, now);
 
             Assert.Equal(0, result.ElapsedOffsetMs);
             Assert.Equal(now, state.BattleStartTime);

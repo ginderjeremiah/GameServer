@@ -555,11 +555,13 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task SimulateOfflineProgress_RemainderSpansCooldown_SetsUpBackdatedActiveBattle()
+        public async Task SimulateOfflineProgress_BoundaryFallsMidBattle_HandsBackThatBattlePendingWithoutCreditingIt()
         {
-            // #1596: when the remainder spans the whole post-battle cooldown, the excess becomes a fresh next
-            // battle's elapsed offset — set up already active and surfaced on the summary so the client resumes
-            // it via replay-to-offset (#1597) with no extra round trip.
+            // #1596: when the away-window boundary falls *inside* a battle rather than a completed battle's
+            // cooldown, that battle's own duration doesn't fit the remaining budget — it must not be credited
+            // as a win (it didn't really conclude), and must be handed back at its true elapsed offset, not a
+            // fresh spawn (a prior, buggy version of this fix double-counted it as both a completed win and a
+            // fresh backdated battle, with an inverted offset besides).
             using var scope = CreateScope();
             var setup = await SeedWinningScenarioAsync(scope);
 
@@ -569,28 +571,29 @@ namespace Game.Application.Tests.Services
             var battleMs = await ComputeBattleDurationMsAsync(scope, setup);
             var cooldownMs = (int)BattleService.PostBattleCooldown.TotalMilliseconds;
             var stepMs = battleMs + cooldownMs;
-            // Cooldown plus half the battle's own duration: always strictly between cooldownMs and stepMs,
-            // regardless of the measured battle duration.
-            var remainderWanted = cooldownMs + (battleMs / 2);
-            // Many steps, so the away window clears the 5-minute floor regardless of the measured battle
-            // duration, while still landing the trailing remainder exactly at remainderWanted.
-            const int steps = 100;
-            var awayMs = (long)(steps * stepMs) - remainderWanted;
+            // Comfortably less than a full battle, regardless of the measured duration, so the away window's
+            // last attempt lands mid-fight rather than in a completed battle's cooldown.
+            var elapsedWanted = battleMs / 2;
+            // Many full battle+cooldown cycles credited first, so the away window clears the 5-minute floor
+            // regardless of the measured battle duration, then one more battle elapsed exactly elapsedWanted
+            // into it when the away window runs out.
+            const int creditedBattles = 99;
+            var awayMs = ((long)creditedBattles * stepMs) + elapsedWanted;
 
             player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
 
             var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
-            Assert.Equal(steps, summary.BattlesWon);
+            // Exactly the battles that genuinely completed — not one more for the boundary battle.
+            Assert.Equal(creditedBattles, summary.BattlesWon);
             Assert.NotNull(summary.ActiveBattle);
             Assert.Equal(setup.EnemyId, summary.ActiveBattle.Enemy.Id);
-            Assert.NotNull(summary.ActiveBattle.ElapsedOffsetMs);
+            Assert.Equal(elapsedWanted, summary.ActiveBattle.ElapsedOffsetMs);
             Assert.True(state.HasActiveBattle);
             Assert.False(state.IsOnCooldown(DateTime.UtcNow));
-            // The backdated battle's own elapsed-since-start is close to the expected excess (allow slack for
-            // real wall-clock time elapsed during the call itself).
+            // The backdated battle's own elapsed-since-start is the true offset, not its complement.
             var actualElapsedMs = (DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
-            Assert.InRange(actualElapsedMs, 1, battleMs + 2000);
+            Assert.InRange(actualElapsedMs, elapsedWanted, elapsedWanted + 2000);
         }
 
         [Fact]

@@ -39,22 +39,35 @@ namespace Game.Core.Battle.Offline
         public long TotalExp { get; }
 
         /// <summary>
-        /// The trailing remainder left once the away-window crediting loop exhausts the budget (#1596): the
-        /// last credited battle+cooldown cycle's assumed duration runs past the real away-window boundary by
-        /// this many milliseconds (0 when nothing was simulated, or when the stalemate cutoff — a CPU-waste
-        /// guard, not an overshoot — stopped the loop early with genuine unspent budget). The orchestration
-        /// layer carries this forward as either a residual cooldown or the elapsed offset of a fresh
-        /// already-in-progress next battle, rather than dropping it when the live loop resumes.
+        /// The residual post-battle cooldown left once the away-window crediting loop exhausts the budget
+        /// inside a completed battle's cooldown (#1596) — always at most the cooldown length, since a
+        /// battle whose own duration doesn't fit in the remaining budget is never credited (see
+        /// <see cref="PendingBattle"/> instead). 0 when nothing was simulated, when the boundary lands inside
+        /// a battle rather than its cooldown (<see cref="PendingBattle"/> is set instead), or when the
+        /// stalemate cutoff — a CPU-waste guard, not an overshoot — stopped the loop early with genuine
+        /// unspent budget. The orchestration layer carries this forward as a residual <c>PlayerState</c>
+        /// cooldown rather than dropping it when the live loop resumes.
         /// </summary>
         public long RemainderMs { get; }
 
+        /// <summary>
+        /// Non-null when the away-window boundary falls <em>inside</em> a battle rather than a completed
+        /// battle's cooldown (#1596): that battle's own duration didn't fit the remaining budget, so it was
+        /// never credited as a win/loss/draw — it is carried forward here (same enemy/seed, its true elapsed
+        /// offset) for the orchestration to hand back as an already-active battle, mirroring the leading-edge
+        /// stale-battle hand-back (#1595). Mutually exclusive with a non-zero <see cref="RemainderMs"/>.
+        /// </summary>
+        public OfflinePendingBattle? PendingBattle { get; }
+
         public OfflineProgressResult(
-            OfflineLoopMode mode, int zoneId, IReadOnlyList<OfflineBattleOutcome> battles, long remainderMs = 0)
+            OfflineLoopMode mode, int zoneId, IReadOnlyList<OfflineBattleOutcome> battles,
+            long remainderMs = 0, OfflinePendingBattle? pendingBattle = null)
         {
             Mode = mode;
             ZoneId = zoneId;
             Battles = battles;
             RemainderMs = remainderMs;
+            PendingBattle = pendingBattle;
 
             // Fold the per-battle outcomes into the run-level aggregates in a single pass, keeping the
             // outcome list the one source of truth (the summary is a materialized view of it).
