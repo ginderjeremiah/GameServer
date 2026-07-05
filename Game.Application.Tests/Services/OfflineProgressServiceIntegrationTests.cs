@@ -544,14 +544,19 @@ namespace Game.Application.Tests.Services
 
             player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
 
+            // Sandwich the call between two real timestamps rather than comparing the cooldown against a
+            // DateTime.UtcNow read after it returns: the call itself does real DB/Redis I/O of unbounded
+            // duration, so a residual this small (half the cooldown) could otherwise already have elapsed by
+            // the time of that later read on a slow/loaded run, and the assertion must not depend on how long
+            // the call actually took.
+            var beforeCall = DateTime.UtcNow;
             var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+            var afterCall = DateTime.UtcNow;
 
             Assert.Equal(steps, summary.BattlesWon);
             Assert.Null(summary.ActiveBattle);
             Assert.False(state.HasActiveBattle);
-            Assert.True(state.IsOnCooldown(DateTime.UtcNow));
-            var residualMs = (state.EnemyCooldown - DateTime.UtcNow).TotalMilliseconds;
-            Assert.InRange(residualMs, 1, cooldownMs);
+            Assert.InRange(state.EnemyCooldown, beforeCall.AddMilliseconds(remainderWanted), afterCall.AddMilliseconds(remainderWanted));
         }
 
         [Fact]
@@ -582,7 +587,12 @@ namespace Game.Application.Tests.Services
 
             player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
 
+            // Sandwich the call between two real timestamps rather than comparing the backdated start time
+            // against a DateTime.UtcNow read after it returns: the call itself does real DB/Redis I/O of
+            // unbounded duration, so the assertion must not depend on how long the call actually took.
+            var beforeCall = DateTime.UtcNow;
             var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+            var afterCall = DateTime.UtcNow;
 
             // Exactly the battles that genuinely completed — not one more for the boundary battle.
             Assert.Equal(creditedBattles, summary.BattlesWon);
@@ -591,9 +601,12 @@ namespace Game.Application.Tests.Services
             Assert.Equal(elapsedWanted, summary.ActiveBattle.ElapsedOffsetMs);
             Assert.True(state.HasActiveBattle);
             Assert.False(state.IsOnCooldown(DateTime.UtcNow));
-            // The backdated battle's own elapsed-since-start is the true offset, not its complement.
-            var actualElapsedMs = (DateTime.UtcNow - state.BattleStartTime).TotalMilliseconds;
-            Assert.InRange(actualElapsedMs, elapsedWanted, elapsedWanted + 2000);
+            // The backdated battle's own start time is the true offset before the call's internal "now", not
+            // the complement of it.
+            Assert.InRange(
+                state.BattleStartTime,
+                beforeCall.AddMilliseconds(-elapsedWanted),
+                afterCall.AddMilliseconds(-elapsedWanted));
         }
 
         [Fact]
