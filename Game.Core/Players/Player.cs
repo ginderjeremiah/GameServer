@@ -118,9 +118,11 @@ namespace Game.Core.Players
 
         /// <summary>
         /// Applies a single experience grant: clamps it to <c>[0, MaxExpPerGrant]</c> and runs the level-up
-        /// loop, raising one <see cref="PlayerLeveledUpEvent"/> per level gained. Shared by the live
-        /// <see cref="GrantExp"/> (one grant, one core update) and the batched <see cref="GrantOfflineExp"/>
-        /// (many grants, one core update) so the clamp and level-up arithmetic cannot drift between the two.
+        /// loop (<see cref="ExpProgression.ApplyExp"/>, shared with the offline simulator's in-loop level
+        /// tracking, #1601), raising one <see cref="PlayerLeveledUpEvent"/> per level gained. Shared by the
+        /// live <see cref="GrantExp"/> (one grant, one core update) and the batched
+        /// <see cref="GrantOfflineExp"/> (many grants, one core update) so the clamp and level-up arithmetic
+        /// cannot drift between the two.
         /// </summary>
         private void ApplyExp(int amount)
         {
@@ -134,15 +136,15 @@ namespace Game.Core.Players
                     $"Player {Id} has a corrupt Level of {Level}; expected at least 1.");
             }
 
-            Exp += Math.Clamp(amount, 0, ServerGameConstants.MaxExpPerGrant);
-            var levelThreshold = Level * GameConstants.ExpPerLevel;
-            while (Exp >= levelThreshold)
+            var startLevel = Level;
+            var result = ExpProgression.ApplyExp(Level, Exp, amount);
+            Level = result.Level;
+            Exp = result.Exp;
+
+            for (var levelsIn = 1; levelsIn <= result.LevelsGained; levelsIn++)
             {
-                Exp -= levelThreshold;
-                Level++;
                 StatPoints.StatPointsGained += GameConstants.StatPointsPerLevel;
-                RaiseEvent(new PlayerLeveledUpEvent(this, Level, StatPoints.StatPointsGained));
-                levelThreshold = Level * GameConstants.ExpPerLevel;
+                RaiseEvent(new PlayerLeveledUpEvent(this, startLevel + levelsIn, StatPoints.StatPointsGained));
             }
         }
 
