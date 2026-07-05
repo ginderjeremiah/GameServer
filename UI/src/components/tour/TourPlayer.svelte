@@ -45,9 +45,9 @@
 				<div class="tour-callout__nav">
 					<button type="button" disabled={isFirst} onclick={goBack}>Back</button>
 					{#if isLast}
-						<button type="button" onclick={onComplete}>Done</button>
+						<button type="button" bind:this={primaryButton} onclick={onComplete}>Done</button>
 					{:else}
-						<button type="button" onclick={goNext}>Next</button>
+						<button type="button" bind:this={primaryButton} onclick={goNext}>Next</button>
 					{/if}
 				</div>
 			</div>
@@ -56,7 +56,7 @@
 {/if}
 
 <script lang="ts">
-import { focusTrap, FOCUSABLE_SELECTOR } from '../focus-trap';
+import { focusTrap } from '../focus-trap';
 import { getTutorialAnchor } from './tutorial-anchor';
 import type { TourStep } from './tour-types';
 
@@ -77,6 +77,7 @@ const { open, steps, label, onDismiss, onComplete }: Props = $props();
 
 let stepIndex = $state(0);
 let shell = $state<HTMLElement | null>(null);
+let primaryButton = $state<HTMLButtonElement | null>(null);
 let calloutPos = $state<{ top: number; left: number } | null>(null);
 let spotlightRect = $state<{ top: number; left: number; width: number; height: number } | null>(null);
 
@@ -156,14 +157,14 @@ $effect(() => {
 	calloutPos = { top, left };
 });
 
-// On open (and per step, since Back/Next can remount focusable controls), move focus onto the first
-// focusable inside the callout, or the shell itself if it somehow has none. Trap/Escape/scroll-lock/
-// restore are owned by focusTrap.
+// Initial focus lands on the primary action (Next/Done) rather than the first focusable control
+// (Skip), so a keyboard user driving the tour via Enter is never bounced onto Skip. `primaryButton`
+// is a fresh DOM node only when Next/Done swap (isLast flips) — not on every step within the same
+// Next/Back pair — so this naturally leaves focus wherever the user already put it (e.g. clicked
+// Back) undisturbed. Trap/Escape/scroll-lock/restore are owned by focusTrap.
 $effect(() => {
-	void stepIndex;
-	if (open && shell) {
-		const target = shell.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-		(target ?? shell).focus();
+	if (open) {
+		(primaryButton ?? shell)?.focus();
 	}
 });
 </script>
