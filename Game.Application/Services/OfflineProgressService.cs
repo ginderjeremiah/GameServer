@@ -83,9 +83,11 @@ namespace Game.Application.Services
         /// Credits a character being switched away from in a deliberate in-game character switch (spike #922):
         /// the same elapsed-time replay as <see cref="SimulateOfflineProgress"/> but with the
         /// <see cref="MinimumOfflineAway"/> floor dropped, so any elapsed time since the departed character's
-        /// <see cref="Player.LastActivity"/> is credited (the 5-minute floor is a login-time concern). Resolves
-        /// the in-flight battle, applies the rewards, re-anchors <c>LastActivity</c>, and persists — so the
-        /// departed character loses no idle progress when the player switches to another of their characters.
+        /// <see cref="Player.LastActivity"/> is credited (the 5-minute floor is a login-time concern). When the
+        /// in-flight battle has settled (or reached the draw cap) it resolves the battle, applies the rewards,
+        /// re-anchors <c>LastActivity</c>, and persists — so the departed character loses no idle progress; when
+        /// that battle is still genuinely in progress it is instead handed back untouched (no rewards, no
+        /// <c>LastActivity</c> re-anchor, no persist), leaving the away clock running against the original departure.
         /// The caller must invoke this off the departed character's battle loop (its socket torn down first),
         /// so the player-state write cannot race a live battle-completion command.
         /// </summary>

@@ -1169,11 +1169,12 @@ namespace Game.Application.Tests.Services
             // large the (capped) replay window is.
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
-            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            // The enemy's skill carries a high base damage (but a cooldown far longer than the one-shot fight,
+            // so it never actually lands) purely to give the enemy a CombatRating comparable to the player's —
+            // otherwise the rating-based reward's anti-grind curve floors a capability-trivial enemy's bounty
+            // to 0. The pinned encounter level keeps the reward deterministic.
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 5000m, cooldownMs: 2000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
-            // Pin the encounter level so the win yields a deterministic, non-zero exp reward (the reward
-            // floors to 0 for an enemy whose total attributes are small relative to the player's stat pool at
-            // level 1 — see StartBattle_AbandoningAWonBattle_GrantsExpForTheVictory).
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
 
