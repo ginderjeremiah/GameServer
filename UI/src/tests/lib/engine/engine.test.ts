@@ -162,6 +162,8 @@ import {
 	inventoryManager
 } from '$lib/engine/engine';
 import { activeModal, clearModals, confirmActiveModal } from '$stores/modal.svelte';
+import { createHook } from '$lib/common/hooks';
+import { onDestroy } from 'svelte';
 import {
 	EItemCategory,
 	ELogType,
@@ -276,10 +278,43 @@ describe('startGame', () => {
 		expect(renderEngine.start).toHaveBeenCalledTimes(1);
 		expect(enemyManager.start).toHaveBeenCalledTimes(1);
 		expect(battleEngine.start).toHaveBeenCalledTimes(1);
-		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced, true);
-		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted, true);
-		expect(listenCommand).toHaveBeenCalledWith('ProficiencyXpGained', handleProficiencyXpGained, true);
-		expect(listenCommand).toHaveBeenCalledWith('ServerCommandFailed', handleServerCommandFailed, true);
+		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced);
+		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted);
+		expect(listenCommand).toHaveBeenCalledWith('ProficiencyXpGained', handleProficiencyXpGained);
+		expect(listenCommand).toHaveBeenCalledWith('ServerCommandFailed', handleServerCommandFailed);
+	});
+
+	it('does not opt into onDestroy cleanup, since it runs outside component init (#1631)', () => {
+		startGame();
+
+		for (const call of listenCommand.mock.calls) {
+			expect(call).toHaveLength(2);
+		}
+	});
+
+	it('registers all four listeners against the real hook without a component context (#1631)', () => {
+		// This file's top-level mock stubs both apiSocket.listenCommand and svelte's onDestroy away, which
+		// would hide a regression that re-adds cleanupOnDestroy: true (the mocked onDestroy never throws).
+		// Route the mocked listenCommand through the real createHook instead, so startGame exercises the
+		// real onNotified/onDestroy wiring; only the cleanupOnDestroy flag it passes is under test here —
+		// whether onDestroy itself throws outside a component is covered directly in hooks.test.ts.
+		const hooks = {
+			SocketReplaced: createHook(),
+			ChallengeCompleted: createHook(),
+			ProficiencyXpGained: createHook(),
+			ServerCommandFailed: createHook()
+		};
+		// One-shot per call (consumed in startGame's fixed call order) so the override doesn't leak into
+		// later tests that rely on the base mock's unlisten-spy return values.
+		for (const hook of Object.values(hooks)) {
+			listenCommand.mockImplementationOnce((_command: string, action: (...args: unknown[]) => void) =>
+				hook.onNotified(action)
+			);
+		}
+
+		startGame();
+
+		expect(onDestroy).not.toHaveBeenCalled();
 	});
 
 	it('does nothing when the static data is not loaded', () => {
