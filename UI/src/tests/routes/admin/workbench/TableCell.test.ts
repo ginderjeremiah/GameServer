@@ -32,6 +32,13 @@ const makeShareCol = (overrides: Partial<ColumnConfig> = {}): ColumnConfig => ({
 	...overrides
 });
 
+const makeTextCol = (overrides: Partial<ColumnConfig> = {}): ColumnConfig => ({
+	key: 'text',
+	label: 'Callout Text',
+	type: 'text',
+	...overrides
+});
+
 describe('TableCell — select type', () => {
 	it('renders a <select> element', () => {
 		const { container } = render(TableCell, {
@@ -149,6 +156,73 @@ describe('TableCell — number type', () => {
 		const input = container.querySelector('input') as HTMLInputElement;
 		expect(input).toBeTruthy();
 		expect(input.getAttribute('inputmode')).toBe('decimal');
+	});
+});
+
+describe('TableCell — text type', () => {
+	it('renders a text input with the row value', () => {
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol(),
+				row: { text: 'Look here' },
+				idx: 0,
+				rows: [{ text: 'Look here' }],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		expect(input).toBeTruthy();
+		expect(input.value).toBe('Look here');
+	});
+
+	it('falls back to an empty string when the row value is absent', () => {
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol(),
+				row: {},
+				idx: 0,
+				rows: [{}],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		expect((container.querySelector('input') as HTMLInputElement).value).toBe('');
+	});
+
+	it('calls onChange with the typed string', async () => {
+		const onChange = vi.fn();
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol(),
+				row: { text: '' },
+				idx: 0,
+				rows: [{ text: '' }],
+				record: {},
+				dirty: false,
+				onChange
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'Tap here to open your inventory' } });
+		expect(onChange).toHaveBeenCalledWith('Tap here to open your inventory');
+	});
+
+	it('adds the "dirty" class when dirty=true', () => {
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol(),
+				row: { text: 'a' },
+				idx: 0,
+				rows: [{ text: 'a' }],
+				record: {},
+				dirty: true,
+				onChange: vi.fn()
+			}
+		});
+		expect(container.querySelector('input')!.classList.contains('dirty')).toBe(true);
 	});
 });
 

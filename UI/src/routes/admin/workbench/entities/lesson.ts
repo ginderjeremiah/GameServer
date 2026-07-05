@@ -1,7 +1,7 @@
 import { ApiRequest, ELessonTriggerType, fetchSocketData, type ILesson } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { persistEntity } from '../save-helpers';
+import { childChanged, persistEntity } from '../save-helpers';
 import type { EntityConfig } from './types';
 
 /** A lesson, normalising the optional mechanic-event trigger to the select's "None" sentinel (-1) so the
@@ -47,8 +47,6 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 			glyph: 'tag',
 			desc: 'Key, trigger & host screen',
 			kind: 'fields',
-			// Steps aren't editable in the Workbench yet (the generic table section is numeric-cell-only;
-			// authoring the free-text tour copy needs a text-capable column — filed as a follow-up).
 			warn: (l) => {
 				if (l.triggerType === ELessonTriggerType.MechanicEvent && l.triggerMechanicEvent === -1) {
 					return 'Mechanic-event lessons must name a mechanic event';
@@ -109,6 +107,59 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					grow: true
 				}
 			]
+		},
+		{
+			key: 'steps',
+			label: 'Tour Steps',
+			glyph: 'map',
+			desc: 'The ordered coach-mark callouts this lesson’s tour plays',
+			count: (l) => l.steps.length,
+			// `ordinal` is both the row identity (SectionTable's rowKey) and an author-editable number —
+			// unlike every other table section, which keys off a `unique` select or a surrogate id neither
+			// of which an author can hand-collide. A duplicate crashes the keyed {#each} and collides in
+			// the backend's ordinal-keyed reconciler, so it's caught here rather than left to blow up.
+			warn: (l) => {
+				if (!l.steps.length) {
+					return 'No tour steps';
+				}
+				const ordinals = l.steps.map((s) => s.ordinal);
+				if (new Set(ordinals).size !== ordinals.length) {
+					return 'Two steps share the same ordinal';
+				}
+				if (l.steps.some((s) => !s.text.trim())) {
+					return 'A tour step is missing its callout text';
+				}
+				return null;
+			},
+			kind: 'table',
+			itemsKey: 'steps',
+			rowKey: 'ordinal',
+			addLabel: 'Add step',
+			emptyIcon: 'map',
+			emptyTitle: 'No tour steps',
+			emptySub: 'This lesson’s tour has nothing to show yet.',
+			newRow: (l) => ({
+				ordinal: l.steps.length ? Math.max(...l.steps.map((s) => s.ordinal)) + 1 : 0,
+				text: '',
+				anchorKey: ''
+			}),
+			columns: [
+				{ key: 'ordinal', label: 'Step', type: 'number', align: 'r', width: 90 },
+				{
+					key: 'text',
+					label: 'Callout Text',
+					type: 'text',
+					min: 260,
+					placeholder: 'What this step teaches the player…'
+				},
+				{
+					key: 'anchorKey',
+					label: 'Anchor Key',
+					type: 'text',
+					width: 200,
+					placeholder: 'Optional — centered if blank'
+				}
+			]
 		}
 	],
 	refresh,
@@ -139,6 +190,23 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 				steps: []
 			}),
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditLessons', changes),
-			refresh
+			refresh,
+			childSavers: [
+				async (id, record, baseline) => {
+					if (childChanged(record.steps, baseline?.steps)) {
+						// SetLessonSteps reconciles against the full desired set (keyed by ordinal), not a diff —
+						// mirroring SetZoneEnemies rather than the Add/Edit/Delete-changes shape SetSkillPortions
+						// takes, since the backend's ChildCollectionReconciler wants the whole set every time.
+						await ApiRequest.post('AdminTools/SetLessonSteps', {
+							id,
+							steps: record.steps.map(({ ordinal, text, anchorKey }) => ({
+								ordinal,
+								text,
+								anchorKey: anchorKey || undefined
+							}))
+						});
+					}
+				}
+			]
 		})
 };

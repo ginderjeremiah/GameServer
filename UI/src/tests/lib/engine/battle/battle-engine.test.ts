@@ -507,7 +507,7 @@ describe('BattleEngine', () => {
 
 		it('wires the tick activations into evaluateMechanicTriggers when a skill fires (#1587)', () => {
 			engine.start();
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			logicalUpdateCallbacks[0](500);
 
@@ -518,7 +518,7 @@ describe('BattleEngine', () => {
 
 		it('does not call evaluateMechanicTriggers on a tick with no activations (nothing off cooldown yet)', () => {
 			engine.start();
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			logicalUpdateCallbacks[0](40);
 

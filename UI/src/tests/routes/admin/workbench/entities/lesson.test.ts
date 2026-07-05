@@ -152,4 +152,113 @@ describe('lessonEntity', () => {
 		const item = postBodyTo('AdminTools/AddEditLessons')[0].item;
 		expect(item.triggerMechanicEvent).toBe(EMechanicEvent.FirstCrit);
 	});
+
+	describe('steps section', () => {
+		const stepsSection = () => lessonEntity.sections.find((s) => s.key === 'steps');
+
+		it('count reports the number of tour steps', () => {
+			const section = stepsSection();
+			const l = {
+				...lessonEntity.newItem(0),
+				steps: [
+					{ ordinal: 0, text: 'First' },
+					{ ordinal: 1, text: 'Second' }
+				]
+			};
+			expect(section?.count?.(l)).toBe(2);
+		});
+
+		it('warns when there are no tour steps', () => {
+			const section = stepsSection();
+			const l = { ...lessonEntity.newItem(0), steps: [] };
+			expect(section && 'warn' in section ? section.warn?.(l) : null).toBe('No tour steps');
+		});
+
+		it('does not warn once a step exists', () => {
+			const section = stepsSection();
+			const l = { ...lessonEntity.newItem(0), steps: [{ ordinal: 0, text: 'Step one' }] };
+			expect(section && 'warn' in section ? section.warn?.(l) : null).toBeNull();
+		});
+
+		it('warns when two steps share the same ordinal', () => {
+			const section = stepsSection();
+			const l = {
+				...lessonEntity.newItem(0),
+				steps: [
+					{ ordinal: 0, text: 'First' },
+					{ ordinal: 0, text: 'Also first' }
+				]
+			};
+			expect(section && 'warn' in section ? section.warn?.(l) : null).toBe('Two steps share the same ordinal');
+		});
+
+		it('warns when a step has blank callout text', () => {
+			const section = stepsSection();
+			const l = { ...lessonEntity.newItem(0), steps: [{ ordinal: 0, text: '   ' }] };
+			expect(section && 'warn' in section ? section.warn?.(l) : null).toBe('A tour step is missing its callout text');
+		});
+
+		it('newRow starts a blank, unanchored step at the next ordinal', () => {
+			const section = stepsSection();
+			const l = {
+				...lessonEntity.newItem(0),
+				steps: [
+					{ ordinal: 0, text: 'First' },
+					{ ordinal: 2, text: 'Third' }
+				]
+			};
+			expect(section && 'newRow' in section ? section.newRow(l) : null).toEqual({
+				ordinal: 3,
+				text: '',
+				anchorKey: ''
+			});
+		});
+
+		it('newRow starts at ordinal 0 for a lesson with no steps yet', () => {
+			const section = stepsSection();
+			const l = { ...lessonEntity.newItem(0), steps: [] };
+			expect(section && 'newRow' in section ? section.newRow(l) : null).toEqual({
+				ordinal: 0,
+				text: '',
+				anchorKey: ''
+			});
+		});
+	});
+
+	describe('persist — steps child saver', () => {
+		it('posts the full step set, normalising a blank anchor key to absent, when steps changed', async () => {
+			const record = {
+				...lessonEntity.newItem(0),
+				key: 'idle-loop-basics',
+				name: 'New',
+				steps: [
+					{ ordinal: 0, text: 'Welcome', anchorKey: 'nav-fight' },
+					{ ordinal: 1, text: 'Centered callout', anchorKey: '' }
+				]
+			};
+			const baseline = { ...record, steps: [] };
+			socket.lessons = [screenVisitLesson()];
+
+			await lessonEntity.persist({ added: [], modified: [{ record, baseline }], deleted: [], existingIds: [0] });
+
+			expect(postBodyTo('AdminTools/SetLessonSteps')).toEqual({
+				id: 0,
+				steps: [
+					{ ordinal: 0, text: 'Welcome', anchorKey: 'nav-fight' },
+					{ ordinal: 1, text: 'Centered callout', anchorKey: undefined }
+				]
+			});
+		});
+
+		it('skips SetLessonSteps when the step set is unchanged', async () => {
+			const steps = [{ ordinal: 0, text: 'Welcome', anchorKey: '' }];
+			const record = { ...lessonEntity.newItem(0), key: 'idle-loop-basics', name: 'New', steps };
+			const baseline = { ...record, name: 'Old', steps };
+			socket.lessons = [screenVisitLesson()];
+
+			await lessonEntity.persist({ added: [], modified: [{ record, baseline }], deleted: [], existingIds: [0] });
+
+			expect(postBodyTo('AdminTools/SetLessonSteps')).toBeUndefined();
+		});
+	});
 });

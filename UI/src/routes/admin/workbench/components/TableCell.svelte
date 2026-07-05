@@ -1,8 +1,8 @@
 {#if col.type === 'select'}
 	<td style:min-width="{col.min ?? 160}px">
 		<div class="fld">
-			<select class="sel" class:dirty value={row[col.key]} onchange={(e) => onChange(+e.currentTarget.value)}>
-				{#each col.options?.(row[col.key]) ?? [] as option (option.value)}
+			<select class="sel" class:dirty value={row[col.key] as number} onchange={(e) => onChange(+e.currentTarget.value)}>
+				{#each col.options?.(row[col.key] as number) ?? [] as option (option.value)}
 					<option value={option.value} disabled={taken.has(option.value) && option.value !== row[col.key]}>
 						{option.text}
 					</option>
@@ -15,8 +15,8 @@
 {:else if col.type === 'attribute'}
 	<td style:min-width="{col.min ?? 160}px">
 		<AttributePicker
-			value={row[col.key]}
-			options={col.options?.(row[col.key]) ?? []}
+			value={row[col.key] as number}
+			options={col.options?.(row[col.key] as number) ?? []}
 			onChange={(v) => onChange(v)}
 			ariaLabel={col.label}
 			disabledValues={col.unique ? taken : undefined}
@@ -28,9 +28,23 @@
 		<div class="fld">
 			<NumInput
 				class="inp num{dirty ? ' dirty' : ''}"
-				value={row[col.key] ?? 0}
+				value={(row[col.key] as number) ?? 0}
 				allowNegative={col.allowNegative}
 				onChange={(n) => onChange(n)}
+			/>
+			{#if dirty}<DirtyDot />{/if}
+		</div>
+	</td>
+{:else if col.type === 'text'}
+	<td style:min-width="{col.min ?? 200}px">
+		<div class="fld">
+			<input
+				class="inp"
+				class:dirty
+				aria-label={col.label}
+				placeholder={col.placeholder}
+				value={(row[col.key] as string) ?? ''}
+				oninput={(e) => onChange(e.currentTarget.value)}
 			/>
 			{#if dirty}<DirtyDot />{/if}
 		</div>
@@ -54,19 +68,20 @@ import AttributePicker from './AttributePicker.svelte';
 
 interface Props {
 	col: ColumnConfig;
-	row: Record<string, number>;
+	row: Record<string, number | string>;
 	idx: number;
-	rows: Record<string, number>[];
+	rows: Record<string, number | string>[];
 	record: unknown;
 	dirty: boolean;
-	onChange: (value: number) => void;
+	onChange: (value: number | string) => void;
 }
 
 const { col, row, idx, rows, record, dirty, onChange }: Props = $props();
 
-// For unique select columns, options already chosen in sibling rows are disabled.
+// For unique select/attribute columns, options already chosen in sibling rows are disabled.
+// These columns' values are always numeric ids, unlike a free-form `text` column's.
 const taken = $derived(
-	col.unique ? new Set(rows.filter((_, ri) => ri !== idx).map((r) => r[col.key])) : new Set<number>()
+	col.unique ? new Set(rows.filter((_, ri) => ri !== idx).map((r) => r[col.key] as number)) : new Set<number>()
 );
 
 // Share columns: denominator is the sibling-row sum unless the column overrides it
@@ -78,8 +93,8 @@ const pct = $derived.by(() => {
 	const weightKey = col.weightKey ?? 'weight';
 	const total = col.shareTotal
 		? col.shareTotal(row, rows, record)
-		: rows.reduce((sum, r) => sum + (r[weightKey] || 0), 0) || 1;
-	return total > 0 ? Math.round(((row[weightKey] || 0) / total) * 100) : 0;
+		: rows.reduce((sum, r) => sum + (Number(r[weightKey]) || 0), 0) || 1;
+	return total > 0 ? Math.round(((Number(row[weightKey]) || 0) / total) * 100) : 0;
 });
 </script>
 
