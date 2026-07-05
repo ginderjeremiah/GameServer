@@ -430,6 +430,7 @@ export class AttributesView {
 		if (response.data) {
 			playerManager.attributes = response.data.attributes;
 			playerManager.statPointsUsed = response.data.statPointsUsed;
+			playerManager.playerRating = response.data.playerRating;
 		}
 
 		if (response.error || !response.data) {

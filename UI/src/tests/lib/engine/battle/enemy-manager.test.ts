@@ -35,7 +35,8 @@ const makeEnemy = (id = 0): IEnemyInstance => ({
 	level: 1,
 	seed: 123,
 	selectedSkills: [0],
-	attributes: []
+	attributes: [],
+	enemyRating: 100
 });
 
 const enemyResponse = (enemy: IEnemyInstance): IApiSocketResponse<'NewEnemy'> => ({

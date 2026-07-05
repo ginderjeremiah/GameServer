@@ -54,11 +54,32 @@ vi.mock('$lib/common', async (importOriginal) => ({
 	delay: vi.fn(() => Promise.resolve())
 }));
 
-const bossInstance: IEnemyInstance = { id: 0, level: 18, seed: 1, selectedSkills: [], attributes: [] };
-const normalInstance: IEnemyInstance = { id: 0, level: 9, seed: 2, selectedSkills: [], attributes: [] };
+const bossInstance: IEnemyInstance = {
+	id: 0,
+	level: 18,
+	seed: 1,
+	selectedSkills: [],
+	attributes: [],
+	enemyRating: 100
+};
+const normalInstance: IEnemyInstance = {
+	id: 0,
+	level: 9,
+	seed: 2,
+	selectedSkills: [],
+	attributes: [],
+	enemyRating: 100
+};
 // The next idle enemy the server bundles with a victory / boss-loss response so the client can begin it
 // without a separate NewEnemy round-trip (distinct from the fetched normalInstance so the two are told apart).
-const preparedInstance: IEnemyInstance = { id: 0, level: 12, seed: 7, selectedSkills: [], attributes: [] };
+const preparedInstance: IEnemyInstance = {
+	id: 0,
+	level: 12,
+	seed: 7,
+	selectedSkills: [],
+	attributes: [],
+	enemyRating: 100
+};
 
 const resp = <T extends 'ChallengeBoss' | 'DefeatEnemy' | 'BattleLost' | 'NewEnemy'>(
 	name: T,

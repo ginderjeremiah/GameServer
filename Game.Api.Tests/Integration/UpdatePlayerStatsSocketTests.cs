@@ -63,6 +63,34 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task UpdatePlayerStats_ValidUpdate_ReturnsPlayerRatingThatIncreasesWithMoreStrength()
+        {
+            // 12 available points (112 gained − 100 used) so two +3 Strength updates both succeed.
+            var (userId, _) = await SeedPlayerAsync(statPointsGained: 112);
+            await LoginAsync(Username, Password);
+
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            var firstUpdate = new[] { new { attributeId = (int)EAttribute.Strength, amount = 3 } };
+            var firstResponse = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>("UpdatePlayerStats", firstUpdate);
+            Assert.Null(firstResponse.Error);
+            Assert.NotNull(firstResponse.Data);
+            Assert.True(firstResponse.Data.PlayerRating > 0);
+
+            var secondUpdate = new[] { new { attributeId = (int)EAttribute.Strength, amount = 3 } };
+            var secondResponse = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>("UpdatePlayerStats", secondUpdate);
+            Assert.Null(secondResponse.Error);
+            Assert.NotNull(secondResponse.Data);
+
+            // Strength feeds both offense and survivability (CombatRating.Classify), so more of it strictly
+            // raises the rating — the response must reflect the reallocation immediately (spike #1526 Decision 7).
+            Assert.True(secondResponse.Data.PlayerRating > firstResponse.Data.PlayerRating,
+                $"Expected the post-reallocation rating ({secondResponse.Data.PlayerRating}) to exceed the prior one ({firstResponse.Data.PlayerRating}).");
+        }
+
+        [Fact]
         public async Task UpdatePlayerStats_SpendMoreThanAvailable_ReturnsError()
         {
             // Default seeded player has 0 available points (100 gained − 100 used).

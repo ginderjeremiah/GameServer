@@ -36,10 +36,19 @@ namespace Game.Api.Models.Player
         /// </summary>
         public required SignaturePassive SignaturePassive { get; set; }
 
+        /// <summary>
+        /// The player's live combat-rating capability measure (<see cref="Game.Core.Battle.CombatRating.Rate"/>,
+        /// spike #1526 Decision 7) — a numeric companion to the attributes screen's inert-stat signaling
+        /// (#1528). Recomputed fresh from current state (not a stored battle snapshot), display-only, never
+        /// recomputed client-side (no parity surface).
+        /// </summary>
+        public double PlayerRating { get; set; }
+
         public static PlayerData FromPlayer(
             CorePlayer player,
             IReadOnlyList<AttributeDistribution> lockedBaseDistribution,
-            SignaturePassive signaturePassive)
+            SignaturePassive signaturePassive,
+            double playerRating)
         {
             var inventory = player.Inventory;
 
@@ -127,6 +136,7 @@ namespace Game.Api.Models.Player
                 },
                 LockedBaseDistribution = lockedBaseDistribution.ToList(),
                 SignaturePassive = signaturePassive,
+                PlayerRating = playerRating,
             };
         }
     }

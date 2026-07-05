@@ -1,6 +1,7 @@
 using Game.Application.Services;
 using Game.Core;
 using Game.Core.Attributes;
+using Game.Core.Battle;
 using Game.Core.Enemies;
 using Game.Core.Skills;
 using Xunit;
@@ -24,6 +25,21 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(12345u, model.Seed);
             // Loadout order is preserved exactly as the enemy's battle skills.
             Assert.Equal([20, 10], model.SelectedSkills);
+        }
+
+        [Fact]
+        public void FromSource_ProjectsEnemyRating_FromTheFieldedBattleSkills()
+        {
+            var enemy = MakeEnemy();
+            enemy.SetBattleSkills([20, 10]);
+            var result = new BattleStartResult { Enemy = enemy, Seed = 12345u };
+
+            var model = EnemyInstanceModel.FromSource(result);
+
+            // The enemy's fielded loadout was already selected (SetBattleSkills) before FromSource runs, so
+            // ToBattler() (which CombatRating.Rate needs) resolves without throwing.
+            var expected = CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+            Assert.Equal(expected, model.EnemyRating, precision: 9);
         }
 
         [Fact]

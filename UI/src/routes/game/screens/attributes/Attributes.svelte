@@ -13,6 +13,7 @@
 		<div class="meters">
 			<BudgetMeter remaining={view.remaining} budget={view.budget} />
 			<LevelMeter />
+			<PowerMeter />
 		</div>
 		<span class="hint">
 			{view.mode === 'theory' ? 'Marginal yield shown per attribute' : 'Drag an axis or use − / + to spend'}
@@ -78,6 +79,7 @@ import { createAttributeTooltip, setAttributeTooltip } from '$components/tooltip
 import ModeToggle from './ModeToggle.svelte';
 import BudgetMeter from './BudgetMeter.svelte';
 import LevelMeter from './LevelMeter.svelte';
+import PowerMeter from './PowerMeter.svelte';
 import AttributesRadar from './AttributesRadar.svelte';
 import GuidedRow from './GuidedRow.svelte';
 import TheoryRow from './TheoryRow.svelte';

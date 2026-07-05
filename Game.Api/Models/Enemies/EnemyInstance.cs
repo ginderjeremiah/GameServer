@@ -1,5 +1,6 @@
 using Game.Abstractions.Contracts;
 using Game.Application.Services;
+using Game.Core.Battle;
 
 namespace Game.Api.Models.Enemies
 {
@@ -19,6 +20,13 @@ namespace Game.Api.Models.Enemies
         public int? ElapsedOffsetMs { get; set; }
 
         /// <summary>
+        /// The enemy's combat-rating capability measure (<see cref="CombatRating.Rate"/>, spike #1526
+        /// Decision 7), rated on its fielded <c>BattleSkills</c> loadout — display-only, never recomputed
+        /// client-side (no parity surface).
+        /// </summary>
+        public double EnemyRating { get; set; }
+
+        /// <summary>
         /// Projects a battle-start result onto the wire model. The single source of truth for the
         /// enemy-instance projection shared by the <c>NewEnemy</c> and <c>ChallengeBoss</c> socket commands,
         /// keeping the two from drifting (#492).
@@ -35,6 +43,7 @@ namespace Game.Api.Models.Enemies
                 Attributes = enemy.GetAttributeModifiers()
                     .Select(modifier => BattlerAttribute.From(modifier.Attribute, modifier.Amount)),
                 ElapsedOffsetMs = source.ElapsedOffsetMs,
+                EnemyRating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false),
             };
         }
     }

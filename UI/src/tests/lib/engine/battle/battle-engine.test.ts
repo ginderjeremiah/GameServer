@@ -268,7 +268,7 @@ describe('BattleEngine', () => {
 		it('transitions to Active when enemy is loaded', () => {
 			engine.start();
 
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			expect(engine.stage).toBe(BattleStage.Active);
@@ -277,7 +277,7 @@ describe('BattleEngine', () => {
 		it('transitions to Victorious when enemy dies', () => {
 			engine.start();
 
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			// Simulate enough logical updates to kill the enemy
@@ -293,7 +293,7 @@ describe('BattleEngine', () => {
 
 		it('pause sets stage to Paused', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			engine.pause();
@@ -302,7 +302,7 @@ describe('BattleEngine', () => {
 
 		it('resume returns to Active when both alive', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			engine.pause();
@@ -312,7 +312,7 @@ describe('BattleEngine', () => {
 
 		it('resume falls back to Idle when a battler is already dead', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			engine.enemy.takeDamage(1e9, EDamageType.Physical);
@@ -323,7 +323,7 @@ describe('BattleEngine', () => {
 
 		it('transitions to Defeated and logs when the player dies', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			// Kill the player, then run a sub-cooldown tick so no skill fires and the enemy survives —
@@ -339,7 +339,7 @@ describe('BattleEngine', () => {
 			// A true stalemate: neither side deals damage, so nobody can ever land the killing blow.
 			mockSkills[0].baseDamage = 0;
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			// Just short of the 2-minute cap: the battle is still in progress.
@@ -354,7 +354,7 @@ describe('BattleEngine', () => {
 
 		it('does not draw when the enemy dies on the same tick the cap is reached (death wins)', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			// Pre-kill the enemy, then cross the cap in one tick: the death branch is checked before the
@@ -413,7 +413,7 @@ describe('BattleEngine', () => {
 			const promise = engine.startLoading(1000);
 			expect(logicalUpdateCallbacks).toHaveLength(2);
 
-			engine.reset({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			engine.reset({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			// Reset cancels the in-flight cooldown (releasing the awaiter) but leaves the engine's own
 			// logical hook in place for the re-armed battle.
@@ -442,7 +442,7 @@ describe('BattleEngine', () => {
 	describe('renderUpdate', () => {
 		it('advances both battlers render cooldowns while Active', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			const playerSpy = vi.spyOn(engine.player, 'updateRenderCooldowns');
@@ -468,7 +468,7 @@ describe('BattleEngine', () => {
 	describe('logicalUpdate', () => {
 		it('logs damage messages', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			logicalUpdateCallbacks[0](500);
@@ -490,6 +490,7 @@ describe('BattleEngine', () => {
 				id: 1,
 				level: 1,
 				seed: 0,
+				enemyRating: 100,
 				selectedSkills: [0],
 				attributes: [{ attributeId: EAttribute.FireResistance, amount: 0.5 }]
 			});
@@ -537,7 +538,7 @@ describe('BattleEngine', () => {
 			// The battle clock advances only while a battle is live, so load an enemy to enter the Active
 			// stage. Slash charges for 500ms, so within these 300ms it never fires — the enemy stays alive
 			// and the engine stays Active.
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 			logicalUpdateCallbacks[0](100);
 			logicalUpdateCallbacks[0](200);
 
@@ -557,7 +558,7 @@ describe('BattleEngine', () => {
 
 		it('rest() stops the live battle: drops to Idle and clears the battle clock', () => {
 			engine.start();
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 			logicalUpdateCallbacks[0](100);
 			expect(engine.timeElapsed).toBe(100);
 
@@ -582,7 +583,7 @@ describe('BattleEngine', () => {
 				}
 			];
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			logicalUpdateCallbacks[0](500); // the 500ms-cooldown skill fires, applying its self buff
@@ -597,6 +598,7 @@ describe('BattleEngine', () => {
 				id: 1,
 				level: 1,
 				seed: 0,
+				enemyRating: 100,
 				selectedSkills: [0],
 				attributes: [
 					{ attributeId: EAttribute.Endurance, amount: 200 }, // survive the full second
@@ -620,7 +622,7 @@ describe('BattleEngine', () => {
 		it('aggregates heal-over-time on the player into a single per-second summary line', () => {
 			mockSkills[0].baseDamage = 0; // no kill, so the full second of regen accumulates
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			engine.player.currentHealth = 10; // leave room so the regen is not capped away
@@ -653,6 +655,7 @@ describe('BattleEngine', () => {
 				id: 1,
 				level: 1,
 				seed: 0,
+				enemyRating: 100,
 				selectedSkills: [],
 				attributes: [
 					{ attributeId: EAttribute.Endurance, amount: 200 },
@@ -700,6 +703,7 @@ describe('BattleEngine', () => {
 				id: 1,
 				level: 1,
 				seed: 0,
+				enemyRating: 100,
 				selectedSkills: [0],
 				attributes: [{ attributeId: EAttribute.Endurance, amount: 200 }]
 			};
@@ -708,7 +712,7 @@ describe('BattleEngine', () => {
 				// The enabler is now the skill's own base chance (#1453); 1 guarantees every [0,1) draw crits.
 				mockSkills[0].criticalChance = 1;
 				engine.start();
-				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 				logicalUpdateCallbacks[0](500); // the player's 500ms skill fires and crits
 
@@ -743,6 +747,7 @@ describe('BattleEngine', () => {
 					id: 1,
 					level: 1,
 					seed: 0,
+					enemyRating: 100,
 					selectedSkills: [0],
 					attributes: [
 						{ attributeId: EAttribute.Endurance, amount: 200 },
@@ -803,13 +808,14 @@ describe('BattleEngine', () => {
 				id: 1,
 				level: 1,
 				seed: 0,
+				enemyRating: 100,
 				selectedSkills: [0],
 				attributes: [{ attributeId: EAttribute.Endurance, amount: 200 }]
 			};
 
 			it("emits an enemy-targeted hit carrying the skill's damage on a player hit", () => {
 				engine.start();
-				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 				logicalUpdateCallbacks[0](500);
 
@@ -821,7 +827,7 @@ describe('BattleEngine', () => {
 			it("carries the skill's damage type on a typed hit float (#1320)", () => {
 				mockSkills[0].damagePortions = [{ type: EDamageType.Fire, weight: 1 }];
 				engine.start();
-				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 				logicalUpdateCallbacks[0](500);
 
@@ -835,7 +841,7 @@ describe('BattleEngine', () => {
 					{ type: EDamageType.Fire, weight: 40 }
 				];
 				engine.start();
-				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 				logicalUpdateCallbacks[0](500);
 
@@ -852,7 +858,7 @@ describe('BattleEngine', () => {
 				// The enabler is now the skill's own base chance (#1453); 1 guarantees every [0,1) draw crits.
 				mockSkills[0].criticalChance = 1;
 				engine.start();
-				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+				enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 				logicalUpdateCallbacks[0](500);
 
@@ -877,6 +883,7 @@ describe('BattleEngine', () => {
 					id: 1,
 					level: 1,
 					seed: 0,
+					enemyRating: 100,
 					selectedSkills: [0],
 					attributes: [
 						{ attributeId: EAttribute.Endurance, amount: 200 },
@@ -914,7 +921,7 @@ describe('BattleEngine', () => {
 	describe('renderUpdate', () => {
 		it('interpolates skill cooldowns and active-effect countdowns while Active', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 
 			engine.player.applyEffect({
@@ -938,7 +945,7 @@ describe('BattleEngine', () => {
 
 		it('leaves render state untouched when not Active', () => {
 			engine.start();
-			const enemyInstance = { id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] };
+			const enemyInstance = { id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] };
 			enemyLoadedCallbacks[0](enemyInstance);
 			engine.player.applyEffect({
 				id: 1,
@@ -993,7 +1000,7 @@ describe('BattleEngine', () => {
 			engine.start(); // the first reset fully derives the player and caches its inputs
 			const resetSpy = vi.spyOn(engine.player, 'reset');
 
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			// A data-less re-arm (no args) — the expensive attribute graph + skill rebuild is skipped.
 			expect(resetSpy).toHaveBeenCalledTimes(1);
@@ -1006,7 +1013,7 @@ describe('BattleEngine', () => {
 
 			const newStats = [{ attributeId: EAttribute.Strength, amount: 5 }];
 			mockInventoryManager.equipmentStats = newStats;
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			expect(resetSpy).toHaveBeenCalledWith(
 				mockPlayerManager,
@@ -1023,7 +1030,7 @@ describe('BattleEngine', () => {
 			const resetSpy = vi.spyOn(engine.player, 'reset');
 
 			mockPlayerManager.level = 6;
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			expect(resetSpy).toHaveBeenCalledWith(
 				mockPlayerManager,
@@ -1044,7 +1051,7 @@ describe('BattleEngine', () => {
 
 			const newModifiers = [{ attribute: EAttribute.Strength, amount: 3, type: EModifierType.Additive, source: 4 }];
 			mockPlayerProficiencies.battleModifiers = newModifiers;
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			expect(resetSpy).toHaveBeenCalledWith(
 				mockPlayerManager,
@@ -1061,7 +1068,7 @@ describe('BattleEngine', () => {
 			const resetSpy = vi.spyOn(engine.player, 'reset');
 
 			// Same equipment/attributes/loadout/level and the same proficiency-modifiers reference.
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			expect(resetSpy).toHaveBeenCalledWith();
 		});
@@ -1074,7 +1081,7 @@ describe('BattleEngine', () => {
 
 			const newLockedBase = [{ attribute: EAttribute.Endurance, amount: 8, type: EModifierType.Additive, source: 3 }];
 			mockPlayerManager.battleLockedBaseModifiers = newLockedBase;
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			expect(resetSpy).toHaveBeenCalledWith(
 				mockPlayerManager,
@@ -1105,7 +1112,7 @@ describe('BattleEngine', () => {
 
 			// A data-less re-arm (unchanged inputs) skips setData, so the already-composed passive persists — it is
 			// neither lost (→ 50) nor re-applied (→ 64).
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 			expect(engine.player.attributes.getValue(EAttribute.Strength)).toBe(57);
 		});
 
@@ -1120,7 +1127,7 @@ describe('BattleEngine', () => {
 			const proficiency = [{ attribute: EAttribute.Strength, amount: 2, type: EModifierType.Additive, source: 8 }];
 			mockPlayerManager.battleLockedBaseModifiers = lockedBase;
 			mockPlayerProficiencies.battleModifiers = proficiency;
-			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, enemyRating: 100, selectedSkills: [0], attributes: [] });
 
 			expect(resetSpy).toHaveBeenCalledWith(
 				mockPlayerManager,

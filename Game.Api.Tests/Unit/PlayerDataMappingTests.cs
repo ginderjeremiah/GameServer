@@ -25,7 +25,7 @@ namespace Game.Api.Tests.Unit
                 skills: [skill5, skill6, skill7, skill8],
                 selectedSkills: [skill7, skill5]);
 
-            var data = PlayerDataModel.FromPlayer(player, [], MakePassive());
+            var data = PlayerDataModel.FromPlayer(player, [], MakePassive(), playerRating: 0);
 
             Assert.Equal(4, data.UnlockedSkills.Count);
 
@@ -51,7 +51,7 @@ namespace Game.Api.Tests.Unit
         {
             var player = MakePlayer(skills: [], selectedSkills: []);
 
-            var data = PlayerDataModel.FromPlayer(player, [], MakePassive());
+            var data = PlayerDataModel.FromPlayer(player, [], MakePassive(), playerRating: 0);
 
             Assert.Empty(data.UnlockedSkills);
         }
@@ -69,7 +69,7 @@ namespace Game.Api.Tests.Unit
 
             var player = MakePlayer(skills: [], selectedSkills: [], inventory: inventory);
 
-            var data = PlayerDataModel.FromPlayer(player, [], MakePassive());
+            var data = PlayerDataModel.FromPlayer(player, [], MakePassive(), playerRating: 0);
 
             Assert.Equal(2, data.InventoryData.UnlockedItems.Count);
 
@@ -93,7 +93,7 @@ namespace Game.Api.Tests.Unit
                 AmountPerLevel = 2m,
             };
 
-            var data = PlayerDataModel.FromPlayer(player, [distribution], MakePassive());
+            var data = PlayerDataModel.FromPlayer(player, [distribution], MakePassive(), playerRating: 0);
 
             var projected = Assert.Single(data.LockedBaseDistribution);
             Assert.Equal(EAttribute.Strength, projected.AttributeId);
@@ -114,13 +114,23 @@ namespace Game.Api.Tests.Unit
                 ModifierType = EModifierType.Additive,
             };
 
-            var data = PlayerDataModel.FromPlayer(player, [], passive);
+            var data = PlayerDataModel.FromPlayer(player, [], passive, playerRating: 0);
 
             Assert.Equal(EAttribute.Toughness, data.SignaturePassive.AttributeId);
             Assert.Equal(2m, data.SignaturePassive.Amount);
             Assert.Equal(EAttribute.Endurance, data.SignaturePassive.ScalingAttributeId);
             Assert.Equal(0.5m, data.SignaturePassive.ScalingAmount);
             Assert.Equal(EModifierType.Additive, data.SignaturePassive.ModifierType);
+        }
+
+        [Fact]
+        public void FromPlayer_ProjectsThePlayerRating()
+        {
+            var player = MakePlayer(skills: [], selectedSkills: []);
+
+            var data = PlayerDataModel.FromPlayer(player, [], MakePassive(), playerRating: 42.5);
+
+            Assert.Equal(42.5, data.PlayerRating);
         }
 
         private static CorePlayer MakePlayer(List<Skill> skills, List<Skill> selectedSkills, Inventory? inventory = null)
