@@ -1,4 +1,5 @@
 import { ApiRequest, fetchSocketData, type ISkillRecipe } from '$lib/api';
+import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
@@ -16,7 +17,13 @@ import { chipsSection, type EntityConfig } from './types';
  * (acyclicity/reachability, an input equal to the result, the proficiency-level range) live on the backend and
  * surface as a save-failure toast; the cheap, local rules are flagged as warnings here.
  */
-const refresh = (): Promise<ISkillRecipe[]> => fetchSocketData('GetSkillRecipes');
+// Written through to staticData.skillRecipes so retire-confirm's reference computation (recipe-result/
+// recipe-input/recipe-condition groups) sees post-save edits, mirroring how entities/skill.ts writes through (#1633).
+const refresh = async (): Promise<ISkillRecipe[]> => {
+	const recipes = await fetchSocketData('GetSkillRecipes');
+	staticData.skillRecipes = recipes;
+	return recipes;
+};
 
 /** The result skill's name, the recipe's identity in the list/detail title and the referenced-by dialog. */
 const resultName = (recipe: ISkillRecipe): string => reference.skillName(recipe.resultSkillId) ?? '';

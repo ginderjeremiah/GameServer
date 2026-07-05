@@ -39,7 +39,9 @@ const SOCKET_SETS: Record<string, { id: number; name: string }[]> = {
 	GetChallenges: [{ id: 0, name: 'First Blood' }],
 	GetPaths: [{ id: 0, name: 'Fire Magic' }],
 	GetProficiencies: [{ id: 0, name: 'Fire' }],
-	GetLessons: [{ id: 0, name: 'Idle Combat' }]
+	GetLessons: [{ id: 0, name: 'Idle Combat' }],
+	GetClasses: [{ id: 0, name: 'Warrior' }],
+	GetSkillRecipes: [{ id: 0, name: 'Recipe' }]
 };
 const TAGS = [{ id: 10, name: 'Fire', tagCategoryId: 100 }];
 const TAG_CATEGORIES = [{ id: 100, name: 'Element' }];
@@ -62,7 +64,8 @@ describe('WorkbenchReference.load', () => {
 
 		await reference.load();
 
-		// The zero-based-id catalogues plus challenge types, paths and proficiencies load over the socket.
+		// The zero-based-id catalogues plus challenge types, paths, proficiencies, classes and skill
+		// recipes load over the socket.
 		for (const command of [
 			'GetEnemies',
 			'GetSkills',
@@ -74,12 +77,14 @@ describe('WorkbenchReference.load', () => {
 			'GetChallenges',
 			'GetPaths',
 			'GetProficiencies',
-			'GetLessons'
+			'GetLessons',
+			'GetClasses',
+			'GetSkillRecipes'
 		]) {
 			expect(mockFetchSocket).toHaveBeenCalledWith(command);
 		}
-		// Only tags + categories use HTTP — the transport split is exactly 11 socket / 2 HTTP.
-		expect(mockFetchSocket).toHaveBeenCalledTimes(11);
+		// Only tags + categories use HTTP — the transport split is exactly 13 socket / 2 HTTP.
+		expect(mockFetchSocket).toHaveBeenCalledTimes(13);
 		expect(mockGet).toHaveBeenCalledTimes(2);
 		expect(mockGet).toHaveBeenCalledWith('Tags');
 		expect(mockGet).toHaveBeenCalledWith('Tags/TagCategories');
@@ -95,6 +100,8 @@ describe('WorkbenchReference.load', () => {
 		expect(staticData.paths).toBe(SOCKET_SETS.GetPaths);
 		expect(staticData.proficiencies).toBe(SOCKET_SETS.GetProficiencies);
 		expect(staticData.lessons).toBe(SOCKET_SETS.GetLessons);
+		expect(staticData.classes).toBe(SOCKET_SETS.GetClasses);
+		expect(staticData.skillRecipes).toBe(SOCKET_SETS.GetSkillRecipes);
 		// …and the tags/categories/challenge-types the singleton owns onto its own fields
 		// (these are $state-wrapped reactive proxies, so compare by value, not identity).
 		expect(reference.tags).toEqual(TAGS);
