@@ -89,10 +89,13 @@ export const startGame = () => {
 		startLogicEngine();
 		startRenderEngine();
 		startBattleEngine();
-		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced, true);
-		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted, true);
-		proficiencyXpGainedUnhook = apiSocket.listenCommand('ProficiencyXpGained', handleProficiencyXpGained, true);
-		serverCommandFailedUnhook = apiSocket.listenCommand('ServerCommandFailed', handleServerCommandFailed, true);
+		// cleanupOnDestroy must stay off: startGame runs outside component init (from welcome.run()'s
+		// async continuation or the WelcomeBackGate click handler), where Svelte's onDestroy throws.
+		// Teardown instead relies on the unhooks captured here, invoked unconditionally by stopGame.
+		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
+		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
+		proficiencyXpGainedUnhook = apiSocket.listenCommand('ProficiencyXpGained', handleProficiencyXpGained);
+		serverCommandFailedUnhook = apiSocket.listenCommand('ServerCommandFailed', handleServerCommandFailed);
 	}
 };
 
