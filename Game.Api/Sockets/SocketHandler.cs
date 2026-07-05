@@ -274,6 +274,9 @@ namespace Game.Api.Sockets
                     .GetPlayer(_context.PlayerId, cancellationToken);
                 if (reloadedPlayer is not null)
                 {
+                    // A null result (the player row is gone) leaves the marker set and this command running
+                    // against the stale in-memory Player — a pathological case, not one worth failing the
+                    // command over; the reload is simply retried before every subsequent command too.
                     _context.Session.SetPlayer(reloadedPlayer);
                 }
             }

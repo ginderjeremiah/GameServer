@@ -126,6 +126,7 @@ namespace Game.Application.Tests.Services
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
+            var originalZoneId = player.CurrentZoneId;
 
             // A repository built with a pubsub that throws for a reason other than cancellation stands in for a
             // transient Redis blip on the flush's *last* attempt in a command's scope (#1632) — SavePlayer must
@@ -144,6 +145,13 @@ namespace Game.Application.Tests.Services
             player.ChangeZone(1);
             var ex = await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(() => throwingRepo.SavePlayer(player));
             Assert.IsType<InvalidOperationException>(ex.InnerException);
+
+            // The reload's correctness rests on the cache blob never advancing past a failed flush (SavePlayer
+            // only writes it once the flush succeeds) — a fresh read must still see the pre-mutation zone, not
+            // the ChangeZone(1) this failed save never persisted (#1632).
+            var rereadPlayer = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(rereadPlayer);
+            Assert.Equal(originalZoneId, rereadPlayer.CurrentZoneId);
         }
 
         private sealed class ThrowingPubSubService : IPubSubService

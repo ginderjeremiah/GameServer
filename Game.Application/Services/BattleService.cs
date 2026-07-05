@@ -142,6 +142,16 @@ namespace Game.Application.Services
         /// already-credited battle as active and the next <c>StartBattle</c> re-abandons — and thus re-credits —
         /// it. Swallowing here keeps the caller on its path to save the resolved state; the client round-trips
         /// <c>NewEnemy</c> when no next battle is bundled.
+        /// <para>
+        /// This swallow can reach a <see cref="Game.Abstractions.DataAccess.PlayerPersistenceFlushFailedException"/>
+        /// without the socket layer marking the session for reload (#1632): <c>ZoneResolutionService.EnsureViableZone</c>
+        /// (called unconditionally from <see cref="StartBattle"/>) saves the player when the prefetch's current
+        /// zone has gone non-viable mid-session. That's accepted here — the only event that save can raise is
+        /// <c>PlayerCoreUpdatedEvent</c> (the zone change), which self-heals: the next core mutation re-raises it,
+        /// and the next battle re-runs <c>EnsureViableZone</c> and re-relocates if it's still lost. No one-shot
+        /// unlock event reaches this path today; if a future change routes one through it, this swallow would
+        /// silently reopen the #1632 hole and needs revisiting.
+        /// </para>
         /// </summary>
         public async Task<BattleStartResult?> TryPrepareNextIdleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {

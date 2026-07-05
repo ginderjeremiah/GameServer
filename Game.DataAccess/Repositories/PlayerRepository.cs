@@ -108,6 +108,10 @@ namespace Game.DataAccess.Repositories
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // A cancellation is a cooperative unwind (the caller's budget, not a persistence fault), so it
+                // propagates unwrapped rather than triggering a reload — pinned by
+                // PlayerWriteBehindTests.SavePlayer_PublishFails_PreservesTheEventForTheNextFlush, which expects
+                // OperationCanceledException specifically and would fail if this were wrapped instead.
                 throw new PlayerPersistenceFlushFailedException(ex);
             }
 
