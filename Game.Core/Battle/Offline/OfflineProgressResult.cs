@@ -38,11 +38,23 @@ namespace Game.Core.Battle.Offline
         /// <see cref="OfflineBattleOutcome.ExpReward"/>.</summary>
         public long TotalExp { get; }
 
-        public OfflineProgressResult(OfflineLoopMode mode, int zoneId, IReadOnlyList<OfflineBattleOutcome> battles)
+        /// <summary>
+        /// The trailing remainder left once the away-window crediting loop exhausts the budget (#1596): the
+        /// last credited battle+cooldown cycle's assumed duration runs past the real away-window boundary by
+        /// this many milliseconds (0 when nothing was simulated, or when the stalemate cutoff — a CPU-waste
+        /// guard, not an overshoot — stopped the loop early with genuine unspent budget). The orchestration
+        /// layer carries this forward as either a residual cooldown or the elapsed offset of a fresh
+        /// already-in-progress next battle, rather than dropping it when the live loop resumes.
+        /// </summary>
+        public long RemainderMs { get; }
+
+        public OfflineProgressResult(
+            OfflineLoopMode mode, int zoneId, IReadOnlyList<OfflineBattleOutcome> battles, long remainderMs = 0)
         {
             Mode = mode;
             ZoneId = zoneId;
             Battles = battles;
+            RemainderMs = remainderMs;
 
             // Fold the per-battle outcomes into the run-level aggregates in a single pass, keeping the
             // outcome list the one source of truth (the summary is a materialized view of it).

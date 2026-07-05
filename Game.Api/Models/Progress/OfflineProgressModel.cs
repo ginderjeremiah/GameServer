@@ -27,9 +27,11 @@ namespace Game.Api.Models.Progress
         public required List<ProficiencyXpResultModel> ProficiencyGains { get; set; }
         public required List<ProficiencyOpenedModel> OpenedProficiencies { get; set; }
 
-        /// <summary>Non-null when the player's pre-existing battle was still genuinely in progress rather than
-        /// concluded (#1595): the still-active battle to resume — the client's replay-to-offset fast-forward
-        /// (#1597) is a separate follow-up. When set, every other field above is at its empty/default value.
+        /// <summary>Non-null when there is a battle to resume from a non-zero elapsed offset — the client's
+        /// replay-to-offset fast-forward (#1597): either the player's pre-existing battle was still genuinely
+        /// in progress rather than concluded (#1595), in which case every other field above is at its
+        /// empty/default value, or the away window's trailing remainder spilled into a fresh next battle
+        /// (#1596), alongside whatever battles the window did credit.
         /// </summary>
         public EnemyInstance? ActiveBattle { get; set; }
 

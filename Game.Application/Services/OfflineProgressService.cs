@@ -141,6 +141,14 @@ namespace Game.Application.Services
 
             var result = _offlineSimulator.Simulate(parameters, cancellationToken);
 
+            // Carry the loop's trailing remainder forward (#1596) rather than dropping it: it mutates state
+            // (a residual cooldown, or a fresh next battle already active) exactly like the resolved stale
+            // battle above already does, so it needs no special handling for either caller — the login path
+            // persists PlayerState afterward, the switch path's mutation is (like the existing ClearBattle
+            // above) discarded when the switch immediately creates a fresh session for the newly selected
+            // character regardless.
+            var activeBattle = ApplyTrailingRemainder(state, mode, zone, parameters, result, now);
+
             var levelBefore = player.Level;
             var statPointsBefore = player.StatPoints.StatPointsGained;
             var rewards = await ApplyOfflineRewards(player, progress, result, cancellationToken);
@@ -163,6 +171,7 @@ namespace Game.Application.Services
                 TotalExp = result.TotalExp,
                 LevelsGained = player.Level - levelBefore,
                 StatPointsGained = player.StatPoints.StatPointsGained - statPointsBefore,
+                ActiveBattle = activeBattle,
                 CompletedChallenges = rewards.CompletedChallenges,
                 ProficiencyGains = rewards.ProficiencyGains.Results,
                 OpenedProficiencies = rewards.ProficiencyGains.Opened,
@@ -219,6 +228,34 @@ namespace Game.Application.Services
                 SeedSource = BattleService.CreateBattleSeed,
                 StalemateCutoffBattles = StalemateCutoffBattles,
             };
+        }
+
+        // Carries the away-window crediting loop's trailing remainder forward (#1596) instead of dropping it:
+        // the remainder is served against the post-battle cooldown first. When it falls entirely within the
+        // cooldown window, only the residual cooldown is set — no battle is active yet even in the model — and
+        // the live idle loop's first NewEnemy after the gate naturally waits it out (the existing cooldown
+        // gate). When it spans the cooldown, the excess becomes a fresh next battle's elapsed offset: set up
+        // already active, backdated by that excess, and returned so the caller can thread it onto the
+        // welcome-back summary for the client's replay-to-offset (#1597) — mirroring how a still-in-progress
+        // stale-battle hand-back (#1595) surfaces. Returns null when there is no remainder to carry.
+        private BattleStartResult? ApplyTrailingRemainder(
+            PlayerState state, OfflineLoopMode mode, CoreZone zone, OfflineSimulationParameters parameters,
+            OfflineProgressResult result, DateTime now)
+        {
+            if (result.RemainderMs <= 0)
+            {
+                return null;
+            }
+
+            if (result.RemainderMs <= parameters.CooldownMs)
+            {
+                state.SetCooldown(now.AddMilliseconds(result.RemainderMs));
+                return null;
+            }
+
+            var elapsedOffsetMs = (int)(result.RemainderMs - parameters.CooldownMs);
+            return _battleService.SetupBackdatedBattle(
+                state, mode, zone, parameters.Snapshot, parameters.ResolveEnemy, now, elapsedOffsetMs);
         }
 
         // Applies a simulated away window's rewards to the player and progress in one consolidated pass
@@ -344,10 +381,12 @@ namespace Game.Application.Services
         public required IReadOnlyList<ProficiencyOpened> OpenedProficiencies { get; init; }
 
         /// <summary>
-        /// Non-null when the player's pre-existing battle was still genuinely in progress rather than concluded
-        /// (#1595): the still-active battle's enemy/seed and elapsed offset the client must resume from
-        /// (replay-to-offset, #1597). When set, no away-window battles were simulated — there was no leftover
-        /// budget beyond this unconcluded fight — and every other field is at its default/empty value.
+        /// Non-null when there is a battle the client must resume from a non-zero elapsed offset via
+        /// replay-to-offset (#1597) rather than starting fresh: either the player's pre-existing battle was
+        /// still genuinely in progress rather than concluded (#1595) — in which case no away-window battles
+        /// were simulated and every other field is at its default/empty value — or the away-window crediting
+        /// loop's trailing remainder spilled past the post-battle cooldown into a fresh next battle (#1596),
+        /// alongside whatever battles the window did credit.
         /// </summary>
         public BattleStartResult? ActiveBattle { get; init; }
 

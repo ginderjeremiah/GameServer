@@ -83,6 +83,65 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.Equal(5, count);
         }
 
+        // ── Trailing remainder (#1596) ───────────────────────────────────────
+
+        [Fact]
+        public void Simulate_RemainderMs_EqualsOvershootPastTheAwayBudget()
+        {
+            var scenario = StrongPlayerWinScenario();
+            var battleMs = SingleBattleDurationMs(scenario);
+            var stepMs = battleMs + CooldownMs;
+            // 4 full steps plus a sliver: the 5th (and last) credited battle+cooldown cycle overshoots the
+            // budget by exactly stepMs - 1.
+            var awayMs = (stepMs * 4) + 1;
+
+            var result = _simulator.Simulate(IdleParameters(awayMs, scenario));
+
+            Assert.Equal(5, result.BattlesSimulated);
+            Assert.Equal(stepMs - 1, result.RemainderMs);
+        }
+
+        [Fact]
+        public void Simulate_RemainderMs_IsZero_WhenAwayBudgetExactlyDivisibleByStep()
+        {
+            var scenario = StrongPlayerWinScenario();
+            var battleMs = SingleBattleDurationMs(scenario);
+            var stepMs = battleMs + CooldownMs;
+            var awayMs = stepMs * 4;
+
+            var result = _simulator.Simulate(IdleParameters(awayMs, scenario));
+
+            Assert.Equal(4, result.BattlesSimulated);
+            Assert.Equal(0, result.RemainderMs);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        public void Simulate_RemainderMs_IsZero_WhenNothingWasSimulated(long awayMs)
+        {
+            var result = _simulator.Simulate(IdleParameters(awayMs, StrongPlayerWinScenario()));
+
+            Assert.Equal(0, result.BattlesSimulated);
+            Assert.Equal(0, result.RemainderMs);
+        }
+
+        [Fact]
+        public void Simulate_RemainderMs_IsZero_WhenTheStalemateCutoffStopsTheLoopEarly()
+        {
+            // The stalemate cutoff is a CPU-waste guard, not a budget overshoot: it can stop the loop with
+            // real away-budget still unspent, which must not be reported as a remainder to carry forward.
+            var parameters = IdleParameters(ManyStepsBudget(), StalemateScenario()) with
+            {
+                StalemateCutoffBattles = 5,
+            };
+
+            var result = _simulator.Simulate(parameters);
+
+            Assert.Equal(5, result.BattlesSimulated);
+            Assert.Equal(0, result.RemainderMs);
+        }
+
         [Fact]
         public void Simulate_AwayBudgetBelowOneStep_RunsExactlyOneBattle()
         {

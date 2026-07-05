@@ -67,6 +67,22 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.False(new OfflineProgressResult(OfflineLoopMode.Idle, 1, []).IsBossBattle);
         }
 
+        [Fact]
+        public void RemainderMs_DefaultsToZero_WhenNotSupplied()
+        {
+            var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles: []);
+
+            Assert.Equal(0, result.RemainderMs);
+        }
+
+        [Fact]
+        public void RemainderMs_CarriesTheSuppliedValue()
+        {
+            var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles: [], remainderMs: 4200);
+
+            Assert.Equal(4200, result.RemainderMs);
+        }
+
         // ── Builders ─────────────────────────────────────────────────────────
 
         private static OfflineBattleOutcome Win(int enemyId, int totalMs, int exp) =>

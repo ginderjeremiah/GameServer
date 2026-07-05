@@ -44,6 +44,10 @@ namespace Game.Core.Battle.Offline
             // draws is a stalemate the player can neither win nor lose; the cutoff below stops it early.
             var madeProgress = false;
 
+            // Whether the loop stopped via the stalemate cutoff rather than exhausting the budget — see the
+            // RemainderMs computation below.
+            var stoppedByStalemateCutoff = false;
+
             while (remainingMs > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -79,11 +83,19 @@ namespace Game.Core.Battle.Offline
                 // reward. Any progress in that batch disables the guard for the rest of the run.
                 if (parameters.StalemateCutoffBattles is int cutoff && !madeProgress && outcomes.Count >= cutoff)
                 {
+                    stoppedByStalemateCutoff = true;
                     break;
                 }
             }
 
-            return new OfflineProgressResult(parameters.Mode, parameters.Zone.Id, outcomes);
+            // The trailing remainder (#1596): the loop always credits a whole battle+cooldown cycle once it
+            // starts one, so the budget-exhausting cycle typically runs past the real away-window boundary —
+            // remainingMs lands at or below zero, and its magnitude is that overshoot. Not applicable when
+            // nothing was simulated, or when the stalemate cutoff stopped the loop early with real budget still
+            // unspent (remainingMs positive for a different reason — a CPU-waste guard, not an overshoot).
+            var remainderMs = !stoppedByStalemateCutoff && outcomes.Count > 0 ? Math.Max(0, -remainingMs) : 0;
+
+            return new OfflineProgressResult(parameters.Mode, parameters.Zone.Id, outcomes, remainderMs);
         }
 
         /// <summary>

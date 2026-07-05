@@ -4,6 +4,7 @@ using Game.Application.Services;
 using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Battle;
+using Game.Core.Battle.Offline;
 using Game.Core.Players;
 using Game.Core.TestInfrastructure.Builders;
 using Game.Infrastructure.Database;
@@ -2117,6 +2118,134 @@ namespace Game.Application.Tests.Services
 
             Assert.False(success);
             Assert.False(player.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public async Task SetupBackdatedBattle_Idle_SetsActiveBattleBackdatedByElapsedOffset()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var zonesRepo = scope.ServiceProvider.GetRequiredService<IZones>();
+            var enemiesRepo = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var domainZone = zonesRepo.GetDomainZone(zone.Id);
+            var snapshot = BattleSnapshot.FromPlayer(player, []);
+            var now = DateTime.UtcNow;
+
+            var result = battleService.SetupBackdatedBattle(
+                state, OfflineLoopMode.Idle, domainZone, snapshot,
+                level => enemiesRepo.GetRandomDomainEnemy(zone.Id, level), now, elapsedOffsetMs: 45_000);
+
+            Assert.Equal(enemy.Id, result.Enemy.Id);
+            Assert.Equal(45_000, result.ElapsedOffsetMs);
+            Assert.True(state.HasActiveBattle);
+            Assert.False(state.IsBossBattle);
+            Assert.Equal(zone.Id, state.BattleZoneId);
+            Assert.Equal(now.AddMilliseconds(-45_000), state.BattleStartTime);
+            Assert.Equal(result.Enemy.BattleSkills.Select(s => s.Id), state.ActiveEnemySkillIds);
+        }
+
+        [Fact]
+        public async Task SetupBackdatedBattle_Boss_BuildsDeterministicBossAndSetsBossFlag()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Boss Zone", levelMin: 1, levelMax: 3, bossEnemyId: boss.Id, bossLevel: 18);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var zonesRepo = scope.ServiceProvider.GetRequiredService<IZones>();
+            var zoneResolution = scope.ServiceProvider.GetRequiredService<ZoneResolutionService>();
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var domainZone = zonesRepo.GetDomainZone(zone.Id);
+            var snapshot = BattleSnapshot.FromPlayer(player, []);
+            var now = DateTime.UtcNow;
+
+            var result = battleService.SetupBackdatedBattle(
+                state, OfflineLoopMode.Boss, domainZone, snapshot,
+                zoneResolution.BossEnemyResolver(domainZone), now, elapsedOffsetMs: 10_000);
+
+            Assert.Equal(boss.Id, result.Enemy.Id);
+            // Deterministic: fought at the fixed boss level with its full authored loadout.
+            Assert.Equal(18, result.Enemy.Level);
+            Assert.True(state.HasActiveBattle);
+            Assert.True(state.IsBossBattle);
+            Assert.Equal(10_000, result.ElapsedOffsetMs);
+            Assert.Equal(now.AddMilliseconds(-10_000), state.BattleStartTime);
+        }
+
+        [Fact]
+        public async Task SetupBackdatedBattle_ZeroOffset_StartsExactlyAtNow()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var zonesRepo = scope.ServiceProvider.GetRequiredService<IZones>();
+            var enemiesRepo = scope.ServiceProvider.GetRequiredService<IEnemies>();
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var domainZone = zonesRepo.GetDomainZone(zone.Id);
+            var snapshot = BattleSnapshot.FromPlayer(player, []);
+            var now = DateTime.UtcNow;
+
+            var result = battleService.SetupBackdatedBattle(
+                state, OfflineLoopMode.Idle, domainZone, snapshot,
+                level => enemiesRepo.GetRandomDomainEnemy(zone.Id, level), now, elapsedOffsetMs: 0);
+
+            Assert.Equal(0, result.ElapsedOffsetMs);
+            Assert.Equal(now, state.BattleStartTime);
         }
     }
 }

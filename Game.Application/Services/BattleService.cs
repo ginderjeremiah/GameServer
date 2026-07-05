@@ -3,12 +3,14 @@ using System.Diagnostics.CodeAnalysis;
 using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Battle;
+using Game.Core.Battle.Offline;
 using Game.Core.Players;
 using Game.Core.Proficiencies;
 using Game.Core.Progress;
 using Microsoft.Extensions.Logging;
 using CoreClass = Game.Core.Classes.Class;
 using CoreEnemy = Game.Core.Enemies.Enemy;
+using CoreZone = Game.Core.Zones.Zone;
 
 namespace Game.Application.Services
 {
@@ -352,6 +354,41 @@ namespace Game.Application.Services
             // No client elapsed for an offline/disconnect resolution — the abandon falls back to wall-clock
             // (capped at DefaultMaxBattleMs), exactly as before.
             return AbandonBattle(player, state, cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Sets up a fresh idle/boss battle as already active, backdated to <paramref name="elapsedOffsetMs"/>
+        /// before <paramref name="now"/> instead of anchored to now — the offline trailing-remainder handoff
+        /// (#1596): once the away-window crediting loop exhausts the budget, a leftover slice of the last
+        /// cycle that spills past the post-battle cooldown becomes this fresh battle's already-elapsed offset
+        /// rather than being dropped when the live loop resumes. Mirrors <see cref="StartBattle"/>/
+        /// <see cref="StartBossBattle"/>'s enemy construction (respecting the resolved loop mode), but the
+        /// caller supplies the snapshot directly — the offline pass already holds it from the just-finished
+        /// simulation rather than the live player/session state — and returns the client-facing payload the
+        /// same way an in-progress hand-back does (#1595), so the welcome-back gate can resume it via
+        /// replay-to-offset (#1597) with no extra round trip.
+        /// </summary>
+        internal BattleStartResult SetupBackdatedBattle(
+            PlayerState state, OfflineLoopMode mode, CoreZone zone, BattleSnapshot snapshot,
+            Func<int, CoreEnemy> resolveEnemy, DateTime now, int elapsedOffsetMs)
+        {
+            var enemy = mode == OfflineLoopMode.Boss
+                ? _battleFactory.CreateBossEnemy(zone, resolveEnemy)
+                : _battleFactory.CreateBattleEnemy(zone, resolveEnemy);
+
+            var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
+            var seed = CreateBattleSeed();
+            var startTime = now.AddMilliseconds(-elapsedOffsetMs);
+
+            state.SetActiveBattle(
+                enemy.Id, enemy.Level, enemySkillIds, seed, startTime, snapshot, zone.Id, isBossBattle: mode == OfflineLoopMode.Boss);
+
+            return new BattleStartResult
+            {
+                Enemy = enemy,
+                Seed = seed,
+                ElapsedOffsetMs = elapsedOffsetMs,
+            };
         }
 
         // Returns null when the stale battle was resolved (win/loss/draw, or nothing to resolve) and has
