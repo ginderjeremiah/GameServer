@@ -25,7 +25,7 @@ import {
 	type DirectHitOutcome,
 	type ReflectOutcome
 } from '$lib/common';
-import { onLogicalUpdate } from '../logical-engine';
+import { onLogicalUpdate, tickSize } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
 import { inventoryManager } from '../engine';
 import { playerManager } from '../player/player-manager';
@@ -204,8 +204,39 @@ export class BattleEngine {
 		this.resetEffectDamage();
 		this.resetPlayer();
 		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });
-		this.resume();
+		// A non-null elapsedOffsetMs (#1595/#1596) means the server handed back a battle already in
+		// progress rather than a fresh spawn — fast-forward to its real elapsed time before going live.
+		if (enemyInstance.elapsedOffsetMs != null) {
+			this.replayToOffset(enemyInstance.elapsedOffsetMs);
+		} else {
+			this.resume();
+		}
 	};
+
+	/**
+	 * Fast-forwards a battle the server handed back mid-flight (#1595/#1596) to its real elapsed offset:
+	 * re-runs the shared {@link battleStep} headless, tick for tick, the same loop the parity
+	 * {@link BattleSimulator} drives — `stepLog`/RNG aside, no presentational side effects (log lines,
+	 * combat floats, mechanic-trigger evaluation) fire for ticks the player never watched. Mirrors the
+	 * backend `BattleSimulator.Simulate`'s loop exactly (tick death-checks, then the `totalMs - tickSize`
+	 * exit value) so the two stay in lockstep. Resolves into whichever stage {@link logicalUpdate} would
+	 * have reached by that point — defensive: the server only ever hands back an unconcluded, under-cap
+	 * battle (#1595/#1596), but the tick boundary makes replaying a conclusion possible. Bounded by
+	 * `DEFAULT_MAX_BATTLE_MS` (the server never reports a larger offset), so at most ~3000 ticks.
+	 */
+	private replayToOffset(offsetMs: number) {
+		let totalMs = tickSize;
+		for (; totalMs <= offsetMs; totalMs += tickSize) {
+			battleStep(this.player, this.enemy, tickSize, this.rng);
+			if (this.enemy.isDead || this.player.isDead) {
+				break;
+			}
+		}
+		this.timeElapsed = this.enemy.isDead || this.player.isDead ? totalMs : totalMs - tickSize;
+		if (!this.resolveConclusion()) {
+			this.resume();
+		}
+	}
 
 	/** Resets the player battler for a new enemy, re-deriving the full attribute graph only when the
 	 *  equipment / attributes / loadout / level changed since the last derive; otherwise re-arms the
@@ -365,22 +396,36 @@ export class BattleEngine {
 			if (activations.length > 0) {
 				evaluateMechanicTriggers(activations);
 			}
-			if (this.enemy.isDead) {
+			if (this.enemy.isDead || this.player.isDead || this.timeElapsed >= DEFAULT_MAX_BATTLE_MS) {
 				this.flushEffectDamage();
-				this.setBattleStage(Victorious);
-			} else if (this.player.isDead) {
-				this.flushEffectDamage();
-				this.setBattleStage(Defeated);
-				logMessage(ELogType.EnemyDefeated, "You've been defeated!");
-			} else if (this.timeElapsed >= DEFAULT_MAX_BATTLE_MS) {
-				// Neither side landed the kill within the 2-minute cap: a true stalemate ends as a draw (no
-				// rewards). Death is checked first, so this only fires with both battlers alive — mirroring the
-				// headless simulator's non-victory timeout return, keeping the live loop in FE/BE parity.
-				this.flushEffectDamage();
-				this.setBattleStage(Drawn);
-				logMessage(ELogType.EnemyDefeated, 'Stalemate! The battle reached the time limit and ended in a draw.');
+				this.resolveConclusion();
 			}
 		}
+	}
+
+	/** Resolves the tick's concluding stage transition — victory, defeat, or the 2-minute stalemate draw —
+	 *  shared by the live tick loop above and {@link replayToOffset}'s headless replay, so the two outcome
+	 *  checks can't drift apart. Returns whether a transition applied; false (both battlers still alive,
+	 *  under the time cap) means the battle continues. */
+	private resolveConclusion(): boolean {
+		if (this.enemy.isDead) {
+			this.setBattleStage(Victorious);
+			return true;
+		}
+		if (this.player.isDead) {
+			this.setBattleStage(Defeated);
+			logMessage(ELogType.EnemyDefeated, "You've been defeated!");
+			return true;
+		}
+		if (this.timeElapsed >= DEFAULT_MAX_BATTLE_MS) {
+			// Neither side landed the kill within the 2-minute cap: a true stalemate ends as a draw (no
+			// rewards). Death is checked first, so this only fires with both battlers alive — mirroring the
+			// headless simulator's non-victory timeout return, keeping the live loop in FE/BE parity.
+			this.setBattleStage(Drawn);
+			logMessage(ELogType.EnemyDefeated, 'Stalemate! The battle reached the time limit and ended in a draw.');
+			return true;
+		}
+		return false;
 	}
 
 	/** Logs a line for each effect applied this tick. Effects now stack — every application is a genuine

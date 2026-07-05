@@ -35,6 +35,7 @@ import {
 	apiSocket,
 	ELogType,
 	type IApiSocketResponse,
+	type IEnemyInstance,
 	type IProficiencyXpResultModel,
 	type IProficiencyOpenedModel
 } from '$lib/api';
@@ -73,7 +74,12 @@ const toastIfVisible = (message: string, options?: Parameters<typeof toastSucces
 	toastSuccess(message, options);
 };
 
-export const startGame = () => {
+/**
+ * Starts the game engines. `activeBattle` threads through an already-known battle the welcome-back gate's
+ * `GetOfflineProgress` summary carried (#1595/#1596/#1597) — see {@link EnemyManager.start} — so it is
+ * resumed via replay-to-offset instead of the idle loop's first fetch silently abandoning it.
+ */
+export const startGame = (activeBattle?: IEnemyInstance) => {
 	if (staticData.loaded) {
 		inventoryManager.initialize();
 		// Fire-and-forget: the per-zone ZonesCleared values back the fight screen's
@@ -88,7 +94,7 @@ export const startGame = () => {
 		void playerProficiencies.load();
 		startLogicEngine();
 		startRenderEngine();
-		startBattleEngine();
+		startBattleEngine(activeBattle);
 		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced, true);
 		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted, true);
 		proficiencyXpGainedUnhook = apiSocket.listenCommand('ProficiencyXpGained', handleProficiencyXpGained, true);
@@ -335,7 +341,9 @@ const startRenderEngine = () => {
 	renderEngine.start();
 };
 
-const startBattleEngine = () => {
-	enemyManager.start();
+// battleEngine starts first so its onNewEnemyLoaded hook is registered before enemyManager can present an
+// activeBattle synchronously (both start() calls are synchronous up to their first await).
+const startBattleEngine = (activeBattle?: IEnemyInstance) => {
 	battleEngine.start();
+	enemyManager.start(activeBattle);
 };

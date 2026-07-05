@@ -99,11 +99,23 @@ export class EnemyManager {
 	 *  the first sync, so the first authoritative state is always sent. */
 	private lastSyncedAutoChallengeBoss?: boolean;
 
-	public start() {
+	/**
+	 * Starts the fight loop. `activeBattle` is the server-handed-back battle a `GetOfflineProgress` summary
+	 * carried (#1595/#1596: a stale battle still genuinely in progress, or the away-window's trailing
+	 * remainder) — presented directly rather than through the normal fetch, since the idle loop's first
+	 * `NewEnemy` would otherwise report 0ms fought and abandon it with no outcome (#1597). Absent, the loop
+	 * starts exactly as before: the initial stage (`Idle`) drives a fresh fetch.
+	 */
+	public start(activeBattle?: IEnemyInstance) {
 		if (!this.started) {
 			this.started = true;
 			this.battleStageUnhook = onBattleStageChanged((stage) => this.watchBattleStage(stage));
-			this.watchBattleStage(battleEngine.stage);
+			if (activeBattle) {
+				this.currentEnemy = activeBattle;
+				notifyNewEnemyLoaded(activeBattle);
+			} else {
+				this.watchBattleStage(battleEngine.stage);
+			}
 		}
 	}
 
