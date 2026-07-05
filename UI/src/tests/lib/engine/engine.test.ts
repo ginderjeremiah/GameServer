@@ -464,7 +464,7 @@ describe('handleProficiencyXpGained', () => {
 		handleProficiencyXpGained(proficiencyXpGainedResponse([proficiencyXpResult({ proficiencyId: 0, newLevel: 2 })]));
 
 		expect(logMessage).toHaveBeenCalledWith(ELogType.Proficiency, 'Fire Magic reached level 2');
-		expect(toastSuccess).toHaveBeenCalledWith('Fire Magic reached level 2');
+		expect(toastSuccess).toHaveBeenCalledWith('Fire Magic reached level 2', undefined);
 	});
 
 	it('does not announce a level-up when the level is unchanged', () => {
@@ -483,9 +483,9 @@ describe('handleProficiencyXpGained', () => {
 		);
 
 		const milestone = 'Fire Magic milestone reached: level 5 — unlocked Fireball';
-		expect(toastSuccess).toHaveBeenCalledWith(milestone);
+		expect(toastSuccess).toHaveBeenCalledWith(milestone, undefined);
 		expect(logMessage).toHaveBeenCalledWith(ELogType.Proficiency, milestone);
-		expect(toastSuccess).not.toHaveBeenCalledWith('Fire Magic reached level 5');
+		expect(toastSuccess).not.toHaveBeenCalledWith('Fire Magic reached level 5', undefined);
 	});
 
 	it('unlocks milestone-granted skills so they are usable immediately', () => {
@@ -502,7 +502,7 @@ describe('handleProficiencyXpGained', () => {
 
 		handleProficiencyXpGained(proficiencyXpGainedResponse([], [{ proficiencyId: 3 }]));
 
-		expect(toastSuccess).toHaveBeenCalledWith('New proficiency unlocked: Inferno Magic');
+		expect(toastSuccess).toHaveBeenCalledWith('New proficiency unlocked: Inferno Magic', undefined);
 		expect(addUnlockedSkill).not.toHaveBeenCalled();
 	});
 

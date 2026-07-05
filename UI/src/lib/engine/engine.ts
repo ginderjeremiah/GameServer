@@ -70,11 +70,7 @@ const toastIfVisible = (message: string, options?: Parameters<typeof toastSucces
 	if (typeof document !== 'undefined' && document.hidden) {
 		return;
 	}
-	if (options) {
-		toastSuccess(message, options);
-	} else {
-		toastSuccess(message);
-	}
+	toastSuccess(message, options);
 };
 
 export const startGame = () => {
