@@ -560,6 +560,53 @@ namespace Game.Core.Tests.Battle.Offline
         }
 
         [Fact]
+        public void Simulate_NonZeroStartingExp_CarriesIntoTheFirstLevelThreshold()
+        {
+            // StartingExp exists so a player already partway to their next level doesn't get an extra free
+            // battle's grace (#1601) — pin that the simulator's in-loop growth actually starts from it, by
+            // making a single win's own (small) reward cross the level-1 threshold only because of exp already
+            // banked pre-window, never when starting from a fresh 0.
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+            var zone = MakeZone(levelMin: 1, levelMax: 1);
+            var resolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m));
+
+            OfflineProgressResult RunOneBattle(int startingExp)
+            {
+                var scenario = new Scenario
+                {
+                    Zone = zone,
+                    Snapshot = snapshot,
+                    ResolveEnemy = FreeFarmEnemy,
+                    StartingExp = startingExp,
+                };
+                // A budget below one step guarantees exactly one simulated battle.
+                return _simulator.Simulate(IdleParameters(awayMs: 1, scenario) with { ResolveClass = resolveClass });
+            }
+
+            var fromZero = RunOneBattle(startingExp: 0);
+            var win = Assert.Single(fromZero.Battles);
+            Assert.True(win.Result.Victory);
+            var firstWinExp = win.ExpReward;
+
+            // Starting from a fresh 0, the single win's own reward alone does not cross the level-1 threshold
+            // (100 exp) — FreeFarmEnemy's reward is far below it.
+            Assert.Equal(1, fromZero.EndingLevel);
+            Assert.Equal(firstWinExp, fromZero.EndingExp);
+
+            // The identical single win, but with just enough pre-window exp banked that this same reward
+            // crosses the threshold.
+            var carried = RunOneBattle(startingExp: 100 - firstWinExp);
+            Assert.Equal(2, carried.EndingLevel);
+            Assert.Equal(0, carried.EndingExp);
+
+            // The GrantOfflineExp parity pin must hold from the same non-zero starting exp too.
+            var player = new PlayerBuilder().WithLevel(snapshot.Level).WithExp(100 - firstWinExp).Build();
+            player.GrantOfflineExp(carried.Battles.Where(b => b.Result.Victory).Select(b => b.ExpReward));
+            Assert.Equal(carried.EndingLevel, player.Level);
+            Assert.Equal(carried.EndingExp, player.Exp);
+        }
+
+        [Fact]
         public void Simulate_AppliesClassSignaturePassive_FromTheFrozenSnapshot()
         {
             // The signature passive (#1126 area E) feeds the same attribute pipeline as the locked base, so a
