@@ -301,9 +301,13 @@ class WorkbenchReference {
 	 * enemy's weight in the same zone (so an enemy's share reflects zone competition,
 	 * not its own zone list).
 	 */
-	enemySpawnShareTotal = (row: Record<string, number>, _rows: Record<string, number>[], record: unknown): number => {
+	enemySpawnShareTotal = (
+		row: Record<string, number | string>,
+		_rows: Record<string, number | string>[],
+		record: unknown
+	): number => {
 		const enemyId = (record as { id: number }).id;
-		let sum = row.weight || 0;
+		let sum = Number(row.weight) || 0;
 		for (const enemy of staticData.enemies ?? []) {
 			if (enemy.id === enemyId) {
 				continue;

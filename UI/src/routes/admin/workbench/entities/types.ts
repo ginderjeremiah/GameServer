@@ -71,13 +71,15 @@ export interface FieldConfig<T> {
 export interface ColumnConfig {
 	key: string;
 	label: string;
-	/** `attribute` renders the searchable, group-by-type AttributePicker (#1327); otherwise as `select`. */
-	type: 'select' | 'attribute' | 'number' | 'share';
+	/** `attribute` renders the searchable, group-by-type AttributePicker (#1327); `text` a free-form
+	 *  string input (e.g. tutorial tour step copy); otherwise as `select`. */
+	type: 'select' | 'attribute' | 'number' | 'share' | 'text';
 	/** Select option provider; receives the row's current value so a retired reference stays visible. */
 	options?: (current?: number) => SelectOption[];
 	align?: 'r';
 	width?: number;
 	min?: number;
+	placeholder?: string;
 	/** Select columns: disable options already chosen in sibling rows. */
 	unique?: boolean;
 	allowNegative?: boolean;
@@ -87,7 +89,11 @@ export interface ColumnConfig {
 	 * Share columns: override the denominator. Defaults to the sum across sibling
 	 * rows; an enemy's spawn share instead competes against all enemies in the zone.
 	 */
-	shareTotal?: (row: Record<string, number>, rows: Record<string, number>[], record: unknown) => number;
+	shareTotal?: (
+		row: Record<string, number | string>,
+		rows: Record<string, number | string>[],
+		record: unknown
+	) => number;
 }
 
 interface BaseSection<T> {
@@ -118,7 +124,7 @@ export interface FieldsSectionConfig<T> extends BaseSection<T> {
 export interface TableActionConfig {
 	label: string;
 	glyph?: WorkbenchIconKind;
-	apply: (rows: Record<string, number>[]) => void;
+	apply: (rows: Record<string, number | string>[]) => void;
 }
 
 export interface TableSectionConfig<T> extends BaseSection<T> {
@@ -138,7 +144,7 @@ export interface TableSectionConfig<T> extends BaseSection<T> {
 	emptyIcon: WorkbenchIconKind;
 	emptyTitle: string;
 	emptySub: string;
-	newRow: (rec: T) => Record<string, number>;
+	newRow: (rec: T) => Record<string, number | string>;
 	columns: ColumnConfig[];
 }
 
