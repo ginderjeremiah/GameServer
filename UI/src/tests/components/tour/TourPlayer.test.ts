@@ -119,6 +119,34 @@ describe('TourPlayer', () => {
 		outside.remove();
 	});
 
+	it('focuses the primary action (Next) on open, not Skip', async () => {
+		const { getByRole } = setup(threeSteps);
+		await tick();
+		expect(document.activeElement).toBe(getByRole('button', { name: 'Next' }));
+	});
+
+	it('does not steal focus back to Skip when advancing steps', async () => {
+		const { getByRole } = setup(threeSteps);
+		await tick();
+
+		const next = getByRole('button', { name: 'Next' }) as HTMLButtonElement;
+		next.focus();
+		await fireEvent.click(next);
+		await tick();
+
+		expect(document.activeElement).toBe(next);
+	});
+
+	it('moves focus onto Done when the last step swaps Next for Done', async () => {
+		const { getByRole } = setup(threeSteps);
+
+		await fireEvent.click(getByRole('button', { name: 'Next' }));
+		await fireEvent.click(getByRole('button', { name: 'Next' }));
+		await tick();
+
+		expect(document.activeElement).toBe(getByRole('button', { name: 'Done' }));
+	});
+
 	it('resets to the first step each time it reopens', async () => {
 		const { getByText, getByRole, rerender } = setup(threeSteps);
 
