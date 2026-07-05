@@ -141,16 +141,7 @@ namespace Game.Api.Tests.Integration
             // satisfying the server-measured elapsed-time check (#1630).
             await SetPlayerState(userId, state =>
             {
-                state.SetActiveBattle(
-                    state.ActiveEnemyId!.Value,
-                    state.ActiveEnemyLevel!.Value,
-                    state.ActiveEnemySkillIds!,
-                    state.BattleSeed!.Value,
-                    startTime: DateTime.UtcNow.AddMinutes(-30),
-                    state.Snapshot!,
-                    zoneId: state.BattleZoneId ?? 0,
-                    isBossBattle: state.IsBossBattle
-                );
+                state.BattleStartTime = DateTime.UtcNow.AddMinutes(-30);
             });
 
             await using var socketClient = new TestSocketClient();
