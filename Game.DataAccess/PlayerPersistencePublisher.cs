@@ -28,7 +28,9 @@ namespace Game.DataAccess
         IDomainEventHandler<SkillUnlockedEvent>,
         IDomainEventHandler<SelectedSkillsChangedEvent>,
         IDomainEventHandler<ItemFavoriteChangedEvent>,
-        IDomainEventHandler<LogPreferenceChangedEvent>
+        IDomainEventHandler<LogPreferenceChangedEvent>,
+        IDomainEventHandler<LessonUnlockedEvent>,
+        IDomainEventHandler<LessonReadEvent>
     {
         private readonly PlayerUpdateBatch _batch = batch;
 
@@ -44,6 +46,8 @@ namespace Game.DataAccess
         public Task HandleAsync(SelectedSkillsChangedEvent domainEvent, CancellationToken cancellationToken = default) => Buffer(domainEvent);
         public Task HandleAsync(ItemFavoriteChangedEvent domainEvent, CancellationToken cancellationToken = default) => Buffer(domainEvent);
         public Task HandleAsync(LogPreferenceChangedEvent domainEvent, CancellationToken cancellationToken = default) => Buffer(domainEvent);
+        public Task HandleAsync(LessonUnlockedEvent domainEvent, CancellationToken cancellationToken = default) => Buffer(domainEvent);
+        public Task HandleAsync(LessonReadEvent domainEvent, CancellationToken cancellationToken = default) => Buffer(domainEvent);
 
         private Task Buffer<T>(T domainEvent) where T : IDomainEvent
         {

@@ -48,6 +48,7 @@ namespace Game.Core.Players
         public required List<Skill> SelectedSkills { get; set; }
         public required List<Skill> Skills { get; set; }
         public required List<LogPreference> LogPreferences { get; set; }
+        public required List<PlayerLesson> Lessons { get; set; }
 
         public void ChangeZone(int zoneId)
         {
@@ -413,6 +414,51 @@ namespace Game.Core.Players
             }
 
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
+        }
+
+        /// <summary>
+        /// Records that a mechanic-anchored lesson's trigger fired client-side (spike #1392). Client-detected
+        /// triggers are trusted — nothing is rewarded, so a dishonest client can only show itself tutorials
+        /// early. A no-op when the lesson already has a row (already unlocked or read), mirroring
+        /// <see cref="UnlockSkill"/>'s re-grant no-op. Returns whether the lesson was newly unlocked, so the
+        /// caller can skip a redundant write-behind save.
+        /// </summary>
+        public bool UnlockLesson(int lessonId, DateTime timestamp)
+        {
+            if (Lessons.Any(l => l.LessonId == lessonId))
+            {
+                return false;
+            }
+
+            Lessons.Add(new PlayerLesson { LessonId = lessonId, UnlockedAt = timestamp });
+            RaiseEvent(new LessonUnlockedEvent(Id, lessonId, timestamp));
+            return true;
+        }
+
+        /// <summary>
+        /// Marks a lesson's coach-mark tour as completed. A screen-anchored lesson plays immediately on first
+        /// visit with no prior <see cref="UnlockLesson"/> call, so a locked lesson normalizes straight to read
+        /// (backfilling <see cref="PlayerLesson.UnlockedAt"/> with this same timestamp) rather than rejecting;
+        /// an already-read lesson (e.g. a Help-screen replay) is a no-op. Returns whether the lesson's state
+        /// actually changed.
+        /// </summary>
+        public bool MarkLessonRead(int lessonId, DateTime timestamp)
+        {
+            var lesson = Lessons.FirstOrDefault(l => l.LessonId == lessonId);
+            if (lesson is not null && lesson.ReadAt is not null)
+            {
+                return false;
+            }
+
+            if (lesson is null)
+            {
+                lesson = new PlayerLesson { LessonId = lessonId, UnlockedAt = timestamp };
+                Lessons.Add(lesson);
+            }
+
+            lesson.ReadAt = timestamp;
+            RaiseEvent(new LessonReadEvent(Id, lessonId, lesson.UnlockedAt, timestamp));
+            return true;
         }
 
         // A victory caller MUST pass the battle's real combat ratings — the effect-based accrual normalizes each

@@ -35,6 +35,7 @@ namespace Game.DataAccess.Mapping
         public required List<int> UnlockedModIds { get; init; }
         public required List<CachedPlayerSkill> Skills { get; init; }
         public required List<LogPreference> LogPreferences { get; init; }
+        public required List<PlayerLesson> Lessons { get; init; }
     }
 
     /// <summary>An unlocked item reduced to its id plus the player-specific state (equip slot, favorite).</summary>

@@ -104,7 +104,8 @@ namespace Game.Application.Tests.Mapping
                     new() { Attribute = EAttribute.Agility, Amount = 3d },
                 ],
                 unlockedModIds: [100, 101],
-                logPreferences: [new() { LogType = ELogType.Damage, Enabled = false }]);
+                logPreferences: [new() { LogType = ELogType.Damage, Enabled = false }],
+                lessons: [new() { LessonId = 3, UnlockedAt = MappedLastActivity, ReadAt = null }]);
 
             var player = PlayerCacheMapper.ToCore(model, Catalog(), Catalog(), Catalog());
 
@@ -122,6 +123,10 @@ namespace Game.Application.Tests.Mapping
             var pref = Assert.Single(player.LogPreferences);
             Assert.Equal(ELogType.Damage, pref.LogType);
             Assert.False(pref.Enabled);
+            var lesson = Assert.Single(player.Lessons);
+            Assert.Equal(3, lesson.LessonId);
+            Assert.Equal(MappedLastActivity, lesson.UnlockedAt);
+            Assert.Null(lesson.ReadAt);
         }
 
         [Fact]
@@ -295,6 +300,11 @@ namespace Game.Application.Tests.Mapping
             var pref = Assert.Single(rehydrated.LogPreferences);
             Assert.Equal(ELogType.Damage, pref.LogType);
             Assert.False(pref.Enabled);
+
+            var lesson = Assert.Single(rehydrated.Lessons);
+            Assert.Equal(3, lesson.LessonId);
+            Assert.Equal(MappedLastActivity, lesson.UnlockedAt);
+            Assert.Null(lesson.ReadAt);
         }
 
         private static readonly DateTime MappedLastActivity = new(2026, 6, 20, 10, 0, 0, DateTimeKind.Utc);
@@ -306,6 +316,7 @@ namespace Game.Application.Tests.Mapping
             List<int>? unlockedModIds = null,
             List<StatAllocation>? statAllocations = null,
             List<LogPreference>? logPreferences = null,
+            List<PlayerLesson>? lessons = null,
             bool autoChallengeBoss = false) => new()
             {
                 Id = 1,
@@ -324,6 +335,7 @@ namespace Game.Application.Tests.Mapping
                 UnlockedModIds = unlockedModIds ?? [],
                 Skills = skills ?? [],
                 LogPreferences = logPreferences ?? [],
+                Lessons = lessons ?? [],
             };
 
         /// <summary>
@@ -377,6 +389,7 @@ namespace Game.Application.Tests.Mapping
                 Skills = [skill5, skill6, skill7],
                 SelectedSkills = [skill6, skill7],
                 LogPreferences = [new LogPreference { LogType = ELogType.Damage, Enabled = false }],
+                Lessons = [new PlayerLesson { LessonId = 3, UnlockedAt = MappedLastActivity, ReadAt = null }],
             };
         }
 

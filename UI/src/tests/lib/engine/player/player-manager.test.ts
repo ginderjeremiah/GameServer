@@ -11,6 +11,23 @@ vi.mock('$lib/engine/log', () => ({
 	logMessage: vi.fn()
 }));
 
+// Controllable stub for the network boundary unlockLesson/markLessonRead cross (mirrors
+// inventory-manager.test.ts's socket stub); the assertions below only care that the command fires.
+const { mockSendSocketCommand } = vi.hoisted(() => {
+	const mockSendSocketCommand = vi.fn();
+	return { mockSendSocketCommand };
+});
+
+vi.mock('$lib/api', async (importOriginal) => {
+	const actual = (await importOriginal()) as Record<string, unknown>;
+	return {
+		...actual,
+		apiSocket: {
+			sendSocketCommand: mockSendSocketCommand
+		}
+	};
+});
+
 const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 	id: 1,
 	name: 'TestPlayer',
@@ -40,6 +57,7 @@ const makePlayerData = (overrides: Partial<IPlayerData> = {}): IPlayerData => ({
 		{ id: ELogType.Damage, enabled: false },
 		{ id: ELogType.Exp, enabled: true }
 	],
+	lessons: [],
 	inventoryData: {
 		unlockedItems: [
 			{
@@ -67,6 +85,7 @@ describe('PlayerManager', () => {
 	beforeEach(() => {
 		manager = new PlayerManager();
 		vi.mocked(logMessage).mockClear();
+		mockSendSocketCommand.mockClear();
 	});
 
 	describe('initialize', () => {
@@ -83,6 +102,7 @@ describe('PlayerManager', () => {
 			expect(manager.attributes).toEqual(data.attributes);
 			expect(manager.unlockedSkills).toEqual(data.unlockedSkills);
 			expect(manager.logPreferences).toEqual(data.logPreferences);
+			expect(manager.lessons).toEqual(data.lessons);
 			expect(manager.inventoryData).toEqual(data.inventoryData);
 		});
 
@@ -309,6 +329,62 @@ describe('PlayerManager', () => {
 		});
 	});
 
+	describe('unlockLesson', () => {
+		it('adds an unread lesson entry and calls the socket command', () => {
+			manager.initialize(makePlayerData());
+
+			manager.unlockLesson(3);
+
+			const lesson = manager.lessons.find((l) => l.lessonId === 3);
+			expect(lesson).toBeDefined();
+			expect(lesson?.readAt).toBeUndefined();
+			expect(mockSendSocketCommand).toHaveBeenCalledWith('UnlockLesson', 3);
+		});
+
+		it('is idempotent — an already-unlocked lesson is not duplicated or re-sent', () => {
+			manager.initialize(makePlayerData({ lessons: [{ lessonId: 3, unlockedAt: '2026-01-01T00:00:00Z' }] }));
+
+			manager.unlockLesson(3);
+
+			expect(manager.lessons.filter((l) => l.lessonId === 3)).toHaveLength(1);
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('markLessonRead', () => {
+		it('sets readAt on a previously unlocked lesson and calls the socket command', () => {
+			manager.initialize(makePlayerData({ lessons: [{ lessonId: 3, unlockedAt: '2026-01-01T00:00:00Z' }] }));
+
+			manager.markLessonRead(3);
+
+			expect(manager.lessons.find((l) => l.lessonId === 3)?.readAt).toBeDefined();
+			expect(mockSendSocketCommand).toHaveBeenCalledWith('MarkLessonRead', 3);
+		});
+
+		it('normalizes a never-unlocked lesson straight to read (screen-anchored lessons skip unlock)', () => {
+			manager.initialize(makePlayerData());
+
+			manager.markLessonRead(3);
+
+			const lesson = manager.lessons.find((l) => l.lessonId === 3);
+			expect(lesson?.unlockedAt).toBeDefined();
+			expect(lesson?.readAt).toBeDefined();
+			expect(mockSendSocketCommand).toHaveBeenCalledWith('MarkLessonRead', 3);
+		});
+
+		it('is idempotent — an already-read lesson is not re-sent', () => {
+			manager.initialize(
+				makePlayerData({
+					lessons: [{ lessonId: 3, unlockedAt: '2026-01-01T00:00:00Z', readAt: '2026-01-01T00:05:00Z' }]
+				})
+			);
+
+			manager.markLessonRead(3);
+
+			expect(mockSendSocketCommand).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('default state', () => {
 		it('starts with empty defaults before initialization', () => {
 			expect(manager.name).toBe('');
@@ -318,6 +394,7 @@ describe('PlayerManager', () => {
 			expect(manager.unlockedSkills).toEqual([]);
 			expect(manager.selectedSkills).toEqual([]);
 			expect(manager.logPreferences).toEqual([]);
+			expect(manager.lessons).toEqual([]);
 			expect(manager.inventoryData).toEqual({
 				unlockedItems: [],
 				unlockedMods: []

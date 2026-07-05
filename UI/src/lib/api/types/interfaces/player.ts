@@ -30,9 +30,16 @@ export interface IPlayerData {
 	statPointsGained: number;
 	statPointsUsed: number;
 	logPreferences: ILogPreference[];
+	lessons: IPlayerLesson[];
 	inventoryData: IInventoryData;
 	lockedBaseDistribution: IAttributeDistribution[];
 	signaturePassive: ISignaturePassive;
+}
+
+export interface IPlayerLesson {
+	lessonId: number;
+	unlockedAt: string;
+	readAt?: string;
 }
 
 export interface ISynthesisResult {

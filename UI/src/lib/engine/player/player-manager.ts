@@ -6,10 +6,11 @@ import {
 	IInventoryData,
 	ILogPreference,
 	IPlayerData,
+	IPlayerLesson,
 	ISignaturePassive,
 	IUnlockedSkill
 } from '$lib/api';
-import { EAttribute, EModifierType } from '$lib/api';
+import { apiSocket, EAttribute, EModifierType } from '$lib/api';
 import { EXP_PER_LEVEL, STAT_POINTS_PER_LEVEL } from '$lib/api/types/game-constants';
 import { formatNum, statify } from '$lib/common';
 import { classLockedBaseModifiers, classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
@@ -37,6 +38,10 @@ export class PlayerManager implements IPlayerData {
 	};
 	public unlockedSkills: IUnlockedSkill[] = [];
 	private logPreferenceList: ILogPreference[] = [];
+	/** Per-lesson tutorial state (spike #1392): absent = locked, `readAt` unset = unread, set = read. The
+	 *  trigger-evaluation/tour-playback consumer (#1587) reads this; this class only syncs it with the
+	 *  server. */
+	public lessons: IPlayerLesson[] = [];
 	public inventoryData: IInventoryData = {
 		unlockedItems: [],
 		unlockedMods: []
@@ -150,8 +155,42 @@ export class PlayerManager implements IPlayerData {
 		this.signaturePassive = data.signaturePassive;
 		this.unlockedSkills = data.unlockedSkills;
 		this.logPreferences = data.logPreferences;
+		this.lessons = data.lessons;
 		this.inventoryData = data.inventoryData;
 		this.refreshSelectedSkills();
+	}
+
+	/**
+	 * Reports that a mechanic-anchored lesson's trigger fired client-side, unlocking it (spike #1392).
+	 * Client-detected and trusted — nothing is rewarded, so a dishonest client can only show itself
+	 * tutorials early. Optimistic and idempotent: a lesson already present (unlocked or read) is a no-op,
+	 * so a re-fired detector can call this freely.
+	 */
+	public unlockLesson(lessonId: number) {
+		if (this.lessons.some((lesson) => lesson.lessonId === lessonId)) {
+			return;
+		}
+		this.lessons.push({ lessonId, unlockedAt: new Date().toISOString() });
+		void apiSocket.sendSocketCommand('UnlockLesson', lessonId);
+	}
+
+	/**
+	 * Marks a lesson's coach-mark tour as completed (spike #1392). A screen-anchored lesson plays
+	 * immediately on first visit with no prior {@link unlockLesson} call, so a lesson with no existing
+	 * entry is added rather than rejected. An already-read lesson (a Help-screen replay) is a no-op.
+	 */
+	public markLessonRead(lessonId: number) {
+		const timestamp = new Date().toISOString();
+		const lesson = this.lessons.find((l) => l.lessonId === lessonId);
+		if (lesson) {
+			if (lesson.readAt) {
+				return;
+			}
+			lesson.readAt = timestamp;
+		} else {
+			this.lessons.push({ lessonId, unlockedAt: timestamp, readAt: timestamp });
+		}
+		void apiSocket.sendSocketCommand('MarkLessonRead', lessonId);
 	}
 
 	/**

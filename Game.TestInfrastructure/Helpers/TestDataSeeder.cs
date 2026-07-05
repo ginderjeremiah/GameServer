@@ -629,6 +629,23 @@ namespace Game.TestInfrastructure.Helpers
             return lesson;
         }
 
+        public static async Task AddPlayerLessonAsync(
+            GameContext context,
+            int playerId,
+            int lessonId,
+            DateTime? unlockedAt = null,
+            DateTime? readAt = null)
+        {
+            context.PlayerLessons.Add(new PlayerLesson
+            {
+                PlayerId = playerId,
+                LessonId = lessonId,
+                UnlockedAt = unlockedAt ?? DateTime.UtcNow,
+                ReadAt = readAt,
+            });
+            await context.SaveChangesAsync();
+        }
+
         // A proficiency is a tier of a path. When no path is supplied, a fresh standalone single-tier path is
         // created so the proficiency is always well-formed.
         public static async Task<Proficiency> CreateProficiencyAsync(

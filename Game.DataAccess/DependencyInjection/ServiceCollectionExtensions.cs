@@ -167,6 +167,8 @@ namespace Game.DataAccess.DependencyInjection
                 .AddPlayerUpdateHandler<SelectedSkillsChangedEvent, SelectedSkillsChangedHandler>()
                 .AddPlayerUpdateHandler<ItemFavoriteChangedEvent, ItemFavoriteChangedHandler>()
                 .AddPlayerUpdateHandler<LogPreferenceChangedEvent, LogPreferenceChangedHandler>()
+                .AddPlayerUpdateHandler<LessonUnlockedEvent, LessonUnlockedHandler>()
+                .AddPlayerUpdateHandler<LessonReadEvent, LessonReadHandler>()
                 .AddPlayerUpdateHandler<ProgressUpdatedEvent, ProgressUpdatedHandler>();
         }
 
@@ -201,6 +203,8 @@ namespace Game.DataAccess.DependencyInjection
             DomainEventDispatcher.RegisterDomainEventHandler<SelectedSkillsChangedEvent, PlayerPersistencePublisher>();
             DomainEventDispatcher.RegisterDomainEventHandler<ItemFavoriteChangedEvent, PlayerPersistencePublisher>();
             DomainEventDispatcher.RegisterDomainEventHandler<LogPreferenceChangedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<LessonUnlockedEvent, PlayerPersistencePublisher>();
+            DomainEventDispatcher.RegisterDomainEventHandler<LessonReadEvent, PlayerPersistencePublisher>();
         }
 
         /// <summary>

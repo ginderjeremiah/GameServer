@@ -18,6 +18,7 @@ namespace Game.TestInfrastructure.Helpers
                     "PlayerAttributes",
                     "PlayerSkills",
                     "PlayerChallenges",
+                    "PlayerLessons",
                     "PlayerStatistics",
                     "LogPreferences",
                     "UserLogins",

@@ -746,6 +746,116 @@ namespace Game.Core.Tests.Players
             Assert.True(evt.Enabled);
         }
 
+        // ── UnlockLesson ─────────────────────────────────────────────────────
+
+        [Fact]
+        public void UnlockLesson_NewLesson_AddsUnreadLessonAndRaisesEvent()
+        {
+            var player = MakePlayer();
+            var timestamp = new DateTime(2026, 7, 5, 12, 0, 0, DateTimeKind.Utc);
+
+            var result = player.UnlockLesson(3, timestamp);
+
+            Assert.True(result);
+            var lesson = Assert.Single(player.Lessons);
+            Assert.Equal(3, lesson.LessonId);
+            Assert.Equal(timestamp, lesson.UnlockedAt);
+            Assert.Null(lesson.ReadAt);
+
+            var evt = player.DomainEvents.OfType<LessonUnlockedEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(3, evt.LessonId);
+            Assert.Equal(timestamp, evt.UnlockedAt);
+        }
+
+        [Fact]
+        public void UnlockLesson_AlreadyUnlocked_IsNoOp()
+        {
+            var player = MakePlayer();
+            player.UnlockLesson(3, DateTime.UtcNow);
+            player.ClearEvents();
+
+            var result = player.UnlockLesson(3, DateTime.UtcNow);
+
+            Assert.False(result);
+            Assert.Single(player.Lessons);
+            Assert.Empty(player.DomainEvents.OfType<LessonUnlockedEvent>());
+        }
+
+        [Fact]
+        public void UnlockLesson_AlreadyRead_IsNoOp()
+        {
+            var player = MakePlayer();
+            player.UnlockLesson(3, DateTime.UtcNow);
+            player.MarkLessonRead(3, DateTime.UtcNow);
+            player.ClearEvents();
+
+            var result = player.UnlockLesson(3, DateTime.UtcNow);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<LessonUnlockedEvent>());
+        }
+
+        // ── MarkLessonRead ────────────────────────────────────────────────────
+
+        [Fact]
+        public void MarkLessonRead_PreviouslyUnlocked_SetsReadAtAndRaisesEvent()
+        {
+            var player = MakePlayer();
+            var unlockedAt = new DateTime(2026, 7, 5, 12, 0, 0, DateTimeKind.Utc);
+            var readAt = unlockedAt.AddMinutes(5);
+            player.UnlockLesson(3, unlockedAt);
+            player.ClearEvents();
+
+            var result = player.MarkLessonRead(3, readAt);
+
+            Assert.True(result);
+            var lesson = Assert.Single(player.Lessons);
+            Assert.Equal(unlockedAt, lesson.UnlockedAt);
+            Assert.Equal(readAt, lesson.ReadAt);
+
+            var evt = player.DomainEvents.OfType<LessonReadEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(player.Id, evt.PlayerId);
+            Assert.Equal(3, evt.LessonId);
+            Assert.Equal(unlockedAt, evt.UnlockedAt);
+            Assert.Equal(readAt, evt.ReadAt);
+        }
+
+        [Fact]
+        public void MarkLessonRead_NeverUnlocked_NormalizesToReadWithBackfilledUnlockedAt()
+        {
+            // A screen-anchored lesson plays immediately on first visit with no prior UnlockLesson call.
+            var player = MakePlayer();
+            var timestamp = new DateTime(2026, 7, 5, 12, 0, 0, DateTimeKind.Utc);
+
+            var result = player.MarkLessonRead(3, timestamp);
+
+            Assert.True(result);
+            var lesson = Assert.Single(player.Lessons);
+            Assert.Equal(timestamp, lesson.UnlockedAt);
+            Assert.Equal(timestamp, lesson.ReadAt);
+
+            var evt = player.DomainEvents.OfType<LessonReadEvent>().SingleOrDefault();
+            Assert.NotNull(evt);
+            Assert.Equal(timestamp, evt.UnlockedAt);
+            Assert.Equal(timestamp, evt.ReadAt);
+        }
+
+        [Fact]
+        public void MarkLessonRead_AlreadyRead_IsNoOp()
+        {
+            var player = MakePlayer();
+            player.MarkLessonRead(3, DateTime.UtcNow);
+            player.ClearEvents();
+
+            var result = player.MarkLessonRead(3, DateTime.UtcNow);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<LessonReadEvent>());
+        }
+
         // ── RecordBattleCompleted ────────────────────────────────────────────
 
         [Fact]
