@@ -233,8 +233,10 @@ export class BattleEngine {
 			}
 		}
 		this.timeElapsed = this.enemy.isDead || this.player.isDead ? totalMs : totalMs - tickSize;
+		// A false return already guarantees both battlers are alive and under the time cap, so go straight
+		// to Active rather than through resume()'s redundant (already-known-false) death re-check.
 		if (!this.resolveConclusion()) {
-			this.resume();
+			this.setBattleStage(Active);
 		}
 	}
 

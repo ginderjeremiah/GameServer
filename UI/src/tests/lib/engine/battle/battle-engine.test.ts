@@ -484,6 +484,26 @@ describe('BattleEngine', () => {
 			expect(engine.timeElapsed).toBe(0);
 			expect(engine.enemy.currentHealth).toBe(engine.enemy.attributes.getValue(EAttribute.MaxHealth));
 		});
+
+		// Defensive: the server never hands back an offset at (or past) the 2-minute cap — a still-in-progress
+		// battle is by definition under it — but the replay must resolve this branch identically if it happens.
+		it('resolves Drawn when the offset lands exactly on the 2-minute cap with both battlers alive', () => {
+			mockSkills[0].baseDamage = 0; // a true stalemate: neither side can ever land the killing blow
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				elapsedOffsetMs: DEFAULT_MAX_BATTLE_MS
+			});
+
+			expect(engine.stage).toBe(BattleStage.Drawn);
+			expect(engine.timeElapsed).toBe(DEFAULT_MAX_BATTLE_MS);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.stringContaining('draw'));
+		});
 	});
 
 	describe('startLoading', () => {
