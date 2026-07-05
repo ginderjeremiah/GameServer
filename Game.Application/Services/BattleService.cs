@@ -276,15 +276,8 @@ namespace Game.Application.Services
             }
 
             var now = DateTime.UtcNow;
-            var battleCompletedAt = state.BattleStartTime.AddMilliseconds(result.TotalMs);
 
-            // Anti-cheat, server-clock only: a victory cannot be claimed before enough real server time has
-            // elapsed since battle start for the battle to have actually finished. Network latency only ever
-            // delays the claim, so a legitimate win always lands at or after the completion time; reject only
-            // when the server itself observed measurably less elapsed time than the replay's duration (minus a
-            // one-tick slack for the mid-tick battle-start alignment). Both ends use the server clock, so this
-            // is immune to client/server clock skew — unlike a check against a client-supplied timestamp.
-            if (now < battleCompletedAt - ElapsedBattleTimeTolerance)
+            if (ClaimedBeforeBattleCouldFinish(state.BattleStartTime, result.TotalMs, now, out var battleCompletedAt))
             {
                 _logger.LogWarning(
                     "EndBattleVictory rejected for player {PlayerId}: claimed before the battle could finish "
@@ -329,6 +322,23 @@ namespace Game.Application.Services
             }
 
             var now = DateTime.UtcNow;
+
+            // Anti-cheat (#1630): mirrors EndBattleVictory's gate. Without it, a tampered client can claim
+            // BattleLost the instant a battle starts, and the full replayed statistics (damage, crits, kills,
+            // …) still get booked and evaluated against challenges — farming statistic/challenge accrual at an
+            // accelerated rate. TryResolveActiveBattle above already replays to conclusion (capped at
+            // DefaultMaxBattleMs), so result.TotalMs is the real duration the claimed outcome took.
+            if (ClaimedBeforeBattleCouldFinish(state.BattleStartTime, result.TotalMs, now, out var battleCompletedAt))
+            {
+                _logger.LogWarning(
+                    "EndBattleLoss rejected for player {PlayerId}: claimed before the battle could finish "
+                    + "(battleStart: {BattleStart:O}, replayMs: {ReplayMs}, battleCompletedAt: {BattleCompletedAt:O}, "
+                    + "now: {Now:O}, shortByMs: {ShortByMs}, toleranceMs: {ToleranceMs}).",
+                    player.Id, state.BattleStartTime, result.TotalMs, battleCompletedAt, now,
+                    (battleCompletedAt - now).TotalMilliseconds, ElapsedBattleTimeTolerance.TotalMilliseconds);
+                return false;
+            }
+
             player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
 
             state.SetCooldown(now + PostBattleCooldown);
@@ -544,6 +554,20 @@ namespace Game.Application.Services
             proficiencies
                 .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level })
                 .ToList();
+
+        // Anti-cheat, server-clock only, shared by the victory and loss claim paths (#1630): a battle-end
+        // claim cannot be accepted before enough real server time has elapsed since battle start for the
+        // replayed outcome to have actually happened. Network latency only ever delays the claim, so a
+        // legitimate claim always lands at or after the completion time; reject only when the server itself
+        // observed measurably less elapsed time than the replay's duration (minus a one-tick slack for the
+        // mid-tick battle-start alignment). Both ends use the server clock, so this is immune to client/server
+        // clock skew — unlike a check against a client-supplied timestamp.
+        private static bool ClaimedBeforeBattleCouldFinish(
+            DateTime battleStartTime, int replayTotalMs, DateTime now, out DateTime battleCompletedAt)
+        {
+            battleCompletedAt = battleStartTime.AddMilliseconds(replayTotalMs);
+            return now < battleCompletedAt - ElapsedBattleTimeTolerance;
+        }
 
         // Shared anti-cheat preamble for the three battle-end paths: guards that a battle is active, resolves
         // the snapshotted enemy, and replays the fight once. Returns false (with no outputs) when there is no

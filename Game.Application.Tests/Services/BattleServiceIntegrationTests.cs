@@ -781,10 +781,65 @@ namespace Game.Application.Tests.Services
             await battleService.StartBattle(player, state, zoneId: zone.Id);
             Assert.True(state.HasActiveBattle);
 
+            // Backdate the battle start so more than the simulated loss's replay duration has elapsed,
+            // satisfying the server-measured elapsed-time check (#1630).
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
             var result = await battleService.EndBattleLoss(player, state);
 
             Assert.True(result);
             Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task EndBattleLoss_ClaimedBeforeBattleCouldFinish_ReturnsFalse()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var strongEnemy = await TestDataSeeder.CreateStrongEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Crush", baseDamage: 100m, cooldownMs: 500);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, strongEnemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, strongEnemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id, level: 1);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Override player attributes to be weak
+            var existingAttrs = context.PlayerAttributes.Where(pa => pa.PlayerId == playerEntity.Id);
+            context.PlayerAttributes.RemoveRange(existingAttrs);
+            context.PlayerAttributes.AddRange(
+                new Infrastructure.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Core.EAttribute.Strength, Amount = 1m },
+                new Infrastructure.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Core.EAttribute.Endurance, Amount = 1m });
+            playerEntity.StatPointsGained = 2;
+            playerEntity.StatPointsUsed = 2;
+            await context.SaveChangesAsync(CancellationToken);
+
+            // Reference data was seeded directly; reload the caches so battle setup resolves it (the caches
+            // no longer lazily refill).
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            // The battle just started, so far less server time has elapsed than the replay's duration — a
+            // tampered client claiming an instant loss is rejected (#1630) before RecordBattleCompleted (and
+            // the statistics/challenge accrual it drives) ever runs, and the battle is left active rather than
+            // cleared/persisted.
+            var result = await battleService.EndBattleLoss(player, state);
+
+            Assert.False(result);
+            Assert.True(state.HasActiveBattle);
         }
 
         [Fact]
