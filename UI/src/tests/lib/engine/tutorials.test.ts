@@ -163,6 +163,17 @@ describe('evaluateScreenTrigger', () => {
 
 		expect(tutorialTour.activeLesson).toBeNull();
 	});
+
+	it('finds a second locked lesson on the same screen even when an earlier one is already read', () => {
+		const readLesson = makeLesson({ id: 2, screenKey: 'attributes' });
+		const lockedLesson = makeLesson({ id: 6, screenKey: 'attributes', ordinal: 1 });
+		staticData.lessons = [readLesson, lockedLesson];
+		mockLessons.push({ lessonId: 2, unlockedAt: 'now', readAt: 'now' });
+
+		evaluateScreenTrigger('attributes');
+
+		expect(tutorialTour.activeLesson).toEqual(lockedLesson);
+	});
 });
 
 describe('evaluateMechanicTriggers', () => {

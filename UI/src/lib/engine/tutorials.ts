@@ -44,9 +44,12 @@ export function closeTutorialTour() {
  */
 export function evaluateScreenTrigger(screenKey: string) {
 	const lesson = liveLessons().find(
-		(candidate) => candidate.triggerType === ELessonTriggerType.ScreenVisit && candidate.screenKey === screenKey
+		(candidate) =>
+			candidate.triggerType === ELessonTriggerType.ScreenVisit &&
+			candidate.screenKey === screenKey &&
+			isLocked(candidate.id)
 	);
-	if (lesson && isLocked(lesson.id)) {
+	if (lesson) {
 		openLesson(lesson);
 	}
 }
