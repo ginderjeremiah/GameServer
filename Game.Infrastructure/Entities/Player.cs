@@ -58,5 +58,6 @@ namespace Game.Infrastructure.Entities
         public virtual List<PlayerStatistic> PlayerStatistics { get => field ?? throw new NotLoadedException(nameof(PlayerStatistics)); set; }
         public virtual List<LogPreference> LogPreferences { get => field ?? throw new NotLoadedException(nameof(LogPreferences)); set; }
         public virtual List<PlayerSkill> PlayerSkills { get => field ?? throw new NotLoadedException(nameof(PlayerSkills)); set; }
+        public virtual List<PlayerLesson> PlayerLessons { get => field ?? throw new NotLoadedException(nameof(PlayerLessons)); set; }
     }
 }

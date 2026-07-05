@@ -49,6 +49,7 @@ namespace Game.Infrastructure.Database
         public DbSet<Player> Players { get; set; }
         public DbSet<PlayerAttribute> PlayerAttributes { get; set; }
         public DbSet<PlayerChallenge> PlayerChallenges { get; set; }
+        public DbSet<PlayerLesson> PlayerLessons { get; set; }
         public DbSet<PlayerProficiency> PlayerProficiencies { get; set; }
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
         public DbSet<PlayerStatistic> PlayerStatistics { get; set; }
@@ -393,6 +394,11 @@ namespace Game.Infrastructure.Database
 
             modelBuilder.Entity<PlayerSkill>()
                 .HasKey(ps => new { ps.PlayerId, ps.SkillId });
+
+            // The composite natural key doubles as the unique constraint the write-behind upsert relies on,
+            // mirroring PlayerProficiency — no separate index needed since neither key column is nullable.
+            modelBuilder.Entity<PlayerLesson>()
+                .HasKey(pl => new { pl.PlayerId, pl.LessonId });
 
             modelBuilder.Entity<PlayerAttribute>(entity =>
             {

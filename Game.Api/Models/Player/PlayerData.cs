@@ -16,6 +16,7 @@ namespace Game.Api.Models.Player
         public int StatPointsGained { get; set; }
         public int StatPointsUsed { get; set; }
         public required List<LogPreference> LogPreferences { get; set; }
+        public required List<PlayerLesson> Lessons { get; set; }
         public required InventoryData InventoryData { get; set; }
 
         /// <summary>
@@ -89,6 +90,14 @@ namespace Game.Api.Models.Player
                     {
                         Id = lp.LogType,
                         Enabled = lp.Enabled,
+                    })
+                    .ToList(),
+                Lessons = player.Lessons
+                    .Select(l => new PlayerLesson
+                    {
+                        LessonId = l.LessonId,
+                        UnlockedAt = l.UnlockedAt,
+                        ReadAt = l.ReadAt,
                     })
                     .ToList(),
                 InventoryData = new InventoryData

@@ -66,6 +66,7 @@ export type ApiSocketResponseTypes = {
 	'GetSkills': ISkill[];
 	'GetStatisticTypes': IStatisticType[];
 	'GetZones': IZone[];
+	'MarkLessonRead': undefined;
 	'NewEnemy': INewEnemyModel;
 	'ProficiencyXpGained': IProficiencyXpGainedModel;
 	'RemoveMod': undefined;
@@ -77,6 +78,7 @@ export type ApiSocketResponseTypes = {
 	'SocketReplaced': undefined;
 	'SynthesizeSkill': ISynthesisResult;
 	'UnequipItem': undefined;
+	'UnlockLesson': undefined;
 	'UpdatePlayerStats': IUpdatePlayerStatsResponse;
 };
 
@@ -85,6 +87,7 @@ export type ApiSocketRequestTypes = {
 	'ChallengeBoss': IChallengeBossRequest;
 	'DefeatEnemy': IDefeatEnemyRequest;
 	'EquipItem': IEquipRequest;
+	'MarkLessonRead': number;
 	'NewEnemy': INewEnemyRequest;
 	'RemoveMod': IRemoveModRequest;
 	'SaveLogPreferences': ILogPreference[];
@@ -93,6 +96,7 @@ export type ApiSocketRequestTypes = {
 	'SetSelectedSkills': number[];
 	'SynthesizeSkill': number;
 	'UnequipItem': IEquipRequest;
+	'UnlockLesson': number;
 	'UpdatePlayerStats': IAttributeUpdate[];
 };
 

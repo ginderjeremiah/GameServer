@@ -55,6 +55,16 @@ namespace Game.Application.Services
             await _playerRepo.SavePlayer(player, cancellationToken);
         }
 
+        public async Task UnlockLesson(Player player, int lessonId, CancellationToken cancellationToken = default)
+        {
+            await SaveIf(player, player.UnlockLesson(lessonId, DateTime.UtcNow), cancellationToken);
+        }
+
+        public async Task MarkLessonRead(Player player, int lessonId, CancellationToken cancellationToken = default)
+        {
+            await SaveIf(player, player.MarkLessonRead(lessonId, DateTime.UtcNow), cancellationToken);
+        }
+
         public async Task<bool> ApplyMod(Player player, int itemId, int itemModId, int itemModSlotId, CancellationToken cancellationToken = default)
         {
             if (!_itemMods.ValidateItemModId(itemModId))

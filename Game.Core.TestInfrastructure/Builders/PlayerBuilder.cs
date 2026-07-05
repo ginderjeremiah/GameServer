@@ -27,6 +27,7 @@ namespace Game.Core.TestInfrastructure.Builders
         private List<Skill> _skills = [];
         private List<Skill> _selectedSkills = [];
         private List<LogPreference> _logPreferences = [];
+        private List<PlayerLesson> _lessons = [];
 
         public PlayerBuilder WithId(int id)
         {
@@ -106,6 +107,12 @@ namespace Game.Core.TestInfrastructure.Builders
             return this;
         }
 
+        public PlayerBuilder WithLessons(IEnumerable<PlayerLesson> lessons)
+        {
+            _lessons = lessons.ToList();
+            return this;
+        }
+
         public Player Build() => new()
         {
             Id = _id,
@@ -126,6 +133,7 @@ namespace Game.Core.TestInfrastructure.Builders
             SelectedSkills = _selectedSkills,
             Skills = _skills,
             LogPreferences = _logPreferences,
+            Lessons = _lessons,
         };
     }
 }

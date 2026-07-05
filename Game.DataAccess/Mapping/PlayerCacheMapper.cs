@@ -84,6 +84,7 @@ namespace Game.DataAccess.Mapping
                 UnlockedModIds = player.Inventory.UnlockedMods.ToList(),
                 Skills = skills,
                 LogPreferences = player.LogPreferences,
+                Lessons = player.Lessons,
             };
         }
 
@@ -179,6 +180,7 @@ namespace Game.DataAccess.Mapping
                 Skills = playerSkills,
                 SelectedSkills = selectedSkills,
                 LogPreferences = model.LogPreferences,
+                Lessons = model.Lessons,
             };
         }
 

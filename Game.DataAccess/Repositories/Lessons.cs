@@ -20,6 +20,11 @@ namespace Game.DataAccess.Repositories
             return [.. Snapshot.Entities.Select(LessonMapper.ToContract)];
         }
 
+        public bool ValidateLessonId(int lessonId)
+        {
+            return LookupLesson(lessonId) is not null;
+        }
+
         public LessonEntity? LookupLesson(int lessonId)
         {
             return Snapshot.Entities.Lookup(lessonId);

@@ -51,6 +51,9 @@ namespace Game.DataAccess.Repositories
                 LogPreferences = p.LogPreferences
                     .Select(lp => new LogPreference { LogType = (ELogType)lp.LogTypeId, Enabled = lp.Enabled })
                     .ToList(),
+                Lessons = p.PlayerLessons
+                    .Select(pl => new PlayerLesson { LessonId = pl.LessonId, UnlockedAt = pl.UnlockedAt, ReadAt = pl.ReadAt })
+                    .ToList(),
             }).AsSplitQuery();
         }
     }

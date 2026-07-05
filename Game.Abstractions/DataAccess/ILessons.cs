@@ -9,6 +9,9 @@ namespace Game.Abstractions.DataAccess
         /// <summary>Every lesson — the reference set the loading screen and the Help screen render from.</summary>
         List<Contracts.Lesson> AllLessons();
 
+        /// <inheritdoc cref="IItemMods.ValidateItemModId"/>
+        bool ValidateLessonId(int lessonId);
+
         /// <inheritdoc cref="IItems.VersionKey"/>
         object VersionKey { get; }
     }
