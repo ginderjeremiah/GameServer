@@ -258,15 +258,22 @@ namespace Game.Application.Tests.Services
             // Leave a battle in-flight (a mid-battle disconnect), backdated so its replay resolves.
             await battleService.StartBattle(player, state, zoneId: setup.ZoneId);
             Assert.True(state.HasActiveBattle);
-            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            var staleBattleStart = DateTime.UtcNow.AddMinutes(-10);
+            state.BattleStartTime = staleBattleStart;
 
             player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
 
             var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
 
-            // The stale battle is settled and cleared before the away window simulates, so no battle is left
-            // active for the idle loop to re-abandon after the gate.
-            Assert.False(state.HasActiveBattle);
+            // The stale battle itself is settled before the away window simulates — either cleared outright, or
+            // superseded by a fresh battle from the away window's own trailing-remainder carry-forward (#1596).
+            // Either way, the original stale battle is not left sitting there for the idle loop to re-abandon
+            // after the gate: if a battle is still active, it must be the fresh one (started well after the
+            // stale one), not the 10-minutes-stale battle itself.
+            if (state.HasActiveBattle)
+            {
+                Assert.True(state.BattleStartTime > staleBattleStart, "The stale battle must not still be active.");
+            }
             Assert.True(summary.HasProgress);
         }
 
@@ -513,6 +520,133 @@ namespace Game.Application.Tests.Services
             Assert.Equal(lastActivityBefore, player.LastActivity);
         }
 
+        [Fact]
+        public async Task SimulateOfflineProgress_RemainderWithinCooldown_SetsResidualCooldownWithNoActiveBattle()
+        {
+            // #1596: when the crediting loop's trailing remainder falls entirely within the post-battle
+            // cooldown, no next battle is set up — just the residual cooldown — and the live idle loop's first
+            // NewEnemy after the gate naturally waits it out via the existing cooldown gate.
+            using var scope = CreateScope();
+            var setup = await SeedWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+
+            var battleMs = await ComputeBattleDurationMsAsync(scope, setup);
+            var cooldownMs = (int)BattleService.PostBattleCooldown.TotalMilliseconds;
+            var stepMs = battleMs + cooldownMs;
+            // Comfortably inside the cooldown window, regardless of the measured battle duration.
+            var remainderWanted = cooldownMs / 2;
+            // Many steps, so the away window clears the 5-minute floor regardless of the measured battle
+            // duration, while still landing the trailing remainder exactly at remainderWanted.
+            const int steps = 100;
+            var awayMs = (long)(steps * stepMs) - remainderWanted;
+
+            player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
+
+            // Sandwich the call between two real timestamps rather than comparing the cooldown against a
+            // DateTime.UtcNow read after it returns: the call itself does real DB/Redis I/O of unbounded
+            // duration, so a residual this small (half the cooldown) could otherwise already have elapsed by
+            // the time of that later read on a slow/loaded run, and the assertion must not depend on how long
+            // the call actually took.
+            var beforeCall = DateTime.UtcNow;
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+            var afterCall = DateTime.UtcNow;
+
+            Assert.Equal(steps, summary.BattlesWon);
+            Assert.Null(summary.ActiveBattle);
+            Assert.False(state.HasActiveBattle);
+            Assert.InRange(state.EnemyCooldown, beforeCall.AddMilliseconds(remainderWanted), afterCall.AddMilliseconds(remainderWanted));
+        }
+
+        [Fact]
+        public async Task SimulateOfflineProgress_BoundaryFallsMidBattle_HandsBackThatBattlePendingWithoutCreditingIt()
+        {
+            // #1596: when the away-window boundary falls *inside* a battle rather than a completed battle's
+            // cooldown, that battle's own duration doesn't fit the remaining budget — it must not be credited
+            // as a win (it didn't really conclude), and must be handed back at its true elapsed offset, not a
+            // fresh spawn (a prior, buggy version of this fix double-counted it as both a completed win and a
+            // fresh backdated battle, with an inverted offset besides).
+            using var scope = CreateScope();
+            var setup = await SeedSlowWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+
+            var battleMs = await ComputeBattleDurationMsAsync(scope, setup);
+            var cooldownMs = (int)BattleService.PostBattleCooldown.TotalMilliseconds;
+            var stepMs = battleMs + cooldownMs;
+            // Comfortably less than a full battle, regardless of the measured duration, so the away window's
+            // last attempt lands mid-fight rather than in a completed battle's cooldown.
+            var elapsedWanted = battleMs / 2;
+            // Many full battle+cooldown cycles credited first, so the away window clears the 5-minute floor
+            // regardless of the measured battle duration, then one more battle elapsed exactly elapsedWanted
+            // into it when the away window runs out.
+            const int creditedBattles = 99;
+            var awayMs = ((long)creditedBattles * stepMs) + elapsedWanted;
+
+            // Reference the exact instant LastActivity is anchored to (call it T0): the away-budget the
+            // service computes is (its own internal "now" T2) - LastActivity = awayMs + (T2 - T0), so the
+            // pending battle's ElapsedOffsetMs = elapsedWanted + (T2 - T0) — it drifts by however long T2 (an
+            // internal clock read the test can't observe directly) lags T0, even by a fraction of a
+            // millisecond, plus up to ~1ms from the production code's (long)TotalMilliseconds truncation — so
+            // it must be asserted as a range bounded by T0 and a read taken after the call returns, never
+            // exact equality; BattleStartTime (derived from it the same way) carries the same slack.
+            var referenceNow = DateTime.UtcNow;
+            player.LastActivity = referenceNow.AddMilliseconds(-awayMs);
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+            var afterCall = DateTime.UtcNow;
+
+            // Exactly the battles that genuinely completed — not one more for the boundary battle.
+            Assert.Equal(creditedBattles, summary.BattlesWon);
+            Assert.NotNull(summary.ActiveBattle);
+            Assert.Equal(setup.EnemyId, summary.ActiveBattle.Enemy.Id);
+            Assert.NotNull(summary.ActiveBattle.ElapsedOffsetMs);
+            var driftBudgetMs = (int)(afterCall - referenceNow).TotalMilliseconds + 2;
+            Assert.InRange(summary.ActiveBattle.ElapsedOffsetMs.Value, elapsedWanted, elapsedWanted + driftBudgetMs);
+            Assert.True(state.HasActiveBattle);
+            Assert.False(state.IsOnCooldown(DateTime.UtcNow));
+            // The backdated battle's own start time is the true offset, not its complement (a prior, buggy
+            // version of this fix backdated by the complement instead). BattleStartTime = T2 - ElapsedOffsetMs
+            // where T2 is the service's internal "now" and ElapsedOffsetMs = elapsedWanted + floor(T2 - T0) —
+            // so BattleStartTime = (T0 - elapsedWanted) + fractional-millisecond-part(T2 - T0), always >= the
+            // exact T0 - elapsedWanted and, since a fractional part is always under 1ms, never more than a
+            // couple of milliseconds above it — regardless of how long the call itself took.
+            Assert.InRange(
+                state.BattleStartTime,
+                referenceNow.AddMilliseconds(-elapsedWanted),
+                referenceNow.AddMilliseconds(-elapsedWanted + 2));
+        }
+
+        [Fact]
+        public async Task SimulateOfflineProgress_RemainderExactlyZero_LeavesNoCooldownOrActiveBattle()
+        {
+            // #1596: when the away budget divides evenly into whole battle+cooldown cycles, there is nothing
+            // to carry forward — the live idle loop can start a fresh battle immediately, exactly as before.
+            using var scope = CreateScope();
+            var setup = await SeedWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+
+            var battleMs = await ComputeBattleDurationMsAsync(scope, setup);
+            var stepMs = battleMs + (int)BattleService.PostBattleCooldown.TotalMilliseconds;
+            // Many steps, so the away window clears the 5-minute floor regardless of the measured battle
+            // duration, while dividing evenly into whole cycles (remainder exactly 0).
+            const int steps = 100;
+            var awayMs = (long)steps * stepMs;
+
+            player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.Equal(steps, summary.BattlesWon);
+            Assert.Null(summary.ActiveBattle);
+            Assert.False(state.HasActiveBattle);
+            Assert.False(state.IsOnCooldown(DateTime.UtcNow));
+        }
+
         /// <summary>
         /// Seeds a player who reliably one-shots a fixed-power enemy in a single-zone idle loop, so an away
         /// window produces a deterministic run of victories (each worth what <see cref="ComputeExpPerWinAsync"/>
@@ -546,6 +680,36 @@ namespace Game.Application.Tests.Services
             return new Setup(playerEntity.Id, zone.Id, enemy.Id);
         }
 
+        /// <summary>
+        /// Like <see cref="SeedWinningScenarioAsync"/>, but with a deliberately weak player skill so the
+        /// deterministic kill takes several real seconds rather than ~1 second — needed by tests that place
+        /// the away-window boundary at a specific point *inside* the battle (#1596), where the margin against
+        /// real scheduling jitter between "the test sets LastActivity" and "the service reads its own clock"
+        /// scales with the battle's own duration. The enemy's cooldown is set far longer than this slower
+        /// fight to preserve the same one-shot-kill determinism (the enemy's authored skill never actually
+        /// fires within the fight).
+        /// </summary>
+        private async Task<Setup> SeedSlowWinningScenarioAsync(IServiceScope scope)
+        {
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 150m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 4000m, cooldownMs: 100_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            return new Setup(playerEntity.Id, zone.Id, enemy.Id);
+        }
+
         private async Task<(Player Player, PlayerState State)> LoadAsync(IServiceScope scope, int playerId)
         {
             var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
@@ -562,6 +726,24 @@ namespace Game.Application.Tests.Services
         // OfflineProgressSimulator/BattleService. Call before running the simulation, since the reward is
         // stationary at the player's starting level/attributes for the whole away window.
         private static async Task<int> ComputeExpPerWinAsync(IServiceScope scope, Setup setup)
+        {
+            var (playerBattler, enemy) = await BuildDeterministicBattlersAsync(scope, setup);
+            return new DefeatRewards(playerBattler, enemy).ExpReward;
+        }
+
+        // The exact duration (ms) of a SeedWinningScenarioAsync battle, computed via a direct BattleSimulator
+        // run against the same deterministic battlers OfflineProgressSimulator/BattleService build (the fight
+        // has no crit/dodge/block variance, so every credited battle in the offline loop takes this long
+        // regardless of its seed). Lets a test pick an away duration that lands the crediting loop's trailing
+        // remainder (#1596) precisely within or past the post-battle cooldown.
+        private static async Task<int> ComputeBattleDurationMsAsync(IServiceScope scope, Setup setup)
+        {
+            var (playerBattler, enemy) = await BuildDeterministicBattlersAsync(scope, setup);
+            return new BattleSimulator(playerBattler, enemy.ToBattler(), seed: 0).Simulate().TotalMs;
+        }
+
+        private static async Task<(Battler PlayerBattler, Game.Core.Enemies.Enemy Enemy)> BuildDeterministicBattlersAsync(
+            IServiceScope scope, Setup setup)
         {
             var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(setup.PlayerId);
             Assert.NotNull(player);
@@ -582,7 +764,7 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(enemy);
             enemy.SelectAllBattleSkills();
 
-            return new DefeatRewards(playerBattler, enemy).ExpReward;
+            return (playerBattler, enemy);
         }
     }
 }

@@ -67,6 +67,44 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.False(new OfflineProgressResult(OfflineLoopMode.Idle, 1, []).IsBossBattle);
         }
 
+        [Fact]
+        public void RemainderMs_DefaultsToZero_WhenNotSupplied()
+        {
+            var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles: []);
+
+            Assert.Equal(0, result.RemainderMs);
+        }
+
+        [Fact]
+        public void RemainderMs_CarriesTheSuppliedValue()
+        {
+            var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles: [], remainderMs: 4200);
+
+            Assert.Equal(4200, result.RemainderMs);
+        }
+
+        [Fact]
+        public void PendingBattle_DefaultsToNull_WhenNotSupplied()
+        {
+            var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles: []);
+
+            Assert.Null(result.PendingBattle);
+        }
+
+        [Fact]
+        public void PendingBattle_CarriesTheSuppliedValue_AndIsExcludedFromTheCreditedAggregates()
+        {
+            var pending = new OfflinePendingBattle(MakeEnemy(9), Seed: 123, ElapsedOffsetMs: 500);
+
+            var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles: [], pendingBattle: pending);
+
+            Assert.Same(pending, result.PendingBattle);
+            // A pending battle was never credited, so it must not be folded into any of the run aggregates.
+            Assert.Equal(0, result.BattlesSimulated);
+            Assert.Equal(0, result.Wins);
+            Assert.Equal(0, result.TotalExp);
+        }
+
         // ── Builders ─────────────────────────────────────────────────────────
 
         private static OfflineBattleOutcome Win(int enemyId, int totalMs, int exp) =>

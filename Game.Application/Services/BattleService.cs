@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Battle;
+using Game.Core.Battle.Offline;
 using Game.Core.Players;
 using Game.Core.Proficiencies;
 using Game.Core.Progress;
@@ -353,6 +354,33 @@ namespace Game.Application.Services
             // No client elapsed for an offline/disconnect resolution — the abandon falls back to wall-clock
             // (capped at DefaultMaxBattleMs), exactly as before.
             return AbandonBattle(player, state, cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Hands back the offline crediting loop's pending battle (#1596) as already active, backdated so it
+        /// resumes at its true elapsed offset: the away-window boundary fell <em>inside</em> this exact battle
+        /// (same enemy/seed the simulator already drew and simulated) rather than after it, so the simulator
+        /// left it uncredited — it is not a fresh spawn, it is that same unconcluded fight. Mirrors <see
+        /// cref="AbandonBattle"/>'s still-in-progress hand-back (#1595): same-shaped <see cref="BattleStartResult"/>
+        /// with a non-null <see cref="BattleStartResult.ElapsedOffsetMs"/>, so the welcome-back gate resumes it
+        /// via replay-to-offset (#1597) with no extra round trip.
+        /// </summary>
+        internal BattleStartResult HandBackPendingBattle(
+            PlayerState state, OfflinePendingBattle pending, BattleSnapshot snapshot, int zoneId, bool isBossBattle, DateTime now)
+        {
+            var enemy = pending.Enemy;
+            var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
+            var startTime = now.AddMilliseconds(-pending.ElapsedOffsetMs);
+
+            state.SetActiveBattle(
+                enemy.Id, enemy.Level, enemySkillIds, pending.Seed, startTime, snapshot, zoneId, isBossBattle);
+
+            return new BattleStartResult
+            {
+                Enemy = enemy,
+                Seed = pending.Seed,
+                ElapsedOffsetMs = pending.ElapsedOffsetMs,
+            };
         }
 
         // Returns null when the stale battle was resolved (win/loss/draw, or nothing to resolve) and has

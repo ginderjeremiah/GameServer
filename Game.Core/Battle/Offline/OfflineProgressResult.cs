@@ -39,6 +39,27 @@ namespace Game.Core.Battle.Offline
         public long TotalExp { get; }
 
         /// <summary>
+        /// The residual post-battle cooldown left once the away-window crediting loop exhausts the budget
+        /// inside a completed battle's cooldown (#1596) — always at most the cooldown length, since a
+        /// battle whose own duration doesn't fit in the remaining budget is never credited (see
+        /// <see cref="PendingBattle"/> instead). 0 when nothing was simulated, when the boundary lands inside
+        /// a battle rather than its cooldown (<see cref="PendingBattle"/> is set instead), or when the
+        /// stalemate cutoff — a CPU-waste guard, not an overshoot — stopped the loop early with genuine
+        /// unspent budget. The orchestration layer carries this forward as a residual <c>PlayerState</c>
+        /// cooldown rather than dropping it when the live loop resumes.
+        /// </summary>
+        public long RemainderMs { get; }
+
+        /// <summary>
+        /// Non-null when the away-window boundary falls <em>inside</em> a battle rather than a completed
+        /// battle's cooldown (#1596): that battle's own duration didn't fit the remaining budget, so it was
+        /// never credited as a win/loss/draw — it is carried forward here (same enemy/seed, its true elapsed
+        /// offset) for the orchestration to hand back as an already-active battle, mirroring the leading-edge
+        /// stale-battle hand-back (#1595). Mutually exclusive with a non-zero <see cref="RemainderMs"/>.
+        /// </summary>
+        public OfflinePendingBattle? PendingBattle { get; }
+
+        /// <summary>
         /// The player's level at the end of the simulated window, per the simulator's own in-loop growth
         /// accounting (#1601) — <see cref="Game.Core.Players.Player.GrantOfflineExp"/> applying the same
         /// victory rewards from the same starting level/exp must land on this exact value, since both paths
@@ -53,11 +74,14 @@ namespace Game.Core.Battle.Offline
 
         public OfflineProgressResult(
             OfflineLoopMode mode, int zoneId, IReadOnlyList<OfflineBattleOutcome> battles,
+            long remainderMs = 0, OfflinePendingBattle? pendingBattle = null,
             int endingLevel = 0, int endingExp = 0)
         {
             Mode = mode;
             ZoneId = zoneId;
             Battles = battles;
+            RemainderMs = remainderMs;
+            PendingBattle = pendingBattle;
             EndingLevel = endingLevel;
             EndingExp = endingExp;
 
