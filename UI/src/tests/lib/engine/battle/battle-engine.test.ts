@@ -149,8 +149,15 @@ vi.mock('$lib/engine/battle/enemy-manager', () => ({
 	})
 }));
 
+// The mechanic-lesson trigger evaluation itself (#1587) is unit-tested against `$lib/engine/tutorials`
+// directly; here we only assert the live loop wires the tick's activations into it.
+vi.mock('$lib/engine/tutorials', () => ({
+	evaluateMechanicTriggers: vi.fn()
+}));
+
 import { BattleEngine, BattleStage, onCombatFloat, type CombatFloatEvent } from '$lib/engine/battle/battle-engine';
 import { logMessage } from '$lib/engine/log';
+import { evaluateMechanicTriggers } from '$lib/engine/tutorials';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 
 describe('BattleEngine', () => {
@@ -161,6 +168,7 @@ describe('BattleEngine', () => {
 		renderUpdateCallbacks = [];
 		enemyLoadedCallbacks = [];
 		vi.mocked(logMessage).mockClear();
+		vi.mocked(evaluateMechanicTriggers).mockClear();
 
 		mockSkills.length = 0;
 		mockSkills[0] = {
@@ -494,6 +502,26 @@ describe('BattleEngine', () => {
 				'player-hit',
 				'resisted'
 			);
+		});
+
+		it('wires the tick activations into evaluateMechanicTriggers when a skill fires (#1587)', () => {
+			engine.start();
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			logicalUpdateCallbacks[0](500);
+
+			expect(evaluateMechanicTriggers).toHaveBeenCalledTimes(1);
+			const [activations] = vi.mocked(evaluateMechanicTriggers).mock.calls[0];
+			expect(activations).toEqual(expect.arrayContaining([expect.objectContaining({ byPlayer: true })]));
+		});
+
+		it('does not call evaluateMechanicTriggers on a tick with no activations (nothing off cooldown yet)', () => {
+			engine.start();
+			enemyLoadedCallbacks[0]({ id: 1, level: 1, seed: 0, selectedSkills: [0], attributes: [] });
+
+			logicalUpdateCallbacks[0](40);
+
+			expect(evaluateMechanicTriggers).not.toHaveBeenCalled();
 		});
 
 		it('does not process updates when not Active', () => {

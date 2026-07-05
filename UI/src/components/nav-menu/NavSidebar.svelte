@@ -21,7 +21,11 @@
 								<SideGlyph kind={screen.key} active={isActive} />
 							{/snippet}
 							{#snippet trailing()}
-								{#if !screen.built}
+								{#if screen.key === 'help' && unreadLessonCount > 0}
+									<span class="unread-badge" class:show={expanded} title="{unreadLessonCount} unread lesson(s)">
+										{unreadLessonCount}
+									</span>
+								{:else if !screen.built}
 									<span class="wip-badge" class:show={expanded}>wip</span>
 								{/if}
 							{/snippet}
@@ -45,7 +49,7 @@
 
 <script lang="ts">
 import { onPingMeasured } from '$lib/api';
-import { logicEngine, renderEngine } from '$lib/engine';
+import { logicEngine, playerManager, renderEngine } from '$lib/engine';
 import CollapsibleRail from '../sidebar/CollapsibleRail.svelte';
 import RailNavGroup from '../sidebar/RailNavGroup.svelte';
 import RailNavItem from '../sidebar/RailNavItem.svelte';
@@ -81,6 +85,11 @@ const groups = [
 ];
 
 const logicRate = $derived(logicEngine.tickRate);
+
+// Persistent unread-lesson indicator (spike #1392, #1587) — deliberately distinct from the wip badge
+// and the toast channel, since a queued mechanic lesson isn't a "not built yet" marker or a
+// transient notification.
+const unreadLessonCount = $derived(playerManager.lessons.filter((lesson) => !lesson.readAt).length);
 const renderRate = $derived(renderEngine.tickRate);
 </script>
 
@@ -111,6 +120,30 @@ const renderRate = $derived(renderEngine.tickRate);
 	border: 1px solid color-mix(in srgb, var(--text-primary) 15%, transparent);
 	border-radius: 2px;
 	text-transform: uppercase;
+	margin-right: 14px;
+	opacity: 0;
+	transition: opacity 160ms ease;
+	transition-delay: 0ms;
+
+	&.show {
+		opacity: 1;
+		transition-delay: 110ms;
+	}
+}
+
+.unread-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	font-family: var(--mono);
+	font-size: 9.5px;
+	font-weight: 600;
+	color: var(--text-on-accent);
+	background: var(--accent);
+	border-radius: 8px;
 	margin-right: 14px;
 	opacity: 0;
 	transition: opacity 160ms ease;
