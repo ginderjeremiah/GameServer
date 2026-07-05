@@ -58,6 +58,25 @@ let challengeCompletedUnhook: Action | undefined;
 let proficiencyXpGainedUnhook: Action | undefined;
 let serverCommandFailedUnhook: Action | undefined;
 
+/**
+ * Toasts a victory-driven success message, but skips it entirely while the tab is hidden. The tick
+ * worker (#1594) keeps resolving battles at full rate in the background, so a long hidden session can
+ * fire far more challenge/proficiency toasts than the throttled auto-dismiss timers can clear — the
+ * same pileup #1598 fixed for combat floaters. Nobody is watching for a popup on a backgrounded tab
+ * anyway; the state update and the combat log (`notifyProficiencyResult`/`notifyProficiencyOpened`)
+ * already keep the permanent record.
+ */
+const toastIfVisible = (message: string, options?: Parameters<typeof toastSuccess>[1]) => {
+	if (typeof document !== 'undefined' && document.hidden) {
+		return;
+	}
+	if (options) {
+		toastSuccess(message, options);
+	} else {
+		toastSuccess(message);
+	}
+};
+
 export const startGame = () => {
 	if (staticData.loaded) {
 		inventoryManager.initialize();
@@ -143,7 +162,7 @@ const notifyChallengeCompleted = (challengeId: number) => {
 		items: staticData.items,
 		itemMods: staticData.itemMods
 	});
-	toastSuccess(challengeCompletedMessage(challenge.name, reward), {
+	toastIfVisible(challengeCompletedMessage(challenge.name, reward), {
 		action: { label: 'View', onClick: () => navigation.requestScreen('challenges') }
 	});
 };
@@ -213,7 +232,7 @@ const notifyNewlyCreatableRecipes = (creatableBefore: ReadonlySet<number>) => {
 		if (!result) {
 			continue;
 		}
-		toastSuccess(recipeAvailableMessage(result.name), {
+		toastIfVisible(recipeAvailableMessage(result.name), {
 			action: { label: 'View', onClick: () => navigation.requestScreen('synthesis') }
 		});
 	}
@@ -248,11 +267,11 @@ const notifyProficiencyResult = (result: IProficiencyXpResultModel, previousLeve
 		const skillName = skillId != null ? staticData.skills?.[skillId]?.name : undefined;
 		const message = proficiencyMilestoneMessage(name, milestoneLevel, skillName);
 		logMessage(ELogType.Proficiency, message);
-		toastSuccess(message);
+		toastIfVisible(message);
 	}
 
 	if (leveledUp && result.milestonesCrossed.length === 0) {
-		toastSuccess(proficiencyLevelMessage(name, result.newLevel));
+		toastIfVisible(proficiencyLevelMessage(name, result.newLevel));
 	}
 };
 
@@ -266,7 +285,7 @@ const notifyProficiencyOpened = (opened: IProficiencyOpenedModel) => {
 	}
 	const message = proficiencyOpenedMessage(proficiency.name);
 	logMessage(ELogType.Proficiency, message);
-	toastSuccess(message);
+	toastIfVisible(message);
 };
 
 // Use goto() not location.href — a reload re-runs the boot gate and bounces an authenticated client back into the game.

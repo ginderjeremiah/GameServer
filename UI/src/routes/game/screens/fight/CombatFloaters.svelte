@@ -162,6 +162,13 @@ const spawn = (event: CombatFloatEvent) => {
 	if (event.target !== side) {
 		return;
 	}
+	// The tick worker keeps the sim running at full rate while the tab is hidden (#1594), so a long
+	// hidden battle can spawn floaters far faster than the throttled removal timer clears them.
+	// They're purely presentational (aria-hidden) and nobody is watching a hidden tab, so skip the
+	// spawn entirely rather than let the DOM accumulate for a stutter on refocus.
+	if (document.hidden) {
+		return;
+	}
 	const crit = event.kind === 'crit';
 	const id = nextId++;
 	floaters.push({
