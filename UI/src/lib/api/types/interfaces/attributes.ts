@@ -29,4 +29,5 @@ export interface IAttributeUpdate {
 export interface IUpdatePlayerStatsResponse {
 	attributes: IBattlerAttribute[];
 	statPointsUsed: number;
+	playerRating: number;
 }

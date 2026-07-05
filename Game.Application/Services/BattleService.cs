@@ -311,6 +311,7 @@ namespace Game.Application.Services
                 NewExp = player.Exp,
                 StatPointsGained = player.StatPoints.StatPointsGained,
                 StatPointsUsed = player.StatPoints.StatPointsUsed,
+                PlayerRating = rewards.PlayerRating,
             };
         }
 
@@ -480,6 +481,21 @@ namespace Game.Application.Services
         // RNG (#178). The seed is server-generated and transmitted to the client as-is, so changing the source
         // does not affect how it is consumed. Shared by both start paths.
         internal static uint CreateBattleSeed() => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(sizeof(uint)));
+
+        /// <summary>
+        /// Rates the player's current live capability (<see cref="CombatRating.Rate"/>, spike #1526 Decision 7)
+        /// for display — a numeric companion to the attributes/battle screens, distinct from the frozen
+        /// snapshot rating <see cref="RecordVictory"/> pays rewards against. Reconstructs a fresh
+        /// <see cref="BattleSnapshot"/> from the player's current state (rather than a stored battle snapshot),
+        /// so the value reflects an allocation/gear/level change immediately instead of the last fought battle.
+        /// </summary>
+        public async Task<double> RatePlayer(Player player, CancellationToken cancellationToken = default)
+        {
+            var snapshot = BattleSnapshot.FromPlayer(player, await CaptureProficiencyLevels(player.Id, cancellationToken));
+            var battler = snapshot.ToBattler(
+                _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
+            return CombatRating.Rate(battler, isPlayer: true);
+        }
 
         // Captures the player's current proficiency levels for the battle snapshot, so the per-level/milestone
         // bonuses bake into the fight at its start (spike #982 area E). Proficiency progress lives on the

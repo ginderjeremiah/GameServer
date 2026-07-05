@@ -5,14 +5,20 @@ import { EAttribute, type IAttribute } from '$lib/api';
 // The card renders a Skills -> SkillTooltip subtree, which imports the battle engine and the
 // reference-data store at module load; both are mocked even though no hover happens here. The player
 // card also reads the player manager (level/XP for the header bar) and the combat-float hook.
-const { mockBattleEngine, mockPlayerManager, onCombatFloat, staticData } = vi.hoisted(() => ({
+const { mockBattleEngine, mockPlayerManager, mockEnemyManager, onCombatFloat, staticData } = vi.hoisted(() => ({
 	mockBattleEngine: { getOpponent: vi.fn() },
-	mockPlayerManager: { level: 7, exp: 280, nextLevelThreshold: 700 },
+	mockPlayerManager: { level: 7, exp: 280, nextLevelThreshold: 700, playerRating: 120 },
+	mockEnemyManager: { currentEnemy: undefined as { enemyRating: number } | undefined },
 	onCombatFloat: vi.fn(() => () => {}),
 	staticData: { attributes: [] as IAttribute[] }
 }));
 
-vi.mock('$lib/engine', () => ({ battleEngine: mockBattleEngine, playerManager: mockPlayerManager, onCombatFloat }));
+vi.mock('$lib/engine', () => ({
+	battleEngine: mockBattleEngine,
+	playerManager: mockPlayerManager,
+	enemyManager: mockEnemyManager,
+	onCombatFloat
+}));
 vi.mock('$stores', () => ({ staticData }));
 
 import BattlerCard from '$routes/game/screens/fight/BattlerCard.svelte';
@@ -128,5 +134,31 @@ describe('BattlerCard', () => {
 		});
 		expect(getByTestId('enemy-card').querySelector('.battler-level')?.textContent).toContain('9');
 		expect(queryByTestId('player-xp-bar')).toBeNull();
+	});
+
+	it("shows the player's combat-power readout in the header", () => {
+		mockPlayerManager.playerRating = 128;
+		const { getByTestId } = render(BattlerCard, { props: { battler: makeBattler(), side: 'player' } });
+		expect(getByTestId('player-power').textContent).toContain('128');
+	});
+
+	it("shows the enemy's combat-power readout once the current enemy has loaded", () => {
+		mockPlayerManager.playerRating = 100;
+		mockEnemyManager.currentEnemy = { enemyRating: 250 };
+		const { getByTestId } = render(BattlerCard, {
+			props: { battler: makeBattler({ name: 'Dire Wolf' }), side: 'enemy' }
+		});
+		// enemyRating (250) far exceeds playerRating (100), so the cue reads as the top "Dangerous" band.
+		expect(getByTestId('enemy-power').textContent).toContain('250');
+		expect(getByTestId('enemy-power').textContent).toContain('Dangerous');
+		mockEnemyManager.currentEnemy = undefined;
+	});
+
+	it('renders no enemy power readout before the current enemy has loaded', () => {
+		mockEnemyManager.currentEnemy = undefined;
+		const { queryByTestId } = render(BattlerCard, {
+			props: { battler: makeBattler({ name: 'Dire Wolf' }), side: 'enemy' }
+		});
+		expect(queryByTestId('enemy-power')).toBeNull();
 	});
 });
