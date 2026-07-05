@@ -190,7 +190,8 @@ namespace Game.Application.Services
         // Builds the simulator inputs for the resolved loop. Idle rolls a random per-zone spawn each battle;
         // boss builds the zone's dedicated boss deterministically — the same factory resolvers the live battle
         // start uses, so an offline battle is constructed identically to an online one. The player snapshot and
-        // the catalog resolvers are shared across the whole run (the player's power is stationary offline).
+        // the catalog resolvers are shared across the whole run; the simulator grows the snapshot's level
+        // in-loop as victories are earned (#1601), so the player's power is not stationary across the window.
         private OfflineSimulationParameters BuildSimulationParameters(
             Player player, OfflineLoopMode mode, CoreZone zone, long awayMs,
             IReadOnlyList<ProficiencyLevelSnapshot> proficiencyLevels)
@@ -201,10 +202,11 @@ namespace Game.Application.Services
 
             return new OfflineSimulationParameters
             {
-                // One snapshot drives the whole window: the player's power — proficiency levels included — is
-                // frozen at the window start, so the away period fights at a stationary power even as the
-                // simulated victories accrue proficiency XP (mirroring how gear and stats are frozen).
+                // The stat allocations, gear, and proficiency levels this snapshot captures are frozen at the
+                // window start (player-action state, #1601) — but the level it also captures grows in-loop as
+                // the simulated victories earn exp, alongside StartingExp below.
                 Snapshot = BattleSnapshot.FromPlayer(player, proficiencyLevels),
+                StartingExp = player.Exp,
                 Mode = mode,
                 Zone = zone,
                 AwayBudgetMs = awayMs,
