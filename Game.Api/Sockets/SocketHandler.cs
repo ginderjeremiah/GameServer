@@ -1,3 +1,4 @@
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
 using Game.Api.Services;
 using Game.Api.Sockets.Commands;
@@ -236,6 +237,11 @@ namespace Game.Api.Sockets
             {
                 // A genuine command fault. The caller owns surfacing it (a client error response, or the
                 // server-push escalation), so no response is sent here.
+                if (ex is PlayerPersistenceFlushFailedException)
+                {
+                    _context.Session.MarkPlayerNeedsReload();
+                }
+
                 return (SocketCommandOutcome.Faulted, ex);
             }
             finally
@@ -257,6 +263,21 @@ namespace Game.Api.Sockets
         private async Task<ApiSocketResponse> RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
         {
             using var scope = _scopeFactory.CreateScope();
+
+            // A prior command's SavePlayer flush genuinely failed (PlayerPersistenceFlushFailedException) — the
+            // connection's in-memory Player may hold mutations that never reached the write-behind queue.
+            // Reload it from the repository (the last successfully-persisted state) before running another
+            // command against it, rather than letting the stuck mutation silently ride along forever (#1632).
+            if (_context.Session.PlayerNeedsReload)
+            {
+                var reloadedPlayer = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>()
+                    .GetPlayer(_context.PlayerId, cancellationToken);
+                if (reloadedPlayer is not null)
+                {
+                    _context.Session.SetPlayer(reloadedPlayer);
+                }
+            }
+
             // CreateCommand binds Parameters (SetParameters), which throws MalformedSocketCommandParametersException
             // on malformed/missing JSON — thrown right at the deserialize call inside SetParameters (not guessed
             // here from the exception's type), so it propagates precisely rather than also catching an unrelated

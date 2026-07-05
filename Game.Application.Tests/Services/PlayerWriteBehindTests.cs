@@ -1,7 +1,10 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
 using Game.Core;
+using Game.Core.Events;
 using Game.Core.Players;
 using Game.DataAccess;
+using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -109,6 +112,51 @@ namespace Game.Application.Tests.Services
             await playerRepo.SavePlayer(player);
 
             Assert.True(await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE) >= 2);
+        }
+
+        [Fact]
+        public async Task SavePlayer_PublishFailsForANonCancellationReason_ThrowsPlayerPersistenceFlushFailedException()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            // A repository built with a pubsub that throws for a reason other than cancellation stands in for a
+            // transient Redis blip on the flush's *last* attempt in a command's scope (#1632) — SavePlayer must
+            // wrap it distinctly rather than let a bare exception propagate, so the socket layer can recognize it
+            // and force the connection's in-memory Player to reload afterward.
+            var throwingRepo = new PlayerRepository(
+                context,
+                scope.ServiceProvider.GetRequiredService<ICacheService>(),
+                new ThrowingPubSubService(),
+                scope.ServiceProvider.GetRequiredService<IDomainEventDispatcher>(),
+                scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>(),
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<IItemMods>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>());
+
+            player.ChangeZone(1);
+            var ex = await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(() => throwingRepo.SavePlayer(player));
+            Assert.IsType<InvalidOperationException>(ex.InnerException);
+        }
+
+        private sealed class ThrowingPubSubService : IPubSubService
+        {
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Wake(string channel) => throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotImplementedException();
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new NotImplementedException();
+            public Task UnSubscribe(string channel, string id) => throw new NotImplementedException();
+            public IPubSubQueue GetQueue(string queueName) => throw new NotImplementedException();
         }
 
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
