@@ -568,7 +568,7 @@ namespace Game.Application.Tests.Services
             // fresh spawn (a prior, buggy version of this fix double-counted it as both a completed win and a
             // fresh backdated battle, with an inverted offset besides).
             using var scope = CreateScope();
-            var setup = await SeedWinningScenarioAsync(scope);
+            var setup = await SeedSlowWinningScenarioAsync(scope);
 
             var (player, state) = await LoadAsync(scope, setup.PlayerId);
             var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
@@ -585,12 +585,16 @@ namespace Game.Application.Tests.Services
             const int creditedBattles = 99;
             var awayMs = ((long)creditedBattles * stepMs) + elapsedWanted;
 
-            player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
+            // Reference the exact instant LastActivity is anchored to (call it T0): the away-budget the
+            // service computes is (its own internal "now" T2) - LastActivity = awayMs + (T2 - T0), so the
+            // pending battle's ElapsedOffsetMs = elapsedWanted + (T2 - T0) — it drifts by however long T2 (an
+            // internal clock read the test can't observe directly) lags T0, even by a fraction of a
+            // millisecond, plus up to ~1ms from the production code's (long)TotalMilliseconds truncation — so
+            // it must be asserted as a range bounded by T0 and a read taken after the call returns, never
+            // exact equality; BattleStartTime (derived from it the same way) carries the same slack.
+            var referenceNow = DateTime.UtcNow;
+            player.LastActivity = referenceNow.AddMilliseconds(-awayMs);
 
-            // Sandwich the call between two real timestamps rather than comparing the backdated start time
-            // against a DateTime.UtcNow read after it returns: the call itself does real DB/Redis I/O of
-            // unbounded duration, so the assertion must not depend on how long the call actually took.
-            var beforeCall = DateTime.UtcNow;
             var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
             var afterCall = DateTime.UtcNow;
 
@@ -598,15 +602,21 @@ namespace Game.Application.Tests.Services
             Assert.Equal(creditedBattles, summary.BattlesWon);
             Assert.NotNull(summary.ActiveBattle);
             Assert.Equal(setup.EnemyId, summary.ActiveBattle.Enemy.Id);
-            Assert.Equal(elapsedWanted, summary.ActiveBattle.ElapsedOffsetMs);
+            Assert.NotNull(summary.ActiveBattle.ElapsedOffsetMs);
+            var driftBudgetMs = (int)(afterCall - referenceNow).TotalMilliseconds + 2;
+            Assert.InRange(summary.ActiveBattle.ElapsedOffsetMs.Value, elapsedWanted, elapsedWanted + driftBudgetMs);
             Assert.True(state.HasActiveBattle);
             Assert.False(state.IsOnCooldown(DateTime.UtcNow));
-            // The backdated battle's own start time is the true offset before the call's internal "now", not
-            // the complement of it.
+            // The backdated battle's own start time is the true offset, not its complement (a prior, buggy
+            // version of this fix backdated by the complement instead). BattleStartTime = T2 - ElapsedOffsetMs
+            // where T2 is the service's internal "now" and ElapsedOffsetMs = elapsedWanted + floor(T2 - T0) —
+            // so BattleStartTime = (T0 - elapsedWanted) + fractional-millisecond-part(T2 - T0), always >= the
+            // exact T0 - elapsedWanted and, since a fractional part is always under 1ms, never more than a
+            // couple of milliseconds above it — regardless of how long the call itself took.
             Assert.InRange(
                 state.BattleStartTime,
-                beforeCall.AddMilliseconds(-elapsedWanted),
-                afterCall.AddMilliseconds(-elapsedWanted));
+                referenceNow.AddMilliseconds(-elapsedWanted),
+                referenceNow.AddMilliseconds(-elapsedWanted + 2));
         }
 
         [Fact]
@@ -666,6 +676,36 @@ namespace Game.Application.Tests.Services
             {
                 await ReloadReferenceCachesAsync();
             }
+
+            return new Setup(playerEntity.Id, zone.Id, enemy.Id);
+        }
+
+        /// <summary>
+        /// Like <see cref="SeedWinningScenarioAsync"/>, but with a deliberately weak player skill so the
+        /// deterministic kill takes several real seconds rather than ~1 second — needed by tests that place
+        /// the away-window boundary at a specific point *inside* the battle (#1596), where the margin against
+        /// real scheduling jitter between "the test sets LastActivity" and "the service reads its own clock"
+        /// scales with the battle's own duration. The enemy's cooldown is set far longer than this slower
+        /// fight to preserve the same one-shot-kill determinism (the enemy's authored skill never actually
+        /// fires within the fight).
+        /// </summary>
+        private async Task<Setup> SeedSlowWinningScenarioAsync(IServiceScope scope)
+        {
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 150m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 4000m, cooldownMs: 100_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
 
             return new Setup(playerEntity.Id, zone.Id, enemy.Id);
         }
