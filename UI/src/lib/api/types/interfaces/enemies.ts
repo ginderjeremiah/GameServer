@@ -39,6 +39,7 @@ export interface IEnemyInstance {
 	attributes: IBattlerAttribute[];
 	seed: number;
 	selectedSkills: number[];
+	elapsedOffsetMs?: number;
 }
 
 export interface INewEnemyModel {

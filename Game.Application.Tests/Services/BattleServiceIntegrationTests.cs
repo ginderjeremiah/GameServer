@@ -1079,19 +1079,20 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task StartBattle_AbandoningAnUnresolvedBattle_RecordsAbandonedNotLost()
+        public async Task StartBattle_AbandoningAStillInProgressBattle_HandsItBackWithoutRecordingAnOutcome()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             // Both combatants wield a skill with an effectively infinite cooldown, so neither lands a hit
-            // within the abandon window — the re-simulation resolves as neither a win nor a death, i.e. an
-            // incomplete abandon.
+            // within the abandon window — the re-simulation resolves as neither a win nor a death. Real elapsed
+            // time since BattleStartTime stays far under the 2-minute cap, so this is not a stalemate: the
+            // battle is genuinely still in progress (#1595) and must be handed back, not booked as a draw.
             var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
             var enemy = await TestDataSeeder.CreateEnemyAsync(context);
             var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
             await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
-            // Pin the encounter level so the abandoned enemy is deterministic.
+            // Pin the encounter level so the handed-back enemy is deterministic.
             var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
             await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
 
@@ -1114,30 +1115,160 @@ namespace Game.Application.Tests.Services
 
             await battleService.StartBattle(player, state, zoneId: zone.Id);
             Assert.True(state.HasActiveBattle);
-            var abandonedEnemyId = state.ActiveEnemyId;
+            var originalEnemyId = state.ActiveEnemyId;
+            var originalSeed = state.BattleSeed;
+            var expBefore = player.Exp;
 
-            // Let some wall-clock time elapse for the abandon, but far less than the skills' cooldowns, so the
-            // re-simulation completes no actions and resolves as neither a win nor a death.
-            state.BattleStartTime = DateTime.UtcNow.AddSeconds(-1);
+            // Let a little wall-clock time elapse for the abandon, but far less than the skills' cooldowns
+            // (and the 2-minute cap), so the re-simulation completes no actions and resolves as neither a win
+            // nor a death.
+            var battleStart = DateTime.UtcNow.AddSeconds(-1);
+            state.BattleStartTime = battleStart;
 
-            // Starting a new battle abandons the in-progress one.
-            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            // Starting a new battle abandons the in-progress one — but since it hasn't concluded, it must be
+            // handed back unchanged rather than replaced with a fresh spawn.
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id);
 
-            // The write-behind handler wrote the abandon to the progress cache (its source of truth); the
-            // command's unit-of-work commit still runs (now a no-op for progress), then read the stats back
-            // from the cache.
+            Assert.Equal(originalEnemyId, result.Enemy.Id);
+            Assert.Equal(originalSeed, result.Seed);
+            Assert.NotNull(result.ElapsedOffsetMs);
+            Assert.True(result.ElapsedOffsetMs >= 900, $"Expected roughly a 1-second offset, got {result.ElapsedOffsetMs}ms.");
+            Assert.True(result.ElapsedOffsetMs < GameConstants.DefaultMaxBattleMs);
+
+            // PlayerState is left completely untouched: same enemy, same seed, same (unbackdated-further)
+            // BattleStartTime.
+            Assert.True(state.HasActiveBattle);
+            Assert.Equal(originalEnemyId, state.ActiveEnemyId);
+            Assert.Equal(originalSeed, state.BattleSeed);
+            Assert.Equal(battleStart, state.BattleStartTime);
+
+            // The write-behind handler would have written any outcome to the progress cache; the command's
+            // unit-of-work commit still runs (a no-op here), then read the stats back from the cache.
             await unitOfWork.CommitAsync();
             var stats = await progressRepo.GetStatistics(playerEntity.Id);
 
             decimal StatValue(EStatisticType type, int? entityId) =>
                 stats.FirstOrDefault(s => s.Type == type && s.EntityId == entityId)?.Value ?? 0m;
 
-            // The abandon is tracked as BattlesAbandoned (global + per-enemy) and never as a loss or a win.
-            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, null));
-            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, abandonedEnemyId));
+            // No outcome is recorded at all — not abandoned, not lost, not won — and no exp is granted, since
+            // nothing concluded.
+            Assert.Equal(0m, StatValue(EStatisticType.BattlesAbandoned, null));
             Assert.Equal(0m, StatValue(EStatisticType.BattlesLost, null));
             Assert.Equal(0m, StatValue(EStatisticType.BattlesWon, null));
             Assert.Equal(0m, StatValue(EStatisticType.PlayerDeaths, null));
+            Assert.Equal(expBefore, player.Exp);
+        }
+
+        [Fact]
+        public async Task ResolveStaleBattle_Concludes_ReturnsNullAndCreditsTheWin()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // A one-shot player skill concludes the replay as a win almost immediately, regardless of how
+            // large the (capped) replay window is.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            // The enemy's skill carries a high base damage (but a cooldown far longer than the one-shot fight,
+            // so it never actually lands) purely to give the enemy a CombatRating comparable to the player's —
+            // otherwise the rating-based reward's anti-grind curve floors a capability-trivial enemy's bounty
+            // to 0. The pinned encounter level keeps the reward deterministic.
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 5000m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+            var expBefore = player.Exp;
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            var handoff = await battleService.ResolveStaleBattle(player, state);
+
+            Assert.Null(handoff);
+            Assert.False(state.HasActiveBattle);
+            Assert.True(player.Exp > expBefore);
+        }
+
+        [Fact]
+        public async Task ResolveStaleBattle_StillInProgressAndGenuineDrawAtCap()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Both combatants wield a skill with an effectively infinite cooldown, so neither lands a hit no
+            // matter how large the (capped) replay window is — the only thing distinguishing "still in
+            // progress" from "genuine draw" is whether real elapsed time has reached the 2-minute cap.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            // Partition 1: real elapsed time is under the 2-minute cap and neither battler died — genuinely
+            // still in progress. Handed back unchanged; PlayerState is left untouched.
+            {
+                var player = await playerRepo.GetPlayer(playerEntity.Id);
+                Assert.NotNull(player);
+                var state = new PlayerState();
+                var expBefore = player.Exp;
+
+                await battleService.StartBattle(player, state, zoneId: zone.Id);
+                var battleStart = DateTime.UtcNow.AddSeconds(-30);
+                state.BattleStartTime = battleStart;
+                var enemyId = state.ActiveEnemyId;
+
+                var handoff = await battleService.ResolveStaleBattle(player, state);
+
+                Assert.NotNull(handoff);
+                Assert.Equal(enemyId, handoff.Enemy.Id);
+                Assert.NotNull(handoff.ElapsedOffsetMs);
+                Assert.True(handoff.ElapsedOffsetMs is >= 29_000 and < GameConstants.DefaultMaxBattleMs);
+                Assert.True(state.HasActiveBattle);
+                Assert.Equal(enemyId, state.ActiveEnemyId);
+                Assert.Equal(battleStart, state.BattleStartTime);
+                Assert.Equal(expBefore, player.Exp);
+            }
+
+            // Partition 2: real elapsed time reaches the cap without either battler dying — a genuine draw,
+            // resolved and cleared (recorded as abandoned), not handed back.
+            {
+                var player = await playerRepo.GetPlayer(playerEntity.Id);
+                Assert.NotNull(player);
+                var state = new PlayerState();
+                var expBefore = player.Exp;
+
+                await battleService.StartBattle(player, state, zoneId: zone.Id);
+                state.BattleStartTime = DateTime.UtcNow.AddMinutes(-20);
+
+                var handoff = await battleService.ResolveStaleBattle(player, state);
+
+                Assert.Null(handoff);
+                Assert.False(state.HasActiveBattle);
+                Assert.Equal(expBefore, player.Exp);
+            }
         }
 
         [Fact]
@@ -1261,6 +1392,71 @@ namespace Game.Application.Tests.Services
 
             // The reported stalemate stays a draw: recorded as abandoned (global + per-enemy), never a win,
             // and no exp is granted.
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, null));
+            Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, abandonedEnemyId));
+            Assert.Equal(0m, StatValue(EStatisticType.BattlesWon, null));
+            Assert.Equal(expBefore, player.Exp);
+        }
+
+        [Fact]
+        public async Task StartBattle_ReportedClientBattleMsUnderCapButRealElapsedPastCap_RecordsGenuineDrawNotHandoff()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Both combatants wield a skill with an effectively infinite cooldown, so no window (however
+            // large) ever concludes the fight — isolating the still-in-progress-vs-draw classification to
+            // real elapsed time alone.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+            var abandonedEnemyId = state.ActiveEnemyId;
+            var abandonedSeed = state.BattleSeed;
+            var expBefore = player.Exp;
+
+            // Real elapsed time since BattleStartTime is well past the 2-minute cap...
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-3);
+
+            // ...but the client under-reports a much smaller clientBattleMs, well under the cap. The
+            // still-in-progress classification must key off the real elapsed time (wallClockMs), not this
+            // client-bounded figure — otherwise a small enough report would turn an already-expired battle
+            // into a false "still in progress" handoff.
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id, clientBattleMs: 50_000);
+
+            // A fresh battle was started — not a handoff of the old one (same enemy is the only one seeded in
+            // the zone, so freshness is asserted via the new random seed and reset BattleStartTime instead).
+            Assert.Null(result.ElapsedOffsetMs);
+            Assert.NotEqual(abandonedSeed, state.BattleSeed);
+            Assert.True(DateTime.UtcNow - state.BattleStartTime < TimeSpan.FromMinutes(1));
+
+            await unitOfWork.CommitAsync();
+            var stats = await progressRepo.GetStatistics(playerEntity.Id);
+
+            decimal StatValue(EStatisticType type, int? entityId) =>
+                stats.FirstOrDefault(s => s.Type == type && s.EntityId == entityId)?.Value ?? 0m;
+
+            // The genuinely-expired battle is booked as a draw (abandoned), not silently handed back.
             Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, null));
             Assert.Equal(1m, StatValue(EStatisticType.BattlesAbandoned, abandonedEnemyId));
             Assert.Equal(0m, StatValue(EStatisticType.BattlesWon, null));

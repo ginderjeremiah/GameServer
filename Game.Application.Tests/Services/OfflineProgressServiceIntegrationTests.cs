@@ -455,6 +455,64 @@ namespace Game.Application.Tests.Services
             Assert.False(state.HasActiveBattle);
         }
 
+        [Fact]
+        public async Task SimulateSwitchProgress_StaleBattleStillInProgress_HandsItBackWithoutSimulatingAwayWindow()
+        {
+            // A departed character's in-flight battle that hasn't concluded within the 2-minute cap (#1595)
+            // must be handed back untouched — not booked as a draw, and no away-window battles simulated in
+            // its place, since there is no leftover budget beyond an unconcluded fight.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Both combatants wield a skill with an effectively infinite cooldown, so neither lands a hit
+            // within the tested window — the battle genuinely never concludes on its own.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, playerEntity.Id);
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+            var activeEnemyId = state.ActiveEnemyId;
+            // Real elapsed time since BattleStartTime stays far under the 2-minute cap.
+            var battleStart = DateTime.UtcNow.AddSeconds(-30);
+            state.BattleStartTime = battleStart;
+
+            var lastActivityBefore = DateTime.UtcNow.AddMinutes(-2);
+            player.LastActivity = lastActivityBefore;
+
+            var summary = await offlineProgressService.SimulateSwitchProgress(player, state, CancellationToken);
+
+            Assert.NotNull(summary.ActiveBattle);
+            Assert.Equal(activeEnemyId, summary.ActiveBattle.Enemy.Id);
+            Assert.NotNull(summary.ActiveBattle.ElapsedOffsetMs);
+            Assert.True(summary.HasProgress);
+            Assert.Equal(0, summary.BattlesWon);
+            Assert.Equal(0, summary.BattlesLost);
+            Assert.Equal(0, summary.BattlesDrawn);
+            Assert.Equal(0, summary.TotalExp);
+
+            // The pre-existing battle is left completely untouched — no clear, no fresh spawn.
+            Assert.True(state.HasActiveBattle);
+            Assert.Equal(activeEnemyId, state.ActiveEnemyId);
+            Assert.Equal(battleStart, state.BattleStartTime);
+            // LastActivity is deliberately left unmoved: nothing was settled, so the away clock keeps counting
+            // against the original disconnect rather than being re-anchored to now.
+            Assert.Equal(lastActivityBefore, player.LastActivity);
+        }
+
         /// <summary>
         /// Seeds a player who reliably one-shots a fixed-power enemy in a single-zone idle loop, so an away
         /// window produces a deterministic run of victories (each worth what <see cref="ComputeExpPerWinAsync"/>
