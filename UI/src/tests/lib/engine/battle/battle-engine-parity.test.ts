@@ -247,7 +247,8 @@ describe('BattleEngine parity with the headless BattleSimulator', () => {
 				level: 1,
 				seed: PARITY_SEED,
 				selectedSkills: enemySkillIds,
-				attributes: toBattlerAttributes(scenario.enemyAttrs)
+				attributes: toBattlerAttributes(scenario.enemyAttrs),
+				enemyRating: 100
 			});
 
 			expect(runEngine(engine)).toEqual(simResult);

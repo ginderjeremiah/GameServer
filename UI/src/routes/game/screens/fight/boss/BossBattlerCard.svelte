@@ -12,6 +12,11 @@
 	<div class="identity">
 		<span class="boss-name">{battler.name}</span>
 		<span class="boss-level">LV · {battler.level}</span>
+		{#if enemyManager.currentEnemy}
+			<span class="power-readout" data-testid="boss-power" style:color="var({ratingCueColorVar(cue)})">
+				⚡ {formatNum(Math.round(enemyManager.currentEnemy.enemyRating))} · {ratingCueLabel(cue)}
+			</span>
+		{/if}
 	</div>
 
 	<BossHpBar currentHealth={battler.currentHealth} {maxHealth} />
@@ -30,9 +35,12 @@
 <script lang="ts">
 import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
+import { formatNum } from '$lib/common';
+import { enemyManager, playerManager } from '$lib/engine';
 import ActiveEffectChips from '../ActiveEffectChips.svelte';
 import CombatFloaters from '../CombatFloaters.svelte';
 import Skills from '../Skills.svelte';
+import { ratingCue, ratingCueColorVar, ratingCueLabel } from '../rating-cue';
 import BossKicker from './BossKicker.svelte';
 import BossDiamond from './BossDiamond.svelte';
 import BossHpBar from './BossHpBar.svelte';
@@ -44,6 +52,7 @@ type Props = {
 const { battler }: Props = $props();
 
 const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
+const cue = $derived(ratingCue(enemyManager.currentEnemy?.enemyRating ?? 0, playerManager.playerRating));
 </script>
 
 <style lang="scss">
@@ -94,6 +103,14 @@ const maxHealth = $derived(battler.attributes.getValue(EAttribute.MaxHealth));
 	font-size: 10px;
 	color: color-mix(in srgb, var(--text-primary) 55%, transparent);
 	letter-spacing: 0.6px;
+}
+
+// The combat-power readout (spike #1526 Decision 7); colour driven inline by the matched/trivial cue.
+.power-readout {
+	font-family: var(--mono);
+	font-size: 9.5px;
+	letter-spacing: 0.6px;
+	white-space: nowrap;
 }
 
 .skills {

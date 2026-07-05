@@ -69,6 +69,9 @@ namespace Game.Api.Tests.Integration
                     "NewEnemy", new { NewZoneId = (int?)null });
 
                 Assert.Null(newEnemyResponse.Error);
+                // The battle-start payload carries the enemy's combat rating (spike #1526 Decision 7) alongside
+                // its attributes/skills, always strictly positive per CombatRating's degenerate-guard floor.
+                Assert.True(newEnemyResponse.Data?.EnemyInstance?.EnemyRating > 0);
 
                 await socketClient1.CloseAsync();
             }
@@ -101,6 +104,9 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Data);
             Assert.NotNull(response.Data.Rewards);
             Assert.True(response.Data.Rewards.ExpReward >= 0);
+            // The victory response carries the player's post-battle combat rating (spike #1526 Decision 7) so
+            // the client's displayed power number can update immediately on a level-up.
+            Assert.True(response.Data.Rewards.PlayerRating > 0);
             // An idle victory bundles the next idle battle so the client begins it without a separate
             // NewEnemy round-trip — its fetch latency is hidden under the post-battle cooldown (#1092).
             Assert.NotNull(response.Data.NextEnemy);

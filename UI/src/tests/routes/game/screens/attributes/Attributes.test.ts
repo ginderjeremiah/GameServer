@@ -11,6 +11,7 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 		level: 0,
 		exp: 0,
 		nextLevelThreshold: 0,
+		playerRating: 0,
 		selectedSkills: [] as number[]
 	},
 	mockInventoryManager: {
@@ -62,6 +63,7 @@ beforeEach(() => {
 	mockPlayerManager.level = 7;
 	mockPlayerManager.exp = 280;
 	mockPlayerManager.nextLevelThreshold = 700;
+	mockPlayerManager.playerRating = 342;
 	// The radar reads prefers-reduced-motion to decide whether to animate; force
 	// the snap path so no rAF runs during the test.
 	window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
@@ -76,6 +78,8 @@ describe('Attributes screen', () => {
 		expect(screen.getByText('Attributes')).toBeTruthy();
 		// 8 unspent points available, none pending.
 		expect(screen.getByText('8')).toBeTruthy();
+		// The server-computed combat rating (spike #1526 Decision 7) is displayed as-is, never recomputed.
+		expect(screen.getByText('342')).toBeTruthy();
 		expect(screen.getByText('No changes')).toBeTruthy();
 	});
 

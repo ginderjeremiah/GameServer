@@ -29,6 +29,7 @@ import { onLogicalUpdate } from '../logical-engine';
 import { onRenderUpdate } from '../render-engine';
 import { inventoryManager } from '../engine';
 import { playerManager } from '../player/player-manager';
+import { evaluateMechanicTriggers } from '../tutorials';
 import { onNewEnemyLoaded } from './enemy-manager';
 
 export enum BattleStage {
@@ -328,13 +329,8 @@ export class BattleEngine {
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
 		if (this.stage === Active) {
 			this.timeElapsed += timeDelta;
-			for (const { skill, damage, byPlayer, crit, dodged, parried, counter, reflected } of battleStep(
-				this.player,
-				this.enemy,
-				timeDelta,
-				this.rng,
-				this.stepLog
-			)) {
+			const activations = battleStep(this.player, this.enemy, timeDelta, this.rng, this.stepLog);
+			for (const { skill, damage, byPlayer, crit, dodged, parried, counter, reflected } of activations) {
 				const outcome = damageLogOutcome(byPlayer, crit, dodged, parried, counter);
 				const damageType = skill.primaryDamageType;
 				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged or
@@ -364,6 +360,11 @@ export class BattleEngine {
 			}
 			this.logEffectApplications();
 			this.accumulateEffectDamage(timeDelta);
+			// Mechanic-anchored tutorial triggers (#1587) are a presentation/client-detection concern like the
+			// combat floaters above, so this only runs in the live loop — never the headless parity simulator.
+			if (activations.length > 0) {
+				evaluateMechanicTriggers(activations);
+			}
 			if (this.enemy.isDead) {
 				this.flushEffectDamage();
 				this.setBattleStage(Victorious);

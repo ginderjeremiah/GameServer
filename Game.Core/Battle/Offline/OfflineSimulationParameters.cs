@@ -17,11 +17,21 @@ namespace Game.Core.Battle.Offline
     public record OfflineSimulationParameters
     {
         /// <summary>
-        /// The player's battle-relevant state, captured once. A player's combat power is stationary while
-        /// offline (allocations and gear cannot change), so this single snapshot drives every simulated
-        /// battle and the exp-reward power measurement.
+        /// The player's battle-relevant state, captured once. Everything requiring the player's hand — stat
+        /// allocations, gear, loadout, proficiency levels — is frozen offline and drives every simulated battle
+        /// unchanged; the captured <see cref="BattleSnapshot.Level"/> is the one exception, growing in-loop as
+        /// victories are earned (#1601, alongside <see cref="StartingExp"/>) so the class locked base — and
+        /// through it the reward power — grows across the window exactly as it would live.
         /// </summary>
         public required BattleSnapshot Snapshot { get; init; }
+
+        /// <summary>
+        /// The player's current exp at window start, alongside <see cref="BattleSnapshot.Level"/> — together
+        /// the starting point the in-loop mid-window growth (#1601) advances from as victories are earned, so
+        /// a level threshold crossed mid-window lands on the same battle it would live (a player already
+        /// partway to their next level does not get an extra free battle's grace).
+        /// </summary>
+        public required int StartingExp { get; init; }
 
         /// <summary>The idle loop the player was running at disconnect — idle-farming or boss-farming.</summary>
         public required OfflineLoopMode Mode { get; init; }
@@ -68,9 +78,9 @@ namespace Game.Core.Battle.Offline
         public required Func<int, Proficiency> ResolveProficiency { get; init; }
 
         /// <summary>Resolves the player's class by id when composing the snapshot's level-scaled locked-base
-        /// distribution. The whole away window fights at the snapshot's frozen level, so the locked base — a
-        /// deterministic function of <c>(class, level)</c> — is stationary across the window like every other
-        /// captured input.</summary>
+        /// distribution. The locked base — a deterministic function of <c>(class, level)</c> — is re-derived
+        /// against this resolver each time a simulated level-up grows the snapshot's level (#1601), so it
+        /// grows across the window exactly as it would live.</summary>
         public required Func<int, Class> ResolveClass { get; init; }
 
         /// <summary>

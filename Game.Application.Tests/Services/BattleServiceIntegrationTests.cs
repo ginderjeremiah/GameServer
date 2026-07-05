@@ -363,6 +363,34 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task RatePlayer_ReflectsLiveState_NotAFrozenBattleSnapshot()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await ReloadReferenceCachesAsync();
+
+            var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var baselineRating = await battleService.RatePlayer(player);
+
+            // A live stat reallocation (no battle involved) must move the rating on the very next call —
+            // unlike DefeatRewards.PlayerRating, this display rating has no frozen snapshot to read from.
+            foreach (var allocation in player.StatPoints.StatAllocations)
+            {
+                allocation.Amount += 50;
+            }
+            var bumpedRating = await battleService.RatePlayer(player);
+
+            Assert.True(bumpedRating > baselineRating,
+                $"Expected the post-reallocation rating ({bumpedRating}) to exceed the baseline ({baselineRating}).");
+        }
+
+        [Fact]
         public async Task RecordVictory_RewardIncludesClassLockedBaseInPlayerRating()
         {
             using var scope = CreateScope();

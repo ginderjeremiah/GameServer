@@ -19,6 +19,7 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 		attributes: IBattlerAttribute[] = [];
 		statPointsGained = 0;
 		statPointsUsed = 0;
+		playerRating = 0;
 		selectedSkills: number[] = [];
 	})(),
 	mockInventoryManager: {
@@ -591,7 +592,7 @@ describe('AttributesView.save', () => {
 			attributeId: id,
 			amount: id === EAttribute.Strength ? 6 : 5
 		}));
-		sendSocketCommand.mockResolvedValue({ data: { attributes: serverResult, statPointsUsed: 1 } });
+		sendSocketCommand.mockResolvedValue({ data: { attributes: serverResult, statPointsUsed: 1, playerRating: 150 } });
 
 		view.inc(idx.str);
 		await view.save();
@@ -603,6 +604,8 @@ describe('AttributesView.save', () => {
 		// Applied to the player manager so battles and other screens see it.
 		expect(mockPlayerManager.attributes).toEqual(serverResult);
 		expect(mockPlayerManager.statPointsUsed).toBe(1);
+		// The server-computed combat rating (spike #1526 Decision 7) reconciles the same way.
+		expect(mockPlayerManager.playerRating).toBe(150);
 		expect(view.dirty).toBe(false);
 		expect(view.committed[idx.str]).toBe(6);
 		expect(view.remaining).toBe(9);

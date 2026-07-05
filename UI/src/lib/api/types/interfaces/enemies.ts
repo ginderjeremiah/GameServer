@@ -31,6 +31,7 @@ export interface IDefeatRewards {
 	newExp: number;
 	statPointsGained: number;
 	statPointsUsed: number;
+	playerRating: number;
 }
 
 export interface IEnemyInstance {
@@ -40,6 +41,7 @@ export interface IEnemyInstance {
 	seed: number;
 	selectedSkills: number[];
 	elapsedOffsetMs?: number;
+	enemyRating: number;
 }
 
 export interface INewEnemyModel {
