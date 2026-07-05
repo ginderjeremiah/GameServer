@@ -114,7 +114,23 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 			glyph: 'map',
 			desc: 'The ordered coach-mark callouts this lesson’s tour plays',
 			count: (l) => l.steps.length,
-			warn: (l) => (l.steps.length ? null : 'No tour steps'),
+			// `ordinal` is both the row identity (SectionTable's rowKey) and an author-editable number —
+			// unlike every other table section, which keys off a `unique` select or a surrogate id neither
+			// of which an author can hand-collide. A duplicate crashes the keyed {#each} and collides in
+			// the backend's ordinal-keyed reconciler, so it's caught here rather than left to blow up.
+			warn: (l) => {
+				if (!l.steps.length) {
+					return 'No tour steps';
+				}
+				const ordinals = l.steps.map((s) => s.ordinal);
+				if (new Set(ordinals).size !== ordinals.length) {
+					return 'Two steps share the same ordinal';
+				}
+				if (l.steps.some((s) => !s.text.trim())) {
+					return 'A tour step is missing its callout text';
+				}
+				return null;
+			},
 			kind: 'table',
 			itemsKey: 'steps',
 			rowKey: 'ordinal',

@@ -156,6 +156,18 @@ describe('lessonEntity', () => {
 	describe('steps section', () => {
 		const stepsSection = () => lessonEntity.sections.find((s) => s.key === 'steps');
 
+		it('count reports the number of tour steps', () => {
+			const section = stepsSection();
+			const l = {
+				...lessonEntity.newItem(0),
+				steps: [
+					{ ordinal: 0, text: 'First' },
+					{ ordinal: 1, text: 'Second' }
+				]
+			};
+			expect(section?.count?.(l)).toBe(2);
+		});
+
 		it('warns when there are no tour steps', () => {
 			const section = stepsSection();
 			const l = { ...lessonEntity.newItem(0), steps: [] };
@@ -166,6 +178,24 @@ describe('lessonEntity', () => {
 			const section = stepsSection();
 			const l = { ...lessonEntity.newItem(0), steps: [{ ordinal: 0, text: 'Step one' }] };
 			expect(section && 'warn' in section ? section.warn?.(l) : null).toBeNull();
+		});
+
+		it('warns when two steps share the same ordinal', () => {
+			const section = stepsSection();
+			const l = {
+				...lessonEntity.newItem(0),
+				steps: [
+					{ ordinal: 0, text: 'First' },
+					{ ordinal: 0, text: 'Also first' }
+				]
+			};
+			expect(section && 'warn' in section ? section.warn?.(l) : null).toBe('Two steps share the same ordinal');
+		});
+
+		it('warns when a step has blank callout text', () => {
+			const section = stepsSection();
+			const l = { ...lessonEntity.newItem(0), steps: [{ ordinal: 0, text: '   ' }] };
+			expect(section && 'warn' in section ? section.warn?.(l) : null).toBe('A tour step is missing its callout text');
 		});
 
 		it('newRow starts a blank, unanchored step at the next ordinal', () => {
