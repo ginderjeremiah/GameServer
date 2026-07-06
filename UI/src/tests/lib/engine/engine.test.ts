@@ -146,6 +146,8 @@ vi.mock('$lib/engine/player/inventory-manager', () => ({
 }));
 vi.mock('$lib/engine/player/player-manager', () => ({ playerManager: playerManagerStub }));
 vi.mock('$lib/engine/log', () => ({ logMessage }));
+const { refreshPlayer } = vi.hoisted(() => ({ refreshPlayer: vi.fn(() => Promise.resolve()) }));
+vi.mock('$lib/engine/session', () => ({ refreshPlayer }));
 
 import {
 	startGame,
@@ -714,15 +716,31 @@ describe('handleServerCommandFailed', () => {
 		expect(playerChallengesStub.load).toHaveBeenCalledWith(true);
 	});
 
+	it('resyncs the player and re-derives inventory when a ChallengeCompleted push was dead-lettered, so a reward item it carried appears immediately', async () => {
+		handleServerCommandFailed(serverCommandFailedResponse('ChallengeCompleted'));
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(refreshPlayer).toHaveBeenCalledTimes(1);
+		expect(inventoryManager.initialize).toHaveBeenCalledTimes(1);
+	});
+
 	it('force-reloads proficiency progress when a ProficiencyXpGained push was dead-lettered', () => {
 		handleServerCommandFailed(serverCommandFailedResponse('ProficiencyXpGained'));
 
 		expect(playerProficienciesStub.load).toHaveBeenCalledWith(true);
 	});
 
+	it('does not resync the player for a dead-lettered ProficiencyXpGained push', () => {
+		handleServerCommandFailed(serverCommandFailedResponse('ProficiencyXpGained'));
+
+		expect(refreshPlayer).not.toHaveBeenCalled();
+	});
+
 	it('does not reload challenges for an unrelated failed command', () => {
 		handleServerCommandFailed(serverCommandFailedResponse('SocketReplaced'));
 
 		expect(playerChallengesStub.load).not.toHaveBeenCalled();
+		expect(refreshPlayer).not.toHaveBeenCalled();
 	});
 });
