@@ -85,6 +85,35 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void ApplyDamageOverTime_ResistanceAboveOne_AtFullHealth_CapsHealAtZero()
+        {
+            // A +2.0 BleedResistance would heal 80 (2000 × 40/1000 × (1 − 2) = −80), but the battler is already
+            // at MaxHealth (no prior damage) so there's no room — capped at zero net effect, consistent with
+            // TakeDamage's absorption cap and ApplyHealOverTime (no overheal/shield concept). Per-type booking
+            // still sees the uncapped tick.
+            var battler = MakeBattler(Stat(Strength, 0), Stat(BleedDamagePerSecond, 2000), Stat(BleedResistance, 2.0)); // MaxHealth 50
+            var dealtByType = new Dictionary<EDamageType, double>();
+
+            var dealt = battler.ApplyDamageOverTime(40, recordDamageDealt: (type, amount) => dealtByType[type] = amount);
+
+            Assert.Equal(0, dealt);
+            Assert.Equal(50, battler.CurrentHealth);
+            Assert.Equal(-80, dealtByType[EDamageType.Bleed]); // per-type booking stays uncapped
+        }
+
+        [Fact]
+        public void ApplyDamageOverTime_ResistanceAboveOne_PartialRoom_CapsHealAtTheRemainingRoom()
+        {
+            var battler = MakeBattler(Stat(Strength, 10), Stat(BleedDamagePerSecond, 50), Stat(BleedResistance, 2.0)); // MaxHealth 100
+            battler.TakeDamage(1, EDamageType.Physical); // no Toughness → 1 damage → CurrentHealth 99, room 1
+
+            var dealt = battler.ApplyDamageOverTime(40); // would heal 2, but only 1 of room remains
+
+            Assert.Equal(-1, dealt);
+            Assert.Equal(100, battler.CurrentHealth);
+        }
+
+        [Fact]
         public void ApplyDamageOverTime_BurnResistedByFireResistance_ThroughCrossCuttingKeys()
         {
             // Burn resists as burn + fire + elemental + dot, so a fire-resistant battler mitigates burns for
