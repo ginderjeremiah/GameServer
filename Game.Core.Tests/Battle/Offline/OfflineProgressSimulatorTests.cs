@@ -12,6 +12,7 @@ using Game.Core.Skills;
 using Game.Core.TestInfrastructure.Builders;
 using Game.Core.Zones;
 using Xunit;
+using CorePath = Game.Core.Proficiencies.Path;
 using static Game.Core.EAttribute;
 
 namespace Game.Core.Tests.Battle.Offline
@@ -748,6 +749,167 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.True(withPassive.Wins > 0);
         }
 
+        // ── Proficiency growth (#1602) ──────────────────────────────────────
+        //
+        // In-loop proficiency accrual: a victory's XP/level/milestone accounting runs immediately (against the
+        // run's own working proficiency state), not after the whole window has already been simulated, so a
+        // milestone attribute payout crossed early feeds forward into every later battle's snapshot exactly
+        // like #1601's level growth already does.
+
+        [Fact]
+        public void Simulate_ProficiencyGrowth_MatchesSequentialAccrualOverTheIdenticalBattleSequence()
+        {
+            // Same-sequence parity: the in-loop offline accrual and the live per-battle path both run
+            // ProficiencyAccrual.Accrue — replaying the simulator's own recorded battle-by-battle stats/ratings
+            // through that identical function one battle at a time (mirroring how the live socket loop would
+            // call it after each victory) must land on the exact same final per-proficiency state the
+            // simulator's in-loop growth reached.
+            var (path, proficiency) = SingleTierProficiency(
+                proficiencyId: 10, pathId: 10, activityKey: EActivityKey.Physical, baseXp: 5m, xpGrowth: 1.2m, maxLevel: 20);
+            var catalog = Catalog((path, proficiency));
+
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1),
+                Snapshot = PlayerSnapshot(strength: 100, endurance: 100),
+                ResolveEnemy = level => WeakEnemy(level),
+            };
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario) with
+            {
+                ResolveProficiency = catalog.ResolveProficiency,
+                ResolvePath = catalog.ResolvePath,
+                PathsForActivityKey = catalog.PathsForActivityKey,
+                DependentsOf = catalog.DependentsOf,
+            });
+
+            var victories = result.Battles.Where(b => b.Result.Victory).ToList();
+            Assert.True(victories.Count > 1, "Expected multiple victories to accrue proficiency XP across.");
+            Assert.Contains(victories, b => b.ProficiencyGains.Results.Count > 0);
+
+            // Replay live-style: call the identical accrual function once per victory, in order, against a
+            // fresh tracker — exactly the shape the live per-battle path (application-layer adapter over
+            // ProficiencyAccrual) applies to a real PlayerProgress aggregate.
+            var levelById = new Dictionary<int, int>();
+            var xpById = new Dictionary<int, decimal>();
+            foreach (var battle in victories)
+            {
+                ProficiencyAccrual.Accrue(
+                    catalog, battle.Result.Stats, Math.Max(battle.PlayerRating, battle.EnemyRating),
+                    id => levelById.GetValueOrDefault(id), id => xpById.GetValueOrDefault(id),
+                    (id, level, xp) =>
+                    {
+                        levelById[id] = level;
+                        xpById[id] = xp;
+                    });
+            }
+
+            var offlineFinal = victories
+                .SelectMany(b => b.ProficiencyGains.Results)
+                .GroupBy(r => r.ProficiencyId)
+                .ToDictionary(g => g.Key, g => g.Last());
+
+            Assert.NotEmpty(offlineFinal);
+            foreach (var (id, offline) in offlineFinal)
+            {
+                Assert.Equal(offline.NewLevel, levelById[id]);
+                Assert.Equal(offline.NewXp, xpById[id]);
+            }
+        }
+
+        [Fact]
+        public void Simulate_MidWindowProficiencyGrowth_FlipsInitialLossesIntoWins()
+        {
+            // A threshold matchup (WeakEnemy, the zone's level-2 roll) the player loses at their bare
+            // window-start proficiency state but wins once a milestone crossed against the zone's other,
+            // permanently-free level-1 roll grants its attribute payout — proving the in-loop accrual changes a
+            // real battle outcome, not just a measured rating. EmptySnapshot carries no class, so the player's
+            // level growing offline (a level-1 FreeFarmEnemy win still earns exp) contributes no locked base —
+            // any flip is attributable only to the proficiency payout.
+            //
+            // The zone's level-1/level-2 roll is genuinely random (BattleFactory.CreateBattleEnemy), not seeded
+            // by the deterministic per-battle SeedSource — so the threshold must require accumulating XP across
+            // many free wins (each a fixed, deterministic yield), not just one, or an unlucky early run of free
+            // rolls could level the payout before the threshold matchup is ever encountered even once,
+            // producing a flaky "never lost early" false negative. ~20 free wins' worth makes that a
+            // vanishingly unlikely ordering (roughly 0.5^20) over the thousands of battles a 10h window runs.
+            var (path, proficiency) = SingleTierProficiency(
+                proficiencyId: 11, pathId: 11, activityKey: EActivityKey.Physical, baseXp: 1500m, maxLevel: 5,
+                payoutLevel: 1, payoutAttribute: Endurance, payoutAmount: 300);
+            var catalog = Catalog((path, proficiency));
+
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 2),
+                Snapshot = EmptySnapshot(),
+                ResolveEnemy = level => level == 1 ? FreeFarmEnemy(level) : WeakEnemy(level),
+            };
+
+            var result = _simulator.Simulate(IdleParameters(TenHoursMs, scenario, capMs: TenHoursMs) with
+            {
+                ResolveProficiency = catalog.ResolveProficiency,
+                ResolvePath = catalog.ResolvePath,
+                PathsForActivityKey = catalog.PathsForActivityKey,
+                DependentsOf = catalog.DependentsOf,
+            });
+
+            var thresholdBattles = result.Battles.Where(b => b.Enemy.Id == EnemyId).ToList();
+            var firstWinIndex = thresholdBattles.FindIndex(b => b.Result.Victory);
+
+            Assert.True(thresholdBattles.Any(b => b.Result.PlayerDied), "The threshold matchup never lost early on.");
+            Assert.True(firstWinIndex > 0, "The threshold matchup never flipped to a win.");
+            // The flip is one-way: leveling only ever helps, it never regresses a won matchup back to a loss.
+            Assert.All(thresholdBattles.Take(firstWinIndex), b => Assert.True(b.Result.PlayerDied));
+            Assert.All(thresholdBattles.Skip(firstWinIndex), b => Assert.True(b.Result.Victory));
+        }
+
+        [Fact]
+        public void Simulate_ResistAccrual_ReflectsTheGrowingPowerDenominator_NotWindowStartPower()
+        {
+            // Two independently-trained paths share the same run: an offense path (Physical) whose level-1
+            // payout grants a large Endurance bonus, and a resist path (PhysicalResist) that never itself
+            // levels (its curve is set far out of reach) so its XpGained is driven purely by
+            // activity ÷ ratingDenominator. Once the offense path's payout lands, the rebuilt rating battler
+            // raises PlayerRating for every later battle — the shared ratingDenominator every path's accrual
+            // normalizes by (spike #1526 Decision 5) — so the resist path's own XP claim shrinks against
+            // roughly the same enemy exposure, even though nothing about the resist path itself changed.
+            // Pre-#1602 every battle read the same window-start denominator, so this could not happen offline.
+            const int offenseProficiencyId = 20;
+            const int resistProficiencyId = 21;
+            var (offensePath, offenseProficiency) = SingleTierProficiency(
+                offenseProficiencyId, pathId: 20, activityKey: EActivityKey.Physical, baseXp: 0.01m, maxLevel: 5,
+                payoutLevel: 1, payoutAttribute: Endurance, payoutAmount: 300);
+            var (resistPath, resistProficiency) = SingleTierProficiency(
+                resistProficiencyId, pathId: 21, activityKey: EActivityKey.PhysicalResist, baseXp: 1_000_000m, maxLevel: 100);
+            var catalog = Catalog((offensePath, offenseProficiency), (resistPath, resistProficiency));
+
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1),
+                Snapshot = PlayerSnapshot(strength: 100, endurance: 100),
+                ResolveEnemy = level => WeakEnemy(level),
+            };
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario) with
+            {
+                ResolveProficiency = catalog.ResolveProficiency,
+                ResolvePath = catalog.ResolvePath,
+                PathsForActivityKey = catalog.PathsForActivityKey,
+                DependentsOf = catalog.DependentsOf,
+            });
+
+            var resistGains = result.Battles
+                .Where(b => b.Result.Victory)
+                .Select(b => b.ProficiencyGains.Results.FirstOrDefault(r => r.ProficiencyId == resistProficiencyId))
+                .Where(r => r is not null)
+                .Select(r => r!.XpGained)
+                .ToList();
+
+            Assert.True(resistGains.Count > 1, "Expected the resist path to accrue XP across multiple battles.");
+            Assert.True(resistGains[0] > resistGains[^1],
+                "Resist accrual did not shrink as the offense path's payout grew the player's rating.");
+        }
+
         // ── Scenario plumbing ────────────────────────────────────────────────
 
         private const int EnemyId = 1;
@@ -765,6 +927,9 @@ namespace Game.Core.Tests.Battle.Offline
             // gate's bare-hands punch probe (these weaponless snapshots field a punch only if one resolves) finds
             // nothing and is dropped, leaving these pre-punch scenarios' balance unchanged.
             public Func<int, Skill?> ResolveSkill { get; init; } = id => id == 0 ? PlayerAttackSkill() : null;
+            // These scenarios capture no proficiency levels and no path trains on any activity key by default
+            // (see PathsForActivityKey in IdleParameters), so this is never called unless a scenario opts in.
+            public Func<int, Proficiency> ResolveProficiency { get; init; } = ThrowProficiency;
         }
 
         private static OfflineSimulationParameters IdleParameters(long awayMs, Scenario scenario, long capMs = TenHoursMs) =>
@@ -781,7 +946,13 @@ namespace Game.Core.Tests.Battle.Offline
                 ResolveItem = scenario.ResolveItem,
                 ResolveMod = scenario.ResolveMod,
                 ResolveSkill = scenario.ResolveSkill,
-                ResolveProficiency = ThrowProficiency,
+                ResolveProficiency = scenario.ResolveProficiency,
+                ResolvePath = ThrowPath,
+                // No path trains on any activity key by default, so the in-loop proficiency accrual (#1602) is
+                // a no-op for scenarios that don't opt into it — matching the pre-#1602 behavior these
+                // unrelated (budget/remainder/level-growth) tests depend on.
+                PathsForActivityKey = _ => [],
+                DependentsOf = _ => [],
                 ResolveClass = ThrowClass,
                 SeedSource = () => 0,
             };
@@ -958,6 +1129,69 @@ namespace Game.Core.Tests.Battle.Offline
         private static AttributeDistribution Distribution(EAttribute attribute, decimal baseAmount, decimal amountPerLevel = 0m) =>
             new() { AttributeId = attribute, BaseAmount = baseAmount, AmountPerLevel = amountPerLevel };
 
+        /// <summary>
+        /// A single-tier path (one proficiency, ordinal 0) trained on <paramref name="activityKey"/>, optionally
+        /// authoring one payout level so a test can pin the resulting attribute bonus. With no payout supplied
+        /// the proficiency still accrues XP/levels normally — it simply grants no attribute modifier.
+        /// </summary>
+        private static (CorePath Path, Proficiency Proficiency) SingleTierProficiency(
+            int proficiencyId, int pathId, EActivityKey activityKey, decimal baseXp, int maxLevel,
+            decimal xpGrowth = 1m, int? payoutLevel = null, EAttribute payoutAttribute = Strength, decimal payoutAmount = 0m)
+        {
+            var levels = payoutLevel is int level
+                ? (IReadOnlyList<ProficiencyLevel>)
+                [
+                    new ProficiencyLevel
+                    {
+                        Level = level,
+                        Modifiers = [new ProficiencyModifier { Attribute = payoutAttribute, ModifierType = EModifierType.Additive, Amount = (double)payoutAmount }],
+                        RewardSkillId = null,
+                    },
+                ]
+                : [];
+
+            var proficiency = new Proficiency
+            {
+                Id = proficiencyId,
+                Name = $"Proficiency {proficiencyId}",
+                Description = string.Empty,
+                PathId = pathId,
+                PathOrdinal = 0,
+                MaxLevel = maxLevel,
+                BaseXp = (double)baseXp,
+                XpGrowth = (double)xpGrowth,
+                PrerequisiteIds = [],
+                Levels = levels,
+            };
+
+            var path = new CorePath
+            {
+                Id = pathId,
+                ActivityKey = activityKey,
+                Tiers = [new PathTier(proficiencyId, Ordinal: 0, MaxLevel: maxLevel)],
+            };
+
+            return (path, proficiency);
+        }
+
+        /// <summary>Bundles a set of (path, proficiency) pairs into the resolver-func catalog the offline
+        /// simulator (and <see cref="ProficiencyAccrual"/>) take. Assumes distinct path/proficiency ids and no
+        /// prerequisites — these tests only need independent, root-tier paths.</summary>
+        private static ProficiencyCatalog Catalog(params (CorePath Path, Proficiency Proficiency)[] entries)
+        {
+            var proficienciesById = entries.ToDictionary(e => e.Proficiency.Id, e => e.Proficiency);
+            var pathsById = entries.ToDictionary(e => e.Path.Id, e => e.Path);
+            var pathsByActivityKey = entries
+                .GroupBy(e => e.Path.ActivityKey)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<CorePath>)g.Select(e => e.Path).ToList());
+
+            return new ProficiencyCatalog(
+                id => proficienciesById[id],
+                id => pathsById[id],
+                key => pathsByActivityKey.TryGetValue(key, out var paths) ? paths : [],
+                _ => []);
+        }
+
         private static Enemy WeakEnemy(int level, int skillCount = 1) =>
             MakeEnemy(level, strength: 5, endurance: 5, skillCount: skillCount);
 
@@ -1073,6 +1307,10 @@ namespace Game.Core.Tests.Battle.Offline
         // These scenarios capture no proficiency levels, so the snapshot never resolves a proficiency.
         private static readonly Func<int, Proficiency> ThrowProficiency =
             id => throw new InvalidOperationException($"Unexpected proficiency resolve for {id}");
+        // PathsForActivityKey defaults to routing no activity anywhere, so the in-loop accrual never resolves a
+        // path unless a scenario opts in by supplying its own PathsForActivityKey/ResolvePath.
+        private static readonly Func<int, CorePath> ThrowPath =
+            id => throw new InvalidOperationException($"Unexpected path resolve for {id}");
         // These scenarios capture no class (the snapshot's ClassId is null), so it never resolves a class.
         private static readonly Func<int, CoreClass> ThrowClass =
             id => throw new InvalidOperationException($"Unexpected class resolve for {id}");

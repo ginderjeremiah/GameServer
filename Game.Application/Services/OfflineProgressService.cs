@@ -211,9 +211,10 @@ namespace Game.Application.Services
 
             return new OfflineSimulationParameters
             {
-                // The stat allocations, gear, and proficiency levels this snapshot captures are frozen at the
-                // window start (player-action state, #1601) — but the level it also captures grows in-loop as
-                // the simulated victories earn exp, alongside StartingExp below.
+                // The stat allocations and gear this snapshot captures are frozen at the window start
+                // (player-action state, #1601) — but the level it also captures grows in-loop as the simulated
+                // victories earn exp (alongside StartingExp below), and the proficiency levels grow in-loop as
+                // victories accrue XP (#1602, alongside the resolvers below).
                 Snapshot = BattleSnapshot.FromPlayer(player, proficiencyLevels),
                 StartingExp = player.Exp,
                 Mode = mode,
@@ -226,6 +227,9 @@ namespace Game.Application.Services
                 ResolveMod = _itemMods.GetItemMod,
                 ResolveSkill = _skills.TryGetSkill,
                 ResolveProficiency = _proficiencies.GetProficiency,
+                ResolvePath = _proficiencies.GetPath,
+                PathsForActivityKey = _proficiencies.PathsForActivityKey,
+                DependentsOf = _proficiencies.DependentsOf,
                 ResolveClass = ResolveClass,
                 SeedSource = BattleService.CreateBattleSeed,
                 StalemateCutoffBattles = StalemateCutoffBattles,
@@ -294,13 +298,12 @@ namespace Game.Application.Services
                 {
                     victoryExpRewards.Add(battle.ExpReward);
 
-                    // Accrue proficiency XP per won battle, exactly as the live handler does — same inputs
-                    // (this battle's skill stats + combat ratings), same service — so the offline accrual
-                    // matches what the player would have earned live (the "offline == live" invariant). The push
-                    // is suppressed; the folded results ride the welcome-back summary instead.
-                    var ratingDenominator = Math.Max(battle.PlayerRating, battle.EnemyRating);
-                    proficiencyGains.Add(_proficiencyRewards.AccrueAndApply(
-                        progress, battle.Result.Stats, ratingDenominator, player, notify: false));
+                    // The simulator already ran this victory's proficiency accrual in-loop (#1602) — against
+                    // its own working state, not this progress aggregate — so a mid-window milestone feeds
+                    // forward into later battles' attribute bonuses rather than only taking effect here after
+                    // the whole window has already been fought. Fold the already-computed result rather than
+                    // re-running the accrual against progress.
+                    proficiencyGains.Add(battle.ProficiencyGains);
                 }
             }
 
@@ -312,10 +315,23 @@ namespace Game.Application.Services
                 player.GrantOfflineExp(victoryExpRewards);
             }
 
+            // Write the window's folded proficiency progress through the real aggregate — the accumulator keeps
+            // each touched proficiency's final level/residual XP (battles fold in order, so the last touch is
+            // the window result), which by construction agrees with the simulator's own in-loop accounting —
+            // and grant the milestone reward skills the in-loop accrual only reported (UnlockSkill is
+            // idempotent). This is the same apply step AccrueAndApply runs per battle live, just once here for
+            // the whole window.
+            var proficiencyResult = proficiencyGains.Build();
+            foreach (var gain in proficiencyResult.Results)
+            {
+                progress.SetProficiencyProgress(gain.ProficiencyId, gain.NewLevel, gain.NewXp);
+            }
+            _proficiencyRewards.GrantRewardSkills(proficiencyResult, player);
+
             var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, notify: false);
 
             await _progressRepo.Save(progress, cancellationToken);
-            return new OfflineRewards(completed, proficiencyGains.Build());
+            return new OfflineRewards(completed, proficiencyResult);
         }
 
         // Resolves the player's class for the locked-base distribution, failing loudly on an unresolvable id
@@ -333,7 +349,7 @@ namespace Game.Application.Services
         // like ResolveClass above, a three-line, dependency-only helper not worth a shared abstraction (CLAUDE.md).
         private static List<ProficiencyLevelSnapshot> ToProficiencyLevels(IEnumerable<PlayerProficiency> proficiencies) =>
             proficiencies
-                .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level })
+                .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level, Xp = p.Xp })
                 .ToList();
     }
 
