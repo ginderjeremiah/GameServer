@@ -518,7 +518,7 @@ namespace Game.Core.Battle
                 var room = _attributes[MaxHealth] - CurrentHealth;
                 var heal = -dot < room ? -dot : room;
                 heal = heal > 0 ? heal : 0;
-                dot = -heal;
+                dot = heal == 0 ? 0 : -heal; // avoid -0.0, matching the frontend mirror bit-for-bit
             }
 
             CurrentHealth -= dot;
