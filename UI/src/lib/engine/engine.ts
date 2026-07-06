@@ -21,6 +21,7 @@ import { InventoryManager } from './player/inventory-manager';
 import { playerManager } from './player/player-manager';
 import { logMessage } from './log';
 import { EnemyManager } from './battle/enemy-manager';
+import { refreshPlayer } from './session';
 import {
 	staticData,
 	statistics,
@@ -102,16 +103,18 @@ export const startGame = () => {
 /**
  * Reacts to a ServerCommandFailed notice: the server dead-lettered a server-pushed command that threw and
  * is telling us to re-sync rather than silently diverge from the authoritative state. Two pushes leave
- * divergent client state: ChallengeCompleted (its completion gates zone navigation) and ProficiencyXpGained
- * (its levels feed the live battler's attribute bonuses), so a failed one force-reloads the matching
- * authoritative progress; any reward/skill it carried still surfaces on the next natural load of the
- * inventory/skills stores.
+ * divergent client state: ChallengeCompleted (its completion gates zone navigation, and may carry an
+ * item/mod reward) and ProficiencyXpGained (its levels feed the live battler's attribute bonuses), so a
+ * failed one force-reloads the matching authoritative progress. A dead-lettered ChallengeCompleted also
+ * re-pulls the player aggregate and re-derives the inventory from it (mirroring `claimVictory`'s resync),
+ * so a reward item the failed push carried appears immediately rather than only after a page reload.
  */
 export const handleServerCommandFailed = (response: IApiSocketResponse<'ServerCommandFailed'>) => {
 	const failedCommand = response.data?.commandName;
 	console.warn(`A server-pushed command failed on the server and was dead-lettered: ${failedCommand ?? 'unknown'}.`);
 	if (failedCommand === 'ChallengeCompleted') {
 		void playerChallenges.load(true);
+		void refreshPlayer().then(() => inventoryManager.initialize());
 	} else if (failedCommand === 'ProficiencyXpGained') {
 		void playerProficiencies.load(true);
 	}
