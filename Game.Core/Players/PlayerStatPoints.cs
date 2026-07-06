@@ -50,12 +50,15 @@ namespace Game.Core.Players
                 }
             }
 
-            var changedPoints = matchedUpdates.Values.Sum(match => match.Update.Amount);
-            var availablePoints = StatPointsGained - StatPointsUsed;
+            // long accumulator: matchedUpdates.Values.Sum for int uses checked arithmetic and would
+            // throw OverflowException on a crafted payload (e.g. two near-int.MaxValue updates)
+            // instead of honoring the all-or-nothing reject contract.
+            var changedPoints = matchedUpdates.Values.Sum(match => (long)match.Update.Amount);
+            var availablePoints = (long)StatPointsGained - StatPointsUsed;
             if (availablePoints - changedPoints >= 0
-                && matchedUpdates.Values.All(match => match.Allocation.Amount + match.Update.Amount >= 0))
+                && matchedUpdates.Values.All(match => match.Allocation.Amount + (long)match.Update.Amount >= 0))
             {
-                StatPointsUsed += changedPoints;
+                StatPointsUsed += (int)changedPoints;
                 foreach (var (allocation, update) in matchedUpdates.Values)
                 {
                     allocation.Amount += update.Amount;
