@@ -202,6 +202,13 @@ export class InventoryManager {
 				return false;
 			}
 
+			// The response carries the authoritative post-equip rating (spike #1526 Decision 7), so
+			// adopt it absolutely rather than leaving the displayed Power stale until the next full
+			// player-state refresh (#1616).
+			if (response.data) {
+				playerManager.playerRating = response.data.playerRating;
+			}
+
 			return true;
 		});
 	}
@@ -232,6 +239,13 @@ export class InventoryManager {
 				rollback();
 				this.refreshEquipmentStats();
 				return false;
+			}
+
+			// The response carries the authoritative post-unequip rating (spike #1526 Decision 7), so
+			// adopt it absolutely rather than leaving the displayed Power stale until the next full
+			// player-state refresh (#1616).
+			if (response.data) {
+				playerManager.playerRating = response.data.playerRating;
 			}
 
 			return true;

@@ -12,7 +12,8 @@ vi.mock('$lib/engine', () => ({
 	playerManager: {
 		get inventoryData() {
 			return mockInventoryData;
-		}
+		},
+		playerRating: 0
 	}
 }));
 
@@ -59,6 +60,7 @@ vi.mock('$lib/engine/log', () => ({
 
 import { InventoryManager, EEquipmentSlot, getEquipmentSlotForCategory } from '$lib/engine/player/inventory-manager';
 import { logMessage } from '$lib/engine/log';
+import { playerManager } from '$lib/engine';
 import type { IInventoryItem } from '$lib/api';
 
 const makeItem = (
@@ -120,6 +122,7 @@ describe('InventoryManager', () => {
 		mockSkills.length = 0;
 		mockInventoryData.unlockedItems = [];
 		mockInventoryData.unlockedMods = [];
+		playerManager.playerRating = 0;
 	});
 
 	describe('initialize', () => {
@@ -548,6 +551,28 @@ describe('InventoryManager', () => {
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
 			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
 		});
+
+		it('adopts the post-equip player rating the response carries', async () => {
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+			mockSendSocketCommand.mockResolvedValue({ data: { playerRating: 42 } });
+
+			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+
+			expect(playerManager.playerRating).toBe(42);
+		});
+
+		it('leaves the player rating unchanged when the socket returns an error', async () => {
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
+
+			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+
+			expect(playerManager.playerRating).toBe(0);
+		});
 	});
 
 	describe('overlapping mutations (serialization)', () => {
@@ -737,6 +762,32 @@ describe('InventoryManager', () => {
 
 			expect(result).toBe(false);
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+		});
+
+		it('adopts the post-unequip player rating the response carries', async () => {
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+			manager.initialize();
+			mockSendSocketCommand.mockResolvedValue({ data: { playerRating: 7 } });
+
+			await manager.unequipItem(EEquipmentSlot.WeaponSlot);
+
+			expect(playerManager.playerRating).toBe(7);
+		});
+
+		it('leaves the player rating unchanged when the socket returns an error', async () => {
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+			manager.initialize();
+			mockSendSocketCommand.mockResolvedValue({ error: 'nope' });
+
+			await manager.unequipItem(EEquipmentSlot.WeaponSlot);
+
+			expect(playerManager.playerRating).toBe(0);
 		});
 	});
 
