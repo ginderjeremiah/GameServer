@@ -388,16 +388,26 @@ namespace Game.DataAccess.Repositories
                 && u.Roles.Any(r => r.Id == adminRoleId), cancellationToken);
         }
 
+        private const string LikeEscapeCharacter = "\\";
+
+        // Escapes ILIKE's own wildcard characters so a search term is matched literally, e.g. a
+        // username containing "%" or "_" is only findable by that literal text, not as a wildcard.
+        private static string EscapeLikePattern(string search) =>
+            search
+                .Replace(LikeEscapeCharacter, LikeEscapeCharacter + LikeEscapeCharacter)
+                .Replace("%", LikeEscapeCharacter + "%")
+                .Replace("_", LikeEscapeCharacter + "_");
+
         private IQueryable<UserEntity> FilteredUsers(string? search, int? roleId, bool? archived)
         {
             var query = _context.Users.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var pattern = $"%{search}%";
+                var pattern = $"%{EscapeLikePattern(search)}%";
                 query = query.Where(u =>
-                    EF.Functions.ILike(u.Username, pattern)
-                    || u.Players.Any(p => EF.Functions.ILike(p.Name, pattern)));
+                    EF.Functions.ILike(u.Username, pattern, LikeEscapeCharacter)
+                    || u.Players.Any(p => EF.Functions.ILike(p.Name, pattern, LikeEscapeCharacter)));
             }
 
             if (roleId is not null)

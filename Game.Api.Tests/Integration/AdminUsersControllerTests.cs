@@ -139,6 +139,39 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetUsers_SearchTermWithLiteralPercent_MatchesOnlyThatUserAndDoesNotMatchEveryone()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateUserAsync(context, "100%legit", "pw");
+                await TestDataSeeder.CreateUserAsync(context, "someoneelse", "pw");
+            }
+
+            // A literal "%" in the search term must not act as an ILIKE wildcard: it should find only
+            // the user whose name actually contains it, not every user (as an unescaped "%...%" would).
+            var results = await GetUsersAsync(authClient, "?search=100%25legit");
+            Assert.Equal(new[] { "100%legit" }, results.Users.Select(u => u.Username));
+        }
+
+        [Fact]
+        public async Task GetUsers_SearchTermWithLiteralUnderscore_MatchesOnlyThatUser()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateUserAsync(context, "under_score", "pw");
+                await TestDataSeeder.CreateUserAsync(context, "underxscore", "pw");
+            }
+
+            // An unescaped "_" would match any single character, so "underxscore" would also match.
+            var results = await GetUsersAsync(authClient, "?search=under_score");
+            Assert.Equal(new[] { "under_score" }, results.Users.Select(u => u.Username));
+        }
+
+        [Fact]
         public async Task GetUsers_FilterByRole_ReturnsOnlyUsersInRole()
         {
             using var authClient = await SetupAdminClientAsync();
