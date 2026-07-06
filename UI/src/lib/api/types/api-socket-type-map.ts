@@ -14,6 +14,7 @@ import type {
 	IDefeatEnemyRequest,
 	IDefeatEnemyResponse,
 	IEnemy,
+	IEquipItemResponse,
 	IEquipRequest,
 	IItem,
 	IItemMod,
@@ -46,7 +47,7 @@ export type ApiSocketResponseTypes = {
 	'ChallengeBoss': INewEnemyModel;
 	'ChallengeCompleted': IChallengeCompletedModel;
 	'DefeatEnemy': IDefeatEnemyResponse;
-	'EquipItem': undefined;
+	'EquipItem': IEquipItemResponse;
 	'GetAttributes': IAttribute[];
 	'GetChallenges': IChallenge[];
 	'GetChallengeTypes': IChallengeType[];
@@ -77,7 +78,7 @@ export type ApiSocketResponseTypes = {
 	'SetSelectedSkills': undefined;
 	'SocketReplaced': undefined;
 	'SynthesizeSkill': ISynthesisResult;
-	'UnequipItem': undefined;
+	'UnequipItem': IEquipItemResponse;
 	'UnlockLesson': undefined;
 	'UpdatePlayerStats': IUpdatePlayerStatsResponse;
 };
