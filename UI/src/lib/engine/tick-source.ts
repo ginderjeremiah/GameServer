@@ -11,11 +11,26 @@ export interface TickSource {
 
 export function createTickSource(onTick: () => void): TickSource {
 	if (typeof Worker !== 'undefined') {
-		const worker = new Worker(new URL('./tick-worker.ts', import.meta.url), { type: 'module' });
+		let worker: Worker | null = new Worker(new URL('./tick-worker.ts', import.meta.url), {
+			type: 'module'
+		});
+		let fallbackHandle: number | null = null;
+
 		worker.onmessage = () => onTick();
-		worker.onerror = (ev) => console.error('The logical engine tick worker failed', ev);
+		worker.onerror = (ev) => {
+			console.error('The logical engine tick worker failed, falling back to setInterval', ev);
+			worker?.terminate();
+			worker = null;
+			fallbackHandle = window.setInterval(onTick, pollingIntervalMs);
+		};
+
 		return {
-			stop: () => worker.terminate()
+			stop: () => {
+				worker?.terminate();
+				if (fallbackHandle !== null) {
+					window.clearInterval(fallbackHandle);
+				}
+			}
 		};
 	}
 

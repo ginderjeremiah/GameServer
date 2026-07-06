@@ -72,4 +72,25 @@ describe('createTickSource', () => {
 		expect(errorSpy).toHaveBeenCalledTimes(1);
 		errorSpy.mockRestore();
 	});
+
+	it('falls back to window.setInterval when the worker fails to start', () => {
+		vi.stubGlobal('Worker', MockWorker);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.useFakeTimers();
+
+		const onTick = vi.fn();
+		const source = createTickSource(onTick);
+		const worker = MockWorker.instances[0];
+
+		worker.onerror?.(new ErrorEvent('error', { message: 'boom' }));
+		expect(worker.terminate).toHaveBeenCalledTimes(1);
+
+		vi.advanceTimersByTime(pollingIntervalMs * 3);
+		expect(onTick.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+		const callCount = onTick.mock.calls.length;
+		source.stop();
+		vi.advanceTimersByTime(pollingIntervalMs * 5);
+		expect(onTick).toHaveBeenCalledTimes(callCount);
+	});
 });
