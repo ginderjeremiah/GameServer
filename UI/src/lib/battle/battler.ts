@@ -205,9 +205,11 @@ export class Battler {
 	 *  damage dealt. With no DoT authored every accumulator is 0, so the return is an exact 0. Mirrors the backend
 	 *  `Battler.ApplyDamageOverTime`.
 	 *
-	 *  Intentionally NOT floored at zero. DoT bypasses mitigation, so a tick goes negative only through a
-	 *  deliberately authored negative accumulator or a resistance above 1 (absorption) — a floor wouldn't prevent
-	 *  that, just silently rewrite it. Authored healing belongs in the capped {@link applyHealOverTime} channel instead. */
+	 *  Each type's own tick is intentionally NOT floored at zero. DoT bypasses mitigation, so a tick goes
+	 *  negative only through a deliberately authored negative accumulator or a resistance above 1 (absorption) —
+	 *  a floor wouldn't prevent that, just silently rewrite it. But the AGGREGATE health change this call
+	 *  realizes IS capped at the remaining room to MaxHealth when the summed total is negative — matching
+	 *  {@link takeDamage}'s absorption cap and {@link applyHealOverTime} (no overheal/shield concept). */
 	public applyDamageOverTime(timeDelta: number) {
 		let dot = 0;
 		for (const { type, accumulator } of dotAccumulators()) {
@@ -216,6 +218,13 @@ export class Battler {
 				continue;
 			}
 			dot += ((perSecond * timeDelta) / 1000) * (1 - resistanceTotal(type, this.attributes));
+		}
+		if (dot < 0) {
+			// Aggregate absorption (net heal): cap the realized health change at the remaining room to
+			// MaxHealth, consistent with takeDamage's absorption cap and applyHealOverTime.
+			const room = this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth;
+			const heal = Math.max(Math.min(-dot, room), 0);
+			dot = heal === 0 ? 0 : -heal; // avoid returning -0 when the room is fully exhausted
 		}
 		this.currentHealth -= dot;
 		return dot;
