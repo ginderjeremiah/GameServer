@@ -193,19 +193,21 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 			refresh,
 			childSavers: [
 				async (id, record, baseline) => {
-					if (childChanged(record.steps, baseline?.steps)) {
-						// SetLessonSteps reconciles against the full desired set (keyed by ordinal), not a diff —
-						// mirroring SetZoneEnemies rather than the Add/Edit/Delete-changes shape SetSkillPortions
-						// takes, since the backend's ChildCollectionReconciler wants the whole set every time.
-						await ApiRequest.post('AdminTools/SetLessonSteps', {
-							id,
-							steps: record.steps.map(({ ordinal, text, anchorKey }) => ({
-								ordinal,
-								text,
-								anchorKey: anchorKey || undefined
-							}))
-						});
+					if (!childChanged(record.steps, baseline?.steps)) {
+						return false;
 					}
+					// SetLessonSteps reconciles against the full desired set (keyed by ordinal), not a diff —
+					// mirroring SetZoneEnemies rather than the Add/Edit/Delete-changes shape SetSkillPortions
+					// takes, since the backend's ChildCollectionReconciler wants the whole set every time.
+					await ApiRequest.post('AdminTools/SetLessonSteps', {
+						id,
+						steps: record.steps.map(({ ordinal, text, anchorKey }) => ({
+							ordinal,
+							text,
+							anchorKey: anchorKey || undefined
+						}))
+					});
+					return true;
 				}
 			]
 		})

@@ -188,12 +188,12 @@ namespace Game.Api.Sockets
             try
             {
                 var commandTask = RunCommand(commandInfo, cts.Token);
-                ApiSocketResponse response;
+                (ApiSocketResponse Response, bool SelfDelivered) result;
                 try
                 {
                     // Bound the wait without abandoning the underlying task: WaitAsync returns the command's
                     // response when it settles, or throws once the budget elapses (the command keeps running).
-                    response = await commandTask.WaitAsync(cts.Token);
+                    result = await commandTask.WaitAsync(cts.Token);
                 }
                 catch (OperationCanceledException) when (cts.IsCancellationRequested)
                 {
@@ -212,10 +212,18 @@ namespace Game.Api.Sockets
                     return (SocketCommandOutcome.TimedOut, null);
                 }
 
+                if (result.SelfDelivered)
+                {
+                    // The command (ISelfDeliveringCommand, e.g. SocketReplaced) already sent its own response —
+                    // often after already closing the socket — so a follow-up send here would either duplicate
+                    // it or be a guaranteed-to-fail no-op misclassified as NotDelivered (#1636).
+                    return (SocketCommandOutcome.Succeeded, null);
+                }
+
                 // SendData reports whether the frame actually went out (false on a non-Open socket or send
                 // failure — e.g. the socket closed just as the command finished). That must not be reported as
                 // Succeeded: the client never saw the response, so the caller needs to know delivery failed.
-                var delivered = await _context.SendData(response);
+                var delivered = await _context.SendData(result.Response);
                 return (delivered ? SocketCommandOutcome.Succeeded : SocketCommandOutcome.NotDelivered, null);
             }
             catch (OperationCanceledException ex)
@@ -256,11 +264,12 @@ namespace Game.Api.Sockets
             }
         }
 
-        // Executes the command and commits its unit of work, returning the response for the caller to send.
-        // It deliberately does not send: ExecuteCommand owns the single send so that a command abandoned on
-        // timeout (whose task runs on here in the background) commits its write but never emits a second,
-        // late response for an id the client already saw time out.
-        private async Task<ApiSocketResponse> RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
+        // Executes the command and commits its unit of work, returning the response (and whether the command
+        // already delivered it itself — ISelfDeliveringCommand) for the caller to send. It deliberately does
+        // not send when not self-delivering: RunCommandUnderLock owns the single send so that a command
+        // abandoned on timeout (whose task runs on here in the background) commits its write but never emits a
+        // second, late response for an id the client already saw time out.
+        private async Task<(ApiSocketResponse Response, bool SelfDelivered)> RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
         {
             using var scope = _scopeFactory.CreateScope();
 
@@ -288,7 +297,7 @@ namespace Game.Api.Sockets
             var command = _commandFactory.CreateCommand(commandInfo, scope);
             var response = await command.ExecuteAsync(_context, cancellationToken);
             await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
-            return response;
+            return (response, command is ISelfDeliveringCommand);
         }
 
         /// <summary>
