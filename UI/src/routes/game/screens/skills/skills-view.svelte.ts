@@ -355,8 +355,8 @@ export class SkillsView {
 
 	/** Equipped skills the battle can actually fire — excludes a weapon-mismatched skill dormant under
 	 *  the equipped weapon (#1342), so the combined totals below never sum an output the battle can't
-	 *  produce. Innate (item-granted) skills also fire but are a selected-loadout-only readout here;
-	 *  see #1637 for the open question of whether they belong in these totals. */
+	 *  produce. Innate (item-granted) skills also fire but are deliberately excluded — the totals stay
+	 *  a selected-loadout-only readout; see #1657 for the open question of folding them in. */
 	private readonly fieldedEquipped = $derived(
 		this.equipped.filter((id) => {
 			const skill = this.metricsById[id]?.skill;
