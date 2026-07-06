@@ -69,8 +69,13 @@ async function restorePlayer(): Promise<boolean> {
 /**
  * Re-pulls the authoritative player aggregate (Login/Status) and re-initializes the player manager.
  * Used by the welcome-back gate to refresh the offline-reward-updated state — level, exp, stat points,
- * unlocked skills, inventory — before the game engine builds the live battler from it. Best-effort: a
- * failed refresh leaves the existing in-memory player intact rather than stranding the player at the gate.
+ * unlocked skills, raw inventory data — before the game engine builds the live battler from it. Best-effort:
+ * a failed refresh leaves the existing in-memory player intact rather than stranding the player at the gate.
+ *
+ * This only re-initializes {@link playerManager}, not the derived `InventoryManager` — a caller that needs
+ * the player's unlocked items/mods to reflect the refresh (rather than just the raw payload) must also
+ * re-run `inventoryManager.initialize()` itself, as the mid-session resync in `EnemyManager.claimVictory`
+ * does (the welcome-back gate gets this for free from the `startGame` call that follows it).
  */
 export async function refreshPlayer(): Promise<void> {
 	await loadPlayer();
