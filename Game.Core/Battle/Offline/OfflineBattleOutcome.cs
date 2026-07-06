@@ -1,4 +1,5 @@
 using Game.Core.Enemies;
+using Game.Core.Proficiencies;
 
 namespace Game.Core.Battle.Offline
 {
@@ -17,6 +18,15 @@ namespace Game.Core.Battle.Offline
     /// (<c>max(PlayerRating, EnemyRating)</c>) — the same inputs the live path threads through
     /// <c>BattleCompletedEvent</c>, so offline and live accrue identically (spike #1318, #1526 Decision 5).
     /// </para>
+    /// <para>
+    /// <see cref="ProficiencyGains"/> is this victory's proficiency accrual (<see cref="ProficiencyAccrual"/>),
+    /// computed in-loop against the run's own working proficiency state (#1602) rather than post-hoc — so a
+    /// later battle's snapshot already reflects a milestone this one crossed. Empty for a non-victory. The
+    /// orchestration layer folds it (via <see cref="ProficiencyGainAccumulator"/>) into the window's applied
+    /// proficiency progress rather than re-running the accrual.
+    /// </para>
     /// </summary>
-    public record OfflineBattleOutcome(Enemy Enemy, BattleResult Result, int ExpReward, double PlayerRating, double EnemyRating);
+    public record OfflineBattleOutcome(
+        Enemy Enemy, BattleResult Result, int ExpReward, double PlayerRating, double EnemyRating,
+        ProficiencyAccrualResult ProficiencyGains);
 }

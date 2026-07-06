@@ -1,5 +1,6 @@
 using Game.Core.Enemies;
 using Game.Core.Players;
+using Game.Core.Proficiencies;
 
 namespace Game.Core.Battle.Offline
 {
@@ -11,10 +12,11 @@ namespace Game.Core.Battle.Offline
     /// <para>
     /// The away period is replayed battle-by-battle rather than sampled — the post-battle cooldown throttles
     /// the battle count, so this stays cheap. It is <b>not</b> otherwise stationary: everything that grows
-    /// automatically in live play (level, and through it the class locked base and reward power) grows across
-    /// the away window too (#1601), so offline play is neither better nor worse than the live idle loop it
-    /// stands in for. What requires player action — stat allocations, gear, loadout — stays frozen on the
-    /// captured snapshot, exactly as it would while the player is away.
+    /// automatically in live play (level and through it the class locked base and reward power (#1601), and
+    /// proficiency levels and their attribute payouts (#1602)) grows across the away window too, so offline
+    /// play is neither better nor worse than the live idle loop it stands in for. What requires player action —
+    /// stat allocations, gear, loadout — stays frozen on the captured snapshot, exactly as it would while the
+    /// player is away.
     /// </para>
     /// </summary>
     public class OfflineProgressSimulator(BattleFactory battleFactory)
@@ -46,13 +48,20 @@ namespace Game.Core.Battle.Offline
             // empty result without simulating anything — the whole away period is skipped.
             var remainingMs = Math.Min(parameters.AwayBudgetMs, parameters.CapMs);
 
-            // A private, mutable-level copy of the snapshot carries the in-loop level growth (#1601); every
-            // other captured field (gear, allocations, proficiency levels) stays frozen on the caller's own
-            // snapshot instance, since those require player action. Exp is tracked alongside it so a
-            // level-up lands on the same battle it would live — a player already partway to their next level
-            // doesn't get an extra free battle's grace.
+            // A private, mutable-level copy of the snapshot carries the in-loop level growth (#1601) and the
+            // in-loop proficiency growth (#1602); every other captured field (gear, allocations) stays frozen
+            // on the caller's own snapshot instance, since those require player action. Exp is tracked
+            // alongside it so a level-up lands on the same battle it would live — a player already partway to
+            // their next level doesn't get an extra free battle's grace.
             var workingSnapshot = CloneForGrowth(parameters.Snapshot);
             var currentExp = parameters.StartingExp;
+
+            // The in-loop proficiency progress store (#1602): keyed by the same mutable ProficiencyLevelSnapshot
+            // instances workingSnapshot.ProficiencyLevels holds, so growing a proficiency in place is
+            // immediately visible to the next battle's ToBattler() call with no separate write-back step.
+            var proficiencyById = workingSnapshot.ProficiencyLevels.ToDictionary(p => p.ProficiencyId);
+            var catalog = new ProficiencyCatalog(
+                parameters.ResolveProficiency, parameters.ResolvePath, parameters.PathsForActivityKey, parameters.DependentsOf);
 
             // The battler that measures each victory's exp reward is re-derived whenever a level-up grows the
             // class locked base (and, through it, the signature passive) — rebuilding it eagerly here and again
@@ -91,12 +100,43 @@ namespace Game.Core.Battle.Offline
                 // ratings the offline proficiency-XP accrual normalizes each path's activity by, so the two
                 // payouts share one evaluation.
                 var rewards = result.Victory ? new DefeatRewards(playerBattlerForRating, enemy) : null;
+                var proficiencyGains = ProficiencyAccrualResult.Empty;
                 if (rewards is not null)
                 {
                     // Snapshot the player's rating onto this battle's stats so the offline accrual normalizes by
                     // the identical measure the live path does (spike #1526 Decision 5) — victory-only, like the
                     // rewards.
                     result.Stats.PlayerRating = rewards.PlayerRating;
+
+                    // Accrue proficiency XP in-loop (#1602): the same domain math the live per-battle path
+                    // runs, against this run's own working proficiency state, so a milestone attribute payout
+                    // crossed here is already baked into the next battle's snapshot below — unlike the pre-#1602
+                    // behavior, where the whole window fought with window-start proficiency bonuses because the
+                    // accrual only ran after the simulation concluded.
+                    var proficiencyLeveledUp = false;
+                    proficiencyGains = ProficiencyAccrual.Accrue(
+                        catalog, result.Stats, Math.Max(rewards.PlayerRating, rewards.EnemyRating),
+                        id => proficiencyById.TryGetValue(id, out var p) ? p.Level : 0,
+                        id => proficiencyById.TryGetValue(id, out var p) ? p.Xp : 0m,
+                        (id, level, xp) =>
+                        {
+                            if (proficiencyById.TryGetValue(id, out var existing))
+                            {
+                                proficiencyLeveledUp |= existing.Level != level;
+                                existing.Level = level;
+                                existing.Xp = xp;
+                            }
+                            else
+                            {
+                                // A never-before-trained proficiency (no captured entry): its implicit starting
+                                // level is 0 (the levelOf default above), so reaching any level here — even on
+                                // its first-ever accrual — is a level-up and must trigger a rating rebuild.
+                                proficiencyLeveledUp |= level != 0;
+                                var created = new ProficiencyLevelSnapshot { ProficiencyId = id, Level = level, Xp = xp };
+                                proficiencyById[id] = created;
+                                workingSnapshot.ProficiencyLevels.Add(created);
+                            }
+                        });
 
                     // Apply the victory's exp in-loop, between battles — matching live, where exp lands on
                     // battle completion — via the same clamp/threshold loop Player.ApplyExp runs (#1601). A
@@ -108,12 +148,22 @@ namespace Game.Core.Battle.Offline
                     if (progression.LevelsGained > 0)
                     {
                         workingSnapshot.Level = progression.Level;
+                    }
+
+                    // Re-derive the rating battler whenever either growth vector actually moved an attribute
+                    // modifier: a player level-up (the locked base) or a proficiency level-up (its per-level/
+                    // milestone bonus) — never on XP alone, which changes nothing ModifiersForLevel reads. This
+                    // is what makes the reward-power measurement — and through it the proficiency accrual's own
+                    // rating denominator on the next battle — grow with proficiency, not just level.
+                    if (progression.LevelsGained > 0 || proficiencyLeveledUp)
+                    {
                         playerBattlerForRating = BuildRatingBattler(workingSnapshot, parameters);
                     }
                 }
 
                 outcomes.Add(new OfflineBattleOutcome(
-                    enemy, result, rewards?.ExpReward ?? 0, rewards?.PlayerRating ?? 0, rewards?.EnemyRating ?? 0));
+                    enemy, result, rewards?.ExpReward ?? 0, rewards?.PlayerRating ?? 0, rewards?.EnemyRating ?? 0,
+                    proficiencyGains));
 
                 madeProgress |= result.Victory || result.PlayerDied;
 
@@ -146,9 +196,13 @@ namespace Game.Core.Battle.Offline
         }
 
         /// <summary>
-        /// A copy of <paramref name="snapshot"/> whose <see cref="BattleSnapshot.Level"/> the simulation loop
-        /// grows independently of the caller's own instance — every other field is shared by reference (never
-        /// mutated by growth), since only the level changes mid-window.
+        /// A copy of <paramref name="snapshot"/> whose <see cref="BattleSnapshot.Level"/> (#1601) and
+        /// <see cref="BattleSnapshot.ProficiencyLevels"/> (#1602) the simulation loop grows independently of
+        /// the caller's own instance — every other field is shared by reference (never mutated by growth).
+        /// <see cref="BattleSnapshot.ProficiencyLevels"/> is deep-copied (a fresh list of fresh
+        /// <see cref="ProficiencyLevelSnapshot"/> instances), not shared, since the loop mutates existing
+        /// entries in place and appends newly-trained ones — sharing the caller's list/instances would leak
+        /// in-loop growth back onto the frozen snapshot the caller (and any other reader) still holds.
         /// </summary>
         private static BattleSnapshot CloneForGrowth(BattleSnapshot snapshot) => new()
         {
@@ -157,7 +211,9 @@ namespace Game.Core.Battle.Offline
             StatAllocations = snapshot.StatAllocations,
             EquippedItems = snapshot.EquippedItems,
             SkillIds = snapshot.SkillIds,
-            ProficiencyLevels = snapshot.ProficiencyLevels,
+            ProficiencyLevels = snapshot.ProficiencyLevels
+                .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level, Xp = p.Xp })
+                .ToList(),
         };
 
         /// <summary>

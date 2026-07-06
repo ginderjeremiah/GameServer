@@ -309,6 +309,15 @@ namespace Game.Core.Battle
 
         /// <summary>The player's level in that proficiency at battle start.</summary>
         public required int Level { get; set; }
+
+        /// <summary>
+        /// The player's residual XP within <see cref="Level"/> at battle start. Unused by battle-modifier
+        /// composition (<see cref="Proficiency.ModifiersForLevel"/> reads only <see cref="Level"/>) — carried
+        /// so the offline simulator's in-loop proficiency accrual (#1602) has a real starting point to grow
+        /// from, mirroring how <see cref="Offline.OfflineSimulationParameters.StartingExp"/> seeds level growth.
+        /// Defaults to 0 for a caller that captures level only.
+        /// </summary>
+        public decimal Xp { get; set; }
     }
 
     /// <summary>
