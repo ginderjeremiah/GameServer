@@ -118,8 +118,12 @@ const colorOf = (event: CombatFloatEvent): string => {
 };
 
 /** The floater's icon: a crit/dodge's per-outcome art, otherwise a typed (non-physical) plain hit's
- *  damage-type icon so basic/physical attacks stay clean. Physical is the untyped baseline. */
+ *  damage-type icon so basic/physical attacks stay clean. Physical is the untyped baseline. An absorbed
+ *  heal shows no icon — it's not the incoming attack's damage type, it's a heal. */
 const iconOf = (event: CombatFloatEvent): string => {
+	if (isHeal(event)) {
+		return '';
+	}
 	const outcome = FLOAT_ICON[event.kind];
 	if (outcome) {
 		return outcome;
@@ -181,7 +185,7 @@ const spawn = (event: CombatFloatEvent) => {
 		glyph: glyphOf(event),
 		amount: amountOf(event),
 		label: labelFor(event.kind),
-		portions: event.portions ?? []
+		portions: isHeal(event) ? [] : (event.portions ?? [])
 	});
 	const timer = setTimeout(() => {
 		removalTimers.delete(timer);
