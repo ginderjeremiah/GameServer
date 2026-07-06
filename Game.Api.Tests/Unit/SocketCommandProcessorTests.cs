@@ -429,6 +429,8 @@ namespace Game.Api.Tests.Unit
             public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
+            public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
         }
 
         /// <summary>A pub/sub whose <c>Subscribe</c> throws, to drive the registration-rollback path
@@ -493,6 +495,8 @@ namespace Game.Api.Tests.Unit
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
+            public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
         }
 
         private sealed class NoOpHostLifetime : IHostApplicationLifetime

@@ -169,6 +169,128 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal("owner-b", await cache.Get(key));
         }
 
+        [Fact]
+        public async Task HashGetAllIfExists_OnAMissingKey_ReturnsNull()
+        {
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            Assert.Null(await cache.HashGetAllIfExists(key));
+        }
+
+        [Fact]
+        public async Task HashSetAndForget_ThenHashGetAllIfExists_RoundTripsFieldsAndSetsTtl()
+        {
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(30));
+
+            Dictionary<string, string>? fields = null;
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                fields = await cache.HashGetAllIfExists(key);
+                if (fields is not null)
+                {
+                    break;
+                }
+
+                await Task.Delay(25);
+            }
+
+            Assert.NotNull(fields);
+            Assert.Equal(2, fields.Count);
+            Assert.Equal("1", fields["a"]);
+            Assert.Equal("2", fields["b"]);
+
+            var ttl = await ReadTtlAsync(key);
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TimeSpan.Zero && ttl <= TimeSpan.FromSeconds(30), $"Expected a positive TTL within 30s but was {ttl}.");
+        }
+
+        [Fact]
+        public async Task HashSetAndForget_OverAnExistingHash_OverwritesOnlyTheNamedFieldsAndRefreshesTtl()
+        {
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(2));
+            await WaitForHashFieldCountAsync(cache, key, 2);
+
+            // Only "a" is named this time — "b" must survive untouched and the TTL must be refreshed well
+            // past the 2s seed ceiling.
+            cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "9" }, TimeSpan.FromSeconds(30));
+
+            Dictionary<string, string>? fields = null;
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline)
+            {
+                fields = await cache.HashGetAllIfExists(key);
+                if (fields?.GetValueOrDefault("a") == "9")
+                {
+                    break;
+                }
+
+                await Task.Delay(25);
+            }
+
+            Assert.NotNull(fields);
+            Assert.Equal("9", fields["a"]);
+            Assert.Equal("2", fields["b"]);
+
+            var ttl = await ReadTtlAsync(key);
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be refreshed past the 2s seed but was {ttl}.");
+        }
+
+        [Fact]
+        public async Task HashGetAllIfExists_OnAKeyHoldingANonHashValue_TreatsItAsAMissAndClearsIt()
+        {
+            // Mirrors a key still holding a prior string-blob representation after a cache-shape change
+            // (#1635 moved player progress from a serialized string to a Redis hash) — HGETALL would otherwise
+            // error every read forever instead of self-healing on the next write.
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            await cache.Set(key, "a-stale-string-blob", TimeSpan.FromSeconds(30));
+
+            Assert.Null(await cache.HashGetAllIfExists(key));
+            Assert.Null(await cache.Get(key));
+        }
+
+        [Fact]
+        public async Task HashSetAndForget_WithNoFields_IsANoOp()
+        {
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            cache.HashSetAndForget(key, new Dictionary<string, string>(), TimeSpan.FromSeconds(30));
+
+            await Task.Delay(200);
+            Assert.Null(await cache.HashGetAllIfExists(key));
+        }
+
+        private static async Task WaitForHashFieldCountAsync(ICacheService cache, string key, int count, int timeoutMs = 5000)
+        {
+            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < deadline)
+            {
+                if ((await cache.HashGetAllIfExists(key))?.Count == count)
+                {
+                    return;
+                }
+
+                await Task.Delay(25);
+            }
+
+            Assert.Fail($"Expected hash '{key}' to have {count} fields within the timeout.");
+        }
+
         private static async Task<bool> WaitUntilValueEqualsAsync(ICacheService cache, string key, string expected, int timeoutMs = 5000)
         {
             var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);

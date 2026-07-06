@@ -61,5 +61,20 @@
         /// resurrect a claim that expired or was rolled back out from under a still-live owner.
         /// </summary>
         public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry);
+        /// <summary>
+        /// Reads every field of the Redis hash at <paramref name="key"/> in one round trip, or
+        /// <see langword="null"/> if the key does not exist — letting a caller distinguish a genuine cache
+        /// miss from a hash that exists but happens to carry no fields.
+        /// </summary>
+        public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Atomically writes <paramref name="fields"/> into the Redis hash at <paramref name="key"/> (adding
+        /// or overwriting each named field; existing fields not named in <paramref name="fields"/> are left
+        /// untouched) and resets the key's TTL to <paramref name="expiry"/>, without awaiting the result
+        /// (fire-and-forget). A no-op when <paramref name="fields"/> is empty — an empty HSET call would
+        /// error, and there is nothing whose TTL needs refreshing. Lets a hot write path persist only the
+        /// rows that changed instead of re-serializing an entire aggregate.
+        /// </summary>
+        public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry);
     }
 }
