@@ -133,6 +133,61 @@ namespace Game.Infrastructure.Cache.Redis
             Redis.KeyDelete(key, CommandFlags.FireAndForget);
         }
 
+        public async Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default)
+        {
+            // TYPE-then-HGETALL in one script (rather than two round trips) so a hot per-battle read pays only
+            // one — and so the two checks can't race a concurrent expiry/eviction between them. Lua false
+            // comes back over RESP as a null reply, which is how a missing key is told apart from one whose
+            // hash happens to have no fields. A key still holding an older, non-hash representation (e.g. a
+            // caller that repurposed a string-valued key into a hash-valued one) is treated the same as a miss
+            // and cleared, so a stale value self-heals via the normal miss-then-reload path on next write
+            // rather than erroring every future read.
+            var result = await RedisCommandBudget.Read(Redis.ScriptEvaluateAsync(
+                "local t = redis.call('type', KEYS[1]).ok "
+                + "if t == 'none' then return false end "
+                + "if t ~= 'hash' then redis.call('del', KEYS[1]) return false end "
+                + "return redis.call('hgetall', KEYS[1])",
+                [key]), cancellationToken);
+
+            if (result.IsNull)
+            {
+                return null;
+            }
+
+            var flat = (RedisValue[])result!;
+            var fields = new Dictionary<string, string>(flat.Length / 2);
+            for (var i = 0; i < flat.Length; i += 2)
+            {
+                fields[flat[i]!] = flat[i + 1]!;
+            }
+
+            return fields;
+        }
+
+        public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry)
+        {
+            if (fields.Count == 0)
+            {
+                return;
+            }
+
+            var argv = new RedisValue[1 + fields.Count * 2];
+            argv[0] = (long)expiry.TotalMilliseconds;
+            var i = 1;
+            foreach (var (field, value) in fields)
+            {
+                argv[i++] = field;
+                argv[i++] = value;
+            }
+
+            // Bundles every field write and the TTL reset into one atomic script (mirroring GetSet/
+            // ReclaimAndForget) so the hash is never left holding freshly-written fields without its expiry
+            // refreshed.
+            Redis.ScriptEvaluate(
+                "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end redis.call('pexpire', KEYS[1], ARGV[1])",
+                [key], argv, flags: CommandFlags.FireAndForget);
+        }
+
         private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always, CancellationToken cancellationToken = default)
         {
             await ObserveWrite(Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when), cancellationToken);
