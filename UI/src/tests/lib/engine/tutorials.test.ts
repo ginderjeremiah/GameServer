@@ -45,7 +45,7 @@ const makeLesson = (overrides: Partial<ILesson> = {}): ILesson => ({
 	screenKey: 'fight',
 	ordinal: 0,
 	designerNotes: '',
-	steps: [],
+	steps: [{ ordinal: 0, text: 'Step text' }],
 	...overrides
 });
 
@@ -80,6 +80,16 @@ describe('openLesson', () => {
 		expect(navigation.requestedScreen).toBe('skills');
 		// $state wraps the assigned lesson in a reactive proxy, so compare by value, not identity.
 		expect(tutorialTour.activeLesson).toEqual(lesson);
+	});
+
+	it('marks a zero-step lesson read immediately instead of opening a stuck tour (#1638)', () => {
+		const lesson = makeLesson({ id: 8, steps: [] });
+
+		openLesson(lesson);
+
+		expect(mockMarkLessonRead).toHaveBeenCalledWith(8);
+		expect(tutorialTour.activeLesson).toBeNull();
+		expect(navigation.requestedScreen).toBeNull();
 	});
 });
 
@@ -173,6 +183,21 @@ describe('evaluateScreenTrigger', () => {
 		evaluateScreenTrigger('attributes');
 
 		expect(tutorialTour.activeLesson).toEqual(lockedLesson);
+	});
+
+	it('does not wedge on a zero-step screen-anchored lesson, and does not re-fire on a later revisit', () => {
+		const lesson = makeLesson({ id: 9, screenKey: 'attributes', steps: [] });
+		staticData.lessons = [lesson];
+
+		evaluateScreenTrigger('attributes');
+
+		expect(tutorialTour.activeLesson).toBeNull();
+		expect(mockMarkLessonRead).toHaveBeenCalledWith(9);
+
+		mockMarkLessonRead.mockClear();
+		evaluateScreenTrigger('attributes');
+
+		expect(mockMarkLessonRead).not.toHaveBeenCalled();
 	});
 });
 
