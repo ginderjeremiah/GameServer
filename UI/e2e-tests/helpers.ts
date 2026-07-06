@@ -115,7 +115,32 @@ export async function createAccountAndStartGame(page: Page, prefix = 'e') {
 	// (WebKit/Firefox) under parallel load routinely takes longer than 5s and flakes. Use the same
 	// 10s budget as the other navigations in this file.
 	await expect(page).toHaveURL('/game', { timeout: 10000 });
+
+	await dismissTutorialTourIfPresent(page);
 	return username;
+}
+
+/**
+ * A fresh account's first visit to the (default) Fight screen auto-plays the screen-anchored
+ * `idle-loop-basics` tutorial tour (a full-screen coach-mark overlay), which would otherwise swallow
+ * the very next click every journey makes. Dismiss it via its Skip control if it appeared, so tests
+ * interact with the screen underneath rather than asserting anything about tutorial content — that's
+ * covered by tutorial.test.ts.
+ *
+ * The tour opens from the welcome-back gate's async `entered` transition, not synchronously with the
+ * `/game` navigation, so this waits for it rather than taking an immediate (and racy) snapshot —
+ * mirroring how {@link selectFirstCharacter} waits out the similarly-async session-takeover modal.
+ * Swallows the timeout if no tour appears (e.g. the lesson is retired later), rather than failing.
+ */
+export async function dismissTutorialTourIfPresent(page: Page) {
+	const tour = page.getByTestId('tutorial-tour');
+	try {
+		await expect(tour).toBeVisible({ timeout: 5000 });
+	} catch {
+		return;
+	}
+	await page.getByTestId('tutorial-tour-skip').click();
+	await expect(tour).not.toBeVisible();
 }
 
 /**
