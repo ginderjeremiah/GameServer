@@ -18,8 +18,11 @@ export function createTickSource(onTick: () => void): TickSource {
 
 		worker.onmessage = () => onTick();
 		worker.onerror = (ev) => {
+			if (worker === null) {
+				return;
+			}
 			console.error('The logical engine tick worker failed, falling back to setInterval', ev);
-			worker?.terminate();
+			worker.terminate();
 			worker = null;
 			fallbackHandle = window.setInterval(onTick, pollingIntervalMs);
 		};
@@ -27,6 +30,7 @@ export function createTickSource(onTick: () => void): TickSource {
 		return {
 			stop: () => {
 				worker?.terminate();
+				worker = null;
 				if (fallbackHandle !== null) {
 					window.clearInterval(fallbackHandle);
 				}
