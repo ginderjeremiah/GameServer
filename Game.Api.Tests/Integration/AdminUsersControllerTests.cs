@@ -172,6 +172,23 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task GetUsers_SearchTermWithLiteralBackslash_MatchesOnlyThatUser()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateUserAsync(context, @"back\slash", "pw");
+                await TestDataSeeder.CreateUserAsync(context, "someoneelse", "pw");
+            }
+
+            // The escape character itself must be escaped first, or a literal "\" in the search term
+            // would corrupt the pattern's own escaping of "%"/"_" (or fail the query outright).
+            var results = await GetUsersAsync(authClient, "?search=back%5Cslash");
+            Assert.Equal(new[] { @"back\slash" }, results.Users.Select(u => u.Username));
+        }
+
+        [Fact]
         public async Task GetUsers_FilterByRole_ReturnsOnlyUsersInRole()
         {
             using var authClient = await SetupAdminClientAsync();
