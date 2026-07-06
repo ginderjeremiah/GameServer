@@ -126,6 +126,24 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
+        public void TryUpdateAttributes_NearIntMaxValueUpdates_RejectsWithoutOverflowing()
+        {
+            // Two updates whose sum overflows int (checked LINQ Sum would throw OverflowException)
+            // must still be rejected via the normal all-or-nothing contract, not crash.
+            var stats = MakeStats(gained: 10, used: 0);
+
+            var result = stats.TryUpdateAttributes([
+                new Update(EAttribute.Strength, 1_500_000_000),
+                new Update(EAttribute.Endurance, 1_500_000_000),
+            ]);
+
+            Assert.False(result);
+            Assert.Equal(0, stats.StatPointsUsed);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Endurance).Amount);
+        }
+
+        [Fact]
         public void TryUpdateAttributes_UnknownAttribute_RejectsWithoutMutating()
         {
             // An update targeting an attribute the player has no allocation row for is rejected rather
