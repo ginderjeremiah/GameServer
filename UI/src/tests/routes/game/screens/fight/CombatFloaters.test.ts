@@ -144,13 +144,33 @@ describe('CombatFloaters', () => {
 			expect(floater.querySelector('img.floater-icon')?.getAttribute('src')).toContain('Critical Damage.png');
 		});
 
-		it('shows an absorbed hit as a positive heal in the regen hue', () => {
+		it('shows an absorbed hit as a positive heal in the regen hue with no damage-type icon', () => {
 			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
 			emit({ target: 'enemy', kind: 'hit', amount: -20, damageType: EDamageType.Fire });
 
 			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
 			expect(floater.textContent).toContain('+20');
 			expect(floater.getAttribute('style')).toContain('var(--health-remaining-color)');
+			expect(floater.querySelector('img.floater-icon')).toBeNull();
+		});
+
+		it('omits the typed ratio bar for a multi-typed absorbed hit', () => {
+			const { getByTestId } = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+			emit({
+				target: 'enemy',
+				kind: 'hit',
+				amount: -30,
+				damageType: EDamageType.Fire,
+				portions: [
+					{ type: EDamageType.Fire, weight: 60 },
+					{ type: EDamageType.Water, weight: 40 }
+				]
+			});
+
+			const floater = getByTestId('enemy-floaters').querySelector('.floater') as HTMLElement;
+			expect(floater.textContent).toContain('+30');
+			expect(floater.querySelector('img.floater-icon')).toBeNull();
+			expect(floater.querySelector('.floater-ratio')).toBeNull();
 		});
 	});
 
