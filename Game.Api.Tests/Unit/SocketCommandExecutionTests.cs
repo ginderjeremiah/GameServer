@@ -6,6 +6,7 @@ using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Application;
 using Game.Core.Players;
+using Game.Core.TestInfrastructure.Builders;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -234,6 +235,42 @@ namespace Game.Api.Tests.Unit
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Failed to deserialize"));
         }
 
+        [Fact]
+        public async Task ExecuteCommand_PlayerPersistenceFlushFails_ReloadsPlayerBeforeTheNextCommand()
+        {
+            // A PlayerPersistenceFlushFailedException means this command's buffered domain events never
+            // reached the write-behind queue, but its aggregate mutation already happened — so the connection's
+            // in-memory Player must be discarded and reloaded before the next command runs, converging back
+            // onto the last successfully-persisted state instead of silently carrying the stuck mutation
+            // forward (#1632).
+            var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
+            var playerRepo = new FakePlayerRepository(reloadedPlayer);
+            using var provider = new ServiceCollection()
+                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IPlayerRepository>(_ => playerRepo)
+                .BuildServiceProvider();
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            session.CreateSession(userId: 1, playerId: 1);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
+            var handler = new SocketHandler(
+                context,
+                new StubCommandFactory(name => name == "Boom" ? new PlayerPersistenceFlushFailedException(new InvalidOperationException("simulated blip")) : null),
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                _loggerFactory.CreateLogger<SocketHandler>(),
+                () => { });
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Boom") { Id = "c1" });
+            Assert.Equal(0, playerRepo.GetPlayerCallCount);
+            Assert.True(session.PlayerNeedsReload);
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c2" });
+            Assert.Equal(1, playerRepo.GetPlayerCallCount);
+            Assert.False(session.PlayerNeedsReload);
+            Assert.Same(reloadedPlayer, session.Player);
+        }
+
         private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
@@ -316,6 +353,19 @@ namespace Game.Api.Tests.Unit
         private sealed class NoOpUnitOfWork : IUnitOfWork
         {
             public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        }
+
+        private sealed class FakePlayerRepository(Player playerToReturn) : IPlayerRepository
+        {
+            public int GetPlayerCallCount { get; private set; }
+
+            public Task<Player?> GetPlayer(int playerId, CancellationToken cancellationToken = default)
+            {
+                GetPlayerCallCount++;
+                return Task.FromResult<Player?>(playerToReturn);
+            }
+
+            public Task SavePlayer(Player player, CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }

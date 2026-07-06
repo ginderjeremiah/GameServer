@@ -137,6 +137,43 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public void MarkPlayerNeedsReload_SetsPlayerNeedsReload()
+        {
+            var session = new SessionService(new FakeSessionStore());
+            session.SetPlayer(new PlayerBuilder().WithId(7).Build());
+
+            session.MarkPlayerNeedsReload();
+
+            Assert.True(session.PlayerNeedsReload);
+        }
+
+        [Fact]
+        public void SetPlayer_ClearsAPendingReloadMarker()
+        {
+            // A prior command's flush failure marks the session for reload (#1632); loading the fresh player
+            // must clear that marker so the next command doesn't reload again unnecessarily.
+            var session = new SessionService(new FakeSessionStore());
+            session.SetPlayer(new PlayerBuilder().WithId(7).Build());
+            session.MarkPlayerNeedsReload();
+
+            session.SetPlayer(new PlayerBuilder().WithId(7).Build());
+
+            Assert.False(session.PlayerNeedsReload);
+        }
+
+        [Fact]
+        public void ClearSession_ResetsAPendingReloadMarker()
+        {
+            var session = new SessionService(new FakeSessionStore());
+            session.SetPlayer(new PlayerBuilder().WithId(7).Build());
+            session.MarkPlayerNeedsReload();
+
+            session.ClearSession();
+
+            Assert.False(session.PlayerNeedsReload);
+        }
+
+        [Fact]
         public void ClearSession_Authenticated_EvictsSessionForRecordedUser()
         {
             var store = new FakeSessionStore();
