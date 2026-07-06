@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
 	},
 	BattleStage: { Idle: 0, Active: 1, Victorious: 2, Defeated: 3, Loading: 4, Paused: 5, Drawn: 6 },
 	playerManager: { currentZone: 3, applyVictoryRewards: vi.fn() },
+	inventoryManager: { initialize: vi.fn() },
 	refreshPlayer: vi.fn(() => Promise.resolve()),
 	staticData: {
 		enemies: [{ id: 0, name: 'Catacomb Lich', isBoss: true }],
@@ -40,7 +41,8 @@ vi.mock('$lib/engine', () => ({
 		h.holder.stageCb = cb;
 		return () => {};
 	}),
-	playerManager: h.playerManager
+	playerManager: h.playerManager,
+	inventoryManager: h.inventoryManager
 }));
 vi.mock('$lib/engine/session', () => ({ refreshPlayer: h.refreshPlayer }));
 vi.mock('$stores', () => ({
@@ -137,6 +139,7 @@ describe('EnemyManager boss mode', () => {
 		h.battleEngine.playerBattleStateMatches.mockReturnValue(true);
 		h.playerManager.applyVictoryRewards.mockClear();
 		h.refreshPlayer.mockClear();
+		h.inventoryManager.initialize.mockClear();
 		h.statistics.markZoneCleared.mockClear();
 		// Default: no zones authored ⇒ no "next zone" to unlock; the unlock tests opt in.
 		h.staticData.zones = undefined;
@@ -899,6 +902,7 @@ describe('EnemyManager boss mode', () => {
 		expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, 'Catacomb Lich was defeated!');
 		// A successful claim needs no resync — the response itself carried the authoritative state.
 		expect(h.refreshPlayer).not.toHaveBeenCalled();
+		expect(h.inventoryManager.initialize).not.toHaveBeenCalled();
 	});
 
 	it('does not log the defeat when DefeatEnemy fails (no premature "defeated" line)', async () => {
@@ -920,6 +924,9 @@ describe('EnemyManager boss mode', () => {
 		// server-side, so an errored claim resyncs the authoritative player state rather than leaving the
 		// client's exp/level silently diverged.
 		expect(h.refreshPlayer).toHaveBeenCalledOnce();
+		// refreshPlayer only re-initializes playerManager; the inventory (an item/mod the outage-window
+		// victory may have unlocked) must be re-derived from it too, or it stays invisible until reload.
+		expect(h.inventoryManager.initialize).toHaveBeenCalledOnce();
 	});
 
 	it('survives a missing/retired enemy id on victory (still grants rewards, omits the name log)', async () => {
