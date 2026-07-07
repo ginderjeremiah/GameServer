@@ -271,6 +271,49 @@ namespace Game.Api.Tests.Unit
             Assert.Same(reloadedPlayer, session.Player);
         }
 
+        [Fact]
+        public async Task ExecuteCommand_AbandonedCommandsFlushFailsAfterTheTimeoutResponse_ReloadsPlayerBeforeTheNextCommand()
+        {
+            // A command abandoned on the per-command timeout budget whose flush later fails for a
+            // non-cancellation reason faults inside ReleaseCommandLockWhenSettled's continuation, not
+            // RunCommandUnderLock's synchronous fault path — it must still mark the session for reload so the
+            // #1632 divergence window doesn't reopen on this path too (#1663).
+            var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
+            var playerRepo = new FakePlayerRepository(reloadedPlayer);
+            using var provider = new ServiceCollection()
+                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IPlayerRepository>(_ => playerRepo)
+                .BuildServiceProvider();
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            session.CreateSession(userId: 1, playerId: 1);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
+            var release = new TaskCompletionSource();
+            var handler = new SocketHandler(
+                context,
+                new WedgedThenStubCommandFactory(release.Task, new PlayerPersistenceFlushFailedException(new InvalidOperationException("late blip"))),
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                _loggerFactory.CreateLogger<SocketHandler>(),
+                () => { },
+                commandTimeout: TimeSpan.FromMilliseconds(10));
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Wedged") { Id = "c1" });
+            Assert.Contains(socket.SentMessages, m => m.Contains("Command timed out.") && m.Contains("c1"));
+            Assert.False(session.PlayerNeedsReload);
+
+            // Let the abandoned command's flush fail now. Acquiring the lock for the next command blocks until
+            // ReleaseCommandLockWhenSettled's continuation has released it, so by the time this call proceeds
+            // the marker (if set) is already visible.
+            release.SetResult();
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c2" });
+
+            Assert.Equal(1, playerRepo.GetPlayerCallCount);
+            Assert.False(session.PlayerNeedsReload);
+            Assert.Same(reloadedPlayer, session.Player);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("Abandoned socket command faulted"));
+        }
+
         private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
@@ -313,6 +356,33 @@ namespace Game.Api.Tests.Unit
             // Every name is treated as registered except the explicit "Unknown" sentinel, so the
             // HandleMessage unknown-command guard can be exercised without populating the static registry.
             public override bool IsKnownCommand(string commandName) => commandName != "Unknown";
+        }
+
+        /// <summary>Ignores the timeout's cancellation token like a genuinely wedged command, then throws once
+        /// <paramref name="waitFor"/> completes — for "Wedged" only; any other command name behaves as a
+        /// normal succeeding <see cref="StubCommand"/>, so a follow-up command can be run afterward.</summary>
+        private sealed class WedgedThenStubCommandFactory(Task waitFor, Exception toThrowAfter) : SocketCommandFactory
+        {
+            public override AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
+            {
+                return commandInfo.Name == "Wedged"
+                    ? new WedgedStubCommand(commandInfo.Name, waitFor, toThrowAfter) { Id = commandInfo.Id }
+                    : new StubCommand(commandInfo.Name, null) { Id = commandInfo.Id };
+            }
+
+            public override bool IsKnownCommand(string commandName) => true;
+        }
+
+        private sealed class WedgedStubCommand(string name, Task waitFor, Exception toThrowAfter) : AbstractSocketCommand
+        {
+            public override string Name { get; set; } = name;
+
+            public override async Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
+            {
+                // Deliberately ignores cancellationToken to simulate a command wedged past the timeout budget.
+                await waitFor;
+                throw toThrowAfter;
+            }
         }
 
         private sealed class StubCommand(string name, Exception? toThrow) : AbstractSocketCommand

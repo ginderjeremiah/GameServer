@@ -310,11 +310,23 @@ namespace Game.Api.Sockets
         {
             _ = commandTask.ContinueWith(task =>
             {
-                // The client already received a timeout response; a cooperative cancellation surfaces here as
-                // the expected OperationCanceledException, while any other fault is genuine and worth logging.
-                if (task.Exception is { } fault && fault.InnerExceptions.Any(e => e is not OperationCanceledException))
+                if (task.Exception is { } fault)
                 {
-                    _logger.LogError(fault, "Abandoned socket command faulted after its timeout response was sent: {CommandInfo} on socket: {Id}.", commandInfo, Id);
+                    // The abandoned flush faulted for a non-cancellation reason after the command's timeout
+                    // already ran: the in-memory Player may hold mutations that never reached the write-behind
+                    // queue, so mark it for reload before the next command runs, same as the synchronous fault
+                    // path in RunCommandUnderLock (#1663).
+                    if (fault.InnerExceptions.Any(e => e is PlayerPersistenceFlushFailedException))
+                    {
+                        _context.Session.MarkPlayerNeedsReload();
+                    }
+
+                    // The client already received a timeout response; a cooperative cancellation surfaces here as
+                    // the expected OperationCanceledException, while any other fault is genuine and worth logging.
+                    if (fault.InnerExceptions.Any(e => e is not OperationCanceledException))
+                    {
+                        _logger.LogError(fault, "Abandoned socket command faulted after its timeout response was sent: {CommandInfo} on socket: {Id}.", commandInfo, Id);
+                    }
                 }
 
                 cts.Dispose();
