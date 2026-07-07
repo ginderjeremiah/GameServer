@@ -357,12 +357,10 @@ export class SkillsView {
 	 *  the current weapon (#1342), plus item-granted innate skills that are fielded — not a duplicate
 	 *  already counted via the loadout or an earlier grant, and not themselves dormant. Reuses
 	 *  {@link innateSkills}'s own duplicate/dormant rule so this can't drift from what the innate band
-	 *  already flags (#1657). */
+	 *  already flags (#1657), and {@link equippedRail}'s equipped→metrics association rather than
+	 *  re-walking `equipped` against `metricsById` a second time (#1662). */
 	private readonly fieldedSkillIds = $derived([
-		...this.equipped.filter((id) => {
-			const skill = this.metricsById[id]?.skill;
-			return skill != null && !this.dormant(skill);
-		}),
+		...this.equippedRail.filter((m) => !this.dormant(m.skill)).map((m) => m.skill.id),
 		...this.innateSkills.filter((i) => !i.duplicate && !this.dormant(i.skill)).map((i) => i.skill.id)
 	]);
 
