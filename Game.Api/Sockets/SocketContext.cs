@@ -18,6 +18,11 @@ namespace Game.Api.Sockets
 
         private readonly byte[] _buffer = new byte[MAX_MESSAGE_SIZE];
 
+        // Sized for the worst case (every byte a standalone char, plus a possible carried-over decoder char)
+        // so a single ReceiveAsync fill can never overflow it, regardless of how the UTF-8 sequences in that
+        // fill are split.
+        private readonly char[] _charBuffer = new char[Encoding.UTF8.GetMaxCharCount(MAX_MESSAGE_SIZE)];
+
         private readonly TaskCompletionSource<ESocketCloseReason> _socketClosedSource = new();
         private readonly ILogger<SocketContext> _logger;
         private readonly WebSocket _socket;
@@ -115,6 +120,12 @@ namespace Game.Api.Sockets
         public async Task<string> ReadMessage(CancellationToken cancellationToken = default)
         {
             var message = new StringBuilder();
+
+            // ReceiveAsync fills at most MAX_MESSAGE_SIZE bytes per call regardless of the sender's UTF-8
+            // framing, so a multi-byte code point can land split across two fills. A stateful decoder carries
+            // an incomplete trailing sequence over to the next GetChars call instead of decoding each fill in
+            // isolation, which would otherwise turn each half into a replacement character (U+FFFD).
+            var decoder = Encoding.UTF8.GetDecoder();
             WebSocketReceiveResult result;
             var framesRead = 0;
             do
@@ -131,7 +142,8 @@ namespace Game.Api.Sockets
                 framesRead++;
                 if (result.Count > 0)
                 {
-                    message.Append(Encoding.UTF8.GetString(_buffer, 0, result.Count));
+                    var charCount = decoder.GetChars(_buffer, 0, result.Count, _charBuffer, 0);
+                    message.Append(_charBuffer, 0, charCount);
                 }
             }
             while (!result.EndOfMessage && framesRead < MAX_FRAMES_PER_MESSAGE);
