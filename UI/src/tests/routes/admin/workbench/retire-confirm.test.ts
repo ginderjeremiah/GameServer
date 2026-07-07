@@ -130,4 +130,25 @@ describe('retireWithConfirm', () => {
 		expect(body).toContain('Advanced Blades');
 		expect(onConfirmed).toHaveBeenCalledOnce();
 	});
+
+	it('surfaces a class starter-skill reference from a bare admin load (#1633 — classes must land in staticData)', async () => {
+		dangerModal.mockResolvedValue(true);
+		const onConfirmed = vi.fn();
+		// Simulates reference.load() populating staticData.classes on a direct /admin entry (no game load).
+		staticData.classes = [{ id: 0, name: 'Warrior', starterSkillIds: [3], starterEquipment: [] }];
+
+		await retireWithConfirm({
+			entityKey: 'skills',
+			id: 3,
+			name: 'Cleave',
+			title: 'Retire Skill?',
+			sources: referenceSourcesFromStatic(),
+			onConfirmed
+		});
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		const body = dangerModal.mock.calls[0][0].body as string;
+		expect(body).toContain('Warrior');
+		expect(onConfirmed).toHaveBeenCalledOnce();
+	});
 });

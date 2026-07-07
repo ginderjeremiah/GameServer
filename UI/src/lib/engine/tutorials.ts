@@ -15,8 +15,17 @@ const isLocked = (lessonId: number): boolean => !playerManager.lessons.some((les
  * Opens `lesson`'s tour: navigates to its host screen (a no-op if already there) and plays its
  * steps. This is the single open→navigate→play flow shared by the screen-anchored auto-trigger
  * below and manually opening a queued unread lesson (e.g. from the Help nav badge, #1589).
+ *
+ * A lesson with no steps can't render `TourPlayer` (it has nothing to show as `currentStep`), so
+ * its dismiss/complete callbacks — the only path that marks a lesson read — would never fire.
+ * Rather than wedge as a permanently "active" lesson that keeps re-triggering, treat it as a no-op
+ * and mark it read immediately so bad content degrades gracefully instead of getting stuck.
  */
 export function openLesson(lesson: ILesson) {
+	if (lesson.steps.length === 0) {
+		playerManager.markLessonRead(lesson.id);
+		return;
+	}
 	navigation.requestScreen(lesson.screenKey);
 	tutorialTour.play(lesson);
 }

@@ -212,20 +212,26 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 			childSavers: [
 				async (id, record, baseline) => {
 					const changes = attributeChanges(record.attributes, baseline?.attributes, 'amount');
-					if (changes.length) {
-						await ApiRequest.post('AdminTools/AddEditItemAttributes', { id, changes });
+					if (!changes.length) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/AddEditItemAttributes', { id, changes });
+					return true;
 				},
 				async (id, record, baseline) => {
 					const changes = modSlotChanges(record.modSlots, baseline?.modSlots, id);
-					if (changes.length) {
-						await ApiRequest.post('AdminTools/AddEditItemModSlots', changes);
+					if (!changes.length) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/AddEditItemModSlots', changes);
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.tags, baseline?.tags)) {
-						await ApiRequest.post('AdminTools/SetTagsForItem', { id, tagIds: record.tags });
+					if (!childChanged(record.tags, baseline?.tags)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetTagsForItem', { id, tagIds: record.tags });
+					return true;
 				}
 			]
 		})

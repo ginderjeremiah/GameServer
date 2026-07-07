@@ -98,11 +98,12 @@ namespace Game.DataAccess.Repositories
             };
             _updateBatch.Add(envelope);
 
-            // The cache is the source of truth, so the advance writes the full current snapshot (absolute
-            // values). Capture it now (off the live progress aggregate) so a deferred advance still snapshots
-            // this save's state, not a later mutation's.
-            var snapshot = ToCached(progress.Statistics, progress.ChallengeProgress, progress.Proficiencies);
-            void AdvanceCache() => _cache.SetAndForget(ProgressKey(playerId), snapshot, ProgressCacheTtl);
+            // The cache is the source of truth, but it is stored as a Redis hash keyed by row identity, so
+            // advancing it only needs to HSET the rows this save actually touched (changed, captured now off
+            // the live aggregate so a deferred advance still reflects this save's state) rather than
+            // re-serializing every row the player has ever earned (#1635).
+            var fields = ToHashFields(changed);
+            void AdvanceCache() => _cache.HashSetAndForget(ProgressKey(playerId), fields, ProgressCacheTtl);
 
             if (_updateBatch.PlayerSaveInProgress)
             {
@@ -125,19 +126,20 @@ namespace Game.DataAccess.Repositories
         private async Task<CachedPlayerProgress> GetCachedProgress(int playerId, CancellationToken cancellationToken)
         {
             var key = ProgressKey(playerId);
-            var cached = await _cache.Get<CachedPlayerProgress>(key, cancellationToken);
-            if (cached is null)
+            var raw = await _cache.HashGetAllIfExists(key, cancellationToken);
+            if (raw is null)
             {
-                cached = await LoadFromDb(playerId, cancellationToken);
-                _cache.SetAndForget(key, cached, ProgressCacheTtl);
-            }
-            else
-            {
-                // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
-                _cache.ExpireAndForget(key, ProgressCacheTtl);
+                // A brand-new player with literally no rows yet leaves nothing to HSET (a no-op), so the hash
+                // key is never created and the next read reloads from the DB again — harmless and self-limiting,
+                // since it only lasts until the player earns their first statistic/challenge/proficiency row.
+                var loaded = await LoadFromDb(playerId, cancellationToken);
+                _cache.HashSetAndForget(key, ToHashFields(loaded), ProgressCacheTtl);
+                return loaded;
             }
 
-            return cached;
+            // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
+            _cache.ExpireAndForget(key, ProgressCacheTtl);
+            return FromHashFields(raw);
         }
 
         private async Task<CachedPlayerProgress> LoadFromDb(int playerId, CancellationToken cancellationToken)
@@ -221,5 +223,71 @@ namespace Game.DataAccess.Repositories
                     Xp = p.Xp,
                 }).ToList(),
             };
+
+        // Field-key prefixes double as the discriminator on read: each row's own kind is self-describing, so
+        // FromHashFields never needs the caller to track kind alongside field name. The row's natural key
+        // (type+entity / challenge id / proficiency id) makes each field name stable and collision-free across
+        // saves, so a later HSET on the same row always overwrites the same field rather than appending a
+        // duplicate.
+        private static string StatField(int statisticTypeId, int? entityId) => $"S_{statisticTypeId}_{entityId?.ToString() ?? "n"}";
+        private static string ChallengeField(int challengeId) => $"C_{challengeId}";
+        private static string ProficiencyField(int proficiencyId) => $"P_{proficiencyId}";
+
+        // Serializes each row as its own hash field, keyed by its natural identity, so Save can HSET only the
+        // rows a save actually touched instead of rewriting the whole cached snapshot (#1635).
+        private static Dictionary<string, string> ToHashFields(CachedPlayerProgress progress)
+        {
+            var fields = new Dictionary<string, string>();
+            foreach (var stat in progress.Statistics)
+            {
+                fields[StatField(stat.StatisticTypeId, stat.EntityId)] = stat.Serialize();
+            }
+
+            foreach (var challenge in progress.Challenges)
+            {
+                fields[ChallengeField(challenge.ChallengeId)] = challenge.Serialize();
+            }
+
+            foreach (var proficiency in progress.Proficiencies)
+            {
+                fields[ProficiencyField(proficiency.ProficiencyId)] = proficiency.Serialize();
+            }
+
+            return fields;
+        }
+
+        private static CachedPlayerProgress FromHashFields(Dictionary<string, string> fields)
+        {
+            var progress = new CachedPlayerProgress();
+            foreach (var (field, value) in fields)
+            {
+                if (field.StartsWith("S_", StringComparison.Ordinal))
+                {
+                    var stat = value.Deserialize<CachedPlayerStatistic>();
+                    if (stat is not null)
+                    {
+                        progress.Statistics.Add(stat);
+                    }
+                }
+                else if (field.StartsWith("C_", StringComparison.Ordinal))
+                {
+                    var challenge = value.Deserialize<CachedPlayerChallenge>();
+                    if (challenge is not null)
+                    {
+                        progress.Challenges.Add(challenge);
+                    }
+                }
+                else if (field.StartsWith("P_", StringComparison.Ordinal))
+                {
+                    var proficiency = value.Deserialize<CachedPlayerProficiency>();
+                    if (proficiency is not null)
+                    {
+                        progress.Proficiencies.Add(proficiency);
+                    }
+                }
+            }
+
+            return progress;
+        }
     }
 }

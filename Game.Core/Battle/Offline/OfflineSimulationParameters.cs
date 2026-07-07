@@ -4,6 +4,7 @@ using Game.Core.Items;
 using Game.Core.Proficiencies;
 using Game.Core.Skills;
 using Game.Core.Zones;
+using CorePath = Game.Core.Proficiencies.Path;
 
 namespace Game.Core.Battle.Offline
 {
@@ -76,6 +77,26 @@ namespace Game.Core.Battle.Offline
         /// <summary>Resolves a proficiency definition by id when composing the snapshot's per-level/milestone
         /// bonuses (used only when the snapshot captured proficiency levels).</summary>
         public required Func<int, Proficiency> ResolveProficiency { get; init; }
+
+        /// <summary>
+        /// Resolves a path's XP-routing view by id — paired with <see cref="PathsForActivityKey"/> by the
+        /// in-loop proficiency accrual (#1602, <see cref="Game.Core.Proficiencies.ProficiencyAccrual"/>) so a
+        /// just-maxed tier's within-path successor can open.
+        /// </summary>
+        public required Func<int, CorePath> ResolvePath { get; init; }
+
+        /// <summary>
+        /// The (non-retired) paths that train on a battle activity key — the reverse index the in-loop
+        /// proficiency accrual (#1602) routes a battle's activity through to each path's frontier tier,
+        /// mirroring the live battle-completion accrual the application layer runs per battle.
+        /// </summary>
+        public required Func<EActivityKey, IReadOnlyList<CorePath>> PathsForActivityKey { get; init; }
+
+        /// <summary>
+        /// The proficiencies naming a given proficiency as a prerequisite — consulted when a just-maxed tier
+        /// might newly satisfy a cross-path gateway (#1602).
+        /// </summary>
+        public required Func<int, IReadOnlyList<int>> DependentsOf { get; init; }
 
         /// <summary>Resolves the player's class by id when composing the snapshot's level-scaled locked-base
         /// distribution. The locked base — a deterministic function of <c>(class, level)</c> — is re-derived

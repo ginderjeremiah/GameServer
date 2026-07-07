@@ -392,6 +392,24 @@ namespace Game.Application.Tests.Content
             Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyInertAttribute");
         }
 
+        [Fact]
+        public void Enemy_PlacedOnlyAsZoneBoss_IsRatedAtZoneBossLevel()
+        {
+            // Enemy 9 carries no spawn-table entry at all — its only live placement is zone 1's dedicated boss
+            // slot — so a representative level can only come from ResolveRatingLevel's boss-level branch
+            // (zone.BossLevel). Its kit (skill 2, same as the sibling AGI-dead-stat tests above) doesn't consume
+            // Agility, so a live rating (i.e. the branch actually firing rather than being skipped as unplaced)
+            // must still surface the dead-stat warning.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0), Zone(1, unlockChallengeId: 0, bossEnemyId: 9, bossLevel: 5), Zone(2, isHome: true)],
+                Enemies = HealthyGraph().Enemies
+                    .Append(Enemy(9, isBoss: true, skillPool: [2], spawns: [], attributeDistribution: [(EAttribute.Agility, 5, 1)]))
+                    .ToList(),
+            };
+            AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 9);
+        }
+
         // --- Classes ----------------------------------------------------------------------------------
 
         [Fact]
@@ -1075,6 +1093,7 @@ namespace Game.Application.Tests.Content
             int id,
             bool isHome = false,
             int? bossEnemyId = null,
+            int bossLevel = 1,
             int? unlockChallengeId = null,
             DateTime? retiredAt = null) => new()
             {
@@ -1085,7 +1104,7 @@ namespace Game.Application.Tests.Content
                 LevelMin = 1,
                 LevelMax = 10,
                 BossEnemyId = bossEnemyId,
-                BossLevel = 1,
+                BossLevel = bossLevel,
                 UnlockChallengeId = unlockChallengeId,
                 IsHome = isHome,
                 DesignerNotes = "",

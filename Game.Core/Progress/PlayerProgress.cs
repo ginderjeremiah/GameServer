@@ -13,8 +13,8 @@ namespace Game.Core.Progress
         private readonly Dictionary<int, PlayerProficiency> _proficiencies;
 
         // Rows mutated since this aggregate was loaded. The write-behind save enqueues only these (as
-        // absolute values) rather than the whole, ever-growing stat set; the full snapshot still goes to
-        // the cache, which is the source of truth.
+        // absolute values), and the cache — the source of truth — advances the same way: it is a Redis hash
+        // keyed by row identity, so only the dirty rows are written rather than the whole, ever-growing set.
         private readonly HashSet<(EStatisticType Type, int? EntityId)> _dirtyStatistics = [];
         private readonly HashSet<int> _dirtyChallenges = [];
         private readonly HashSet<int> _dirtyProficiencies = [];

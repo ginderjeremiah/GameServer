@@ -1,5 +1,6 @@
 import { ApiRequest, EAttribute, EModifierType, ESkillAcquisition, fetchSocketData, type IClass } from '$lib/api';
 import { hasFlag } from '$lib/common';
+import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
@@ -15,10 +16,13 @@ export interface WorkbenchClass extends Omit<IClass, 'passiveScalingAttributeId'
 
 // Classes load over the socket; the admin filter invalidates this cache on every write server-side, so a
 // plain refetch returns the freshly-saved list. The optional scaling attribute is normalised to the select's
-// "None" sentinel (-1) for the editable copy.
+// "None" sentinel (-1) for the editable copy. Written through to staticData.classes so retire-confirm's
+// reference computation (starter-skill/starter-equipment groups) sees post-save edits (#1633).
 const refresh = async (): Promise<WorkbenchClass[]> => {
 	const classes = await fetchSocketData('GetClasses');
-	return classes.map((c) => ({ ...c, passiveScalingAttributeId: c.passiveScalingAttributeId ?? -1 }));
+	const workbenchClasses = classes.map((c) => ({ ...c, passiveScalingAttributeId: c.passiveScalingAttributeId ?? -1 }));
+	staticData.classes = workbenchClasses;
+	return workbenchClasses;
 };
 
 export const classEntity: EntityConfig<WorkbenchClass> = {
@@ -240,28 +244,34 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			refresh,
 			childSavers: [
 				async (id, record, baseline) => {
-					if (childChanged(record.starterSkillIds, baseline?.starterSkillIds)) {
-						await ApiRequest.post('AdminTools/SetClassStarterSkills', {
-							classId: id,
-							skillIds: record.starterSkillIds
-						});
+					if (!childChanged(record.starterSkillIds, baseline?.starterSkillIds)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetClassStarterSkills', {
+						classId: id,
+						skillIds: record.starterSkillIds
+					});
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.starterEquipment, baseline?.starterEquipment)) {
-						await ApiRequest.post('AdminTools/SetClassStarterEquipment', {
-							classId: id,
-							equipment: record.starterEquipment
-						});
+					if (!childChanged(record.starterEquipment, baseline?.starterEquipment)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetClassStarterEquipment', {
+						classId: id,
+						equipment: record.starterEquipment
+					});
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.attributeDistributions, baseline?.attributeDistributions)) {
-						await ApiRequest.post('AdminTools/SetClassAttributeDistributions', {
-							classId: id,
-							attributeDistributions: record.attributeDistributions
-						});
+					if (!childChanged(record.attributeDistributions, baseline?.attributeDistributions)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetClassAttributeDistributions', {
+						classId: id,
+						attributeDistributions: record.attributeDistributions
+					});
+					return true;
 				}
 			]
 		})

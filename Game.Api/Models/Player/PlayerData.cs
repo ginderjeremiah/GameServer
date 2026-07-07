@@ -42,7 +42,7 @@ namespace Game.Api.Models.Player
         /// (#1528). Recomputed fresh from current state (not a stored battle snapshot), display-only, never
         /// recomputed client-side (no parity surface).
         /// </summary>
-        public double PlayerRating { get; set; }
+        public required double PlayerRating { get; set; }
 
         public static PlayerData FromPlayer(
             CorePlayer player,

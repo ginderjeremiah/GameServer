@@ -1,4 +1,6 @@
 using Game.Api.Models.Enemies;
+using Game.Api.Services;
+using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -14,6 +16,16 @@ namespace Game.Api.Tests.Integration
     public class BattleLostSocketTests : ApiIntegrationTestBase
     {
         public BattleLostSocketTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
+
+        private async Task SetPlayerState(int userId, Action<PlayerState> modifyState)
+        {
+            using var scope = CreateScope();
+            var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
+            sessionService.SetAuthenticatedUser(userId);
+            await sessionService.LoadPlayerState();
+            modifyState(sessionService.PlayerState);
+            sessionService.SavePlayerState();
+        }
 
         private async Task<int> SeedWeakPlayerVsStrongEnemyAsync()
         {
@@ -109,15 +121,31 @@ namespace Game.Api.Tests.Integration
         {
             var userId = await SeedWeakPlayerVsStrongEnemyAsync();
 
-            await using var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();
-            await socketClient.ConnectAsync(wsClient, userId);
 
-            // Start battle against strong enemy
-            var newEnemyResponse = await socketClient.SendCommandAsync<NewEnemyModel>(
-                "NewEnemy", new { NewZoneId = (int?)null });
-            Assert.Null(newEnemyResponse.Error);
-            Assert.NotNull(newEnemyResponse.Data?.EnemyInstance);
+            await using (var socketClient1 = new TestSocketClient())
+            {
+                await socketClient1.ConnectAsync(wsClient, userId);
+                Assert.Equal(WebSocketState.Open, socketClient1.State);
+
+                // Start battle against strong enemy
+                var newEnemyResponse = await socketClient1.SendCommandAsync<NewEnemyModel>(
+                    "NewEnemy", new { NewZoneId = (int?)null });
+                Assert.Null(newEnemyResponse.Error);
+                Assert.NotNull(newEnemyResponse.Data?.EnemyInstance);
+
+                await socketClient1.CloseAsync();
+            }
+
+            // Backdate the battle start so more than the simulated loss's replay duration has elapsed,
+            // satisfying the server-measured elapsed-time check (#1630).
+            await SetPlayerState(userId, state =>
+            {
+                state.BattleStartTime = DateTime.UtcNow.AddMinutes(-30);
+            });
+
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
 
             // Report loss
             var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost");
@@ -129,6 +157,27 @@ namespace Game.Api.Tests.Integration
             // — letting the client begin it without a separate NewEnemy round-trip after the cooldown (#1092).
             Assert.NotNull(response.Data.NextEnemy);
             Assert.NotNull(response.Data.NextZoneId);
+        }
+
+        [Fact]
+        public async Task BattleLost_ClaimedBeforeBattleCouldFinish_ReturnsError()
+        {
+            var userId = await SeedWeakPlayerVsStrongEnemyAsync();
+
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            // Start battle against strong enemy
+            var newEnemyResponse = await socketClient.SendCommandAsync<NewEnemyModel>(
+                "NewEnemy", new { NewZoneId = (int?)null });
+            Assert.Null(newEnemyResponse.Error);
+
+            // Report the loss immediately: the battle just started, so far less server time has elapsed than
+            // its replay duration and the claim could not have finished yet — rejected (#1630).
+            var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost");
+
+            Assert.NotNull(response.Error);
         }
     }
 }

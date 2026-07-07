@@ -408,10 +408,13 @@ namespace Game.Core.Battle
         /// is <c>0</c>, so the loop adds nothing and the return is an exact <c>0</c>.
         /// </summary>
         /// <remarks>
-        /// Intentionally <b>not</b> floored at zero. DoT bypasses mitigation entirely, so a tick goes negative
-        /// only through a deliberately authored negative accumulator or a resistance above <c>1</c> (absorption)
-        /// — and a floor wouldn't prevent that, it would just silently rewrite the value. Authored healing
-        /// belongs in the capped <see cref="ApplyHealOverTime"/> channel instead. The resistance
+        /// Each type's own tick is intentionally <b>not</b> floored at zero. DoT bypasses mitigation entirely, so
+        /// a tick goes negative only through a deliberately authored negative accumulator or a resistance above
+        /// <c>1</c> (absorption) — and a floor wouldn't prevent that, it would just silently rewrite the value;
+        /// the per-type recorders above always see this uncapped tick. But the <b>aggregate</b> health change
+        /// this call realizes <i>is</i> capped at the remaining room to <see cref="MaxHealth"/> when the summed
+        /// <c>dot</c> is negative — matching <see cref="TakeDamage"/>'s absorption cap and
+        /// <see cref="ApplyHealOverTime"/> (the game has no overheal/shield concept). The resistance
         /// sum is folded in the fixed <see cref="DamageTypes.ResistanceAttributes"/> order, and each type's
         /// contribution is summed in <see cref="DamageTypes.DotAccumulators"/> order, so both simulators agree
         /// bit-for-bit. A single typed DoT with no resistance reduces to <c>perSec × ms/1000</c> — byte-identical
@@ -504,6 +507,18 @@ namespace Game.Core.Battle
                 }
 
                 dot += tickDamage;
+            }
+
+            if (dot < 0)
+            {
+                // Aggregate absorption (net heal across the ticked types): cap the realized health change at
+                // the remaining room to MaxHealth, consistent with TakeDamage's absorption cap and
+                // ApplyHealOverTime — the game has no overheal/shield concept. Per-type booking above already
+                // recorded the uncapped tick.
+                var room = _attributes[MaxHealth] - CurrentHealth;
+                var heal = -dot < room ? -dot : room;
+                heal = heal > 0 ? heal : 0;
+                dot = heal == 0 ? 0 : -heal; // avoid -0.0, matching the frontend mirror bit-for-bit
             }
 
             CurrentHealth -= dot;

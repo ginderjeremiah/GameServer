@@ -11,6 +11,7 @@ namespace Game.Api.Services
     {
         private readonly ISessionStore _sessionStore = sessionStore;
         private Player? _player;
+        private bool _playerNeedsReload;
 
         public int UserId { get; private set; }
 
@@ -86,6 +87,7 @@ namespace Game.Api.Services
             UserId = 0;
             TokenSelectedPlayerId = null;
             _player = null;
+            _playerNeedsReload = false;
             PlayerState = new();
         }
 
@@ -102,6 +104,22 @@ namespace Game.Api.Services
         public void SetPlayer(Player player)
         {
             _player = player;
+            _playerNeedsReload = false;
+        }
+
+        /// <summary>
+        /// True once a command's <c>SavePlayer</c> flush has genuinely failed (see
+        /// <see cref="Game.Abstractions.DataAccess.PlayerPersistenceFlushFailedException"/>) — the in-memory
+        /// <see cref="Player"/> may hold mutations that never reached the write-behind queue. <c>SocketHandler</c>
+        /// reloads the player from the repository before the next command runs whenever this is set, converging
+        /// the session back onto the last successfully-persisted state instead of silently carrying the stuck
+        /// mutation forward (#1632).
+        /// </summary>
+        public bool PlayerNeedsReload => _playerNeedsReload;
+
+        public void MarkPlayerNeedsReload()
+        {
+            _playerNeedsReload = true;
         }
 
         public void CreateSession(int userId, int playerId)

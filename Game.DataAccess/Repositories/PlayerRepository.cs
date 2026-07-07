@@ -98,8 +98,22 @@ namespace Game.DataAccess.Repositories
 
             // FlushAsync only drains the batch and runs deferred progress cache-advances (see RunFlushedCallbacks)
             // once the publish has actually succeeded, so a failed flush (a transient Redis blip) leaves both
-            // buffered for the next save's flush instead of silently losing them (#1494).
-            await _updateBatch.FlushAsync(_pubsub, cancellationToken);
+            // buffered for the next save's flush instead of silently losing them (#1494). But this command's
+            // scope (and its PlayerUpdateBatch) ends here regardless, so a genuine flush failure is wrapped in
+            // a distinct type: the socket layer forces the connection's in-memory Player to reload afterward,
+            // rather than silently carrying this save's mutations forward with no queued event to match (#1632).
+            try
+            {
+                await _updateBatch.FlushAsync(_pubsub, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A cancellation is a cooperative unwind (the caller's budget, not a persistence fault), so it
+                // propagates unwrapped rather than triggering a reload — pinned by
+                // PlayerWriteBehindTests.SavePlayer_PublishFails_PreservesTheEventForTheNextFlush, which expects
+                // OperationCanceledException specifically and would fail if this were wrapped instead.
+                throw new PlayerPersistenceFlushFailedException(ex);
+            }
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 

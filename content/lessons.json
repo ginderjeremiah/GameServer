@@ -1,1 +1,76 @@
-[]
+[
+  {
+    "id": 0,
+    "key": "idle-loop-basics",
+    "name": "The Idle Loop",
+    "triggerType": "ScreenVisit",
+    "screenKey": "fight",
+    "triggerMechanicEvent": null,
+    "ordinal": 0,
+    "designerNotes": "Screen-anchored on first Fight visit — taught-by-blurb candidate per content-design.md §2 (the core idle loop doesn't need a whole zone to teach). Fires immediately since the player is looking right at the screen it explains.",
+    "retiredAt": null,
+    "steps": [
+      {
+        "ordinal": 0,
+        "text": "Welcome to the fight screen — your build takes over from here. Skills fire on their own; there's nothing to click during battle.",
+        "anchorKey": null
+      },
+      {
+        "ordinal": 1,
+        "text": "The bars above each combatant track HP. Whoever's hits zero first loses the fight, and the next enemy loads in automatically.",
+        "anchorKey": null
+      },
+      {
+        "ordinal": 2,
+        "text": "You don't have to watch every fight — close the game and come back later. Progress continues while you're away, up to a cap, so spend your time building your character and let the idle loop do the rest.",
+        "anchorKey": null
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "key": "crit-dodge-variance",
+    "name": "Crits & Dodges",
+    "triggerType": "MechanicEvent",
+    "screenKey": "fight",
+    "triggerMechanicEvent": "FirstCrit",
+    "ordinal": 1,
+    "designerNotes": "Mechanic-anchored on the player's first landed crit (EMechanicEvent.FirstCrit), per content-design.md §2's single 'crit/dodge variance' taught-by-blurb pairing — one lesson covers both crit and dodge variance rather than splitting into two, since crit and dodge are the same lesson (damage varies hit to hit) from opposite sides of the exchange. Anchored on crit rather than dodge because a crit-capable skill exists in every starter kit while dodge is opt-in gear (see content-design.md §4's Evasion path), so crit is reached first far more reliably.",
+    "retiredAt": null,
+    "steps": [
+      {
+        "ordinal": 0,
+        "text": "That hit landed harder than normal — a critical hit! Crits deal bonus damage a percentage of the time, so your damage per hit will naturally vary.",
+        "anchorKey": null
+      },
+      {
+        "ordinal": 1,
+        "text": "The same goes on defense: sometimes an incoming attack misses entirely — a dodge. Don't read too much into any single hit; it's the average over a whole fight that matters.",
+        "anchorKey": null
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "key": "cooldown-charging",
+    "name": "Skill Cooldowns",
+    "triggerType": "MechanicEvent",
+    "screenKey": "fight",
+    "triggerMechanicEvent": "FirstCooldownRecharge",
+    "ordinal": 2,
+    "designerNotes": "Mechanic-anchored on the player's first observed cooldown recharge (EMechanicEvent.FirstCooldownRecharge) — taught-by-blurb candidate per content-design.md §2.",
+    "retiredAt": null,
+    "steps": [
+      {
+        "ordinal": 0,
+        "text": "See a skill icon fill back up and fire again on its own? That's its cooldown recharging. Each skill charges independently and activates the moment it's ready.",
+        "anchorKey": null
+      },
+      {
+        "ordinal": 1,
+        "text": "Reducing a skill's cooldown means more casts over the same fight, so cooldown speed compounds with your other stats instead of competing with them.",
+        "anchorKey": null
+      }
+    ]
+  }
+]

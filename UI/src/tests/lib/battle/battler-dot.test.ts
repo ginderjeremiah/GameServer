@@ -96,6 +96,35 @@ describe('Battler damage/heal-over-time', () => {
 		expect(battler.currentHealth).toBe(52); // 50 − (−2)
 	});
 
+	it('caps the DoT absorption heal at zero when already at MaxHealth', () => {
+		// A +2.0 BleedResistance would heal 80 (2000 × 40/1000 × (1 − 2) = −80), but the battler is already at
+		// MaxHealth (no prior damage) so there's no room — capped at zero net effect.
+		const battler = makeBattler([
+			{ id: EAttribute.Strength, amount: 0 }, // MaxHealth 50
+			{ id: EAttribute.BleedDamagePerSecond, amount: 2000 },
+			{ id: EAttribute.BleedResistance, amount: 2.0 }
+		]);
+
+		const dealt = battler.applyDamageOverTime(40);
+
+		expect(dealt).toBe(0);
+		expect(battler.currentHealth).toBe(50);
+	});
+
+	it('caps the DoT absorption heal at the remaining room to MaxHealth', () => {
+		const battler = makeBattler([
+			{ id: EAttribute.Strength, amount: 10 }, // MaxHealth 100
+			{ id: EAttribute.BleedDamagePerSecond, amount: 50 },
+			{ id: EAttribute.BleedResistance, amount: 2.0 }
+		]);
+		battler.takeDamage(1, EDamageType.Physical); // no Toughness → 1 damage → currentHealth 99, room 1
+
+		const dealt = battler.applyDamageOverTime(40); // would heal 2, but only 1 of room remains
+
+		expect(dealt).toBe(-1);
+		expect(battler.currentHealth).toBe(100);
+	});
+
 	it('resists burn through the cross-cutting fire key', () => {
 		// Burn resists as burn + fire + elemental + dot: 250 BurnDamagePerSecond → 10/tick, halved by 0.5
 		// FireResistance → 5.

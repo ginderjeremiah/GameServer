@@ -1,7 +1,14 @@
 import { apiSocket, ELogType, IEnemyInstance } from '$lib/api';
 import { Action, createHook, delay, isZoneUnlocked, navigableZones, nextZoneByOrder } from '$lib/common';
 import { staticData, statistics, playerChallenges } from '$stores';
-import { battleEngine, BattleStage, onBattleStageChanged, playerManager, type PlayerBattleState } from '../';
+import {
+	battleEngine,
+	BattleStage,
+	inventoryManager,
+	onBattleStageChanged,
+	playerManager,
+	type PlayerBattleState
+} from '../';
 import { logMessage } from '../log';
 import { refreshPlayer } from '../session';
 
@@ -658,8 +665,11 @@ export class EnemyManager {
 				// The transport settles a lost/timed-out response as an error even when the command may have
 				// actually succeeded server-side (see docs/frontend.md's socket request lifecycle) — resync the
 				// authoritative player state rather than leaving exp/level silently diverged for the rest of
-				// the session.
+				// the session. refreshPlayer only re-initializes playerManager, so the inventory (an item/mod
+				// reward the lost response may have carried) is re-derived from it separately, mirroring what
+				// startGame does on the initial load.
 				await refreshPlayer();
+				inventoryManager.initialize();
 			}
 		}
 		// Guard `data` for a possible error response (absent `data`), now that this is the shared

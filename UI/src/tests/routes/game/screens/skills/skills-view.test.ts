@@ -718,6 +718,44 @@ describe('SkillsView — critical hits fold into effective damage', () => {
 	});
 });
 
+/* The header's combined effective totals must never sum an output the battle can't produce (#1637):
+   a dormant (weapon-mismatched) equipped skill is excluded, mirroring the per-card suppression
+   `EquippedBand.svelte` already applies. */
+describe('SkillsView — combined effective totals exclude dormant skills (#1637)', () => {
+	const swordSkill = skill({
+		id: 6,
+		name: 'Golf',
+		baseDamage: 20,
+		cooldownMs: 1000,
+		damagePortions: [{ type: EDamageType.Sword, weight: 1 }]
+	});
+
+	beforeEach(() => {
+		staticData.skills = [...SKILLS, swordSkill];
+		mockPlayerManager.unlockedSkills = [
+			{ skillId: 0, selected: true, order: 0 },
+			{ skillId: 1, selected: true, order: 1 },
+			{ skillId: 6, selected: true, order: 2 }
+		];
+	});
+
+	it('contributes 0 to both totals while dormant under a mismatched weapon', () => {
+		mockInventoryManager.equippedWeaponType = EDamageType.Unarmed;
+		const v = new SkillsView();
+		expect(v.dormant(swordSkill)).toBe(true);
+		expect(v.combinedEffectiveBurst).toBeCloseTo(v.effective(0) + v.effective(1), 10);
+		expect(v.combinedEffectiveDps).toBeCloseTo(v.effectiveDps(0) + v.effectiveDps(1), 10);
+	});
+
+	it('restores its contribution once the matching weapon is equipped', () => {
+		mockInventoryManager.equippedWeaponType = EDamageType.Sword;
+		const v = new SkillsView();
+		expect(v.dormant(swordSkill)).toBe(false);
+		expect(v.combinedEffectiveBurst).toBeCloseTo(v.effective(0) + v.effective(1) + v.effective(6), 10);
+		expect(v.combinedEffectiveDps).toBeCloseTo(v.effectiveDps(0) + v.effectiveDps(1) + v.effectiveDps(6), 10);
+	});
+});
+
 /* The weapon-match grey-out (#1342): a weapon-leaf-typed skill is dormant unless the matching weapon is
    equipped. `dormant()` derives from the same `isFielded` rule the battle assembly applies. */
 describe('SkillsView — weapon-match grey-out', () => {

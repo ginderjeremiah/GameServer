@@ -270,6 +270,9 @@ namespace Game.Application.Content
             {
                 foreach (var zone in Live(_graph.Zones, z => z.RetiredAt))
                 {
+                    // Deliberate precedence: a zone's spawn-table placement is checked before its boss slot, so
+                    // an enemy that is both spawn-tabled and the dedicated boss of the same zone rates at the
+                    // zone's level range midpoint, not BossLevel.
                     if (enemy.Spawns.Any(s => s.ZoneId == zone.Id))
                     {
                         return (zone.LevelMin + zone.LevelMax) / 2;

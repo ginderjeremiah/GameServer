@@ -1,3 +1,4 @@
+using Game.Api.Models.InventoryItems;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
@@ -65,6 +66,34 @@ namespace Game.Api.Tests.Integration
             var response = await socketClient.SendCommandRawAsync("UnequipItem", parameters);
 
             Assert.Null(response.Error);
+        }
+
+        [Fact]
+        public async Task EquipItem_ItemWithAttributes_ReturnsPlayerRatingThatDropsOnUnequip()
+        {
+            // The seeded weapon carries a Strength bonus (TestDataSeeder.CreateItemAsync's default), which
+            // feeds both offense and survivability (CombatRating.Classify), so equipping/unequipping it must
+            // move the reported rating immediately rather than leaving it stale until the next full
+            // player-state refresh (#1616).
+            var (userId, _, itemId) = await SeedPlayerWithInventoryAsync("equipratinguser", "equipratingpass",
+                async (context, playerId, item) =>
+                    await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, item.Id));
+            await LoginAsync("equipratinguser", "equipratingpass");
+            await using var socketClient = await ConnectSocketAsync(userId);
+
+            var equipParameters = new { itemId, equipmentSlotId = (int)EEquipmentSlot.WeaponSlot };
+            var equipResponse = await socketClient.SendCommandAsync<EquipItemResponse>("EquipItem", equipParameters);
+            Assert.Null(equipResponse.Error);
+            Assert.NotNull(equipResponse.Data);
+            Assert.True(equipResponse.Data.PlayerRating > 0);
+
+            var unequipParameters = new { equipmentSlotId = (int)EEquipmentSlot.WeaponSlot };
+            var unequipResponse = await socketClient.SendCommandAsync<EquipItemResponse>("UnequipItem", unequipParameters);
+            Assert.Null(unequipResponse.Error);
+            Assert.NotNull(unequipResponse.Data);
+
+            Assert.True(unequipResponse.Data.PlayerRating < equipResponse.Data.PlayerRating,
+                $"Expected the post-unequip rating ({unequipResponse.Data.PlayerRating}) to be lower than the equipped rating ({equipResponse.Data.PlayerRating}).");
         }
 
         [Fact]

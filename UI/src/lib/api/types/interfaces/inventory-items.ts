@@ -12,6 +12,10 @@ export interface IApplyModRequest {
 	itemModSlotId: number;
 }
 
+export interface IEquipItemResponse {
+	playerRating: number;
+}
+
 export interface IEquipRequest {
 	itemId: number;
 	equipmentSlotId: number;

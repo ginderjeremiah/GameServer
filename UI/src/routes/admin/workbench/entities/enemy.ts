@@ -196,22 +196,28 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 			refresh,
 			childSavers: [
 				async (id, record, baseline) => {
-					if (childChanged(record.attributeDistribution, baseline?.attributeDistribution)) {
-						await ApiRequest.post('AdminTools/SetEnemyAttributeDistributions', {
-							enemyId: id,
-							attributeDistributions: record.attributeDistribution
-						});
+					if (!childChanged(record.attributeDistribution, baseline?.attributeDistribution)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetEnemyAttributeDistributions', {
+						enemyId: id,
+						attributeDistributions: record.attributeDistribution
+					});
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.skillPool, baseline?.skillPool)) {
-						await ApiRequest.post('AdminTools/SetEnemySkills', { enemyId: id, skillIds: record.skillPool });
+					if (!childChanged(record.skillPool, baseline?.skillPool)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetEnemySkills', { enemyId: id, skillIds: record.skillPool });
+					return true;
 				},
 				async (id, record, baseline) => {
-					if (childChanged(record.spawns, baseline?.spawns)) {
-						await ApiRequest.post('AdminTools/SetEnemySpawns', { enemyId: id, spawns: record.spawns });
+					if (!childChanged(record.spawns, baseline?.spawns)) {
+						return false;
 					}
+					await ApiRequest.post('AdminTools/SetEnemySpawns', { enemyId: id, spawns: record.spawns });
+					return true;
 				}
 			]
 		})

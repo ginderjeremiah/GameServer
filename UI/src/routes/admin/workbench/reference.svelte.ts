@@ -64,7 +64,9 @@ class WorkbenchReference {
 			challenges,
 			paths,
 			proficiencies,
-			lessons
+			lessons,
+			classes,
+			skillRecipes
 		] = await Promise.all([
 			fetchSocketData('GetEnemies'),
 			fetchSocketData('GetSkills'),
@@ -80,7 +82,11 @@ class WorkbenchReference {
 			fetchSocketData('GetChallenges'),
 			fetchSocketData('GetPaths'),
 			fetchSocketData('GetProficiencies'),
-			fetchSocketData('GetLessons')
+			fetchSocketData('GetLessons'),
+			// Referenced (not authored) via this loader too — retire-confirm's reference computation
+			// reads staticData.classes/skillRecipes, and the admin can be entered directly (#1633).
+			fetchSocketData('GetClasses'),
+			fetchSocketData('GetSkillRecipes')
 		]);
 		staticData.enemies = enemies;
 		staticData.skills = skills;
@@ -92,6 +98,8 @@ class WorkbenchReference {
 		staticData.paths = paths;
 		staticData.proficiencies = proficiencies;
 		staticData.lessons = lessons;
+		staticData.classes = classes;
+		staticData.skillRecipes = skillRecipes;
 		this.tags = tags;
 		this.tagCategories = tagCategories;
 		this.challengeTypes = challengeTypes;
