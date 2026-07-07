@@ -10,7 +10,7 @@
 	it can decide what each means for the lesson's read state.
 -->
 {#if open && currentStep}
-	<div class="tour-layer">
+	<div class="tour-layer" data-testid="tutorial-tour">
 		<button class="tour-backdrop" type="button" tabindex="-1" aria-label="Dismiss tour" onclick={onDismiss}></button>
 
 		{#if spotlightRect}
@@ -41,7 +41,9 @@
 				<p class="tour-callout__text">{currentStep.text}</p>
 			</div>
 			<div class="tour-callout__controls">
-				<button class="tour-callout__skip" type="button" onclick={onDismiss}>Skip</button>
+				<button class="tour-callout__skip" type="button" data-testid="tutorial-tour-skip" onclick={onDismiss}
+					>Skip</button
+				>
 				<div class="tour-callout__nav">
 					<button type="button" disabled={isFirst} onclick={goBack}>Back</button>
 					{#if isLast}
