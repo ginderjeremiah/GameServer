@@ -100,7 +100,8 @@ describe('WelcomeBackView', () => {
 			enemyRating: 100,
 			selectedSkills: [0],
 			attributes: [],
-			elapsedOffsetMs: 30000
+			elapsedOffsetMs: 30000,
+			isBossBattle: false
 		};
 		const view = makeView(progress({ activeBattle }));
 		await view.run();

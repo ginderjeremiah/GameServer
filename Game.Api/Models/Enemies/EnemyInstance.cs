@@ -27,6 +27,13 @@ namespace Game.Api.Models.Enemies
         public double EnemyRating { get; set; }
 
         /// <summary>
+        /// Whether this is (or, for a hand-back, was) a dedicated-boss fight rather than an idle-zone spawn
+        /// (#1647) — lets the client route a resumed hand-back into the boss loop instead of always
+        /// defaulting to idle.
+        /// </summary>
+        public bool IsBossBattle { get; set; }
+
+        /// <summary>
         /// Projects a battle-start result onto the wire model. The single source of truth for the
         /// enemy-instance projection shared by the <c>NewEnemy</c> and <c>ChallengeBoss</c> socket commands,
         /// keeping the two from drifting (#492).
@@ -44,6 +51,7 @@ namespace Game.Api.Models.Enemies
                     .Select(modifier => BattlerAttribute.From(modifier.Attribute, modifier.Amount)),
                 ElapsedOffsetMs = source.ElapsedOffsetMs,
                 EnemyRating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false),
+                IsBossBattle = source.IsBossBattle,
             };
         }
     }

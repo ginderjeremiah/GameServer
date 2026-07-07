@@ -112,12 +112,17 @@ export class EnemyManager {
 	 * remainder) — presented directly rather than through the normal fetch, since the idle loop's first
 	 * `NewEnemy` would otherwise report 0ms fought and abandon it with no outcome (#1597). Absent, the loop
 	 * starts exactly as before: the initial stage (`Idle`) drives a fresh fetch.
+	 *
+	 * A handed-back battle's `isBossBattle` (the authoritative `PlayerState.IsBossBattle`) routes the mode
+	 * accordingly (#1647), so a resumed boss fight is presented through the boss loop instead of always
+	 * defaulting to idle.
 	 */
 	public start(activeBattle?: IEnemyInstance) {
 		if (!this.started) {
 			this.started = true;
 			this.battleStageUnhook = onBattleStageChanged((stage) => this.watchBattleStage(stage));
 			if (activeBattle) {
+				this.mode = activeBattle.isBossBattle ? 'boss' : 'idle';
 				this.currentEnemy = activeBattle;
 				notifyNewEnemyLoaded(activeBattle);
 			} else {
@@ -266,6 +271,11 @@ export class EnemyManager {
 					if (result.data.zoneId != null && result.data.zoneId !== playerManager.currentZone) {
 						playerManager.currentZone = result.data.zoneId;
 					}
+					// A still-in-progress battle handed back on this NewEnemy (e.g. a sub-5-minute reconnect
+					// the welcome-back gate didn't resume directly) may be a boss fight the authoritative
+					// PlayerState never actually abandoned — trust its isBossBattle flag over this fetch
+					// loop's own idle-only assumption so the client routes into the boss loop (#1647).
+					this.mode = result.data.enemyInstance.isBossBattle ? 'boss' : 'idle';
 					this.currentEnemy = result.data.enemyInstance;
 					notifyNewEnemyLoaded(this.currentEnemy);
 					return;

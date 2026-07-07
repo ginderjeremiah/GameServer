@@ -327,7 +327,8 @@ describe('startGame', () => {
 			enemyRating: 100,
 			selectedSkills: [],
 			attributes: [],
-			elapsedOffsetMs: 12000
+			elapsedOffsetMs: 12000,
+			isBossBattle: false
 		};
 
 		startGame(activeBattle);
