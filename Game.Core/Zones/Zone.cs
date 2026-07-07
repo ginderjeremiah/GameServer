@@ -79,9 +79,6 @@ namespace Game.Core.Zones
         /// chain) keeps progression authorable and decoupled from zone ordering.</summary>
         public required int? UnlockChallengeId { get; init; }
 
-        /// <summary>Whether this zone has a dedicated boss that can be challenged.</summary>
-        public bool HasBoss => BossEnemyId.HasValue;
-
         /// <summary>
         /// Whether this zone is unlocked for a player given the set of challenge ids they have completed.
         /// An ungated zone (<see cref="UnlockChallengeId"/> is <c>null</c>) is always unlocked; a gated zone

@@ -29,22 +29,6 @@ namespace Game.Core.Tests.Zones
         }
 
         [Fact]
-        public void HasBoss_WithBossEnemyId_IsTrue()
-        {
-            var zone = MakeZone(bossEnemyId: 9);
-
-            Assert.True(zone.HasBoss);
-        }
-
-        [Fact]
-        public void HasBoss_WithoutBossEnemyId_IsFalse()
-        {
-            var zone = MakeZone(bossEnemyId: null);
-
-            Assert.False(zone.HasBoss);
-        }
-
-        [Fact]
         public void IsUnlocked_UngatedZone_IsAlwaysUnlocked()
         {
             var zone = MakeZone(unlockChallengeId: null);

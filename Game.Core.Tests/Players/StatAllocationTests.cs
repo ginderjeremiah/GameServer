@@ -18,28 +18,5 @@ namespace Game.Core.Tests.Players
             Assert.Equal(EModifierType.Additive, modifier.Type);
             Assert.Equal(EAttributeModifierSource.PlayerStatPoints, modifier.Source);
         }
-
-        [Fact]
-        public void ToModifier_MatchesPlayerStatPointsToAttributeModifiers()
-        {
-            var allocations = new List<StatAllocation>
-            {
-                new() { Attribute = EAttribute.Strength, Amount = 4 },
-                new() { Attribute = EAttribute.Agility, Amount = 6 },
-            };
-            var statPoints = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 10 };
-
-            var fromAllocations = allocations.Select(a => a.ToModifier()).ToList();
-            var fromStatPoints = statPoints.ToAttributeModifiers().ToList();
-
-            Assert.Equal(fromStatPoints.Count, fromAllocations.Count);
-            for (var i = 0; i < fromStatPoints.Count; i++)
-            {
-                Assert.Equal(fromStatPoints[i].Attribute, fromAllocations[i].Attribute);
-                Assert.Equal(fromStatPoints[i].Amount, fromAllocations[i].Amount);
-                Assert.Equal(fromStatPoints[i].Type, fromAllocations[i].Type);
-                Assert.Equal(fromStatPoints[i].Source, fromAllocations[i].Source);
-            }
-        }
     }
 }

@@ -13,9 +13,9 @@ namespace Game.Core.Players
 
         /// <summary>
         /// Converts this allocation into the additive <see cref="AttributeModifier"/> it contributes to a
-        /// player's battle attributes. Single source of truth for the allocation → modifier rule, shared by
-        /// the live <see cref="PlayerStatPoints.ToAttributeModifiers"/> path and the battle-snapshot
-        /// reconstruction (<see cref="Battle.BattleSnapshot.ToBattler"/>).
+        /// player's battle attributes. Single source of truth for the allocation → modifier rule, used by the
+        /// battle-snapshot reconstruction (<see cref="Battle.BattleSnapshot.ToBattler"/>) and the
+        /// <c>Game.Core.TestInfrastructure</c> attribute-composition shortcut.
         /// </summary>
         public AttributeModifier ToModifier()
         {

@@ -40,7 +40,6 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(11, result.LevelMax);
             Assert.Equal(boss.Id, result.BossEnemyId);
             Assert.Equal(18, result.BossLevel);
-            Assert.True(result.HasBoss);
         }
 
         [Fact]
@@ -57,7 +56,6 @@ namespace Game.Application.Tests.DataAccess
             var result = zones.GetDomainZone(zone.Id);
 
             Assert.Null(result.BossEnemyId);
-            Assert.False(result.HasBoss);
         }
 
         [Fact]

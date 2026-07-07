@@ -18,7 +18,7 @@ namespace Game.Core.TestInfrastructure.Builders
     {
         public static IEnumerable<AttributeModifier> GetAllModifiers(this Player player)
         {
-            return player.StatPoints.ToAttributeModifiers()
+            return player.StatPoints.StatAllocations.Select(allocation => allocation.ToModifier())
                 .Concat(player.Inventory.GetEquippedAttributeModifiers());
         }
 
