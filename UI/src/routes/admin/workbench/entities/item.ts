@@ -1,7 +1,7 @@
 import { ApiRequest, EItemCategory, ERarity, fetchSocketData, type IItem } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { attributeChanges, childChanged, modSlotChanges, persistEntity } from '../save-helpers';
+import { attributeChanges, childChanged, guardedSave, modSlotChanges, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
 import { tagsSection } from './tags-section';
 import type { EntityConfig } from './types';
@@ -212,27 +212,18 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 			childSavers: [
 				async (id, record, baseline) => {
 					const changes = attributeChanges(record.attributes, baseline?.attributes, 'amount');
-					if (!changes.length) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/AddEditItemAttributes', { id, changes });
-					return true;
+					return guardedSave(changes.length > 0, () =>
+						ApiRequest.post('AdminTools/AddEditItemAttributes', { id, changes })
+					);
 				},
 				async (id, record, baseline) => {
 					const changes = modSlotChanges(record.modSlots, baseline?.modSlots, id);
-					if (!changes.length) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/AddEditItemModSlots', changes);
-					return true;
+					return guardedSave(changes.length > 0, () => ApiRequest.post('AdminTools/AddEditItemModSlots', changes));
 				},
-				async (id, record, baseline) => {
-					if (!childChanged(record.tags, baseline?.tags)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetTagsForItem', { id, tagIds: record.tags });
-					return true;
-				}
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.tags, baseline?.tags), () =>
+						ApiRequest.post('AdminTools/SetTagsForItem', { id, tagIds: record.tags })
+					)
 			]
 		})
 };

@@ -1,7 +1,7 @@
 import { ApiRequest, fetchSocketData, type IZone, type IZoneEnemy } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { childChanged, persistEntity } from '../save-helpers';
+import { childChanged, guardedSave, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
 import type { EntityConfig } from './types';
 
@@ -183,13 +183,10 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditZones', changes),
 			refresh,
 			childSavers: [
-				async (id, record, baseline) => {
-					if (!childChanged(record.zoneEnemies, baseline?.zoneEnemies)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetZoneEnemies', { zoneId: id, zoneEnemies: record.zoneEnemies });
-					return true;
-				}
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.zoneEnemies, baseline?.zoneEnemies), () =>
+						ApiRequest.post('AdminTools/SetZoneEnemies', { zoneId: id, zoneEnemies: record.zoneEnemies })
+					)
 			]
 		})
 };
