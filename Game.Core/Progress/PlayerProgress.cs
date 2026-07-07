@@ -204,6 +204,12 @@ namespace Game.Core.Progress
         public HashSet<int> CompletedChallengeIds() =>
             [.. _challenges.Values.Where(c => c.Completed).Select(c => c.Challenge.Id)];
 
+        /// <summary>
+        /// Looks up a recorded statistic value, collapsing "no row" and "recorded 0" to the same <c>0m</c>.
+        /// Production code must always distinguish the two (see <see cref="TryGetStatisticValue"/>'s remarks) and
+        /// so never calls this; it is kept as a deliberate test-only convenience — most test assertions only
+        /// care about the value, not row presence — rather than removed.
+        /// </summary>
         public decimal GetStatisticValue(EStatisticType type, int? entityId)
         {
             TryGetStatisticValue(type, entityId, out var value);

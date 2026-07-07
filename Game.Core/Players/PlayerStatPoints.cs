@@ -1,6 +1,4 @@
-﻿using Game.Core.Attributes.Modifiers;
-
-namespace Game.Core.Players
+﻿namespace Game.Core.Players
 {
     /// <summary>
     /// Represents the stat points a player can and has allocated to core attributes.
@@ -68,14 +66,6 @@ namespace Game.Core.Players
             }
 
             return false;
-        }
-
-        /// <summary>
-        /// Converts the stat allocations to a list of <see cref="AttributeModifier"/>.
-        /// </summary>
-        public IEnumerable<AttributeModifier> ToAttributeModifiers()
-        {
-            return StatAllocations.Select(allocation => allocation.ToModifier());
         }
     }
 }

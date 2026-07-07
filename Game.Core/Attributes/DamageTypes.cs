@@ -169,7 +169,9 @@ namespace Game.Core.Attributes
 
         /// <summary>The martial weapon-leaf damage types (Sword / Axe / Bow / Club / Dagger / Unarmed), in enum
         /// order — the types the weapon-match gate treats as gated. A weapon's <see cref="Items.Item.WeaponType"/>
-        /// is not constrained to this set (any leaf is valid, e.g. a caster weapon's element).</summary>
+        /// is not constrained to this set (any leaf is valid, e.g. a caster weapon's element). No production
+        /// caller today — <see cref="IsWeaponLeaf"/> is the production gate — but kept public deliberately as the
+        /// taxonomy-invariant contract <c>DamageTypesTests</c> pins <see cref="IsWeaponLeaf"/> against.</summary>
         public static IReadOnlyList<EDamageType> WeaponLeaves { get; } = LeafTypes.Where(WeaponLeafSet.Contains).ToList();
 
         /// <summary>Whether <paramref name="type"/> is a weapon-type leaf — a leaf under the Physical category key,
@@ -199,7 +201,10 @@ namespace Game.Core.Attributes
 
         /// <summary>
         /// The amplification / resistance attribute pair a <paramref name="key"/> backs. The resistance is
-        /// <c>null</c> for an amplification-only weapon key (#1340).
+        /// <c>null</c> for an amplification-only weapon key (#1340). No production caller today — the damage
+        /// pipeline reads the precomputed <see cref="AmplificationAttributes"/>/<see cref="ResistanceAttributes"/>
+        /// lists instead — but kept public deliberately as the taxonomy-invariant contract
+        /// <c>DamageTypesTests</c> pins those precomputed lists against.
         /// </summary>
         public static (EAttribute Amplification, EAttribute? Resistance) AttributesFor(EDamageTypeKey key)
         {

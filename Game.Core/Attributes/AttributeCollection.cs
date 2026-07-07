@@ -99,9 +99,10 @@ namespace Game.Core.Attributes
         }
 
         /// <summary>
-        /// Retrieves all the <see cref="AttributeModifier"/> instances contained in the collection.
-        /// Test-only today (no production caller) — kept as an instance member rather than moved out since
-        /// it needs the private per-attribute node storage.
+        /// Retrieves all the <see cref="AttributeModifier"/> instances contained in the collection. Used by
+        /// <see cref="Battle.Battler.CloneWithAttributeDelta"/> to rebuild a battler's modifier set minus its
+        /// static and skill-effect modifiers (the combat rating's marginal-value helper). Kept as an instance
+        /// member rather than moved out since it needs the private per-attribute node storage.
         /// </summary>
         /// <returns></returns>
         public IEnumerable<AttributeModifier> AllModifiers()
