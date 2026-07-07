@@ -13,6 +13,7 @@ const { mockPlayerManager, mockEnemyManager, staticData, playerChallenges, regis
 		// Navigation routes through enemyManager.navigateToZone (so Home can halt the loop); the mock just
 		// applies the zone the way the real method does, so the existing click assertions still hold.
 		mockEnemyManager: {
+			mode: 'idle' as 'idle' | 'boss',
 			navigateToZone: vi.fn((zoneId: number) => {
 				mockPlayerManager.currentZone = zoneId;
 			})
@@ -77,6 +78,7 @@ beforeEach(() => {
 	playerChallenges.isChallengeCompleted.mockReset();
 	playerChallenges.isChallengeCompleted.mockReturnValue(false);
 	mockEnemyManager.navigateToZone.mockClear();
+	mockEnemyManager.mode = 'idle';
 	staticData.challenges = [];
 	// Deliberately out of array order to prove the component orders by `order`, not index.
 	staticData.zones = [zone(30, 3, 'Frozen Summit'), zone(10, 1, 'Verdant Hollow'), zone(20, 2, 'Ashen Wastes')];
@@ -324,6 +326,41 @@ describe('ZoneNav', () => {
 		mockPlayerManager.currentZone = 20;
 		render(ZoneNav);
 		expect(screen.getByTestId('zone-nav').textContent).toContain('Zone · 02');
+	});
+
+	it('hard-disables both arrows while a dedicated-boss fight is engaged', () => {
+		mockEnemyManager.mode = 'boss';
+
+		render(ZoneNav);
+		const [left, right] = screen.getAllByRole('button') as HTMLButtonElement[];
+
+		expect(left.disabled).toBe(true);
+		expect(right.disabled).toBe(true);
+		expect(left.getAttribute('aria-label')).toBe('Zone navigation locked during boss fight');
+		expect(right.getAttribute('aria-label')).toBe('Zone navigation locked during boss fight');
+	});
+
+	it('does not navigate (even bypassing the disabled button) while a boss fight is engaged', async () => {
+		mockEnemyManager.mode = 'boss';
+
+		render(ZoneNav);
+		const [left, right] = screen.getAllByRole('button') as HTMLButtonElement[];
+
+		await fireEvent.click(left);
+		await fireEvent.click(right);
+
+		expect(mockEnemyManager.navigateToZone).not.toHaveBeenCalled();
+		expect(mockPlayerManager.currentZone).toBe(20);
+	});
+
+	it('leaves zone navigation enabled while idle-farming (not engaged in a boss fight)', () => {
+		mockEnemyManager.mode = 'idle';
+
+		render(ZoneNav);
+		const [left, right] = screen.getAllByRole('button') as HTMLButtonElement[];
+
+		expect(left.disabled).toBe(false);
+		expect(right.disabled).toBe(false);
 	});
 
 	it('navigates into the Home sanctuary via the left arrow', async () => {

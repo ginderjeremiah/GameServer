@@ -11,7 +11,11 @@
 			class:locked={leftLocked}
 			disabled={leftAbsent}
 			aria-disabled={leftLocked || undefined}
-			aria-label={leftLocked ? 'Previous zone locked' : 'Previous zone'}
+			aria-label={bossEngaged
+				? 'Zone navigation locked during boss fight'
+				: leftLocked
+					? 'Previous zone locked'
+					: 'Previous zone'}
 			onclick={handleClickLeft}
 			onfocus={(e) => focusLock(leftLocked, prevZone?.unlockChallengeId, e)}
 			onblur={hideLock}
@@ -40,7 +44,11 @@
 			class:locked={rightLocked}
 			disabled={rightAbsent}
 			aria-disabled={rightLocked || undefined}
-			aria-label={rightLocked ? 'Next zone locked' : 'Next zone'}
+			aria-label={bossEngaged
+				? 'Zone navigation locked during boss fight'
+				: rightLocked
+					? 'Next zone locked'
+					: 'Next zone'}
 			onclick={handleClickRight}
 			onfocus={(e) => focusLock(rightLocked, nextZone?.unlockChallengeId, e)}
 			onblur={hideLock}
@@ -123,13 +131,18 @@ const completed = (id: number) => playerChallenges.isChallengeCompleted(id);
 // simply being at the first/last zone (no neighbour at all).
 const leftLocked = $derived(prevZone != null && !isZoneUnlocked(prevZone, completed));
 const rightLocked = $derived(nextZone != null && !isZoneUnlocked(nextZone, completed));
-// An arrow is hard-`disabled` (unfocusable) only when there is no neighbour to explain at all;
-// a locked-but-existing neighbour stays focusable with `aria-disabled` so its gate is reachable.
-const leftAbsent = $derived(prevZone == null);
-const rightAbsent = $derived(nextZone == null);
+// A dedicated-boss fight is engaged, so navigation is hard-disabled: reassigning the current zone
+// mid-fight would desync the boss UI (and the eventual clear/unlock check) from the fight actually
+// in progress (#1698). Retreat is the sanctioned way out and already returns to idle before navigating.
+const bossEngaged = $derived(enemyManager.mode === 'boss');
+// An arrow is hard-`disabled` (unfocusable) when there is no neighbour to explain, or while a boss
+// fight is engaged; a locked-but-existing neighbour otherwise stays focusable with `aria-disabled` so
+// its gate is reachable.
+const leftAbsent = $derived(prevZone == null || bossEngaged);
+const rightAbsent = $derived(nextZone == null || bossEngaged);
 
 const goToZone = (zone: IZone | undefined) => {
-	if (zone != null && isZoneUnlocked(zone, completed)) {
+	if (zone != null && !bossEngaged && isZoneUnlocked(zone, completed)) {
 		enemyManager.navigateToZone(zone.id);
 	}
 };
