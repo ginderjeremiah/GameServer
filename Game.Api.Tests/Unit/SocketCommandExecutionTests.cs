@@ -314,6 +314,48 @@ namespace Game.Api.Tests.Unit
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("Abandoned socket command faulted"));
         }
 
+        [Fact]
+        public async Task ExecuteCommand_ReloadFindsNoPlayerRow_KeepsStalePlayerAndRetriesReloadOnNextCommand()
+        {
+            // A reload that finds the player row gone (a pathological case — see RunCommand's comment) must
+            // not clobber the in-memory Player with null, and must leave the marker set so the reload is
+            // retried before every subsequent command until it actually finds the row (#1632).
+            var originalPlayer = new PlayerBuilder().WithId(1).Build();
+            var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
+            var playerRepo = new FakePlayerRepository(null, reloadedPlayer);
+            using var provider = new ServiceCollection()
+                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IPlayerRepository>(_ => playerRepo)
+                .BuildServiceProvider();
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            session.CreateSession(userId: 1, playerId: 1);
+            session.SetPlayer(originalPlayer);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
+            var handler = new SocketHandler(
+                context,
+                new StubCommandFactory(name => name == "Boom" ? new PlayerPersistenceFlushFailedException(new InvalidOperationException("simulated blip")) : null),
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                _loggerFactory.CreateLogger<SocketHandler>(),
+                () => { });
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Boom") { Id = "c1" });
+            Assert.True(session.PlayerNeedsReload);
+
+            // The reload finds no row: the stale Player must survive untouched and the marker must stay set.
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c2" });
+            Assert.Equal(1, playerRepo.GetPlayerCallCount);
+            Assert.Same(originalPlayer, session.Player);
+            Assert.True(session.PlayerNeedsReload);
+
+            // The next command retries the reload; this time it finds the row and the session converges.
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c3" });
+            Assert.Equal(2, playerRepo.GetPlayerCallCount);
+            Assert.Same(reloadedPlayer, session.Player);
+            Assert.False(session.PlayerNeedsReload);
+        }
+
         private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
@@ -425,14 +467,18 @@ namespace Game.Api.Tests.Unit
             public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
 
-        private sealed class FakePlayerRepository(Player playerToReturn) : IPlayerRepository
+        /// <summary>Returns each of <paramref name="responses"/> in order on successive <see cref="GetPlayer"/>
+        /// calls, then keeps repeating the last one — lets a test pin a null-then-recovers reload sequence
+        /// while single-response callers keep getting the same player back every time.</summary>
+        private sealed class FakePlayerRepository(params Player?[] responses) : IPlayerRepository
         {
             public int GetPlayerCallCount { get; private set; }
 
             public Task<Player?> GetPlayer(int playerId, CancellationToken cancellationToken = default)
             {
+                var response = responses[Math.Min(GetPlayerCallCount, responses.Length - 1)];
                 GetPlayerCallCount++;
-                return Task.FromResult<Player?>(playerToReturn);
+                return Task.FromResult(response);
             }
 
             public Task SavePlayer(Player player, CancellationToken cancellationToken = default) => Task.CompletedTask;
