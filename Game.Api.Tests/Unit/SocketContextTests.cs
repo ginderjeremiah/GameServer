@@ -166,6 +166,26 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task ReadMessage_MultiByteCharacterSplitAcrossFrames_DecodesCorrectly()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new ScriptedWebSocket();
+            var context = CreateContext(socket);
+
+            // "hel😀lo" — the emoji's 4-byte UTF-8 sequence (F0 9F 98 80) is split mid-character across two
+            // receive fills, reproducing a code point straddling the 4KB buffer boundary (#1699).
+            var fullBytes = Encoding.UTF8.GetBytes("hel😀lo");
+            var firstChunk = fullBytes[..5];
+            var secondChunk = fullBytes[5..];
+            socket.QueueBytes(firstChunk, endOfMessage: false);
+            socket.QueueBytes(secondChunk, endOfMessage: true);
+
+            var message = await context.ReadMessage(cancellationToken).WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.Equal("hel😀lo", message);
+        }
+
+        [Fact]
         public async Task ReadMessage_CloseFrame_StopsReadingAndReturnsEmpty()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -230,6 +250,9 @@ namespace Game.Api.Tests.Unit
 
             public void QueueData(string text, bool endOfMessage)
                 => _receives.Enqueue(new ReceiveStep(Encoding.UTF8.GetBytes(text), WebSocketMessageType.Text, endOfMessage));
+
+            public void QueueBytes(byte[] payload, bool endOfMessage)
+                => _receives.Enqueue(new ReceiveStep(payload, WebSocketMessageType.Text, endOfMessage));
 
             public void QueueClose()
                 => _receives.Enqueue(new ReceiveStep([], WebSocketMessageType.Close, EndOfMessage: true));
