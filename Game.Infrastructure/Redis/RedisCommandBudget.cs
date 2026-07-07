@@ -41,6 +41,9 @@ namespace Game.Infrastructure.Redis
 
         public static async Task<T> Write<T>(Task<T> command, CancellationToken cancellationToken, ILogger logger, string faultMessage)
         {
+            // Same racy-WaitAsync guard as Read: honour an already-cancelled budget before awaiting, so a command
+            // that finished first can't silently swallow the cancellation.
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 return await command.WaitAsync(cancellationToken);
@@ -54,6 +57,9 @@ namespace Game.Infrastructure.Redis
 
         public static async Task Write(Task command, CancellationToken cancellationToken, ILogger logger, string faultMessage)
         {
+            // Same racy-WaitAsync guard as Read: honour an already-cancelled budget before awaiting, so a command
+            // that finished first can't silently swallow the cancellation.
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 await command.WaitAsync(cancellationToken);

@@ -50,6 +50,34 @@ namespace Game.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task Write_WhenBudgetAlreadyCancelled_ThrowsWithoutAwaitingTheCommand()
+        {
+            // A command that never completes on its own: if Write awaited it the test would hang, so completing
+            // promptly proves the already-cancelled budget is honoured up front (the racy-WaitAsync guard).
+            var command = new TaskCompletionSource<int>();
+            using var cts = new CancellationTokenSource();
+            var logger = new CapturingLogger();
+            await cts.CancelAsync();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RedisCommandBudget.Write(command.Task, cts.Token, logger, "ignored"));
+            Assert.False(command.Task.IsCompleted);
+            Assert.Empty(logger.Entries);
+        }
+
+        [Fact]
+        public async Task Write_Void_WhenBudgetAlreadyCancelled_ThrowsWithoutAwaitingTheCommand()
+        {
+            var command = new TaskCompletionSource();
+            using var cts = new CancellationTokenSource();
+            var logger = new CapturingLogger();
+            await cts.CancelAsync();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RedisCommandBudget.Write(command.Task, cts.Token, logger, "ignored"));
+            Assert.False(command.Task.IsCompleted);
+            Assert.Empty(logger.Entries);
+        }
+
+        [Fact]
         public async Task Write_AwaitCancelledThenCommandFaults_LogsTheAbandonedFault()
         {
             var command = new TaskCompletionSource<int>();
