@@ -7,7 +7,7 @@
    The engine/socket touch points are injected so the flow is unit-testable without the live engine; the
    `+page.svelte` wires the real `GetOfflineProgress`, player re-sync, mode reconciliation, and game start. */
 
-import type { IOfflineProgressModel } from '$lib/api';
+import type { IEnemyInstance, IOfflineProgressModel } from '$lib/api';
 
 export type WelcomePhase = 'checking' | 'summary' | 'entered';
 
@@ -19,8 +19,10 @@ export interface WelcomeBackDeps {
 	/** Reconciles the backend-persisted idle-loop mode onto the fresh live session (re-arms auto-fight). */
 	reconcileMode: (autoChallengeBoss: boolean) => void;
 	/** Starts the game engine + idle loop — deferred until the gate is dismissed, or run straight away
-	 *  when there is no reward window. */
-	enterGame: () => void;
+	 *  when there is no reward window. `activeBattle` carries a battle the summary handed back still in
+	 *  progress (#1595/#1596), so the engine resumes it via replay-to-offset (#1597) instead of the idle
+	 *  loop's first fetch silently abandoning it. */
+	enterGame: (activeBattle?: IEnemyInstance) => void;
 }
 
 export class WelcomeBackView {
@@ -59,6 +61,6 @@ export class WelcomeBackView {
 			return;
 		}
 		this.phase = 'entered';
-		this.deps.enterGame();
+		this.deps.enterGame(this.summary?.activeBattle);
 	}
 }

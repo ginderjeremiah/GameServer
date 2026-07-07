@@ -89,4 +89,33 @@ describe('WelcomeBackView', () => {
 		view.enter();
 		expect(deps.enterGame).toHaveBeenCalledTimes(1);
 	});
+
+	// A summary carrying activeBattle (#1595/#1596) means the away window's boundary fell inside a battle
+	// still in progress; enterGame must resume it via replay-to-offset (#1597) rather than a fresh spawn.
+	it("threads the summary's activeBattle into enterGame on dismissal", async () => {
+		const activeBattle = {
+			id: 3,
+			level: 2,
+			seed: 9,
+			enemyRating: 100,
+			selectedSkills: [0],
+			attributes: [],
+			elapsedOffsetMs: 30000
+		};
+		const view = makeView(progress({ activeBattle }));
+		await view.run();
+
+		view.enter();
+
+		expect(deps.enterGame).toHaveBeenCalledWith(activeBattle);
+	});
+
+	it('passes undefined to enterGame when there is no activeBattle to resume', async () => {
+		const view = makeView(progress());
+		await view.run();
+
+		view.enter();
+
+		expect(deps.enterGame).toHaveBeenCalledWith(undefined);
+	});
 });

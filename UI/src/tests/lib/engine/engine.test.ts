@@ -319,6 +319,22 @@ describe('startGame', () => {
 		expect(onDestroy).not.toHaveBeenCalled();
 	});
 
+	it('threads an already-known active battle (#1595/#1596/#1597) into enemyManager.start', () => {
+		const activeBattle = {
+			id: 2,
+			level: 1,
+			seed: 1,
+			enemyRating: 100,
+			selectedSkills: [],
+			attributes: [],
+			elapsedOffsetMs: 12000
+		};
+
+		startGame(activeBattle);
+
+		expect(enemyManager.start).toHaveBeenCalledWith(activeBattle);
+	});
+
 	it('does nothing when the static data is not loaded', () => {
 		staticDataStub.loaded = false;
 		startGame();

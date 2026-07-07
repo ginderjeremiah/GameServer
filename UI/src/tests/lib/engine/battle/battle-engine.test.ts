@@ -366,6 +366,146 @@ describe('BattleEngine', () => {
 		});
 	});
 
+	// A non-null elapsedOffsetMs (#1595/#1596) means the server handed back a battle already in progress;
+	// BattleEngine.reset fast-forwards to it via a headless replay (#1597) before going live.
+	describe('replay-to-offset (#1597)', () => {
+		it('matches an uninterrupted live run to the same tick (state parity)', () => {
+			// Engine A fights the battle live, tick by tick, up to 600ms.
+			const engineA = new BattleEngine();
+			engineA.start();
+			const enemyInstance = { id: 1, level: 1, seed: 7, enemyRating: 100, selectedSkills: [0], attributes: [] };
+			enemyLoadedCallbacks[0](enemyInstance);
+			for (let elapsed = 0; elapsed < 600; elapsed += 40) {
+				logicalUpdateCallbacks[0](40);
+			}
+
+			// Engine B receives the identical enemy/seed handed back mid-flight at that same elapsed offset.
+			const engineB = new BattleEngine();
+			engineB.start();
+			enemyLoadedCallbacks[1]({ ...enemyInstance, elapsedOffsetMs: 600 });
+
+			expect(engineB.timeElapsed).toBe(engineA.timeElapsed);
+			expect(engineB.stage).toBe(engineA.stage);
+			expect(engineB.player.currentHealth).toBe(engineA.player.currentHealth);
+			expect(engineB.enemy.currentHealth).toBe(engineA.enemy.currentHealth);
+		});
+
+		it('suppresses per-tick combat log lines, floats and mechanic triggers during the replay', () => {
+			const events: CombatFloatEvent[] = [];
+			const unhook = onCombatFloat((event) => events.push(event));
+			engine.start();
+			// A tanky enemy survives the 500ms-cooldown skill's opening hit, so the fight is still going at
+			// 600ms — the replay must stay silent even though a real hit landed mid-replay.
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [{ attributeId: EAttribute.Endurance, amount: 200 }],
+				elapsedOffsetMs: 600
+			});
+
+			expect(vi.mocked(logMessage).mock.calls.some(([type]) => type === ELogType.Damage)).toBe(false);
+			expect(events).toHaveLength(0);
+			expect(evaluateMechanicTriggers).not.toHaveBeenCalled();
+			expect(engine.stage).toBe(BattleStage.Active);
+
+			unhook();
+		});
+
+		it('resumes Active with timeElapsed at the (tick-quantized) offset when the battle is still unconcluded', () => {
+			engine.start();
+			// 500ms-cooldown skill hasn't fired yet at 90ms, so nothing can conclude the fight.
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				elapsedOffsetMs: 90
+			});
+
+			expect(engine.stage).toBe(BattleStage.Active);
+			// Only whole 40ms ticks are replayed (mirroring the backend's identical tick loop): 2 ticks (80ms),
+			// not the raw 90ms offset.
+			expect(engine.timeElapsed).toBe(80);
+		});
+
+		it('resolves Victorious when the replay concludes within the offset, stopping short of it', () => {
+			mockSkills[0].baseDamage = 1e9;
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				elapsedOffsetMs: 2000
+			});
+
+			expect(engine.stage).toBe(BattleStage.Victorious);
+			expect(engine.timeElapsed).toBeLessThan(2000);
+		});
+
+		it('resolves Defeated when the replay concludes with the player dying, logging the same line the live loop would', () => {
+			mockSkills[0].baseDamage = 0; // the player's skill can't kill the enemy
+			mockSkills[1] = { ...mockSkills[0], id: 1, baseDamage: 1e9, cooldownMs: 40 };
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [1],
+				attributes: [],
+				elapsedOffsetMs: 2000
+			});
+
+			expect(engine.stage).toBe(BattleStage.Defeated);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, "You've been defeated!");
+		});
+
+		it('replays exactly zero ticks when the offset is under one tick, leaving the battle fresh', () => {
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				elapsedOffsetMs: 10
+			});
+
+			expect(engine.stage).toBe(BattleStage.Active);
+			expect(engine.timeElapsed).toBe(0);
+			expect(engine.enemy.currentHealth).toBe(engine.enemy.attributes.getValue(EAttribute.MaxHealth));
+		});
+
+		// Defensive: the server never hands back an offset at (or past) the 2-minute cap — a still-in-progress
+		// battle is by definition under it — but the replay must resolve this branch identically if it happens.
+		it('resolves Drawn when the offset lands exactly on the 2-minute cap with both battlers alive', () => {
+			mockSkills[0].baseDamage = 0; // a true stalemate: neither side can ever land the killing blow
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				elapsedOffsetMs: DEFAULT_MAX_BATTLE_MS
+			});
+
+			expect(engine.stage).toBe(BattleStage.Drawn);
+			expect(engine.timeElapsed).toBe(DEFAULT_MAX_BATTLE_MS);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.stringContaining('draw'));
+		});
+	});
+
 	describe('startLoading', () => {
 		it('enters the Loading stage and seeds the countdown', () => {
 			engine.startLoading(100);

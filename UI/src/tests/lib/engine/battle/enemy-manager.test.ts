@@ -280,6 +280,20 @@ describe('EnemyManager.start', () => {
 		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 }));
 		expect(manager.currentEnemy).toEqual(makeEnemy(5));
 	});
+
+	// A GetOfflineProgress summary's activeBattle (#1595/#1596) is presented directly rather than through a
+	// fresh NewEnemy fetch — which would report 0ms fought and abandon the handed-back battle (#1597).
+	it('presents a server-handed-back active battle directly, without a NewEnemy round trip', () => {
+		const activeBattle = { ...makeEnemy(6), elapsedOffsetMs: 45000 };
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		manager.start(activeBattle);
+
+		expect(sendSocketCommand).not.toHaveBeenCalled();
+		expect(manager.currentEnemy).toEqual(activeBattle);
+		expect(loaded).toEqual([activeBattle]);
+	});
 });
 
 describe('EnemyManager Home zone', () => {

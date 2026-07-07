@@ -64,9 +64,9 @@ const welcome = new WelcomeBackView({
 	},
 	resyncPlayer: refreshPlayer,
 	reconcileMode: (autoChallengeBoss) => enemyManager.reconcilePersistedMode(autoChallengeBoss),
-	enterGame: () => {
+	enterGame: (activeBattle) => {
 		try {
-			startGame();
+			startGame(activeBattle);
 		} catch (e) {
 			console.error('Failed to start game', e);
 		}
