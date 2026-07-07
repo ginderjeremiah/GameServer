@@ -359,17 +359,29 @@ namespace Game.Core.Battle
             var net = ComputeNetDamage(dealt, damageType);
             if (net < 0)
             {
-                // Absorption: cap the heal at the remaining room to MaxHealth (consistent with ApplyHealOverTime),
-                // and report the actual healed amount so the per-skill / global stats stay reconciled.
-                var room = _attributes[MaxHealth] - CurrentHealth;
-                var heal = -net < room ? -net : room;
-                heal = heal > 0 ? heal : 0;
+                // Absorption: cap the heal at the remaining room to MaxHealth, and report the actual healed
+                // amount so the per-skill / global stats stay reconciled.
+                var heal = CapHealToRoom(-net);
                 CurrentHealth += heal;
-                return -heal;
+                return heal == 0 ? 0 : -heal;
             }
 
             CurrentHealth -= net;
             return net;
+        }
+
+        /// <summary>
+        /// Caps <paramref name="heal"/> to this battler's remaining room to <see cref="MaxHealth"/>, floored at
+        /// <c>0</c> — never negative, and never a negative zero when the room is fully exhausted. Shared by the
+        /// three channels whose net effect can be a heal — <see cref="TakeDamage"/>'s direct-hit absorption,
+        /// <see cref="ApplyDamageOverTime"/>'s aggregate DoT-absorption, and <see cref="ApplyHealOverTime"/> —
+        /// since the game has no overheal/shield concept regardless of the heal's source.
+        /// </summary>
+        private double CapHealToRoom(double heal)
+        {
+            var room = _attributes[MaxHealth] - CurrentHealth;
+            var capped = heal < room ? heal : room;
+            return capped > 0 ? capped : 0;
         }
 
         /// <summary>
@@ -515,9 +527,7 @@ namespace Game.Core.Battle
                 // the remaining room to MaxHealth, consistent with TakeDamage's absorption cap and
                 // ApplyHealOverTime — the game has no overheal/shield concept. Per-type booking above already
                 // recorded the uncapped tick.
-                var room = _attributes[MaxHealth] - CurrentHealth;
-                var heal = -dot < room ? -dot : room;
-                heal = heal > 0 ? heal : 0;
+                var heal = CapHealToRoom(-dot);
                 dot = heal == 0 ? 0 : -heal; // avoid -0.0, matching the frontend mirror bit-for-bit
             }
 
@@ -533,7 +543,7 @@ namespace Game.Core.Battle
         public double ApplyHealOverTime(int ms)
         {
             var heal = _attributes[HealthRegenPerSecond] * ms / 1000.0;
-            var healed = Math.Min(heal, _attributes[MaxHealth] - CurrentHealth);
+            var healed = CapHealToRoom(heal);
             if (healed > 0)
             {
                 CurrentHealth += healed;

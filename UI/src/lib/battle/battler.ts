@@ -178,13 +178,23 @@ export class Battler {
 		const net = mitigateDamage(dealt, damageType, this.attributes);
 		if (net < 0) {
 			// Absorption: cap the heal at the remaining room to MaxHealth, and report the actual healed amount.
-			const room = this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth;
-			const heal = Math.max(Math.min(-net, room), 0);
+			const heal = this.capHealToRoom(-net);
 			this.currentHealth += heal;
-			return -heal;
+			return heal === 0 ? 0 : -heal;
 		}
 		this.currentHealth -= net;
 		return net;
+	}
+
+	/** Caps `heal` to this battler's remaining room to MaxHealth, floored at 0 — never negative, and never a
+	 *  negative zero when the room is fully exhausted. Shared by the three channels whose net effect can be a
+	 *  heal — {@link takeDamage}'s direct-hit absorption, {@link applyDamageOverTime}'s aggregate DoT-absorption,
+	 *  and {@link applyHealOverTime} — since the game has no overheal/shield concept regardless of source.
+	 *  Mirrors the backend `Battler.CapHealToRoom`. */
+	private capHealToRoom(heal: number): number {
+		const room = this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth;
+		const capped = Math.min(heal, room);
+		return capped > 0 ? capped : 0;
 	}
 
 	/** Subtracts `amount` of reflected damage directly from this (attacking) battler's health, BYPASSING all of
@@ -222,8 +232,7 @@ export class Battler {
 		if (dot < 0) {
 			// Aggregate absorption (net heal): cap the realized health change at the remaining room to
 			// MaxHealth, consistent with takeDamage's absorption cap and applyHealOverTime.
-			const room = this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth;
-			const heal = Math.max(Math.min(-dot, room), 0);
+			const heal = this.capHealToRoom(-dot);
 			dot = heal === 0 ? 0 : -heal; // avoid returning -0 when the room is fully exhausted
 		}
 		this.currentHealth -= dot;
@@ -234,7 +243,7 @@ export class Battler {
 	 *  `timeDelta`), capped at MaxHealth. Returns the actual (post-cap) health restored. */
 	public applyHealOverTime(timeDelta: number) {
 		const heal = (this.attributes.getValue(EAttribute.HealthRegenPerSecond) * timeDelta) / 1000;
-		const healed = Math.min(heal, this.attributes.getValue(EAttribute.MaxHealth) - this.currentHealth);
+		const healed = this.capHealToRoom(heal);
 		if (healed > 0) {
 			this.currentHealth += healed;
 			return healed;
