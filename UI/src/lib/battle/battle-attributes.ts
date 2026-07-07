@@ -43,8 +43,8 @@ export interface AttributeEntry {
  *   deep-proxy its elements, so the stored modifier would no longer be `===` the reference the caller
  *   holds). Only the reactive `attributeValues` — what combat reads — is reassigned on each recompute.
  *
- * The named display projections ({@link getAttributeMap}/{@link getAttributeCount}) are nothing the
- * combat loop consumes — they back the inventory/breakdown/tooltip surfaces only — so they are built
+ * The named display projection ({@link getAttributeMap}) is nothing the
+ * combat loop consumes — it backs the inventory/breakdown/tooltip surfaces only — so it is built
  * **lazily on first read** and memoised, then invalidated on the next recompute. This keeps the
  * per-modifier hot path (every effect application/expiry, for both battlers, up to each tick) off the
  * per-attribute `.map` + `attributeName` reference scans; the projections rebuild once, the next time
@@ -172,9 +172,6 @@ export class BattleAttributes {
 		const { all, nonZero } = this.#ensureProjections();
 		return includeZeroes ? all : nonZero;
 	};
-
-	/** The count of non-zero attributes, for consumers that only need the size. */
-	public getAttributeCount = (): number => this.#ensureProjections().nonZero.length;
 
 	/** Builds and memoises the named display projections on demand. A read of the reactive
 	 *  `attributeValues` keeps `$derived` consumers tracking changes; the projections themselves cache
