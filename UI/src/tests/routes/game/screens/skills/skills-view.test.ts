@@ -756,6 +756,50 @@ describe('SkillsView — combined effective totals exclude dormant skills (#1637
 	});
 });
 
+/* The header's combined totals reflect every skill the battle actually fields, not just the selected
+   loadout (#1657): a non-duplicate, non-dormant innate (item-granted) skill contributes too, reusing
+   innateSkills' own duplicate/dormant rule so the totals can't drift from the innate band's display. */
+describe('SkillsView — combined effective totals include fielded innate skills (#1657)', () => {
+	const grantedSwordSkill = skill({
+		id: 7,
+		name: 'Hotel',
+		baseDamage: 20,
+		cooldownMs: 1000,
+		damagePortions: [{ type: EDamageType.Sword, weight: 1 }]
+	});
+
+	it('adds a granted skill’s contribution once, alongside the selected loadout', () => {
+		mockInventoryManager.equippedSlots = [{ name: 'Staff of Embers', grantedSkillId: 4 }];
+		mockInventoryManager.grantedSkillIds = [4];
+		const v = new SkillsView();
+		expect(v.innateSkills).toEqual([{ skill: SKILLS[4], sourceItemName: 'Staff of Embers', duplicate: false }]);
+		expect(v.combinedEffectiveBurst).toBeCloseTo(v.effective(0) + v.effective(1) + v.effective(2) + v.effective(4), 10);
+		expect(v.combinedEffectiveDps).toBeCloseTo(
+			v.effectiveDps(0) + v.effectiveDps(1) + v.effectiveDps(2) + v.effectiveDps(4),
+			10
+		);
+	});
+
+	it('does not double-count a grant that duplicates an already-selected skill', () => {
+		// Skill 0 is already in the equipped loadout, so the grant is a duplicate — fielded once.
+		mockInventoryManager.equippedSlots = [{ name: 'Echo Blade', grantedSkillId: 0 }];
+		mockInventoryManager.grantedSkillIds = [0];
+		const v = new SkillsView();
+		expect(v.innateSkills[0]).toMatchObject({ duplicate: true });
+		expect(v.combinedEffectiveBurst).toBeCloseTo(v.effective(0) + v.effective(1) + v.effective(2), 10);
+	});
+
+	it('excludes a granted skill that is itself dormant under the equipped weapon', () => {
+		staticData.skills = [...SKILLS, grantedSwordSkill];
+		mockInventoryManager.equippedWeaponType = EDamageType.Unarmed;
+		mockInventoryManager.equippedSlots = [{ name: 'Runic Gauntlet', grantedSkillId: grantedSwordSkill.id }];
+		mockInventoryManager.grantedSkillIds = [grantedSwordSkill.id];
+		const v = new SkillsView();
+		expect(v.dormant(grantedSwordSkill)).toBe(true);
+		expect(v.combinedEffectiveBurst).toBeCloseTo(v.effective(0) + v.effective(1) + v.effective(2), 10);
+	});
+});
+
 /* The weapon-match grey-out (#1342): a weapon-leaf-typed skill is dormant unless the matching weapon is
    equipped. `dormant()` derives from the same `isFielded` rule the battle assembly applies. */
 describe('SkillsView — weapon-match grey-out', () => {

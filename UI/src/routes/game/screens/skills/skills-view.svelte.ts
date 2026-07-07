@@ -353,22 +353,24 @@ export class SkillsView {
 	/** Metrics for the inspected skill, falling back to the first listed skill. */
 	readonly selected = $derived(this.metricsById[this.selectedId] ?? this.railList[0]);
 
-	/** Equipped skills the battle can actually fire — excludes a weapon-mismatched skill dormant under
-	 *  the equipped weapon (#1342), so the combined totals below never sum an output the battle can't
-	 *  produce. Innate (item-granted) skills also fire but are deliberately excluded — the totals stay
-	 *  a selected-loadout-only readout; see #1657 for the open question of folding them in. */
-	private readonly fieldedEquipped = $derived(
-		this.equipped.filter((id) => {
+	/** Every skill id the battle will actually fire right now: equipped skills that aren't dormant under
+	 *  the current weapon (#1342), plus item-granted innate skills that are fielded — not a duplicate
+	 *  already counted via the loadout or an earlier grant, and not themselves dormant. Reuses
+	 *  {@link innateSkills}'s own duplicate/dormant rule so this can't drift from what the innate band
+	 *  already flags (#1657). */
+	private readonly fieldedSkillIds = $derived([
+		...this.equipped.filter((id) => {
 			const skill = this.metricsById[id]?.skill;
 			return skill != null && !this.dormant(skill);
-		})
-	);
+		}),
+		...this.innateSkills.filter((i) => !i.duplicate && !this.dormant(i.skill)).map((i) => i.skill.id)
+	]);
 
-	/** Combined effective DPS of the equipped loadout vs the current Toughness. */
-	readonly combinedEffectiveDps = $derived(this.fieldedEquipped.reduce((sum, id) => sum + this.effectiveDps(id), 0));
+	/** Combined effective DPS of every fielded skill (loadout + innate) vs the current Toughness. */
+	readonly combinedEffectiveDps = $derived(this.fieldedSkillIds.reduce((sum, id) => sum + this.effectiveDps(id), 0));
 
-	/** Combined effective single-hit burst of the equipped loadout vs the current Toughness. */
-	readonly combinedEffectiveBurst = $derived(this.fieldedEquipped.reduce((sum, id) => sum + this.effective(id), 0));
+	/** Combined effective single-hit burst of every fielded skill (loadout + innate) vs the current Toughness. */
+	readonly combinedEffectiveBurst = $derived(this.fieldedSkillIds.reduce((sum, id) => sum + this.effective(id), 0));
 
 	/* ── per-skill effective reads (Toughness-aware) ─────────────────────────── */
 
