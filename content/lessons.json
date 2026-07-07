@@ -18,7 +18,7 @@
       {
         "ordinal": 1,
         "text": "The bars above each combatant track HP. Whoever's hits zero first loses the fight, and the next enemy loads in automatically.",
-        "anchorKey": null
+        "anchorKey": "fight-hp-bar-player"
       },
       {
         "ordinal": 2,
@@ -41,12 +41,12 @@
       {
         "ordinal": 0,
         "text": "That hit landed harder than normal — a critical hit! Crits deal bonus damage a percentage of the time, so your damage per hit will naturally vary.",
-        "anchorKey": null
+        "anchorKey": "fight-combat-log-enemy"
       },
       {
         "ordinal": 1,
         "text": "The same goes on defense: sometimes an incoming attack misses entirely — a dodge. Don't read too much into any single hit; it's the average over a whole fight that matters.",
-        "anchorKey": null
+        "anchorKey": "fight-combat-log-player"
       }
     ]
   },
@@ -64,7 +64,7 @@
       {
         "ordinal": 0,
         "text": "See a skill icon fill back up and fire again on its own? That's its cooldown recharging. Each skill charges independently and activates the moment it's ready.",
-        "anchorKey": null
+        "anchorKey": "fight-skill-bar-player"
       },
       {
         "ordinal": 1,

@@ -1,4 +1,9 @@
-<div class="skills-row" class:reversed={side === 'enemy'} style:--ready-accent={readyAccent}>
+<div
+	class="skills-row"
+	class:reversed={side === 'enemy'}
+	style:--ready-accent={readyAccent}
+	use:tutorialAnchor={`fight-skill-bar-${side}`}
+>
 	{#each battler.skills as skill, index (skill?.id ?? -index - 1)}
 		<div class="skill-column">
 			{#if skill}
@@ -50,6 +55,7 @@ import {
 import SkillEffectBadge from '$components/SkillEffectBadge.svelte';
 import CooldownOverlay from '$components/CooldownOverlay.svelte';
 import { describedByTooltip } from '$components/tooltip/describedby-tooltip';
+import { tutorialAnchor } from '$components';
 import SkillTooltip from './SkillTooltip.svelte';
 import { chargeProjection } from './skill-cooldown';
 

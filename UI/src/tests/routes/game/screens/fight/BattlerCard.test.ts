@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { EAttribute, type IAttribute } from '$lib/api';
+import { getTutorialAnchor } from '$components';
 
 // The card renders a Skills -> SkillTooltip subtree, which imports the battle engine and the
 // reference-data store at module load; both are mocked even though no hover happens here. The player
@@ -160,5 +161,16 @@ describe('BattlerCard', () => {
 			props: { battler: makeBattler({ name: 'Dire Wolf' }), side: 'enemy' }
 		});
 		expect(queryByTestId('enemy-power')).toBeNull();
+	});
+
+	it('registers its HP bar as a tutorial-tour anchor keyed by side', () => {
+		const player = render(BattlerCard, { props: { battler: makeBattler(), side: 'player' } });
+		expect(getTutorialAnchor('fight-hp-bar-player')).toBe(
+			player.getByTestId('player-card').querySelector('.hp-bar-slot')
+		);
+		player.unmount();
+
+		const enemy = render(BattlerCard, { props: { battler: makeBattler({ name: 'Dire Wolf' }), side: 'enemy' } });
+		expect(getTutorialAnchor('fight-hp-bar-enemy')).toBe(enemy.getByTestId('enemy-card').querySelector('.hp-bar-slot'));
 	});
 });
