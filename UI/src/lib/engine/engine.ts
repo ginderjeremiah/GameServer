@@ -44,6 +44,18 @@ import {
 export const inventoryManager = statify(new InventoryManager());
 export const enemyManager = statify(new EnemyManager());
 
+/**
+ * Re-pulls the authoritative player aggregate and re-derives the inventory from it — the shared resync
+ * used whenever a lost/dead-lettered command may have actually succeeded server-side and left exp/level/
+ * inventory silently diverged. See {@link refreshPlayer}'s doc comment for why the two steps don't happen
+ * together automatically. Lives here (rather than alongside `refreshPlayer` in `session.ts`) because it
+ * needs the `inventoryManager` instance owned by this module.
+ */
+export async function resyncPlayerAndInventory(): Promise<void> {
+	await refreshPlayer();
+	inventoryManager.initialize();
+}
+
 export const logicEngine = statify(new LogicalEngine());
 export const renderEngine = statify(new RenderEngine());
 export const battleEngine = statify(new BattleEngine());
@@ -120,7 +132,7 @@ export const handleServerCommandFailed = (response: IApiSocketResponse<'ServerCo
 	console.warn(`A server-pushed command failed on the server and was dead-lettered: ${failedCommand ?? 'unknown'}.`);
 	if (failedCommand === 'ChallengeCompleted') {
 		void playerChallenges.load(true);
-		void refreshPlayer().then(() => inventoryManager.initialize());
+		void resyncPlayerAndInventory();
 	} else if (failedCommand === 'ProficiencyXpGained') {
 		void playerProficiencies.load(true);
 	}
