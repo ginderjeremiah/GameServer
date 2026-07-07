@@ -1,7 +1,7 @@
 import { ApiRequest, ELessonTriggerType, fetchSocketData, type ILesson } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { childChanged, persistEntity } from '../save-helpers';
+import { childChanged, guardedSave, persistEntity } from '../save-helpers';
 import type { EntityConfig } from './types';
 
 /** A lesson, normalising the optional mechanic-event trigger to the select's "None" sentinel (-1) so the
@@ -192,23 +192,20 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditLessons', changes),
 			refresh,
 			childSavers: [
-				async (id, record, baseline) => {
-					if (!childChanged(record.steps, baseline?.steps)) {
-						return false;
-					}
+				async (id, record, baseline) =>
 					// SetLessonSteps reconciles against the full desired set (keyed by ordinal), not a diff —
 					// mirroring SetZoneEnemies rather than the Add/Edit/Delete-changes shape SetSkillPortions
 					// takes, since the backend's ChildCollectionReconciler wants the whole set every time.
-					await ApiRequest.post('AdminTools/SetLessonSteps', {
-						id,
-						steps: record.steps.map(({ ordinal, text, anchorKey }) => ({
-							ordinal,
-							text,
-							anchorKey: anchorKey || undefined
-						}))
-					});
-					return true;
-				}
+					guardedSave(childChanged(record.steps, baseline?.steps), () =>
+						ApiRequest.post('AdminTools/SetLessonSteps', {
+							id,
+							steps: record.steps.map(({ ordinal, text, anchorKey }) => ({
+								ordinal,
+								text,
+								anchorKey: anchorKey || undefined
+							}))
+						})
+					)
 			]
 		})
 };

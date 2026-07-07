@@ -2,7 +2,7 @@ import { ApiRequest, ESkillAcquisition, fetchSocketData, type IEnemy } from '$li
 import { hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { childChanged, persistEntity } from '../save-helpers';
+import { childChanged, guardedSave, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
 import { chipsSection, type EntityConfig } from './types';
 
@@ -195,30 +195,21 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditEnemies', changes),
 			refresh,
 			childSavers: [
-				async (id, record, baseline) => {
-					if (!childChanged(record.attributeDistribution, baseline?.attributeDistribution)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetEnemyAttributeDistributions', {
-						enemyId: id,
-						attributeDistributions: record.attributeDistribution
-					});
-					return true;
-				},
-				async (id, record, baseline) => {
-					if (!childChanged(record.skillPool, baseline?.skillPool)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetEnemySkills', { enemyId: id, skillIds: record.skillPool });
-					return true;
-				},
-				async (id, record, baseline) => {
-					if (!childChanged(record.spawns, baseline?.spawns)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetEnemySpawns', { enemyId: id, spawns: record.spawns });
-					return true;
-				}
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.attributeDistribution, baseline?.attributeDistribution), () =>
+						ApiRequest.post('AdminTools/SetEnemyAttributeDistributions', {
+							enemyId: id,
+							attributeDistributions: record.attributeDistribution
+						})
+					),
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.skillPool, baseline?.skillPool), () =>
+						ApiRequest.post('AdminTools/SetEnemySkills', { enemyId: id, skillIds: record.skillPool })
+					),
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.spawns, baseline?.spawns), () =>
+						ApiRequest.post('AdminTools/SetEnemySpawns', { enemyId: id, spawns: record.spawns })
+					)
 			]
 		})
 };

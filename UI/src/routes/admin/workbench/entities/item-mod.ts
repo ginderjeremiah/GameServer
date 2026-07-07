@@ -1,7 +1,7 @@
 import { ApiRequest, EItemModType, ERarity, fetchSocketData, type IItemMod } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { attributeChanges, childChanged, persistEntity } from '../save-helpers';
+import { attributeChanges, childChanged, guardedSave, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
 import { tagsSection } from './tags-section';
 import type { EntityConfig } from './types';
@@ -118,19 +118,14 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 			childSavers: [
 				async (id, record, baseline) => {
 					const changes = attributeChanges(record.attributes, baseline?.attributes, 'amount');
-					if (!changes.length) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/AddEditItemModAttributes', { id, changes });
-					return true;
+					return guardedSave(changes.length > 0, () =>
+						ApiRequest.post('AdminTools/AddEditItemModAttributes', { id, changes })
+					);
 				},
-				async (id, record, baseline) => {
-					if (!childChanged(record.tags, baseline?.tags)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetTagsForItemMod', { id, tagIds: record.tags });
-					return true;
-				}
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.tags, baseline?.tags), () =>
+						ApiRequest.post('AdminTools/SetTagsForItemMod', { id, tagIds: record.tags })
+					)
 			]
 		})
 };

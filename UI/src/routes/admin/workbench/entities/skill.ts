@@ -11,7 +11,13 @@ import {
 } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { attributeChanges, damagePortionChanges, persistEntity, skillEffectChanges } from '../save-helpers';
+import {
+	attributeChanges,
+	damagePortionChanges,
+	guardedSave,
+	persistEntity,
+	skillEffectChanges
+} from '../save-helpers';
 import { firstFree } from './helpers';
 import type { EntityConfig } from './types';
 
@@ -259,27 +265,17 @@ export const skillEntity: EntityConfig<ISkill> = {
 			childSavers: [
 				async (id, record, baseline) => {
 					const changes = damagePortionChanges(record.damagePortions, baseline?.damagePortions);
-					if (!changes.length) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetSkillPortions', { id, changes });
-					return true;
+					return guardedSave(changes.length > 0, () => ApiRequest.post('AdminTools/SetSkillPortions', { id, changes }));
 				},
 				async (id, record, baseline) => {
 					const changes = attributeChanges(record.damageMultipliers, baseline?.damageMultipliers, 'multiplier');
-					if (!changes.length) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetSkillMultipliers', { id, changes });
-					return true;
+					return guardedSave(changes.length > 0, () =>
+						ApiRequest.post('AdminTools/SetSkillMultipliers', { id, changes })
+					);
 				},
 				async (id, record, baseline) => {
 					const changes = skillEffectChanges(record.effects, baseline?.effects);
-					if (!changes.length) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetSkillEffects', { id, changes });
-					return true;
+					return guardedSave(changes.length > 0, () => ApiRequest.post('AdminTools/SetSkillEffects', { id, changes }));
 				}
 			]
 		})

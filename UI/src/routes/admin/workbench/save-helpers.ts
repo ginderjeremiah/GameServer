@@ -64,6 +64,15 @@ export const resolveId = (id: number, idMap: Map<number, number>): number => idM
 /** Returns whether it actually wrote — a no-op (unchanged collection) must report `false`. */
 type ChildSaver<T> = (id: number, record: T, baseline: T | undefined) => Promise<boolean>;
 
+/** Collapses a child saver's no-op/write branch: skip (and report `false`) when unchanged, else post and report `true`. */
+export const guardedSave = async (changed: boolean, post: () => Promise<unknown>): Promise<boolean> => {
+	if (!changed) {
+		return false;
+	}
+	await post();
+	return true;
+};
+
 interface PersistOptions<T extends Identified, D> {
 	diff: SaveDiff<T>;
 	/** Maps a record to the DTO sent through the primary Add/Edit/Delete endpoint. */

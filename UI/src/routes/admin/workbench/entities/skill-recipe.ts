@@ -1,7 +1,7 @@
 import { ApiRequest, fetchSocketData, type ISkillRecipe } from '$lib/api';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { childChanged, persistEntity } from '../save-helpers';
+import { childChanged, guardedSave, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
 import { chipsSection, type EntityConfig } from './types';
 
@@ -157,20 +157,14 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditSkillRecipes', changes),
 			refresh,
 			childSavers: [
-				async (id, record, baseline) => {
-					if (!childChanged(record.inputSkillIds, baseline?.inputSkillIds)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetSkillRecipeInputs', { id, skillIds: record.inputSkillIds });
-					return true;
-				},
-				async (id, record, baseline) => {
-					if (!childChanged(record.conditions, baseline?.conditions)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetSkillRecipeConditions', { id, conditions: record.conditions });
-					return true;
-				}
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.inputSkillIds, baseline?.inputSkillIds), () =>
+						ApiRequest.post('AdminTools/SetSkillRecipeInputs', { id, skillIds: record.inputSkillIds })
+					),
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.conditions, baseline?.conditions), () =>
+						ApiRequest.post('AdminTools/SetSkillRecipeConditions', { id, conditions: record.conditions })
+					)
 			]
 		})
 };

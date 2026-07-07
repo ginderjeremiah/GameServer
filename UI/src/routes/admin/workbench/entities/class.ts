@@ -2,7 +2,7 @@ import { ApiRequest, EAttribute, EModifierType, ESkillAcquisition, fetchSocketDa
 import { hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
-import { childChanged, persistEntity } from '../save-helpers';
+import { childChanged, guardedSave, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
 import { chipsSection, type EntityConfig } from './types';
 
@@ -243,36 +243,27 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			postPrimary: (changes) => ApiRequest.post('AdminTools/AddEditClasses', changes),
 			refresh,
 			childSavers: [
-				async (id, record, baseline) => {
-					if (!childChanged(record.starterSkillIds, baseline?.starterSkillIds)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetClassStarterSkills', {
-						classId: id,
-						skillIds: record.starterSkillIds
-					});
-					return true;
-				},
-				async (id, record, baseline) => {
-					if (!childChanged(record.starterEquipment, baseline?.starterEquipment)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetClassStarterEquipment', {
-						classId: id,
-						equipment: record.starterEquipment
-					});
-					return true;
-				},
-				async (id, record, baseline) => {
-					if (!childChanged(record.attributeDistributions, baseline?.attributeDistributions)) {
-						return false;
-					}
-					await ApiRequest.post('AdminTools/SetClassAttributeDistributions', {
-						classId: id,
-						attributeDistributions: record.attributeDistributions
-					});
-					return true;
-				}
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.starterSkillIds, baseline?.starterSkillIds), () =>
+						ApiRequest.post('AdminTools/SetClassStarterSkills', {
+							classId: id,
+							skillIds: record.starterSkillIds
+						})
+					),
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.starterEquipment, baseline?.starterEquipment), () =>
+						ApiRequest.post('AdminTools/SetClassStarterEquipment', {
+							classId: id,
+							equipment: record.starterEquipment
+						})
+					),
+				async (id, record, baseline) =>
+					guardedSave(childChanged(record.attributeDistributions, baseline?.attributeDistributions), () =>
+						ApiRequest.post('AdminTools/SetClassAttributeDistributions', {
+							classId: id,
+							attributeDistributions: record.attributeDistributions
+						})
+					)
 			]
 		})
 };
