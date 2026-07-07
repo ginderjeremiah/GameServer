@@ -625,6 +625,7 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(next.Enemy);
             Assert.True(state.HasActiveBattle);
             Assert.False(state.IsBossBattle);
+            Assert.False(next.IsBossBattle);
             // The prefetched battle's start is anchored to the scheduled cooldown expiry — NOT to now — so the
             // next victory's elapsed-time check passes (latency only delays the claim) and the FOLLOWING
             // cooldown stays correctly sized (anchoring to now would back-date the start and shrink it).
@@ -1218,6 +1219,8 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(result.ElapsedOffsetMs);
             Assert.True(result.ElapsedOffsetMs >= 900, $"Expected roughly a 1-second offset, got {result.ElapsedOffsetMs}ms.");
             Assert.True(result.ElapsedOffsetMs < GameConstants.DefaultMaxBattleMs);
+            // Idle-loop battle, so the hand-back must not mislabel it as a boss fight (#1647).
+            Assert.False(result.IsBossBattle);
 
             // PlayerState is left completely untouched: same enemy, same seed, same (unbackdated-further)
             // BattleStartTime.
@@ -1241,6 +1244,57 @@ namespace Game.Application.Tests.Services
             Assert.Equal(0m, StatValue(EStatisticType.BattlesWon, null));
             Assert.Equal(0m, StatValue(EStatisticType.PlayerDeaths, null));
             Assert.Equal(expBefore, player.Exp);
+        }
+
+        [Fact]
+        public async Task StartBattle_AbandoningAStillInProgressBossBattle_HandsItBackWithBossFlagSet()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Mirrors the idle-battle sibling above, but starting from a boss fight (#1647): both combatants
+            // wield a skill with an effectively infinite cooldown so the abandon re-simulation resolves as
+            // neither a win nor a death, and the still-in-progress hand-back must carry IsBossBattle so the
+            // client can stay routed into the boss loop instead of defaulting to idle.
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowBossSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1, bossEnemyId: boss.Id, bossLevel: 1);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var started = await battleService.StartBossBattle(player, state, zone.Id);
+            Assert.NotNull(started);
+            Assert.True(state.HasActiveBattle);
+            Assert.True(state.IsBossBattle);
+
+            // Let a little wall-clock time elapse for the abandon, but far less than the skills' cooldowns
+            // (and the 2-minute cap), so the re-simulation completes no actions and resolves as neither a win
+            // nor a death — the boss fight is genuinely still in progress.
+            state.BattleStartTime = DateTime.UtcNow.AddSeconds(-1);
+
+            // An ordinary NewEnemy request (StartBattle) while the boss fight is still active abandons it —
+            // but since it hasn't concluded, it must be handed back unchanged, still flagged as a boss battle
+            // (the quick-reconnect path #1647 is about).
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            Assert.Equal(boss.Id, result.Enemy.Id);
+            Assert.NotNull(result.ElapsedOffsetMs);
+            Assert.True(result.IsBossBattle);
+            Assert.True(state.HasActiveBattle);
+            Assert.True(state.IsBossBattle);
         }
 
         [Fact]
@@ -1734,6 +1788,7 @@ namespace Game.Application.Tests.Services
             Assert.Equal(boss.Id, result.Enemy.Id);
             Assert.True(state.HasActiveBattle);
             Assert.True(state.IsBossBattle);
+            Assert.True(result.IsBossBattle);
         }
 
         [Fact]
@@ -2241,6 +2296,7 @@ namespace Game.Application.Tests.Services
             Assert.Equal(enemy.Id, result.Enemy.Id);
             Assert.Equal(42u, result.Seed);
             Assert.Equal(45_000, result.ElapsedOffsetMs);
+            Assert.False(result.IsBossBattle);
             Assert.True(state.HasActiveBattle);
             Assert.False(state.IsBossBattle);
             Assert.Equal(zone.Id, state.BattleZoneId);
@@ -2289,6 +2345,7 @@ namespace Game.Application.Tests.Services
             Assert.Equal(18, result.Enemy.Level);
             Assert.True(state.HasActiveBattle);
             Assert.True(state.IsBossBattle);
+            Assert.True(result.IsBossBattle);
             Assert.Equal(10_000, result.ElapsedOffsetMs);
             Assert.Equal(now.AddMilliseconds(-10_000), state.BattleStartTime);
         }

@@ -42,6 +42,7 @@ export interface IEnemyInstance {
 	selectedSkills: number[];
 	elapsedOffsetMs?: number;
 	enemyRating: number;
+	isBossBattle: boolean;
 }
 
 export interface INewEnemyModel {

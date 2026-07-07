@@ -62,7 +62,8 @@ const bossInstance: IEnemyInstance = {
 	seed: 1,
 	selectedSkills: [],
 	attributes: [],
-	enemyRating: 100
+	enemyRating: 100,
+	isBossBattle: true
 };
 const normalInstance: IEnemyInstance = {
 	id: 0,
@@ -70,7 +71,8 @@ const normalInstance: IEnemyInstance = {
 	seed: 2,
 	selectedSkills: [],
 	attributes: [],
-	enemyRating: 100
+	enemyRating: 100,
+	isBossBattle: false
 };
 // The next idle enemy the server bundles with a victory / boss-loss response so the client can begin it
 // without a separate NewEnemy round-trip (distinct from the fetched normalInstance so the two are told apart).
@@ -80,7 +82,8 @@ const preparedInstance: IEnemyInstance = {
 	seed: 7,
 	selectedSkills: [],
 	attributes: [],
-	enemyRating: 100
+	enemyRating: 100,
+	isBossBattle: false
 };
 
 const resp = <T extends 'ChallengeBoss' | 'DefeatEnemy' | 'BattleLost' | 'NewEnemy'>(

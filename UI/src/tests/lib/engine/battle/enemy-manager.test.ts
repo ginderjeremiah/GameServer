@@ -36,7 +36,8 @@ const makeEnemy = (id = 0): IEnemyInstance => ({
 	seed: 123,
 	selectedSkills: [0],
 	attributes: [],
-	enemyRating: 100
+	enemyRating: 100,
+	isBossBattle: false
 });
 
 const enemyResponse = (enemy: IEnemyInstance): IApiSocketResponse<'NewEnemy'> => ({
@@ -97,6 +98,19 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(loaded).toEqual([enemy]);
 		expect(delay).not.toHaveBeenCalled();
 		expect(logMessage).not.toHaveBeenCalled();
+	});
+
+	// #1647: a sub-5-minute reconnect resumes via this ordinary NewEnemy fetch rather than a welcome-back
+	// activeBattle hand-back — if the still-in-progress battle it hands back was actually a boss fight, the
+	// mode must follow the authoritative flag instead of staying idle.
+	it('adopts boss mode when NewEnemy hands back a still-in-progress boss battle', async () => {
+		const bossHandback = { ...makeEnemy(2), elapsedOffsetMs: 12000, isBossBattle: true };
+		sendSocketCommand.mockResolvedValue(enemyResponse(bossHandback));
+
+		await manager.getNewEnemy();
+
+		expect(manager.currentEnemy).toEqual(bossHandback);
+		expect(manager.mode).toBe('boss');
 	});
 
 	it('adopts the server-reported zone when the player was relocated out of an unplayable zone', async () => {
@@ -293,6 +307,18 @@ describe('EnemyManager.start', () => {
 		expect(sendSocketCommand).not.toHaveBeenCalled();
 		expect(manager.currentEnemy).toEqual(activeBattle);
 		expect(loaded).toEqual([activeBattle]);
+		expect(manager.mode).toBe('idle');
+	});
+
+	// #1647: a resumed battle handed back as still-active must route into the boss loop when it actually
+	// was a boss fight, or the Zone-Cleared overlay/BattleLost/auto-rechallenge bookkeeping never runs.
+	it('routes a resumed boss battle into the boss loop', () => {
+		const activeBossBattle = { ...makeEnemy(6), elapsedOffsetMs: 45000, isBossBattle: true };
+
+		manager.start(activeBossBattle);
+
+		expect(manager.mode).toBe('boss');
+		expect(manager.currentEnemy).toEqual(activeBossBattle);
 	});
 });
 

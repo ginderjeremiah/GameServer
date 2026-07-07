@@ -27,6 +27,20 @@ namespace Game.Api.Tests.Unit
             Assert.Equal([20, 10], model.SelectedSkills);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void FromSource_ProjectsIsBossBattle(bool isBossBattle)
+        {
+            var enemy = MakeEnemy();
+            enemy.SetBattleSkills([]);
+            var result = new BattleStartResult { Enemy = enemy, Seed = 1u, IsBossBattle = isBossBattle };
+
+            var model = EnemyInstanceModel.FromSource(result);
+
+            Assert.Equal(isBossBattle, model.IsBossBattle);
+        }
+
         [Fact]
         public void FromSource_ProjectsEnemyRating_FromTheFieldedBattleSkills()
         {

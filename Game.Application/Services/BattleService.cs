@@ -113,6 +113,7 @@ namespace Game.Application.Services
             {
                 Enemy = enemy,
                 Seed = seed,
+                IsBossBattle = false,
             };
         }
 
@@ -212,6 +213,7 @@ namespace Game.Application.Services
             {
                 Enemy = enemy,
                 Seed = seed,
+                IsBossBattle = true,
             };
         }
 
@@ -400,6 +402,7 @@ namespace Game.Application.Services
                 Enemy = enemy,
                 Seed = pending.Seed,
                 ElapsedOffsetMs = pending.ElapsedOffsetMs,
+                IsBossBattle = isBossBattle,
             };
         }
 
@@ -460,6 +463,7 @@ namespace Game.Application.Services
                     Enemy = enemy,
                     Seed = state.BattleSeed ?? 0,
                     ElapsedOffsetMs = wallClockMs,
+                    IsBossBattle = state.IsBossBattle,
                 };
             }
             else
@@ -640,6 +644,13 @@ namespace Game.Application.Services
         /// #1597 — before continuing live. Null for a freshly started battle.
         /// </summary>
         public int? ElapsedOffsetMs { get; set; }
+
+        /// <summary>
+        /// Whether this is (or, for a hand-back, was) a dedicated-boss fight rather than an idle-zone
+        /// spawn — mirrors the authoritative <see cref="PlayerState.IsBossBattle"/> so a resumed hand-back
+        /// (#1595/#1596) lets the client route into the boss loop instead of always defaulting to idle (#1647).
+        /// </summary>
+        public bool IsBossBattle { get; set; }
     }
 
 }
