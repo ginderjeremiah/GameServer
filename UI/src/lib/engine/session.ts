@@ -72,10 +72,10 @@ async function restorePlayer(): Promise<boolean> {
  * unlocked skills, raw inventory data — before the game engine builds the live battler from it. Best-effort:
  * a failed refresh leaves the existing in-memory player intact rather than stranding the player at the gate.
  *
- * This only re-initializes {@link playerManager}, not the derived `InventoryManager` — a caller that needs
- * the player's unlocked items/mods to reflect the refresh (rather than just the raw payload) must also
- * re-run `inventoryManager.initialize()` itself, as the mid-session resync in `EnemyManager.claimVictory`
- * does (the welcome-back gate gets this for free from the `startGame` call that follows it).
+ * This only re-initializes {@link playerManager}, not the derived `InventoryManager` — a mid-session caller
+ * that needs the player's unlocked items/mods to reflect the refresh (rather than just the raw payload)
+ * should use `resyncPlayerAndInventory()` (in `engine.ts`) instead, which does both steps. The welcome-back
+ * gate gets the inventory step for free from the `startGame` call that follows it.
  */
 export async function refreshPlayer(): Promise<void> {
 	await loadPlayer();
