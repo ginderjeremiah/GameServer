@@ -3,6 +3,7 @@ import { render, cleanup } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import { EDamageType } from '$lib/api';
 import type { CombatFloatEvent } from '$lib/engine';
+import { getTutorialAnchor } from '$components';
 
 // CombatFloaters subscribes to the engine's combat-float hook at init. Capture the registered
 // callback so the test can drive events directly; the real `$lib/common` formatNum is used.
@@ -268,6 +269,15 @@ describe('CombatFloaters', () => {
 		vi.advanceTimersByTime(1600);
 		flushSync();
 		expect(getByTestId('enemy-floaters').querySelectorAll('.floater')).toHaveLength(0);
+	});
+
+	it('registers itself as a tutorial-tour anchor keyed by side', () => {
+		const enemy = render(CombatFloaters, { props: { side: 'enemy', testId: 'enemy-floaters' } });
+		expect(getTutorialAnchor('fight-combat-log-enemy')).toBe(enemy.getByTestId('enemy-floaters'));
+		enemy.unmount();
+
+		const player = render(CombatFloaters, { props: { side: 'player', testId: 'player-floaters' } });
+		expect(getTutorialAnchor('fight-combat-log-player')).toBe(player.getByTestId('player-floaters'));
 	});
 
 	it('drives the CSS animation duration from the JS constant via a custom property', () => {

@@ -5,7 +5,13 @@
      its net heal in the regen hue (#1320, Area F). A reflect (#1330) floats over the original attacker
      with the shared combat-log reflect glyph and the side's hue — raw/untyped, never tinted by type.
      Purely presentational (aria-hidden) — the combat log is the accessible record of the same events. -->
-<div class="floaters" aria-hidden="true" data-testid={testId} style:--float-duration="{DURATION_MS}ms">
+<div
+	class="floaters"
+	aria-hidden="true"
+	data-testid={testId}
+	style:--float-duration="{DURATION_MS}ms"
+	use:tutorialAnchor={`fight-combat-log-${side}`}
+>
 	{#each floaters as floater (floater.id)}
 		<div
 			class="floater"
@@ -41,6 +47,7 @@ import { onCombatFloat, type CombatFloatEvent } from '$lib/engine';
 import { EDamageType, type ISkillDamagePortion } from '$lib/api';
 import LogGlyph from '$components/log-panel/LogGlyph.svelte';
 import DamageRatioBar from '$components/DamageRatioBar.svelte';
+import { tutorialAnchor } from '$components';
 import type { GlyphKind } from '$components/log-panel/log-kind';
 
 type Props = {

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EAttribute, EModifierType, ESkillEffectTarget, type IAttribute } from '$lib/api';
+import { getTutorialAnchor } from '$components';
 
 // Skills renders a SkillTooltip child, which resolves the opponent through the battle engine
 // and attribute names through the reference-data store; both are mocked.
@@ -140,6 +141,15 @@ describe('Skills', () => {
 		// The misleading grid semantics are gone — no grid roles remain.
 		expect(container.querySelector('[role="grid"]')).toBeNull();
 		expect(container.querySelector('[role="gridcell"]')).toBeNull();
+	});
+
+	it('registers itself as a tutorial-tour anchor keyed by side', () => {
+		const player = render(Skills, { props: { battler, side: 'player' } });
+		expect(getTutorialAnchor('fight-skill-bar-player')).toBe(player.container.querySelector('.skills-row'));
+		player.unmount();
+
+		const enemy = render(Skills, { props: { battler, side: 'enemy' } });
+		expect(getTutorialAnchor('fight-skill-bar-enemy')).toBe(enemy.container.querySelector('.skills-row'));
 	});
 
 	it('associates every skill slot with the shared tooltip via aria-describedby', () => {
