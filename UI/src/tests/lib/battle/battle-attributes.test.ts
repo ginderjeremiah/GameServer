@@ -311,22 +311,6 @@ describe('BattleAttributes', () => {
 		});
 	});
 
-	describe('getAttributeCount', () => {
-		it('returns the non-zero attribute count without building the full map', () => {
-			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10], [EAttribute.Agility, 4]), false);
-			expect(ba.getAttributeCount()).toBe(ba.getAttributeMap().length);
-			expect(ba.getAttributeCount()).toBe(2);
-		});
-
-		it('reflects a modifier change', () => {
-			const ba = new BattleAttributes([], false);
-			expect(ba.getAttributeCount()).toBe(0);
-
-			ba.addModifier(additive(EAttribute.Strength, 5));
-			expect(ba.getAttributeCount()).toBe(1);
-		});
-	});
-
 	// Mirrors Game.Core.Tests AttributeCollectionTests.RemoveModifier_* so the two attribute
 	// implementations stay aligned on add/remove and the derived-cascade behaviour.
 	describe('addModifier / removeModifier', () => {

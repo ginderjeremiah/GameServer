@@ -78,16 +78,3 @@ export function plural(str: string) {
 export function tintColor(color: string, alpha: number): string {
 	return `color-mix(in srgb, ${color} ${+(alpha * 100).toFixed(3)}%, transparent)`;
 }
-
-export function groupBy<T>(arr: T[], groupFn: (item: T) => string) {
-	const ret: { [key: string]: T[] } = {};
-	for (const t of arr) {
-		const key = groupFn(t);
-		if (ret[key]) {
-			ret[key].push(t);
-		} else {
-			ret[key] = [t];
-		}
-	}
-	return ret;
-}

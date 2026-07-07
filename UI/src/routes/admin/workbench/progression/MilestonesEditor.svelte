@@ -101,7 +101,7 @@
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import { reference } from '../reference.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
-import { cumulativeXp, modifiersAtLevel, rewardAtLevel } from './progression-helpers';
+import { cumulativeXp, isMilestoneLevel, modifiersAtLevel, rewardAtLevel } from './progression-helpers';
 import { NO_SKILL, type WorkbenchProficiency } from './types';
 import ProgSelect from './ProgSelect.svelte';
 import ProgNumber from './ProgNumber.svelte';
@@ -137,7 +137,7 @@ const attrOptionsFor = (current: number) =>
 const levelNodes = $derived.by(() => {
 	const nodes: { level: number; kind: 'empty' | 'bonus' | 'milestone' }[] = [];
 	for (let level = 1; level <= maxLevel; level++) {
-		const hasReward = rewardAtLevel(tier, level) !== undefined;
+		const hasReward = isMilestoneLevel(tier, level);
 		const hasMod = modifiersAtLevel(tier, level).length > 0;
 		nodes.push({ level, kind: hasReward ? 'milestone' : hasMod ? 'bonus' : 'empty' });
 	}

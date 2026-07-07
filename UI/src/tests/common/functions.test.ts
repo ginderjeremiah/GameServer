@@ -5,7 +5,6 @@ import {
 	normalizeText,
 	plural,
 	keys,
-	groupBy,
 	enumPairs,
 	hasFlag,
 	toggleFlag,
@@ -105,23 +104,6 @@ describe('keys', () => {
 
 	it('returns empty array for undefined', () => {
 		expect(keys(undefined)).toEqual([]);
-	});
-});
-
-describe('groupBy', () => {
-	it('groups items by the given function', () => {
-		const items = [
-			{ type: 'a', value: 1 },
-			{ type: 'b', value: 2 },
-			{ type: 'a', value: 3 }
-		];
-		const result = groupBy(items, (i) => i.type);
-		expect(result['a']).toHaveLength(2);
-		expect(result['b']).toHaveLength(1);
-	});
-
-	it('returns empty object for empty array', () => {
-		expect(groupBy([], () => 'x')).toEqual({});
 	});
 });
 
