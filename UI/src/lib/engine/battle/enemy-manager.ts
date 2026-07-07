@@ -487,6 +487,14 @@ export class EnemyManager {
 		return this.started && this.mode === 'boss' && !this.transitioning;
 	}
 
+	/** Whether `generation` (a {@link transitionGeneration} snapshot) is still current — false once a stop
+	 *  or a superseding challenge/retreat (which bumps the generation via {@link beginTransition}) has moved
+	 *  on. Unlike {@link bossLoopActive}, this doesn't require `mode === 'boss'`: boss-loss resolution leaves
+	 *  boss mode itself partway through (via returnToIdle), so it re-checks this after each await instead. */
+	private transitionCurrent(generation: number): boolean {
+		return this.started && generation === this.transitionGeneration;
+	}
+
 	private async watchBattleStage(stage: BattleStage) {
 		// While swapping the active battle, ignore the outgoing battle's resolving stage changes.
 		if (this.transitioning) {
@@ -619,9 +627,19 @@ export class EnemyManager {
 	}
 
 	private async resolveBossLoss() {
+		// Snapshot the transition generation up front: a challenge/retreat pressed during either await below
+		// bumps it (via beginTransition), and its result can resolve the parked startLoading below early
+		// (finishLoading) — so this resolution must not then hand a stale prepared idle battle to a fresh
+		// getNewEnemy call and clobber the fight the supersession already started (#1696).
+		const generation = this.transitionGeneration;
 		// Record the loss explicitly (turning auto-fight off) and drop back to the boss-available
 		// state — the normal idle farm loop — honoring the post-loss cooldown.
 		const lostResponse = await apiSocket.sendSocketCommand('BattleLost');
+		// A retreat/challenge superseded this resolution while BattleLost was in flight; the superseding
+		// transition already owns the loop's state, so abandon rather than clobber it below.
+		if (!this.transitionCurrent(generation)) {
+			return;
+		}
 		if (lostResponse.error) {
 			logMessage(ELogType.Debug, 'There was an error recording the boss loss: ' + lostResponse.error);
 		}
@@ -634,6 +652,11 @@ export class EnemyManager {
 		const cooldown = lostResponse.data?.cooldown ?? 0;
 		if (cooldown > 0) {
 			await battleEngine.startLoading(cooldown);
+			// Re-check after the cooldown: a challenge pressed during it can resolve this parked startLoading
+			// early, so a fresh getNewEnemy below must not present the stale prepared battle over the new fight.
+			if (!this.transitionCurrent(generation)) {
+				return;
+			}
 		}
 		await this.getNewEnemy(prepared);
 	}

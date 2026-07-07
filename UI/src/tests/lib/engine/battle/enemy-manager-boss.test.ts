@@ -516,6 +516,57 @@ describe('EnemyManager boss mode', () => {
 		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
 	});
 
+	it('abandons boss-loss resolution when a retreat lands while BattleLost is in flight', async () => {
+		// #1696: a retreat pressed while the loss is still being recorded must win — the resolution's own
+		// (stale) BattleLost response must not clobber the idle fight the retreat already moved to.
+		await manager.challengeBoss();
+		let releaseLost!: (r: IApiSocketResponse<'BattleLost'>) => void;
+		const lostGate = new Promise<IApiSocketResponse<'BattleLost'>>((resolve) => (releaseLost = resolve));
+		send.mockImplementation((name: string) => (name === 'BattleLost' ? lostGate : Promise.resolve(newEnemyResponse)));
+
+		const handled = fireStage(h.BattleStage.Defeated);
+		await flush(); // park the loss resolution on the in-flight BattleLost
+
+		const retreated = manager.retreatFromBoss(); // supersedes: bumps the transition generation
+		await flush();
+		releaseLost(lostResponse); // the stale BattleLost now resolves
+		await Promise.all([handled, retreated]);
+
+		// The retreat's own idle enemy stands; the loss resolution bailed rather than re-fetching over it.
+		expect(manager.mode).toBe('idle');
+		expect(manager.currentEnemy).toEqual(normalInstance);
+		expect(send.mock.calls.filter((c: unknown[]) => c[0] === 'NewEnemy').length).toBe(1);
+	});
+
+	it('does not spawn the stale prepared idle enemy when a challenge lands during the post-loss cooldown', async () => {
+		// #1696's exact failure scenario: BattleLost bundles a prefetched idle enemy and a cooldown; a
+		// challenge pressed during that cooldown resolves the parked startLoading early (finishLoading) and
+		// takes over the boss loop. The loss resolution's continuation must not then present the stale
+		// prepared idle enemy over the fight the challenge started.
+		await manager.challengeBoss();
+		let releaseCooldown!: () => void;
+		const cooldownGate = new Promise<void>((resolve) => (releaseCooldown = resolve));
+		h.battleEngine.startLoading.mockReturnValueOnce(cooldownGate);
+		send.mockImplementation((name: string) =>
+			name === 'BattleLost' ? Promise.resolve(bundledLostResponse(5000)) : Promise.resolve(challengeResponse)
+		);
+
+		const handled = fireStage(h.BattleStage.Defeated);
+		await flush(); // loss recorded; parked on the gated post-loss cooldown
+		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(5000);
+
+		// The player re-challenges during the cooldown — this bumps the transition generation and engages
+		// the boss, mirroring the engine reset that resolves the parked startLoading early in production.
+		const challenge = manager.challengeBoss();
+		releaseCooldown();
+		await Promise.all([handled, challenge]);
+
+		// The boss fight the challenge started stands; the stale prepared idle enemy was never presented.
+		expect(manager.mode).toBe('boss');
+		expect(manager.currentEnemy).toEqual(bossInstance);
+		expect(manager.currentEnemy).not.toEqual(preparedInstance);
+	});
+
 	it('on a boss draw (timeout): retreats to the idle loop with auto-fight off, recording no loss', async () => {
 		await manager.challengeBoss();
 		manager.setAutoFight(true);
