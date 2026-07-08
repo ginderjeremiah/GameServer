@@ -47,7 +47,7 @@ import { apiSocket, getRoles } from '$lib/api';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { onDestroy, onMount } from 'svelte';
+import { onDestroy, onMount, untrack } from 'svelte';
 import { confirmQuit } from './game-actions';
 import { WelcomeBackView } from './welcome-back/welcome-back-view.svelte';
 import WelcomeBackGate from './welcome-back/WelcomeBackGate.svelte';
@@ -140,10 +140,16 @@ $effect(() => {
 
 // Screen-anchored tutorial trigger (#1587): the single screen-activation point cross-screen
 // navigation uses. Gated on `entered` so a lesson can't fire against the default screen before the
-// welcome-back gate passes (the player hasn't "navigated" anywhere yet at that point).
+// welcome-back gate passes (the player hasn't "navigated" anywhere yet at that point). Only
+// `welcome.phase` and `currentScreen` should drive a re-evaluation — `evaluateScreenTrigger` also
+// reads `staticData.lessons`/`playerManager.lessons` (#1709), and those must NOT be tracked here or
+// any lesson-state mutation (e.g. a mechanic-anchored unlock, or marking a lesson read) would re-run
+// this effect and re-open/re-queue a lesson mid-tour instead of only on an actual screen change.
 $effect(() => {
-	if (welcome.phase === 'entered') {
-		evaluateScreenTrigger(currentScreen);
+	const phase = welcome.phase;
+	const screenKey = currentScreen;
+	if (phase === 'entered') {
+		untrack(() => evaluateScreenTrigger(screenKey));
 	}
 });
 
