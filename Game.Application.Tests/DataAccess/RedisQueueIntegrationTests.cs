@@ -187,6 +187,7 @@ namespace Game.Application.Tests.DataAccess
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.ReserveNextAsync(AlreadyCancelled()));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.ReclaimProcessingAsync(AlreadyCancelled()));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.GetLengthAsync(AlreadyCancelled()));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.GetProcessingCountAsync(AlreadyCancelled()));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.PeekAsync(1, AlreadyCancelled()));
 
             // None of the throwing ops consumed the seeded item — a cancelled budget leaves the queue untouched.
@@ -198,6 +199,31 @@ namespace Game.Application.Tests.DataAccess
             var cts = new CancellationTokenSource();
             cts.Cancel();
             return cts.Token;
+        }
+
+        [Fact]
+        public async Task GetProcessingCountAsync_ReflectsReservedButNotYetAcknowledgedItems()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddRangeToQueueAsync(["a", "b"]);
+            Assert.Equal(0, await queue.GetProcessingCountAsync());
+
+            // Reserving parks the item on the processing list without acknowledging it.
+            Assert.Equal("a", await queue.ReserveNextAsync());
+            Assert.Equal(1, await queue.GetProcessingCountAsync());
+
+            Assert.Equal("b", await queue.ReserveNextAsync());
+            Assert.Equal(2, await queue.GetProcessingCountAsync());
+
+            // Acknowledging removes it from the processing list for good.
+            await queue.AcknowledgeAsync("a");
+            Assert.Equal(1, await queue.GetProcessingCountAsync());
+
+            await queue.AcknowledgeAsync("b");
+            Assert.Equal(0, await queue.GetProcessingCountAsync());
         }
 
         [Fact]

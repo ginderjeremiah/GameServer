@@ -18,11 +18,27 @@ namespace Game.DataAccess
         /// </summary>
         private static readonly TimeSpan DefaultDrainTimeout = TimeSpan.FromSeconds(5);
 
+        /// <summary>
+        /// How long a drain pass must find the processing list still non-empty (with nothing left to reserve
+        /// from the main queue) before opportunistically reclaiming it. Comfortably longer than a healthy
+        /// apply — including its retry backoff (<see cref="PlayerUpdateRetryPolicy"/>) — so this doesn't
+        /// routinely race a genuinely in-flight item on another instance.
+        /// </summary>
+        private static readonly TimeSpan DefaultReclaimGracePeriod = TimeSpan.FromSeconds(30);
+
         private readonly IServiceProvider _services;
         private readonly IPubSubService _pubsub;
         private readonly ILogger<DataProviderSynchronizer> _logger;
         private readonly PlayerUpdateRetryPolicy _retryPolicy;
         private readonly TimeSpan _drainTimeout;
+        private readonly TimeSpan _reclaimGracePeriod;
+        private readonly TimeProvider _timeProvider;
+
+        // When a drain pass finds the main queue empty but the processing list non-empty, this is the instant
+        // that state was first observed. Reset to null whenever the processing list is seen empty (including
+        // right after an opportunistic reclaim). Touched only under the serialized drain (the gate below), so
+        // it needs no lock — the same rationale as _lastReportedDeadLetterDepth.
+        private DateTimeOffset? _strandedProcessingObservedAt;
 
         // Cancelled on shutdown to signal any in-flight drain (the startup drain or a pub/sub wake) to stop
         // reserving new items and unwind at a clean item boundary, and to make a late wake a no-op.
@@ -53,13 +69,22 @@ namespace Game.DataAccess
         // from re-spamming the log on every drain. Touched only under the serialized drain, so it needs no lock.
         private long _lastReportedDeadLetterDepth;
 
-        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy, TimeSpan? drainTimeout = null)
+        public DataProviderSynchronizer(
+            IServiceProvider services,
+            IPubSubService pubsub,
+            ILogger<DataProviderSynchronizer> logger,
+            PlayerUpdateRetryPolicy retryPolicy,
+            TimeSpan? drainTimeout = null,
+            TimeSpan? reclaimGracePeriod = null,
+            TimeProvider? timeProvider = null)
         {
             _services = services;
             _pubsub = pubsub;
             _logger = logger;
             _retryPolicy = retryPolicy;
             _drainTimeout = drainTimeout ?? DefaultDrainTimeout;
+            _reclaimGracePeriod = reclaimGracePeriod ?? DefaultReclaimGracePeriod;
+            _timeProvider = timeProvider ?? TimeProvider.System;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -204,6 +229,14 @@ namespace Game.DataAccess
                 var next = await queue.ReserveNextAsync(cancellationToken);
                 if (next is null)
                 {
+                    // Nothing left to reserve. Opportunistically reclaim anything stranded on the processing
+                    // list (past the grace period) instead of waiting for the next process restart to recover
+                    // it (#1702), and keep draining if that surfaced fresh work.
+                    if (await TryReclaimStrandedProcessingAsync(queue, cancellationToken))
+                    {
+                        continue;
+                    }
+
                     break;
                 }
 
@@ -216,6 +249,49 @@ namespace Game.DataAccess
             {
                 await SurfaceDeadLetterDepth(deadLetterQueue);
             }
+        }
+
+        /// <summary>
+        /// Reclaims items stranded on the processing list — orphaned not by a crash (the startup reclaim's
+        /// job) but by <c>ProcessMessage</c>'s own escape paths faulting after a durable apply (the dead-letter
+        /// write or the acknowledge itself hitting a Redis blip) — once they've sat there, with nothing left on
+        /// the main queue, for at least <see cref="_reclaimGracePeriod"/>. The grace period exists only to
+        /// avoid needlessly racing an item another live instance is still genuinely applying; reclaiming it
+        /// regardless would still be safe under the queue's idempotent at-least-once contract. Returns whether
+        /// anything was reclaimed, so the caller knows to keep draining.
+        /// </summary>
+        private async Task<bool> TryReclaimStrandedProcessingAsync(IPubSubQueue queue, CancellationToken cancellationToken)
+        {
+            var processingCount = await queue.GetProcessingCountAsync(cancellationToken);
+            if (processingCount == 0)
+            {
+                _strandedProcessingObservedAt = null;
+                return false;
+            }
+
+            var now = _timeProvider.GetUtcNow();
+            if (_strandedProcessingObservedAt is null)
+            {
+                // First sighting: start the clock rather than reclaiming immediately.
+                _strandedProcessingObservedAt = now;
+                return false;
+            }
+
+            if (now - _strandedProcessingObservedAt.Value < _reclaimGracePeriod)
+            {
+                return false;
+            }
+
+            var reclaimed = await queue.ReclaimProcessingAsync(cancellationToken);
+            _strandedProcessingObservedAt = null;
+            if (reclaimed > 0)
+            {
+                _logger.LogInformation(
+                    "Opportunistically reclaimed {Count} player update(s) stranded on the processing list for over {GracePeriod} on queue '{Queue}'.",
+                    reclaimed, _reclaimGracePeriod, Constants.PUBSUB_PLAYER_QUEUE);
+            }
+
+            return reclaimed > 0;
         }
 
         /// <summary>

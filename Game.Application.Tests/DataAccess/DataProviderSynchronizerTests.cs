@@ -920,6 +920,86 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_ProcessingListStrandedWithinGracePeriod_DoesNotReclaimYet()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+
+            // Model an item stranded on the processing list without a crash (e.g. the dead-letter write or the
+            // acknowledge itself faulting after a durable apply): reserved but never acknowledged, with nothing
+            // else left on the main queue.
+            var queue = new InMemoryPubSubQueue("malformed");
+            var stranded = await queue.ReserveNextAsync();
+            Assert.NotNull(stranded);
+
+            // A drain pass immediately after finds the main queue empty and the processing list non-empty, but
+            // the grace period hasn't elapsed yet, so it only starts the clock without reclaiming.
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+            Assert.Equal(1, await queue.ReclaimProcessingAsync());
+        }
+
+        [Fact]
+        public async Task ProcessQueue_ProcessingListStrandedPastGracePeriod_ReclaimsAndAppliesTheEvent()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            var validEvent = new PlayerCoreUpdatedEvent(
+                PlayerId: player.Id,
+                Level: 33,
+                Exp: 3333,
+                CurrentZoneId: 0,
+                StatPointsGained: 100,
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow,
+                AutoChallengeBoss: false);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+
+            // Reserve without acknowledging, stranding the event on the processing list with nothing left on
+            // the main queue — the same stranding shape as the crashed-run test above, but here modelling a
+            // still-live instance whose acknowledge (not the apply) faulted.
+            var queue = new InMemoryPubSubQueue(Serialize(validEvent));
+            Assert.NotNull(await queue.ReserveNextAsync());
+
+            // First pass only starts the grace clock.
+            await synchronizer.ProcessQueue(queue);
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+
+            // Once the grace period has elapsed, the next drain pass reclaims it and applies it — without
+            // waiting for the process to restart.
+            timeProvider.Advance(TimeSpan.FromSeconds(31));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("stranded"));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+            Assert.Equal(0, await queue.ReclaimProcessingAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(33, persisted.Level);
+            Assert.Equal(3333, persisted.Exp);
+        }
+
+        [Fact]
         public async Task StartAsync_ReclaimsInFlightItemOrphanedByCrashedRun_AndApplies()
         {
             using var scope = CreateScope();
@@ -1190,6 +1270,8 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
 
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_processing.Count);
+
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default)
             {
                 IReadOnlyList<string> head = count <= 0
@@ -1295,6 +1377,14 @@ namespace Game.Application.Tests.DataAccess
                 lock (_gate)
                 {
                     return Task.FromResult((long)_items.Count);
+                }
+            }
+
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_processing.Count);
                 }
             }
 
@@ -1442,6 +1532,7 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_processing.Count);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -1472,6 +1563,7 @@ namespace Game.Application.Tests.DataAccess
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -1480,6 +1572,16 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
+
+        /// <summary>A controllable <see cref="TimeProvider"/> so the opportunistic-reclaim grace period can be
+        /// crossed deterministically instead of relying on wall-clock delays.</summary>
+        private sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
+        {
+            private DateTimeOffset _now = start;
+
+            public override DateTimeOffset GetUtcNow() => _now;
+            public void Advance(TimeSpan delta) => _now += delta;
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>
