@@ -845,6 +845,38 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void AcceptChanges_ClearsAllThreeDirtySets()
+        {
+            var progress = MakeProgress();
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats { PlayerDamageDealt = 10.0 }, isBossBattle: false, zoneId: 0);
+            progress.EvaluateChallenges([MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5)]);
+            progress.SetProficiencyProgress(proficiencyId: 3, level: 1, xp: 40m);
+
+            progress.AcceptChanges();
+
+            Assert.Empty(progress.DirtyStatistics);
+            Assert.Empty(progress.DirtyChallenges);
+            Assert.Empty(progress.DirtyProficiencies);
+        }
+
+        [Fact]
+        public void AcceptChanges_ThenMutatingAgain_DirtiesOnlyTheNewMutation()
+        {
+            // Simulates a saved aggregate reused for a second mutation: the first save's rows must not
+            // resurface in the persist set once a new, unrelated statistic is touched.
+            var progress = MakeProgress();
+            progress.RecordBattleCompleted(MakeEnemy(id: 1), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats { PlayerDamageDealt = 10.0 }, isBossBattle: false, zoneId: 0);
+            progress.AcceptChanges();
+
+            progress.SetProficiencyProgress(proficiencyId: 3, level: 1, xp: 40m);
+
+            Assert.Empty(progress.DirtyStatistics);
+            Assert.Equal(3, Assert.Single(progress.DirtyProficiencies).ProficiencyId);
+        }
+
+        [Fact]
         public void RecordBattleCompleted_MarksOnlyTheTouchedStatisticsDirty()
         {
             var progress = MakeProgress();

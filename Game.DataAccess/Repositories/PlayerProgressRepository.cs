@@ -98,6 +98,10 @@ namespace Game.DataAccess.Repositories
             };
             _updateBatch.Add(envelope);
 
+            // The envelope above already captured this save's changed rows, so clearing the dirty tracking
+            // now is safe: a second save of this same aggregate (without further mutation) enqueues nothing.
+            progress.AcceptChanges();
+
             // The cache is the source of truth, but it is stored as a Redis hash keyed by row identity, so
             // advancing it only needs to HSET the rows this save actually touched (changed, captured now off
             // the live aggregate so a deferred advance still reflects this save's state) rather than

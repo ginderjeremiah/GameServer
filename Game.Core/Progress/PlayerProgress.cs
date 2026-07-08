@@ -244,6 +244,18 @@ namespace Game.Core.Progress
             _proficiencies.TryGetValue(proficiencyId, out proficiency);
 
         /// <summary>
+        /// Clears the dirty-row tracking, so a subsequent save of this same aggregate re-enqueues and
+        /// re-persists only rows mutated since <em>this</em> point rather than every row dirtied since load.
+        /// Called by the repository once a save's envelope has been buffered.
+        /// </summary>
+        public void AcceptChanges()
+        {
+            _dirtyStatistics.Clear();
+            _dirtyChallenges.Clear();
+            _dirtyProficiencies.Clear();
+        }
+
+        /// <summary>
         /// Sets a proficiency's absolute level and accumulated XP, creating the row on first training, and
         /// marks it dirty for the write-behind persist. The XP → level computation against the authored curve
         /// belongs to the XP-accrual sub-issue (#1116); this is the persistence seam it writes its result
