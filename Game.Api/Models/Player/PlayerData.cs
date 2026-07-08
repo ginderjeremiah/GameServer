@@ -6,15 +6,15 @@ namespace Game.Api.Models.Player
 {
     public class PlayerData : IModel
     {
-        public int Id { get; set; }
+        public required int Id { get; set; }
         public required string Name { get; set; }
-        public int Level { get; set; }
-        public int Exp { get; set; }
+        public required int Level { get; set; }
+        public required int Exp { get; set; }
         public required List<BattlerAttribute> Attributes { get; set; }
         public required List<UnlockedSkill> UnlockedSkills { get; set; }
-        public int CurrentZone { get; set; }
-        public int StatPointsGained { get; set; }
-        public int StatPointsUsed { get; set; }
+        public required int CurrentZone { get; set; }
+        public required int StatPointsGained { get; set; }
+        public required int StatPointsUsed { get; set; }
         public required List<LogPreference> LogPreferences { get; set; }
         public required List<PlayerLesson> Lessons { get; set; }
         public required InventoryData InventoryData { get; set; }
