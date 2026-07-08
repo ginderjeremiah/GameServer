@@ -896,6 +896,56 @@ namespace Game.Core.Tests.Players
             Assert.Equal(timestamp, coreUpdated.LastActivity);
         }
 
+        [Fact]
+        public void RecordBattleCompleted_CarriesZeroRatingsOntoEvent()
+        {
+            // No rating parameters exist on this overload at all — a loss/draw never claims proficiency XP.
+            var player = MakePlayer();
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow);
+
+            var evt = Assert.Single(player.DomainEvents.OfType<BattleCompletedEvent>());
+            Assert.Equal(0, evt.PlayerRating);
+            Assert.Equal(0, evt.EnemyRating);
+        }
+
+        // ── RecordBattleVictory ──────────────────────────────────────────────
+
+        [Fact]
+        public void RecordBattleVictory_ThreadsCombatRatingsOntoEvent()
+        {
+            var player = MakePlayer();
+            var enemy = MakeEnemy(id: 5);
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 3200, Stats: new BattleStats());
+
+            player.RecordBattleVictory(
+                enemy, result, isBossBattle: true, zoneId: 7, timestamp: DateTime.UtcNow,
+                playerRating: 12.5, enemyRating: 8.25);
+
+            var evt = Assert.Single(player.DomainEvents.OfType<BattleCompletedEvent>());
+            Assert.Equal(12.5, evt.PlayerRating);
+            Assert.Equal(8.25, evt.EnemyRating);
+        }
+
+        [Fact]
+        public void RecordBattleVictory_StampsLastActivityAndRaisesCoreUpdated()
+        {
+            var player = MakePlayer();
+            var enemy = MakeEnemy(id: 5);
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, Stats: new BattleStats());
+            var timestamp = new DateTime(2026, 6, 20, 12, 0, 0, DateTimeKind.Utc);
+
+            player.RecordBattleVictory(
+                enemy, result, isBossBattle: false, zoneId: 3, timestamp: timestamp,
+                playerRating: 1, enemyRating: 1);
+
+            Assert.Equal(timestamp, player.LastActivity);
+            var coreUpdated = player.DomainEvents.OfType<PlayerCoreUpdatedEvent>().SingleOrDefault();
+            Assert.NotNull(coreUpdated);
+            Assert.Equal(timestamp, coreUpdated.LastActivity);
+        }
+
         // ── StampActivity ────────────────────────────────────────────────────
 
         [Fact]

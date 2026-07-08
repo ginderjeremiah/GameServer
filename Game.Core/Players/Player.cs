@@ -463,15 +463,28 @@ namespace Game.Core.Players
             return true;
         }
 
-        // A victory caller MUST pass the battle's real combat ratings — the effect-based accrual normalizes each
-        // path's activity by max(playerRating, enemyRating), so the default 0/0 disables the accrual entirely
-        // (the normalization guard treats a non-positive denominator as no claim). Defaulting to 0 is correct
-        // only for the loss/abandon paths (no XP on a non-victory); a future victory path that forgets to thread
-        // them would silently accrue zero XP. Today both victory paths route through RecordVictory, which passes
-        // them.
-        public void RecordBattleCompleted(
+        // Records a non-victory (loss/draw) battle outcome. No combat ratings are threaded onto the event —
+        // XP only accrues on a win — so a victory MUST go through RecordBattleVictory instead, which requires
+        // them; that split (rather than a defaultable parameter) makes a victory caller forgetting the ratings
+        // a compile error instead of a silent zero-XP accrual.
+        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp)
+        {
+            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating: 0, enemyRating: 0);
+        }
+
+        // Records a victorious battle outcome, threading the combat ratings the win was rated against so the
+        // progress handler can normalize proficiency accrual by max(playerRating, enemyRating) (spike #1526
+        // Decision 5). Both current victory paths route through BattleService.RecordVictory, which supplies them.
+        public void RecordBattleVictory(
             Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
-            double playerRating = 0, double enemyRating = 0)
+            double playerRating, double enemyRating)
+        {
+            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating, enemyRating);
+        }
+
+        private void RecordBattleOutcome(
+            Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
+            double playerRating, double enemyRating)
         {
             RaiseEvent(new BattleCompletedEvent(
                 this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId,
