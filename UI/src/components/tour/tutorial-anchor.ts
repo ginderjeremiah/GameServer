@@ -63,7 +63,11 @@ export const TOUR_ANCHOR_KEY = {
 
 const SIDES: readonly Side[] = ['player', 'enemy'];
 
-/** Every anchor key the app ever registers, across both sides. */
+/**
+ * Every anchor key the app ever registers, across both sides — the *intended* single source of
+ * truth. `tutorialAnchor` itself accepts any string, so this is only complete as long as new
+ * `use:tutorialAnchor` call sites register their key here rather than inlining a fresh literal.
+ */
 export const TOUR_ANCHOR_KEYS: readonly string[] = SIDES.flatMap((side) => [
 	TOUR_ANCHOR_KEY.fightCombatLog(side),
 	TOUR_ANCHOR_KEY.fightHpBar(side),

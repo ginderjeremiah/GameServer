@@ -94,6 +94,16 @@ describe('committed lesson content (content/lessons.json)', () => {
 	// anchorKey a live lesson step references must resolve to a real `use:tutorialAnchor` registration.
 	// A missing anchor degrades gracefully at runtime (centered callout), so this is a content-quality
 	// check, not a crash guard.
+	const liveAnchorKeys = liveLessons.flatMap((lesson) =>
+		lesson.steps.map((step) => step.anchorKey).filter((anchorKey) => anchorKey !== null)
+	);
+
+	// Guards against the check below passing vacuously if every live step happened to have a null
+	// anchorKey (a centered-callout step), mirroring the live-lesson guard above.
+	it('has at least one live lesson step with an anchorKey to check', () => {
+		expect(liveAnchorKeys.length).toBeGreaterThan(0);
+	});
+
 	it('gives every live lesson step an anchorKey that resolves to a registered tour anchor', () => {
 		const anchorKeys = new Set(TOUR_ANCHOR_KEYS);
 		const badAnchorKeys = liveLessons.flatMap((lesson) =>
