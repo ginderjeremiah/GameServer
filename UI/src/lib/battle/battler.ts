@@ -311,6 +311,7 @@ export class Battler {
 		// on the same tick (see advanceEffects).
 		for (const v of this.activeEffects) {
 			if (v.attribute === effect.attributeId) {
+				v.durationMs = effect.durationMs;
 				v.remainingMs = effect.durationMs;
 				v.renderRemainingMs = effect.durationMs;
 			}
