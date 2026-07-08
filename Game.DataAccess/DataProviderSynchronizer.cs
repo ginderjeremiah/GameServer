@@ -239,6 +239,17 @@ namespace Game.DataAccess
                 {
                     await concurrencyGate.WaitAsync(cancellationToken);
 
+                    // WaitAsync(CancellationToken) can win a race against its own token: if the slot is
+                    // released at roughly the same moment the token is cancelled, the wait can complete by
+                    // acquiring the slot instead of throwing OperationCanceledException. Re-checking here
+                    // closes that race deterministically — a stop never reserves one item past the boundary
+                    // depending on how that race happened to resolve.
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        concurrencyGate.Release();
+                        break;
+                    }
+
                     string? next;
                     try
                     {
