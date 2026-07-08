@@ -1298,6 +1298,58 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_ForceAbandonAStillInProgressBossBattle_DiscardsItAndStartsAFreshIdleBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Mirrors StartBattle_AbandoningAStillInProgressBossBattle_HandsItBackWithBossFlagSet, but this
+            // NewEnemy request sets forceAbandon (retreat, #1690): the still-in-progress boss fight must be
+            // discarded instead of handed back, and a fresh idle battle started in its place — the same
+            // override StartBossBattle already applies unconditionally for ChallengeBoss.
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowBossSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+            var idleEnemy = await TestDataSeeder.CreateEnemyAsync(context, "Idle Critter");
+            var idleSkill = await TestDataSeeder.CreateSkillAsync(context, "Nibble");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, idleEnemy.Id, idleSkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1, bossEnemyId: boss.Id, bossLevel: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, idleEnemy.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            var started = await battleService.StartBossBattle(player, state, zone.Id);
+            Assert.NotNull(started);
+            Assert.True(state.HasActiveBattle);
+            Assert.True(state.IsBossBattle);
+
+            // Still genuinely in progress (far under the 2-minute cap) — without forceAbandon this would be
+            // handed back unchanged, per the sibling test above.
+            state.BattleStartTime = DateTime.UtcNow.AddSeconds(-1);
+
+            var result = await battleService.StartBattle(player, state, zoneId: zone.Id, forceAbandon: true);
+
+            Assert.Equal(idleEnemy.Id, result.Enemy.Id);
+            Assert.Null(result.ElapsedOffsetMs);
+            Assert.False(result.IsBossBattle);
+            Assert.True(state.HasActiveBattle);
+            Assert.False(state.IsBossBattle);
+            Assert.Equal(idleEnemy.Id, state.ActiveEnemyId);
+        }
+
+        [Fact]
         public async Task ResolveStaleBattle_Concludes_ReturnsNullAndCreditsTheWin()
         {
             using var scope = CreateScope();

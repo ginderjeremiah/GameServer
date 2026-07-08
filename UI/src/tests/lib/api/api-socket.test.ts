@@ -193,7 +193,7 @@ describe('ApiSocket', () => {
 
 		it('assigns incrementing command IDs', async () => {
 			const p1 = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
-			const p2 = apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1 });
+			const p2 = apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1, forceAbandon: false });
 			await flushMicrotasks();
 			const ws = lastWs();
 

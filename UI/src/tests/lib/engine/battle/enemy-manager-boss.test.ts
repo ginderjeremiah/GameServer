@@ -596,6 +596,19 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 
+	it('retreat force-abandons a still-in-progress boss fight instead of asking the backend to hand it back', async () => {
+		// #1690: retreat must not resume the same boss fight even if the server would otherwise hand a
+		// still-active battle back unchanged (as an ordinary NewEnemy does). The frontend signals the
+		// discard via forceAbandon; the backend-side discard itself is pinned by
+		// BattleServiceIntegrationTests.StartBattle_ForceAbandonAStillInProgressBossBattle_DiscardsItAndStartsAFreshIdleBattle.
+		await manager.challengeBoss();
+		expect(manager.mode).toBe('boss');
+
+		await manager.retreatFromBoss();
+
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ forceAbandon: true }));
+	});
+
 	it('ignores retreat when not engaged in a boss fight', async () => {
 		await manager.retreatFromBoss();
 		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
@@ -940,7 +953,7 @@ describe('EnemyManager boss mode', () => {
 		expect(send).not.toHaveBeenCalledWith('BattleLost');
 		// The drawn battle was fought to the cap, so the fetch reports the elapsed time the client simulated
 		// (battleEngine.timeElapsed) — the backend abandon re-simulates that window and records the draw.
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 8880 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 8880, forceAbandon: false });
 		expect(manager.mode).toBe('idle');
 	});
 
@@ -1032,7 +1045,7 @@ describe('EnemyManager boss mode', () => {
 		// The bundled enemy was for zone 3; the player is now in zone 7, so it is discarded and a fresh enemy
 		// is fetched for (and the server told about) the new zone. The discarded prefetch was never fought, so
 		// the fetch reports clientBattleMs 0 — the backend records no phantom abandon for it.
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 7, clientBattleMs: 0 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 7, clientBattleMs: 0, forceAbandon: false });
 		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 
@@ -1056,7 +1069,7 @@ describe('EnemyManager boss mode', () => {
 		await handled;
 
 		// The never-fought prefetch reports clientBattleMs 0, so the backend records no phantom abandon for it.
-		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 0 });
+		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 0, forceAbandon: false });
 		expect(manager.currentEnemy).toEqual(normalInstance);
 	});
 

@@ -81,7 +81,11 @@ describe('EnemyManager.getNewEnemy', () => {
 
 		await manager.getNewEnemy();
 
-		expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 });
+		expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', {
+			newZoneId: 3,
+			clientBattleMs: undefined,
+			forceAbandon: false
+		});
 	});
 
 	it('stores the enemy and notifies listeners on success', async () => {
@@ -291,7 +295,13 @@ describe('EnemyManager.start', () => {
 
 		manager.start();
 
-		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3 }));
+		await vi.waitFor(() =>
+			expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', {
+				newZoneId: 3,
+				clientBattleMs: undefined,
+				forceAbandon: false
+			})
+		);
 		expect(manager.currentEnemy).toEqual(makeEnemy(5));
 	});
 
@@ -372,6 +382,12 @@ describe('EnemyManager Home zone', () => {
 		manager.navigateToZone(COMBAT_ZONE);
 
 		expect(playerManager.currentZone).toBe(COMBAT_ZONE);
-		await vi.waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', { newZoneId: COMBAT_ZONE }));
+		await vi.waitFor(() =>
+			expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', {
+				newZoneId: COMBAT_ZONE,
+				clientBattleMs: undefined,
+				forceAbandon: false
+			})
+		);
 	});
 });
