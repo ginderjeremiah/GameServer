@@ -1203,6 +1203,55 @@ namespace Game.Application.Tests.DataAccess
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
         }
 
+        [Fact]
+        public async Task ProcessQueue_LargeBacklogAcrossManyPlayers_CompactsInFlightTrackingWithoutLosingOrdering()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // 20 players × an order-sensitive equip/unequip pair each = 40 events, comfortably past the
+            // default compaction threshold (max(4 * 8, 32) = 32) so this pass exercises CompactCompletedItems
+            // sweeping finished entries out of inFlight/playerLanes mid-drain, not just at pass end.
+            const int playerCount = 20;
+            var players = new List<Infrastructure.Entities.Player>();
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            for (var i = 0; i < playerCount; i++)
+            {
+                var user = await TestDataSeeder.CreateUserAsync(context, username: $"backlog-user-{i}");
+                var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+                await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, item.Id, equipmentSlot: null);
+                players.Add(player);
+            }
+
+            // All equips first, then all unequips: by the time the later unequips are reserved, many earlier
+            // players' equip tasks have already completed and — if compaction is correct — been swept from
+            // playerLanes. A later unequip must still resolve to "no predecessor to wait for" and apply
+            // cleanly rather than losing its chain.
+            var messages = new List<string>();
+            messages.AddRange(players.Select(p => Serialize(new ItemEquippedEvent(p.Id, item.Id, (int)EEquipmentSlot.HelmSlot))));
+            messages.AddRange(players.Select(p => Serialize(new ItemUnequippedEvent(p.Id, item.Id))));
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
+
+            var queue = new InMemoryPubSubQueue([.. messages]);
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Null(await queue.GetNextAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            foreach (var player in players)
+            {
+                var row = await verifyContext.UnlockedItems
+                    .SingleAsync(ui => ui.PlayerId == player.Id && ui.ItemId == item.Id, CancellationToken);
+                Assert.Null(row.EquipmentSlotId);
+            }
+        }
+
         private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
         {
             var row = Assert.Single(rows, ps => ps.SkillId == skillId);

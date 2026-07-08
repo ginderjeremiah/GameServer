@@ -227,6 +227,12 @@ namespace Game.DataAccess
             var inFlight = new List<Task>();
             using var concurrencyGate = new SemaphoreSlim(_maxConcurrentDrainItems);
 
+            // Sweep completed entries out of both collections once they grow past this many, so a large-backlog
+            // pass — the exact case #1701 targets — retains roughly the concurrency budget rather than the
+            // whole pass's item count. Checked periodically rather than every item so the amortized sweep cost
+            // stays O(pass size) overall instead of O(pass size squared).
+            var compactionThreshold = Math.Max(_maxConcurrentDrainItems * 8, 32);
+
             try
             {
                 while (!cancellationToken.IsCancellationRequested)
@@ -255,6 +261,11 @@ namespace Game.DataAccess
                     var itemTask = ProcessReservedItemAsync(previous, next, queue, deadLetterQueue, concurrencyGate, cancellationToken);
                     playerLanes[playerId] = itemTask;
                     inFlight.Add(itemTask);
+
+                    if (inFlight.Count >= compactionThreshold)
+                    {
+                        CompactCompletedItems(playerLanes, inFlight);
+                    }
                 }
             }
             finally
@@ -274,6 +285,37 @@ namespace Game.DataAccess
             if (!cancellationToken.IsCancellationRequested)
             {
                 await SurfaceDeadLetterDepth(deadLetterQueue);
+            }
+        }
+
+        /// <summary>
+        /// Drops already-finished tasks from <paramref name="inFlight"/> and <paramref name="playerLanes"/> so a
+        /// large-backlog pass retains roughly the concurrency budget rather than growing to the whole pass's
+        /// item count. Only a lane whose <em>current</em> (most recently chained) task has completed is
+        /// evicted — a still-running or not-yet-started successor for that player is left untouched, so a later
+        /// item for the same player still correctly chains onto it rather than a stale completed entry.
+        /// </summary>
+        private static void CompactCompletedItems(Dictionary<int, Task> playerLanes, List<Task> inFlight)
+        {
+            inFlight.RemoveAll(task => task.IsCompleted);
+
+            List<int>? completedLanes = null;
+            foreach (var (playerId, task) in playerLanes)
+            {
+                if (task.IsCompleted)
+                {
+                    (completedLanes ??= []).Add(playerId);
+                }
+            }
+
+            if (completedLanes is null)
+            {
+                return;
+            }
+
+            foreach (var playerId in completedLanes)
+            {
+                playerLanes.Remove(playerId);
             }
         }
 
