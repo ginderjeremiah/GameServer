@@ -85,6 +85,29 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task Save_SavingTheSameAggregateAgainWithoutFurtherMutation_EnqueuesNothing()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+
+            using var scope = CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []);
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            await repo.Save(progress);
+            Assert.Equal(1, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            // Saving the exact same aggregate a second time, with no new mutation, must not re-enqueue the
+            // rows the first save already persisted — Save clears the dirty tracking once its own envelope
+            // is buffered (the double-publish sharp edge a future multi-step caller could otherwise hit).
+            await repo.Save(progress);
+            Assert.Equal(1, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+        }
+
+        [Fact]
         public async Task Save_WritesCache_SoASubsequentReadIsServedWithoutTheDatabase()
         {
             var playerId = await SeedPlayerAsync();
