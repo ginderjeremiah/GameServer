@@ -10,19 +10,31 @@ export interface TickSource {
 }
 
 export function createTickSource(onTick: () => void): TickSource {
+	let worker: Worker | null = null;
+
 	if (typeof Worker !== 'undefined') {
-		let worker: Worker | null = new Worker(new URL('./tick-worker.ts', import.meta.url), {
-			type: 'module'
-		});
+		try {
+			worker = new Worker(new URL('./tick-worker.ts', import.meta.url), {
+				type: 'module'
+			});
+		} catch (err) {
+			// A CSP worker-src restriction throws synchronously from the constructor itself,
+			// unlike a worker script failure, which only ever surfaces via the async onerror below.
+			console.error('The logical engine tick worker failed to start, falling back to setInterval', err);
+		}
+	}
+
+	if (worker !== null) {
+		const activeWorker = worker;
 		let fallbackHandle: number | null = null;
 
-		worker.onmessage = () => onTick();
-		worker.onerror = (ev) => {
+		activeWorker.onmessage = () => onTick();
+		activeWorker.onerror = (ev) => {
 			if (worker === null) {
 				return;
 			}
 			console.error('The logical engine tick worker failed, falling back to setInterval', ev);
-			worker.terminate();
+			activeWorker.terminate();
 			worker = null;
 			fallbackHandle = window.setInterval(onTick, pollingIntervalMs);
 		};
