@@ -75,7 +75,7 @@ describe('createTickSource', () => {
 
 	it('falls back to window.setInterval when the worker fails to start', () => {
 		vi.stubGlobal('Worker', MockWorker);
-		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.useFakeTimers();
 
 		const onTick = vi.fn();
@@ -92,5 +92,31 @@ describe('createTickSource', () => {
 		source.stop();
 		vi.advanceTimersByTime(pollingIntervalMs * 5);
 		expect(onTick).toHaveBeenCalledTimes(callCount);
+		errorSpy.mockRestore();
+	});
+
+	it('falls back to window.setInterval when the Worker constructor throws synchronously', () => {
+		class ThrowingWorker {
+			constructor() {
+				throw new DOMException('Refused to construct a worker', 'SecurityError');
+			}
+		}
+		vi.stubGlobal('Worker', ThrowingWorker);
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.useFakeTimers();
+
+		const onTick = vi.fn();
+		const source = createTickSource(onTick);
+
+		expect(errorSpy).toHaveBeenCalledTimes(1);
+
+		vi.advanceTimersByTime(pollingIntervalMs * 3);
+		expect(onTick.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+		const callCount = onTick.mock.calls.length;
+		source.stop();
+		vi.advanceTimersByTime(pollingIntervalMs * 5);
+		expect(onTick).toHaveBeenCalledTimes(callCount);
+		errorSpy.mockRestore();
 	});
 });
