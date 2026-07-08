@@ -289,7 +289,6 @@ export class Battler {
 		if (view) {
 			view.totalAmount = combinedAmount;
 			view.count++;
-			view.durationMs = effect.durationMs;
 			foldSourceContribution(view.sources, effect.id, amount, isMultiplicative);
 		} else {
 			view = {
