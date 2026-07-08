@@ -764,7 +764,11 @@ namespace Game.Application.Tests.DataAccess
             // stop arrives.
             var gatedQueue = new GatedDrainQueue("malformed-1", "malformed-2");
             var pubsub = new SingleQueuePubSubService(gatedQueue);
-            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(5));
+            // Concurrency pinned to 1: this test's boundary assertion (ReservedCount) is about how far the
+            // reserve loop gets ahead of a stuck item, which bounded cross-player concurrency (#1701) widens
+            // to the configured limit — see ProcessQueue_DifferentPlayersEvents_ApplyConcurrently and
+            // ProcessQueue_StopDuringDrain_ReservesAtMostMaxConcurrentItemsAheadOfAGatedItem for that behavior.
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(5), maxConcurrentDrainItems: 1);
 
             // The startup drain reserves + dead-letters the first item, then blocks inside its acknowledge.
             var startTask = synchronizer.StartAsync(CancellationToken.None);
@@ -1082,6 +1086,123 @@ namespace Game.Application.Tests.DataAccess
             Assert.Null(row.EquipmentSlotId);
         }
 
+        [Fact]
+        public async Task ProcessQueue_DifferentPlayersEvents_ApplyConcurrently()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user1 = await TestDataSeeder.CreateUserAsync(context, username: "concurrent-user-1");
+            var player1 = await TestDataSeeder.CreatePlayerAsync(context, user1.Id, level: 5, zoneId: 0);
+            var user2 = await TestDataSeeder.CreateUserAsync(context, username: "concurrent-user-2");
+            var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5, zoneId: 0);
+
+            var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
+            var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, maxConcurrentDrainItems: 2);
+
+            // The acknowledge delay widens the window so two different players' items — independent of each
+            // other — genuinely overlap there when bounded cross-player concurrency (#1701) is in effect.
+            var queue = new ConcurrentAcknowledgeTrackingQueue(TimeSpan.FromMilliseconds(50), Serialize(evt1), Serialize(evt2));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Equal(2, queue.MaxObservedConcurrency);
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted1 = await verifyContext.Players.FindAsync([player1.Id], CancellationToken);
+            var persisted2 = await verifyContext.Players.FindAsync([player2.Id], CancellationToken);
+            Assert.NotNull(persisted1);
+            Assert.NotNull(persisted2);
+            Assert.Equal(9, persisted1.Level);
+            Assert.Equal(9, persisted2.Level);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_SamePlayerEventsInterleavedWithOtherPlayers_StillApplyInOrder()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var userA = await TestDataSeeder.CreateUserAsync(context, username: "lane-user-a");
+            var playerA = await TestDataSeeder.CreatePlayerAsync(context, userA.Id, level: 5, zoneId: 0);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerA.Id, item.Id, equipmentSlot: null);
+
+            var userB = await TestDataSeeder.CreateUserAsync(context, username: "lane-user-b");
+            var playerB = await TestDataSeeder.CreatePlayerAsync(context, userB.Id, level: 3, zoneId: 0);
+
+            // Player B's unrelated event sits between player A's order-sensitive equip/unequip pair. Bounded
+            // cross-player concurrency (#1701) may run B's event alongside A's, but A's own pair is chained
+            // onto the same per-player lane, so it must still apply strictly in order.
+            var equip = new ItemEquippedEvent(playerA.Id, item.Id, (int)EEquipmentSlot.HelmSlot);
+            var unrelated = new PlayerCoreUpdatedEvent(playerB.Id, 7, 500, 0, 100, 100, DateTime.UtcNow, false);
+            var unequip = new ItemUnequippedEvent(playerA.Id, item.Id);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, maxConcurrentDrainItems: 4);
+
+            var queue = new InMemoryPubSubQueue(Serialize(equip), Serialize(unrelated), Serialize(unequip));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Null(await queue.GetNextAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await verifyContext.UnlockedItems
+                .SingleAsync(ui => ui.PlayerId == playerA.Id && ui.ItemId == item.Id, CancellationToken);
+
+            // Applied in order despite the interleaved unrelated player, so the slot is empty (the unequip).
+            Assert.Null(row.EquipmentSlotId);
+
+            var persistedB = await verifyContext.Players.FindAsync([playerB.Id], CancellationToken);
+            Assert.NotNull(persistedB);
+            Assert.Equal(7, persistedB.Level);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_StopDuringDrain_ReservesAtMostMaxConcurrentItemsAheadOfAGatedItem()
+        {
+            using var scope = CreateScope();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+
+            // Five malformed items (no derivable player id) so every one routes onto the same "unknown player"
+            // lane; the first is gated inside its acknowledge, holding one of the two concurrency slots.
+            var gatedQueue = new GatedDrainQueue("malformed-1", "malformed-2", "malformed-3", "malformed-4", "malformed-5");
+            var pubsub = new SingleQueuePubSubService(gatedQueue);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(5), maxConcurrentDrainItems: 2);
+
+            var startTask = synchronizer.StartAsync(CancellationToken.None);
+            await gatedQueue.AcknowledgeReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // The loop reserves as far ahead as its 2-slot budget allows, then blocks acquiring a third slot —
+            // unreachable until the gated item releases one — so once it settles at 2 it can never advance
+            // further without our help below, making the assertion deterministic rather than a timing guess.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (gatedQueue.ReservedCount < 2)
+            {
+                Assert.True(DateTime.UtcNow < deadline, "Timed out waiting for the drain to reserve its second item.");
+                await Task.Delay(10, CancellationToken);
+            }
+
+            await Task.Delay(100, CancellationToken);
+            Assert.Equal(2, gatedQueue.ReservedCount);
+
+            gatedQueue.ReleaseAcknowledge.SetResult();
+            await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await synchronizer.StopAsync(CancellationToken.None);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+        }
+
         private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
         {
             var row = Assert.Single(rows, ps => ps.SkillId == skillId);
@@ -1288,6 +1409,93 @@ namespace Game.Application.Tests.DataAccess
                     _processing.Remove(value);
                 }
                 return Task.CompletedTask;
+            }
+
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_items.Count);
+                }
+            }
+
+            // The drained-queue assertion uses GetNextAsync to confirm nothing is left waiting.
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult(_items.Count > 0 ? _items.Dequeue() : null);
+                }
+            }
+
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// An <see cref="IPubSubQueue"/> whose <see cref="AcknowledgeAsync"/> delays each acknowledge (to widen
+        /// the overlap window) and records the peak number of acknowledges in flight at once. Reserves are
+        /// immediate (unlike <see cref="ConcurrencyTrackingQueue"/>, which tracks reserve concurrency instead),
+        /// so this isolates concurrency in the apply/acknowledge phase — the phase bounded cross-player
+        /// concurrency (#1701) actually parallelizes.
+        /// </summary>
+        private sealed class ConcurrentAcknowledgeTrackingQueue : IPubSubQueue
+        {
+            private readonly object _gate = new();
+            private readonly Queue<string?> _items;
+            private readonly List<string?> _processing = [];
+            private readonly TimeSpan _acknowledgeDelay;
+            private int _activeAcknowledges;
+
+            public int MaxObservedConcurrency { get; private set; }
+
+            public ConcurrentAcknowledgeTrackingQueue(TimeSpan acknowledgeDelay, params string?[] items)
+            {
+                _acknowledgeDelay = acknowledgeDelay;
+                _items = new Queue<string?>(items);
+            }
+
+            public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    if (_items.Count == 0)
+                    {
+                        return Task.FromResult<string?>(null);
+                    }
+
+                    var value = _items.Dequeue();
+                    _processing.Add(value);
+                    return Task.FromResult(value);
+                }
+            }
+
+            public async Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default)
+            {
+                var active = Interlocked.Increment(ref _activeAcknowledges);
+                lock (_gate)
+                {
+                    MaxObservedConcurrency = Math.Max(MaxObservedConcurrency, active);
+                }
+
+                try
+                {
+                    await Task.Delay(_acknowledgeDelay);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _activeAcknowledges);
+                }
+
+                lock (_gate)
+                {
+                    _processing.Remove(value);
+                }
             }
 
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default)

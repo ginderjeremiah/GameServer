@@ -18,11 +18,28 @@ namespace Game.DataAccess
         /// </summary>
         private static readonly TimeSpan DefaultDrainTimeout = TimeSpan.FromSeconds(5);
 
+        /// <summary>
+        /// Default upper bound on how many player-update events this instance applies concurrently within one
+        /// drain pass. Same-player ordering is preserved regardless (see <see cref="ProcessReservedItemAsync"/>),
+        /// so this only relaxes the cross-player serialization that otherwise ceilings single-instance
+        /// convergence throughput at one DB round-trip per event (#1701). Conservative default; tune via the
+        /// constructor for a fleet under heavier convergence load.
+        /// </summary>
+        private const int DefaultMaxConcurrentDrainItems = 4;
+
+        /// <summary>
+        /// Lane key for a reserved item whose player id couldn't be determined (a malformed envelope/payload).
+        /// Such items are rare and are routed onto one shared serial lane rather than their own concurrent
+        /// slot — always order-safe since a genuine player id never collides with it.
+        /// </summary>
+        private const int UnknownPlayerLane = int.MinValue;
+
         private readonly IServiceProvider _services;
         private readonly IPubSubService _pubsub;
         private readonly ILogger<DataProviderSynchronizer> _logger;
         private readonly PlayerUpdateRetryPolicy _retryPolicy;
         private readonly TimeSpan _drainTimeout;
+        private readonly int _maxConcurrentDrainItems;
 
         // Cancelled on shutdown to signal any in-flight drain (the startup drain or a pub/sub wake) to stop
         // reserving new items and unwind at a clean item boundary, and to make a late wake a no-op.
@@ -53,13 +70,14 @@ namespace Game.DataAccess
         // from re-spamming the log on every drain. Touched only under the serialized drain, so it needs no lock.
         private long _lastReportedDeadLetterDepth;
 
-        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy, TimeSpan? drainTimeout = null)
+        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy, TimeSpan? drainTimeout = null, int? maxConcurrentDrainItems = null)
         {
             _services = services;
             _pubsub = pubsub;
             _logger = logger;
             _retryPolicy = retryPolicy;
             _drainTimeout = drainTimeout ?? DefaultDrainTimeout;
+            _maxConcurrentDrainItems = maxConcurrentDrainItems ?? DefaultMaxConcurrentDrainItems;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -192,29 +210,94 @@ namespace Game.DataAccess
             // Reserve each item (move it to the processing list) instead of destructively popping it, and only
             // acknowledge (remove it) once ProcessMessage has durably applied or dead-lettered it. A crash
             // anywhere in between leaves the item on the processing list to be reclaimed on next startup rather
-            // than lost (#769). At-least-once is safe because the handlers are idempotent. Stopping is both
-            // checked between items and threaded into the reserve, so a shutdown ends at a clean boundary while a
-            // wedged reserve still unwinds promptly. Once an item is reserved its apply and acknowledge run
-            // without the token so the in-flight write finishes cleanly — only the dead-time retry backoff
-            // between failed attempts honors the token (a stop during it abandons the retry, and the reserved
-            // item is reclaimed and re-applied on the next startup) — so the just-acknowledged item is durable
-            // and anything still queued is reclaimed on the next startup.
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var next = await queue.ReserveNextAsync(cancellationToken);
-                if (next is null)
-                {
-                    break;
-                }
+            // than lost (#769). At-least-once is safe because the handlers are idempotent.
+            //
+            // Reservation itself stays strictly sequential (one ReserveNextAsync at a time, in order), but the
+            // apply+acknowledge of already-reserved items runs with bounded concurrency across DISTINCT players
+            // (#1701) — cross-instance ordering was already only best-effort, so this introduces no new hazard
+            // there. Same-player items still apply strictly in order: each is chained onto a per-player "lane"
+            // (playerLanes) that only starts an item once the previous same-player item has fully applied and
+            // acknowledged. The concurrency gate is acquired before reserving, not just before processing, so
+            // reservation itself is bounded by the same budget — a stop still ends at a bounded (not unbounded)
+            // number of in-flight items, reclaimed on the next startup if the drain timeout is exceeded. Once an
+            // item is reserved its apply and acknowledge run without the token so the in-flight write finishes
+            // cleanly — only the dead-time retry backoff between failed attempts honors the token (a stop during
+            // it abandons the retry, and the reserved item is reclaimed and re-applied on the next startup).
+            var playerLanes = new Dictionary<int, Task>();
+            var inFlight = new List<Task>();
+            using var concurrencyGate = new SemaphoreSlim(_maxConcurrentDrainItems);
 
-                await ProcessMessage(next, deadLetterQueue, cancellationToken);
-                await queue.AcknowledgeAsync(next);
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await concurrencyGate.WaitAsync(cancellationToken);
+
+                    string? next;
+                    try
+                    {
+                        next = await queue.ReserveNextAsync(cancellationToken);
+                    }
+                    catch
+                    {
+                        concurrencyGate.Release();
+                        throw;
+                    }
+
+                    if (next is null)
+                    {
+                        concurrencyGate.Release();
+                        break;
+                    }
+
+                    var playerId = PlayerUpdateEnvelopeReader.TryReadPlayerId(next) ?? UnknownPlayerLane;
+                    var previous = playerLanes.TryGetValue(playerId, out var existingLane) ? existingLane : Task.CompletedTask;
+                    var itemTask = ProcessReservedItemAsync(previous, next, queue, deadLetterQueue, concurrencyGate, cancellationToken);
+                    playerLanes[playerId] = itemTask;
+                    inFlight.Add(itemTask);
+                }
+            }
+            finally
+            {
+                // Always await every item this pass started — including one still mid-flight when cancellation
+                // unwinds the reserve loop above (e.g. a stop mid-wait-for-a-slot) — so a stop genuinely waits
+                // for an in-progress apply to finish. Without this, ProcessQueue's caller could release the
+                // drain gate (and StopAsync could return) while an item was still applying, which is exactly
+                // the "cut off mid-SaveChanges" outcome the gate exists to prevent (docs/backend-persistence.md).
+                if (inFlight.Count > 0)
+                {
+                    await Task.WhenAll(inFlight);
+                }
             }
 
             // Skip the extra Redis round-trip if we stopped early; the depth is surfaced again on the next drain.
             if (!cancellationToken.IsCancellationRequested)
             {
                 await SurfaceDeadLetterDepth(deadLetterQueue);
+            }
+        }
+
+        /// <summary>
+        /// Applies and acknowledges one reserved item once <paramref name="previous"/> (the same player's prior
+        /// item, or an already-completed task when this is the first/only item for its player this pass)
+        /// finishes, then releases the concurrency slot <see cref="DrainQueueAsync"/> acquired for it before
+        /// reserving. The slot is held for this item's whole lifetime, including any wait on
+        /// <paramref name="previous"/> — a deliberate cost: it is what keeps a backlog dominated by one hot
+        /// player from letting <see cref="DrainQueueAsync"/> reserve unboundedly far ahead of what is actually
+        /// converging, so a stop mid-drain still ends at a bounded number of in-flight items rather than an
+        /// unbounded one.
+        /// </summary>
+        private async Task ProcessReservedItemAsync(Task previous, string message, IPubSubQueue queue, IPubSubQueue deadLetterQueue, SemaphoreSlim concurrencyGate, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await previous;
+                await ProcessMessage(message, deadLetterQueue, cancellationToken);
+                await queue.AcknowledgeAsync(message);
+            }
+            finally
+            {
+                concurrencyGate.Release();
             }
         }
 
