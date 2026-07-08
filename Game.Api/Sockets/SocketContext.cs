@@ -34,6 +34,18 @@ namespace Game.Api.Sockets
         // calling SendData. Left undisposed for the same reason as the command lock.
         private readonly SemaphoreSlim _sendLock = new(1, 1);
 
+        // Upper bound Close applies — on top of the caller's cancellationToken — to acquiring the send lock
+        // and completing the close handshake, before forcibly aborting the underlying socket. A wedged send
+        // (e.g. a client stalled with a TCP zero-window) holds the send lock and deliberately ignores its own
+        // cancellation once a frame has begun (see SendData's per-chunk CancellationToken.None), so cancelling
+        // the *wait* for the lock doesn't unblock the send itself — only Abort() does. This bound is what lets
+        // the inactivity watchdog's terminal Close (which passes no caller token at all) and the shutdown
+        // drain's deadline-bound Close both guarantee they eventually complete rather than hanging forever
+        // (#1726).
+        private static readonly TimeSpan DefaultCloseAbortTimeout = TimeSpan.FromSeconds(5);
+
+        private readonly TimeSpan _closeAbortTimeout;
+
         public string SocketId { get; }
         public int PlayerId { get; }
         public SessionService Session { get; }
@@ -49,7 +61,7 @@ namespace Game.Api.Sockets
         /// </summary>
         public bool IsAdmin { get; }
 
-        public SocketContext(WebSocket socket, int playerId, SessionService session, bool isAdmin, ILogger<SocketContext> logger)
+        public SocketContext(WebSocket socket, int playerId, SessionService session, bool isAdmin, ILogger<SocketContext> logger, TimeSpan? closeAbortTimeout = null)
         {
             _socket = socket;
             SocketId = Guid.NewGuid().ToString();
@@ -57,6 +69,7 @@ namespace Game.Api.Sockets
             Session = session;
             IsAdmin = isAdmin;
             _logger = logger;
+            _closeAbortTimeout = closeAbortTimeout ?? DefaultCloseAbortTimeout;
         }
 
         public async Task<bool> SendData(string data, CancellationToken cancellationToken = default)
@@ -172,25 +185,54 @@ namespace Game.Api.Sockets
                 {
                     // The close frame is a send too, so take the same lock to avoid overlapping an in-flight
                     // SendData; re-check state inside the lock so a racing close only sends one close frame.
-                    await _sendLock.WaitAsync(cancellationToken);
+                    // Bound the wait (and the close handshake itself) with _closeAbortTimeout on top of the
+                    // caller's token: a wedged send holding the lock ignores its own cancellation, so falling
+                    // back to Abort() here is the only way to guarantee this method — and whatever awaits it —
+                    // doesn't hang forever (#1726).
+                    using var abortTimeoutCts = new CancellationTokenSource(_closeAbortTimeout);
+                    using var boundedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, abortTimeoutCts.Token);
+
+                    var lockAcquired = true;
                     try
                     {
-                        if (_socket.State is WebSocketState.Open)
-                        {
-                            await _socket.CloseAsync(closeReason.GetCloseStatus(), closeReason.GetDescription(), cancellationToken);
-                        }
+                        await _sendLock.WaitAsync(boundedCts.Token);
                     }
-                    finally
+                    catch (OperationCanceledException)
                     {
-                        _sendLock.Release();
+                        _logger.LogWarning("Timed out waiting for the send lock while closing socket ({Id}); aborting the connection.", SocketId);
+                        _socket.Abort();
+                        lockAcquired = false;
+                    }
+
+                    if (lockAcquired)
+                    {
+                        try
+                        {
+                            if (_socket.State is WebSocketState.Open)
+                            {
+                                try
+                                {
+                                    await _socket.CloseAsync(closeReason.GetCloseStatus(), closeReason.GetDescription(), boundedCts.Token);
+                                }
+                                catch (OperationCanceledException)
+                                {
+                                    _logger.LogWarning("Timed out sending the close frame on socket ({Id}); aborting the connection.", SocketId);
+                                    _socket.Abort();
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            _sendLock.Release();
+                        }
                     }
                 }
             }
             finally
             {
-                // Settle WaitSocketClosed only after the close frame has been sent, so the middleware that
-                // awaits it can't dispose the socket and race the flush. Best-effort: the finally still
-                // releases waiters if CloseAsync throws or the drain token cancels the send.
+                // Settle WaitSocketClosed only after the close frame has been sent (or the connection aborted),
+                // so the middleware that awaits it can't dispose the socket and race the flush. Best-effort: the
+                // finally still releases waiters if CloseAsync throws or the bound elapses.
                 _socketClosedSource.TrySetResult(closeReason);
             }
         }

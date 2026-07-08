@@ -43,10 +43,13 @@ namespace Game.Api.Sockets
         private readonly TimeSpan _commandTimeout;
 
         /// <summary>How long a socket may go without inbound traffic before the watchdog closes it.</summary>
-        private static readonly TimeSpan InactivityTimeout = TimeSpan.FromSeconds(60);
+        private static readonly TimeSpan DefaultInactivityTimeout = TimeSpan.FromSeconds(60);
 
         /// <summary>How often the inactivity watchdog re-checks the last-activity timestamp.</summary>
-        private static readonly TimeSpan InactivityPollInterval = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan DefaultInactivityPollInterval = TimeSpan.FromSeconds(10);
+
+        private readonly TimeSpan _inactivityTimeout;
+        private readonly TimeSpan _inactivityPollInterval;
 
         // Written by the read loop and read by the inactivity loop on separate threads, so it is accessed via
         // Interlocked to give the cross-thread happens-before edge a plain DateTime field would lack — a
@@ -64,7 +67,8 @@ namespace Game.Api.Sockets
         /// <summary>Completes once both the read and inactivity loops have wound down.</summary>
         public Task Completion => _loops;
 
-        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Action onActivity, TimeSpan? commandTimeout = null)
+        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Action onActivity,
+            TimeSpan? commandTimeout = null, TimeSpan? inactivityTimeout = null, TimeSpan? inactivityPollInterval = null)
         {
             _context = context;
             _commandFactory = commandFactory;
@@ -72,6 +76,8 @@ namespace Game.Api.Sockets
             _logger = logger;
             _onActivity = onActivity;
             _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
+            _inactivityTimeout = inactivityTimeout ?? DefaultInactivityTimeout;
+            _inactivityPollInterval = inactivityPollInterval ?? DefaultInactivityPollInterval;
         }
 
         /// <summary>
@@ -94,20 +100,14 @@ namespace Game.Api.Sockets
         /// <summary>
         /// Gracefully closes the socket for a host shutdown: sends a <see cref="ESocketCloseReason.ServerShuttingDown"/>
         /// close frame so the client reconnects to a healthy instance rather than hanging on a half-open
-        /// socket, then waits for the loops to wind down. <paramref name="drainDeadline"/> bounds the close
-        /// frame's own send; the loops are awaited unconditionally since they never fault on cancellation.
+        /// socket, then waits for the loops to wind down. <paramref name="drainDeadline"/> bounds the close;
+        /// past that (or past <see cref="SocketContext"/>'s own internal close-abort bound), <see cref="SocketContext.Close"/>
+        /// aborts the connection outright rather than throwing, so this never needs to catch a cancellation —
+        /// the loops are then awaited unconditionally since they never fault on cancellation (#1726).
         /// </summary>
         public async Task ShutdownAsync(CancellationToken drainDeadline)
         {
-            try
-            {
-                await _context.Close(ESocketCloseReason.ServerShuttingDown, drainDeadline);
-            }
-            catch (OperationCanceledException)
-            {
-                // The drain window elapsed mid-close; the read loop is aborted via the same token below.
-            }
-
+            await _context.Close(ESocketCloseReason.ServerShuttingDown, drainDeadline);
             await Completion;
         }
 
@@ -338,9 +338,9 @@ namespace Game.Api.Sockets
         {
             try
             {
-                while (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResponseTicks) < InactivityTimeout.Ticks && _context.State is Open)
+                while (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResponseTicks) < _inactivityTimeout.Ticks && _context.State is Open)
                 {
-                    await Task.Delay(InactivityPollInterval, hostStopping);
+                    await Task.Delay(_inactivityPollInterval, hostStopping);
                 }
             }
             catch (OperationCanceledException)
