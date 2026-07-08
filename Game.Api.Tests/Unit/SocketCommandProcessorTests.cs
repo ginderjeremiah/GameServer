@@ -331,6 +331,7 @@ namespace Game.Api.Tests.Unit
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -355,6 +356,7 @@ namespace Game.Api.Tests.Unit
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -404,6 +406,7 @@ namespace Game.Api.Tests.Unit
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             // The escalation path reads the depth right after adding, to log it alongside the escalation.
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)Added.Count);
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();

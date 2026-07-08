@@ -22,14 +22,22 @@
         public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Moves every item left on the processing list — orphaned when a previous run crashed between reserving
-        /// and acknowledging — back onto the head of this queue in their original order, so they are re-processed
-        /// rather than stranded. Returns the number of items reclaimed.
+        /// Moves every item left on the processing list — orphaned by a previous run crashing between reserving
+        /// and acknowledging, or stranded by a live consumer's own acknowledge/dead-letter path faulting — back
+        /// onto the head of this queue in their original order, so they are re-processed rather than lost.
+        /// Returns the number of items reclaimed.
         /// </summary>
         public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default);
 
         /// <summary>The current number of items waiting on this queue (e.g. to surface dead-letter-queue depth).</summary>
         public Task<long> GetLengthAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The current number of items reserved via <see cref="ReserveNextAsync"/> but not yet acknowledged —
+        /// the size of the side processing list. Lets a caller detect items stranded there (so they can be
+        /// reclaimed opportunistically) without mutating anything, unlike <see cref="ReclaimProcessingAsync"/>.
+        /// </summary>
+        public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Returns up to <paramref name="count"/> items from the head of the queue (oldest first) WITHOUT

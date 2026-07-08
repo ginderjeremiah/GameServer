@@ -110,6 +110,11 @@ namespace Game.Infrastructure.PubSub.Redis
             return RedisCommandBudget.Read(_redis.ListLengthAsync(QueueName), cancellationToken);
         }
 
+        public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
+        {
+            return RedisCommandBudget.Read(_redis.ListLengthAsync(ProcessingQueueName), cancellationToken);
+        }
+
         public async Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default)
         {
             if (count <= 0)
