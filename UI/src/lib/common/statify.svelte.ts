@@ -26,13 +26,9 @@ export const statify = <T>(state: T) => {
 		return state;
 	}
 
-	statified.__statifyPerformed = true;
+	Object.defineProperty(statified, '__statifyPerformed', { value: true, enumerable: false });
 
 	for (const property in state) {
-		if (property === '__statifyPerformed') {
-			continue;
-		}
-
 		const data = statified[property];
 		const dataType = typeof data;
 		if (dataType === 'function') {

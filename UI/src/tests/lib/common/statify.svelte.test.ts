@@ -39,6 +39,13 @@ describe('statify', () => {
 		expect(statify(outer)).toBe(outer);
 	});
 
+	it('stamps the idempotency guard as non-enumerable', () => {
+		const outer = statify(new Outer());
+
+		expect(Object.keys(outer)).not.toContain('__statifyPerformed');
+		expect(JSON.stringify(outer)).not.toContain('__statifyPerformed');
+	});
+
 	it('recursively statifies nested class instances and array elements', () => {
 		const outer = statify(new Outer());
 
