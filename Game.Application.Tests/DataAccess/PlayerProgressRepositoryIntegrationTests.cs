@@ -332,7 +332,10 @@ namespace Game.Application.Tests.DataAccess
                 await repo.Save(progress); // first save: creates the hash with several statistic fields
             }
 
-            var fieldsAfterFirstSave = await redis.HashGetAllAsync(hashKey);
+            // The cache advance is a fire-and-forget HSET (Save returns once the write is dispatched, not once
+            // it lands), so poll rather than reading immediately — otherwise this races the write and sees a
+            // partial (or empty) hash (#1718).
+            var fieldsAfterFirstSave = await WaitForHashFieldCountAsync(redis, hashKey, minCount: 2);
             Assert.True(fieldsAfterFirstSave.Length > 1, "Expected the battle-completion save to touch more than one statistic row.");
 
             using (var scope = CreateScope())
@@ -346,7 +349,7 @@ namespace Game.Application.Tests.DataAccess
             // The second save's HSET only wrote the one new proficiency field — every field the first save
             // wrote is still present, proving a save's cache write is scoped to its own dirty rows rather than
             // re-serializing (and re-sending) the whole cached snapshot (#1635).
-            var fieldsAfterSecondSave = await redis.HashGetAllAsync(hashKey);
+            var fieldsAfterSecondSave = await WaitForHashFieldCountAsync(redis, hashKey, minCount: fieldsAfterFirstSave.Length + 1);
             Assert.Equal(fieldsAfterFirstSave.Length + 1, fieldsAfterSecondSave.Length);
             foreach (var field in fieldsAfterFirstSave)
             {
@@ -385,6 +388,27 @@ namespace Game.Application.Tests.DataAccess
         {
             var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
             return await ConnectionMultiplexer.ConnectAsync(options);
+        }
+
+        // HashSetAndForget dispatches its HSET with CommandFlags.FireAndForget (RedisService.cs), so it can
+        // return before the write lands on the server — a read on a separate connection right after a Save can
+        // race it. Poll until the expected field count shows up rather than asserting on a single read (#1718).
+        private static async Task<HashEntry[]> WaitForHashFieldCountAsync(IDatabase redis, string hashKey, int minCount, int timeoutMs = 5000)
+        {
+            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            HashEntry[] fields;
+            do
+            {
+                fields = await redis.HashGetAllAsync(hashKey);
+                if (fields.Length >= minCount)
+                {
+                    return fields;
+                }
+
+                await Task.Delay(25);
+            } while (DateTime.UtcNow < deadline);
+
+            return fields;
         }
 
         private static async Task<ProgressUpdatedEvent> DequeueProgressEvent(IDatabase redis)
