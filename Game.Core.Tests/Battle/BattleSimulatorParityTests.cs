@@ -454,9 +454,9 @@ namespace Game.Core.Tests.Battle
 
                 // Effect apply → expire → re-apply (#941): a periodic poison whose duration (80ms = 2 ticks) is
                 // shorter than its skill's cooldown (120ms = 3 ticks), so each application fully LAPSES for a
-                // tick before the skill fires again and re-applies — the cycle where the backend's absolute
-                // ExpiresAtMs clock and the frontend's decrementing remainingMs are most likely to drift by a
-                // tick. (Distinct from the refresh-while-active stacking and single-shot expiry rows.)
+                // tick before the skill fires again and re-applies — the cycle where the two simulators'
+                // shared-expiry bookkeeping (both keyed to an absolute elapsed-ms clock, #1705) is most likely
+                // to drift by a tick. (Distinct from the refresh-while-active stacking and single-shot expiry rows.)
                 //   Player: skill baseDamage 0, cooldown 120, Opponent +250 PoisonDamagePerSecond for 80ms → 10/tick.
                 //     Fires at ticks 120,240,360; each application deals DoT on its 2 active ticks, then lapses one.
                 //   Enemy:  MaxHealth 50, no skills.
