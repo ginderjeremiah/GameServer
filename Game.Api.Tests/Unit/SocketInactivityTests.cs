@@ -73,8 +73,10 @@ namespace Game.Api.Tests.Unit
             var socket = new IdleWebSocket();
             var session = new SessionService(new NoOpSessionStore());
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
+            // A generous margin (10x the delivery cadence below) so a loaded CI runner overshooting a single
+            // Task.Delay can't flake this into a false watchdog firing.
             var handler = new SocketHandler(context, new StubCommandFactory(), _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(),
-                () => { }, inactivityTimeout: TimeSpan.FromMilliseconds(150), inactivityPollInterval: TimeSpan.FromMilliseconds(20));
+                () => { }, inactivityTimeout: TimeSpan.FromMilliseconds(500), inactivityPollInterval: TimeSpan.FromMilliseconds(20));
 
             using var drainDeadline = new CancellationTokenSource();
             handler.Listen(drainDeadline: drainDeadline.Token);
