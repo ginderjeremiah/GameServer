@@ -54,14 +54,18 @@ namespace Game.Application.Services
         // offline pass paces the same as the live idle loop.
         internal static readonly TimeSpan PostBattleCooldown = TimeSpan.FromSeconds(5);
 
-        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, DateTime? scheduledStartTime = null, int? clientBattleMs = null, CancellationToken cancellationToken = default)
+        public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, DateTime? scheduledStartTime = null, int? clientBattleMs = null, bool forceAbandon = false, CancellationToken cancellationToken = default)
         {
             if (state.HasActiveBattle)
             {
-                // A still-in-progress handoff (#1595) means the existing battle hasn't concluded yet — hand
-                // it back instead of abandoning it for a fresh spawn.
-                if (await AbandonBattle(player, state, clientBattleMs, cancellationToken) is { } handoff)
+                var handoff = await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+                if (handoff is not null && !forceAbandon)
                 {
+                    // A still-in-progress handoff (#1595) means the existing battle hasn't concluded yet —
+                    // hand it back instead of abandoning it for a fresh spawn, unless the caller explicitly
+                    // asked to force-discard it (forceAbandon) — the same override StartBossBattle always
+                    // applies for ChallengeBoss (#1690). Nothing was cleared or persisted for a
+                    // still-in-progress abandon, so proceeding to overwrite it below is safe either way.
                     return handoff;
                 }
             }

@@ -54,4 +54,5 @@ export interface INewEnemyModel {
 export interface INewEnemyRequest {
 	newZoneId?: number;
 	clientBattleMs?: number;
+	forceAbandon: boolean;
 }

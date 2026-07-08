@@ -191,8 +191,12 @@ export class EnemyManager {
 	 * *inside* this method's re-entrancy/supersession guard (rather than from the stage handler directly), so
 	 * a prefetched enemy can never double-spawn with a concurrent fetch nor clobber a fight a transition moved
 	 * on to — the same guarantees the fetch path relies on.
+	 *
+	 * `forceAbandon` discards a still-in-progress battle instead of the default hand-back — used by
+	 * {@link retreatFromBoss} so leaving a boss fight is immediate rather than waiting for it to conclude
+	 * (#1690), mirroring the unconditional discard `ChallengeBoss` already applies server-side.
 	 */
-	public async getNewEnemy(prepared?: PreparedBattle): Promise<void> {
+	public async getNewEnemy(prepared?: PreparedBattle, forceAbandon = false): Promise<void> {
 		const generation = this.fetchGeneration;
 		if (this.fetchingEnemy) {
 			// A fetch is already running. If it captured this same generation it's a genuine re-entrant
@@ -211,12 +215,12 @@ export class EnemyManager {
 				return;
 			}
 		}
-		const run = this.runFetchLoop(generation, prepared);
+		const run = this.runFetchLoop(generation, prepared, forceAbandon);
 		this.inFlightFetch = run;
 		await run;
 	}
 
-	private async runFetchLoop(generation: number, prepared?: PreparedBattle): Promise<void> {
+	private async runFetchLoop(generation: number, prepared?: PreparedBattle, forceAbandon = false): Promise<void> {
 		this.fetchingEnemy = true;
 		this.fetchingGeneration = generation;
 		try {
@@ -254,7 +258,8 @@ export class EnemyManager {
 			while (this.started && generation === this.fetchGeneration) {
 				const result = await apiSocket.sendSocketCommand('NewEnemy', {
 					newZoneId: playerManager.currentZone,
-					clientBattleMs
+					clientBattleMs,
+					forceAbandon
 				});
 				// The loop condition only gates the top of each iteration, so a stop / superseding
 				// transition that lands while parked on the await above (not on the cancellable backoff)
@@ -399,7 +404,11 @@ export class EnemyManager {
 		}
 	}
 
-	/** Retreat from an in-progress boss fight back to the normal idle farm loop. */
+	/**
+	 * Retreat from an in-progress boss fight back to the normal idle farm loop. Force-abandons the boss
+	 * battle server-side (#1690) — mirroring the unconditional discard `challengeBoss()` gets for free —
+	 * so a still-active fight ends immediately instead of being handed back and resumed under boss mode.
+	 */
 	public async retreatFromBoss() {
 		if (this.transitioning) {
 			if (this.mode === 'idle') {
@@ -418,7 +427,7 @@ export class EnemyManager {
 		try {
 			// getNewEnemy self-guards via the fetch generation, so a press superseding this retreat is
 			// abandoned there; endTransition then leaves the guard for whichever transition is current.
-			await this.getNewEnemy();
+			await this.getNewEnemy(undefined, true);
 		} finally {
 			this.endTransition(generation);
 		}
