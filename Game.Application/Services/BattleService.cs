@@ -524,7 +524,7 @@ namespace Game.Application.Services
             // Thread both combat ratings onto the battle-completed event so the progress handler can normalize
             // each path's activity by max(playerRating, enemyRating) for the effect-based proficiency accrual
             // (spike #1526 Decision 5) — the same snapshot-measured ratings the exp reward above used.
-            player.RecordBattleCompleted(
+            player.RecordBattleVictory(
                 enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp,
                 rewards.PlayerRating, rewards.EnemyRating);
 
