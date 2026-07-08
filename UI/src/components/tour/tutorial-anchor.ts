@@ -46,3 +46,26 @@ export function tutorialAnchor(node: HTMLElement, key: string) {
 		}
 	};
 }
+
+type Side = 'player' | 'enemy';
+
+/**
+ * Canonical builders for the per-side fight-screen anchor keys — the single source of truth both the
+ * `use:tutorialAnchor` call sites (`CombatFloaters`, `BattlerCard`, `Skills`) and `TOUR_ANCHOR_KEYS`
+ * below build from, so a lesson's `anchorKey` can be validated against real registrations without
+ * inspecting Svelte templates.
+ */
+export const TOUR_ANCHOR_KEY = {
+	fightCombatLog: (side: Side) => `fight-combat-log-${side}` as const,
+	fightHpBar: (side: Side) => `fight-hp-bar-${side}` as const,
+	fightSkillBar: (side: Side) => `fight-skill-bar-${side}` as const
+};
+
+const SIDES: readonly Side[] = ['player', 'enemy'];
+
+/** Every anchor key the app ever registers, across both sides. */
+export const TOUR_ANCHOR_KEYS: readonly string[] = SIDES.flatMap((side) => [
+	TOUR_ANCHOR_KEY.fightCombatLog(side),
+	TOUR_ANCHOR_KEY.fightHpBar(side),
+	TOUR_ANCHOR_KEY.fightSkillBar(side)
+]);

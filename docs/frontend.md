@@ -22,6 +22,8 @@ All frontend code lives in `UI`:
 
 Unit-test all UI logic (pages/components) and lib code; simple non-interactive display components don't need tests. Place tests under `tests` mirroring the source structure. Use Playwright e2e tests only for critical user flows, written from the user's perspective — they're costly to write and run.
 
+A test that reads committed content directly (e.g. asserting `content/lessons.json` only references real frontend keys) imports it via the `$content` alias (`kit.alias` in `svelte.config.js`, pointing at the repo-root `content/` folder) rather than a deep relative path out of the `UI/` package root.
+
 # Important Architectural Design Decisions
 
 ## Battle simulation & parity

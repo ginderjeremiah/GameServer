@@ -10,7 +10,7 @@
 	aria-hidden="true"
 	data-testid={testId}
 	style:--float-duration="{DURATION_MS}ms"
-	use:tutorialAnchor={`fight-combat-log-${side}`}
+	use:tutorialAnchor={TOUR_ANCHOR_KEY.fightCombatLog(side)}
 >
 	{#each floaters as floater (floater.id)}
 		<div
@@ -47,7 +47,7 @@ import { onCombatFloat, type CombatFloatEvent } from '$lib/engine';
 import { EDamageType, type ISkillDamagePortion } from '$lib/api';
 import LogGlyph from '$components/log-panel/LogGlyph.svelte';
 import DamageRatioBar from '$components/DamageRatioBar.svelte';
-import { tutorialAnchor } from '$components';
+import { tutorialAnchor, TOUR_ANCHOR_KEY } from '$components';
 import type { GlyphKind } from '$components/log-panel/log-kind';
 
 type Props = {

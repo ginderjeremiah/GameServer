@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { GAME_SCREENS, visibleScreens, type ScreenDef } from '$routes/game/screens/screen-defs';
 import { ERole } from '$lib/api';
-import lessonsContent from '../../../../../../content/lessons.json';
+import { TOUR_ANCHOR_KEYS } from '$components';
+import lessonsContent from '$content/lessons.json';
 
 const screens: ScreenDef[] = [
 	{ key: 'fight', label: 'Fight', group: 'combat', built: true },
@@ -72,13 +73,35 @@ describe('GAME_SCREENS', () => {
 // backend representation, so the backend progression-graph lint deliberately leaves this check to
 // the frontend (see ProgressionGraphChecker.CheckLessons and #1673).
 describe('committed lesson content (content/lessons.json)', () => {
+	const liveLessons = lessonsContent.filter((lesson) => !lesson.retiredAt);
+
+	// Guards against the check below passing vacuously (e.g. an empty/fully-retired lessons.json)
+	// with zero real coverage.
+	it('has at least one live lesson to check', () => {
+		expect(liveLessons.length).toBeGreaterThan(0);
+	});
+
 	it('gives every live lesson a screenKey that resolves to a real ScreenDef.key', () => {
 		const screenKeys = new Set(GAME_SCREENS.map((s) => s.key));
-		const badScreenKeys = lessonsContent
-			.filter((lesson) => !lesson.retiredAt)
+		const badScreenKeys = liveLessons
 			.filter((lesson) => !screenKeys.has(lesson.screenKey))
 			.map((lesson) => `${lesson.key} -> "${lesson.screenKey}"`);
 
 		expect(badScreenKeys).toEqual([]);
+	});
+
+	// Frontend half of the coverage #1592 called for (the backend lint can't see the DOM): every
+	// anchorKey a live lesson step references must resolve to a real `use:tutorialAnchor` registration.
+	// A missing anchor degrades gracefully at runtime (centered callout), so this is a content-quality
+	// check, not a crash guard.
+	it('gives every live lesson step an anchorKey that resolves to a registered tour anchor', () => {
+		const anchorKeys = new Set(TOUR_ANCHOR_KEYS);
+		const badAnchorKeys = liveLessons.flatMap((lesson) =>
+			lesson.steps
+				.filter((step) => step.anchorKey && !anchorKeys.has(step.anchorKey))
+				.map((step) => `${lesson.key}[${step.ordinal}] -> "${step.anchorKey}"`)
+		);
+
+		expect(badAnchorKeys).toEqual([]);
 	});
 });
