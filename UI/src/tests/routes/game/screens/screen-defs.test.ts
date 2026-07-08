@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GAME_SCREENS, visibleScreens, type ScreenDef } from '$routes/game/screens/screen-defs';
 import { ERole } from '$lib/api';
+import lessonsContent from '../../../../../../content/lessons.json';
 
 const screens: ScreenDef[] = [
 	{ key: 'fight', label: 'Fight', group: 'combat', built: true },
@@ -64,5 +65,20 @@ describe('GAME_SCREENS', () => {
 		const wipWithComponent = GAME_SCREENS.filter((s) => !s.built && s.component).map((s) => s.key);
 
 		expect(wipWithComponent).toEqual([]);
+	});
+});
+
+// `Lesson.screenKey` is a plain string, not an FK — screens are a frontend-only registry with no
+// backend representation, so the backend progression-graph lint deliberately leaves this check to
+// the frontend (see ProgressionGraphChecker.CheckLessons and #1673).
+describe('committed lesson content (content/lessons.json)', () => {
+	it('gives every live lesson a screenKey that resolves to a real ScreenDef.key', () => {
+		const screenKeys = new Set(GAME_SCREENS.map((s) => s.key));
+		const badScreenKeys = lessonsContent
+			.filter((lesson) => !lesson.retiredAt)
+			.filter((lesson) => !screenKeys.has(lesson.screenKey))
+			.map((lesson) => `${lesson.key} -> "${lesson.screenKey}"`);
+
+		expect(badScreenKeys).toEqual([]);
 	});
 });
