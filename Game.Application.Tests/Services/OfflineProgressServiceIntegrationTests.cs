@@ -134,6 +134,42 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SimulateOfflineProgress_AwayLongerThanSimulationCap_StampsChallengeCompletedAtWithinCappedWindow()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var setup = await SeedWinningScenarioAsync(scope, reload: false);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var challenge = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 3m, rewardItemId: item.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            // Well beyond MaximumOfflineSimulation (10h): the simulated window is clamped to the cap, so a
+            // challenge completed within it must be stamped at the capped window's end, not at this claim
+            // (which is ~10h later than the window it was actually simulated within).
+            var lastActivity = DateTime.UtcNow.AddHours(-20);
+            player.LastActivity = lastActivity;
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.Single(summary.CompletedChallenges, c => c.ChallengeId == challenge.Id);
+            var challenges = await progressRepo.GetChallenges(setup.PlayerId);
+            var playerChallenge = Assert.Single(challenges, c => c.Challenge.Id == challenge.Id);
+            Assert.NotNull(playerChallenge.CompletedAt);
+
+            var expectedWindowEnd = lastActivity + OfflineProgressService.MaximumOfflineSimulation;
+            Assert.True(
+                Math.Abs((playerChallenge.CompletedAt!.Value - expectedWindowEnd).TotalSeconds) < 5,
+                $"Expected CompletedAt near the capped window end {expectedWindowEnd:O}, got {playerChallenge.CompletedAt:O}.");
+            Assert.True(DateTime.UtcNow - playerChallenge.CompletedAt!.Value > TimeSpan.FromHours(9));
+        }
+
+        [Fact]
         public async Task SimulateOfflineProgress_MixedWinLossWindow_CompletesAWinTrackingChallengeCrossedByEarlyWins()
         {
             using var scope = CreateScope();

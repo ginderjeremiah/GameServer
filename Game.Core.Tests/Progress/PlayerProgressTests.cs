@@ -10,6 +10,8 @@ namespace Game.Core.Tests.Progress
 {
     public class PlayerProgressTests
     {
+        private static readonly DateTime Timestamp = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         // ── RecordBattleCompleted: global statistics ─────────────────────────
 
         [Fact]
@@ -584,7 +586,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.EnemiesKilled, null, 5m),
             ]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             var result = Assert.Single(completed);
             Assert.Equal(0, result.ChallengeId);
@@ -593,7 +595,7 @@ namespace Game.Core.Tests.Progress
 
             var playerChallenge = Assert.Single(progress.ChallengeProgress);
             Assert.True(playerChallenge.Completed);
-            Assert.NotNull(playerChallenge.CompletedAt);
+            Assert.Equal(Timestamp, playerChallenge.CompletedAt);
             Assert.Equal(5m, playerChallenge.Progress);
         }
 
@@ -606,7 +608,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.EnemiesKilled, null, 3m),
             ]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
             var playerChallenge = Assert.Single(progress.ChallengeProgress);
@@ -624,7 +626,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.EnemiesKilled, null, 12m),
             ]);
 
-            progress.EvaluateChallenges([challenge]);
+            progress.EvaluateChallenges([challenge], Timestamp);
 
             var playerChallenge = Assert.Single(progress.ChallengeProgress);
             Assert.True(playerChallenge.Completed);
@@ -640,7 +642,7 @@ namespace Game.Core.Tests.Progress
                 statistics: [Stat(EStatisticType.EnemiesKilled, null, 12m)],
                 challenges: [alreadyCompleted]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
         }
@@ -653,7 +655,7 @@ namespace Game.Core.Tests.Progress
             var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5, retiredAt: DateTime.UtcNow);
             var progress = MakeProgress(statistics: [Stat(EStatisticType.EnemiesKilled, null, 12m)]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
             Assert.Empty(progress.ChallengeProgress);
@@ -671,7 +673,7 @@ namespace Game.Core.Tests.Progress
                 statistics: [Stat(EStatisticType.EnemiesKilled, null, 12m)],
                 challenges: [alreadyCompleted]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
             Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
@@ -687,7 +689,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.EnemiesKilled, 2, 3m),
             ]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Single(completed);
         }
@@ -703,7 +705,7 @@ namespace Game.Core.Tests.Progress
 
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, new BattleStats(),
                 isBossBattle: true, zoneId: 3);
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Single(completed);
             Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
@@ -715,7 +717,7 @@ namespace Game.Core.Tests.Progress
             var challenge = MakeChallenge(id: 0, EChallengeType.LevelReached, goal: 5);
             var progress = MakeProgress(player: new PlayerBuilder().WithLevel(5).Build());
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Single(completed);
         }
@@ -726,7 +728,7 @@ namespace Game.Core.Tests.Progress
             var challenge = MakeChallenge(id: 0, EChallengeType.LevelReached, goal: 10);
             var progress = MakeProgress(player: new PlayerBuilder().WithLevel(5).Build());
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
             Assert.Equal(5m, Assert.Single(progress.ChallengeProgress).Progress);
@@ -741,7 +743,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.FastestVictory, null, 8m), // best victory in 8s, goal is "within 10s"
             ]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Single(completed);
             Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
@@ -756,7 +758,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.FastestVictory, null, 14m),
             ]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
         }
@@ -767,7 +769,7 @@ namespace Game.Core.Tests.Progress
             var challenge = MakeChallenge(id: 0, EChallengeType.TimeTrial, goal: 10);
             var progress = MakeProgress(); // no FastestVictory statistic recorded yet
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
         }
@@ -783,7 +785,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.FastestVictory, null, 0m),
             ]);
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Single(completed);
             Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
@@ -798,7 +800,7 @@ namespace Game.Core.Tests.Progress
             var challenge = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5);
             var progress = MakeProgress(); // no EnemiesKilled statistic recorded yet
 
-            var completed = progress.EvaluateChallenges([challenge]);
+            var completed = progress.EvaluateChallenges([challenge], Timestamp);
 
             Assert.Empty(completed);
             Assert.Empty(progress.DirtyChallenges);
@@ -816,7 +818,7 @@ namespace Game.Core.Tests.Progress
                 Stat(EStatisticType.BattlesWon, null, 2m),
             ]);
 
-            var completed = progress.EvaluateChallenges([met, unmet]);
+            var completed = progress.EvaluateChallenges([met, unmet], Timestamp);
 
             Assert.Equal(0, Assert.Single(completed).ChallengeId);
         }
@@ -850,7 +852,7 @@ namespace Game.Core.Tests.Progress
             var progress = MakeProgress();
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
                 new BattleStats { PlayerDamageDealt = 10.0 }, isBossBattle: false, zoneId: 0);
-            progress.EvaluateChallenges([MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5)]);
+            progress.EvaluateChallenges([MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5)], Timestamp);
             progress.SetProficiencyProgress(proficiencyId: 3, level: 1, xp: 40m);
 
             progress.AcceptChanges();
@@ -1023,7 +1025,7 @@ namespace Game.Core.Tests.Progress
                 statistics: [Stat(EStatisticType.EnemiesKilled, null, 5m)],
                 challenges: [doneRow]);
 
-            progress.EvaluateChallenges([progressed, alreadyDone]);
+            progress.EvaluateChallenges([progressed, alreadyDone], Timestamp);
 
             // The challenge that advanced this evaluation is dirty; the already-completed one is skipped untouched.
             Assert.Contains(0, progress.DirtyChallenges.Select(c => c.Challenge.Id));
