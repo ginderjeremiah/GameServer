@@ -4,14 +4,14 @@ The global overlay UI — transient notifications, blocking dialogs, and non-blo
 
 ## Toast notifications
 
-User-facing notifications (currently errors; the system is type-aware for future success/warning/info) are a single global toast system. The `toast` store owns the active toasts in a keyed map (mirroring the tooltip store, so dismissal is order-independent) and exposes `showToast` plus per-type helpers; a single `ToastContainer` in the root layout renders the stack and the individual `Toast` components are presentation-only. The visual treatment derives from a single per-type `--toast-accent` token so a theme can restyle a status by overriding that one variable.
+User-facing notifications (type-aware: error, success, warning, info) are a single global toast system. The `toast` store owns the active toasts in a keyed map (mirroring the tooltip store, so dismissal is order-independent) and exposes `showToast` plus per-type helpers; a single `ToastContainer` in the root layout renders the stack and the individual `Toast` components are presentation-only. The visual treatment derives from a single per-type `--toast-accent` token so a theme can restyle a status by overriding that one variable.
 
 - **The store is the single entry point** — anywhere imports a helper and calls it; error sources are wired to the store rather than rendering ad-hoc UI (socket failures are subscribed once in the root layout; the Workbench reports save/load failures that were previously swallowed).
 - **Duplicate messages collapse** — a repeated identical message refreshes the existing toast's timer instead of stacking, so a flapping connection can't bury the screen.
 - **Auto-dismiss is opt-out** — pass `duration: 0` for a sticky toast.
 - **The store removes synchronously; the view animates the exit.** Dismissal deletes from the store immediately (logically gone), but `ToastContainer` keeps its own render list and lets a removed toast linger marked `leaving` until its CSS exit animation finishes — so the motion lives in CSS and collapses under `prefers-reduced-motion`, while the store stays the single synchronous source of truth.
 
-(An optional inline `action` button and an `onDismiss` callback are part of the standardized design and provided for future use.)
+(An optional inline `action` button and an `onDismiss` callback are part of the standardized design — used by e.g. the challenge-completion, synthesis-discovery, and dead-letter-replay toasts.)
 
 ## Modal dialogs
 

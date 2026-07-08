@@ -47,11 +47,10 @@ namespace Game.Core.Battle
         /// <summary>
         /// The player's proficiency levels at battle start (one entry per proficiency the player has trained).
         /// Captured so the per-level/milestone attribute bonuses bake into the snapshot exactly like the stat
-        /// allocations — a level gained while idling takes effect on the next battle. Unlike the snapshot's
-        /// captured player <see cref="Level"/> (which the offline simulator grows mid-window, #1601), these
-        /// stay frozen at their window-start values for the whole away period (spike #982 decision 7;
-        /// un-freezing them too is the committed follow-up, #1602). Defaults to empty so a snapshot built
-        /// without proficiency state carries no proficiency bonus.
+        /// allocations — a level gained while idling takes effect on the next battle. Like the snapshot's
+        /// captured player <see cref="Level"/> (#1601), the offline simulator grows a working copy of these
+        /// mid-window (#1602); the snapshot's own list stays the frozen window-start capture. Defaults to
+        /// empty so a snapshot built without proficiency state carries no proficiency bonus.
         /// </summary>
         public List<ProficiencyLevelSnapshot> ProficiencyLevels { get; set; } = [];
 

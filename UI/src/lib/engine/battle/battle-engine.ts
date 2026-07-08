@@ -101,7 +101,7 @@ export class BattleEngine {
 	public running = false;
 
 	/** The seeded battle RNG, re-created from each enemy's seed in {@link reset} so the live battle draws the
-	 *  crit/dodge/block rolls from the same stream the backend replays. Seeded to 0 until the first reset. */
+	 *  crit/parry/dodge rolls from the same stream the backend replays. Seeded to 0 until the first reset. */
 	private rng = new Mulberry32(0);
 
 	private logicalUnhook?: Action;

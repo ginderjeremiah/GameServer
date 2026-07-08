@@ -19,10 +19,11 @@ namespace Game.Core.Battle.Offline
     {
         /// <summary>
         /// The player's battle-relevant state, captured once. Everything requiring the player's hand — stat
-        /// allocations, gear, loadout, proficiency levels — is frozen offline and drives every simulated battle
-        /// unchanged; the captured <see cref="BattleSnapshot.Level"/> is the one exception, growing in-loop as
-        /// victories are earned (#1601, alongside <see cref="StartingExp"/>) so the class locked base — and
-        /// through it the reward power — grows across the window exactly as it would live.
+        /// allocations, gear, loadout — is frozen offline and drives every simulated battle unchanged; the
+        /// captured <see cref="BattleSnapshot.Level"/> (#1601, alongside <see cref="StartingExp"/>) and a
+        /// working copy of the proficiency levels (#1602) grow in-loop as victories are earned, so the class
+        /// locked base and proficiency bonuses — and through them the reward power — grow across the window
+        /// exactly as they would live.
         /// </summary>
         public required BattleSnapshot Snapshot { get; init; }
 
