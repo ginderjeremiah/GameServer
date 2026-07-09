@@ -188,6 +188,34 @@ namespace Game.Infrastructure.Cache.Redis
                 [key], argv, flags: CommandFlags.FireAndForget);
         }
 
+        public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry)
+        {
+            if (fields.Count == 0)
+            {
+                return;
+            }
+
+            var argv = new RedisValue[1 + fields.Count * 2];
+            argv[0] = (long)expiry.TotalMilliseconds;
+            var i = 1;
+            foreach (var (field, value) in fields)
+            {
+                argv[i++] = field;
+                argv[i++] = value;
+            }
+
+            // Same script as HashSetAndForget, guarded by an existence check so a key that vanished (eviction
+            // under memory pressure, an operator delete) is never resurrected from a caller's partial field
+            // view — resurrecting it would recreate the hash holding only these fields, silently shadowing
+            // every other row the caller didn't touch this call.
+            Redis.ScriptEvaluate(
+                "if redis.call('exists', KEYS[1]) == 1 then "
+                + "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end "
+                + "redis.call('pexpire', KEYS[1], ARGV[1]) "
+                + "end",
+                [key], argv, flags: CommandFlags.FireAndForget);
+        }
+
         private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always, CancellationToken cancellationToken = default)
         {
             await ObserveWrite(Redis.StringSetAsync(key, value, expiry: expiry, flags: flags, when: when), cancellationToken);
