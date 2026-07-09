@@ -206,6 +206,9 @@ export class ApiSocket {
 					console.warn(`Socket missed ${this.missedPongs} consecutive pongs; closing the half-open connection.`);
 					this.awaitingPong = false;
 					this.missedPongs = 0;
+					// Deliberately code-less: handleClose only stops the keepalive on ev.code ===
+					// NORMAL_CLOSURE, so this must surface as 1005/1006 to fall through to its
+					// reconnect branch. Passing NORMAL_CLOSURE here would silently disable auto-reconnect.
 					socket.close();
 					return;
 				}
