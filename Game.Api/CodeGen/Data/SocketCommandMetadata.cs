@@ -30,8 +30,14 @@ namespace Game.Api.CodeGen.Data
                 }
             }
 
-            if (socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommandWithParams<>)) is not null
-                || socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommand<,>)) is not null)
+            // A server-initiated command (IServerInitiatedCommand) may bind its Parameters from a typed base
+            // purely to reuse DeserializeParameters<T>'s malformed-payload classification, but the client only
+            // ever listens for it and can never send it (SocketCommandFactory.IsServerInitiatedOnly rejects an
+            // inbound attempt). It must never surface in ApiSocketRequestTypes/ApiSocketCommandWithRequest,
+            // which the frontend uses to type its client->server sends.
+            if (!socketCommand.IsAssignableTo(typeof(IServerInitiatedCommand))
+                && (socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommandWithParams<>)) is not null
+                    || socketCommand.GetClosedGenericBase(typeof(AbstractSocketCommand<,>)) is not null))
             {
                 var property = socketCommand.GetProperty(nameof(AbstractSocketCommandWithParams<>.Parameters));
                 if (property is not null)
