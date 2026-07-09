@@ -80,9 +80,9 @@ export const refreshTokens = (): Promise<StoredTokens | null> => {
 				return tokens;
 			}
 
-			const current = getRefreshToken();
-			if (current !== null && current !== refreshToken) {
-				return getTokens();
+			const current = getTokens();
+			if (current !== null && current.refreshToken !== refreshToken) {
+				return current;
 			}
 
 			clearTokens();
