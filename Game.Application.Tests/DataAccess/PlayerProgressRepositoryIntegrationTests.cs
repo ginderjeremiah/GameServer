@@ -416,22 +416,9 @@ namespace Game.Application.Tests.DataAccess
         // HashSetAndForget dispatches its HSET with CommandFlags.FireAndForget (RedisService.cs), so it can
         // return before the write lands on the server — a read on a separate connection right after a Save can
         // race it. Poll until the expected field count shows up rather than asserting on a single read (#1718).
-        private static async Task<HashEntry[]> WaitForHashFieldCountAsync(IDatabase redis, string hashKey, int minCount, int timeoutMs = 5000)
+        private static Task<HashEntry[]> WaitForHashFieldCountAsync(IDatabase redis, string hashKey, int minCount, int timeoutMs = 5000)
         {
-            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            HashEntry[] fields;
-            do
-            {
-                fields = await redis.HashGetAllAsync(hashKey);
-                if (fields.Length >= minCount)
-                {
-                    return fields;
-                }
-
-                await Task.Delay(25);
-            } while (DateTime.UtcNow < deadline);
-
-            return fields;
+            return PollingHelper.PollUntilAsync(() => redis.HashGetAllAsync(hashKey), fields => fields.Length >= minCount, timeoutMs);
         }
 
         private static async Task<ProgressUpdatedEvent> DequeueProgressEvent(IDatabase redis)
