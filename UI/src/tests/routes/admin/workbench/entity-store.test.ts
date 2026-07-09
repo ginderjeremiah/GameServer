@@ -345,6 +345,40 @@ describe('EntityStore', () => {
 		});
 	});
 
+	describe('mutators guard against an in-flight save', () => {
+		it('patch no-ops while saving so a keystroke landing mid-save cannot be silently discarded', () => {
+			const store = new EntityStore(makeConfig(), seed);
+			store.saving = true;
+			store.patch(0, (draft) => (draft.name = 'raced'));
+			expect(store.items.find((r) => r.id === 0)!.name).toBe('Alpha');
+		});
+
+		it('addItem, removeItem, restoreItem and resetItem all no-op while saving', () => {
+			const store = new EntityStore(makeConfig(), seed);
+			store.saving = true;
+
+			expect(store.addItem()).toBe(0);
+			expect(store.items).toHaveLength(2);
+
+			store.removeItem(0);
+			expect(store.status(store.items.find((r) => r.id === 0)!)).toBe('clean');
+
+			store.saving = false;
+			store.patch(1, (draft) => (draft.value = 7));
+			store.saving = true;
+
+			store.resetItem(1);
+			expect(store.items.find((r) => r.id === 1)!.value).toBe(7);
+
+			store.removeItem(1);
+			store.saving = false;
+			store.removeItem(1);
+			store.saving = true;
+			store.restoreItem(1);
+			expect(store.status(store.items.find((r) => r.id === 1)!)).toBe('deleted');
+		});
+	});
+
 	describe('recordStates memo', () => {
 		// A config with a required-name field so warnings are exercised alongside status.
 		const requiredNameConfig = (): EntityConfig<Row> => ({

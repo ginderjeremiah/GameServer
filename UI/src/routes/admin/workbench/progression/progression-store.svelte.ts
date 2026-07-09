@@ -180,7 +180,15 @@ export class ProgressionStore {
 
 	// ── Record patches ──
 
+	/**
+	 * Edits made while a save is in flight would either be silently overwritten by the post-save
+	 * reseed from server truth or land as a "clean" record whose dirty indicator never fires — so
+	 * every mutator no-ops while {@link saving} is true rather than risk either.
+	 */
 	patchPath(id: number, mutate: (draft: WorkbenchPath) => void) {
+		if (this.saving) {
+			return;
+		}
 		this.paths = this.paths.map((path) => {
 			if (path.id !== id) {
 				return path;
@@ -193,6 +201,9 @@ export class ProgressionStore {
 	}
 
 	patchProf(id: number, mutate: (draft: WorkbenchProficiency) => void) {
+		if (this.saving) {
+			return;
+		}
 		this.profs = this.profs.map((prof) => {
 			if (prof.id !== id) {
 				return prof;
@@ -207,6 +218,9 @@ export class ProgressionStore {
 	// ── Add / reorder / retire ──
 
 	addPath() {
+		if (this.saving) {
+			return;
+		}
 		const pathId = this.nextId--;
 		const tierId = this.nextId--;
 		this.paths = [newPath(pathId), ...this.paths];
@@ -218,6 +232,9 @@ export class ProgressionStore {
 	}
 
 	addTier(pathId: number): number {
+		if (this.saving) {
+			return tiersOfPath(this.profs, pathId)[0]?.id ?? 0;
+		}
 		const tiers = tiersOfPath(this.profs, pathId);
 		const ordinal = tiers.length ? Math.max(...tiers.map((t) => t.pathOrdinal)) + 1 : 0;
 		const id = this.nextId--;
@@ -227,6 +244,9 @@ export class ProgressionStore {
 	}
 
 	reorderTiers(pathId: number, fromIndex: number, toIndex: number) {
+		if (this.saving) {
+			return;
+		}
 		const tiers = tiersOfPath(this.profs, pathId);
 		if (fromIndex < 0 || toIndex < 0 || fromIndex >= tiers.length || toIndex >= tiers.length || fromIndex === toIndex) {
 			return;
@@ -256,6 +276,9 @@ export class ProgressionStore {
 
 	/** Remove a never-saved path (and its never-saved tiers) locally; reconcile the selection. */
 	removePath(id: number) {
+		if (this.saving) {
+			return;
+		}
 		this.paths = this.paths.filter((path) => path.id !== id);
 		this.profs = this.profs.filter((prof) => prof.pathId !== id);
 		if (this.selectedPathId === id) {
@@ -267,6 +290,9 @@ export class ProgressionStore {
 
 	/** Remove a never-saved tier locally; leave the drill view if it was open. */
 	removeTier(id: number) {
+		if (this.saving) {
+			return;
+		}
 		this.profs = this.profs.filter((prof) => prof.id !== id);
 		if (this.drilledTierId === id) {
 			this.drilledTierId = null;
