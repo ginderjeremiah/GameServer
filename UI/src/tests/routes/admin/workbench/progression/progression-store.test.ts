@@ -429,4 +429,31 @@ describe('navigation & detail mutations', () => {
 
 		store.dispose();
 	});
+
+	it('mutators no-op while a save is in flight so a keystroke landing mid-save cannot be silently discarded', async () => {
+		seedServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.saving = true;
+
+		store.patchPath(0, (d) => (d.name = 'raced'));
+		expect(reqPath(store, 0).name).toBe('Fire');
+
+		store.patchProf(0, (d) => (d.name = 'raced'));
+		expect(reqProf(store, 0).name).toBe('Fire T0');
+
+		store.addPath();
+		expect(store.paths).toHaveLength(1);
+
+		const beforeTierCount = store.profs.length;
+		expect(store.addTier(0)).toBe(0);
+		expect(store.profs).toHaveLength(beforeTierCount);
+
+		store.reorderTiers(0, 0, 0);
+		store.removePath(0);
+		expect(store.paths).toHaveLength(1);
+		store.removeTier(0);
+		expect(store.profs).toHaveLength(beforeTierCount);
+	});
 });

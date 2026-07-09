@@ -30,7 +30,7 @@
 		{/snippet}
 	</DetailHeader>
 
-	<div class="detail-body" class:locked={store.isRetired(tier)}>
+	<div class="detail-body" class:locked={store.isRetired(tier) || store.saving}>
 		<div class="body-inner">
 			{#if store.tierTab === 'identity'}
 				<div class="sec-title">

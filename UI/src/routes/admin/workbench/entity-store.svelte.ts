@@ -109,7 +109,15 @@ export class EntityStore<T extends Identified> {
 		return { added, modified, deleted, total: added + modified + deleted };
 	});
 
+	/**
+	 * Edits made while a save is in flight would either be silently overwritten by that save's
+	 * post-persist baseline replacement or would land as a "clean" record whose dirty indicator
+	 * never fires — so every mutator no-ops while {@link saving} is true rather than risk either.
+	 */
 	patch(id: number, mutate: (draft: T) => void) {
+		if (this.saving) {
+			return;
+		}
 		this.items = this.items.map((record) => {
 			if (record.id !== id) {
 				return record;
@@ -122,6 +130,9 @@ export class EntityStore<T extends Identified> {
 	}
 
 	addItem(): number {
+		if (this.saving) {
+			return this.items[0]?.id ?? 0;
+		}
 		const id = this.nextId--;
 		this.items = [this.config.newItem(id), ...this.items];
 		this.saved = false;
@@ -129,6 +140,9 @@ export class EntityStore<T extends Identified> {
 	}
 
 	removeItem(id: number) {
+		if (this.saving) {
+			return;
+		}
 		if (this.baseMap[id] === undefined) {
 			// Never-saved record: just drop it.
 			this.items = this.items.filter((record) => record.id !== id);
@@ -139,6 +153,9 @@ export class EntityStore<T extends Identified> {
 	}
 
 	restoreItem(id: number) {
+		if (this.saving) {
+			return;
+		}
 		this.deleted.delete(id);
 		this.saved = false;
 	}
@@ -163,6 +180,9 @@ export class EntityStore<T extends Identified> {
 	}
 
 	resetItem(id: number) {
+		if (this.saving) {
+			return;
+		}
 		const baseline = this.baseMap[id];
 		if (baseline) {
 			this.items = this.items.map((record) => (record.id === id ? clone(baseline) : record));

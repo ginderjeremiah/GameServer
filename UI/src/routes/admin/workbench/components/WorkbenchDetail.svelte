@@ -77,7 +77,7 @@
 		</div>
 
 		<div class="detail-body">
-			<div class="body-inner" class:locked={status === 'deleted'}>
+			<div class="body-inner" class:locked={status === 'deleted' || store.saving}>
 				<div class="sec-title">
 					{curSection.label}{#if curSection.desc}<span class="sub">— {curSection.desc}</span>{/if}<span class="ln"
 					></span>
