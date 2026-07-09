@@ -28,16 +28,19 @@ namespace Game.Application.Services
         /// <paramref name="progress"/> (plus the statistic-independent ones), applies each completion's rewards
         /// to <paramref name="player"/>, and returns the completions so the caller can surface them. Pass
         /// <paramref name="notify"/> <c>true</c> on the live path to raise the per-challenge client push, or
-        /// <c>false</c> for the offline batch to suppress it.
+        /// <c>false</c> for the offline batch to suppress it. <paramref name="timestamp"/> stamps any completion's
+        /// <see cref="PlayerChallenge.CompletedAt"/> — the live "now" or, for the offline batch, the simulated
+        /// away-window time rather than the moment the rewards are claimed.
         /// </summary>
         public IReadOnlyList<CompletedChallenge> EvaluateAndApply(
             PlayerProgress progress,
             IReadOnlyCollection<(EStatisticType Type, int? EntityId)> touchedStatistics,
             Player player,
+            DateTime timestamp,
             bool notify)
         {
             var relevantChallenges = _challenges.Index().RelevantTo(touchedStatistics);
-            var completed = progress.EvaluateChallenges(relevantChallenges);
+            var completed = progress.EvaluateChallenges(relevantChallenges, timestamp);
 
             foreach (var c in completed)
             {

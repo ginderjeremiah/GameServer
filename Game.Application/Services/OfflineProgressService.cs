@@ -105,6 +105,12 @@ namespace Game.Application.Services
             var awayMs = (long)(now - player.LastActivity).TotalMilliseconds;
             var cappedAwayMs = Math.Min(awayMs, (long)MaximumOfflineSimulation.TotalMilliseconds);
 
+            // The simulated window's end — captured from LastActivity before anything below can re-anchor it.
+            // Challenge completions during this pass are stamped here rather than at "now": when a long absence
+            // is clamped to MaximumOfflineSimulation, "now" could be hours past the point the window's replay
+            // actually simulated the completion.
+            var awayWindowEnd = player.LastActivity + TimeSpan.FromMilliseconds(cappedAwayMs);
+
             // Below the threshold there are no offline rewards. Re-anchor LastActivity (so the next away period
             // starts fresh and an immediate re-claim is a no-op) and return an empty summary. Any stale
             // in-flight battle is left for the idle loop's first StartBattle to abandon, exactly as on a normal
@@ -151,7 +157,7 @@ namespace Game.Application.Services
 
             var levelBefore = player.Level;
             var statPointsBefore = player.StatPoints.StatPointsGained;
-            var rewards = await ApplyOfflineRewards(player, progress, result, cancellationToken);
+            var rewards = await ApplyOfflineRewards(player, progress, result, awayWindowEnd, cancellationToken);
 
             // Re-anchor the away clock and persist the player (exp/levels/unlocks) in one save. The exp batch
             // already raised its own single core update in ApplyOfflineRewards; this re-anchor raises one more.
@@ -269,7 +275,8 @@ namespace Game.Application.Services
         // (the summary is the notification). Returns the completed challenges and the folded proficiency gains
         // (spike #982 decision 9 — the offline accrual's notification rides the summary, not a per-battle push).
         private async Task<OfflineRewards> ApplyOfflineRewards(
-            Player player, PlayerProgress progress, OfflineProgressResult result, CancellationToken cancellationToken)
+            Player player, PlayerProgress progress, OfflineProgressResult result, DateTime timestamp,
+            CancellationToken cancellationToken)
         {
             if (result.BattlesSimulated == 0)
             {
@@ -328,7 +335,7 @@ namespace Game.Application.Services
             }
             _proficiencyRewards.GrantRewardSkills(proficiencyResult, player);
 
-            var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, notify: false);
+            var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, timestamp, notify: false);
 
             await _progressRepo.Save(progress, cancellationToken);
             return new OfflineRewards(completed, proficiencyResult);

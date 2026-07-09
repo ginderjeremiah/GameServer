@@ -7,6 +7,8 @@ namespace Game.Core.Tests.Progress
 {
     public class ChallengeTests
     {
+        private static readonly DateTime Timestamp = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         [Fact]
         public void UpdateChallengeProgress_StatisticType_UsesMatchingStatisticValue()
         {
@@ -17,7 +19,7 @@ namespace Game.Core.Tests.Progress
                 new PlayerStatistic { Type = EStatisticType.EnemiesKilled, EntityId = null, Value = 7m },
             ]);
 
-            challenge.UpdateChallengeProgress(playerChallenge, progress);
+            challenge.UpdateChallengeProgress(playerChallenge, progress, Timestamp);
 
             Assert.Equal(7m, playerChallenge.Progress);
             Assert.False(playerChallenge.Completed);
@@ -34,10 +36,11 @@ namespace Game.Core.Tests.Progress
                 new PlayerStatistic { Type = EStatisticType.EnemiesKilled, EntityId = 4, Value = 5m },
             ]);
 
-            challenge.UpdateChallengeProgress(playerChallenge, progress);
+            challenge.UpdateChallengeProgress(playerChallenge, progress, Timestamp);
 
             Assert.Equal(5m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
+            Assert.Equal(Timestamp, playerChallenge.CompletedAt);
         }
 
         [Fact]
@@ -47,7 +50,7 @@ namespace Game.Core.Tests.Progress
             var playerChallenge = new PlayerChallenge(challenge, progress: 0m, completed: false);
             var progress = MakeProgress(player: new PlayerBuilder().WithLevel(8).Build());
 
-            challenge.UpdateChallengeProgress(playerChallenge, progress);
+            challenge.UpdateChallengeProgress(playerChallenge, progress, Timestamp);
 
             Assert.Equal(8m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
@@ -60,7 +63,7 @@ namespace Game.Core.Tests.Progress
             var playerChallenge = new PlayerChallenge(challenge, progress: 0m, completed: false);
             var progress = MakeProgress();
 
-            challenge.UpdateChallengeProgress(playerChallenge, progress);
+            challenge.UpdateChallengeProgress(playerChallenge, progress, Timestamp);
 
             Assert.Equal(0m, playerChallenge.Progress);
             Assert.False(playerChallenge.Completed);
@@ -85,7 +88,7 @@ namespace Game.Core.Tests.Progress
                     : [];
                 var progress = MakeProgress(player, statistics);
 
-                challenge.UpdateChallengeProgress(playerChallenge, progress);
+                challenge.UpdateChallengeProgress(playerChallenge, progress, Timestamp);
 
                 Assert.True(playerChallenge.Completed, $"Challenge type {type} did not progress.");
             }

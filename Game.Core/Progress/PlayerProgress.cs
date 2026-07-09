@@ -139,7 +139,7 @@ namespace Game.Core.Progress
             return [.. _dirtyStatistics];
         }
 
-        public List<CompletedChallenge> EvaluateChallenges(IEnumerable<Challenge> challenges)
+        public List<CompletedChallenge> EvaluateChallenges(IEnumerable<Challenge> challenges, DateTime timestamp)
         {
             var completed = new List<CompletedChallenge>();
 
@@ -169,7 +169,7 @@ namespace Game.Core.Progress
                 var beforeProgress = playerChallenge.Progress;
                 var beforeCompleted = playerChallenge.Completed;
 
-                challenge.UpdateChallengeProgress(playerChallenge, this);
+                challenge.UpdateChallengeProgress(playerChallenge, this, timestamp);
 
                 if (playerChallenge.Progress != beforeProgress || playerChallenge.Completed != beforeCompleted)
                 {

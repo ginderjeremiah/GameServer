@@ -29,7 +29,8 @@ namespace Game.Application.Events
             // Evaluate only the challenges whose tracked statistic this battle actually moved (plus the
             // statistic-independent ones) and apply their rewards, raising the live per-challenge push. The
             // offline-rewards batch runs this same step with the push suppressed.
-            _challengeRewards.EvaluateAndApply(progress, touchedStatistics, domainEvent.Player, notify: true);
+            _challengeRewards.EvaluateAndApply(
+                progress, touchedStatistics, domainEvent.Player, DateTime.UtcNow, notify: true);
 
             // Accrue proficiency XP on a victory: each path claims pie × activity ÷ max(playerRating,
             // enemyRating), routed to its frontier tier (the effect-based model, spike #1318, max-normalized per

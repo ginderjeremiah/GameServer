@@ -24,7 +24,7 @@ namespace Game.Core.Progress
         /// <paramref name="value"/> is not a real best), while a genuine 0 (<paramref name="hasData"/> true)
         /// can satisfy the goal.
         /// </param>
-        public void UpdateProgress(decimal value, bool hasData)
+        public void UpdateProgress(decimal value, bool hasData, DateTime timestamp)
         {
             if (Completed)
             {
@@ -42,7 +42,7 @@ namespace Game.Core.Progress
                     if (value <= Challenge.ProgressGoal)
                     {
                         Completed = true;
-                        CompletedAt = DateTime.UtcNow;
+                        CompletedAt = timestamp;
                     }
                 }
             }
@@ -52,7 +52,7 @@ namespace Game.Core.Progress
                 if (value >= Challenge.ProgressGoal)
                 {
                     Completed = true;
-                    CompletedAt = DateTime.UtcNow;
+                    CompletedAt = timestamp;
                 }
             }
         }
