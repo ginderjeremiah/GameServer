@@ -138,6 +138,9 @@ namespace Game.Api
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
                 .AddHttpContextAccessor()
+                // Backs LoginTrackingMiddleware's short-lived per-device dedupe memo (instance-local is
+                // fine — a session sticks to one instance, per the single-connection architecture).
+                .AddMemoryCache()
                 .AddDataAccess()
                 .AddDomainEventDispatcher()
                 .AddApplication()
