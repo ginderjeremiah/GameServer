@@ -128,6 +128,9 @@ export class ApiSocket {
 		// (no prior refresh token) still opens an unauthenticated socket below.
 		if (!accessToken && hadRefreshToken) {
 			this.stopPingInterval();
+			// Terminal: nothing will reconnect and re-flush the queue, so settle it here too (mirroring every
+			// other terminal branch in handleClose) rather than stranding a caller mid-connect.
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			handleAuthFailure();
 			return;
 		}
