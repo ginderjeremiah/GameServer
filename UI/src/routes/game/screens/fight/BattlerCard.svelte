@@ -41,7 +41,7 @@
 	</div>
 
 	<!-- HP Bar -->
-	<div class="hp-bar-slot" use:tutorialAnchor={`fight-hp-bar-${side}`}>
+	<div class="hp-bar-slot" use:tutorialAnchor={TOUR_ANCHOR_KEY.fightHpBar(side)}>
 		<HpBar currentHealth={battler.currentHealth} {maxHealth} ariaLabel="{battler.name} health" />
 	</div>
 
@@ -60,7 +60,7 @@ import { EAttribute } from '$lib/api';
 import { type Battler } from '$lib/battle';
 import { formatNum, tintColor } from '$lib/common';
 import { enemyManager, playerManager } from '$lib/engine';
-import { HpBar, XpBar, tutorialAnchor } from '$components';
+import { HpBar, XpBar, tutorialAnchor, TOUR_ANCHOR_KEY } from '$components';
 import ActiveEffectChips from './ActiveEffectChips.svelte';
 import CombatFloaters from './CombatFloaters.svelte';
 import Skills from './Skills.svelte';
