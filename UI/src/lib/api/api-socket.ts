@@ -18,6 +18,12 @@ const NORMAL_CLOSURE = 1000;
  *  socket dropped, so it is deliberately torn down (not just left firing) once the session ends. */
 const PING_INTERVAL_MS = 10000;
 
+/** A `readyState` of OPEN doesn't mean the connection is alive — after a laptop sleep/wake or a NAT drop
+ *  the browser can be unaware the underlying TCP connection is dead for minutes. This many consecutive
+ *  pings that never get a pong back is treated as proof the socket is half-open (not just a single slow
+ *  round trip), at which point it's closed so the keepalive's own reconnect logic takes over. */
+const MAX_MISSED_PONGS = 3;
+
 /** A handshake auth-rejection refreshes the token pair and reconnects, but only this many times in a row
  *  before giving up — so a server that keeps rejecting a freshly-refreshed token (a flapping or broken
  *  server) can't drive an unbounded refresh/reconnect loop that rapidly burns single-use refresh tokens. */
@@ -80,6 +86,10 @@ export class ApiSocket {
 		[key in ApiSocketCommand]: ReturnType<typeof createHook<[IApiSocketResponse<key>]>>;
 	}> = {};
 	private lastPing = 0;
+	// Set when a ping is sent, cleared when its pong arrives; consecutive misses drive the half-open
+	// detection in attemptPing (see MAX_MISSED_PONGS).
+	private awaitingPong = false;
+	private missedPongs = 0;
 	private socketOpened = false;
 	// Consecutive handshake-auth refresh/reconnect attempts since the last *stable* open; bounded by
 	// MAX_SOCKET_AUTH_RETRIES so a flapping/post-open-rejecting server can't loop and burn refresh tokens.
@@ -117,6 +127,8 @@ export class ApiSocket {
 
 	private async openSocket(): Promise<void> {
 		this.socketOpened = false;
+		this.awaitingPong = false;
+		this.missedPongs = 0;
 		// Pre-emptively refresh an access token that is missing or about to expire (mirroring the HTTP
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
@@ -184,7 +196,22 @@ export class ApiSocket {
 		}
 		void this.ensureSocket();
 		if (socket && socket.readyState === socket.OPEN) {
+			if (this.awaitingPong) {
+				this.missedPongs++;
+				if (this.missedPongs >= MAX_MISSED_PONGS) {
+					// readyState alone can't tell a half-open socket from a live one; MAX_MISSED_PONGS
+					// consecutive silent pings is the signal. Close it so handleClose's existing
+					// reconnect machinery takes over, rather than leaving every command to eat the full
+					// per-request timeout until the OS notices the connection is dead.
+					console.warn(`Socket missed ${this.missedPongs} consecutive pongs; closing the half-open connection.`);
+					this.awaitingPong = false;
+					this.missedPongs = 0;
+					socket.close();
+					return;
+				}
+			}
 			this.lastPing = performance.now();
+			this.awaitingPong = true;
 			socket.send('ping');
 		}
 	}
@@ -246,6 +273,8 @@ export class ApiSocket {
 	private receiveResponse(ev: MessageEvent) {
 		const now = performance.now();
 		if (ev.data == 'pong') {
+			this.awaitingPong = false;
+			this.missedPongs = 0;
 			pingHook.notify(now - this.lastPing);
 			return;
 		} else if (ev.data === 'ping') {
