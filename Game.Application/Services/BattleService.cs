@@ -547,7 +547,18 @@ namespace Game.Application.Services
         /// </summary>
         public async Task<double> RatePlayer(Player player, CancellationToken cancellationToken = default)
         {
-            var snapshot = BattleSnapshot.FromPlayer(player, await CaptureProficiencyLevels(player.Id, cancellationToken));
+            var proficiencyLevels = await _progressRepo.GetProficiencies(player.Id, cancellationToken);
+            return RatePlayer(player, proficiencyLevels);
+        }
+
+        /// <summary>
+        /// Overload for callers that already loaded the player's proficiency levels for another purpose in the
+        /// same command (e.g. <c>EquipItem</c>'s gear proficiency gate), so rating doesn't re-read the same
+        /// Redis hash a second time.
+        /// </summary>
+        public double RatePlayer(Player player, IEnumerable<PlayerProficiency> proficiencyLevels)
+        {
+            var snapshot = BattleSnapshot.FromPlayer(player, ToProficiencyLevels(proficiencyLevels));
             var battler = snapshot.ToBattler(
                 _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
             return CombatRating.Rate(battler, isPlayer: true);

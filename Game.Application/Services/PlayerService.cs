@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Players;
+using Game.Core.Progress;
 
 namespace Game.Application.Services
 {
@@ -21,13 +22,17 @@ namespace Game.Application.Services
             return await SaveIf(player, player.TryUpdateAttributes(updates), cancellationToken);
         }
 
-        public async Task<bool> EquipItem(Player player, int itemId, EEquipmentSlot slot, CancellationToken cancellationToken = default)
+        // Returns the loaded proficiency levels alongside the outcome so callers that need them again for the
+        // same command (e.g. EquipItem's post-command PlayerRating) don't re-read the same Redis hash (#1729).
+        public async Task<(bool Success, List<PlayerProficiency> ProficiencyLevels)> EquipItem(
+            Player player, int itemId, EEquipmentSlot slot, CancellationToken cancellationToken = default)
         {
             // The proficiency gate is evaluated against the player's current levels, which live on the
             // separate PlayerProgress aggregate; the domain rule itself stays in Inventory.TryEquipItem.
             var proficiencyLevels = await _playerProgress.GetProficiencies(player.Id, cancellationToken);
             var levelsByProficiency = proficiencyLevels.ToDictionary(p => p.ProficiencyId, p => p.Level);
-            return await SaveIf(player, player.TryEquipItem(itemId, slot, levelsByProficiency), cancellationToken);
+            var success = await SaveIf(player, player.TryEquipItem(itemId, slot, levelsByProficiency), cancellationToken);
+            return (success, proficiencyLevels);
         }
 
         public async Task<bool> UnequipItem(Player player, EEquipmentSlot slot, CancellationToken cancellationToken = default)
