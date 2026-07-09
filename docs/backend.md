@@ -9,7 +9,7 @@ The backend follows an onion-style architecture across several projects (each in
 - **`Game.DataAccess`** — repository implementations, the entity↔domain/contract mappers (`Mapping/`), and the in-memory reference-data caches.
 - **`Game.Infrastructure`** — the Redis cache/pub-sub implementations, the EF `GameContext`, the **EF entity models** (`Game.Infrastructure.Entities`), and migrations.
 
-Each layer has a matching `*.Tests` project. `Game.Infrastructure.Tests` is deliberately lightweight — only in-process logic with no out-of-process dependency; anything coupled to Redis or the database is covered by integration tests instead.
+Four `*.Tests` projects cover the layers (`Api`/`Application`/`Core`/`Infrastructure`); data-tier tests live under `Game.Application.Tests/DataAccess`, and `Game.Abstractions` (interfaces only) has none. `Game.Infrastructure.Tests` is deliberately lightweight — only in-process logic with no out-of-process dependency; anything coupled to Redis or the database is covered by integration tests instead.
 
 # General Backend Guidelines
 

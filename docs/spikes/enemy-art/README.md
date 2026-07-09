@@ -76,7 +76,7 @@ transparency. The direction generalizes.
 3. **Treatment #3 (framed) is reserved, not rejected.** It fights the combat card (frame
    inside the card's frame; baked backdrop clashes per-zone; hardest to theme), but it would
    shine on a **bestiary / enemy dossier** screen — note the existing
-   [EntityDossier.svelte](../../../UI/src/routes/game/screens/stats/EntityDossier.svelte).
+   [EnemyDossier.svelte](../../../UI/src/routes/game/screens/codex/EnemyDossier.svelte).
    Synthesis: transparent "presence" art for combat, framed art held for a future codex.
 
 ## Pipeline notes

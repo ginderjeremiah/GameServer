@@ -1,7 +1,7 @@
 # Spike #1398 — Should utility be worked into the proficiency system?
 
 - **Spike issue:** [#1398](https://github.com/ginderjeremiah/GameServer/issues/1398)
-- **Status:** Ideation complete; design decided. Implementation split into sub-issues (see [Implementation issues](#implementation-issues)); one follow-on spike opened ([attribute identity-sourcing](#follow-on-spikes)).
+- **Status:** Ideation complete; design decided. Implementation split into sub-issues (see [Implementation issues](#changes-by-area--implementation-issues)); one follow-on spike opened ([attribute identity-sourcing](#follow-on-spikes)).
 - **Related:** reworks the effect-based accrual from spike [#1318](https://github.com/ginderjeremiah/GameServer/issues/1318); touches the crit sourcing from [#178](./178-player-crit-dodge-block.md); unblocks the class-secondary TBDs and the archetype planning in [content-design.md](../content-design.md) (§4–§8).
 
 ## The question, as filed
