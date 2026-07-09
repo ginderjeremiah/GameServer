@@ -171,21 +171,12 @@ namespace Game.Infrastructure.Cache.Redis
                 return;
             }
 
-            var argv = new RedisValue[1 + fields.Count * 2];
-            argv[0] = (long)expiry.TotalMilliseconds;
-            var i = 1;
-            foreach (var (field, value) in fields)
-            {
-                argv[i++] = field;
-                argv[i++] = value;
-            }
-
             // Bundles every field write and the TTL reset into one atomic script (mirroring GetSet/
             // ReclaimAndForget) so the hash is never left holding freshly-written fields without its expiry
             // refreshed.
             Redis.ScriptEvaluate(
                 "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end redis.call('pexpire', KEYS[1], ARGV[1])",
-                [key], argv, flags: CommandFlags.FireAndForget);
+                [key], BuildHashArgv(fields, expiry), flags: CommandFlags.FireAndForget);
         }
 
         public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry)
@@ -193,15 +184,6 @@ namespace Game.Infrastructure.Cache.Redis
             if (fields.Count == 0)
             {
                 return;
-            }
-
-            var argv = new RedisValue[1 + fields.Count * 2];
-            argv[0] = (long)expiry.TotalMilliseconds;
-            var i = 1;
-            foreach (var (field, value) in fields)
-            {
-                argv[i++] = field;
-                argv[i++] = value;
             }
 
             // Same script as HashSetAndForget, guarded by an existence check so a key that vanished (eviction
@@ -213,7 +195,22 @@ namespace Game.Infrastructure.Cache.Redis
                 + "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end "
                 + "redis.call('pexpire', KEYS[1], ARGV[1]) "
                 + "end",
-                [key], argv, flags: CommandFlags.FireAndForget);
+                [key], BuildHashArgv(fields, expiry), flags: CommandFlags.FireAndForget);
+        }
+
+        // Shared argv layout for both hash-set scripts above: [expiry-ms, then field/value pairs].
+        private static RedisValue[] BuildHashArgv(IReadOnlyDictionary<string, string> fields, TimeSpan expiry)
+        {
+            var argv = new RedisValue[1 + fields.Count * 2];
+            argv[0] = (long)expiry.TotalMilliseconds;
+            var i = 1;
+            foreach (var (field, value) in fields)
+            {
+                argv[i++] = field;
+                argv[i++] = value;
+            }
+
+            return argv;
         }
 
         private async Task StringSetAsync(string key, string? value, TimeSpan? expiry = null, CommandFlags flags = CommandFlags.None, When when = When.Always, CancellationToken cancellationToken = default)
