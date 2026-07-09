@@ -164,13 +164,16 @@ describe('ApiSocket', () => {
 			// Refresh token spent/revoked: no usable token can be obtained.
 			vi.mocked(ensureValidAccessToken).mockResolvedValue(null);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
 			// No doomed unauthenticated handshake is opened, and the keepalive is not left running.
 			expect(webSocketMock).not.toHaveBeenCalled();
 			expect(internals(apiSocket).pingIntervalId).toBeNull();
+			// The queued command was never sent (no socket ever opened) and nothing will reconnect to
+			// re-flush it, so it must settle with an error rather than await a response forever.
+			await expect(promise).resolves.toMatchObject({ error: expect.any(String) });
 		});
 	});
 
