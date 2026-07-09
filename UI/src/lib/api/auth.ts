@@ -25,55 +25,75 @@ import {
 /** Refresh the access token this many seconds before it actually expires, to absorb clock skew. */
 const EXPIRY_LEEWAY_SECONDS = 30;
 
-let inFlightRefresh: Promise<StoredTokens | null> | null = null;
+/**
+ * A refresh attempt's outcome, distinguishing a definitive rejection from a merely failed attempt:
+ *
+ *  - `success` — a fresh token pair was minted.
+ *  - `rejected` — either there is no stored refresh token to present, or the backend affirmatively
+ *    rejected the one presented (`Login/Refresh` returns 400 for "Invalid or expired refresh token" —
+ *    its only failure path). Both are a definitively dead session, not something a retry can fix.
+ *  - `retryable` — the attempt didn't complete (network error, a non-400 non-2xx status such as a 5xx or
+ *    a 429 from rate limiting, or a malformed body). The stored refresh token may still be good; this is
+ *    not proof the session is dead, so callers must not clear tokens or force a logout on it.
+ */
+export type RefreshOutcome =
+	| { status: 'success'; tokens: StoredTokens }
+	| { status: 'rejected' }
+	| { status: 'retryable' };
 
-const performRefresh = async (refreshToken: string): Promise<StoredTokens | null> => {
+let inFlightRefresh: Promise<RefreshOutcome> | null = null;
+
+const performRefresh = async (refreshToken: string): Promise<RefreshOutcome> => {
+	let response: Response;
 	try {
-		const response = await fetch('/api/Login/Refresh', {
+		response = await fetch('/api/Login/Refresh', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ refreshToken })
 		});
-
-		if (!response.ok) {
-			return null;
-		}
-
-		const body = (await response.json()) as { data?: Partial<StoredTokens> };
-		const tokens = body.data;
-		if (tokens?.accessToken && tokens?.refreshToken) {
-			return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
-		}
 	} catch {
-		// Network error — treat as a failed refresh.
+		// Network error — can't tell whether the token is still valid, so it isn't a rejection.
+		return { status: 'retryable' };
 	}
 
-	return null;
+	if (!response.ok) {
+		return response.status === 400 ? { status: 'rejected' } : { status: 'retryable' };
+	}
+
+	const body = (await response.json()) as { data?: Partial<StoredTokens> };
+	const tokens = body.data;
+	if (tokens?.accessToken && tokens?.refreshToken) {
+		return { status: 'success', tokens: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken } };
+	}
+
+	// A 2xx with no usable token pair is a malformed response, not proof the refresh token is dead.
+	return { status: 'retryable' };
 };
 
 /**
  * Exchanges the stored refresh token for a fresh pair and persists the rotated tokens. Concurrent
- * callers share a single request so the single-use refresh token is only consumed once. On failure
- * the stored tokens are cleared (the refresh token is spent or revoked, so the session is dead).
+ * callers share a single request so the single-use refresh token is only consumed once. Stored tokens
+ * are cleared only on a definitive rejection — a retryable failure (network blip, transient server
+ * error) leaves them in place so a later attempt can still use the still-possibly-valid refresh token.
  */
-export const refreshTokens = (): Promise<StoredTokens | null> => {
+export const refreshTokens = (): Promise<RefreshOutcome> => {
 	if (inFlightRefresh) {
 		return inFlightRefresh;
 	}
 
 	const refreshToken = getRefreshToken();
 	if (!refreshToken) {
-		return Promise.resolve(null);
+		return Promise.resolve({ status: 'rejected' });
 	}
 
 	inFlightRefresh = performRefresh(refreshToken)
-		.then((tokens) => {
-			if (tokens) {
-				setTokens(tokens);
-			} else {
+		.then((outcome) => {
+			if (outcome.status === 'success') {
+				setTokens(outcome.tokens);
+			} else if (outcome.status === 'rejected') {
 				clearTokens();
 			}
-			return tokens;
+			return outcome;
 		})
 		.finally(() => {
 			inFlightRefresh = null;
@@ -84,19 +104,23 @@ export const refreshTokens = (): Promise<StoredTokens | null> => {
 
 /**
  * Ensures a usable access token is available before a request or socket connection, refreshing
- * pre-emptively when the current token is missing or within the leeway window of expiring. Returns
- * the access token to use, or null when no valid token could be obtained.
+ * pre-emptively when the current token is missing or within the leeway window of expiring. Returns the
+ * access token to use (or null when none could be obtained) alongside whether the refresh attempt — if
+ * one was made — was a definitive rejection, so callers can tell a dead session from a transient one.
  */
-export const ensureValidAccessToken = async (): Promise<string | null> => {
+export const ensureValidAccessToken = async (): Promise<{ accessToken: string | null; rejected: boolean }> => {
 	const expiry = getAccessTokenExpiry();
 	const nowSeconds = Date.now() / 1000;
 
 	if (expiry === null || expiry - EXPIRY_LEEWAY_SECONDS <= nowSeconds) {
-		const refreshed = await refreshTokens();
-		return refreshed?.accessToken ?? null;
+		const outcome = await refreshTokens();
+		return {
+			accessToken: outcome.status === 'success' ? outcome.tokens.accessToken : null,
+			rejected: outcome.status === 'rejected'
+		};
 	}
 
-	return getAccessToken();
+	return { accessToken: getAccessToken(), rejected: false };
 };
 
 /**

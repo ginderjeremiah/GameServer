@@ -121,14 +121,20 @@ export class ApiSocket {
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
 		const hadRefreshToken = getRefreshToken() !== null;
-		const accessToken = await ensureValidAccessToken();
-		// A logged-in session whose pre-emptive refresh failed (refresh token spent/revoked) is
-		// unrecoverable: route to the auth-failure handler rather than opening a doomed handshake the close
-		// handler can no longer recover from (its refresh token is now gone). A never-logged-in caller
-		// (no prior refresh token) still opens an unauthenticated socket below.
+		const { accessToken, rejected } = await ensureValidAccessToken();
+		// A logged-in session (one that had a refresh token) whose pre-emptive refresh didn't yield a
+		// token: bail out without opening rather than handing the server a stale/missing token. A
+		// never-logged-in caller (no prior refresh token) still opens an unauthenticated socket below.
 		if (!accessToken && hadRefreshToken) {
-			this.stopPingInterval();
-			handleAuthFailure();
+			if (rejected) {
+				// The refresh token was definitively spent/revoked: unrecoverable, so route to the auth-failure
+				// handler rather than opening a doomed handshake the close handler can no longer recover from.
+				this.stopPingInterval();
+				handleAuthFailure();
+			}
+			// Otherwise the failure was retryable (network blip, transient server error): leave everything
+			// intact and just bail out — the keepalive ping's next ensureSocket() call retries the connect
+			// rather than forcing a logout over a transient failure.
 			return;
 		}
 		// Browsers can't set an Authorization header on the WebSocket handshake, so the access token
@@ -376,12 +382,12 @@ export class ApiSocket {
 		}
 
 		this.socketAuthRetries++;
-		refreshTokens().then((tokens) => {
-			if (tokens) {
+		refreshTokens().then((outcome) => {
+			if (outcome.status === 'success') {
 				// processCommandQueue ensures the socket (now with the freshly refreshed token) and flushes
 				// any queued-but-unsent commands.
 				void this.processCommandQueue();
-			} else {
+			} else if (outcome.status === 'rejected') {
 				// Refresh is spent/revoked — the session is unrecoverable. Stop the keepalive before routing
 				// to login so it can't fire a reconnect on the now-cleared token during the teardown, and
 				// settle the unsent queue since nothing will re-flush it.
@@ -389,6 +395,9 @@ export class ApiSocket {
 				this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 				handleAuthFailure();
 			}
+			// Otherwise the refresh attempt was retryable (network blip, transient server error): leave the
+			// queue and tokens intact — the keepalive ping's next ensureSocket() call retries the reconnect,
+			// which will attempt the refresh again, rather than forcing a logout over a transient failure.
 		});
 	}
 

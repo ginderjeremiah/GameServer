@@ -24,13 +24,13 @@ describe('auth', () => {
 	});
 
 	describe('refreshTokens', () => {
-		it('returns null and makes no request when there is no refresh token', async () => {
+		it('returns rejected and makes no request when there is no refresh token', async () => {
 			const fetchMock = vi.fn();
 			vi.stubGlobal('fetch', fetchMock);
 
 			const result = await refreshTokens();
 
-			expect(result).toBeNull();
+			expect(result).toEqual({ status: 'rejected' });
 			expect(fetchMock).not.toHaveBeenCalled();
 		});
 
@@ -41,7 +41,10 @@ describe('auth', () => {
 
 			const result = await refreshTokens();
 
-			expect(result).toEqual({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+			expect(result).toEqual({
+				status: 'success',
+				tokens: { accessToken: 'new-access', refreshToken: 'new-refresh' }
+			});
 			expect(getTokens()).toEqual({ accessToken: 'new-access', refreshToken: 'new-refresh' });
 			expect(fetchMock).toHaveBeenCalledWith(
 				'/api/Login/Refresh',
@@ -49,17 +52,58 @@ describe('auth', () => {
 			);
 		});
 
-		it('clears storage and returns null when the server rejects the refresh token', async () => {
+		it('clears storage and returns rejected when the server rejects the refresh token (400)', async () => {
 			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
 			vi.stubGlobal(
 				'fetch',
-				vi.fn(async () => ({ ok: false, json: async () => ({}) }))
+				vi.fn(async () => ({ ok: false, status: 400, json: async () => ({}) }))
 			);
 
 			const result = await refreshTokens();
 
-			expect(result).toBeNull();
+			expect(result).toEqual({ status: 'rejected' });
 			expect(getTokens()).toBeNull();
+		});
+
+		it('keeps storage and returns retryable on a network error (fetch throws)', async () => {
+			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => {
+					throw new TypeError('Failed to fetch');
+				})
+			);
+
+			const result = await refreshTokens();
+
+			expect(result).toEqual({ status: 'retryable' });
+			expect(getTokens()).toEqual({ accessToken: 'old', refreshToken: 'old-refresh' });
+		});
+
+		it('keeps storage and returns retryable on a transient server error (5xx)', async () => {
+			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }))
+			);
+
+			const result = await refreshTokens();
+
+			expect(result).toEqual({ status: 'retryable' });
+			expect(getTokens()).toEqual({ accessToken: 'old', refreshToken: 'old-refresh' });
+		});
+
+		it('keeps storage and returns retryable when rate-limited (429)', async () => {
+			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => ({ ok: false, status: 429, json: async () => ({}) }))
+			);
+
+			const result = await refreshTokens();
+
+			expect(result).toEqual({ status: 'retryable' });
+			expect(getTokens()).toEqual({ accessToken: 'old', refreshToken: 'old-refresh' });
 		});
 
 		it('collapses concurrent refreshes onto a single request (single-use token safe)', async () => {
@@ -80,7 +124,7 @@ describe('auth', () => {
 			const [a, b] = await Promise.all([first, second]);
 
 			expect(fetchMock).toHaveBeenCalledTimes(1);
-			expect(a).toEqual({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+			expect(a).toEqual({ status: 'success', tokens: { accessToken: 'new-access', refreshToken: 'new-refresh' } });
 			expect(b).toEqual(a);
 		});
 	});
@@ -94,7 +138,7 @@ describe('auth', () => {
 
 			const result = await ensureValidAccessToken();
 
-			expect(result).toBe(token);
+			expect(result).toEqual({ accessToken: token, rejected: false });
 			expect(fetchMock).not.toHaveBeenCalled();
 		});
 
@@ -105,7 +149,7 @@ describe('auth', () => {
 
 			const result = await ensureValidAccessToken();
 
-			expect(result).toBe('fresh-access');
+			expect(result).toEqual({ accessToken: 'fresh-access', rejected: false });
 			expect(fetchMock).toHaveBeenCalledTimes(1);
 		});
 
@@ -116,7 +160,33 @@ describe('auth', () => {
 
 			const result = await ensureValidAccessToken();
 
-			expect(result).toBe('fresh-access');
+			expect(result).toEqual({ accessToken: 'fresh-access', rejected: false });
+		});
+
+		it('reports a definitive rejection without a token when the refresh token is dead', async () => {
+			setTokens({ accessToken: makeAccessToken(10), refreshToken: 'r' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => ({ ok: false, status: 400, json: async () => ({}) }))
+			);
+
+			const result = await ensureValidAccessToken();
+
+			expect(result).toEqual({ accessToken: null, rejected: true });
+		});
+
+		it('reports retryable (not rejected) without a token on a network error', async () => {
+			setTokens({ accessToken: makeAccessToken(10), refreshToken: 'r' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => {
+					throw new TypeError('Failed to fetch');
+				})
+			);
+
+			const result = await ensureValidAccessToken();
+
+			expect(result).toEqual({ accessToken: null, rejected: false });
 		});
 	});
 

@@ -44,10 +44,12 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
 });
 
 vi.stubGlobal('fetch', fetchMock);
-vi.stubGlobal('window', { encodeURIComponent });
+// `location` is a minimal stand-in so handleAuthFailure's redirect guard (window.location.pathname) can
+// run without throwing; only the refresh-failure tests below inspect it.
+vi.stubGlobal('window', { encodeURIComponent, location: { pathname: '/game', href: '' } });
 
 import { ApiRequest } from '$lib/api/api-request';
-import { setTokens } from '$lib/api/token-store';
+import { setTokens, getTokens } from '$lib/api/token-store';
 
 // Builds a JWT-shaped access token whose `exp` claim is `secondsFromNow` in the future, so the
 // request layer treats it as valid and attaches it without attempting a pre-emptive refresh.
@@ -216,6 +218,47 @@ describe('ApiRequest', () => {
 			expect(callsTo('/api/Login/Refresh')).toHaveLength(0);
 			expect(fetchCalls).toHaveLength(1);
 			expect(response.status).toBe(401);
+		});
+
+		it('clears tokens and redirects when the refresh is definitively rejected (400)', async () => {
+			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'refresh-1' });
+			window.location.href = '';
+
+			fetchResponder = (call) =>
+				call.url === '/api/Login/Refresh'
+					? { status: 400, body: JSON.stringify({ errorMessage: 'Invalid or expired refresh token' }) }
+					: { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) };
+
+			const response = await new ApiRequest('Tags').get();
+
+			// The original 401 is what the caller sees; only one refresh attempt is made (the isRetry guard
+			// prevents `execute` from recursing into a second 401-triggered refresh on the retried request).
+			expect(response.status).toBe(401);
+			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			expect(callsTo('/api/Tags')).toHaveLength(1);
+			expect(getTokens()).toBeNull();
+			expect(window.location.href).toBe('/');
+		});
+
+		it('preserves tokens and does not redirect when the refresh is retryable (5xx)', async () => {
+			const accessToken = makeAccessToken(600);
+			setTokens({ accessToken, refreshToken: 'refresh-1' });
+			window.location.href = '';
+
+			fetchResponder = (call) =>
+				call.url === '/api/Login/Refresh'
+					? { status: 503, body: '' }
+					: { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) };
+
+			const response = await new ApiRequest('Tags').get();
+
+			// A transient refresh failure just surfaces the original 401 — no forced logout, and the isRetry
+			// guard still caps this at a single refresh attempt rather than looping.
+			expect(response.status).toBe(401);
+			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			expect(callsTo('/api/Tags')).toHaveLength(1);
+			expect(getTokens()).toEqual({ accessToken, refreshToken: 'refresh-1' });
+			expect(window.location.href).toBe('');
 		});
 	});
 });
