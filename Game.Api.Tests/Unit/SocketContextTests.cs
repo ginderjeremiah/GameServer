@@ -153,6 +153,27 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task Close_SocketInCloseReceived_CompletesTheHandshakeWithNormalClosure()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            // Mirrors the read loop's terminal Close after ReceiveAsync returns a client-initiated Close
+            // frame: the socket is already in CloseReceived, not Open.
+            var socket = new GatedCloseWebSocket { StateOverride = WebSocketState.CloseReceived };
+            var context = CreateContext(socket);
+
+            var closeTask = context.Close(ESocketCloseReason.Finished, cancellationToken);
+            await socket.CloseStarted.WaitAsync(WaitTimeout, cancellationToken);
+            socket.CompleteClose();
+            await closeTask.WaitAsync(WaitTimeout, cancellationToken);
+
+            // CloseAsync is called (completing the handshake with a reciprocal close frame) rather than
+            // being skipped because the state isn't Open (#1759).
+            Assert.True(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.CloseStatusUsed);
+            await context.WaitSocketClosed().WaitAsync(WaitTimeout, cancellationToken);
+        }
+
+        [Fact]
         public async Task SendData_MidFrameCancellation_CompletesTheFrameRatherThanLeavingItHalfSent()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
