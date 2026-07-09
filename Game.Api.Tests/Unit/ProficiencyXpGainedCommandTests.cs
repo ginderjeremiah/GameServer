@@ -6,12 +6,18 @@ namespace Game.Api.Tests.Unit
 {
     /// <summary>
     /// Unit coverage for the server-initiated <see cref="ProficiencyXpGained"/> push command: it echoes the
-    /// emitted payload straight back as its response data (the client listens for it), and rejects a missing
-    /// payload on both the set-parameters and execute paths. The handler ignores the socket context, so these
-    /// run as plain unit tests without a live socket — mirroring the other echo push commands.
+    /// emitted payload straight back as its response data (the client listens for it), and classifies a missing
+    /// payload as <see cref="MalformedSocketCommandParametersException"/> like every other command's
+    /// <c>SetParameters</c>. The handler ignores the socket context, so these run as plain unit tests without a
+    /// live socket — mirroring the other echo push commands.
     /// </summary>
     public class ProficiencyXpGainedCommandTests
     {
+        private static ProficiencyXpGained NewCommand()
+        {
+            return new ProficiencyXpGained { Parameters = new ProficiencyXpGainedModel { Proficiencies = [], Opened = [] } };
+        }
+
         [Fact]
         public async Task SetParameters_ThenExecute_EchoesThePayloadBack()
         {
@@ -32,7 +38,7 @@ namespace Game.Api.Tests.Unit
                 Opened = [new ProficiencyOpenedModel { ProficiencyId = 4 }],
             };
 
-            var command = new ProficiencyXpGained();
+            var command = NewCommand();
             // The emitted info carries the serialized payload exactly as the notifier would send it.
             command.SetParameters(new ProficiencyXpGainedInfo(model).Parameters);
 
@@ -51,18 +57,13 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void SetParameters_NullPayload_Throws()
+        public void SetParameters_NullPayload_ThrowsMalformedSocketCommandParametersException()
         {
-            var command = new ProficiencyXpGained();
-            Assert.Throws<ArgumentNullException>(() => command.SetParameters(null));
-        }
+            var command = NewCommand();
 
-        [Fact]
-        public async Task Execute_WithoutParameters_Throws()
-        {
-            var command = new ProficiencyXpGained();
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => command.HandleExecuteAsync(context: null!, CancellationToken.None));
+            var ex = Assert.Throws<MalformedSocketCommandParametersException>(() => command.SetParameters(null));
+
+            Assert.IsType<ArgumentNullException>(ex.InnerException);
         }
     }
 }
