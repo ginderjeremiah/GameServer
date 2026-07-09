@@ -1,4 +1,12 @@
-import { ApiRequest, EChangeType, fetchSocketData, type IChange, type IPath, type IProficiency } from '$lib/api';
+import {
+	ApiRequest,
+	EChangeType,
+	fetchSocketData,
+	type IChange,
+	type IPath,
+	type IProficiency,
+	type ISetProficiencyPrerequisitesData
+} from '$lib/api';
 import { staticData, toastError } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, canonicalEqual, resolveId, resolveNewIds } from '../save-helpers';
@@ -437,7 +445,12 @@ export class ProgressionStore {
 				profDiff.added
 			);
 
-			// 5. Proficiency child collections — modifiers, rewards, and cross-path prerequisites.
+			// 5. Proficiency child collections — modifiers and rewards per tier, plus every changed tier's
+			// cross-path prerequisites collected into one combined batch (posted in step 6) rather than posted
+			// per tier: the backend validates a batch against its final combined graph, so a gateway swap
+			// spanning two tiers (one drops an edge while the other gains the reverse) can't be false-rejected
+			// as a cycle depending on which tier's post happens to land first.
+			const prerequisiteChanges: ISetProficiencyPrerequisitesData[] = [];
 			for (const prof of [...profDiff.added, ...profDiff.modified.map((m) => m.record)]) {
 				const baseline = baseProfMap[prof.id];
 				const id = resolveId(prof.id, profIdMap);
@@ -451,9 +464,14 @@ export class ProgressionStore {
 				}
 				if (childChanged(prof.prerequisiteIds, baseline?.prerequisiteIds)) {
 					const prerequisiteIds = prof.prerequisiteIds.map((pid) => resolveId(pid, profIdMap));
-					await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', { id, prerequisiteIds });
-					committed = true;
+					prerequisiteChanges.push({ id, prerequisiteIds });
 				}
+			}
+
+			// 6. Cross-path prerequisites, all changed tiers in one call (see above).
+			if (prerequisiteChanges.length) {
+				await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', prerequisiteChanges);
+				committed = true;
 			}
 
 			// 7. Follow the selection across any id remap, then re-seed from server truth.
