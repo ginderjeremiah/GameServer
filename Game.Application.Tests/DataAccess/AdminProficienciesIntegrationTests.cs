@@ -454,11 +454,11 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
 
-            var result = admin.SetPrerequisites(new SetProficiencyPrerequisitesData
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
             {
                 Id = proficiencyId,
                 PrerequisiteIds = [proficiencyId],
-            });
+            }]);
 
             Assert.False(result.Succeeded);
             Assert.Contains("cannot be its own prerequisite", result.ErrorMessage);
@@ -489,14 +489,83 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
 
-            var result = admin.SetPrerequisites(new SetProficiencyPrerequisitesData
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
             {
                 Id = prerequisiteId,
                 PrerequisiteIds = [gatedId],
-            });
+            }]);
 
             Assert.False(result.Succeeded);
             Assert.Contains("cycle", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetPrerequisites_BatchNamesTheSameProficiencyTwice_ReturnsFailure()
+        {
+            int proficiencyId, otherId;
+            using (var seedScope = CreateScope())
+            {
+                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
+                otherId = (await SeedProficiencyAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SetPrerequisites([
+                new SetProficiencyPrerequisitesData { Id = proficiencyId, PrerequisiteIds = [] },
+                new SetProficiencyPrerequisitesData { Id = proficiencyId, PrerequisiteIds = [otherId] },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("more than once", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetPrerequisites_BatchedGatewaySwap_AcceptsTheCombinedAcyclicResult()
+        {
+            // Reproduces the false-cycle rejection this batch endpoint exists to fix: A currently gates on B
+            // (A -> B). The swap reverses the gateway in one save — A drops its prerequisite on B while B
+            // gains one on A — an edit whose end state (B -> A only) is acyclic. Processed one-at-a-time in
+            // submission order, whichever change posts first would see the other side's edge still live and
+            // false-reject the swap as a cycle; batched, both edges are judged against the same combined,
+            // final graph.
+            int aId, bId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var a = await SeedProficiencyAsync(seedScope);
+                var b = await SeedProficiencyAsync(seedScope);
+                aId = a.Id;
+                bId = b.Id;
+
+                context.Set<Entities.ProficiencyPrerequisite>().Add(new Entities.ProficiencyPrerequisite
+                {
+                    ProficiencyId = aId,
+                    PrerequisiteProficiencyId = bId,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+                var result = admin.SetPrerequisites([
+                    new SetProficiencyPrerequisitesData { Id = aId, PrerequisiteIds = [] },
+                    new SetProficiencyPrerequisitesData { Id = bId, PrerequisiteIds = [aId] },
+                ]);
+
+                Assert.True(result.Succeeded, result.ErrorMessage);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var edges = await assertContext.Set<Entities.ProficiencyPrerequisite>().ToListAsync(CancellationToken);
+            Assert.DoesNotContain(edges, e => e.ProficiencyId == aId);
+            Assert.Contains(edges, e => e.ProficiencyId == bId && e.PrerequisiteProficiencyId == aId);
         }
 
         private async Task<Entities.Path> SeedPathAsync(IServiceScope scope)

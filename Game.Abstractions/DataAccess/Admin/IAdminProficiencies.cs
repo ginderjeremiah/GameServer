@@ -23,8 +23,14 @@ namespace Game.Abstractions.DataAccess.Admin
         /// exist or a reward skill is not Player-acquirable.</summary>
         AdminSaveResult SetRewards(SetProficiencyRewardsData data);
 
-        /// <summary>Reconciles a proficiency's cross-path prerequisite edges. Fails if the proficiency does
-        /// not exist, a prerequisite does not exist, or a proficiency lists itself.</summary>
-        AdminSaveResult SetPrerequisites(SetProficiencyPrerequisitesData data);
+        /// <summary>Reconciles the cross-path prerequisite edges of every proficiency named in
+        /// <paramref name="changes"/> as one batch. Validated against the combined prospective graph — every
+        /// changed proficiency's desired edges plus every other proficiency's existing ones — so a gateway
+        /// swap spanning several proficiencies (one drops an edge while another gains the reverse) is judged
+        /// by its final acyclic state rather than rejected as a false cycle depending on submission order.
+        /// Fails (applying nothing) if a proficiency does not exist, a prerequisite does not exist, a
+        /// proficiency lists itself, a proficiency is named more than once in the batch, or the combined
+        /// result would cycle.</summary>
+        AdminSaveResult SetPrerequisites(IReadOnlyList<SetProficiencyPrerequisitesData> changes);
     }
 }

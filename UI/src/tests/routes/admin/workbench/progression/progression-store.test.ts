@@ -92,9 +92,11 @@ const applyPost = (endpoint: string, body: Rec) => {
 			prof.levelRewards = body.rewards;
 		}
 	} else if (endpoint === 'AdminTools/SetProficiencyPrerequisites') {
-		const prof = serverProfs.find((p) => p.id === body.id);
-		if (prof) {
-			prof.prerequisiteIds = body.prerequisiteIds;
+		for (const change of body as Rec[]) {
+			const prof = serverProfs.find((p) => p.id === change.id);
+			if (prof) {
+				prof.prerequisiteIds = change.prerequisiteIds;
+			}
 		}
 	}
 };
@@ -278,6 +280,33 @@ describe('save orchestration', () => {
 		expect(mods.id).toBe(0);
 		expect(mods.modifiers[0].level).toBe(3);
 		expect(serverProfs[0].levelModifiers).toHaveLength(1);
+	});
+
+	it('batches cross-path prerequisite changes into one call so a gateway swap posts as a single combined set', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0', prerequisiteIds: [1] }),
+			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Swap the gateway: tier 0 drops its prerequisite on tier 1, tier 1 gains one on tier 0. Posted
+		// per tier in submission order, the backend would see tier 0's still-live edge and tier 1's new
+		// one at the same time and reject it as a cycle — batching avoids that entirely.
+		store.removePrerequisite(0, 1);
+		store.addPrerequisite(1, 0);
+
+		await store.save();
+
+		const prereqCalls = callsTo('AdminTools/SetProficiencyPrerequisites');
+		expect(prereqCalls).toHaveLength(1);
+		expect(prereqCalls[0]).toEqual([
+			{ id: 0, prerequisiteIds: [] },
+			{ id: 1, prerequisiteIds: [0] }
+		]);
+		expect(serverProfs.find((p) => p.id === 0)?.prerequisiteIds).toEqual([]);
+		expect(serverProfs.find((p) => p.id === 1)?.prerequisiteIds).toEqual([0]);
 	});
 
 	it('preserves edits and surfaces an error when the first write fails (pre-commit)', async () => {
