@@ -1,6 +1,7 @@
 using Game.Abstractions.Infrastructure;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
+using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 using Xunit;
@@ -136,18 +137,7 @@ namespace Game.Application.Tests.DataAccess
 
             cache.ReclaimAndForget(key, "owner-a", TimeSpan.FromSeconds(30));
 
-            var deadline = DateTime.UtcNow.AddSeconds(5);
-            TimeSpan? ttl = null;
-            while (DateTime.UtcNow < deadline)
-            {
-                ttl = await ReadTtlAsync(key);
-                if (ttl > TimeSpan.FromSeconds(10))
-                {
-                    break;
-                }
-
-                await Task.Delay(25);
-            }
+            var ttl = await PollingHelper.PollUntilAsync(() => ReadTtlAsync(key), t => t > TimeSpan.FromSeconds(10));
 
             Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be extended past its 2s seed but was {ttl}.");
             Assert.Equal("owner-a", await cache.Get(key));
@@ -188,18 +178,7 @@ namespace Game.Application.Tests.DataAccess
 
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(30));
 
-            Dictionary<string, string>? fields = null;
-            var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                fields = await cache.HashGetAllIfExists(key);
-                if (fields is not null)
-                {
-                    break;
-                }
-
-                await Task.Delay(25);
-            }
+            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f is not null);
 
             Assert.NotNull(fields);
             Assert.Equal(2, fields.Count);
@@ -225,18 +204,7 @@ namespace Game.Application.Tests.DataAccess
             // past the 2s seed ceiling.
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "9" }, TimeSpan.FromSeconds(30));
 
-            Dictionary<string, string>? fields = null;
-            var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                fields = await cache.HashGetAllIfExists(key);
-                if (fields?.GetValueOrDefault("a") == "9")
-                {
-                    break;
-                }
-
-                await Task.Delay(25);
-            }
+            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.GetValueOrDefault("a") == "9");
 
             Assert.NotNull(fields);
             Assert.Equal("9", fields["a"]);
@@ -277,34 +245,17 @@ namespace Game.Application.Tests.DataAccess
 
         private static async Task WaitForHashFieldCountAsync(ICacheService cache, string key, int count, int timeoutMs = 5000)
         {
-            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (DateTime.UtcNow < deadline)
+            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.Count == count, timeoutMs);
+            if (fields?.Count != count)
             {
-                if ((await cache.HashGetAllIfExists(key))?.Count == count)
-                {
-                    return;
-                }
-
-                await Task.Delay(25);
+                Assert.Fail($"Expected hash '{key}' to have {count} fields within the timeout.");
             }
-
-            Assert.Fail($"Expected hash '{key}' to have {count} fields within the timeout.");
         }
 
         private static async Task<bool> WaitUntilValueEqualsAsync(ICacheService cache, string key, string expected, int timeoutMs = 5000)
         {
-            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (DateTime.UtcNow < deadline)
-            {
-                if (await cache.Get(key) == expected)
-                {
-                    return true;
-                }
-
-                await Task.Delay(25);
-            }
-
-            return await cache.Get(key) == expected;
+            var value = await PollingHelper.PollUntilAsync(() => cache.Get(key), v => v == expected, timeoutMs);
+            return value == expected;
         }
 
         private async Task<TimeSpan?> ReadTtlAsync(string key)
