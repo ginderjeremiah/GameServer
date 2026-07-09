@@ -41,6 +41,10 @@ export type RefreshOutcome =
 	| { status: 'rejected' }
 	| { status: 'retryable' };
 
+/** The access token to use (or null when none could be obtained) alongside whether a refresh attempt —
+ *  if one was made — was a definitive rejection, so callers can tell a dead session from a transient one. */
+export type AccessTokenResult = { accessToken: string | null; rejected: boolean };
+
 let inFlightRefresh: Promise<RefreshOutcome> | null = null;
 
 const performRefresh = async (refreshToken: string): Promise<RefreshOutcome> => {
@@ -104,11 +108,9 @@ export const refreshTokens = (): Promise<RefreshOutcome> => {
 
 /**
  * Ensures a usable access token is available before a request or socket connection, refreshing
- * pre-emptively when the current token is missing or within the leeway window of expiring. Returns the
- * access token to use (or null when none could be obtained) alongside whether the refresh attempt — if
- * one was made — was a definitive rejection, so callers can tell a dead session from a transient one.
+ * pre-emptively when the current token is missing or within the leeway window of expiring.
  */
-export const ensureValidAccessToken = async (): Promise<{ accessToken: string | null; rejected: boolean }> => {
+export const ensureValidAccessToken = async (): Promise<AccessTokenResult> => {
 	const expiry = getAccessTokenExpiry();
 	const nowSeconds = Date.now() / 1000;
 

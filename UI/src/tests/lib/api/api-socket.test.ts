@@ -51,7 +51,7 @@ vi.stubGlobal('WebSocket', webSocketMock);
 
 import { ApiSocket, fetchSocketData, onSocketError } from '$lib/api/api-socket';
 import { setTokens, getAccessToken, getTokens } from '$lib/api/token-store';
-import { ensureValidAccessToken, refreshTokens, handleAuthFailure } from '$lib/api/auth';
+import { ensureValidAccessToken, refreshTokens, handleAuthFailure, type AccessTokenResult } from '$lib/api/auth';
 
 // Opening a socket is now asynchronous (it awaits the pre-emptive refresh before `new WebSocket`), so a
 // command no longer creates the socket synchronously. Drain the promise microtask queue to let the
@@ -141,9 +141,9 @@ describe('ApiSocket', () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			// Hold the pre-emptive refresh open so both callers pass the "is there a socket?" check while
 			// awaiting, exercising the single-flight guard.
-			let releaseRefresh: (result: { accessToken: string | null; rejected: boolean }) => void = () => {};
+			let releaseRefresh: (result: AccessTokenResult) => void = () => {};
 			vi.mocked(ensureValidAccessToken).mockReturnValue(
-				new Promise<{ accessToken: string | null; rejected: boolean }>((resolve) => {
+				new Promise<AccessTokenResult>((resolve) => {
 					releaseRefresh = resolve;
 				})
 			);
