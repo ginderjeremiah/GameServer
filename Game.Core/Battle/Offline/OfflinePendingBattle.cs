@@ -11,5 +11,12 @@ namespace Game.Core.Battle.Offline
     /// leading-edge stale-battle hand-back (#1595): this is simply that same "still in progress" state, arrived
     /// at from the trailing edge of the away window instead of a mid-battle disconnect.
     /// </summary>
-    public sealed record OfflinePendingBattle(Enemy Enemy, uint Seed, int ElapsedOffsetMs);
+    /// <param name="Snapshot">
+    /// The player snapshot this battle was actually simulated against — the mid-window-grown one (#1601/#1602),
+    /// not the window-start snapshot the caller froze the run's parameters with (#1758). The hand-back must
+    /// resume the battle from this exact state: the client rebuilds its battler from the post-reward live
+    /// player, so a stale, weaker snapshot here would let the server's later anti-cheat replay disagree with a
+    /// legitimate client win.
+    /// </param>
+    public sealed record OfflinePendingBattle(Enemy Enemy, uint Seed, int ElapsedOffsetMs, BattleSnapshot Snapshot);
 }

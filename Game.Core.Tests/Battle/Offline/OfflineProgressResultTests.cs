@@ -95,7 +95,7 @@ namespace Game.Core.Tests.Battle.Offline
         [Fact]
         public void PendingBattle_CarriesTheSuppliedValue_AndIsExcludedFromTheCreditedAggregates()
         {
-            var pending = new OfflinePendingBattle(MakeEnemy(9), Seed: 123, ElapsedOffsetMs: 500);
+            var pending = new OfflinePendingBattle(MakeEnemy(9), Seed: 123, ElapsedOffsetMs: 500, Snapshot: MakeSnapshot());
 
             var result = new OfflineProgressResult(OfflineLoopMode.Idle, zoneId: 1, battles: [], pendingBattle: pending);
 
@@ -119,6 +119,14 @@ namespace Game.Core.Tests.Battle.Offline
         private static OfflineBattleOutcome Draw(int enemyId, int totalMs) =>
             new(MakeEnemy(enemyId), new BattleResult(Victory: false, PlayerDied: false, totalMs, new BattleStats()), ExpReward: 0,
                 PlayerRating: 0, EnemyRating: 0, ProficiencyGains: ProficiencyAccrualResult.Empty);
+
+        private static BattleSnapshot MakeSnapshot() => new()
+        {
+            Level = 1,
+            StatAllocations = [],
+            EquippedItems = [],
+            SkillIds = [],
+        };
 
         private static Enemy MakeEnemy(int id) => new()
         {

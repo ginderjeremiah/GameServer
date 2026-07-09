@@ -2341,9 +2341,9 @@ namespace Game.Application.Tests.Services
             pendingEnemy.SelectAllBattleSkills();
             var snapshot = BattleSnapshot.FromPlayer(player, []);
             var now = DateTime.UtcNow;
-            var pending = new OfflinePendingBattle(pendingEnemy, Seed: 42, ElapsedOffsetMs: 45_000);
+            var pending = new OfflinePendingBattle(pendingEnemy, Seed: 42, ElapsedOffsetMs: 45_000, Snapshot: snapshot);
 
-            var result = battleService.HandBackPendingBattle(state, pending, snapshot, zone.Id, isBossBattle: false, now);
+            var result = battleService.HandBackPendingBattle(state, pending, zone.Id, isBossBattle: false, now);
 
             Assert.Equal(enemy.Id, result.Enemy.Id);
             Assert.Equal(42u, result.Seed);
@@ -2389,9 +2389,9 @@ namespace Game.Application.Tests.Services
             pendingBoss.SelectAllBattleSkills();
             var snapshot = BattleSnapshot.FromPlayer(player, []);
             var now = DateTime.UtcNow;
-            var pending = new OfflinePendingBattle(pendingBoss, Seed: 7, ElapsedOffsetMs: 10_000);
+            var pending = new OfflinePendingBattle(pendingBoss, Seed: 7, ElapsedOffsetMs: 10_000, Snapshot: snapshot);
 
-            var result = battleService.HandBackPendingBattle(state, pending, snapshot, zone.Id, isBossBattle: true, now);
+            var result = battleService.HandBackPendingBattle(state, pending, zone.Id, isBossBattle: true, now);
 
             Assert.Equal(boss.Id, result.Enemy.Id);
             Assert.Equal(18, result.Enemy.Level);
@@ -2433,9 +2433,9 @@ namespace Game.Application.Tests.Services
             pendingEnemy.SelectAllBattleSkills();
             var snapshot = BattleSnapshot.FromPlayer(player, []);
             var now = DateTime.UtcNow;
-            var pending = new OfflinePendingBattle(pendingEnemy, Seed: 1, ElapsedOffsetMs: 0);
+            var pending = new OfflinePendingBattle(pendingEnemy, Seed: 1, ElapsedOffsetMs: 0, Snapshot: snapshot);
 
-            var result = battleService.HandBackPendingBattle(state, pending, snapshot, zone.Id, isBossBattle: false, now);
+            var result = battleService.HandBackPendingBattle(state, pending, zone.Id, isBossBattle: false, now);
 
             Assert.Equal(0, result.ElapsedOffsetMs);
             Assert.Equal(now, state.BattleStartTime);

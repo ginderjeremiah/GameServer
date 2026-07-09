@@ -153,7 +153,7 @@ namespace Game.Application.Services
             // path persists PlayerState afterward, the switch path's mutation is (like the existing ClearBattle
             // above) discarded when the switch immediately creates a fresh session for the newly selected
             // character regardless.
-            var activeBattle = ApplyTrailingRemainder(state, result.IsBossBattle, zone.Id, parameters.Snapshot, result, now);
+            var activeBattle = ApplyTrailingRemainder(state, result.IsBossBattle, zone.Id, result, now);
 
             var levelBefore = player.Level;
             var statPointsBefore = player.StatPoints.StatPointsGained;
@@ -246,18 +246,19 @@ namespace Game.Application.Services
         // The simulator already tells the two cases apart:
         // - PendingBattle: the away boundary fell inside a battle the simulator drew but could not credit (its
         //   own duration didn't fit the remaining budget) — hand it back active at its true elapsed offset
-        //   (same enemy/seed the simulator already simulated), exactly like a still-in-progress stale-battle
-        //   hand-back (#1595), so the client resumes it via replay-to-offset (#1597).
+        //   (same enemy/seed and the possibly-grown snapshot the simulator already simulated it against, #1758),
+        //   exactly like a still-in-progress stale-battle hand-back (#1595), so the client resumes it via
+        //   replay-to-offset (#1597).
         // - RemainderMs: the boundary fell inside a completed battle's post-battle cooldown — no battle is
         //   active yet even in the model, so just set the residual PlayerState cooldown; the live idle loop's
         //   first NewEnemy after the gate naturally waits it out (the existing cooldown gate).
         // Returns null when there is nothing to carry.
         private BattleStartResult? ApplyTrailingRemainder(
-            PlayerState state, bool isBossBattle, int zoneId, BattleSnapshot snapshot, OfflineProgressResult result, DateTime now)
+            PlayerState state, bool isBossBattle, int zoneId, OfflineProgressResult result, DateTime now)
         {
             if (result.PendingBattle is { } pending)
             {
-                return _battleService.HandBackPendingBattle(state, pending, snapshot, zoneId, isBossBattle, now);
+                return _battleService.HandBackPendingBattle(state, pending, zoneId, isBossBattle, now);
             }
 
             if (result.RemainderMs > 0)

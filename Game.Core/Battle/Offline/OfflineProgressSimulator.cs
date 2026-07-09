@@ -34,8 +34,9 @@ namespace Game.Core.Battle.Offline
         /// <c>duration + cooldown</c> from the budget. If it doesn't fit, the away-window boundary falls
         /// inside it rather than after it: it did not really conclude, so it is not credited as a win/loss/
         /// draw at all — it is carried forward as <see cref="OfflineProgressResult.PendingBattle"/> (the exact
-        /// enemy/seed just simulated, with its true elapsed-so-far offset) for the orchestration to hand back
-        /// as an already-active battle, and the loop stops (there is no away time left beyond it). This keeps
+        /// enemy/seed just simulated, with its true elapsed-so-far offset, and the snapshot — possibly grown by
+        /// prior credited victories, #1758 — it was actually simulated against) for the orchestration to hand
+        /// back as an already-active battle, and the loop stops (there is no away time left beyond it). This keeps
         /// the loop from ever double-counting the battle straddling the boundary as both a completed win and
         /// a resumed fight.
         /// </para>
@@ -91,7 +92,7 @@ namespace Game.Core.Battle.Offline
                     // ended mid-fight. Not a completed outcome: carry it forward uncredited, at the real time
                     // that had elapsed into it (exactly the budget remaining when this attempt started), and
                     // stop — there is no away time left beyond this unconcluded fight.
-                    pendingBattle = new OfflinePendingBattle(enemy, seed, (int)remainingMs);
+                    pendingBattle = new OfflinePendingBattle(enemy, seed, (int)remainingMs, workingSnapshot);
                     break;
                 }
 
