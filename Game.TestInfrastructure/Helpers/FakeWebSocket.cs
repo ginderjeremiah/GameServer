@@ -16,6 +16,7 @@ namespace Game.TestInfrastructure.Helpers
         private readonly Task? _sendGate;
         private readonly TimeSpan _sendDuration;
         private readonly TaskCompletionSource _firstSendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly CancellationTokenSource _abortCts = new();
         private readonly object _lock = new();
         private readonly List<byte> _pendingMessage = [];
         private readonly List<string> _sentMessages = [];
@@ -29,6 +30,9 @@ namespace Game.TestInfrastructure.Helpers
 
         /// <summary>The total number of completed sends.</summary>
         public int CompletedSends { get; private set; }
+
+        /// <summary>Whether <see cref="Abort"/> has been called.</summary>
+        public bool AbortCalled { get; private set; }
 
         /// <summary>Whether <see cref="CloseAsync"/> has been called.</summary>
         public bool CloseAsyncCalled { get; private set; }
@@ -72,7 +76,14 @@ namespace Game.TestInfrastructure.Helpers
             {
                 if (_sendGate is not null)
                 {
-                    await _sendGate;
+                    // Races the gate against Abort() so a test can simulate a wedged send (a peer with a zero
+                    // TCP receive window) that only Abort() — not cancellation — can unblock, mirroring the
+                    // real WebSocket contract SocketContext.SendData relies on (#1760).
+                    var abortTask = Task.Delay(Timeout.InfiniteTimeSpan, _abortCts.Token);
+                    if (await Task.WhenAny(_sendGate, abortTask) == abortTask)
+                    {
+                        throw new WebSocketException(WebSocketError.InvalidState, "Aborted");
+                    }
                 }
                 else
                 {
@@ -84,22 +95,30 @@ namespace Game.TestInfrastructure.Helpers
                 lock (_lock)
                 {
                     _activeSends--;
-                    CompletedSends++;
-                    _pendingMessage.AddRange(chunk);
-                    if (endOfMessage)
-                    {
-                        _sentMessages.Add(Encoding.UTF8.GetString(_pendingMessage.ToArray()));
-                        _pendingMessage.Clear();
-                    }
+                }
+            }
+
+            lock (_lock)
+            {
+                CompletedSends++;
+                _pendingMessage.AddRange(chunk);
+                if (endOfMessage)
+                {
+                    _sentMessages.Add(Encoding.UTF8.GetString(_pendingMessage.ToArray()));
+                    _pendingMessage.Clear();
                 }
             }
         }
 
-        public override WebSocketState State => CloseAsyncCalled ? WebSocketState.Closed : WebSocketState.Open;
+        public override WebSocketState State => AbortCalled ? WebSocketState.Aborted : CloseAsyncCalled ? WebSocketState.Closed : WebSocketState.Open;
         public override WebSocketCloseStatus? CloseStatus => null;
         public override string? CloseStatusDescription => null;
         public override string? SubProtocol => null;
-        public override void Abort() { }
+        public override void Abort()
+        {
+            AbortCalled = true;
+            _abortCts.Cancel();
+        }
         public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
         {
             CloseAsyncCalled = true;
