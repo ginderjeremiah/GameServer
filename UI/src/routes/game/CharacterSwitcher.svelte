@@ -39,7 +39,7 @@
 </Popover>
 
 <script lang="ts">
-import { ApiRequest, apiSocket, getRefreshToken, setTokens } from '$lib/api';
+import { ApiRequest, apiSocket, ensureValidAccessToken, getRefreshToken, setTokens } from '$lib/api';
 import { playerManager, stopEngines } from '$lib/engine';
 import Popover from '$components/Popover.svelte';
 import { confirmSessionTakeover } from '../login/session-takeover';
@@ -65,6 +65,10 @@ let view = $state<PlayerSelectView | null>(null);
 // credit + rebind through SwitchPlayer. Every terminal outcome ends in a full-page navigation, so the
 // brief window with a torn-down game is never interactive.
 const switchPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
+	// SwitchPlayer is authenticated, so posting it would otherwise let ApiRequest.execute's own
+	// pre-emptive ensureValidAccessToken() rotate the refresh token *after* it had already been read
+	// below — settling that refresh here first means the token we read is the one that's actually sent.
+	await ensureValidAccessToken();
 	const refreshToken = getRefreshToken();
 	if (!refreshToken) {
 		reloadToBoot();
