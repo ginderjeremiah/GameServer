@@ -150,6 +150,29 @@ describe('load & normalization', () => {
 		expect(store.selectedPathId).toBe(0);
 		expect(store.totalChanges).toBe(0);
 	});
+
+	it('surfaces a persistent error and stays unloaded when the initial load fails', async () => {
+		fetchMock.mockRejectedValue(new Error('network down'));
+		const store = new ProgressionStore();
+		await store.load();
+
+		expect(store.loaded).toBe(false);
+		expect(store.error).toBe('network down');
+		expect(toastErrorMock).toHaveBeenCalledWith('network down');
+	});
+
+	it('clears the error and loads once a retry succeeds', async () => {
+		fetchMock.mockRejectedValueOnce(new Error('network down'));
+		const store = new ProgressionStore();
+		await store.load();
+		expect(store.error).toBe('network down');
+
+		seedServer();
+		await store.load();
+
+		expect(store.error).toBeNull();
+		expect(store.loaded).toBe(true);
+	});
 });
 
 describe('local editing', () => {

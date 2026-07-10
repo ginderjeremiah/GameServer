@@ -47,6 +47,7 @@ export class ProgressionStore {
 	loaded = $state(false);
 	saving = $state(false);
 	saved = $state(false);
+	error = $state<string | null>(null);
 
 	// Selection / navigation.
 	selectedPathId = $state<number | null>(null);
@@ -61,6 +62,7 @@ export class ProgressionStore {
 	// ── Loading / seeding ──
 
 	async load() {
+		this.error = null;
 		try {
 			const [paths, profs] = await Promise.all([fetchSocketData('GetPaths'), fetchSocketData('GetProficiencies')]);
 			this.setData(paths, profs);
@@ -69,7 +71,9 @@ export class ProgressionStore {
 			this.pathTab = 'tiers';
 			this.loaded = true;
 		} catch (ex) {
-			toastError(ex instanceof Error ? ex.message : 'Failed to load progression data.');
+			const message = ex instanceof Error ? ex.message : 'Failed to load progression data.';
+			this.error = message;
+			toastError(message);
 		}
 	}
 
