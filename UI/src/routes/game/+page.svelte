@@ -76,7 +76,12 @@ const welcome = new WelcomeBackView({
 if (browser) {
 	// Cleanup is registered once at init (the gate may start the loops later, after an await, where
 	// onDestroy can't be called); stopEngines is idempotent, so it's safe even if the loops never ran.
-	onDestroy(stopEngines);
+	// welcome.cancel() guards against welcome.run()'s async continuation (still in flight on a slow
+	// GetOfflineProgress) starting the engines after this page has already unmounted.
+	onDestroy(() => {
+		stopEngines();
+		welcome.cancel();
+	});
 	onMount(() => {
 		void welcome.run();
 	});

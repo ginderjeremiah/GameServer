@@ -108,9 +108,13 @@ export const startGame = (activeBattle?: IEnemyInstance) => {
 		startLogicEngine();
 		startRenderEngine();
 		startBattleEngine(activeBattle);
+		// Unhook any listeners a prior startGame left behind (defensive against a missed stopEngines)
+		// before registering this call's own — otherwise a second startGame without an intervening
+		// unhook would leak the first set and double-fire every handler.
+		unhookSocketListeners();
 		// cleanupOnDestroy must stay off: startGame runs outside component init (from welcome.run()'s
 		// async continuation or the WelcomeBackGate click handler), where Svelte's onDestroy throws.
-		// Teardown instead relies on the unhooks captured here, invoked unconditionally by stopGame.
+		// Teardown instead relies on the unhooks captured here, invoked unconditionally by stopEngines.
 		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
 		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
 		proficiencyXpGainedUnhook = apiSocket.listenCommand('ProficiencyXpGained', handleProficiencyXpGained);
@@ -320,11 +324,28 @@ export const handleSocketReplaced = async () => {
 };
 
 /**
- * Stops the live game loops (logical, render, battle) and the background-throttle monitor. Shared by the
- * full {@link stopGame} teardown and the game route's own unmount cleanup, so navigating away from the
- * game stops the loops without tearing down the socket/stores a session-replacement must clear. Every
- * stop is idempotent, so this is safe to call even when the loops never started (e.g. the player left
- * during the welcome-back gate, before {@link startGame} ran).
+ * Unhooks the four `startGame`-registered socket listeners, if any are currently registered.
+ * Idempotent (each unhook no-ops once already removed) and safe to call when `startGame` never ran.
+ */
+const unhookSocketListeners = () => {
+	socketReplacedUnhook?.();
+	challengeCompletedUnhook?.();
+	proficiencyXpGainedUnhook?.();
+	serverCommandFailedUnhook?.();
+	socketReplacedUnhook = undefined;
+	challengeCompletedUnhook = undefined;
+	proficiencyXpGainedUnhook = undefined;
+	serverCommandFailedUnhook = undefined;
+};
+
+/**
+ * Stops the live game loops (logical, render, battle), the background-throttle monitor, and the four
+ * `startGame`-registered socket listeners. Shared by the full {@link stopGame} teardown and the game
+ * route's own unmount cleanup, so navigating away from the game fully tears down this run of the engines
+ * — including its listeners — without tearing down the socket/stores a session-replacement must clear.
+ * Every stop is idempotent, so this is safe to call even when the loops never started (e.g. the player
+ * left during the welcome-back gate, before {@link startGame} ran), and safe to call again on a route
+ * that never re-entered the game.
  */
 export const stopEngines = () => {
 	logicEngine.stop();
@@ -332,6 +353,7 @@ export const stopEngines = () => {
 	renderEngine.stop();
 	enemyManager.stop();
 	battleEngine.stop();
+	unhookSocketListeners();
 };
 
 const stopGame = () => {
@@ -340,10 +362,6 @@ const stopGame = () => {
 	playerChallenges.reset();
 	playerProficiencies.reset();
 	resetLogs();
-	socketReplacedUnhook?.();
-	challengeCompletedUnhook?.();
-	proficiencyXpGainedUnhook?.();
-	serverCommandFailedUnhook?.();
 	// SocketReplaced routes back to login client-side (no reload), so the socket singleton survives. Tear
 	// it down explicitly, otherwise the keepalive ping would silently reconnect and fight the session that
 	// just took over.

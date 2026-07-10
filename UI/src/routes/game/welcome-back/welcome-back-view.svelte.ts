@@ -28,6 +28,7 @@ export interface WelcomeBackDeps {
 export class WelcomeBackView {
 	phase = $state<WelcomePhase>('checking');
 	summary = $state<IOfflineProgressModel | null>(null);
+	private cancelled = false;
 
 	constructor(private readonly deps: WelcomeBackDeps) {}
 
@@ -38,6 +39,9 @@ export class WelcomeBackView {
 	 */
 	async run(): Promise<void> {
 		const progress = await this.deps.fetchProgress();
+		if (this.cancelled) {
+			return;
+		}
 
 		if (progress) {
 			this.deps.reconcileMode(progress.autoChallengeBoss);
@@ -51,16 +55,31 @@ export class WelcomeBackView {
 
 		// Pull the reward-updated player aggregate before the engine builds the live battler from it.
 		await this.deps.resyncPlayer();
+		if (this.cancelled) {
+			return;
+		}
 		this.summary = progress;
 		this.phase = 'summary';
 	}
 
-	/** Dismisses the gate (or the no-gate pass-through) and starts the game exactly once. */
+	/** Dismisses the gate (or the no-gate pass-through) and starts the game exactly once. Also a no-op
+	 *  once {@link cancel} has been called (the page unmounted before this ran). */
 	enter(): void {
-		if (this.phase === 'entered') {
+		if (this.phase === 'entered' || this.cancelled) {
 			return;
 		}
 		this.phase = 'entered';
 		this.deps.enterGame(this.summary?.activeBattle);
+	}
+
+	/**
+	 * Marks the gate cancelled so a `run()` continuation that resolves after the game page has already
+	 * unmounted (e.g. the `GetOfflineProgress` round-trip lands after the player navigated away) can't
+	 * start the engines behind a screen that no longer owns them — {@link enter} becomes a no-op, and
+	 * a still-in-flight `run()` bails out at its next await rather than reconciling mode or entering.
+	 * Call from the page's `onDestroy`.
+	 */
+	cancel(): void {
+		this.cancelled = true;
 	}
 }
