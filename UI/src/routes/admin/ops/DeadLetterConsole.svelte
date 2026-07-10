@@ -111,7 +111,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each queue.entries as entry (entry.index)}
+					{#each queue.entries as entry (`${queue.generation}-${entry.index}`)}
 						<DeadLetterRow
 							{entry}
 							selected={queue.isSelected(entry.index)}

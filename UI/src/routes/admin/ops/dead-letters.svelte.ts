@@ -91,6 +91,13 @@ export class DeadLetterConsoleState {
 	error = $state<string | null>(null);
 	readonly selected = new SvelteSet<number>();
 
+	/**
+	 * Bumped on every successful {@link load}. `entry.index` is only a queue position, reused by whatever
+	 * entry now sits there, so the console keys rows by `generation` + `index` rather than `index` alone —
+	 * otherwise a row's local expanded-payload state would leak onto a different entry after a refresh.
+	 */
+	generation = $state(0);
+
 	private readonly routes: QueueRoutes;
 
 	constructor(variant: DeadLetterQueueVariant = 'player-update') {
@@ -160,6 +167,7 @@ export class DeadLetterConsoleState {
 			});
 			this.totalCount = inspection.totalCount;
 			this.entries = inspection.entries;
+			this.generation++;
 			this.clearSelection();
 			this.loaded = true;
 			return true;
