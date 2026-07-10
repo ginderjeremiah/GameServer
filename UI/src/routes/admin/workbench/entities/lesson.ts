@@ -141,7 +141,7 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 			newRow: (l) => ({
 				ordinal: l.steps.length ? Math.max(...l.steps.map((s) => s.ordinal)) + 1 : 0,
 				text: '',
-				anchorKey: ''
+				anchorKey: undefined
 			}),
 			columns: [
 				{ key: 'ordinal', label: 'Step', type: 'number', align: 'r', width: 90 },
@@ -157,7 +157,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					label: 'Anchor Key',
 					type: 'text',
 					width: 200,
-					placeholder: 'Optional — centered if blank'
+					placeholder: 'Optional — centered if blank',
+					optional: true
 				}
 			]
 		}

@@ -68,6 +68,10 @@ export interface FieldConfig<T> {
 	reqMsg?: string;
 }
 
+/** A table row's cell values; `undefined` marks an optional field explicitly cleared (vs. `''`), so
+ *  it canonicalizes the same as a baseline that omits the field entirely. */
+export type TableRow = Record<string, number | string | undefined>;
+
 export interface ColumnConfig {
 	key: string;
 	label: string;
@@ -79,7 +83,7 @@ export interface ColumnConfig {
 	 * and the full row (so options can be filtered by a sibling column, e.g. an item picker narrowed to
 	 * the row's equipment-slot category).
 	 */
-	options?: (current?: number, row?: Record<string, number | string>) => SelectOption[];
+	options?: (current?: number, row?: TableRow) => SelectOption[];
 	align?: 'r';
 	width?: number;
 	min?: number;
@@ -87,17 +91,16 @@ export interface ColumnConfig {
 	/** Select columns: disable options already chosen in sibling rows. */
 	unique?: boolean;
 	allowNegative?: boolean;
+	/** Text columns: a cleared input stores as `undefined` rather than `''`, so an optional field reads
+	 *  as unmodified against a baseline that omits it (e.g. a tour step's Anchor Key). */
+	optional?: boolean;
 	/** Share columns: which numeric field drives the bar (default "weight"). */
 	weightKey?: string;
 	/**
 	 * Share columns: override the denominator. Defaults to the sum across sibling
 	 * rows; an enemy's spawn share instead competes against all enemies in the zone.
 	 */
-	shareTotal?: (
-		row: Record<string, number | string>,
-		rows: Record<string, number | string>[],
-		record: unknown
-	) => number;
+	shareTotal?: (row: TableRow, rows: TableRow[], record: unknown) => number;
 }
 
 interface BaseSection<T> {
@@ -128,7 +131,7 @@ export interface FieldsSectionConfig<T> extends BaseSection<T> {
 export interface TableActionConfig {
 	label: string;
 	glyph?: WorkbenchIconKind;
-	apply: (rows: Record<string, number | string>[]) => void;
+	apply: (rows: TableRow[]) => void;
 }
 
 export interface TableSectionConfig<T> extends BaseSection<T> {
@@ -148,7 +151,7 @@ export interface TableSectionConfig<T> extends BaseSection<T> {
 	emptyIcon: WorkbenchIconKind;
 	emptyTitle: string;
 	emptySub: string;
-	newRow: (rec: T) => Record<string, number | string>;
+	newRow: (rec: T) => TableRow;
 	columns: ColumnConfig[];
 }
 

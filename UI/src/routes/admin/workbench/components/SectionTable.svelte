@@ -79,7 +79,7 @@
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';
-import { fieldsOf, type Identified, type TableSectionConfig } from '../entities/types';
+import { fieldsOf, type Identified, type TableRow, type TableSectionConfig } from '../entities/types';
 import EmptySection from './EmptySection.svelte';
 import TableCell from './TableCell.svelte';
 
@@ -94,13 +94,13 @@ const { section, record, baseline, store }: Props = $props();
 
 const itemsKey = $derived(section.itemsKey as string);
 const rowKey = $derived(section.rowKey);
-const rows = $derived((fieldsOf(record)[itemsKey] as Record<string, number | string>[]) ?? []);
-const baseRows = $derived(baseline ? (fieldsOf(baseline)[itemsKey] as Record<string, number | string>[]) : null);
+const rows = $derived((fieldsOf(record)[itemsKey] as TableRow[]) ?? []);
+const baseRows = $derived(baseline ? (fieldsOf(baseline)[itemsKey] as TableRow[]) : null);
 
 // Match each row to its baseline by stable identity (not array position), so a mid-list delete
 // shifting indices can no longer compare a row against the wrong baseline.
 const baseByKey = $derived.by(() => {
-	const map: Record<number, Record<string, number | string>> = {};
+	const map: Record<number, TableRow> = {};
 	for (const baseRow of baseRows ?? []) {
 		map[baseRow[rowKey] as number] = baseRow;
 	}
@@ -113,15 +113,15 @@ const noFree = $derived(
 	uniqueCol ? (uniqueCol.options?.() ?? []).every((o) => rows.some((r) => r[uniqueCol.key] === o.value)) : false
 );
 
-const mutateRows = (mutate: (list: Record<string, number | string>[]) => void) => {
+const mutateRows = (mutate: (list: TableRow[]) => void) => {
 	store.patch(record.id, (draft) => {
-		mutate(fieldsOf(draft)[itemsKey] as Record<string, number | string>[]);
+		mutate(fieldsOf(draft)[itemsKey] as TableRow[]);
 	});
 };
 
 const add = () =>
 	store.patch(record.id, (draft) => {
-		const list = fieldsOf(draft)[itemsKey] as Record<string, number | string>[];
+		const list = fieldsOf(draft)[itemsKey] as TableRow[];
 		const row = section.newRow(draft);
 		// Surrogate-id collections mark new rows with id 0; give each a unique negative id so its
 		// identity (and the {#each} key) stays stable and collision-free across several unsaved rows.
@@ -132,7 +132,19 @@ const add = () =>
 		list.push(row);
 	});
 const removeRow = (i: number) => mutateRows((list) => list.splice(i, 1));
-const setCell = (i: number, key: string, value: number | string) => mutateRows((list) => (list[i][key] = value));
+const setCell = (i: number, key: string, value: number | string | undefined) =>
+	mutateRows((list) => {
+		// Editing a row's identity column (e.g. a tour step's author-editable `ordinal`) into another
+		// row's value would duplicate the {#each} key — crashing dev builds and mis-reconciling prod
+		// ones. Swap the two rows' identities instead, so the edit still lands and both keys stay unique.
+		if (key === rowKey) {
+			const collision = list.find((r, ri) => ri !== i && r[rowKey] === value);
+			if (collision) {
+				collision[rowKey] = list[i][rowKey];
+			}
+		}
+		list[i][key] = value;
+	});
 </script>
 
 <style lang="scss">

@@ -22,7 +22,7 @@ import {
 } from '$lib/api';
 import { enumPairs, hasFlag, rarityColor as rarityVar, rarityLabel, tagColor } from '$lib/common';
 import { staticData } from '$stores';
-import type { SelectOption } from './entities/types';
+import type { SelectOption, TableRow } from './entities/types';
 
 const toOptions = (pairs: { id: number; name: string }[]): SelectOption[] =>
 	pairs.map((p) => ({ value: p.id, text: p.name }));
@@ -335,11 +335,7 @@ class WorkbenchReference {
 	 * enemy's weight in the same zone (so an enemy's share reflects zone competition,
 	 * not its own zone list).
 	 */
-	enemySpawnShareTotal = (
-		row: Record<string, number | string>,
-		_rows: Record<string, number | string>[],
-		record: unknown
-	): number => {
+	enemySpawnShareTotal = (row: TableRow, _rows: TableRow[], record: unknown): number => {
 		const enemyId = (record as { id: number }).id;
 		let sum = Number(row.weight) || 0;
 		for (const enemy of staticData.enemies ?? []) {
