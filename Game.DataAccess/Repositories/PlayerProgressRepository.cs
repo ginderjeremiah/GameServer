@@ -35,6 +35,11 @@ namespace Game.DataAccess.Repositories
 
         private static string ProgressKey(int playerId) => $"{Constants.CACHE_PROGRESS_PREFIX}_{playerId}";
 
+        // Redis can't represent a hash key with zero fields, so a brand-new player's empty DB reload writes
+        // this instead — a field name sharing no prefix with the row kinds below (S_/C_/P_), so
+        // FromHashFields silently ignores it on every read. See GetCachedProgress for why the key must exist.
+        private static readonly Dictionary<string, string> PresenceMarkerFields = new() { ["_"] = "1" };
+
         public async Task<PlayerProgress> Load(Player player, CancellationToken cancellationToken = default)
         {
             var cached = await GetCachedProgress(player.Id, cancellationToken);
@@ -105,9 +110,14 @@ namespace Game.DataAccess.Repositories
             // The cache is the source of truth, but it is stored as a Redis hash keyed by row identity, so
             // advancing it only needs to HSET the rows this save actually touched (changed, captured now off
             // the live aggregate so a deferred advance still reflects this save's state) rather than
-            // re-serializing every row the player has ever earned (#1635).
+            // re-serializing every row the player has ever earned (#1635). The advance only ever holds this
+            // save's dirty rows — a partial view — so it must not resurrect the key if it vanished between the
+            // load and now (Redis eviction under memory pressure, or an operator delete): recreating the hash
+            // from a partial view would silently shadow every other row the player holds behind a present key
+            // that never falls through to the DB (#1761). GetCachedProgress's miss-reload path is the one
+            // place that legitimately creates the key, since it rebuilds the whole set from the DB first.
             var fields = ToHashFields(changed);
-            void AdvanceCache() => _cache.HashSetAndForget(ProgressKey(playerId), fields, ProgressCacheTtl);
+            void AdvanceCache() => _cache.HashSetIfExistsAndForget(ProgressKey(playerId), fields, ProgressCacheTtl);
 
             if (_updateBatch.PlayerSaveInProgress)
             {
@@ -133,11 +143,15 @@ namespace Game.DataAccess.Repositories
             var raw = await _cache.HashGetAllIfExists(key, cancellationToken);
             if (raw is null)
             {
-                // A brand-new player with literally no rows yet leaves nothing to HSET (a no-op), so the hash
-                // key is never created and the next read reloads from the DB again — harmless and self-limiting,
-                // since it only lasts until the player earns their first statistic/challenge/proficiency row.
+                // This reload just read the authoritative full state from the DB, so it's the one place that
+                // may safely *create* the hash — Save's advance (above) only ever holds this save's dirty
+                // rows and must not (#1761). A brand-new player with literally no rows yet leaves nothing to
+                // HSET, but the key still needs to exist afterward so that player's first-ever Save (whose
+                // dirty rows equal the player's entire state at that point) is able to create it rather than
+                // silently no-op forever — so an empty reload writes the presence marker field instead.
                 var loaded = await LoadFromDb(playerId, cancellationToken);
-                _cache.HashSetAndForget(key, ToHashFields(loaded), ProgressCacheTtl);
+                var fields = ToHashFields(loaded);
+                _cache.HashSetAndForget(key, fields.Count > 0 ? fields : PresenceMarkerFields, ProgressCacheTtl);
                 return loaded;
             }
 
