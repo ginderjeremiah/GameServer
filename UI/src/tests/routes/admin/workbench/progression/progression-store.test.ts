@@ -40,8 +40,39 @@ let serverProfs: Rec[];
 
 const nextId = (set: Rec[]) => (set.length ? Math.max(...set.map((r) => r.id)) + 1 : 0);
 
+/**
+ * Mirrors the backend's AdminPaths.FindRetiredPathGatingLiveGateway guard: rejects newly retiring a
+ * path if, against the *current* server graph, one of its tiers still gates a live gateway. Lets
+ * save-orchestration tests exercise the real ordering hazard from #1776 instead of asserting it away.
+ */
+const findRetiredPathGatingLiveGatewayRejection = (changes: Rec[]): string | undefined => {
+	for (const change of changes) {
+		if (change.changeType !== EChangeType.Edit || !change.item.retiredAt) {
+			continue;
+		}
+		const path = serverPaths.find((p) => p.id === change.item.id);
+		if (!path || path.retiredAt) {
+			continue;
+		}
+		const retiredTierIds = new Set(serverProfs.filter((p) => p.pathId === path.id).map((p) => p.id));
+		for (const gateway of serverProfs) {
+			if (gateway.retiredAt || retiredTierIds.has(gateway.id)) {
+				continue;
+			}
+			if (gateway.prerequisiteIds.some((id: number) => retiredTierIds.has(id))) {
+				return `Retiring path '${path.name}' would soft-lock live proficiency '${gateway.name}'.`;
+			}
+		}
+	}
+	return undefined;
+};
+
 const applyPost = (endpoint: string, body: Rec) => {
 	if (endpoint === 'AdminTools/AddEditPaths') {
+		const rejection = findRetiredPathGatingLiveGatewayRejection(body as Rec[]);
+		if (rejection) {
+			throw new Error(rejection);
+		}
 		let id = nextId(serverPaths);
 		for (const change of body as Rec[]) {
 			if (change.changeType === EChangeType.Add) {
@@ -330,6 +361,93 @@ describe('save orchestration', () => {
 		]);
 		expect(serverProfs.find((p) => p.id === 0)?.prerequisiteIds).toEqual([]);
 		expect(serverProfs.find((p) => p.id === 1)?.prerequisiteIds).toEqual([0]);
+	});
+
+	it('a non-retiring save keeps every prerequisite change in one batch, even spanning a brand-new tier', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0', prerequisiteIds: [1] }),
+			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Reverse the persisted 0/1 edge (tier 0 drops its prerequisite on tier 1, tier 1 gains one on
+		// tier 0) while tier 0 *also* gains a prerequisite on a brand-new tier added in this same save.
+		// No path is being retired, so the early-post split from #1776 must not kick in here: splitting
+		// this into two POSTs (tier 1's change resolvable now, tier 0's and the new tier's deferred for
+		// id remap) would have the backend see tier 0's still-live edge on tier 1 and tier 1's new edge
+		// on tier 0 at the same time and reject the whole save as a transient cycle, even though neither
+		// intermediate state nor the final one actually cycles.
+		const newTierId = store.addTier(0);
+		store.removePrerequisite(0, 1);
+		store.addPrerequisite(0, newTierId);
+		store.addPrerequisite(1, 0);
+
+		await store.save();
+
+		const prereqCalls = callsTo('AdminTools/SetProficiencyPrerequisites');
+		expect(prereqCalls).toHaveLength(1);
+		expect(prereqCalls[0]).toEqual([
+			{ id: 2, prerequisiteIds: [] },
+			{ id: 0, prerequisiteIds: [2] },
+			{ id: 1, prerequisiteIds: [0] }
+		]);
+		expect(serverProfs.find((p) => p.id === 0)?.prerequisiteIds).toEqual([2]);
+		expect(serverProfs.find((p) => p.id === 1)?.prerequisiteIds).toEqual([0]);
+	});
+
+	it('retiring a path and removing the gateway prerequisite it now soft-locks succeeds in one save (#1776)', async () => {
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'd', activityKey: EActivityKey.Water, retiredAt: null }
+		];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0' }),
+			fullTier({ id: 1, pathId: 1, pathOrdinal: 0, name: 'Water T0', prerequisiteIds: [0] })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Retiring path 0 (Fire) would soft-lock the live gateway (Water T0) unless its prerequisite on
+		// Fire T0 is also dropped in the same save.
+		store.retirePath(0, true);
+		store.removePrerequisite(1, 0);
+
+		await store.save();
+
+		expect(toastErrorMock).not.toHaveBeenCalled();
+		expect(store.pathBaseline(0)?.retiredAt).toBeTruthy();
+		expect(store.profBaseline(1)?.prerequisiteIds).toEqual([]);
+
+		// The prerequisite removal must land before the path retire commits, or the backend's guard
+		// (simulated above) would reject the retire against its still-live edge.
+		const pathCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/AddEditPaths');
+		const prereqCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyPrerequisites');
+		expect(prereqCallIndex).toBeGreaterThanOrEqual(0);
+		expect(pathCallIndex).toBeGreaterThan(prereqCallIndex);
+	});
+
+	it('retiring a path that still gates a live gateway (prerequisite untouched) is rejected, same as before', async () => {
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'd', activityKey: EActivityKey.Water, retiredAt: null }
+		];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0' }),
+			fullTier({ id: 1, pathId: 1, pathOrdinal: 0, name: 'Water T0', prerequisiteIds: [0] })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.retirePath(0, true);
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		// Rejected pre-commit: nothing wrote, so the local retire edit is preserved for a clean retry.
+		expect(store.paths.find((p) => p.id === 0)?.retiredAt).toBeTruthy();
+		expect(serverPaths.find((p) => p.id === 0)?.retiredAt).toBeFalsy();
 	});
 
 	it('preserves edits and surfaces an error when the first write fails (pre-commit)', async () => {
