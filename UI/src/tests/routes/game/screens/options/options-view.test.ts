@@ -236,6 +236,28 @@ describe('OptionsView.save', () => {
 		expect(toastError).not.toHaveBeenCalled();
 	});
 
+	it('does not resurrect an already-discarded toggle when an external resync lands mid-flight during a successful save', async () => {
+		let resolveSend: (value: unknown) => void = () => {};
+		mockSendSocketCommand.mockReturnValue(new Promise((resolve) => (resolveSend = resolve)));
+
+		view.setOne(ELogType.Damage, false);
+		const saving = view.save();
+
+		// An external resync (unrelated to this save) reassigns logPreferences while the request
+		// is still in flight — this already discards the pending toggle per the class's
+		// external-resync policy.
+		mockPlayerManager.logPreferences = [{ id: ELogType.Exp, enabled: false }];
+
+		resolveSend({});
+		await saving;
+
+		// The save still succeeds and its own result is adopted, but the already-discarded
+		// toggle must not reappear as a pending change.
+		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Damage)?.enabled).toBe(false);
+		expect(view.isDirty).toBe(false);
+		expect(view.changedPreferences).toEqual([]);
+	});
+
 	it('toggling after a save clears the saved flash', async () => {
 		view.setOne(ELogType.Damage, false);
 		await view.save();

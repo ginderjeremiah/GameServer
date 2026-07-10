@@ -687,6 +687,36 @@ describe('AttributesView.save', () => {
 		expect(sendSocketCommand).not.toHaveBeenCalled();
 		expect(toastError).not.toHaveBeenCalled();
 	});
+
+	it('does not manufacture a phantom negative delta when an external resync lands mid-flight during a successful save', async () => {
+		const serverResult: IBattlerAttribute[] = CORE_ATTRIBUTES.map((id) => ({
+			attributeId: id,
+			amount: id === EAttribute.Strength ? 6 : 5
+		}));
+		let resolveSend: (value: unknown) => void = () => {};
+		sendSocketCommand.mockReturnValue(new Promise((resolve) => (resolveSend = resolve)));
+
+		view.inc(idx.str);
+		const saving = view.save();
+
+		// An external resync (unrelated to this save, e.g. a background ChallengeCompleted
+		// reconcile) reassigns attributes while the request is still in flight — this already
+		// discards the pending edit per the class's external-resync policy.
+		mockPlayerManager.attributes = CORE_ATTRIBUTES.map((id) => ({
+			attributeId: id,
+			amount: id === EAttribute.Endurance ? 7 : 5
+		}));
+
+		resolveSend({ data: { attributes: serverResult, statPointsUsed: 1 } });
+		await saving;
+
+		// The save still succeeds and its own result is adopted, but the already-discarded edit
+		// must not be "consumed" a second time into a spurious -1 Strength refund.
+		expect(view.committed[idx.str]).toBe(6);
+		expect(view.dirty).toBe(false);
+		expect(view.changedUpdates).toEqual([]);
+		expect(view.values).toEqual(view.committed);
+	});
 });
 
 describe('AttributesView live stat-point pool', () => {

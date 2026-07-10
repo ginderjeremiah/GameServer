@@ -461,8 +461,14 @@ export class AttributesView {
 		this.saving = false;
 
 		// Snapshot the current effective deltas (any mid-flight edit included) before the
-		// reassignment below moves the resync marker out from under them.
+		// reassignment below moves the resync marker out from under them. Reference equality
+		// with `#pendingDeltas` tells whether they were still valid at this exact moment —
+		// `effectiveDeltas()` falls back to a *new* zero array (never `#pendingDeltas` itself)
+		// the instant an external resync lands mid-flight and invalidates them; in that case
+		// they're already gone and must not be "consumed" a second time below (which would
+		// otherwise subtract `sentDeltas` from zero and manufacture a phantom negative delta).
 		const currentDeltas = this.effectiveDeltas();
+		const deltasStillValid = currentDeltas === this.#pendingDeltas;
 
 		// Any returned payload is the server's authoritative post-command state (the
 		// rejection path returns it unchanged), so adopt the allocations and the spent
@@ -483,8 +489,11 @@ export class AttributesView {
 		}
 
 		// Consume exactly the deltas that were sent, preserving any edit made while the save was
-		// in flight instead of wiping it (#1506).
-		this.#pendingDeltas = this.#pendingDeltas.map((d, i) => d - sentDeltas[i]);
+		// in flight instead of wiping it (#1506) — unless an external resync already discarded
+		// the pending set mid-flight, in which case there's nothing left to consume.
+		if (deltasStillValid) {
+			this.#pendingDeltas = this.#pendingDeltas.map((d, i) => d - sentDeltas[i]);
+		}
 		this.flashSaved();
 	}
 
