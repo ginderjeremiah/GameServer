@@ -62,6 +62,24 @@ describe('auth', () => {
 			expect(getTokens()).toBeNull();
 		});
 
+		it("adopts another tab's rotated pair instead of clearing when storage no longer holds the presented token", async () => {
+			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => {
+					// Simulate another tab winning the race and rotating storage while this tab's
+					// (now stale) refresh request is in flight.
+					setTokens({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
+					return { ok: false, json: async () => ({}) };
+				})
+			);
+
+			const result = await refreshTokens();
+
+			expect(result).toEqual({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
+			expect(getTokens()).toEqual({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
+		});
+
 		it('collapses concurrent refreshes onto a single request (single-use token safe)', async () => {
 			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
 			let resolveFetch: (value: unknown) => void = () => {};
