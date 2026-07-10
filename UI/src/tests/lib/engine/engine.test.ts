@@ -151,6 +151,7 @@ vi.mock('$lib/engine/session', () => ({ refreshPlayer }));
 
 import {
 	startGame,
+	stopEngines,
 	handleSocketReplaced,
 	handleChallengeCompleted,
 	handleProficiencyXpGained,
@@ -370,6 +371,55 @@ describe('startGame', () => {
 		void handleSocketReplaced();
 
 		expect(disconnect).toHaveBeenCalledTimes(1);
+	});
+
+	it("unhooks the previous call's listeners before re-registering, so a remount cannot leak them (#1807)", () => {
+		startGame();
+		startGame();
+
+		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
+		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
+		expect(unlistenProficiencyXpGained).toHaveBeenCalledTimes(1);
+		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('stopEngines', () => {
+	it('stops every loop and the background-throttle monitor', () => {
+		stopEngines();
+
+		expect(logicEngine.stop).toHaveBeenCalledTimes(1);
+		expect(renderEngine.stop).toHaveBeenCalledTimes(1);
+		expect(enemyManager.stop).toHaveBeenCalledTimes(1);
+		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
+	});
+
+	it('unhooks the four startGame-registered socket listeners (the game route unmount cleanup, #1807)', () => {
+		startGame();
+		stopEngines();
+
+		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
+		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
+		expect(unlistenProficiencyXpGained).toHaveBeenCalledTimes(1);
+		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
+	});
+
+	it('is idempotent and safe to call when startGame never ran', () => {
+		expect(() => {
+			stopEngines();
+			stopEngines();
+		}).not.toThrow();
+	});
+
+	it('lets a later startGame register fresh listeners without leaking the previous set', () => {
+		startGame();
+		stopEngines();
+		vi.clearAllMocks();
+
+		startGame();
+
+		expect(unlistenSocketReplaced).not.toHaveBeenCalled();
+		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced);
 	});
 });
 
