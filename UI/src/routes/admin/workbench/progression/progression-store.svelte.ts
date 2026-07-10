@@ -401,7 +401,30 @@ export class ProgressionStore {
 			const pathDiff = diffCatalogue(this.paths, this.basePaths);
 			const profDiff = diffCatalogue(this.profs, this.baseProfs);
 
-			// 1. Path identities — send an Edit only when the identity DTO itself changed.
+			// 1. Cross-path prerequisite changes that touch only already-persisted tiers need no id remap,
+			// so they can be posted immediately, before path identities. This lets a save that both retires
+			// a path and removes the now-offending gateway prerequisite (on some other, already-persisted
+			// tier) succeed in one shot: the retire guard (AdminPaths.FindRetiredPathGatingLiveGateway)
+			// validates against the live cache, which this write has already reloaded by the time the path
+			// save below runs (see #1776). A change naming a brand-new tier (either as the gateway or as a
+			// prerequisite) still needs the id map resolved further down and is deferred to step 7, same as
+			// before.
+			const allPrerequisiteChanges = [...profDiff.added, ...profDiff.modified.map((m) => m.record)]
+				.filter((prof) => childChanged(prof.prerequisiteIds, baseProfMap[prof.id]?.prerequisiteIds))
+				.map((prof) => ({ prof, prerequisiteIds: prof.prerequisiteIds }));
+			const resolvableNow = allPrerequisiteChanges.filter(
+				({ prof, prerequisiteIds }) => prof.id >= 0 && prerequisiteIds.every((id) => id >= 0)
+			);
+			if (resolvableNow.length) {
+				const changes: ISetProficiencyPrerequisitesData[] = resolvableNow.map(({ prof, prerequisiteIds }) => ({
+					id: prof.id,
+					prerequisiteIds
+				}));
+				await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', changes);
+				committed = true;
+			}
+
+			// 2. Path identities — send an Edit only when the identity DTO itself changed.
 			const pathChanges: IChange<ReturnType<typeof pathIdentityDto>>[] = [
 				...pathDiff.added.map((p) => ({ changeType: EChangeType.Add, item: pathIdentityDto(p) })),
 				...pathDiff.modified
@@ -413,7 +436,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 2. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
+			// 3. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
 			const freshPaths = await fetchSocketData('GetPaths');
 			const pathIdMap = resolveNewIds(
 				freshPaths,
@@ -421,7 +444,7 @@ export class ProgressionStore {
 				pathDiff.added
 			);
 
-			// 3. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
+			// 4. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
 			const toProfDto = (prof: WorkbenchProficiency) => ({
 				...profIdentityDto(prof),
 				pathId: resolveId(prof.pathId, pathIdMap)
@@ -437,7 +460,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 4. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
+			// 5. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
 			const freshProfs = await fetchSocketData('GetProficiencies');
 			const profIdMap = resolveNewIds(
 				freshProfs,
@@ -445,12 +468,7 @@ export class ProgressionStore {
 				profDiff.added
 			);
 
-			// 5. Proficiency child collections — modifiers and rewards per tier, plus every changed tier's
-			// cross-path prerequisites collected into one combined batch (posted in step 6) rather than posted
-			// per tier: the backend validates a batch against its final combined graph, so a gateway swap
-			// spanning two tiers (one drops an edge while the other gains the reverse) can't be false-rejected
-			// as a cycle depending on which tier's post happens to land first.
-			const prerequisiteChanges: ISetProficiencyPrerequisitesData[] = [];
+			// 6. Proficiency child collections — modifiers and rewards per tier.
 			for (const prof of [...profDiff.added, ...profDiff.modified.map((m) => m.record)]) {
 				const baseline = baseProfMap[prof.id];
 				const id = resolveId(prof.id, profIdMap);
@@ -462,19 +480,25 @@ export class ProgressionStore {
 					await ApiRequest.post('AdminTools/SetProficiencyRewards', { id, rewards: prof.levelRewards });
 					committed = true;
 				}
-				if (childChanged(prof.prerequisiteIds, baseline?.prerequisiteIds)) {
-					const prerequisiteIds = prof.prerequisiteIds.map((pid) => resolveId(pid, profIdMap));
-					prerequisiteChanges.push({ id, prerequisiteIds });
-				}
 			}
 
-			// 6. Cross-path prerequisites, all changed tiers in one call (see above).
+			// 7. Every remaining (not-yet-posted, step 1) cross-path prerequisite change — naming a brand-new
+			// tier as the gateway or as a prerequisite — collected into one combined batch: the backend
+			// validates a batch against its final combined graph, so a gateway swap spanning two tiers (one
+			// drops an edge while the other gains the reverse) can't be false-rejected as a cycle depending on
+			// which tier's post happens to land first.
+			const prerequisiteChanges: ISetProficiencyPrerequisitesData[] = allPrerequisiteChanges
+				.filter((change) => !resolvableNow.includes(change))
+				.map(({ prof, prerequisiteIds }) => ({
+					id: resolveId(prof.id, profIdMap),
+					prerequisiteIds: prerequisiteIds.map((pid) => resolveId(pid, profIdMap))
+				}));
 			if (prerequisiteChanges.length) {
 				await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', prerequisiteChanges);
 				committed = true;
 			}
 
-			// 7. Follow the selection across any id remap, then re-seed from server truth.
+			// 8. Follow the selection across any id remap, then re-seed from server truth.
 			if (this.selectedPathId != null) {
 				this.selectedPathId = resolveId(this.selectedPathId, pathIdMap);
 			}
