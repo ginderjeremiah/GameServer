@@ -402,19 +402,25 @@ export class ProgressionStore {
 			const profDiff = diffCatalogue(this.profs, this.baseProfs);
 
 			// 1. Cross-path prerequisite changes that touch only already-persisted tiers need no id remap,
-			// so they can be posted immediately, before path identities. This lets a save that both retires
-			// a path and removes the now-offending gateway prerequisite (on some other, already-persisted
-			// tier) succeed in one shot: the retire guard (AdminPaths.FindRetiredPathGatingLiveGateway)
-			// validates against the live cache, which this write has already reloaded by the time the path
-			// save below runs (see #1776). A change naming a brand-new tier (either as the gateway or as a
-			// prerequisite) still needs the id map resolved further down and is deferred to step 7, same as
-			// before.
+			// so — only when this save is also retiring a path — they're posted immediately, before path
+			// identities. This lets a save that both retires a path and removes the now-offending gateway
+			// prerequisite (on some other, already-persisted tier) succeed in one shot: the retire guard
+			// (AdminPaths.FindRetiredPathGatingLiveGateway) validates against the live cache, which this
+			// write has already reloaded by the time the path save below runs (see #1776). Splitting into
+			// two POSTs narrows the "single combined batch" cycle-safety guarantee below (step 7), so it's
+			// scoped to exactly the case that needs it: a non-retiring save always keeps every prerequisite
+			// change in one batch, preserving the full invariant.
+			const hasPendingRetire = pathDiff.modified.some(
+				({ record, baseline }) => record.retiredAt != null && baseline.retiredAt == null
+			);
 			const allPrerequisiteChanges = [...profDiff.added, ...profDiff.modified.map((m) => m.record)]
 				.filter((prof) => childChanged(prof.prerequisiteIds, baseProfMap[prof.id]?.prerequisiteIds))
 				.map((prof) => ({ prof, prerequisiteIds: prof.prerequisiteIds }));
-			const resolvableNow = allPrerequisiteChanges.filter(
-				({ prof, prerequisiteIds }) => prof.id >= 0 && prerequisiteIds.every((id) => id >= 0)
-			);
+			const resolvableNow = hasPendingRetire
+				? allPrerequisiteChanges.filter(
+						({ prof, prerequisiteIds }) => prof.id >= 0 && prerequisiteIds.every((id) => id >= 0)
+					)
+				: [];
 			if (resolvableNow.length) {
 				const changes: ISetProficiencyPrerequisitesData[] = resolvableNow.map(({ prof, prerequisiteIds }) => ({
 					id: prof.id,
@@ -482,13 +488,17 @@ export class ProgressionStore {
 				}
 			}
 
-			// 7. Every remaining (not-yet-posted, step 1) cross-path prerequisite change — naming a brand-new
-			// tier as the gateway or as a prerequisite — collected into one combined batch: the backend
-			// validates a batch against its final combined graph, so a gateway swap spanning two tiers (one
-			// drops an edge while the other gains the reverse) can't be false-rejected as a cycle depending on
-			// which tier's post happens to land first.
+			// 7. Every prerequisite change not already posted in step 1 (the common case: everything, when
+			// this save isn't retiring a path) collected into one combined batch: the backend validates a
+			// batch against its final combined graph, so a gateway swap spanning two tiers (one drops an
+			// edge while the other gains the reverse) can't be false-rejected as a cycle depending on which
+			// tier's post happens to land first. Only when step 1 *did* split some changes out early (a
+			// pending retire) can a swap spanning the two groups still be false-rejected — an intentionally
+			// narrow, retire-only residual of the fuller invariant this batch otherwise preserves.
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+			const resolvedEarly = new Set(resolvableNow);
 			const prerequisiteChanges: ISetProficiencyPrerequisitesData[] = allPrerequisiteChanges
-				.filter((change) => !resolvableNow.includes(change))
+				.filter((change) => !resolvedEarly.has(change))
 				.map(({ prof, prerequisiteIds }) => ({
 					id: resolveId(prof.id, profIdMap),
 					prerequisiteIds: prerequisiteIds.map((pid) => resolveId(pid, profIdMap))

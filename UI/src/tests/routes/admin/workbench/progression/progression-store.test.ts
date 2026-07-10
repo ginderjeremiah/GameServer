@@ -340,6 +340,40 @@ describe('save orchestration', () => {
 		expect(serverProfs.find((p) => p.id === 1)?.prerequisiteIds).toEqual([0]);
 	});
 
+	it('a non-retiring save keeps every prerequisite change in one batch, even spanning a brand-new tier', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0', prerequisiteIds: [1] }),
+			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Reverse the persisted 0/1 edge (tier 0 drops its prerequisite on tier 1, tier 1 gains one on
+		// tier 0) while tier 0 *also* gains a prerequisite on a brand-new tier added in this same save.
+		// No path is being retired, so the early-post split from #1776 must not kick in here: splitting
+		// this into two POSTs (tier 1's change resolvable now, tier 0's and the new tier's deferred for
+		// id remap) would have the backend see tier 0's still-live edge on tier 1 and tier 1's new edge
+		// on tier 0 at the same time and reject the whole save as a transient cycle, even though neither
+		// intermediate state nor the final one actually cycles.
+		const newTierId = store.addTier(0);
+		store.removePrerequisite(0, 1);
+		store.addPrerequisite(0, newTierId);
+		store.addPrerequisite(1, 0);
+
+		await store.save();
+
+		const prereqCalls = callsTo('AdminTools/SetProficiencyPrerequisites');
+		expect(prereqCalls).toHaveLength(1);
+		expect(prereqCalls[0]).toEqual([
+			{ id: 2, prerequisiteIds: [] },
+			{ id: 0, prerequisiteIds: [2] },
+			{ id: 1, prerequisiteIds: [0] }
+		]);
+		expect(serverProfs.find((p) => p.id === 0)?.prerequisiteIds).toEqual([2]);
+		expect(serverProfs.find((p) => p.id === 1)?.prerequisiteIds).toEqual([0]);
+	});
+
 	it('retiring a path and removing the gateway prerequisite it now soft-locks succeeds in one save (#1776)', async () => {
 		serverPaths = [
 			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
