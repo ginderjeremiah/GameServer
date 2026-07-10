@@ -5,7 +5,7 @@
 # IMPORTANT: This file uses bridge networking (the Docker default). It requires Docker Desktop
 # (Windows/Mac) or a Linux Docker host with iptables/bridge networking enabled. It does NOT work
 # in the constrained sandbox environments used by Claude Code remote sessions or GitHub Actions —
-# use docker-compose.yml for those (which uses host networking). See docs/backend.md for context.
+# use docker-compose.yml for those (which uses host networking). See docs/infrastructure.md for context.
 #
 # Usage:
 #   docker compose -f docker-compose.local.yml up -d --build
