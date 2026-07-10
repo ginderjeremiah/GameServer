@@ -58,10 +58,14 @@ jobs:
             - 'content/**'
             - 'e2e-admin-provision.sql'
             - '.dockerignore'
+            - '.editorconfig'
+            - 'global.json'
+            - '.config/dotnet-tools.json'
             - '.github/workflows/**'
             - 'UI/src/lib/api/types/**'
           frontend:
             - 'UI/**'
+            - 'content/**'
             - '.github/workflows/**'
 
   # Non-test backend verifications (codegen drift + formatter), split out of test-backend so that
