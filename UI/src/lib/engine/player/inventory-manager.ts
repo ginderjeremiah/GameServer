@@ -80,7 +80,18 @@ export class InventoryManager {
 	/** Serializes the optimistic mutations so rollback baselines never interleave (see {@link serialize}). */
 	private queue = new SerializedQueue();
 
+	/**
+	 * Bumped on every {@link initialize}. `initialize()` runs outside the {@link queue} (a mid-session
+	 * resync can't wait behind an in-flight mutation's persist), so a mutation that started optimistically
+	 * applying before a resync — then has its persist fail afterward — must not roll back: its snapshot
+	 * predates the resync's fresh item instances, and restoring it would splice orphaned pre-resync objects
+	 * back into live state (#1808). Each mutation captures the generation at snapshot time and checks it
+	 * via {@link rollbackIfCurrent} before invoking its rollback.
+	 */
+	private generation = 0;
+
 	public initialize() {
+		this.generation++;
 		this.unlockedItems.clear();
 		this.unlockedMods.clear();
 		this.equippedSlots = new Array(6).fill(undefined);
@@ -185,6 +196,7 @@ export class InventoryManager {
 
 			// Apply optimistically (instant UI), then persist; a failed persist rolls the change back so
 			// the authoritative state can never diverge from what was actually saved.
+			const startGeneration = this.generation;
 			const affected = [item, this.equippedSlots[slotId]].filter((it): it is Item => it != null);
 			const rollback = combineSnapshots(
 				snapshotFields(this, 'equippedSlots'),
@@ -197,8 +209,7 @@ export class InventoryManager {
 				equipmentSlotId: slotId
 			});
 			if (response.error) {
-				rollback();
-				this.refreshEquipmentStats();
+				this.rollbackIfCurrent(startGeneration, rollback, () => this.refreshEquipmentStats());
 				return false;
 			}
 
@@ -220,6 +231,7 @@ export class InventoryManager {
 				return false;
 			}
 
+			const startGeneration = this.generation;
 			const rollback = combineSnapshots(
 				snapshotFields(this, 'equippedSlots'),
 				snapshotFields(item, 'equipped', 'equipmentSlotId')
@@ -236,8 +248,7 @@ export class InventoryManager {
 				equipmentSlotId: slotId
 			});
 			if (response.error) {
-				rollback();
-				this.refreshEquipmentStats();
+				this.rollbackIfCurrent(startGeneration, rollback, () => this.refreshEquipmentStats());
 				return false;
 			}
 
@@ -261,6 +272,7 @@ export class InventoryManager {
 				return false;
 			}
 
+			const startGeneration = this.generation;
 			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 			item.appliedMods = [...item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId), mod];
 			this.refreshItemAttributes(item);
@@ -272,8 +284,7 @@ export class InventoryManager {
 				itemModSlotId
 			});
 			if (response.error) {
-				rollback();
-				this.refreshEquipmentStatsIfEquipped(item);
+				this.rollbackIfCurrent(startGeneration, rollback, () => this.refreshEquipmentStatsIfEquipped(item));
 				return false;
 			}
 
@@ -289,6 +300,7 @@ export class InventoryManager {
 				return false;
 			}
 
+			const startGeneration = this.generation;
 			const rollback = snapshotFields(item, 'appliedMods', 'totalAttributes');
 			item.appliedMods = item.appliedMods.filter((m) => m.itemModSlotId !== itemModSlotId);
 			this.refreshItemAttributes(item);
@@ -299,8 +311,7 @@ export class InventoryManager {
 				itemModSlotId
 			});
 			if (response.error) {
-				rollback();
-				this.refreshEquipmentStatsIfEquipped(item);
+				this.rollbackIfCurrent(startGeneration, rollback, () => this.refreshEquipmentStatsIfEquipped(item));
 				return false;
 			}
 
@@ -374,6 +385,21 @@ export class InventoryManager {
 	 */
 	private serialize<T>(operation: () => Promise<T>): Promise<T> {
 		return this.queue.run(operation);
+	}
+
+	/**
+	 * Invokes `rollback` only if no {@link initialize} resync has happened since `startGeneration` was
+	 * captured. `initialize()` runs outside the {@link queue}, so a mid-flight mutation's persist can fail
+	 * after a resync has already rebuilt `unlockedItems`/`equippedSlots` with fresh objects; rolling back at
+	 * that point would restore the stale pre-resync snapshot — reintroducing orphaned item references the
+	 * resync just replaced (#1808). When the generation has moved on, the resync's own state is left as-is.
+	 */
+	private rollbackIfCurrent(startGeneration: number, rollback: RestoreSnapshot, after: () => void) {
+		if (this.generation !== startGeneration) {
+			return;
+		}
+		rollback();
+		after();
 	}
 
 	/** The equip mutation, reassigning a fresh slot array so a captured snapshot stays a valid baseline. */
