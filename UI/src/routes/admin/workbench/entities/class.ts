@@ -1,4 +1,12 @@
-import { ApiRequest, EAttribute, EModifierType, ESkillAcquisition, fetchSocketData, type IClass } from '$lib/api';
+import {
+	ApiRequest,
+	EAttribute,
+	type EEquipmentSlot,
+	EModifierType,
+	ESkillAcquisition,
+	fetchSocketData,
+	type IClass
+} from '$lib/api';
 import { hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
@@ -155,6 +163,12 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			glyph: 'box',
 			desc: 'Items equipped at character creation',
 			count: (c) => c.starterEquipment.length,
+			warn: (c) => {
+				const mismatch = c.starterEquipment.find(
+					(e) => reference.itemCategoryOf(e.itemId) !== reference.equipmentSlotCategory(e.equipmentSlot)
+				);
+				return mismatch ? `Item doesn't match its equipment slot's category` : null;
+			},
 			kind: 'table',
 			itemsKey: 'starterEquipment',
 			rowKey: 'equipmentSlot',
@@ -162,13 +176,16 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			emptyIcon: 'box',
 			emptyTitle: 'No starter equipment',
 			emptySub: 'This class starts with nothing equipped.',
-			newRow: (c) => ({
-				equipmentSlot: firstFree(
+			newRow: (c) => {
+				const equipmentSlot = firstFree(
 					c.starterEquipment.map((e) => e.equipmentSlot),
 					reference.equipmentSlotOptions()
-				),
-				itemId: reference.itemOptions()[0]?.value ?? 0
-			}),
+				);
+				return {
+					equipmentSlot,
+					itemId: reference.itemOptionsForSlot(equipmentSlot)[0]?.value ?? 0
+				};
+			},
 			columns: [
 				{
 					key: 'equipmentSlot',
@@ -178,7 +195,13 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 					min: 160,
 					unique: true
 				},
-				{ key: 'itemId', label: 'Item', type: 'select', options: reference.itemOptions, min: 220 }
+				{
+					key: 'itemId',
+					label: 'Item',
+					type: 'select',
+					options: (current, row) => reference.itemOptionsForSlot((row?.equipmentSlot as EEquipmentSlot) ?? 0, current),
+					min: 220
+				}
 			]
 		},
 		{

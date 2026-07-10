@@ -106,6 +106,22 @@ describe('TableCell — select type', () => {
 		expect(zone1?.disabled).toBe(false);
 	});
 
+	it('passes the full row to the options provider, alongside the current value', () => {
+		const options = vi.fn(() => [{ value: 1, text: 'Zone A' }]);
+		render(TableCell, {
+			props: {
+				col: makeSelectCol({ options }),
+				row: { zoneId: 1, kind: 2 },
+				idx: 0,
+				rows: [{ zoneId: 1, kind: 2 }],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		expect(options).toHaveBeenCalledWith(1, { zoneId: 1, kind: 2 });
+	});
+
 	it('adds the "dirty" class to the select when dirty=true', () => {
 		const { container } = render(TableCell, {
 			props: {

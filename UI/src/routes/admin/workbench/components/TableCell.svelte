@@ -2,7 +2,7 @@
 	<td style:min-width="{col.min ?? 160}px">
 		<div class="fld">
 			<select class="sel" class:dirty value={row[col.key] as number} onchange={(e) => onChange(+e.currentTarget.value)}>
-				{#each col.options?.(row[col.key] as number) ?? [] as option (option.value)}
+				{#each col.options?.(row[col.key] as number, row) ?? [] as option (option.value)}
 					<option value={option.value} disabled={taken.has(option.value) && option.value !== row[col.key]}>
 						{option.text}
 					</option>
@@ -16,7 +16,7 @@
 	<td style:min-width="{col.min ?? 160}px">
 		<AttributePicker
 			value={row[col.key] as number}
-			options={col.options?.(row[col.key] as number) ?? []}
+			options={col.options?.(row[col.key] as number, row) ?? []}
 			onChange={(v) => onChange(v)}
 			ariaLabel={col.label}
 			disabledValues={col.unique ? taken : undefined}
