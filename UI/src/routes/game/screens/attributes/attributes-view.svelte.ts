@@ -268,17 +268,34 @@ export function derivedShortLabel(id: EAttribute): string {
 }
 
 /* ── reactive view-model ──────────────────────────────────────────────────
-   Owns the working allocation (`draft`) and the persisted baseline
-   (`committed`), derives the dirty set and the live/preview derived stats, and
+   Owns the persisted baseline (`committed`) and the working allocation
+   (`draft`), derives the dirty set and the live/preview derived stats, and
    persists only the per-attribute deltas (mirroring the backend's update
-   contract). */
+   contract).
+
+   `committed` is read live off the player manager rather than snapshotted once
+   at construction: a mid-session resync (`playerManager.initialize()`, #1809)
+   reassigns `attributes` wholesale, and the baseline must track it or the
+   screen computes `remaining`/deltas against a server state that no longer
+   exists. `draft` layers unsaved per-attribute deltas (`#pendingDeltas`) over
+   `committed`, but only while `#pendingDeltasAttrs` — the manager `attributes`
+   reference those deltas were computed against — still matches the live one;
+   {@link effectiveDeltas} treats them as zero the moment it doesn't. A
+   not-yet-saved edit can't be trusted to still apply cleanly against a
+   baseline it was never computed against, and an **external** resync (not this
+   view's own `save`, which keeps the marker in lockstep) is by definition the
+   fresher truth — so it silently drops the edit rather than layering it onto
+   the new baseline. `save` instead consumes exactly the deltas it sent,
+   preserving any edit made while that request was in flight (#1506). */
 export class AttributesView {
 	/** Active density mode; persisted to local storage per player. */
 	mode = $state<AttributeMode>('guided');
-	/** Working allocation per core attribute (index matches CORE_ATTRIBUTES). */
-	draft = $state<number[]>([]);
-	/** Last-saved allocation; the dirty set is `draft` minus this. */
-	committed = $state<number[]>([]);
+	/** Unsaved per-attribute deltas (index matches CORE_ATTRIBUTES), valid only against
+	 *  {@link #pendingDeltasAttrs} — see {@link effectiveDeltas}. */
+	#pendingDeltas = $state<number[]>(CORE_ATTRIBUTES.map(() => 0));
+	/** The `playerManager.attributes` reference {@link #pendingDeltas} was computed against; `null`
+	 *  never matches, so deltas read as zero until the first edit stamps it. */
+	#pendingDeltasAttrs = $state<IBattlerAttribute[] | null>(null);
 	/** Brief "Attributes saved" confirmation flash. */
 	saved = $state(false);
 	/** True while a save request is in flight (guards against double-submit). */
@@ -291,14 +308,26 @@ export class AttributesView {
 
 	constructor() {
 		this.mode = readStoredMode();
-		const committed = CORE_ATTRIBUTES.map((id) => readAllocation(id));
-		this.committed = committed;
-		this.draft = [...committed];
 	}
 
 	/** Unspent pool (statPointsGained − statPointsUsed), derived live from the reactive
 	 *  player manager so points granted by a background level-up appear without a remount. */
 	readonly savedAvailable = $derived(playerManager.statPointsGained - playerManager.statPointsUsed);
+
+	/** Last-saved allocation per core attribute, read live off the player manager (see the class doc). */
+	readonly committed = $derived(CORE_ATTRIBUTES.map((id) => readAllocation(id)));
+
+	/** {@link #pendingDeltas} if they're still valid against the live manager state, otherwise all
+	 *  zero — a pure read (no mutation), so it's safe to call from a `$derived` (see the class doc). */
+	private effectiveDeltas(): number[] {
+		return this.#pendingDeltasAttrs === playerManager.attributes ? this.#pendingDeltas : CORE_ATTRIBUTES.map(() => 0);
+	}
+
+	/** Working allocation per core attribute: {@link committed} plus the {@link effectiveDeltas}. */
+	readonly draft = $derived.by(() => {
+		const deltas = this.effectiveDeltas();
+		return this.committed.map((v, i) => v + deltas[i]);
+	});
 
 	/** Current (pending) value per core attribute. */
 	readonly values = $derived(this.draft);
@@ -347,9 +376,10 @@ export class AttributesView {
 		if (add <= 0) {
 			return;
 		}
-		const next = [...this.draft];
+		const next = [...this.effectiveDeltas()];
 		next[i] += add;
-		this.draft = next;
+		this.#pendingDeltas = next;
+		this.#pendingDeltasAttrs = playerManager.attributes;
 		this.saved = false;
 	}
 
@@ -358,9 +388,10 @@ export class AttributesView {
 		if (sub <= 0) {
 			return;
 		}
-		const next = [...this.draft];
+		const next = [...this.effectiveDeltas()];
 		next[i] -= sub;
-		this.draft = next;
+		this.#pendingDeltas = next;
+		this.#pendingDeltasAttrs = playerManager.attributes;
 		this.saved = false;
 	}
 
@@ -396,7 +427,8 @@ export class AttributesView {
 	}
 
 	discard(): void {
-		this.draft = [...this.committed];
+		this.#pendingDeltas = CORE_ATTRIBUTES.map(() => 0);
+		this.#pendingDeltasAttrs = playerManager.attributes;
 		this.saved = false;
 	}
 
@@ -405,10 +437,10 @@ export class AttributesView {
 	 *  non-reactive call sites like {@link save}. */
 	get changedUpdates(): IAttributeUpdate[] {
 		const updates: IAttributeUpdate[] = [];
+		const deltas = this.effectiveDeltas();
 		for (let i = 0; i < CORE_ATTRIBUTES.length; i++) {
-			const delta = this.draft[i] - this.committed[i];
-			if (delta !== 0) {
-				updates.push({ attributeId: CORE_ATTRIBUTES[i], amount: delta });
+			if (deltas[i] !== 0) {
+				updates.push({ attributeId: CORE_ATTRIBUTES[i], amount: deltas[i] });
 			}
 		}
 		return updates;
@@ -420,17 +452,35 @@ export class AttributesView {
 			return;
 		}
 
+		// The exact deltas being sent, so they can be subtracted back out below regardless of
+		// what happens to the rest of the pending set while the request is in flight.
+		const sentDeltas = [...this.effectiveDeltas()];
+
 		this.saving = true;
 		const response = await apiSocket.sendSocketCommand('UpdatePlayerStats', updates);
 		this.saving = false;
 
+		// Snapshot the current effective deltas (any mid-flight edit included) before the
+		// reassignment below moves the resync marker out from under them. Reference equality
+		// with `#pendingDeltas` tells whether they were still valid at this exact moment —
+		// `effectiveDeltas()` falls back to a *new* zero array (never `#pendingDeltas` itself)
+		// the instant an external resync lands mid-flight and invalidates them; in that case
+		// they're already gone and must not be "consumed" a second time below (which would
+		// otherwise subtract `sentDeltas` from zero and manufacture a phantom negative delta).
+		const currentDeltas = this.effectiveDeltas();
+		const deltasStillValid = currentDeltas === this.#pendingDeltas;
+
 		// Any returned payload is the server's authoritative post-command state (the
 		// rejection path returns it unchanged), so adopt the allocations and the spent
-		// total absolutely rather than re-deriving the spend locally (#1548).
+		// total absolutely rather than re-deriving the spend locally (#1548). `committed`
+		// picks this up live (see the class doc); this view's own reassignment isn't an
+		// external resync, so re-pin the (still-unconsumed, on an error) deltas against it.
 		if (response.data) {
 			playerManager.attributes = response.data.attributes;
 			playerManager.statPointsUsed = response.data.statPointsUsed;
 			playerManager.playerRating = response.data.playerRating;
+			this.#pendingDeltas = currentDeltas;
+			this.#pendingDeltasAttrs = playerManager.attributes;
 		}
 
 		if (response.error || !response.data) {
@@ -438,11 +488,12 @@ export class AttributesView {
 			return;
 		}
 
-		// Advance the baseline by exactly the deltas that were sent, preserving any
-		// draft edits made while the save was in flight instead of wiping them (#1506).
-		this.committed = this.committed.map(
-			(value, i) => value + (updates.find((u) => u.attributeId === CORE_ATTRIBUTES[i])?.amount ?? 0)
-		);
+		// Consume exactly the deltas that were sent, preserving any edit made while the save was
+		// in flight instead of wiping it (#1506) — unless an external resync already discarded
+		// the pending set mid-flight, in which case there's nothing left to consume.
+		if (deltasStillValid) {
+			this.#pendingDeltas = this.#pendingDeltas.map((d, i) => d - sentDeltas[i]);
+		}
 		this.flashSaved();
 	}
 

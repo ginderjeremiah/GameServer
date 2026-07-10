@@ -164,13 +164,16 @@ describe('ApiSocket', () => {
 			// Refresh token spent/revoked: no usable token can be obtained.
 			vi.mocked(ensureValidAccessToken).mockResolvedValue(null);
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
 			// No doomed unauthenticated handshake is opened, and the keepalive is not left running.
 			expect(webSocketMock).not.toHaveBeenCalled();
 			expect(internals(apiSocket).pingIntervalId).toBeNull();
+			// The queued command was never sent (no socket ever opened) and nothing will reconnect to
+			// re-flush it, so it must settle with an error rather than await a response forever.
+			await expect(promise).resolves.toMatchObject({ error: expect.any(String) });
 		});
 	});
 
@@ -801,6 +804,68 @@ describe('ApiSocket', () => {
 
 			expect(internals(apiSocket).pingIntervalId).toBeNull();
 			expect(ws.close).toHaveBeenCalledWith(1000);
+		});
+	});
+
+	describe('half-open detection (missed pongs)', () => {
+		it('closes the socket once MAX_MISSED_PONGS consecutive pings go unanswered', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				// readyState stays OPEN throughout (the mock never flips it) — exactly the half-open case:
+				// nothing ever answers the pings. 1st tick sends the first ping; 2nd–4th ticks each find the
+				// prior ping still unanswered (3 consecutive misses), so the 4th tick closes the socket.
+				vi.advanceTimersByTime(40000);
+
+				expect(ws.close).toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('does not close the socket while every ping keeps getting answered', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				for (let i = 0; i < 5; i++) {
+					vi.advanceTimersByTime(10000);
+					receive(ws, 'pong');
+				}
+
+				expect(ws.close).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('a pong resets the missed-pong streak, so an isolated slow round trip does not close the socket', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				// Two ticks with no pong (one miss shy of the threshold), then a late pong arrives and
+				// resets the streak before it can accumulate further.
+				vi.advanceTimersByTime(20000);
+				receive(ws, 'pong');
+
+				// Two more unanswered ticks after the reset stay well under the threshold.
+				vi.advanceTimersByTime(20000);
+
+				expect(ws.close).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 

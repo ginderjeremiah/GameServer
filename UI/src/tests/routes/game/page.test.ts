@@ -230,4 +230,22 @@ describe('game +page.svelte shell', () => {
 		await waitFor(() => expect(screen.getByTestId('tour-player').getAttribute('data-open')).toBe('false'));
 		expect(playerManager.lessons.some((l) => l.lessonId === 7 && l.readAt)).toBe(true);
 	});
+
+	it('stops the engines and cancels the welcome-back gate on unmount, so a GetOfflineProgress that resolves afterwards cannot start the game (#1807)', async () => {
+		let resolveProgress: (value: { data: { hasProgress: boolean } }) => void = () => {};
+		sendSocketCommand.mockImplementation(() => new Promise((resolve) => (resolveProgress = resolve)));
+
+		const { unmount } = render(GamePage);
+		await waitFor(() => expect(sendSocketCommand).toHaveBeenCalled());
+
+		unmount();
+		expect(stopEngines).toHaveBeenCalledTimes(1);
+
+		// The GetOfflineProgress round-trip lands only now, after the page is gone.
+		resolveProgress({ data: { hasProgress: false } });
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(startGame).not.toHaveBeenCalled();
+	});
 });

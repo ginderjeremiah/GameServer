@@ -1,4 +1,12 @@
-import { ApiRequest, EChangeType, fetchSocketData, type IChange, type IPath, type IProficiency } from '$lib/api';
+import {
+	ApiRequest,
+	EChangeType,
+	fetchSocketData,
+	type IChange,
+	type IPath,
+	type IProficiency,
+	type ISetProficiencyPrerequisitesData
+} from '$lib/api';
 import { staticData, toastError } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, canonicalEqual, resolveId, resolveNewIds } from '../save-helpers';
@@ -39,6 +47,7 @@ export class ProgressionStore {
 	loaded = $state(false);
 	saving = $state(false);
 	saved = $state(false);
+	error = $state<string | null>(null);
 
 	// Selection / navigation.
 	selectedPathId = $state<number | null>(null);
@@ -53,6 +62,7 @@ export class ProgressionStore {
 	// ── Loading / seeding ──
 
 	async load() {
+		this.error = null;
 		try {
 			const [paths, profs] = await Promise.all([fetchSocketData('GetPaths'), fetchSocketData('GetProficiencies')]);
 			this.setData(paths, profs);
@@ -61,7 +71,9 @@ export class ProgressionStore {
 			this.pathTab = 'tiers';
 			this.loaded = true;
 		} catch (ex) {
-			toastError(ex instanceof Error ? ex.message : 'Failed to load progression data.');
+			const message = ex instanceof Error ? ex.message : 'Failed to load progression data.';
+			this.error = message;
+			toastError(message);
 		}
 	}
 
@@ -180,7 +192,15 @@ export class ProgressionStore {
 
 	// ── Record patches ──
 
+	/**
+	 * Edits made while a save is in flight would either be silently overwritten by the post-save
+	 * reseed from server truth or land as a "clean" record whose dirty indicator never fires — so
+	 * every mutator no-ops while {@link saving} is true rather than risk either.
+	 */
 	patchPath(id: number, mutate: (draft: WorkbenchPath) => void) {
+		if (this.saving) {
+			return;
+		}
 		this.paths = this.paths.map((path) => {
 			if (path.id !== id) {
 				return path;
@@ -193,6 +213,9 @@ export class ProgressionStore {
 	}
 
 	patchProf(id: number, mutate: (draft: WorkbenchProficiency) => void) {
+		if (this.saving) {
+			return;
+		}
 		this.profs = this.profs.map((prof) => {
 			if (prof.id !== id) {
 				return prof;
@@ -207,6 +230,9 @@ export class ProgressionStore {
 	// ── Add / reorder / retire ──
 
 	addPath() {
+		if (this.saving) {
+			return;
+		}
 		const pathId = this.nextId--;
 		const tierId = this.nextId--;
 		this.paths = [newPath(pathId), ...this.paths];
@@ -218,6 +244,9 @@ export class ProgressionStore {
 	}
 
 	addTier(pathId: number): number {
+		if (this.saving) {
+			return tiersOfPath(this.profs, pathId)[0]?.id ?? 0;
+		}
 		const tiers = tiersOfPath(this.profs, pathId);
 		const ordinal = tiers.length ? Math.max(...tiers.map((t) => t.pathOrdinal)) + 1 : 0;
 		const id = this.nextId--;
@@ -227,6 +256,9 @@ export class ProgressionStore {
 	}
 
 	reorderTiers(pathId: number, fromIndex: number, toIndex: number) {
+		if (this.saving) {
+			return;
+		}
 		const tiers = tiersOfPath(this.profs, pathId);
 		if (fromIndex < 0 || toIndex < 0 || fromIndex >= tiers.length || toIndex >= tiers.length || fromIndex === toIndex) {
 			return;
@@ -256,6 +288,9 @@ export class ProgressionStore {
 
 	/** Remove a never-saved path (and its never-saved tiers) locally; reconcile the selection. */
 	removePath(id: number) {
+		if (this.saving) {
+			return;
+		}
 		this.paths = this.paths.filter((path) => path.id !== id);
 		this.profs = this.profs.filter((prof) => prof.pathId !== id);
 		if (this.selectedPathId === id) {
@@ -267,6 +302,9 @@ export class ProgressionStore {
 
 	/** Remove a never-saved tier locally; leave the drill view if it was open. */
 	removeTier(id: number) {
+		if (this.saving) {
+			return;
+		}
 		this.profs = this.profs.filter((prof) => prof.id !== id);
 		if (this.drilledTierId === id) {
 			this.drilledTierId = null;
@@ -367,7 +405,36 @@ export class ProgressionStore {
 			const pathDiff = diffCatalogue(this.paths, this.basePaths);
 			const profDiff = diffCatalogue(this.profs, this.baseProfs);
 
-			// 1. Path identities — send an Edit only when the identity DTO itself changed.
+			// 1. Cross-path prerequisite changes that touch only already-persisted tiers need no id remap,
+			// so — only when this save is also retiring a path — they're posted immediately, before path
+			// identities. This lets a save that both retires a path and removes the now-offending gateway
+			// prerequisite (on some other, already-persisted tier) succeed in one shot: the retire guard
+			// (AdminPaths.FindRetiredPathGatingLiveGateway) validates against the live cache, which this
+			// write has already reloaded by the time the path save below runs (see #1776). Splitting into
+			// two POSTs narrows the "single combined batch" cycle-safety guarantee below (step 7), so it's
+			// scoped to exactly the case that needs it: a non-retiring save always keeps every prerequisite
+			// change in one batch, preserving the full invariant.
+			const hasPendingRetire = pathDiff.modified.some(
+				({ record, baseline }) => record.retiredAt != null && baseline.retiredAt == null
+			);
+			const allPrerequisiteChanges = [...profDiff.added, ...profDiff.modified.map((m) => m.record)]
+				.filter((prof) => childChanged(prof.prerequisiteIds, baseProfMap[prof.id]?.prerequisiteIds))
+				.map((prof) => ({ prof, prerequisiteIds: prof.prerequisiteIds }));
+			const resolvableNow = hasPendingRetire
+				? allPrerequisiteChanges.filter(
+						({ prof, prerequisiteIds }) => prof.id >= 0 && prerequisiteIds.every((id) => id >= 0)
+					)
+				: [];
+			if (resolvableNow.length) {
+				const changes: ISetProficiencyPrerequisitesData[] = resolvableNow.map(({ prof, prerequisiteIds }) => ({
+					id: prof.id,
+					prerequisiteIds
+				}));
+				await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', changes);
+				committed = true;
+			}
+
+			// 2. Path identities — send an Edit only when the identity DTO itself changed.
 			const pathChanges: IChange<ReturnType<typeof pathIdentityDto>>[] = [
 				...pathDiff.added.map((p) => ({ changeType: EChangeType.Add, item: pathIdentityDto(p) })),
 				...pathDiff.modified
@@ -379,7 +446,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 2. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
+			// 3. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
 			const freshPaths = await fetchSocketData('GetPaths');
 			const pathIdMap = resolveNewIds(
 				freshPaths,
@@ -387,7 +454,7 @@ export class ProgressionStore {
 				pathDiff.added
 			);
 
-			// 3. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
+			// 4. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
 			const toProfDto = (prof: WorkbenchProficiency) => ({
 				...profIdentityDto(prof),
 				pathId: resolveId(prof.pathId, pathIdMap)
@@ -403,7 +470,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 4. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
+			// 5. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
 			const freshProfs = await fetchSocketData('GetProficiencies');
 			const profIdMap = resolveNewIds(
 				freshProfs,
@@ -411,7 +478,7 @@ export class ProgressionStore {
 				profDiff.added
 			);
 
-			// 5. Proficiency child collections — modifiers, rewards, and cross-path prerequisites.
+			// 6. Proficiency child collections — modifiers and rewards per tier.
 			for (const prof of [...profDiff.added, ...profDiff.modified.map((m) => m.record)]) {
 				const baseline = baseProfMap[prof.id];
 				const id = resolveId(prof.id, profIdMap);
@@ -423,14 +490,29 @@ export class ProgressionStore {
 					await ApiRequest.post('AdminTools/SetProficiencyRewards', { id, rewards: prof.levelRewards });
 					committed = true;
 				}
-				if (childChanged(prof.prerequisiteIds, baseline?.prerequisiteIds)) {
-					const prerequisiteIds = prof.prerequisiteIds.map((pid) => resolveId(pid, profIdMap));
-					await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', { id, prerequisiteIds });
-					committed = true;
-				}
 			}
 
-			// 7. Follow the selection across any id remap, then re-seed from server truth.
+			// 7. Every prerequisite change not already posted in step 1 (the common case: everything, when
+			// this save isn't retiring a path) collected into one combined batch: the backend validates a
+			// batch against its final combined graph, so a gateway swap spanning two tiers (one drops an
+			// edge while the other gains the reverse) can't be false-rejected as a cycle depending on which
+			// tier's post happens to land first. Only when step 1 *did* split some changes out early (a
+			// pending retire) can a swap spanning the two groups still be false-rejected — an intentionally
+			// narrow, retire-only residual of the fuller invariant this batch otherwise preserves.
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+			const resolvedEarly = new Set(resolvableNow);
+			const prerequisiteChanges: ISetProficiencyPrerequisitesData[] = allPrerequisiteChanges
+				.filter((change) => !resolvedEarly.has(change))
+				.map(({ prof, prerequisiteIds }) => ({
+					id: resolveId(prof.id, profIdMap),
+					prerequisiteIds: prerequisiteIds.map((pid) => resolveId(pid, profIdMap))
+				}));
+			if (prerequisiteChanges.length) {
+				await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', prerequisiteChanges);
+				committed = true;
+			}
+
+			// 8. Follow the selection across any id remap, then re-seed from server truth.
 			if (this.selectedPathId != null) {
 				this.selectedPathId = resolveId(this.selectedPathId, pathIdMap);
 			}

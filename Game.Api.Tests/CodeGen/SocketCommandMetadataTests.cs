@@ -75,6 +75,18 @@ namespace Game.Api.Tests.CodeGen
             Assert.Null(metadata.ResponseDescriptor);
             Assert.Null(metadata.ParameterDescriptor);
         }
+
+        [Fact]
+        public void Constructor_ServerInitiatedCommand_OmitsParameterDescriptor()
+        {
+            // A server-initiated command may still bind Parameters from a typed base (to reuse
+            // DeserializeParameters<T>'s malformed-payload classification), but the client only ever listens
+            // for it and can never send it, so it must not surface in ApiSocketRequestTypes.
+            var metadata = new SocketCommandMetadata(typeof(TestSocketCommandServerInitiatedFull));
+
+            Assert.NotNull(metadata.ResponseDescriptor);
+            Assert.Null(metadata.ParameterDescriptor);
+        }
     }
 
     public class SocketParamModel
@@ -147,6 +159,16 @@ namespace Game.Api.Tests.CodeGen
         public override Task<ApiSocketResponse> ExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             return Task.FromResult(Success());
+        }
+    }
+
+    public class TestSocketCommandServerInitiatedFull : AbstractSocketCommand<SimpleModel, SocketParamModel>, IServerInitiatedCommand
+    {
+        public override string Name { get; set; } = "TestServerInitiatedFull";
+
+        public override Task<ApiSocketResponse<SimpleModel>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Success(new SimpleModel()));
         }
     }
 }

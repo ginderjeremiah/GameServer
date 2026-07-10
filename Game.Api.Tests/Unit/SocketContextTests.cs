@@ -174,6 +174,23 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task SendData_WedgedSend_AbortsInsteadOfHangingForever()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new WedgeableSendWebSocket();
+            var context = CreateContext(socket, sendAbortTimeout: TimeSpan.FromMilliseconds(100));
+
+            // Mirrors a client stalled with a TCP zero-window: the send never completes on its own, holding
+            // the send lock (and, in RunCommandUnderLock's case, the per-socket command lock too) indefinitely
+            // unless SendData itself falls back to Abort() the same way Close() already does (#1741) — closing
+            // the gap that fix left on this, the far more common send path (#1760).
+            var sent = await context.SendData("stuck").WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.False(sent);
+            Assert.True(socket.AbortCalled);
+        }
+
+        [Fact]
         public async Task SendData_MidFrameCancellation_CompletesTheFrameRatherThanLeavingItHalfSent()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -288,10 +305,10 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(WebSocketCloseStatus.MessageTooBig, socket.CloseStatusUsed);
         }
 
-        private static SocketContext CreateContext(WebSocket socket, bool isAdmin = false, TimeSpan? closeAbortTimeout = null)
+        private static SocketContext CreateContext(WebSocket socket, bool isAdmin = false, TimeSpan? closeAbortTimeout = null, TimeSpan? sendAbortTimeout = null)
         {
             var session = new SessionService(new NoOpSessionStore());
-            return new SocketContext(socket, playerId: 1, session, isAdmin, NullLogger<SocketContext>.Instance, closeAbortTimeout);
+            return new SocketContext(socket, playerId: 1, session, isAdmin, NullLogger<SocketContext>.Instance, closeAbortTimeout, sendAbortTimeout);
         }
 
         /// <summary>

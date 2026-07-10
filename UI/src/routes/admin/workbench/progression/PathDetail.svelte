@@ -19,7 +19,7 @@
 		onRemove={() => store.removePath(path.id)}
 	/>
 
-	<div class="detail-body" class:locked={store.isRetired(path)}>
+	<div class="detail-body" class:locked={store.isRetired(path) || store.saving}>
 		<div class="body-inner">
 			{#if store.pathTab === 'identity'}
 				<div class="sec-title">Identity<span class="sub">— the path-level record</span><span class="ln"></span></div>

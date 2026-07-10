@@ -389,17 +389,20 @@ namespace Game.Application.Services
         /// left it uncredited — it is not a fresh spawn, it is that same unconcluded fight. Mirrors <see
         /// cref="AbandonBattle"/>'s still-in-progress hand-back (#1595): same-shaped <see cref="BattleStartResult"/>
         /// with a non-null <see cref="BattleStartResult.ElapsedOffsetMs"/>, so the welcome-back gate resumes it
-        /// via replay-to-offset (#1597) with no extra round trip.
+        /// via replay-to-offset (#1597) with no extra round trip. The stored snapshot is <see
+        /// cref="OfflinePendingBattle.Snapshot"/> — the one the simulator actually fought this battle against,
+        /// not the window-start snapshot the caller's run started from (#1758) — so the server's later
+        /// anti-cheat replay agrees with the client, which resumes from the same post-reward state.
         /// </summary>
         internal BattleStartResult HandBackPendingBattle(
-            PlayerState state, OfflinePendingBattle pending, BattleSnapshot snapshot, int zoneId, bool isBossBattle, DateTime now)
+            PlayerState state, OfflinePendingBattle pending, int zoneId, bool isBossBattle, DateTime now)
         {
             var enemy = pending.Enemy;
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
             var startTime = now.AddMilliseconds(-pending.ElapsedOffsetMs);
 
             state.SetActiveBattle(
-                enemy.Id, enemy.Level, enemySkillIds, pending.Seed, startTime, snapshot, zoneId, isBossBattle);
+                enemy.Id, enemy.Level, enemySkillIds, pending.Seed, startTime, pending.Snapshot, zoneId, isBossBattle);
 
             return new BattleStartResult
             {

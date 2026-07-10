@@ -39,6 +39,16 @@ namespace Game.DataAccess.Repositories.Admin
                 return collisionRejection;
             }
 
+            // A payout only fires at a reachable level (see FindLevelOutOfRange), but that rule is enforced
+            // by the child-collection setters, not this identity save — so lowering MaxLevel here without
+            // also touching the modifier/reward collections in the same request would silently strand an
+            // already-persisted payout above the new cap. Reject before staging, mirroring the up-front
+            // validation the other identity-level guards already do.
+            if (FindShrunkenMaxLevelViolation(changes) is { } maxLevelRejection)
+            {
+                return maxLevelRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Proficiency
                 {
@@ -151,17 +161,86 @@ namespace Game.DataAccess.Repositories.Admin
                 update: r => _entityStore.Update(ToRewardEntity(proficiency.Id, r)));
         }
 
-        public AdminSaveResult SetPrerequisites(SetProficiencyPrerequisitesData data)
+        public AdminSaveResult SetPrerequisites(IReadOnlyList<SetProficiencyPrerequisitesData> changes)
         {
-            var proficiency = _proficiencies.LookupProficiency(data.Id);
-            if (proficiency is null)
+            // A batch entry names each proficiency at most once — two entries for the same proficiency would
+            // leave its desired set ambiguous — so reject the whole batch before validating anything else.
+            var seenIds = new HashSet<int>();
+            foreach (var change in changes)
             {
-                return AdminSaveResult.NotFound("Proficiency");
+                if (!seenIds.Add(change.Id))
+                {
+                    return AdminSaveResult.Failure(
+                        "The submitted proficiency prerequisite batch names the same proficiency more than once.");
+                }
             }
 
-            foreach (var prerequisiteId in data.PrerequisiteIds)
+            var proficiencies = new Dictionary<int, Entities.Proficiency>();
+            foreach (var change in changes)
             {
-                if (prerequisiteId == proficiency.Id)
+                var proficiency = _proficiencies.LookupProficiency(change.Id);
+                if (proficiency is null)
+                {
+                    return AdminSaveResult.NotFound("Proficiency");
+                }
+
+                // A duplicate desired id would double-track the same edge as an insert; ChildCollectionReconciler
+                // would catch this too, but only once staging its own set has begun — checking every change's
+                // set up front keeps an earlier change's reconcile from staging entities before a later change
+                // in the same batch is found invalid.
+                if (change.PrerequisiteIds.Distinct().Count() != change.PrerequisiteIds.Count)
+                {
+                    return ChangeSetProcessor.DuplicateFailure<SetProficiencyPrerequisitesData>("proficiency prerequisite");
+                }
+
+                if (ValidatePrerequisiteIds(proficiency.Id, change.PrerequisiteIds) is { } idRejection)
+                {
+                    return idRejection;
+                }
+
+                proficiencies[change.Id] = proficiency;
+            }
+
+            // Reject a combined result that would cycle (A needs B needs A), which would soft-lock every node
+            // on it. Build the prospective graph — every other proficiency's existing edges plus every changed
+            // proficiency's desired set — and run full cycle detection once, before anything commits.
+            var desiredByProficiencyId = changes.ToDictionary(c => c.Id, IReadOnlyList<int> (c) => c.PrerequisiteIds);
+            if (FindPrerequisiteCycle(desiredByProficiencyId) is { } cycleRejection)
+            {
+                return cycleRejection;
+            }
+
+            foreach (var change in changes)
+            {
+                var proficiency = proficiencies[change.Id];
+                ChildCollectionReconciler.Reconcile(
+                    existing: proficiency.Prerequisites,
+                    desired: change.PrerequisiteIds,
+                    existingKey: p => p.PrerequisiteProficiencyId,
+                    desiredKey: id => id,
+                    delete: p => _entityStore.Delete(new Entities.ProficiencyPrerequisite
+                    {
+                        ProficiencyId = proficiency.Id,
+                        PrerequisiteProficiencyId = p.PrerequisiteProficiencyId,
+                    }),
+                    insert: id => _entityStore.Insert(new Entities.ProficiencyPrerequisite
+                    {
+                        ProficiencyId = proficiency.Id,
+                        PrerequisiteProficiencyId = id,
+                    }),
+                    resourceName: "proficiency prerequisite");
+            }
+
+            return AdminSaveResult.Success;
+        }
+
+        /// <summary>Returns a rejection if any id in <paramref name="prerequisiteIds"/> is
+        /// <paramref name="proficiencyId"/> itself or does not exist, else null.</summary>
+        private AdminSaveResult? ValidatePrerequisiteIds(int proficiencyId, IReadOnlyList<int> prerequisiteIds)
+        {
+            foreach (var prerequisiteId in prerequisiteIds)
+            {
+                if (prerequisiteId == proficiencyId)
                 {
                     return AdminSaveResult.Failure("A proficiency cannot be its own prerequisite.");
                 }
@@ -172,30 +251,7 @@ namespace Game.DataAccess.Repositories.Admin
                 }
             }
 
-            // Reject a prerequisite that would cycle (A needs B needs A), which would soft-lock both nodes.
-            // Build the prospective graph — every other proficiency's existing edges plus this one's desired
-            // set — and run full cycle detection before anything commits.
-            if (FindPrerequisiteCycle(proficiency.Id, data.PrerequisiteIds) is { } cycleRejection)
-            {
-                return cycleRejection;
-            }
-
-            return ChildCollectionReconciler.Reconcile(
-                existing: proficiency.Prerequisites,
-                desired: data.PrerequisiteIds,
-                existingKey: p => p.PrerequisiteProficiencyId,
-                desiredKey: id => id,
-                delete: p => _entityStore.Delete(new Entities.ProficiencyPrerequisite
-                {
-                    ProficiencyId = proficiency.Id,
-                    PrerequisiteProficiencyId = p.PrerequisiteProficiencyId,
-                }),
-                insert: id => _entityStore.Insert(new Entities.ProficiencyPrerequisite
-                {
-                    ProficiencyId = proficiency.Id,
-                    PrerequisiteProficiencyId = id,
-                }),
-                resourceName: "proficiency prerequisite");
+            return null;
         }
 
         private static Entities.ProficiencyLevelModifier ToModifierEntity(int proficiencyId, Contracts.ProficiencyLevelModifier modifier)
@@ -289,6 +345,39 @@ namespace Game.DataAccess.Repositories.Admin
             return null;
         }
 
+        /// <summary>Returns a rejection if an edited proficiency's new <c>MaxLevel</c> would fall below the
+        /// level of a modifier or reward it already has persisted, else null. Checks only against the
+        /// proficiency's currently-persisted child rows (not this request's own change set), matching the
+        /// scope of <see cref="FindLevelOutOfRange"/>.</summary>
+        private AdminSaveResult? FindShrunkenMaxLevelViolation(IReadOnlyList<Change<Contracts.Proficiency>> changes)
+        {
+            foreach (var change in changes)
+            {
+                if (change.ChangeType != EChangeType.Edit)
+                {
+                    continue;
+                }
+
+                var existing = _proficiencies.LookupProficiency(change.Item.Id);
+                if (existing is null)
+                {
+                    continue;
+                }
+
+                var highestPayoutLevel = existing.LevelModifiers.Select(m => (int?)m.Level)
+                    .Concat(existing.LevelRewards.Select(r => (int?)r.Level))
+                    .Max();
+
+                if (highestPayoutLevel is { } level && level > change.Item.MaxLevel)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Proficiency '{existing.Name}' has a payout at level {level}, above the new cap of {change.Item.MaxLevel}.");
+                }
+            }
+
+            return null;
+        }
+
         /// <summary>Returns a rejection if any authored level falls outside <c><paramref name="minLevel"/>..MaxLevel</c>,
         /// else null. A payout level must be reachable, and levels past the cap never fire. <paramref name="minLevel"/>
         /// is 0 for modifiers (a payout authored at the just-opened state is honored cumulatively) and 1 for rewards
@@ -307,16 +396,19 @@ namespace Game.DataAccess.Repositories.Admin
             return null;
         }
 
-        /// <summary>Returns a rejection if setting <paramref name="proficiencyId"/>'s prerequisites to
-        /// <paramref name="desiredPrerequisiteIds"/> would introduce a cycle in the prerequisite graph, else
-        /// null. The prospective graph keeps every other proficiency's existing edges and overrides only this
-        /// node's.</summary>
-        private AdminSaveResult? FindPrerequisiteCycle(int proficiencyId, IReadOnlyList<int> desiredPrerequisiteIds)
+        /// <summary>Returns a rejection if overriding each proficiency named in
+        /// <paramref name="desiredByProficiencyId"/> with its desired prerequisite set would introduce a cycle
+        /// in the prerequisite graph, else null. The prospective graph keeps every other proficiency's
+        /// existing edges and overrides only the named nodes'.</summary>
+        private AdminSaveResult? FindPrerequisiteCycle(IReadOnlyDictionary<int, IReadOnlyList<int>> desiredByProficiencyId)
         {
             var graph = _proficiencies.AllProficiencyEntities().ToDictionary(
                 p => p.Id,
                 p => (IReadOnlyList<int>)p.Prerequisites.Select(pr => pr.PrerequisiteProficiencyId).ToList());
-            graph[proficiencyId] = desiredPrerequisiteIds;
+            foreach (var (proficiencyId, desiredPrerequisiteIds) in desiredByProficiencyId)
+            {
+                graph[proficiencyId] = desiredPrerequisiteIds;
+            }
 
             if (ProficiencyPrerequisiteGraph.TryFindCycle(graph, out var cycle))
             {

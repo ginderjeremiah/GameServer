@@ -210,8 +210,15 @@ describe('lessonEntity', () => {
 			expect(section && 'newRow' in section ? section.newRow(l) : null).toEqual({
 				ordinal: 3,
 				text: '',
-				anchorKey: ''
+				anchorKey: undefined
 			});
+		});
+
+		it('marks the Anchor Key column optional, so a cleared cell reads as unset rather than ""', () => {
+			const section = stepsSection();
+			const anchorCol =
+				section && 'columns' in section ? section.columns.find((c) => c.key === 'anchorKey') : undefined;
+			expect(anchorCol?.optional).toBe(true);
 		});
 
 		it('newRow starts at ordinal 0 for a lesson with no steps yet', () => {
@@ -220,7 +227,7 @@ describe('lessonEntity', () => {
 			expect(section && 'newRow' in section ? section.newRow(l) : null).toEqual({
 				ordinal: 0,
 				text: '',
-				anchorKey: ''
+				anchorKey: undefined
 			});
 		});
 	});

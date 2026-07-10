@@ -127,15 +127,33 @@ export const SETTINGS_CATS: SettingsCatDef[] = [
 export type LogPrefMap = Record<number, boolean>;
 
 /* ── reactive view-model ─────────────────────────────────────────────────
-   Owns the working copy (`draft`) and the persisted baseline (`baseline`),
+   Owns the persisted baseline (`baseline`) and the working copy (`draft`),
    derives the dirty set by comparison, and — mirroring the original
-   `LogManager.saveSettingChanges` — persists only the actual diff. */
+   `LogManager.saveSettingChanges` — persists only the actual diff.
+
+   `baseline` is read live off the player manager rather than snapshotted once
+   at construction: a mid-session resync (`playerManager.initialize()`, #1809)
+   reassigns `logPreferences` wholesale, and the baseline must track it or the
+   screen keeps showing pre-resync values and diffs against a server state that
+   no longer exists. `draft` layers explicitly-touched overrides
+   (`#draftOverrides`) over `baseline`, but only while `#draftOverridesPrefs` —
+   the manager `logPreferences` reference those overrides were computed against
+   — still matches the live one; {@link effectiveOverrides} treats them as
+   empty the moment it doesn't. A not-yet-saved toggle can't be trusted to
+   still apply cleanly against a baseline it was never computed against, and an
+   **external** resync (not this view's own `save`, which keeps the marker in
+   lockstep) is by definition the fresher truth — so it silently drops the
+   toggle rather than layering it onto the new baseline. `save` instead
+   consumes exactly the overrides it sent, preserving any toggle made while
+   that request was in flight (#1506). */
 export class OptionsView {
 	category = $state<string>('logging');
-	/** Working copy edited by the toggles. */
-	draft = $state<LogPrefMap>({});
-	/** Last-persisted state; the dirty set is `draft` minus this. */
-	baseline = $state<LogPrefMap>({});
+	/** Log types toggled since the last save/discard, valid only against
+	 *  {@link #draftOverridesPrefs} — see {@link effectiveOverrides}. */
+	#draftOverrides = $state<Partial<Record<ELogType, boolean>>>({});
+	/** The `playerManager.logPreferences` reference {@link #draftOverrides} was computed against;
+	 *  `null` never matches, so overrides read as empty until the first toggle stamps it. */
+	#draftOverridesPrefs = $state<ILogPreference[] | null>(null);
 	/** Brief "Preferences saved" confirmation flash. */
 	saved = $state(false);
 	/** True while a save request is in flight (guards against double-submit). */
@@ -143,11 +161,27 @@ export class OptionsView {
 
 	#flashTimer: ReturnType<typeof setTimeout> | undefined;
 
-	constructor() {
-		const initial = readPlayerPrefs();
-		this.draft = { ...initial };
-		this.baseline = { ...initial };
+	/** Last-persisted preferences, read live off the player manager (see the class doc). */
+	readonly baseline = $derived(readPlayerPrefs());
+
+	/** {@link #draftOverrides} if they're still valid against the live manager state, otherwise
+	 *  empty — a pure read (no mutation), so it's safe to call from a `$derived` (see the class doc). */
+	private effectiveOverrides(): Partial<Record<ELogType, boolean>> {
+		return this.#draftOverridesPrefs === playerManager.logPreferences ? this.#draftOverrides : {};
 	}
+
+	/** Working preferences: {@link baseline} with the {@link effectiveOverrides} layered on top. */
+	readonly draft = $derived.by<LogPrefMap>(() => {
+		const map: LogPrefMap = { ...this.baseline };
+		const overrides = this.effectiveOverrides();
+		for (const lt of LOG_TYPES) {
+			const override = overrides[lt.id];
+			if (override !== undefined) {
+				map[lt.id] = override;
+			}
+		}
+		return map;
+	});
 
 	/** Log types whose draft value differs from the persisted baseline. */
 	readonly dirtyIds = $derived(LOG_TYPES.filter((lt) => this.isDirtyId(lt.id)).map((lt) => lt.id));
@@ -170,21 +204,24 @@ export class OptionsView {
 	}
 
 	setOne(id: ELogType, enabled: boolean): void {
-		this.draft = { ...this.draft, [id]: enabled };
+		this.#draftOverrides = { ...this.effectiveOverrides(), [id]: enabled };
+		this.#draftOverridesPrefs = playerManager.logPreferences;
 		this.saved = false;
 	}
 
 	setMany(ids: ELogType[], enabled: boolean): void {
-		const next = { ...this.draft };
+		const next = { ...this.effectiveOverrides() };
 		for (const id of ids) {
 			next[id] = enabled;
 		}
-		this.draft = next;
+		this.#draftOverrides = next;
+		this.#draftOverridesPrefs = playerManager.logPreferences;
 		this.saved = false;
 	}
 
 	discard(): void {
-		this.draft = { ...this.baseline };
+		this.#draftOverrides = {};
+		this.#draftOverridesPrefs = playerManager.logPreferences;
 		this.saved = false;
 	}
 
@@ -204,6 +241,11 @@ export class OptionsView {
 			return;
 		}
 
+		// The exact values being sent, so an override can be told apart below from one that was
+		// re-touched while the request was in flight. A transient local (not reactive state).
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const sentValues = new Map(changed.map((pref) => [pref.id, pref.enabled]));
+
 		this.saving = true;
 		const response = await apiSocket.sendSocketCommand('SaveLogPreferences', changed);
 		this.saving = false;
@@ -215,15 +257,24 @@ export class OptionsView {
 			return;
 		}
 
-		// Mirror only the entries actually sent onto the player manager and baseline —
-		// a toggle flipped while the save was in flight stays dirty (and unapplied)
-		// instead of being baselined as clean without ever reaching the server (#1506).
+		// Snapshot the current effective overrides (any mid-flight toggle included) before
+		// applyToPlayer's reassignment below moves the resync marker out from under them.
+		const currentOverrides = this.effectiveOverrides();
+
+		// Applying to the player manager advances the live baseline (see the class doc); this
+		// view's own reassignment isn't an external resync, so re-pin the overrides against it.
 		applyToPlayer(changed);
-		const baseline = { ...this.baseline };
-		for (const pref of changed) {
-			baseline[pref.id] = pref.enabled;
+		this.#draftOverridesPrefs = playerManager.logPreferences;
+
+		// Drop an override only if it still holds exactly the value that was sent — one re-touched
+		// while the request was in flight stays pending instead of being silently cleared (#1506).
+		const remaining = { ...currentOverrides };
+		for (const [id, sentValue] of sentValues) {
+			if (remaining[id] === sentValue) {
+				delete remaining[id];
+			}
 		}
-		this.baseline = baseline;
+		this.#draftOverrides = remaining;
 		this.flashSaved();
 	}
 

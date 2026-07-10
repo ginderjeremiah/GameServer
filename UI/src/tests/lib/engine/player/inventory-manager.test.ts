@@ -720,6 +720,86 @@ describe('InventoryManager', () => {
 		});
 	});
 
+	describe('resync during an in-flight mutation (#1808)', () => {
+		beforeEach(() => {
+			mockItems[1] = makeItem(1, EItemCategory.Weapon);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+		});
+
+		it('does not roll back a mid-flight equip whose persist fails after a resync superseded it', async () => {
+			let resolveSend: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveSend = resolve)));
+
+			const pending = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			await flush();
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+
+			// A mid-session resync (e.g. resyncPlayerAndInventory after a lost DefeatEnemy response) rebuilds
+			// the inventory with fresh item instances while the equip's persist is still in flight. The
+			// authoritative state shows the equip actually landed server-side — only the ack was lost.
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+			manager.initialize();
+			const postResyncItem = manager.unlockedItems.get(1);
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+
+			resolveSend({ error: 'nope' });
+			await pending;
+
+			// The rollback must be skipped: firing it would restore the pre-optimistic-apply snapshot (empty
+			// slot), clobbering the resync's authoritative "actually equipped" state with stale data and
+			// splicing the orphaned pre-resync item back into live state.
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBe(postResyncItem);
+		});
+
+		it('rolls back a mid-flight equip normally when no resync happened since it started', async () => {
+			let resolveSend: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveSend = resolve)));
+
+			const pending = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			await flush();
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+
+			resolveSend({ error: 'nope' });
+			await pending;
+
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
+		});
+
+		it('does not roll back a mid-flight unequip whose persist fails after a resync superseded it', async () => {
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+			manager.initialize();
+
+			let resolveSend: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveSend = resolve)));
+
+			const pending = manager.unequipItem(EEquipmentSlot.WeaponSlot);
+			await flush();
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
+
+			// The resync's authoritative state has the item still equipped (the unequip never reached the
+			// server before the resync fired).
+			mockInventoryData.unlockedItems = [
+				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
+			];
+			manager.initialize();
+			const postResyncItem = manager.unlockedItems.get(1);
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
+
+			resolveSend({ error: 'nope' });
+			await pending;
+
+			// A stale rollback would splice the pre-resync (now-orphaned) item object back into
+			// equippedSlots instead of leaving the resync's fresh, still-equipped item in place.
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBe(postResyncItem);
+		});
+	});
+
 	describe('unequipItem', () => {
 		it('unequips the item in a slot and sends the socket command', async () => {
 			mockItems[1] = makeItem(1);

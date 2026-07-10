@@ -264,6 +264,15 @@ describe('deriveFromType', () => {
 		expect(c.statisticType).toBeUndefined();
 		expect(c.entityType).toBe(EEntityType.None);
 	});
+
+	it('defaults a DamageType-scoped type to the first damage-type key instead of Global (#1781)', () => {
+		// KillsByDamageType has no global row on the backend, so leaving the default Global
+		// target would land on a state the backend hard-rejects on save.
+		const c = make({ challengeTypeId: EChallengeType.EnemiesKilled });
+		deriveFromType(c, TYPES, EChallengeType.KillsByDamageType);
+		expect(c.entityType).toBe(EEntityType.DamageType);
+		expect(c.targetEntityId).toBe(0);
+	});
 });
 
 describe('number formatting', () => {

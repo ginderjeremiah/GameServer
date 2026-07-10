@@ -193,7 +193,10 @@ namespace Game.Application.Tests.DataAccess
             var batch = scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
 
-            var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []);
+            // Load first, mirroring the real battle-completion path (BattleStatisticsEventHandler always loads
+            // before saving) — it's also what establishes the cache key a fresh player's first save can then
+            // advance (#1761), rather than constructing the aggregate directly and skipping that step.
+            var progress = await repo.Load(MakeDomainPlayer(playerId));
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
                 new BattleStats(), isBossBattle: false, zoneId: 0);
 
@@ -377,6 +380,55 @@ namespace Game.Application.Tests.DataAccess
             foreach (var field in fieldsAfterFirstSave)
             {
                 Assert.Contains(fieldsAfterSecondSave, f => f.Name == field.Name && f.Value == field.Value);
+            }
+        }
+
+        [Fact]
+        public async Task Save_CacheKeyVanishesBetweenLoadAndSave_DoesNotResurrectAPartialHash()
+        {
+            var playerId = await SeedPlayerAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.AddPlayerStatisticAsync(context, playerId, EStatisticType.EnemiesKilled, 5m);
+            }
+
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+            var hashKey = $"Progress_{playerId}";
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+                // Cache miss -> DB reload establishes the full snapshot (the pre-existing 5 kills) in the cache.
+                var progress = await repo.Load(MakeDomainPlayer(playerId));
+                await WaitForHashFieldCountAsync(redis, hashKey, minCount: 1);
+
+                // Simulate the key vanishing (Redis eviction under memory pressure, or an operator delete)
+                // between this load and the save below — the exact race #1761 describes.
+                await redis.KeyDeleteAsync(hashKey);
+
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
+                await repo.Save(progress);
+            }
+
+            // The advance must not resurrect the key from this save's partial (dirty-only) view — it holds
+            // only the incremented kill count, not the pre-existing 5. Give the fire-and-forget advance a
+            // moment to (not) land, then assert the key is still gone.
+            await Task.Delay(200);
+            Assert.False(await redis.KeyExistsAsync(hashKey), "The cache advance must not recreate a key that vanished mid-flight from a partial dirty-row view.");
+
+            // A subsequent read falls through to the DB (the write-behind synchronizer is disabled in this
+            // harness, so the just-enqueued event never applied) and correctly serves the original 5 kills —
+            // not a shadowed/regressed value from a resurrected partial hash.
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var stats = await repo.GetStatistics(playerId);
+                var kills = Assert.Single(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
+                Assert.Equal(5m, kills.Value);
             }
         }
 

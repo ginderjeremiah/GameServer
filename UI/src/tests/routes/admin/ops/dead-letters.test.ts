@@ -112,6 +112,22 @@ describe('DeadLetterConsoleState.load', () => {
 
 		expect(state.selectedCount).toBe(0);
 	});
+
+	it('bumps generation on every successful load, but not on a failed one', async () => {
+		getMock.mockResolvedValue(inspection([entry({ index: 0 })]));
+		const state = new DeadLetterConsoleState();
+		expect(state.generation).toBe(0);
+
+		await state.load();
+		expect(state.generation).toBe(1);
+
+		getMock.mockRejectedValueOnce(new Error('boom'));
+		await state.load();
+		expect(state.generation).toBe(1);
+
+		await state.load();
+		expect(state.generation).toBe(2);
+	});
 });
 
 describe('DeadLetterConsoleState selection', () => {

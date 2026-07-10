@@ -243,6 +243,55 @@ namespace Game.Application.Tests.DataAccess
             Assert.Null(await cache.HashGetAllIfExists(key));
         }
 
+        [Fact]
+        public async Task HashSetIfExistsAndForget_OnAMissingKey_DoesNotCreateIt()
+        {
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            cache.HashSetIfExistsAndForget(key, new Dictionary<string, string> { ["a"] = "1" }, TimeSpan.FromSeconds(30));
+
+            await Task.Delay(200);
+            Assert.Null(await cache.HashGetAllIfExists(key));
+        }
+
+        [Fact]
+        public async Task HashSetIfExistsAndForget_OverAnExistingHash_OverwritesOnlyTheNamedFieldsAndRefreshesTtl()
+        {
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(2));
+            await WaitForHashFieldCountAsync(cache, key, 2);
+
+            cache.HashSetIfExistsAndForget(key, new Dictionary<string, string> { ["a"] = "9" }, TimeSpan.FromSeconds(30));
+
+            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.GetValueOrDefault("a") == "9");
+
+            Assert.NotNull(fields);
+            Assert.Equal("9", fields["a"]);
+            Assert.Equal("2", fields["b"]);
+
+            var ttl = await ReadTtlAsync(key);
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be refreshed past the 2s seed but was {ttl}.");
+        }
+
+        [Fact]
+        public async Task HashSetIfExistsAndForget_WithNoFields_IsANoOp()
+        {
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            cache.HashSetIfExistsAndForget(key, new Dictionary<string, string>(), TimeSpan.FromSeconds(30));
+
+            await Task.Delay(200);
+            Assert.Null(await cache.HashGetAllIfExists(key));
+        }
+
         private static async Task WaitForHashFieldCountAsync(ICacheService cache, string key, int count, int timeoutMs = 5000)
         {
             var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.Count == count, timeoutMs);

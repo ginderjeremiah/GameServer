@@ -46,6 +46,17 @@ namespace Game.Api.Sockets
 
         private readonly TimeSpan _closeAbortTimeout;
 
+        // Upper bound SendData applies to an in-progress send, on top of holding the send lock. A wedged send
+        // (e.g. a peer with a zero TCP receive window that keeps sending inbound traffic so the inactivity
+        // watchdog never fires) holds the send lock forever otherwise: its chunks send under
+        // CancellationToken.None once a frame has begun (see SendChunks), so cancellation alone can't unblock
+        // it — only Abort() can, the same fallback Close() already uses (#1741). Without this bound, every
+        // future send (including the response to the very next command, which holds SocketHandler's command
+        // lock across the send) would wait on the send lock forever too (#1760).
+        private static readonly TimeSpan DefaultSendAbortTimeout = TimeSpan.FromSeconds(5);
+
+        private readonly TimeSpan _sendAbortTimeout;
+
         public string SocketId { get; }
         public int PlayerId { get; }
         public SessionService Session { get; }
@@ -61,7 +72,7 @@ namespace Game.Api.Sockets
         /// </summary>
         public bool IsAdmin { get; }
 
-        public SocketContext(WebSocket socket, int playerId, SessionService session, bool isAdmin, ILogger<SocketContext> logger, TimeSpan? closeAbortTimeout = null)
+        public SocketContext(WebSocket socket, int playerId, SessionService session, bool isAdmin, ILogger<SocketContext> logger, TimeSpan? closeAbortTimeout = null, TimeSpan? sendAbortTimeout = null)
         {
             _socket = socket;
             SocketId = Guid.NewGuid().ToString();
@@ -70,6 +81,7 @@ namespace Game.Api.Sockets
             IsAdmin = isAdmin;
             _logger = logger;
             _closeAbortTimeout = closeAbortTimeout ?? DefaultCloseAbortTimeout;
+            _sendAbortTimeout = sendAbortTimeout ?? DefaultSendAbortTimeout;
         }
 
         public async Task<bool> SendData(string data, CancellationToken cancellationToken = default)
@@ -93,36 +105,64 @@ namespace Game.Api.Sockets
                 return false;
             }
 
+            var sendTask = SendChunks(dataBytes);
+            using var timeoutCts = new CancellationTokenSource(_sendAbortTimeout);
             try
             {
-                for (int i = 0; i < dataBytes.Length; i += MAX_MESSAGE_SIZE)
-                {
-                    var isFinalChunk = dataBytes.Length - i <= MAX_MESSAGE_SIZE;
-                    var chunkSize = isFinalChunk ? dataBytes.Length - i : MAX_MESSAGE_SIZE;
+                // WaitAsync bounds only the wait, not sendTask itself — a wedged chunk send (see SendChunks)
+                // ignores this timeout and keeps running in the background, which is why the lock is handed
+                // off to a continuation below rather than released here.
+                await sendTask.WaitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+            {
+                _logger.LogWarning("Timed out sending socket data after {Timeout} on socket ({Id}); aborting the connection.", _sendAbortTimeout, SocketId);
+                _socket.Abort();
 
-                    // Send each chunk with CancellationToken.None: once a multi-chunk frame has begun it must
-                    // be written to completion under the lock. Cancelling mid-frame would release the lock on a
-                    // half-sent frame and let the next writer interleave into it, corrupting the stream.
-                    // Cancellation is honoured before the frame starts (the lock wait above), not during it.
-                    await _socket.SendAsync(
-                        buffer: new ArraySegment<byte>(dataBytes, i, chunkSize),
-                        messageType: WebSocketMessageType.Text,
-                        endOfMessage: isFinalChunk,
-                        CancellationToken.None
-                    );
-                }
+                // The abandoned send still holds the lock; hand its release off to a continuation once Abort()
+                // finally unblocks it (mirrors SocketHandler.ReleaseCommandLockWhenSettled), so the next
+                // SendData or Close can't start a new frame while this one is still notionally in flight.
+                _ = sendTask.ContinueWith(t =>
+                {
+                    if (t.Exception is { } fault)
+                    {
+                        _logger.LogDebug(fault, "Abandoned socket send faulted after being aborted on socket ({Id}).", SocketId);
+                    }
+
+                    _sendLock.Release();
+                }, TaskScheduler.Default);
+
+                return false;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send socket data: {Data}", data);
+                _sendLock.Release();
                 return false;
             }
-            finally
-            {
-                _sendLock.Release();
-            }
 
+            _sendLock.Release();
             return true;
+        }
+
+        // Sends the payload as one or more chunks, each under CancellationToken.None: once a multi-chunk frame
+        // has begun it must be written to completion, since cancelling mid-frame would let the next writer
+        // interleave into a half-sent frame and corrupt the stream. SendData bounds how long it waits on this
+        // task rather than cancelling it directly.
+        private async Task SendChunks(byte[] dataBytes)
+        {
+            for (int i = 0; i < dataBytes.Length; i += MAX_MESSAGE_SIZE)
+            {
+                var isFinalChunk = dataBytes.Length - i <= MAX_MESSAGE_SIZE;
+                var chunkSize = isFinalChunk ? dataBytes.Length - i : MAX_MESSAGE_SIZE;
+
+                await _socket.SendAsync(
+                    buffer: new ArraySegment<byte>(dataBytes, i, chunkSize),
+                    messageType: WebSocketMessageType.Text,
+                    endOfMessage: isFinalChunk,
+                    CancellationToken.None
+                );
+            }
         }
 
         public async Task<bool> SendData<T>(T data, CancellationToken cancellationToken = default) where T : ApiSocketResponse
