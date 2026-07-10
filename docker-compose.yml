@@ -5,11 +5,11 @@
 #
 # Networking: every service uses `network_mode: host`. This is deliberate. The constrained sandbox
 # used for remote Claude sessions runs a dockerd with `--iptables=false` and no usable bridge (see
-# docs/backend.md "Integration-Test Containers in Constrained Environments" and
+# docs/infrastructure.md "Integration-Test Containers in Constrained Environments" and
 # .claude/hooks/session-start.sh), so bridge networking and published ports do not work there. Host
 # networking keeps everything on localhost, which works in that sandbox and on GitHub Actions Linux
 # runners alike. Note: host networking requires a Linux Docker host — on Docker Desktop (Windows/Mac)
-# run the API natively instead (this stack targets CI and the sandbox).
+# use docker-compose.local.yml instead (this stack targets CI and the sandbox).
 #
 # Ports default to dedicated values to avoid colliding with the integration-test backing services
 # (5499 / 6399) and any native PostgreSQL/Redis. Override via the environment if needed.
@@ -19,7 +19,7 @@
 # loads its reference-data caches — driven by DataAccessOptions__SeedContentOnStartup below, so the
 # stack comes up fully playable with no post-boot seed or API restart. The e2e admin-role fixture
 # (granting the Admin role to 'e2eadmin…' accounts) is not content, so it is applied separately by the
-# CI workflow from e2e-admin-provision.sql. See docs/backend.md "Content export (source-controlled snapshot)".
+# CI workflow from e2e-admin-provision.sql. See docs/backend-content.md "Content export (source-controlled snapshot)".
 
 services:
   postgres:
