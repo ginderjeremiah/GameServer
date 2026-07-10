@@ -34,6 +34,16 @@ type RetireableRef = { id: number; name: string; retiredAt?: string | null };
  *  dimension has no DB reference table to load, so its "records" are just the enum itself. */
 const damageTypeKeyRefs: RetireableRef[] = enumPairs(EDamageTypeKey);
 
+/** Mirrors the backend's `EquipmentSlot.ItemCategory` mapping (`Game.Core/Players/Inventories/EquipmentSlot.cs`). */
+const equipmentSlotCategories: Record<EEquipmentSlot, EItemCategory> = {
+	[EEquipmentSlot.HelmSlot]: EItemCategory.Helm,
+	[EEquipmentSlot.ChestSlot]: EItemCategory.Chest,
+	[EEquipmentSlot.LegSlot]: EItemCategory.Leg,
+	[EEquipmentSlot.BootSlot]: EItemCategory.Boot,
+	[EEquipmentSlot.WeaponSlot]: EItemCategory.Weapon,
+	[EEquipmentSlot.AccessorySlot]: EItemCategory.Accessory
+};
+
 /**
  * Loads and exposes the reference data the workbench's select options, tag UI,
  * and derived spawn-share math read from. Catalogues that the workbench also
@@ -176,6 +186,22 @@ class WorkbenchReference {
 	];
 	/** Item picker options (active items, plus the current value even if retired). */
 	itemOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.items ?? [], keep);
+	/** The item category an equipment slot accepts, mirroring the backend's `EquipmentSlot.ItemCategory`. */
+	equipmentSlotCategory = (slot: EEquipmentSlot): EItemCategory => equipmentSlotCategories[slot];
+	/**
+	 * Item picker options narrowed to the category a given equipment slot accepts (plus the current
+	 * value even if it's since become a category mismatch — the class starter-equipment table's
+	 * section `warn` is the backstop for that case, mirroring the retired-`keep` convention above).
+	 */
+	itemOptionsForSlot = (slot: EEquipmentSlot, keep?: number): SelectOption[] => {
+		const category = this.equipmentSlotCategory(slot);
+		return this.retireableOptions(
+			(staticData.items ?? []).filter((i) => i.itemCategoryId === category || i.id === keep),
+			keep
+		);
+	};
+	/** An item's category, for validating it against the equipment slot it's assigned to. */
+	itemCategoryOf = (id: number): EItemCategory | undefined => staticData.items?.[id]?.itemCategoryId;
 	skillCatalogue = () =>
 		(staticData.skills ?? []).map((s) => ({
 			id: s.id,

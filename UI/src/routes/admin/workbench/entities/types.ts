@@ -74,8 +74,12 @@ export interface ColumnConfig {
 	/** `attribute` renders the searchable, group-by-type AttributePicker (#1327); `text` a free-form
 	 *  string input (e.g. tutorial tour step copy); otherwise as `select`. */
 	type: 'select' | 'attribute' | 'number' | 'share' | 'text';
-	/** Select option provider; receives the row's current value so a retired reference stays visible. */
-	options?: (current?: number) => SelectOption[];
+	/**
+	 * Select option provider; receives the row's current value (so a retired reference stays visible)
+	 * and the full row (so options can be filtered by a sibling column, e.g. an item picker narrowed to
+	 * the row's equipment-slot category).
+	 */
+	options?: (current?: number, row?: Record<string, number | string>) => SelectOption[];
 	align?: 'r';
 	width?: number;
 	min?: number;
