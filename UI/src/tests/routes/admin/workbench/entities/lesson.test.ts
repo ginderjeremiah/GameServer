@@ -210,7 +210,7 @@ describe('lessonEntity', () => {
 			expect(section && 'newRow' in section ? section.newRow(l) : null).toEqual({
 				ordinal: 3,
 				text: '',
-				anchorKey: ''
+				anchorKey: undefined
 			});
 		});
 
@@ -227,7 +227,7 @@ describe('lessonEntity', () => {
 			expect(section && 'newRow' in section ? section.newRow(l) : null).toEqual({
 				ordinal: 0,
 				text: '',
-				anchorKey: ''
+				anchorKey: undefined
 			});
 		});
 	});

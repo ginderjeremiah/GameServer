@@ -212,6 +212,7 @@ describe('SectionTable — surrogate-id collections', () => {
 interface Step {
 	ordinal: number;
 	text: string;
+	anchorKey?: string;
 }
 interface StepRow extends Identified {
 	steps: Step[];
@@ -219,7 +220,8 @@ interface StepRow extends Identified {
 
 // Mirrors the lesson entity's "Tour Steps" section: `ordinal` is both the row identity (rowKey) and
 // an author-editable number column, unlike every other table's rowKey (a surrogate id or a `unique`
-// select/attribute the UI itself keeps collision-free).
+// select/attribute the UI itself keeps collision-free). `anchorKey` mirrors the optional Anchor Key
+// column (blank stores as unset rather than "").
 const stepSection: TableSectionConfig<StepRow> = {
 	key: 'steps',
 	label: 'Steps',
@@ -231,10 +233,11 @@ const stepSection: TableSectionConfig<StepRow> = {
 	emptyIcon: 'map',
 	emptyTitle: 'No steps',
 	emptySub: '',
-	newRow: (rec) => ({ ordinal: rec.steps.length, text: '' }),
+	newRow: (rec) => ({ ordinal: rec.steps.length, text: '', anchorKey: undefined }),
 	columns: [
 		{ key: 'ordinal', label: 'Step', type: 'number', align: 'r' },
-		{ key: 'text', label: 'Text', type: 'text' }
+		{ key: 'text', label: 'Text', type: 'text' },
+		{ key: 'anchorKey', label: 'Anchor Key', type: 'text', optional: true }
 	]
 };
 
@@ -283,5 +286,28 @@ describe('SectionTable — editable-identity (rowKey) collections', () => {
 		// The edited row took the new ordinal; its former sibling was swapped to the vacated one.
 		expect(store.items[0].steps.find((s) => s.text === 'First')?.ordinal).toBe(1);
 		expect(store.items[0].steps.find((s) => s.text === 'Second')?.ordinal).toBe(0);
+	});
+
+	it('typing into then erasing an optional cell returns the row to baseline-equal (not dirty)', async () => {
+		// Baseline (and the initial draft) omit anchorKey entirely — the "centered callout" state. A
+		// typed-then-erased edit must land back on that same unset state, not a stray "".
+		const store = new EntityStore(config(), [{ id: 1, steps: [{ ordinal: 0, text: 'Welcome' }] }]);
+		const { container } = render(SectionTable, {
+			props: {
+				section: stepSection as unknown as TableSectionConfig<Identified>,
+				record: store.items[0] as Identified,
+				baseline: store.baselineOf(1),
+				store: store as unknown as EntityStore<Identified>
+			}
+		});
+
+		const anchorInput = screen.getByLabelText('Anchor Key') as HTMLInputElement;
+		await fireEvent.input(anchorInput, { target: { value: 'nav-fight' } });
+		await fireEvent.input(anchorInput, { target: { value: '' } });
+
+		expect(store.items[0].steps[0].anchorKey).toBeUndefined();
+		const edge = container.querySelector('.row-edge') as HTMLElement;
+		expect(edge.getAttribute('style')).toContain('box-shadow: none');
+		expect(edge.getAttribute('style')).not.toContain('var(--change-modified)');
 	});
 });
