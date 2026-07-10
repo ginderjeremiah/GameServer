@@ -340,6 +340,43 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveProficiencies_ShrinksMaxLevelToExactlyThePersistedPayoutLevel_IsAccepted()
+        {
+            // The guard rejects only a payout strictly above the new cap (`level > MaxLevel`), matching
+            // FindLevelOutOfRange's own `level > proficiency.MaxLevel` boundary — a payout landing exactly
+            // on the new cap is still reachable and must not be rejected.
+            int proficiencyId, pathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var proficiency = await SeedProficiencyAsync(seedScope);
+                proficiencyId = proficiency.Id;
+                pathId = proficiency.PathId;
+
+                context.ProficiencyLevelModifiers.Add(new Entities.ProficiencyLevelModifier
+                {
+                    ProficiencyId = proficiencyId,
+                    Level = 5,
+                    AttributeId = (int)EAttribute.Strength,
+                    ModifierType = (int)EModifierType.Additive,
+                    Amount = 1m,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: proficiencyId, pathId: pathId, maxLevel: 5) },
+            ]);
+
+            Assert.True(result.Succeeded, result.ErrorMessage);
+        }
+
+        [Fact]
         public void SetModifiers_UnknownProficiency_ReturnsNotFound()
         {
             using var scope = CreateScope();
