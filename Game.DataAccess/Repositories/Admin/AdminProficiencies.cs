@@ -39,6 +39,16 @@ namespace Game.DataAccess.Repositories.Admin
                 return collisionRejection;
             }
 
+            // A payout only fires at a reachable level (see FindLevelOutOfRange), but that rule is enforced
+            // by the child-collection setters, not this identity save — so lowering MaxLevel here without
+            // also touching the modifier/reward collections in the same request would silently strand an
+            // already-persisted payout above the new cap. Reject before staging, mirroring the up-front
+            // validation the other identity-level guards already do.
+            if (FindShrunkenMaxLevelViolation(changes) is { } maxLevelRejection)
+            {
+                return maxLevelRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(new Entities.Proficiency
                 {
@@ -329,6 +339,39 @@ namespace Game.DataAccess.Repositories.Admin
                     var pathName = _proficiencies.LookupPath(tier.PathId)?.Name;
                     var pathLabel = pathName is null ? $"{tier.PathId}" : $"'{pathName}'";
                     return AdminSaveResult.Failure($"Path {pathLabel} has two tiers at ordinal {tier.PathOrdinal}.");
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns a rejection if an edited proficiency's new <c>MaxLevel</c> would fall below the
+        /// level of a modifier or reward it already has persisted, else null. Checks only against the
+        /// proficiency's currently-persisted child rows (not this request's own change set), matching the
+        /// scope of <see cref="FindLevelOutOfRange"/>.</summary>
+        private AdminSaveResult? FindShrunkenMaxLevelViolation(IReadOnlyList<Change<Contracts.Proficiency>> changes)
+        {
+            foreach (var change in changes)
+            {
+                if (change.ChangeType != EChangeType.Edit)
+                {
+                    continue;
+                }
+
+                var existing = _proficiencies.LookupProficiency(change.Item.Id);
+                if (existing is null)
+                {
+                    continue;
+                }
+
+                var highestPayoutLevel = existing.LevelModifiers.Select(m => (int?)m.Level)
+                    .Concat(existing.LevelRewards.Select(r => (int?)r.Level))
+                    .Max();
+
+                if (highestPayoutLevel is { } level && level > change.Item.MaxLevel)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Proficiency '{existing.Name}' has a payout at level {level}, above the new cap of {change.Item.MaxLevel}.");
                 }
             }
 
