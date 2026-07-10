@@ -59,11 +59,16 @@ foreach ($name in $gatedNames) {
   }
   $lineOk = $a.coverage -ge $floor.line
   $branchOk = $true
-  if ($null -ne $floor.branch -and $null -ne $a.branchcoverage) {
-    $branchOk = $a.branchcoverage -ge $floor.branch
+  if ($null -ne $floor.branch) {
+    if ($null -eq $a.branchcoverage) {
+      $branchOk = $false
+      $failures.Add("$name branch floor configured ($($floor.branch)%) but no branch data in report")
+    } elseif ($a.branchcoverage -lt $floor.branch) {
+      $branchOk = $false
+      $failures.Add("$name branch $($a.branchcoverage)% < floor $($floor.branch)%")
+    }
   }
   if (-not $lineOk) { $failures.Add("$name line $($a.coverage)% < floor $($floor.line)%") }
-  if (-not $branchOk) { $failures.Add("$name branch $($a.branchcoverage)% < floor $($floor.branch)%") }
   $status = 'PASS'
   if (-not ($lineOk -and $branchOk)) { $status = 'FAIL' }
   $floorText = "L$($floor.line)"
@@ -91,11 +96,16 @@ foreach ($name in $gatedNsNames) {
   }
   $lineOk = $ns.LinePct -ge $entry.line
   $branchOk = $true
-  if ($null -ne $entry.branch -and $null -ne $ns.BranchPct) {
-    $branchOk = $ns.BranchPct -ge $entry.branch
+  if ($null -ne $entry.branch) {
+    if ($null -eq $ns.BranchPct) {
+      $branchOk = $false
+      $failures.Add("$name branch floor configured ($($entry.branch)%) but no branch data in report")
+    } elseif ($ns.BranchPct -lt $entry.branch) {
+      $branchOk = $false
+      $failures.Add("$name branch $($ns.BranchPct)% < floor $($entry.branch)%")
+    }
   }
   if (-not $lineOk) { $failures.Add("$name line $($ns.LinePct)% < floor $($entry.line)%") }
-  if (-not $branchOk) { $failures.Add("$name branch $($ns.BranchPct)% < floor $($entry.branch)%") }
   $status = 'PASS'
   if (-not ($lineOk -and $branchOk)) { $status = 'FAIL' }
   $floorText = "L$($entry.line)"
