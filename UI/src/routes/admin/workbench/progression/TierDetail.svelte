@@ -11,7 +11,12 @@
 			{ key: 'identity', label: 'Identity · Conlang', warn: identityWarn },
 			{ key: 'xp', label: 'XP Curve', warn: xpWarn },
 			{ key: 'milestones', label: 'Milestones', count: payoutCount, dirty: milestonesDirty, warn: milestoneWarn },
-			{ key: 'gateways', label: 'Gateways', count: tier.prerequisiteIds.length, disabled: !isRoot }
+			{
+				key: 'gateways',
+				label: 'Gateways',
+				count: tier.prerequisiteIds.length,
+				disabled: !isRoot && tier.prerequisiteIds.length === 0
+			}
 		]}
 		activeTab={store.tierTab}
 		onTab={(k) => store.setTierTab(k as TierTab)}
