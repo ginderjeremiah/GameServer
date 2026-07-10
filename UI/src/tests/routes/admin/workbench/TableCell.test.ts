@@ -240,6 +240,42 @@ describe('TableCell — text type', () => {
 		});
 		expect(container.querySelector('input')!.classList.contains('dirty')).toBe(true);
 	});
+
+	it('calls onChange with undefined (not "") when an optional column is cleared to blank', async () => {
+		const onChange = vi.fn();
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol({ optional: true }),
+				row: { text: 'nav-fight' },
+				idx: 0,
+				rows: [{ text: 'nav-fight' }],
+				record: {},
+				dirty: false,
+				onChange
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: '' } });
+		expect(onChange).toHaveBeenCalledWith(undefined);
+	});
+
+	it('calls onChange with "" (not undefined) when a non-optional column is cleared to blank', async () => {
+		const onChange = vi.fn();
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol(),
+				row: { text: 'a' },
+				idx: 0,
+				rows: [{ text: 'a' }],
+				record: {},
+				dirty: false,
+				onChange
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: '' } });
+		expect(onChange).toHaveBeenCalledWith('');
+	});
 });
 
 describe('TableCell — share type', () => {

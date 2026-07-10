@@ -208,3 +208,80 @@ describe('SectionTable — surrogate-id collections', () => {
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
+
+interface Step {
+	ordinal: number;
+	text: string;
+}
+interface StepRow extends Identified {
+	steps: Step[];
+}
+
+// Mirrors the lesson entity's "Tour Steps" section: `ordinal` is both the row identity (rowKey) and
+// an author-editable number column, unlike every other table's rowKey (a surrogate id or a `unique`
+// select/attribute the UI itself keeps collision-free).
+const stepSection: TableSectionConfig<StepRow> = {
+	key: 'steps',
+	label: 'Steps',
+	glyph: 'map',
+	kind: 'table',
+	itemsKey: 'steps',
+	rowKey: 'ordinal',
+	addLabel: 'Add step',
+	emptyIcon: 'map',
+	emptyTitle: 'No steps',
+	emptySub: '',
+	newRow: (rec) => ({ ordinal: rec.steps.length, text: '' }),
+	columns: [
+		{ key: 'ordinal', label: 'Step', type: 'number', align: 'r' },
+		{ key: 'text', label: 'Text', type: 'text' }
+	]
+};
+
+describe('SectionTable — editable-identity (rowKey) collections', () => {
+	const config = (): EntityConfig<StepRow> =>
+		({
+			key: 'rows',
+			label: 'Rows',
+			singular: 'Row',
+			glyph: 'box',
+			blankName: 'Unnamed',
+			newItem: (id: number) => ({ id, steps: [] }),
+			meta: () => [],
+			sections: [stepSection],
+			refresh: async () => [],
+			persist: async () => []
+		}) as unknown as EntityConfig<StepRow>;
+
+	it('swaps identities instead of duplicating them when an edit collides with a sibling row', async () => {
+		const store = new EntityStore(config(), [
+			{
+				id: 1,
+				steps: [
+					{ ordinal: 0, text: 'First' },
+					{ ordinal: 1, text: 'Second' }
+				]
+			}
+		]);
+		const { container } = render(SectionTable, {
+			props: {
+				section: stepSection as unknown as TableSectionConfig<Identified>,
+				record: store.items[0] as Identified,
+				baseline: store.baselineOf(1),
+				store: store as unknown as EntityStore<Identified>
+			}
+		});
+
+		// Editing the first row's ordinal (0) to the second row's ordinal (1) must not leave two
+		// rows sharing ordinal 1 — that duplicate key crashes Svelte's keyed {#each}.
+		const ordinalInputs = container.querySelectorAll('input.num');
+		await fireEvent.input(ordinalInputs[0], { target: { value: '1' } });
+
+		const ordinals = store.items[0].steps.map((s) => s.ordinal).sort();
+		expect(ordinals).toEqual([0, 1]);
+		expect(new Set(ordinals).size).toBe(2);
+		// The edited row took the new ordinal; its former sibling was swapped to the vacated one.
+		expect(store.items[0].steps.find((s) => s.text === 'First')?.ordinal).toBe(1);
+		expect(store.items[0].steps.find((s) => s.text === 'Second')?.ordinal).toBe(0);
+	});
+});

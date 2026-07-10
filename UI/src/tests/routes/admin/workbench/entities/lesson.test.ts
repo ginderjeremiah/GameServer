@@ -214,6 +214,13 @@ describe('lessonEntity', () => {
 			});
 		});
 
+		it('marks the Anchor Key column optional, so a cleared cell reads as unset rather than ""', () => {
+			const section = stepsSection();
+			const anchorCol =
+				section && 'columns' in section ? section.columns.find((c) => c.key === 'anchorKey') : undefined;
+			expect(anchorCol?.optional).toBe(true);
+		});
+
 		it('newRow starts at ordinal 0 for a lesson with no steps yet', () => {
 			const section = stepsSection();
 			const l = { ...lessonEntity.newItem(0), steps: [] };

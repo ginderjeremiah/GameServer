@@ -157,7 +157,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					label: 'Anchor Key',
 					type: 'text',
 					width: 200,
-					placeholder: 'Optional — centered if blank'
+					placeholder: 'Optional — centered if blank',
+					optional: true
 				}
 			]
 		}
