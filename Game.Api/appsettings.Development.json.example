@@ -11,7 +11,7 @@
     "Audience": "game-server-api"
   },
   "Cors": {
-    "AllowedOrigins": [ "http://localhost:5173", "http://localhost:5174" ]
+    "AllowedOrigins": [ "http://localhost:5173" ]
   },
   "DataAccessOptions": {
     "DatabaseSystem": 1,
