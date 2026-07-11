@@ -180,6 +180,7 @@ export class BattleEngine {
 	 */
 	public rest() {
 		this.finishLoading?.();
+		this.flushEffectDamage();
 		this.timeElapsed = 0;
 		this.setBattleStage(Idle);
 	}
@@ -201,7 +202,7 @@ export class BattleEngine {
 		// Seed the battle RNG from the enemy instance's seed (the same value the backend simulates against),
 		// so the crit/dodge/block draws stay in lockstep with the anti-cheat replay.
 		this.rng = new Mulberry32(enemyInstance.seed);
-		this.resetEffectDamage();
+		this.flushEffectDamage();
 		this.resetPlayer();
 		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });
 		// A non-null elapsedOffsetMs (#1595/#1596) means the server handed back a battle already in
