@@ -434,7 +434,49 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 2. Path identities — send an Edit only when the identity DTO itself changed.
+			// 2. Proficiency child-collection removals that resolve an about-to-shrink MaxLevel are posted
+			// before the proficiency identities below (step 4). The backend's shrunken-MaxLevel guard
+			// (AdminProficiencies.FindShrunkenMaxLevelViolation) validates a MaxLevel edit against the
+			// proficiency's *currently-persisted* modifiers/rewards, so an operator who lowers MaxLevel and
+			// removes the now-out-of-range payout in the same save would otherwise be rejected — the guard
+			// would see the still-persisted payout, since the child setters (step 6) run after the identity
+			// edit. Scoped to exactly the profs where the removal actually clears the violation; a shrink
+			// that leaves an offending payout in place still reaches the identity edit unsplit, so the
+			// backend correctly rejects it (see #1827/#1804).
+			const shrinksPastPersistedPayout = ({
+				record,
+				baseline
+			}: {
+				record: WorkbenchProficiency;
+				baseline: WorkbenchProficiency;
+			}) => {
+				if (record.maxLevel >= baseline.maxLevel) {
+					return false;
+				}
+				const payoutLevel = (prof: WorkbenchProficiency) =>
+					[...prof.levelModifiers, ...prof.levelRewards].map((row) => row.level);
+				const persistedOffends = payoutLevel(baseline).some((level) => level > record.maxLevel);
+				const stillOffends = payoutLevel(record).some((level) => level > record.maxLevel);
+				return persistedOffends && !stillOffends;
+			};
+			const earlyChildRemovals = profDiff.modified.filter(shrinksPastPersistedPayout);
+			for (const { record, baseline } of earlyChildRemovals) {
+				if (childChanged(record.levelModifiers, baseline.levelModifiers)) {
+					await ApiRequest.post('AdminTools/SetProficiencyModifiers', {
+						id: record.id,
+						modifiers: record.levelModifiers
+					});
+					committed = true;
+				}
+				if (childChanged(record.levelRewards, baseline.levelRewards)) {
+					await ApiRequest.post('AdminTools/SetProficiencyRewards', { id: record.id, rewards: record.levelRewards });
+					committed = true;
+				}
+			}
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+			const earlyChildRemovalIds = new Set(earlyChildRemovals.map(({ record }) => record.id));
+
+			// 3. Path identities — send an Edit only when the identity DTO itself changed.
 			const pathChanges: IChange<ReturnType<typeof pathIdentityDto>>[] = [
 				...pathDiff.added.map((p) => ({ changeType: EChangeType.Add, item: pathIdentityDto(p) })),
 				...pathDiff.modified
@@ -446,7 +488,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 3. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
+			// 4. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
 			const freshPaths = await fetchSocketData('GetPaths');
 			const pathIdMap = resolveNewIds(
 				freshPaths,
@@ -454,7 +496,7 @@ export class ProgressionStore {
 				pathDiff.added
 			);
 
-			// 4. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
+			// 5. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
 			const toProfDto = (prof: WorkbenchProficiency) => ({
 				...profIdentityDto(prof),
 				pathId: resolveId(prof.pathId, pathIdMap)
@@ -470,7 +512,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 5. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
+			// 6. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
 			const freshProfs = await fetchSocketData('GetProficiencies');
 			const profIdMap = resolveNewIds(
 				freshProfs,
@@ -478,8 +520,12 @@ export class ProgressionStore {
 				profDiff.added
 			);
 
-			// 6. Proficiency child collections — modifiers and rewards per tier.
+			// 7. Proficiency child collections — modifiers and rewards per tier, minus the ones already
+			// posted early in step 2.
 			for (const prof of [...profDiff.added, ...profDiff.modified.map((m) => m.record)]) {
+				if (earlyChildRemovalIds.has(prof.id)) {
+					continue;
+				}
 				const baseline = baseProfMap[prof.id];
 				const id = resolveId(prof.id, profIdMap);
 				if (childChanged(prof.levelModifiers, baseline?.levelModifiers)) {
@@ -492,7 +538,7 @@ export class ProgressionStore {
 				}
 			}
 
-			// 7. Every prerequisite change not already posted in step 1 (the common case: everything, when
+			// 8. Every prerequisite change not already posted in step 1 (the common case: everything, when
 			// this save isn't retiring a path) collected into one combined batch: the backend validates a
 			// batch against its final combined graph, so a gateway swap spanning two tiers (one drops an
 			// edge while the other gains the reverse) can't be false-rejected as a cycle depending on which
@@ -512,7 +558,7 @@ export class ProgressionStore {
 				committed = true;
 			}
 
-			// 8. Follow the selection across any id remap, then re-seed from server truth.
+			// 9. Follow the selection across any id remap, then re-seed from server truth.
 			if (this.selectedPathId != null) {
 				this.selectedPathId = resolveId(this.selectedPathId, pathIdMap);
 			}

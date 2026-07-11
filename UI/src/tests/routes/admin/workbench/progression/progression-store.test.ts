@@ -67,6 +67,32 @@ const findRetiredPathGatingLiveGatewayRejection = (changes: Rec[]): string | und
 	return undefined;
 };
 
+/**
+ * Mirrors the backend's AdminProficiencies.FindShrunkenMaxLevelViolation guard: rejects an identity
+ * Edit whose new MaxLevel falls below the level of a modifier/reward the proficiency *currently has
+ * persisted* (i.e. as of this call, not this request's own child-collection changes).
+ */
+const findShrunkenMaxLevelRejection = (changes: Rec[]): string | undefined => {
+	for (const change of changes) {
+		if (change.changeType !== EChangeType.Edit) {
+			continue;
+		}
+		const existing = serverProfs.find((p) => p.id === change.item.id);
+		if (!existing) {
+			continue;
+		}
+		const highest = Math.max(
+			-Infinity,
+			...existing.levelModifiers.map((m: Rec) => m.level),
+			...existing.levelRewards.map((r: Rec) => r.level)
+		);
+		if (highest > change.item.maxLevel) {
+			return `Proficiency '${existing.name}' has a payout at level ${highest}, above the new cap of ${change.item.maxLevel}.`;
+		}
+	}
+	return undefined;
+};
+
 const applyPost = (endpoint: string, body: Rec) => {
 	if (endpoint === 'AdminTools/AddEditPaths') {
 		const rejection = findRetiredPathGatingLiveGatewayRejection(body as Rec[]);
@@ -88,6 +114,10 @@ const applyPost = (endpoint: string, body: Rec) => {
 			}
 		}
 	} else if (endpoint === 'AdminTools/AddEditProficiencies') {
+		const rejection = findShrunkenMaxLevelRejection(body as Rec[]);
+		if (rejection) {
+			throw new Error(rejection);
+		}
 		let id = nextId(serverProfs);
 		for (const change of body as Rec[]) {
 			if (change.changeType === EChangeType.Add) {
@@ -448,6 +478,68 @@ describe('save orchestration', () => {
 		// Rejected pre-commit: nothing wrote, so the local retire edit is preserved for a clean retry.
 		expect(store.paths.find((p) => p.id === 0)?.retiredAt).toBeTruthy();
 		expect(serverPaths.find((p) => p.id === 0)?.retiredAt).toBeFalsy();
+	});
+
+	it('lowering MaxLevel and removing the now out-of-range payout in one save succeeds (#1827/#1804)', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({
+				id: 0,
+				pathId: 0,
+				pathOrdinal: 0,
+				name: 'Fire T0',
+				maxLevel: 10,
+				levelModifiers: [{ level: 8, attributeId: 0, modifierTypeId: 0, amount: 5 }],
+				levelRewards: [{ level: 8, rewardSkillId: 3 }]
+			})
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.patchProf(0, (d) => (d.maxLevel = 5));
+		store.removePayout(0, 8);
+
+		await store.save();
+
+		expect(toastErrorMock).not.toHaveBeenCalled();
+		expect(store.profBaseline(0)?.maxLevel).toBe(5);
+		expect(store.profBaseline(0)?.levelModifiers).toHaveLength(0);
+		expect(store.profBaseline(0)?.levelRewards).toHaveLength(0);
+
+		// Both child collections' removals must land before the identity Edit commits, or the backend's
+		// guard (simulated above) would reject the shrink against the still-persisted level-8 payout.
+		const modifiersCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyModifiers');
+		const rewardsCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyRewards');
+		const identityCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/AddEditProficiencies');
+		expect(modifiersCallIndex).toBeGreaterThanOrEqual(0);
+		expect(rewardsCallIndex).toBeGreaterThanOrEqual(0);
+		expect(identityCallIndex).toBeGreaterThan(modifiersCallIndex);
+		expect(identityCallIndex).toBeGreaterThan(rewardsCallIndex);
+	});
+
+	it('lowering MaxLevel without removing the offending payout is still rejected, same as before', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({
+				id: 0,
+				pathId: 0,
+				pathOrdinal: 0,
+				name: 'Fire T0',
+				maxLevel: 10,
+				levelModifiers: [{ level: 8, attributeId: 0, modifierTypeId: 0, amount: 5 }]
+			})
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.patchProf(0, (d) => (d.maxLevel = 5));
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		// Rejected pre-commit: nothing wrote, so the local edit is preserved for a clean retry.
+		expect(store.profs.find((p) => p.id === 0)?.maxLevel).toBe(5);
+		expect(serverProfs.find((p) => p.id === 0)?.maxLevel).toBe(10);
 	});
 
 	it('preserves edits and surfaces an error when the first write fails (pre-commit)', async () => {
