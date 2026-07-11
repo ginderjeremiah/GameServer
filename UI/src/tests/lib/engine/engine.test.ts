@@ -63,19 +63,14 @@ vi.mock('$stores', async () => {
 const {
 	listenCommand,
 	disconnect,
-	unlistenSocketReplaced,
 	unlistenChallengeCompleted,
 	unlistenProficiencyXpGained,
 	unlistenServerCommandFailed
 } = vi.hoisted(() => {
-	const unlistenSocketReplaced = vi.fn();
 	const unlistenChallengeCompleted = vi.fn();
 	const unlistenProficiencyXpGained = vi.fn();
 	const unlistenServerCommandFailed = vi.fn();
 	const listenCommand = vi.fn().mockImplementation((command: string) => {
-		if (command === 'SocketReplaced') {
-			return unlistenSocketReplaced;
-		}
 		if (command === 'ChallengeCompleted') {
 			return unlistenChallengeCompleted;
 		}
@@ -90,7 +85,6 @@ const {
 	return {
 		listenCommand,
 		disconnect,
-		unlistenSocketReplaced,
 		unlistenChallengeCompleted,
 		unlistenProficiencyXpGained,
 		unlistenServerCommandFailed
@@ -230,6 +224,9 @@ afterEach(() => {
 	// vi.unstubAllGlobals doesn't undo a defineProperty, so drop the own-property override of
 	// document.hidden and let it fall back to the jsdom prototype getter.
 	delete (document as unknown as Record<string, unknown>).hidden;
+	// engine.ts's captured unhook closures are module-level state that outlives a single test; clear them
+	// so a test calling startGame() without a matching stop can't leak its listeners into the next test.
+	stopEngines();
 });
 
 describe('handleSocketReplaced', () => {
@@ -270,7 +267,7 @@ describe('handleSocketReplaced', () => {
 });
 
 describe('startGame', () => {
-	it('initializes the inventory, starts the engines and wires SocketReplaced when data is loaded', () => {
+	it('initializes the inventory, starts the engines and wires its screen-scoped socket listeners when data is loaded', () => {
 		startGame();
 
 		expect(inventoryManager.initialize).toHaveBeenCalledTimes(1);
@@ -281,10 +278,15 @@ describe('startGame', () => {
 		expect(renderEngine.start).toHaveBeenCalledTimes(1);
 		expect(enemyManager.start).toHaveBeenCalledTimes(1);
 		expect(battleEngine.start).toHaveBeenCalledTimes(1);
-		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced);
 		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted);
 		expect(listenCommand).toHaveBeenCalledWith('ProficiencyXpGained', handleProficiencyXpGained);
 		expect(listenCommand).toHaveBeenCalledWith('ServerCommandFailed', handleServerCommandFailed);
+	});
+
+	it('does not wire SocketReplaced itself — it is registered app-wide by the root layout (#1836)', () => {
+		startGame();
+
+		expect(listenCommand).not.toHaveBeenCalledWith('SocketReplaced', expect.anything());
 	});
 
 	it('does not opt into onDestroy cleanup, since it runs outside component init (#1631)', () => {
@@ -295,14 +297,13 @@ describe('startGame', () => {
 		}
 	});
 
-	it('registers all four listeners against the real hook without a component context (#1631)', () => {
+	it('registers all three listeners against the real hook without a component context (#1631)', () => {
 		// This file's top-level mock stubs both apiSocket.listenCommand and svelte's onDestroy away, which
 		// would hide a regression that re-adds cleanupOnDestroy: true (the mocked onDestroy never throws).
 		// Route the mocked listenCommand through the real createHook instead, so startGame exercises the
 		// real onNotified/onDestroy wiring; only the cleanupOnDestroy flag it passes is under test here —
 		// whether onDestroy itself throws outside a component is covered directly in hooks.test.ts.
 		const hooks = {
-			SocketReplaced: createHook(),
 			ChallengeCompleted: createHook(),
 			ProficiencyXpGained: createHook(),
 			ServerCommandFailed: createHook()
@@ -346,21 +347,10 @@ describe('startGame', () => {
 		expect(listenCommand).not.toHaveBeenCalled();
 	});
 
-	it('the wired SocketReplaced handler stops the engines and shows the disconnect modal', () => {
-		startGame();
-		const handler = listenCommand.mock.calls[0][1] as () => void;
-
-		void handler();
-
-		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
-		expect(activeModal.current?.body).toBe(SESSION_REPLACED_BODY);
-	});
-
-	it('stopGame unregisters SocketReplaced, ChallengeCompleted, ProficiencyXpGained and ServerCommandFailed listeners', () => {
+	it('stopGame unregisters ChallengeCompleted, ProficiencyXpGained and ServerCommandFailed listeners', () => {
 		startGame();
 		void handleSocketReplaced();
 
-		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
 		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
 		expect(unlistenProficiencyXpGained).toHaveBeenCalledTimes(1);
 		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
@@ -377,7 +367,6 @@ describe('startGame', () => {
 		startGame();
 		startGame();
 
-		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
 		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
 		expect(unlistenProficiencyXpGained).toHaveBeenCalledTimes(1);
 		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
@@ -394,11 +383,10 @@ describe('stopEngines', () => {
 		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
 	});
 
-	it('unhooks the four startGame-registered socket listeners (the game route unmount cleanup, #1807)', () => {
+	it('unhooks the three startGame-registered socket listeners (the game route unmount cleanup, #1807)', () => {
 		startGame();
 		stopEngines();
 
-		expect(unlistenSocketReplaced).toHaveBeenCalledTimes(1);
 		expect(unlistenChallengeCompleted).toHaveBeenCalledTimes(1);
 		expect(unlistenProficiencyXpGained).toHaveBeenCalledTimes(1);
 		expect(unlistenServerCommandFailed).toHaveBeenCalledTimes(1);
@@ -418,8 +406,8 @@ describe('stopEngines', () => {
 
 		startGame();
 
-		expect(unlistenSocketReplaced).not.toHaveBeenCalled();
-		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced);
+		expect(unlistenChallengeCompleted).not.toHaveBeenCalled();
+		expect(listenCommand).toHaveBeenCalledWith('ChallengeCompleted', handleChallengeCompleted);
 	});
 });
 

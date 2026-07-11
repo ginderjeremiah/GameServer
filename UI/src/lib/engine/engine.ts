@@ -67,7 +67,6 @@ export const SESSION_REPLACED_TITLE = 'Session Replaced';
 export const SESSION_REPLACED_BODY =
 	'Another session has started elsewhere. You have been disconnected. You will be taken to the login screen.';
 
-let socketReplacedUnhook: Action | undefined;
 let challengeCompletedUnhook: Action | undefined;
 let proficiencyXpGainedUnhook: Action | undefined;
 let serverCommandFailedUnhook: Action | undefined;
@@ -115,7 +114,8 @@ export const startGame = (activeBattle?: IEnemyInstance) => {
 		// cleanupOnDestroy must stay off: startGame runs outside component init (from welcome.run()'s
 		// async continuation or the WelcomeBackGate click handler), where Svelte's onDestroy throws.
 		// Teardown instead relies on the unhooks captured here, invoked unconditionally by stopEngines.
-		socketReplacedUnhook = apiSocket.listenCommand('SocketReplaced', handleSocketReplaced);
+		// SocketReplaced is NOT registered here — it's wired once, app-wide, in the root layout (#1836),
+		// so a takeover push is still handled while browsing outside /game (e.g. /admin).
 		challengeCompletedUnhook = apiSocket.listenCommand('ChallengeCompleted', handleChallengeCompleted);
 		proficiencyXpGainedUnhook = apiSocket.listenCommand('ProficiencyXpGained', handleProficiencyXpGained);
 		serverCommandFailedUnhook = apiSocket.listenCommand('ServerCommandFailed', handleServerCommandFailed);
@@ -324,22 +324,20 @@ export const handleSocketReplaced = async () => {
 };
 
 /**
- * Unhooks the four `startGame`-registered socket listeners, if any are currently registered.
+ * Unhooks the three `startGame`-registered socket listeners, if any are currently registered.
  * Idempotent (each unhook no-ops once already removed) and safe to call when `startGame` never ran.
  */
 const unhookSocketListeners = () => {
-	socketReplacedUnhook?.();
 	challengeCompletedUnhook?.();
 	proficiencyXpGainedUnhook?.();
 	serverCommandFailedUnhook?.();
-	socketReplacedUnhook = undefined;
 	challengeCompletedUnhook = undefined;
 	proficiencyXpGainedUnhook = undefined;
 	serverCommandFailedUnhook = undefined;
 };
 
 /**
- * Stops the live game loops (logical, render, battle), the background-throttle monitor, and the four
+ * Stops the live game loops (logical, render, battle), the background-throttle monitor, and the three
  * `startGame`-registered socket listeners. Shared by the full {@link stopGame} teardown and the game
  * route's own unmount cleanup, so navigating away from the game fully tears down this run of the engines
  * — including its listeners — without tearing down the socket/stores a session-replacement must clear.
