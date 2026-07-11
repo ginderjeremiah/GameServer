@@ -190,7 +190,7 @@ namespace Game.Api.Tests.Unit
             // stay pinned until process shutdown (#1760).
             var socket = new FakeWebSocket(new TaskCompletionSource().Task);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>(),
                 sendAbortTimeout: TimeSpan.FromMilliseconds(50));
             var handler = new SocketHandler(context, new StubCommandFactory(_ => null), _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => { });
@@ -275,7 +275,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(
                 context,
@@ -310,7 +310,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var release = new TaskCompletionSource();
             var handler = new SocketHandler(
@@ -353,7 +353,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            await session.CreateSession(userId: 1, playerId: 1);
             session.SetPlayer(originalPlayer);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(
@@ -383,7 +383,7 @@ namespace Game.Api.Tests.Unit
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(throwOn, throwOnCreate, selfDelivering), _scopeFactory,
                 _loggerFactory.CreateLogger<SocketHandler>(), () => { });

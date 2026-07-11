@@ -122,12 +122,22 @@ namespace Game.Api.Services
             _playerNeedsReload = true;
         }
 
-        public void CreateSession(int userId, int playerId)
+        /// <summary>
+        /// Establishes the session binding for <paramref name="playerId"/> (login's <c>SelectPlayer</c>, or an
+        /// in-game <c>SwitchPlayer</c>) and primes the session cache here — before any socket exists — so the
+        /// subsequent Status/socket reads hit the cache instead of rehydrating. When the cache already holds
+        /// state for this same player (a credential re-login, or switching back to the character already bound),
+        /// that cached state is kept rather than overwritten, since it may carry a cache-only in-flight battle
+        /// snapshot that exists nowhere else. A genuinely different (or absent) cached player still gets a
+        /// fresh <see cref="PlayerState"/>.
+        /// </summary>
+        public async Task CreateSession(int userId, int playerId, CancellationToken cancellationToken = default)
         {
             UserId = userId;
-            // Login establishes the binding before any socket exists, so it primes the session cache here; the
-            // subsequent Status/socket reads then hit the cache instead of rehydrating.
-            PlayerState = new PlayerState { PlayerId = playerId };
+            var existing = await _sessionStore.GetSession(userId, cancellationToken);
+            PlayerState = existing is not null && existing.PlayerId == playerId
+                ? existing
+                : new PlayerState { PlayerId = playerId };
             _sessionStore.Update(PlayerState, UserId);
         }
 

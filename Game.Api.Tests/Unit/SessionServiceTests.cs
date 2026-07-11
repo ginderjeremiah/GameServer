@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Api.Services;
+using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Core.TestInfrastructure.Builders;
 using Xunit;
@@ -90,20 +91,58 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
-        public void CreateSession_PrimesTheCache()
+        public async Task CreateSession_NoExistingCachedSession_PrimesTheCacheWithFreshState()
         {
             // Login establishes the binding before any socket exists, so it does prime the cache (the one HTTP
             // path that legitimately writes the session, at the start of the session lifecycle).
             var store = new FakeSessionStore();
             var session = new SessionService(store);
 
-            session.CreateSession(userId: 5, playerId: 7);
+            await session.CreateSession(userId: 5, playerId: 7);
 
             Assert.True(session.HasPlayerSession);
             Assert.Equal(7, session.SelectedPlayerId);
             var update = Assert.Single(store.Updates);
             Assert.Equal(5, update.UserId);
             Assert.Equal(7, update.State.PlayerId);
+        }
+
+        [Fact]
+        public async Task CreateSession_CachedSessionForSamePlayer_PreservesTheExistingInFlightBattleSnapshot()
+        {
+            // A credential re-login (or a switch back onto the character already bound) for a player whose
+            // cache-only in-flight battle is still live must not clobber it with a fresh, battle-less state
+            // (#1818) — the same battle already resumes fine across a plain socket reconnect.
+            var existing = new PlayerState { PlayerId = 7 };
+            existing.SetActiveBattle(
+                enemyId: 42, level: 3, enemySkillIds: [1, 2], seed: 99,
+                startTime: DateTime.UtcNow, snapshot: new BattleSnapshot { Level = 3, StatAllocations = [], EquippedItems = [], SkillIds = [] }, zoneId: 1, isBossBattle: false);
+            var store = new FakeSessionStore { Session = existing };
+            var session = new SessionService(store);
+
+            await session.CreateSession(userId: 5, playerId: 7);
+
+            Assert.Same(existing, session.PlayerState);
+            Assert.True(session.PlayerState.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task CreateSession_CachedSessionForADifferentPlayer_ResetsToFreshState()
+        {
+            // Switching to a genuinely different character has nothing to preserve in this cache slot (it only
+            // ever holds one player's state per account), so it must still reset rather than carry the departed
+            // character's battle forward onto the new one.
+            var departed = new PlayerState { PlayerId = 3 };
+            departed.SetActiveBattle(
+                enemyId: 42, level: 3, enemySkillIds: [1, 2], seed: 99,
+                startTime: DateTime.UtcNow, snapshot: new BattleSnapshot { Level = 3, StatAllocations = [], EquippedItems = [], SkillIds = [] }, zoneId: 1, isBossBattle: false);
+            var store = new FakeSessionStore { Session = departed };
+            var session = new SessionService(store);
+
+            await session.CreateSession(userId: 5, playerId: 7);
+
+            Assert.Equal(7, session.PlayerState.PlayerId);
+            Assert.False(session.PlayerState.HasActiveBattle);
         }
 
         [Fact]

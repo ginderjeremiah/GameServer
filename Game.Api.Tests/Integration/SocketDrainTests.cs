@@ -114,7 +114,7 @@ namespace Game.Api.Tests.Integration
             // surface this behaviour deterministically.
             using var scope = CreateScope();
             var session = scope.ServiceProvider.GetRequiredService<SessionService>();
-            session.CreateSession(userId: 4242, playerId: 4242);
+            await session.CreateSession(userId: 4242, playerId: 4242);
             var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
             var registry = Factory.Services.GetRequiredService<SocketConnectionRegistry>();
 

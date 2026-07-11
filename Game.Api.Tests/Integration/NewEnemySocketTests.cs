@@ -87,7 +87,7 @@ namespace Game.Api.Tests.Integration
 
             using var scope = CreateScope();
             var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
-            sessionService.CreateSession(userId, playerId);
+            await sessionService.CreateSession(userId, playerId);
             sessionService.PlayerState.SetCooldown(DateTime.UtcNow.AddMinutes(5)); // Set cooldown for 5 minutes
             sessionService.SavePlayerState();
 
