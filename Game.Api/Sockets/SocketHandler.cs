@@ -231,8 +231,13 @@ namespace Game.Api.Sockets
                 // A cancellation that is NOT the per-command timeout (handled above with the
                 // cts.IsCancellationRequested guard) is a lifetime/teardown cancellation, not a command
                 // defect: log it as a teardown rather than surfacing a misleading "Internal Server Error",
-                // and send no response since the socket is unwinding (#671).
+                // and send no response since the socket is unwinding (#671). It may still have unwound the
+                // command mid-SavePlayer (a leaked dependency cancellation, not the command's own budget),
+                // leaving a mutation that never reached the write-behind queue — mark the in-memory Player
+                // for reload the same as a genuine flush failure; harmless even when nothing was mutated yet,
+                // since the reload just re-reads the last persisted state (#1849).
                 _logger.LogDebug(ex, "Socket command cancelled during teardown: {CommandInfo} on socket: {Id}", commandInfo, Id);
+                _context.Session.MarkPlayerNeedsReload();
                 return (SocketCommandOutcome.TornDown, ex);
             }
             catch (MalformedSocketCommandParametersException ex)
@@ -310,7 +315,17 @@ namespace Game.Api.Sockets
         {
             _ = commandTask.ContinueWith(task =>
             {
-                if (task.Exception is { } fault)
+                if (task.IsCanceled)
+                {
+                    // An unhandled OperationCanceledException marks the whole task Canceled rather than
+                    // Faulted (regardless of which token it carries), so a cancellation mid-SavePlayer
+                    // (dispatch or flush) never reaches the fault branch below — it settles here instead. The
+                    // in-memory Player may already hold a mutation that never reached the write-behind queue,
+                    // so mark it for reload the same as a genuine flush failure; harmless even when nothing
+                    // was actually mutated yet, since the reload just re-reads the last persisted state (#1849).
+                    _context.Session.MarkPlayerNeedsReload();
+                }
+                else if (task.Exception is { } fault)
                 {
                     // The abandoned flush faulted for a non-cancellation reason after the command's timeout
                     // already ran: the in-memory Player may hold mutations that never reached the write-behind
@@ -321,12 +336,10 @@ namespace Game.Api.Sockets
                         _context.Session.MarkPlayerNeedsReload();
                     }
 
-                    // The client already received a timeout response; a cooperative cancellation surfaces here as
-                    // the expected OperationCanceledException, while any other fault is genuine and worth logging.
-                    if (fault.InnerExceptions.Any(e => e is not OperationCanceledException))
-                    {
-                        _logger.LogError(fault, "Abandoned socket command faulted after its timeout response was sent: {CommandInfo} on socket: {Id}.", commandInfo, Id);
-                    }
+                    // The client already received a timeout response; a cancellation reaching here would have
+                    // settled the task as Canceled (handled above), so any fault reaching this branch is genuine
+                    // and worth logging.
+                    _logger.LogError(fault, "Abandoned socket command faulted after its timeout response was sent: {CommandInfo} on socket: {Id}.", commandInfo, Id);
                 }
 
                 cts.Dispose();
