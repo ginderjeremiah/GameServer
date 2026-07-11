@@ -1479,6 +1479,46 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task ResolveStaleBattle_BattleStartedOverIntOverflowThresholdAgo_StillCreditsTheWin()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Same one-shot setup as ResolveStaleBattle_Concludes_ReturnsNullAndCreditsTheWin, but the battle's
+            // wall-clock age (30 days) exceeds int.MaxValue ms (~24.9 days) — pinning that the abandon still
+            // resolves a definite outcome instead of the elapsed-time computation overflowing into garbage.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 5000m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+            var expBefore = player.Exp;
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            state.BattleStartTime = DateTime.UtcNow.AddDays(-30);
+
+            var handoff = await battleService.ResolveStaleBattle(player, state);
+
+            Assert.Null(handoff);
+            Assert.False(state.HasActiveBattle);
+            Assert.True(player.Exp > expBefore);
+        }
+
+        [Fact]
         public async Task ResolveStaleBattle_StillInProgressAndGenuineDrawAtCap()
         {
             using var scope = CreateScope();
