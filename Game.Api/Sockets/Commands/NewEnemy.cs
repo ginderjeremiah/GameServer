@@ -34,7 +34,7 @@ namespace Game.Api.Sockets.Commands
 
             var result = await _battleService.StartBattle(player, state, player.CurrentZoneId, Parameters.NewZoneId, clientBattleMs: Parameters.ClientBattleMs, forceAbandon: Parameters.ForceAbandon, cancellationToken: cancellationToken);
 
-            context.Session.SavePlayerState();
+            await context.Session.SavePlayerStateAsync(cancellationToken);
 
             _logger.LogDebug("NewEnemy: (enemyId: {EnemyId}, level: {Level}, seed: {Seed})",
                 result.Enemy.Id, result.Enemy.Level, result.Seed);

@@ -54,6 +54,7 @@ namespace Game.Api.Tests.Unit
         {
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
             public void Update(PlayerState sessionData, int userId) { }
+            public Task UpdateAsync(PlayerState sessionData, int userId, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public void Clear(int userId) { }
         }
     }

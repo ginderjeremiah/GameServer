@@ -89,7 +89,7 @@ namespace Game.Api.Tests.Integration
             var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
             await sessionService.CreateSession(userId, playerId);
             sessionService.PlayerState.SetCooldown(DateTime.UtcNow.AddMinutes(5)); // Set cooldown for 5 minutes
-            sessionService.SavePlayerState();
+            await sessionService.SavePlayerStateAsync();
 
             await using var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();

@@ -50,6 +50,11 @@ namespace Game.DataAccess.Repositories
             _cache.SetAndForget(SessionKey(userId), playerState, SessionCacheTtl);
         }
 
+        public async Task UpdateAsync(PlayerState playerState, int userId, CancellationToken cancellationToken = default)
+        {
+            await _cache.Set(SessionKey(userId), playerState, SessionCacheTtl, cancellationToken);
+        }
+
         public void Clear(int userId)
         {
             _cache.DeleteAndForget(SessionKey(userId));

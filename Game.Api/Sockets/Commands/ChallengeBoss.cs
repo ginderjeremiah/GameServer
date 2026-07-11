@@ -41,7 +41,7 @@ namespace Game.Api.Sockets.Commands
                 return ErrorWithData("This zone has no boss to challenge.", new NewEnemyModel());
             }
 
-            context.Session.SavePlayerState();
+            await context.Session.SavePlayerStateAsync(cancellationToken);
 
             _logger.LogDebug("ChallengeBoss: (zoneId: {ZoneId}, enemyId: {EnemyId}, level: {Level}, seed: {Seed})",
                 zoneId, result.Enemy.Id, result.Enemy.Level, result.Seed);
