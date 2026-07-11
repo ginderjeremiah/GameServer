@@ -9,6 +9,7 @@ import { ApiResponse } from './api-response';
 import { keys } from '../common/functions';
 import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
 import { ensureDeviceFingerprint, getDeviceFingerprint } from './device-fingerprint';
+import { getTokens } from './token-store';
 
 /** Header carrying the client-computed device fingerprint, used by the backend for connection tracking. */
 const DEVICE_FINGERPRINT_HEADER = 'X-Device-Fingerprint';
@@ -107,6 +108,12 @@ export class ApiRequest<U extends ApiEndpoint> {
 		if (response.status === 401 && this.requiresAuth && !isRetry) {
 			const refreshed = await refreshTokens();
 			if (refreshed) {
+				return this.execute(method, url, payload, true);
+			}
+
+			// A concurrent tab can rotate in a fresh pair in the gap between refreshTokens()'s own
+			// re-read and here; adopt it instead of tearing down a session that's still alive elsewhere.
+			if (getTokens() !== null) {
 				return this.execute(method, url, payload, true);
 			}
 

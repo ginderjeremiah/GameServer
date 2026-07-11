@@ -8,7 +8,7 @@ import {
 import { ApiSocketRequest } from './api-socket-request';
 import { createHook } from '../common/hooks';
 import { Action } from '../common/types';
-import { getAccessToken, getRefreshToken } from './token-store';
+import { getAccessToken, getRefreshToken, getTokens } from './token-store';
 import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
 
 /** WebSocket close code for a clean, intentional shutdown — never an auth failure. */
@@ -133,11 +133,17 @@ export class ApiSocket {
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
 		const hadRefreshToken = getRefreshToken() !== null;
-		const accessToken = await ensureValidAccessToken();
+		let accessToken = await ensureValidAccessToken();
 		// A logged-in session whose pre-emptive refresh failed (refresh token spent/revoked) is
 		// unrecoverable: route to the auth-failure handler rather than opening a doomed handshake the close
 		// handler can no longer recover from (its refresh token is now gone). A never-logged-in caller
 		// (no prior refresh token) still opens an unauthenticated socket below.
+		if (!accessToken && hadRefreshToken) {
+			// A concurrent tab can rotate in a fresh pair in the gap between ensureValidAccessToken()'s
+			// internal re-read and here; adopt it instead of tearing down a session that's still alive
+			// elsewhere.
+			accessToken = getTokens()?.accessToken ?? null;
+		}
 		if (!accessToken && hadRefreshToken) {
 			this.stopPingInterval();
 			// Terminal: nothing will reconnect and re-flush the queue, so settle it here too (mirroring every
@@ -412,7 +418,9 @@ export class ApiSocket {
 
 		this.socketAuthRetries++;
 		refreshTokens().then((tokens) => {
-			if (tokens) {
+			// A concurrent tab can rotate in a fresh pair in the gap between refreshTokens()'s own re-read
+			// and here; adopt it instead of tearing down a session that's still alive elsewhere.
+			if (tokens || getTokens() !== null) {
 				// processCommandQueue ensures the socket (now with the freshly refreshed token) and flushes
 				// any queued-but-unsent commands.
 				void this.processCommandQueue();

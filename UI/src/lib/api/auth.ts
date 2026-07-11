@@ -116,6 +116,11 @@ export const ensureValidAccessToken = async (): Promise<string | null> => {
  * Handles an unrecoverable auth failure (refresh exhausted): clears the stored tokens and returns the
  * user to the login screen. A full-page navigation tears down all in-memory game state, mirroring the
  * logout flow. The redirect is skipped when already on the login page to avoid a reload loop.
+ *
+ * This always clears — a caller reacting to a failed refresh must re-read storage itself first (as
+ * `execute`/`openSocket`/`handleClose` do) and skip calling this at all if a concurrent tab has since
+ * rotated in a fresh pair, otherwise this unconditional clear would wipe out a session that's still
+ * alive elsewhere.
  */
 export const handleAuthFailure = (): void => {
 	clearTokens();
