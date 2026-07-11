@@ -8,6 +8,7 @@ using Game.Core.Players;
 using Game.Core.Progress;
 using Game.Core.TestInfrastructure.Builders;
 using Game.DataAccess;
+using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -176,6 +177,47 @@ namespace Game.Application.Tests.DataAccess
                 var kills = Assert.Single(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
                 Assert.Equal(1m, kills.Value);
             }
+        }
+
+        [Fact]
+        public async Task Save_StandalonePublishFailsForANonCancellationReason_ThrowsPlayerPersistenceFlushFailedException()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            var challenges = scope.ServiceProvider.GetRequiredService<IChallenges>();
+            var batch = scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>();
+
+            // A repository built with a pubsub that throws for a reason other than cancellation stands in for a
+            // transient Redis blip on a *standalone* progress save's flush (e.g. the offline-rewards batch,
+            // outside any player save) — Save must wrap it the same way SavePlayer does, so the socket layer can
+            // force the connection's in-memory Player to reload afterward rather than letting the caller's
+            // already-applied mutations ride along un-persisted (#1819).
+            var throwingRepo = new PlayerProgressRepository(context, challenges, cache, new ThrowingPubSubService(), batch);
+
+            var progress = await throwingRepo.Load(MakeDomainPlayer(playerId));
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            var ex = await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(() => throwingRepo.Save(progress));
+            Assert.IsType<InvalidOperationException>(ex.InnerException);
+
+            // The cache must not have advanced past the failed flush (publish-before-cache), so a fresh read via
+            // a healthy repository still sees no statistics rather than the un-enqueued kill.
+            using var readScope = CreateScope();
+            var readRepo = readScope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var stats = await readRepo.GetStatistics(playerId);
+            Assert.DoesNotContain(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
+        }
+
+        // Stands in for a transient Redis blip on a standalone progress save's own flush, mirroring
+        // PlayerWriteBehindTests' ThrowingPubSubService for the player-save path.
+        private sealed class ThrowingPubSubService : NotSupportedPubSubService
+        {
+            public override Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Simulated transient publish failure.");
         }
 
         [Fact]

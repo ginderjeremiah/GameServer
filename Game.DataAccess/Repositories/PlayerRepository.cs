@@ -91,9 +91,23 @@ namespace Game.DataAccess.Repositories
             // battle-completion path: BattleCompletedEvent -> BattleStatisticsEventHandler -> progress save)
             // joins this batch instead of issuing its own round-trip, collapsing the player and progress
             // writes onto this one flush (#1237).
+            //
+            // A handler fault (e.g. a transient Redis/DB blip inside BattleStatisticsEventHandler, or an
+            // API-layer notifier) is caught rather than left to escape here unwrapped: escaping here would skip
+            // the flush below entirely, discarding whatever other handlers already buffered into the batch
+            // before/around the failure. Instead the fault is captured and the flush still runs, then the fault
+            // is rethrown (wrapped, see below) once the batch's already-buffered envelopes are safely enqueued (#1819).
+            Exception? dispatchFault = null;
             using (_updateBatch.BeginPlayerSave())
             {
-                await _dispatcher.DispatchAsync(player, cancellationToken);
+                try
+                {
+                    await _dispatcher.DispatchAsync(player, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    dispatchFault = ex;
+                }
             }
 
             // FlushAsync only drains the batch and runs deferred progress cache-advances (see RunFlushedCallbacks)
@@ -113,6 +127,14 @@ namespace Game.DataAccess.Repositories
                 // PlayerWriteBehindTests.SavePlayer_PublishFails_PreservesTheEventForTheNextFlush, which expects
                 // OperationCanceledException specifically and would fail if this were wrapped instead.
                 throw new PlayerPersistenceFlushFailedException(ex);
+            }
+
+            if (dispatchFault is not null)
+            {
+                // The flush above succeeded (whatever it carried), but the dispatch itself still failed, so the
+                // aggregate's in-memory state may not match what actually got persisted — force the same reload
+                // a flush failure triggers, and skip the cache blob write below (#1819).
+                throw new PlayerPersistenceFlushFailedException(dispatchFault);
             }
 
             var playerKey = $"{PlayerPrefix}_{player.Id}";
