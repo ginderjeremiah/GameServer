@@ -91,6 +91,38 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task SavePlayerStateAsync_WritesTheAwaitedStoreUpdate_NotTheFireAndForgetOne()
+        {
+            // The battle-lifecycle save must go through the awaited write (#1853): a dropped fire-and-forget
+            // write here would leave a stale session showing an already-credited battle as still active, so a
+            // reconnect's next battle-end would re-credit it.
+            var store = new FakeSessionStore();
+            var session = new SessionService(store);
+            session.SetAuthenticatedUser(5);
+            session.RehydrateSession(7);
+
+            await session.SavePlayerStateAsync();
+
+            var update = Assert.Single(store.AsyncUpdates);
+            Assert.Equal(5, update.UserId);
+            Assert.Equal(7, update.State.PlayerId);
+            Assert.Empty(store.Updates);
+        }
+
+        [Fact]
+        public async Task SavePlayerStateAsync_ForwardsCancellationTokenToStore()
+        {
+            var store = new FakeSessionStore();
+            var session = new SessionService(store);
+            session.SetAuthenticatedUser(5);
+            using var cts = new CancellationTokenSource();
+
+            await session.SavePlayerStateAsync(cts.Token);
+
+            Assert.Equal(cts.Token, store.LastUpdateAsyncToken);
+        }
+
+        [Fact]
         public async Task CreateSession_NoExistingCachedSession_PrimesTheCacheWithFreshState()
         {
             // Login establishes the binding before any socket exists, so it does prime the cache (the one HTTP
@@ -258,8 +290,10 @@ namespace Game.Api.Tests.Unit
         {
             public PlayerState? Session { get; set; }
             public List<(PlayerState State, int UserId)> Updates { get; } = [];
+            public List<(PlayerState State, int UserId)> AsyncUpdates { get; } = [];
             public List<int> Cleared { get; } = [];
             public CancellationToken LastGetSessionToken { get; private set; }
+            public CancellationToken LastUpdateAsyncToken { get; private set; }
 
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default)
             {
@@ -268,6 +302,14 @@ namespace Game.Api.Tests.Unit
             }
 
             public void Update(PlayerState sessionData, int userId) => Updates.Add((sessionData, userId));
+
+            public Task UpdateAsync(PlayerState sessionData, int userId, CancellationToken cancellationToken = default)
+            {
+                LastUpdateAsyncToken = cancellationToken;
+                AsyncUpdates.Add((sessionData, userId));
+                return Task.CompletedTask;
+            }
+
             public void Clear(int userId) => Cleared.Add(userId);
         }
     }
