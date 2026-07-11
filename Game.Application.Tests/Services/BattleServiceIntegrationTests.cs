@@ -1116,6 +1116,92 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_AbandoningAWonBattle_SetsPostBattleCooldownAndAnchorsReplacementBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // Backdate so the abandon (triggered by starting the next battle) resolves as a real win.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            var beforeAbandon = DateTime.UtcNow;
+
+            // Regression coverage for #1851: a tampered client that never sends DefeatEnemy and instead loops
+            // NewEnemy (which is exactly what a repeated StartBattle-abandons-the-active-battle round trip
+            // simulates) must not be able to farm away the post-battle cooldown.
+            var next = await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // The won-abandon applies the same pacing cooldown EndBattleVictory would have.
+            Assert.True(state.EnemyCooldown >= beforeAbandon + BattleService.PostBattleCooldown);
+
+            // The replacement battle spawned in the same call is anchored to that cooldown's expiry — not to
+            // now — so the cooldown just incurred actually paces the next fight instead of being bypassed.
+            Assert.Equal(state.EnemyCooldown, state.BattleStartTime);
+            Assert.False(next.ElapsedOffsetMs.HasValue);
+        }
+
+        [Fact]
+        public async Task StartBattle_AbandoningADrawnBattle_SetsPostBattleCooldown()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // Same shape as StartBattle_AbandonReplayCappedAtMaxBattleDuration_KeepsTimeoutAStalemate: neither
+            // combatant's skill ever fires within the battle cap, so the real-elapsed-time-past-the-cap window
+            // resolves as a genuine draw (not a win, not a still-in-progress hand-back).
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "SlowPoke", baseDamage: 1m, cooldownMs: 100_000_000);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "SlowSwipe", baseDamage: 1m, cooldownMs: 100_000_000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-20);
+            var beforeAbandon = DateTime.UtcNow;
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // A drawn abandon must be paced exactly like a won one — otherwise a tampered client could farm
+            // statistic/challenge accrual by looping a stalemate abandon with no cooldown.
+            Assert.True(state.EnemyCooldown >= beforeAbandon + BattleService.PostBattleCooldown);
+            Assert.Equal(state.EnemyCooldown, state.BattleStartTime);
+        }
+
+        [Fact]
         public async Task StartBattle_AbandoningAWonBattleWithOutOfRangeNewZoneId_CreditsVictoryWithoutThrowing()
         {
             using var scope = CreateScope();
