@@ -50,6 +50,28 @@ namespace Game.Api.Tests.Unit
         }
 
         [Theory]
+        [InlineData("ChallengeCompleted")]
+        [InlineData("ProficiencyXpGained")]
+        public void IsReplayable_ReturnsTrue_ForCommandsThatOptIntoReplay(string commandName)
+        {
+            var factory = new SocketCommandFactory();
+
+            Assert.True(factory.IsReplayable(commandName));
+        }
+
+        [Theory]
+        [InlineData("SocketReplaced")]
+        [InlineData("ServerCommandFailed")]
+        [InlineData("GetZones")]
+        [InlineData("NonExistentCommand")]
+        public void IsReplayable_ReturnsFalse_ForSessionLifecycleCommandsAndNonServerInitiatedOrUnknownCommands(string commandName)
+        {
+            var factory = new SocketCommandFactory();
+
+            Assert.False(factory.IsReplayable(commandName));
+        }
+
+        [Theory]
         [InlineData("GetZones")]
         [InlineData("DefeatEnemy")]
         [InlineData("SocketReplaced")]
