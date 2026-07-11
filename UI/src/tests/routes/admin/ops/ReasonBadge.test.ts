@@ -27,4 +27,11 @@ describe('ReasonBadge', () => {
 		expect(badge.textContent?.trim()).toBe('Unknown event type');
 		expect(badge.classList.contains('warn')).toBe(true);
 	});
+
+	it('renders the not-replayable label with the warn tone', () => {
+		render(ReasonBadge, { props: { reason: EDeadLetterReason.NotReplayable } });
+		const badge = screen.getByTestId('reason-badge');
+		expect(badge.textContent?.trim()).toBe('Not replayable');
+		expect(badge.classList.contains('warn')).toBe(true);
+	});
 });

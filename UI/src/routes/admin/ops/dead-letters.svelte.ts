@@ -56,6 +56,12 @@ const REASON_META: Record<EDeadLetterReason, ReasonMeta> = {
 		hint: 'Exhausted its retries or delivery attempts — safe to replay once the cause is fixed.',
 		replayable: true,
 		tone: 'ok'
+	},
+	[EDeadLetterReason.NotReplayable]: {
+		label: 'Not replayable',
+		hint: 'Only meaningful at the moment it was originally emitted — replaying it now would act on stale intent.',
+		replayable: false,
+		tone: 'warn'
 	}
 };
 

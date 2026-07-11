@@ -60,6 +60,13 @@ describe('reasonMeta', () => {
 		expect(meta.tone).toBe('ok');
 		expect(meta.label).toBe('Replayable');
 	});
+
+	it('classifies not-replayable session-lifecycle entries as non-replayable', () => {
+		const meta = reasonMeta(EDeadLetterReason.NotReplayable);
+		expect(meta.replayable).toBe(false);
+		expect(meta.tone).toBe('warn');
+		expect(meta.label).toBe('Not replayable');
+	});
 });
 
 describe('formatPayload', () => {
