@@ -47,26 +47,13 @@ Install PostgreSQL and Redis locally, then configure the API to point at them (s
 
 ### 3. Configure the backend (native install only)
 
-The API reads its settings from `appsettings.Development.json` (gitignored) or via [.NET user secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets). At minimum you need:
+The API reads its settings from `appsettings.Development.json`, which is gitignored so local secrets never get committed. Copy the template to create yours:
 
-```json
-{
-  "HashPepper": "<any-random-string>",
-  "Jwt": {
-    "SigningKey": "<at-least-32-character-secret>",
-    "Issuer": "game-server-api",
-    "Audience": "game-server-api"
-  },
-  "DataAccessOptions": {
-    "DatabaseSystem": 1,
-    "CacheSystem": 0,
-    "PubSubSystem": 0,
-    "DbConnectionString": "Host=localhost;Port=5432;Database=game;Username=<user>;Password=<password>",
-    "CacheConnectionString": "localhost:6379",
-    "PubSubConnectionString": "localhost:6379"
-  }
-}
+```sh
+cp Game.Api/appsettings.Development.json.example Game.Api/appsettings.Development.json
 ```
+
+Then fill in your own values (or leave the placeholders for local-only use). Alternatively, keep secrets out of any file entirely via [.NET user secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets).
 
 > `DatabaseSystem: 1` = PostgreSQL, `CacheSystem: 0` / `PubSubSystem: 0` = Redis.
 
