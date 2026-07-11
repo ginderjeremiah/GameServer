@@ -489,7 +489,8 @@ describe('save orchestration', () => {
 				pathOrdinal: 0,
 				name: 'Fire T0',
 				maxLevel: 10,
-				levelModifiers: [{ level: 8, attributeId: 0, modifierTypeId: 0, amount: 5 }]
+				levelModifiers: [{ level: 8, attributeId: 0, modifierTypeId: 0, amount: 5 }],
+				levelRewards: [{ level: 8, rewardSkillId: 3 }]
 			})
 		];
 		const store = new ProgressionStore();
@@ -503,13 +504,17 @@ describe('save orchestration', () => {
 		expect(toastErrorMock).not.toHaveBeenCalled();
 		expect(store.profBaseline(0)?.maxLevel).toBe(5);
 		expect(store.profBaseline(0)?.levelModifiers).toHaveLength(0);
+		expect(store.profBaseline(0)?.levelRewards).toHaveLength(0);
 
-		// The payout removal must land before the identity Edit commits, or the backend's guard
-		// (simulated above) would reject the shrink against the still-persisted level-8 modifier.
+		// Both child collections' removals must land before the identity Edit commits, or the backend's
+		// guard (simulated above) would reject the shrink against the still-persisted level-8 payout.
 		const modifiersCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyModifiers');
+		const rewardsCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyRewards');
 		const identityCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/AddEditProficiencies');
 		expect(modifiersCallIndex).toBeGreaterThanOrEqual(0);
+		expect(rewardsCallIndex).toBeGreaterThanOrEqual(0);
 		expect(identityCallIndex).toBeGreaterThan(modifiersCallIndex);
+		expect(identityCallIndex).toBeGreaterThan(rewardsCallIndex);
 	});
 
 	it('lowering MaxLevel without removing the offending payout is still rejected, same as before', async () => {
