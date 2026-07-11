@@ -154,6 +154,69 @@ namespace Game.Application.Tests.Services
             Assert.Equal(originalZoneId, rereadPlayer.CurrentZoneId);
         }
 
+        [Fact]
+        public async Task SavePlayer_DispatchFaultsForANonCancellationReason_StillFlushesBufferedEnvelopes_AndThrowsPlayerPersistenceFlushFailedException()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+            var originalZoneId = player.CurrentZoneId;
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            // A dispatcher that stands in for a handler faulting mid-drain (e.g. BattleStatisticsEventHandler's
+            // own progress save hitting a transient Redis/DB error, #1819): it still buffers an envelope into
+            // the shared batch — mirroring a sibling handler that succeeded before the fault — and then throws.
+            var batch = scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>();
+            var throwingRepo = new PlayerRepository(
+                context,
+                scope.ServiceProvider.GetRequiredService<ICacheService>(),
+                scope.ServiceProvider.GetRequiredService<IPubSubService>(),
+                new BufferThenThrowDispatcher(batch),
+                batch,
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<IItemMods>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>());
+
+            player.ChangeZone(1);
+            var ex = await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(() => throwingRepo.SavePlayer(player));
+            Assert.IsType<InvalidOperationException>(ex.InnerException);
+
+            // The envelope the stub buffered before throwing was still flushed to the queue — a dispatch fault
+            // must not discard whatever other handlers already buffered in the same batch.
+            Assert.Equal(1, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            // The cache blob write is skipped after a dispatch fault (same as a flush failure), so a fresh read
+            // still sees the pre-mutation zone, not the ChangeZone(1) this faulted save never durably applied.
+            var rereadPlayer = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(rereadPlayer);
+            Assert.Equal(originalZoneId, rereadPlayer.CurrentZoneId);
+        }
+
+        // Stands in for a domain event handler faulting partway through a dispatch: buffers an envelope into
+        // the shared batch (as a sibling handler that already succeeded would have) before throwing, so the
+        // test can assert SavePlayer still flushes what was buffered rather than losing it (#1819).
+        private sealed class BufferThenThrowDispatcher(PlayerUpdateBatch batch) : IDomainEventDispatcher
+        {
+            public Task DispatchAsync(AggregateRoot aggregateRoot, CancellationToken cancellationToken = default)
+            {
+                batch.Add(new DomainEventEnvelope { Type = "Test", Payload = "{}" });
+                throw new InvalidOperationException("Simulated handler fault during dispatch.");
+            }
+
+            public Task DispatchAsync(IEnumerable<IDomainEvent> events, CancellationToken cancellationToken = default) =>
+                throw new NotImplementedException();
+        }
+
         private sealed class ThrowingPubSubService : IPubSubService
         {
             public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
