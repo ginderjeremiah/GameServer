@@ -56,6 +56,13 @@ namespace Game.Application.Services
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, DateTime? scheduledStartTime = null, int? clientBattleMs = null, bool forceAbandon = false, CancellationToken cancellationToken = default)
         {
+            // Non-null only when the abandoned battle resolved to a win/loss/draw (AbandonBattle just applied
+            // the post-battle cooldown to state.EnemyCooldown, #1851) — used below to anchor the replacement
+            // battle to that cooldown's expiry instead of now, exactly like PrepareNextIdleBattle does for the
+            // natural end-of-battle flow. Otherwise this abandon-then-respawn round trip would let a caller
+            // (NewEnemy) skip the cooldown it just incurred by spawning the next battle immediately.
+            DateTime? abandonedOutcomeCooldown = null;
+
             if (state.HasActiveBattle)
             {
                 var handoff = await AbandonBattle(player, state, clientBattleMs, cancellationToken);
@@ -67,6 +74,14 @@ namespace Game.Application.Services
                     // applies for ChallengeBoss (#1690). Nothing was cleared or persisted for a
                     // still-in-progress abandon, so proceeding to overwrite it below is safe either way.
                     return handoff;
+                }
+
+                // Callers only reach StartBattle with an already-active battle via NewEnemy, which gates on
+                // state.IsOnCooldown before calling in, so a pre-existing cooldown can never still be in the
+                // future here — a future EnemyCooldown at this point can only be the one AbandonBattle just set.
+                if (handoff is null && state.EnemyCooldown > DateTime.UtcNow)
+                {
+                    abandonedOutcomeCooldown = state.EnemyCooldown;
                 }
             }
 
@@ -98,10 +113,12 @@ namespace Game.Application.Services
             var zone = _zones.GetDomainZone(zoneId);
 
             // Anchor the battle's start to the scheduled time when prefetching the next idle battle during
-            // the post-battle cooldown (its deterministic expiry); otherwise to now. Anchoring a prefetched
-            // battle to its scheduled start — not now — keeps the elapsed-time victory check and the
-            // following cooldown correct (see PrepareNextIdleBattle).
-            var battleStartTime = scheduledStartTime ?? DateTime.UtcNow;
+            // the post-battle cooldown (its deterministic expiry), or when this call's own abandon just
+            // incurred that cooldown (abandonedOutcomeCooldown); otherwise to now. Anchoring to the scheduled
+            // start rather than now keeps the elapsed-time victory check and the following cooldown correct
+            // (see PrepareNextIdleBattle) — and, for the abandon case, is what makes the cooldown just applied
+            // actually pace the replacement battle instead of being immediately bypassed (#1851).
+            var battleStartTime = scheduledStartTime ?? abandonedOutcomeCooldown ?? DateTime.UtcNow;
             var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBattleEnemy(
@@ -478,6 +495,11 @@ namespace Game.Application.Services
                 player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
             }
 
+            // Both outcome branches above (won or lost/drew) reach here — the still-in-progress branch
+            // above returns early instead. Mirror EndBattleVictory/EndBattleLoss's pacing cooldown so an
+            // outcome resolved via abandon can't skip it (#1851): without this, a client that never sends
+            // DefeatEnemy and instead loops NewEnemy farms every kill's cooldown away.
+            state.SetCooldown(now + PostBattleCooldown);
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
