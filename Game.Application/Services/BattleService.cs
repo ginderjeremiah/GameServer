@@ -437,7 +437,9 @@ namespace Game.Application.Services
         private async Task<BattleStartResult?> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
-            var wallClockMs = (int)(now - state.BattleStartTime).TotalMilliseconds;
+            // A stale battle can be far older than int.MaxValue ms (~24.9 days), so clamp before narrowing —
+            // an unchecked out-of-range double-to-int cast is unspecified rather than a safe saturation.
+            var wallClockMs = (int)Math.Clamp((now - state.BattleStartTime).TotalMilliseconds, 0, int.MaxValue);
 
             // Bound the re-simulation by how long the client actually simulated the battle being abandoned,
             // when it reports it — so a battle the client never fought (e.g. a server-prefetched next battle
