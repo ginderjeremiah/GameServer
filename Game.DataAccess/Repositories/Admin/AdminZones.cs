@@ -143,6 +143,16 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Zone");
             }
 
+            // Anti-tamper: a negative weight commits cleanly but throws inside ProbabilityTable's
+            // constructor when the enemy snapshot next rebuilds, permanently poisoning every instance's
+            // reload (and boot) since the Workbench's own corrective save then collides with the already-
+            // committed row. Reject it up front. Zero is safe — ProbabilityTable treats an all-zero set
+            // as uniform.
+            if (data.ZoneEnemies.Any(ze => ze.Weight < 0))
+            {
+                return AdminSaveResult.Failure("A zone enemy's spawn weight cannot be negative.");
+            }
+
             // The Home zone is a no-combat sanctuary: no enemies spawn there and never will. Reject assigning
             // a spawn table to it (clearing it to empty stays allowed). Mirrors the per-enemy guard in
             // AdminEnemies.SetSpawns so neither authoring direction can populate Home's spawn table.
