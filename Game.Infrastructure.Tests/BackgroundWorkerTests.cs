@@ -400,6 +400,56 @@ namespace Game.Infrastructure.Tests
             worker.Kill();
         }
 
+        [Fact]
+        public async Task SyncWorker_StartRacingRunCompletion_NeverObservesNotRunningAtRunStart()
+        {
+            // Reproduces #1822: pre-fix, the sync loop had no run-serialization gate, so a Start() landing while a
+            // run was still executing could dispatch a genuinely concurrent second run whose IsRunning = true got
+            // clobbered by the finishing run's trailing IsRunning = false — leaving that run observing IsRunning
+            // false throughout. The fix routes the sync overload through the same gated loop the async overload
+            // uses. Several threads spin Start() in a tight loop against a fast, non-blocking run to cross that
+            // window many times.
+            const int starterThreads = 4;
+            const int minInvocations = 3000;
+
+            using var probe = new WorkerProbe(startReleased: true);
+            var worker = new BackgroundWorker(NullLogger<BackgroundWorker>.Instance, probe.SyncAction);
+            probe.RunningObserver = () => worker.IsRunning;
+
+            var stop = 0;
+            var starters = new Task[starterThreads];
+            for (var i = 0; i < starterThreads; i++)
+            {
+                starters[i] = Task.Run(() =>
+                {
+                    while (Volatile.Read(ref stop) == 0)
+                    {
+                        try
+                        {
+                            worker.Start();
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            // A losing Start() racing Kill()/Dispose() at teardown is a legitimate outcome, not
+                            // the race under test.
+                            return;
+                        }
+                    }
+                });
+            }
+
+            WaitUntil(() => probe.Invocations >= minInvocations);
+            Volatile.Write(ref stop, 1);
+            var race = Task.WhenAll(starters);
+            var finished = await Task.WhenAny(race, Task.Delay(WaitTimeout, TestContext.Current.CancellationToken));
+            Assert.True(finished == race, "The starter threads did not stop in time.");
+            await race;
+
+            worker.Kill();
+
+            Assert.Equal(0, probe.NotRunningAtStartCount);
+        }
+
         // Atomically raises target to value when value is greater, used to detect any overlapping run.
         private static void InterlockedMax(ref int target, int value)
         {
@@ -513,6 +563,7 @@ namespace Game.Infrastructure.Tests
             private readonly TaskCompletionSource _releaseTask =
                 new(TaskCreationOptions.RunContinuationsAsynchronously);
             private int _invocations;
+            private int _notRunningAtStartCount;
 
             /// <param name="startReleased">
             /// When true the gate starts open, so the action runs straight through instead of blocking.
@@ -543,6 +594,9 @@ namespace Game.Infrastructure.Tests
 
             /// <summary>The value <see cref="RunningObserver"/> returned on the most recent run start.</summary>
             public bool ObservedRunningAtStart { get; private set; }
+
+            /// <summary>The number of runs across the probe's lifetime that observed <see cref="RunningObserver"/> false at start.</summary>
+            public int NotRunningAtStartCount => Volatile.Read(ref _notRunningAtStartCount);
 
             public Action SyncAction => () =>
             {
@@ -581,6 +635,10 @@ namespace Game.Infrastructure.Tests
                 if (RunningObserver is not null)
                 {
                     ObservedRunningAtStart = RunningObserver();
+                    if (!ObservedRunningAtStart)
+                    {
+                        Interlocked.Increment(ref _notRunningAtStartCount);
+                    }
                 }
                 Interlocked.Increment(ref _invocations);
                 Started.Set();
