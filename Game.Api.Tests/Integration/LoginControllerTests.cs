@@ -196,6 +196,43 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task SelectPlayer_ReEntersSameCharacterWithCachedInFlightBattle_PreservesTheBattle()
+        {
+            // A credential re-login (rather than a plain socket reconnect) must not discard the same
+            // character's cache-only in-flight battle snapshot (#1818) — it exists nowhere else, and the
+            // battle already resumes fine across a plain reconnect, so behavior shouldn't hinge on how the
+            // client re-entered.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "relogin", "reloginpass");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await ReloadReferenceCachesAsync();
+
+            var firstLogin = await LoginAsync("relogin", "reloginpass");
+            await SelectPlayerAsync(firstLogin.Tokens, player.Id);
+
+            // Simulate quitting mid-battle: the session cache holds an in-flight battle snapshot that exists
+            // nowhere else (the write-behind path is what would normally populate this via the game socket).
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            var inFlight = new Game.Core.Players.PlayerState { PlayerId = player.Id };
+            inFlight.SetActiveBattle(
+                enemyId: 1, level: 1, enemySkillIds: [1], seed: 1,
+                startTime: DateTime.UtcNow, snapshot: new Game.Core.Battle.BattleSnapshot { Level = 1, StatAllocations = [], EquippedItems = [], SkillIds = [] },
+                zoneId: 1, isBossBattle: false);
+            sessionStore.Update(inFlight, user.Id);
+
+            // Log back in with credentials (a new pre-selection token, not a plain socket reconnect) and
+            // re-select the same character.
+            var secondLogin = await LoginAsync("relogin", "reloginpass");
+            await SelectPlayerAsync(secondLogin.Tokens, player.Id);
+
+            var session = await sessionStore.GetSession(user.Id);
+            Assert.NotNull(session);
+            Assert.True(session.HasActiveBattle);
+            Assert.Equal(inFlight.ActiveEnemyId, session.ActiveEnemyId);
+        }
+
+        [Fact]
         public async Task SelectPlayer_DeliversClassLockedBaseAndSignaturePassive()
         {
             // The logged-in player payload (LoginController.BuildPlayerData) projects the character's class

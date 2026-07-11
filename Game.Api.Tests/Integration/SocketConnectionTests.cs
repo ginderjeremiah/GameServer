@@ -114,7 +114,7 @@ namespace Game.Api.Tests.Integration
             // An authenticated but non-upgrade request to /socket short-circuits to 400 before any upgrade, so
             // the body carries the { errorMessage } envelope rather than being empty.
             var (userId, playerId) = await SeedAsync();
-            var authedClient = CreateAuthenticatedClient(userId, playerId);
+            var authedClient = await CreateAuthenticatedClient(userId, playerId);
 
             var response = await authedClient.GetAsync("/socket", CancellationToken);
 

@@ -125,7 +125,7 @@ namespace Game.Api.Controllers
 
             // Establish the session binding now that a character is chosen — a request-scoped presentation
             // concern, mirroring how login used to bind. The token returned already carries the player.
-            _sessionService.CreateSession(_sessionService.UserId, result.Player.Id);
+            await _sessionService.CreateSession(_sessionService.UserId, result.Player.Id, HttpContext.RequestAborted);
 
             return ApiResponse.Success(new SelectPlayerResult
             {
@@ -173,7 +173,7 @@ namespace Game.Api.Controllers
                 return ApiResponse.Error(SelectPlayerErrorMessage(result.Status), SelectPlayerErrorCategory(result.Status));
             }
 
-            _sessionService.CreateSession(_sessionService.UserId, result.Player.Id);
+            await _sessionService.CreateSession(_sessionService.UserId, result.Player.Id, HttpContext.RequestAborted);
 
             return ApiResponse.Success(new SelectPlayerResult
             {

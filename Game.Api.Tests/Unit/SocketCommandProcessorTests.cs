@@ -148,7 +148,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 42);
+            await session.CreateSession(userId: 1, playerId: 42);
 
             // The Subscribe failure propagates out of RegisterSocket...
             await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session, isAdmin: false));
@@ -197,7 +197,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 77);
+            await session.CreateSession(userId: 1, playerId: 77);
             var context = await manager.RegisterSocket(socket, session, isAdmin: false);
 
             // The unsubscribe fault during teardown must be swallowed, not propagated...
@@ -244,7 +244,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             // RegisterSocket wires the real processor into the fake pub/sub via RegisterSocketCommandListener,
             // so the captured callback is the production GetSocketCommandProcessor closure under test.
             manager.RegisterSocket(socket, session, isAdmin: false).GetAwaiter().GetResult();
