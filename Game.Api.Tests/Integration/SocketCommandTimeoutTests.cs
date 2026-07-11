@@ -86,6 +86,49 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task CooperativelyCancellingCommand_MarksPlayerForReload()
+        {
+            using var scope = CreateScope();
+            // This command parks on a gate that is never released, but it honors the cancellation token — the
+            // same shape RunCommand's SavePlayer would take if a dispatch/flush observed the per-command budget
+            // mid-save. An unhandled OperationCanceledException settles the abandoned task as Canceled rather
+            // than Faulted, so the release continuation must classify that as a stranded-mutation risk too (#1849).
+            var neverReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var session = scope.ServiceProvider.GetRequiredService<SessionService>();
+            var (socket, handler, _) = CreateHandler(scope, ShortTimeout,
+                new GatedCommand("Coop", neverReleased.Task, observeToken: true));
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Coop") { Id = "coop-1" });
+            await WaitForSentMessageAsync(socket, m => m.Contains("Command timed out"));
+
+            // The abandoned task settles asynchronously once it observes the cancelled token; poll for the
+            // release continuation to have run and marked the session.
+            var markedForReload = await PollingHelper.PollUntilAsync(
+                () => Task.FromResult(session.PlayerNeedsReload),
+                satisfied: marked => marked);
+            Assert.True(markedForReload);
+        }
+
+        [Fact]
+        public async Task CommandThatThrowsCancellationUnrelatedToTheBudget_IsTornDown_AndMarksPlayerForReload()
+        {
+            using var scope = CreateScope();
+            // Simulates a leaked dependency cancellation (e.g. an internal token unrelated to the per-command
+            // budget) surfacing before the budget elapses: cts.IsCancellationRequested is false, so this misses
+            // RunCommandUnderLock's timeout-specific catch and reaches its outer "teardown" catch instead — which
+            // must also treat it as a possible stranded mutation, not assume nothing was mutated (#1849).
+            var session = scope.ServiceProvider.GetRequiredService<SessionService>();
+            var (socket, handler, scopeFactory) = CreateHandler(scope, WaitTimeout,
+                new GatedCommand("LeakedCancel", Task.CompletedTask, observeToken: false, faultWith: new OperationCanceledException("simulated leaked cancellation")));
+
+            await handler.ExecuteCommand(new SocketCommandInfo("LeakedCancel") { Id = "leaked-1" });
+
+            Assert.True(session.PlayerNeedsReload);
+            Assert.Equal(1, scopeFactory.ScopesCreated);
+            Assert.DoesNotContain(socket.SentMessages, m => m.Contains("leaked-1"));
+        }
+
+        [Fact]
         public async Task CommandThatFinishesWithinBudget_CompletesNormally_WithoutTimeout()
         {
             using var scope = CreateScope();
