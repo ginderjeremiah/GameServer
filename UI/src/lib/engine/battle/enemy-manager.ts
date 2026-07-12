@@ -104,6 +104,12 @@ export class EnemyManager {
 	 *  redundant re-syncs (e.g. a returnToIdle when the persisted mode is already idle). `undefined` until
 	 *  the first sync, so the first authoritative state is always sent. */
 	private lastSyncedAutoChallengeBoss?: boolean;
+	/** Whether the fight loop has not yet sent a `NewEnemy` request since {@link start}. Re-armed by every
+	 *  `start()` and consumed by the first `runFetchLoop` dispatch, regardless of whether that `start()` was
+	 *  handed an `activeBattle` — a fresh `battleEngine` has no history for whatever battle the server may
+	 *  still be holding (e.g. a sub-5-minute reconnect the welcome-back gate didn't resume directly), so its
+	 *  untouched `timeElapsed` of 0 must not be reported as a genuine "never fought" claim (#1883). */
+	private isFirstFetch = true;
 
 	/**
 	 * Starts the fight loop. `activeBattle` is the server-handed-back battle a `GetOfflineProgress` summary
@@ -119,6 +125,7 @@ export class EnemyManager {
 	public start(activeBattle?: IEnemyInstance) {
 		if (!this.started) {
 			this.started = true;
+			this.isFirstFetch = true;
 			this.battleStageUnhook = onBattleStageChanged((stage) => this.watchBattleStage(stage));
 			if (activeBattle) {
 				this.mode = activeBattle.isBossBattle ? 'boss' : 'idle';
@@ -246,9 +253,16 @@ export class EnemyManager {
 			// How long the client actually simulated the battle this fetch supersedes, so the backend bounds
 			// its abandon re-simulation accurately. We only reach here for a prefetched battle that was *not*
 			// presented (absent or invalidated by a zone/build change during the cooldown) — the client never
-			// fought it, so report 0 and the backend records no phantom outcome. A plain fetch (no prefetch,
-			// e.g. after an idle loss/draw) reports the elapsed time the client did fight.
-			const clientBattleMs = prepared ? 0 : battleEngine.timeElapsed;
+			// fought it, so report 0 and the backend records no phantom outcome. The loop's first-ever fetch
+			// omits the field entirely instead: `battleEngine` has never held a battle yet, so its `timeElapsed`
+			// is an untouched 0 with no relation to whatever battle the server may still be holding (e.g. a
+			// sub-5-minute reconnect the welcome-back gate deliberately left for this fetch to resolve) — a
+			// literal 0 would falsely claim "never fought," discarding it with no outcome instead of letting the
+			// backend's wall-clock fallback settle or hand it back (#1883). A plain fetch after that (e.g. an
+			// idle loss/draw) reports the elapsed time the client genuinely did fight.
+			const isFirstFetch = this.isFirstFetch;
+			this.isFirstFetch = false;
+			const clientBattleMs = prepared ? 0 : isFirstFetch ? undefined : battleEngine.timeElapsed;
 
 			// Retry iteratively rather than via self-recursion: each attempt returns to a flat stack
 			// (a sustained outage no longer grows the async chain without bound). The loop ends as soon
