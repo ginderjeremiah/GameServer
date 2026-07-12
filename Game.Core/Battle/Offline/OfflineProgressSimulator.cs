@@ -64,13 +64,21 @@ namespace Game.Core.Battle.Offline
             var catalog = new ProficiencyCatalog(
                 parameters.ResolveProficiency, parameters.ResolvePath, parameters.PathsForActivityKey, parameters.DependentsOf);
 
-            // The battler that measures each victory's exp reward is re-derived whenever a level-up grows the
-            // class locked base (and, through it, the signature passive) — rebuilding it eagerly here and again
-            // after every level-up, rather than lazily on next use, keeps the "current rating battler" a single
-            // invariant read at each DefeatRewards call below. It is never simulated (CombatRating.Rate only
-            // reads it), so reusing the same instance across battles between level-ups is safe even though a
-            // Battler is otherwise single-use.
-            var playerBattlerForRating = BuildRatingBattler(workingSnapshot, parameters);
+            // The materials that assemble the player's battler are re-derived whenever a level-up grows the
+            // class locked base (and, through it, the signature passive) or a proficiency level-up grows its
+            // bonuses — rebuilding them eagerly here and again after every such growth, rather than on every
+            // battle, is what lets SimulateBattle build a fresh single-use Battler per battle without re-walking
+            // the resolver/LINQ composition each time. playerRating is memoized alongside them: CombatRating.Rate
+            // is not cheap (it materializes a full attribute set twice, #1730), and it depends only on these same
+            // materials, so it is recomputed exactly when they are — not every battle.
+            var playerMaterials = BuildMaterials(workingSnapshot, parameters);
+            var playerRating = CombatRating.Rate(playerMaterials.Build(), isPlayer: true);
+
+            // The boss's own rating, memoized for the whole run: CreateBossEnemy is fully deterministic (fixed
+            // level, full authored loadout, no random roll), so in Boss mode every battle's enemy rates
+            // identically and re-deriving it per victory would be pure waste. Left null (and never consulted)
+            // in Idle mode, where each battle's random encounter genuinely differs.
+            double? bossEnemyRating = null;
 
             // Tracks whether any battle has produced progress (a win or a loss). A run that is nothing but
             // draws is a stalemate the player can neither win nor lose; the cutoff below stops it early.
@@ -84,7 +92,7 @@ namespace Game.Core.Battle.Offline
 
                 var enemy = BuildEnemy(parameters);
                 var seed = parameters.SeedSource();
-                var result = SimulateBattle(workingSnapshot, parameters, enemy, seed);
+                var result = SimulateBattle(playerMaterials, enemy, seed);
 
                 if (result.TotalMs > remainingMs)
                 {
@@ -97,10 +105,16 @@ namespace Game.Core.Battle.Offline
                 }
 
                 // Rewards are earned only on a victory, measured from the current (possibly mid-window-grown)
-                // rating battler like the live path. The same DefeatRewards yields both the exp and the combat
+                // player rating like the live path. The same DefeatRewards yields both the exp and the combat
                 // ratings the offline proficiency-XP accrual normalizes each path's activity by, so the two
-                // payouts share one evaluation.
-                var rewards = result.Victory ? new DefeatRewards(playerBattlerForRating, enemy) : null;
+                // payouts share one evaluation. The enemy rating reuses the memoized boss rating in Boss mode
+                // (populating it on the first victory) and is re-derived per victory in Idle mode, where each
+                // random encounter genuinely differs.
+                var rewards = result.Victory
+                    ? new DefeatRewards(playerRating, parameters.Mode == OfflineLoopMode.Boss
+                        ? bossEnemyRating ??= CombatRating.Rate(enemy.ToBattler(), isPlayer: false)
+                        : CombatRating.Rate(enemy.ToBattler(), isPlayer: false))
+                    : null;
                 var proficiencyGains = ProficiencyAccrualResult.Empty;
                 if (rewards is not null)
                 {
@@ -151,14 +165,16 @@ namespace Game.Core.Battle.Offline
                         workingSnapshot.Level = progression.Level;
                     }
 
-                    // Re-derive the rating battler whenever either growth vector actually moved an attribute
-                    // modifier: a player level-up (the locked base) or a proficiency level-up (its per-level/
-                    // milestone bonus) — never on XP alone, which changes nothing ModifiersForLevel reads. This
-                    // is what makes the reward-power measurement — and through it the proficiency accrual's own
-                    // rating denominator on the next battle — grow with proficiency, not just level.
+                    // Re-derive the materials (and the rating they measure) whenever either growth vector
+                    // actually moved an attribute modifier: a player level-up (the locked base) or a proficiency
+                    // level-up (its per-level/milestone bonus) — never on XP alone, which changes nothing
+                    // ModifiersForLevel reads. This is what makes the reward-power measurement — and through it
+                    // the proficiency accrual's own rating denominator on the next battle — grow with
+                    // proficiency, not just level.
                     if (progression.LevelsGained > 0 || proficiencyLeveledUp)
                     {
-                        playerBattlerForRating = BuildRatingBattler(workingSnapshot, parameters);
+                        playerMaterials = BuildMaterials(workingSnapshot, parameters);
+                        playerRating = CombatRating.Rate(playerMaterials.Build(), isPlayer: true);
                     }
                 }
 
@@ -218,11 +234,12 @@ namespace Game.Core.Battle.Offline
         };
 
         /// <summary>
-        /// Builds the battler <see cref="DefeatRewards"/> measures the player's power from — reused across
-        /// battles until the next level-up requires rebuilding it.
+        /// Builds the materials both the per-battle simulated battler and the <see cref="DefeatRewards"/> rating
+        /// battler assemble from — reused across battles until the next level-up or proficiency level-up
+        /// requires rebuilding them (#1730).
         /// </summary>
-        private static Battler BuildRatingBattler(BattleSnapshot snapshot, OfflineSimulationParameters parameters) =>
-            snapshot.ToBattler(
+        private static BattlerMaterials BuildMaterials(BattleSnapshot snapshot, OfflineSimulationParameters parameters) =>
+            snapshot.GetBattlerMaterials(
                 parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
                 parameters.ResolveProficiency, parameters.ResolveClass);
 
@@ -244,18 +261,15 @@ namespace Game.Core.Battle.Offline
 
         /// <summary>
         /// Runs one battle with the given seed (the caller draws it up front so it can carry the same seed
-        /// forward on a pending-battle hand-back, #1596), rebuilding the player from
-        /// <paramref name="snapshot"/> — the current, possibly mid-window-grown level (#1601) — which mirrors
-        /// the live replay path. Both battlers are rebuilt per battle because the simulation mutates battler
-        /// health/effects (a battler is single-use).
+        /// forward on a pending-battle hand-back, #1596), building the player from
+        /// <paramref name="playerMaterials"/> — the current, possibly mid-window-grown level (#1601) — which
+        /// mirrors the live replay path. Both battlers are rebuilt per battle because the simulation mutates
+        /// battler health/effects (a battler is single-use); the player's materials are cached by the caller and
+        /// only actually recomposed on a level-up or proficiency level-up (#1730).
         /// </summary>
-        private static BattleResult SimulateBattle(BattleSnapshot snapshot, OfflineSimulationParameters parameters, Enemy enemy, uint seed)
+        private static BattleResult SimulateBattle(BattlerMaterials playerMaterials, Enemy enemy, uint seed)
         {
-            var playerBattler = snapshot.ToBattler(
-                parameters.ResolveItem, parameters.ResolveMod, parameters.ResolveSkill,
-                parameters.ResolveProficiency, parameters.ResolveClass);
-
-            return new BattleSimulator(playerBattler, enemy.ToBattler(), seed).Simulate();
+            return new BattleSimulator(playerMaterials.Build(), enemy.ToBattler(), seed).Simulate();
         }
     }
 }
