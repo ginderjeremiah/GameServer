@@ -50,6 +50,17 @@ namespace Game.DataAccess.Repositories.Admin
                     return AdminSaveResult.Failure("The Home zone cannot have a boss. Home is a no-combat sanctuary where no enemies spawn.");
                 }
 
+                // SetEnemies / AdminEnemies.SetSpawns block populating a Home zone's spawn table going
+                // forward, but neither fires against this save's own flip — an edit that sets IsHome on a
+                // combat zone whose spawn table is already populated would otherwise leave the sanctuary with
+                // live spawns. An Add can never carry pre-existing spawns, so this only applies to edits.
+                if (change.ChangeType == EChangeType.Edit
+                    && change.Item.IsHome
+                    && _zones.LookupZone(change.Item.Id) is { ZoneEnemies.Count: > 0 })
+                {
+                    return AdminSaveResult.Failure("The Home zone cannot have enemy spawns. Home is a no-combat sanctuary where no enemies spawn; clear the zone's spawn table before making it Home.");
+                }
+
                 // Challenges are zero-based-id reference data, so a valid id is an in-range index (an O(1)
                 // check, like the enemy/zone validators above).
                 if (change.Item.UnlockChallengeId is int unlockChallengeId
