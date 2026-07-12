@@ -107,14 +107,26 @@ namespace Game.Core.Battle.Offline
                 // Rewards are earned only on a victory, measured from the current (possibly mid-window-grown)
                 // player rating like the live path. The same DefeatRewards yields both the exp and the combat
                 // ratings the offline proficiency-XP accrual normalizes each path's activity by, so the two
-                // payouts share one evaluation. The enemy rating reuses the memoized boss rating in Boss mode
-                // (populating it on the first victory) and is re-derived per victory in Idle mode, where each
-                // random encounter genuinely differs.
-                var rewards = result.Victory
-                    ? new DefeatRewards(playerRating, parameters.Mode == OfflineLoopMode.Boss
-                        ? bossEnemyRating ??= CombatRating.Rate(enemy.ToBattler(), isPlayer: false)
-                        : CombatRating.Rate(enemy.ToBattler(), isPlayer: false))
-                    : null;
+                // payouts share one evaluation.
+                DefeatRewards? rewards = null;
+                if (result.Victory)
+                {
+                    // The enemy rating reuses the memoized boss rating in Boss mode (populating it on the first
+                    // victory) and is re-derived per victory in Idle mode, where each random encounter genuinely
+                    // differs. Kept as an explicit local — not folded into the DefeatRewards call — so the
+                    // bossEnemyRating cache write-back stays visible rather than buried in a ternary argument.
+                    double enemyRating;
+                    if (parameters.Mode == OfflineLoopMode.Boss)
+                    {
+                        enemyRating = bossEnemyRating ??= CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+                    }
+                    else
+                    {
+                        enemyRating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+                    }
+
+                    rewards = new DefeatRewards(playerRating, enemyRating);
+                }
                 var proficiencyGains = ProficiencyAccrualResult.Empty;
                 if (rewards is not null)
                 {
