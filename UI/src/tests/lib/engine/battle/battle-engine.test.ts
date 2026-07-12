@@ -47,7 +47,14 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 				amount: 0,
 				type: 1,
 				source: 9
-			})
+			}),
+			// Every log type enabled by default, mirroring the real manager's `?? true` fallback. Typed with
+			// the real `ELogType` param (type-only, erased at runtime) so tests can override with a
+			// type-checked predicate without referencing the enum's runtime value from this hoisted factory.
+			logTypeEnabled: (logType: ELogType) => {
+				void logType;
+				return true;
+			}
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],
@@ -745,6 +752,34 @@ describe('BattleEngine', () => {
 			);
 		});
 
+		it('skips building the damage log line when the Damage log type is disabled, but still floats the hit', () => {
+			mockPlayerManager.logTypeEnabled = (logType: ELogType) => logType !== ELogType.Damage;
+			const events: CombatFloatEvent[] = [];
+			const unhook = onCombatFloat((event) => events.push(event));
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				isBossBattle: false
+			});
+
+			logicalUpdateCallbacks[0](500);
+			unhook();
+			mockPlayerManager.logTypeEnabled = () => true;
+
+			expect(logMessage).not.toHaveBeenCalledWith(
+				ELogType.Damage,
+				expect.anything(),
+				expect.anything(),
+				expect.anything()
+			);
+			expect(events).toContainEqual(expect.objectContaining({ target: 'enemy', kind: 'hit' }));
+		});
+
 		it('surfaces the damage type and resist outcome for a typed hit on a resistant defender (#1320)', () => {
 			// A fire skill into a fire-resistant enemy: the engine names the type and flags the resist on the line.
 			mockSkills[0].damagePortions = [{ type: EDamageType.Fire, weight: 1 }];
@@ -893,6 +928,37 @@ describe('BattleEngine', () => {
 			logicalUpdateCallbacks[0](500); // the 500ms-cooldown skill fires, applying its self buff
 
 			expect(logMessage).toHaveBeenCalledWith(ELogType.SkillEffect, expect.stringContaining('empowered'));
+		});
+
+		it('skips building skill-effect log lines when the SkillEffect log type is disabled', () => {
+			mockSkills[0].effects = [
+				{
+					id: 1,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 15,
+					durationMs: 1000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
+				}
+			];
+			mockPlayerManager.logTypeEnabled = (logType: ELogType) => logType !== ELogType.SkillEffect;
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				isBossBattle: false
+			});
+
+			logicalUpdateCallbacks[0](500); // the 500ms-cooldown skill fires, applying its self buff
+
+			mockPlayerManager.logTypeEnabled = () => true;
+			expect(logMessage).not.toHaveBeenCalledWith(ELogType.SkillEffect, expect.anything());
 		});
 
 		it('aggregates damage-over-time into a single per-second summary line', () => {

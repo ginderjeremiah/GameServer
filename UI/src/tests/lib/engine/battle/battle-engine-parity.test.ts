@@ -31,7 +31,10 @@ const mockPlayerManager = {
 	selectedSkills: [] as number[],
 	attributes: [] as IBattlerAttribute[],
 	battleLockedBaseModifiers: [] as unknown[],
-	battleSignaturePassiveModifier: () => ({ attribute: 0, amount: 0, type: 1, source: 9 })
+	battleSignaturePassiveModifier: () => ({ attribute: 0, amount: 0, type: 1, source: 9 }),
+	// Every log type enabled, mirroring the real manager's `?? true` fallback — irrelevant to the parity
+	// assertions themselves (logging is outside `battleStep`), just needed so `logicalUpdate` doesn't throw.
+	logTypeEnabled: () => true
 };
 // The weapon-match gate's equipped weapon type is left undefined so the player is ungated, matching the
 // comparison simulator battlers (which field their full loadout); the scenarios use weapon-agnostic skills.

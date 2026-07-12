@@ -69,24 +69,36 @@ export function attributesForKey(key: EDamageTypeKey): DamageTypeKeyAttributes {
 	return DAMAGE_TYPE_KEY_ATTRIBUTES[key];
 }
 
+// Amplification/resistance attribute lists per leaf type, precomputed once (mirrors the backend's
+// `DamageTypes.AmplificationByType`/`ResistanceByType`) so the per-hit/per-tick lookup in the damage
+// pipeline is a map read rather than rebuilding an array on every call.
+const AMPLIFICATION_ATTRIBUTES_BY_TYPE: ReadonlyMap<EDamageType, readonly EAttribute[]> = new Map(
+	Object.entries(DAMAGE_TYPE_APPLIES).map(([type, keys]) => [
+		Number(type) as EDamageType,
+		keys.map((key) => DAMAGE_TYPE_KEY_ATTRIBUTES[key].amplification)
+	])
+);
+
+const RESISTANCE_ATTRIBUTES_BY_TYPE: ReadonlyMap<EDamageType, readonly EAttribute[]> = new Map(
+	Object.entries(DAMAGE_TYPE_APPLIES).map(([type, keys]) => [
+		Number(type) as EDamageType,
+		keys
+			.map((key): EAttribute | null => DAMAGE_TYPE_KEY_ATTRIBUTES[key].resistance)
+			.filter((resistance): resistance is EAttribute => resistance !== null)
+	])
+);
+
 /** The attacker-side amplification attributes summed for a hit of the given leaf `type`, in fixed
  *  iteration order (per-hit lookup helper for the damage pipeline). */
-export function amplificationAttributes(type: EDamageType): EAttribute[] {
-	return applies(type).map((key) => DAMAGE_TYPE_KEY_ATTRIBUTES[key].amplification);
+export function amplificationAttributes(type: EDamageType): readonly EAttribute[] {
+	return AMPLIFICATION_ATTRIBUTES_BY_TYPE.get(type) ?? [];
 }
 
 /** The defender-side resistance attributes summed for a hit of the given leaf `type`, in fixed
  *  iteration order (per-hit lookup helper for the damage pipeline). Amplification-only weapon keys (#1340)
  *  contribute no resistance, so they drop out — a weapon hit resists via the shared `Physical` key only. */
-export function resistanceAttributes(type: EDamageType): EAttribute[] {
-	const resistances: EAttribute[] = [];
-	for (const key of applies(type)) {
-		const { resistance } = DAMAGE_TYPE_KEY_ATTRIBUTES[key];
-		if (resistance !== null) {
-			resistances.push(resistance);
-		}
-	}
-	return resistances;
+export function resistanceAttributes(type: EDamageType): readonly EAttribute[] {
+	return RESISTANCE_ATTRIBUTES_BY_TYPE.get(type) ?? [];
 }
 
 // The attribute → key inverse, precomputed once (mirrors the backend's `DamageTypes.KeyByAttribute`)
