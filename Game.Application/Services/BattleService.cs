@@ -219,6 +219,14 @@ namespace Game.Application.Services
 
             if (state.HasActiveBattle)
             {
+                // Captured before the abandon so the check below can tell "this abandon incurred a fresh
+                // cooldown" apart from "a cooldown was already sitting there." Unlike StartBattle (whose
+                // caller, NewEnemy, gates on IsOnCooldown first), ChallengeBoss has no cooldown gate — a
+                // player can challenge mid an already-running post-battle cooldown (e.g. the prefetched next
+                // idle battle's BattleStartTime is still in the future), in which case AbandonBattle resolves
+                // no outcome (elapsedMs clamps to 0) and leaves EnemyCooldown exactly as it found it.
+                var cooldownBeforeAbandon = state.EnemyCooldown;
+
                 // Deliberate override: challenging the boss always abandons whatever idle battle is running
                 // (even one still genuinely in progress, #1595) and proceeds — unlike NewEnemy, this is an
                 // explicit different action, not "give my existing battle back," so the handoff is discarded.
@@ -226,7 +234,7 @@ namespace Game.Application.Services
                 // in-memory state below with the boss battle is safe either way.
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
 
-                if (state.EnemyCooldown > DateTime.UtcNow)
+                if (state.EnemyCooldown > cooldownBeforeAbandon)
                 {
                     abandonedOutcomeCooldown = state.EnemyCooldown;
                 }

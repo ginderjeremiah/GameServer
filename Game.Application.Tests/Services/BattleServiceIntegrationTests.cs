@@ -1011,6 +1011,54 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBossBattle_AbandonResolvesNoOutcomeWithLeftoverCooldown_DoesNotAnchorToTheStaleCooldown()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context, "Idle Enemy");
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, name: "IdleSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Boss Zone", bossEnemyId: boss.Id, bossLevel: 5);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, name: "PlayerSkill");
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, playerSkill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // A fresh idle battle (near-zero real elapsed time), plus a leftover post-battle cooldown still
+            // in flight from an earlier idle loss/prefetch. ChallengeBoss has no IsOnCooldown gate (unlike
+            // NewEnemy), so a player can reach StartBossBattle while EnemyCooldown is still in the future.
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            var leftoverCooldown = DateTime.UtcNow.AddSeconds(4);
+            state.SetCooldown(leftoverCooldown);
+
+            // Regression coverage for the #1906 review: this abandon resolves no outcome of its own (the
+            // idle battle just started, so real-elapsed time is ~0), so the pre-existing leftover cooldown
+            // must not be mistaken for one this call incurred and used to anchor the boss's start.
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(leftoverCooldown, state.EnemyCooldown);
+            Assert.True(state.BattleStartTime < leftoverCooldown);
+        }
+
+        [Fact]
         public async Task StartBossBattle_BosslessZoneWithActiveBattle_ReturnsNullAndLeavesBattleUntouched()
         {
             using var scope = CreateScope();
