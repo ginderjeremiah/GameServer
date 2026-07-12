@@ -65,7 +65,7 @@ namespace Game.Application.Services
 
             if (state.HasActiveBattle)
             {
-                var handoff = await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+                var (handoff, _) = await AbandonBattle(player, state, clientBattleMs, cancellationToken);
                 if (handoff is not null && !forceAbandon)
                 {
                     // A still-in-progress handoff (#1595) means the existing battle hasn't concluded yet —
@@ -386,13 +386,15 @@ namespace Game.Application.Services
         /// Resolves a stale in-flight battle left by a mid-battle disconnect, crediting it exactly like an
         /// abandon (re-simulate capped at the elapsed wall-clock, pay a win out in full, else record the
         /// loss/draw) and clearing it — or, when the replay hasn't concluded within the 2-minute cap, handing
-        /// it back still active with its elapsed offset (#1595) instead of booking a phantom draw. Returns
-        /// null when the battle was resolved (or there was none to resolve); returns the handoff otherwise.
-        /// Used by the offline-rewards flow to settle the disconnected battle before it simulates the away
-        /// window — so the window's simulation, and the idle loop that follows the welcome-back gate, both
-        /// start from a clean state.
+        /// it back still active with its elapsed offset (#1595) instead of booking a phantom draw.
+        /// <see cref="StaleBattleResolution.Handoff"/> is null when the battle was resolved (or there was none
+        /// to resolve); non-null otherwise. <see cref="StaleBattleResolution.SettledBattleMs"/> carries the
+        /// resolved battle's own credited duration (null when nothing was resolved, e.g. a handoff or no active
+        /// battle at all) — the caller (the offline-rewards flow) must deduct that span, plus its post-battle
+        /// cooldown, from the away window it is about to simulate, since the settled battle's span already
+        /// falls inside that same window and must not be credited twice (#1882).
         /// </summary>
-        public Task<BattleStartResult?> ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        public Task<StaleBattleResolution> ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             // No client elapsed for an offline/disconnect resolution — the abandon falls back to wall-clock
             // (capped at DefaultMaxBattleMs), exactly as before.
@@ -430,11 +432,13 @@ namespace Game.Application.Services
             };
         }
 
-        // Returns null when the stale battle was resolved (win/loss/draw, or nothing to resolve) and has
-        // already been cleared/persisted. Returns a non-null BattleStartResult — the same enemy/seed, plus
+        // Handoff is null when the stale battle was resolved (win/loss/draw, or nothing to resolve) and has
+        // already been cleared/persisted. Handoff is a non-null BattleStartResult — the same enemy/seed, plus
         // the real elapsed offset since BattleStartTime — when the battle is instead handed back still active
         // (#1595): the caller must leave PlayerState untouched in that case (nothing was cleared or saved).
-        private async Task<BattleStartResult?> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
+        // SettledBattleMs carries the resolved battle's own credited duration (its BattleResult.TotalMs) only
+        // when an outcome was actually recorded; null for a handoff and for "nothing to resolve" alike.
+        private async Task<StaleBattleResolution> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
             // A stale battle can be far older than int.MaxValue ms (~24.9 days), so clamp before narrowing —
@@ -462,7 +466,7 @@ namespace Game.Application.Services
             if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, simulateMs))
             {
                 state.ClearBattle();
-                return null;
+                return new StaleBattleResolution(null, null);
             }
 
             if (result.Victory)
@@ -484,13 +488,15 @@ namespace Game.Application.Services
                 // snapshot, BattleStartTime unchanged) and hand it back with its elapsed offset instead of
                 // booking a phantom draw. Only a battle whose real elapsed time reaches the cap is a genuine
                 // draw, regardless of what the client claims to have simulated.
-                return new BattleStartResult
-                {
-                    Enemy = enemy,
-                    Seed = state.BattleSeed ?? 0,
-                    ElapsedOffsetMs = wallClockMs,
-                    IsBossBattle = state.IsBossBattle,
-                };
+                return new StaleBattleResolution(
+                    new BattleStartResult
+                    {
+                        Enemy = enemy,
+                        Seed = state.BattleSeed ?? 0,
+                        ElapsedOffsetMs = wallClockMs,
+                        IsBossBattle = state.IsBossBattle,
+                    },
+                    null);
             }
             else
             {
@@ -505,7 +511,7 @@ namespace Game.Application.Services
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
-            return null;
+            return new StaleBattleResolution(null, result.TotalMs);
         }
 
         // Books a victory: grants the earned exp and records the win (kills, zone clears, and the
@@ -695,4 +701,12 @@ namespace Game.Application.Services
         public bool IsBossBattle { get; set; }
     }
 
+    /// <summary>
+    /// The outcome of <see cref="BattleService.ResolveStaleBattle"/>: either the stale battle is handed back
+    /// still active (<see cref="Handoff"/> non-null, <see cref="SettledBattleMs"/> null), or it was resolved —
+    /// crediting a win/loss/draw and clearing it (<see cref="Handoff"/> null) — in which case
+    /// <see cref="SettledBattleMs"/> carries the credited battle's own duration, or stays null if there was no
+    /// active battle to resolve in the first place.
+    /// </summary>
+    public record StaleBattleResolution(BattleStartResult? Handoff, int? SettledBattleMs);
 }
