@@ -28,6 +28,11 @@
 				onNew={newItem}
 			/>
 		</div>
+	{:else if error}
+		<div class="workbench-error" role="alert" data-testid="workbench-error">
+			<p>{error}</p>
+			<button type="button" class="btn" onclick={loadSeed}>Refresh</button>
+		</div>
 	{:else}
 		<Loading loading={true} delay={150} />
 	{/if}
@@ -36,6 +41,7 @@
 <script lang="ts">
 import { onMount, onDestroy } from 'svelte';
 import { Loading } from '$components';
+import { toastError } from '$stores';
 import './workbench.scss';
 import type { EntityConfig, Identified } from './entities/types';
 import { workbenchDirty } from './dirty.svelte';
@@ -52,14 +58,26 @@ interface Props {
 const { entity, groupLabel = '' }: Props = $props();
 
 let store = $state<EntityStore<Identified>>();
+let error = $state<string | null>(null);
 let selId = $state(0);
 let selectedTab = $state<string>();
 const tab = $derived(selectedTab ?? entity.sections[0]?.key);
 
-onMount(async () => {
-	const seed = await entity.refresh();
-	store = new EntityStore(entity, seed);
-	selId = seed[0]?.id ?? 0;
+async function loadSeed() {
+	error = null;
+	try {
+		const seed = await entity.refresh();
+		store = new EntityStore(entity, seed);
+		selId = seed[0]?.id ?? 0;
+	} catch (ex) {
+		const message = ex instanceof Error ? ex.message : 'Failed to load workbench data.';
+		error = message;
+		toastError(message);
+	}
+}
+
+onMount(() => {
+	void loadSeed();
 });
 
 // Cancel any pending "saved" flash timer so a save that lands near unmount can't
@@ -118,5 +136,22 @@ const newItem = () => {
 }
 .unsaved {
 	color: var(--text-secondary);
+}
+.workbench-error {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	padding: 20px;
+	text-align: center;
+
+	p {
+		max-width: 480px;
+		color: var(--error);
+		font-size: 13px;
+	}
 }
 </style>
