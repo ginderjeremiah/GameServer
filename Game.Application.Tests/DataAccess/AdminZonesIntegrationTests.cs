@@ -350,6 +350,52 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveZones_FlipZoneToHomeWithSpawns_ReturnsFailure()
+        {
+            int combatZoneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var zone = await TestDataSeeder.CreateZoneAsync(context, "Wilds");
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id, weight: 1);
+                combatZoneId = zone.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Flipping an already-spawn-populated combat zone to Home is the third way to leave the
+            // sanctuary with live spawns (the other two — a Home boss, and SetEnemies against a Home zone —
+            // are already guarded). The guard reasons over the zone's currently cached spawn table, not this
+            // save's own payload, since SaveZones never carries spawn data.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SaveZones(
+            [
+                new Change<Contracts.Zone>
+                {
+                    ChangeType = EChangeType.Edit,
+                    Item = new Contracts.Zone
+                    {
+                        Id = combatZoneId,
+                        Name = "Wilds",
+                        Description = "",
+                        DesignerNotes = "",
+                        LevelMin = 1,
+                        LevelMax = 10,
+                        BossLevel = 1,
+                        IsHome = true,
+                    },
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "The Home zone cannot have enemy spawns. Home is a no-combat sanctuary where no enemies spawn; clear the zone's spawn table before making it Home.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveZones_RetiredHomeZone_DoesNotBlockNewHome()
         {
             using (var seedScope = CreateScope())
