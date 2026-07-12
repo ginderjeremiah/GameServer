@@ -7,8 +7,11 @@ namespace Game.Api.Sockets.Commands
     /// <summary>
     /// Starts a deterministic battle against the current (or requested) zone's dedicated boss. Mirrors
     /// <see cref="NewEnemy"/> but for the always-available "Challenge Boss" action: there is no cooldown
-    /// gate, and the response reuses <see cref="NewEnemyModel"/>. Returns an error when the zone has no
-    /// dedicated boss authored.
+    /// gate on the request itself, and the response reuses <see cref="NewEnemyModel"/>, including the
+    /// same anchored-cooldown handshake (#1884) — when this call's own abandon resolved a win/loss/draw,
+    /// the returned battle's start is anchored to that cooldown's expiry and <see
+    /// cref="NewEnemyModel.Cooldown"/> tells the client to wait it out before treating the boss as live.
+    /// Returns an error when the zone has no dedicated boss authored.
     /// </summary>
     public class ChallengeBoss : AbstractSocketCommand<NewEnemyModel, ChallengeBossRequest>
     {
@@ -46,9 +49,16 @@ namespace Game.Api.Sockets.Commands
             _logger.LogDebug("ChallengeBoss: (zoneId: {ZoneId}, enemyId: {EnemyId}, level: {Level}, seed: {Seed})",
                 zoneId, result.Enemy.Id, result.Enemy.Level, result.Seed);
 
+            // Still in the future only when this call's own abandon resolved a win/loss/draw and incurred the
+            // post-battle cooldown (BattleService.StartBossBattle's abandonedOutcomeCooldown, #1884): the
+            // returned battle's start was anchored to that cooldown's expiry rather than now, so the client
+            // must wait it out before treating the boss as live — mirroring NewEnemy's identical handshake.
+            var afterStart = DateTime.UtcNow;
+
             return Success(new NewEnemyModel
             {
-                EnemyInstance = EnemyInstance.FromSource(result)
+                EnemyInstance = EnemyInstance.FromSource(result),
+                Cooldown = state.EnemyCooldown > afterStart ? (state.EnemyCooldown - afterStart).TotalMilliseconds : null,
             });
         }
     }

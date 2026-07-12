@@ -965,6 +965,52 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBossBattle_AbandoningAWonBattle_SetsPostBattleCooldownAndAnchorsReplacementBossBattle()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Boss Zone", levelMin: 10, levelMax: 10, bossEnemyId: boss.Id, bossLevel: 10);
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBossBattle(player, state, zone.Id);
+
+            // Backdate so the abandon (triggered by the next ChallengeBoss) resolves as a real win.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            var beforeAbandon = DateTime.UtcNow;
+
+            // Regression coverage for #1884 (the boss-path variant of #1851): a scripted client looping
+            // ChallengeBoss without ever sending DefeatEnemy must not be able to farm away the post-battle
+            // pacing cooldown, exactly like the already-covered NewEnemy loop cannot.
+            var next = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.NotNull(next);
+            Assert.True(state.EnemyCooldown >= beforeAbandon + BattleService.PostBattleCooldown);
+
+            // The replacement boss battle spawned in the same call is anchored to that cooldown's expiry —
+            // not to now — so the cooldown just incurred actually paces the next fight instead of being
+            // bypassed.
+            Assert.Equal(state.EnemyCooldown, state.BattleStartTime);
+        }
+
+        [Fact]
         public async Task StartBossBattle_BosslessZoneWithActiveBattle_ReturnsNullAndLeavesBattleUntouched()
         {
             using var scope = CreateScope();

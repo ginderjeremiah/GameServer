@@ -414,6 +414,18 @@ export class EnemyManager {
 				return;
 			}
 			if (result.data?.enemyInstance) {
+				// A positive cooldown means this call's own abandon resolved a win/loss/draw and the server
+				// anchored the returned boss battle's start to that cooldown's expiry (#1884, the boss-path
+				// variant of #1851/#1881's NewEnemy handshake) rather than now — wait it out before presenting
+				// the boss so the client's battle clock doesn't start ahead of the server's anchor.
+				if (result.data.cooldown) {
+					await battleEngine.startLoading(result.data.cooldown);
+					// The awaited cooldown can overlap a stop / superseding transition; re-check before
+					// presenting so a resolved wait can't clobber the fight the supersession moved on to.
+					if (!this.started || generation !== this.transitionGeneration) {
+						return;
+					}
+				}
 				this.currentEnemy = result.data.enemyInstance;
 				notifyNewEnemyLoaded(this.currentEnemy);
 				// Now genuinely in the boss loop, so persist boss mode iff auto-fight is armed — a pre-armed

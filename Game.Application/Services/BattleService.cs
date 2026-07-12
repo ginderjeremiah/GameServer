@@ -210,6 +210,13 @@ namespace Game.Application.Services
                 return null;
             }
 
+            // Non-null only when the abandoned battle resolved to a win/loss/draw (AbandonBattle just applied
+            // the post-battle cooldown to state.EnemyCooldown, #1851) — mirrors StartBattle's
+            // abandonedOutcomeCooldown (#1884). Without this, a scripted ChallengeBoss loop pays each abandoned
+            // win in full while spawning the next boss battle immediately, farming away the pacing cooldown a
+            // loop through NewEnemy already cannot.
+            DateTime? abandonedOutcomeCooldown = null;
+
             if (state.HasActiveBattle)
             {
                 // Deliberate override: challenging the boss always abandons whatever idle battle is running
@@ -218,9 +225,14 @@ namespace Game.Application.Services
                 // Nothing was cleared or persisted for a still-in-progress abandon, so overwriting the
                 // in-memory state below with the boss battle is safe either way.
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+
+                if (state.EnemyCooldown > DateTime.UtcNow)
+                {
+                    abandonedOutcomeCooldown = state.EnemyCooldown;
+                }
             }
 
-            var now = DateTime.UtcNow;
+            var now = abandonedOutcomeCooldown ?? DateTime.UtcNow;
             var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBossEnemy(zone, _zoneResolution.BossEnemyResolver(zone));
