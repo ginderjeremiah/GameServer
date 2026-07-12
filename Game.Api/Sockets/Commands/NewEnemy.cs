@@ -39,12 +39,19 @@ namespace Game.Api.Sockets.Commands
             _logger.LogDebug("NewEnemy: (enemyId: {EnemyId}, level: {Level}, seed: {Seed})",
                 result.Enemy.Id, result.Enemy.Level, result.Seed);
 
+            // Still in the future only when this call's own abandon resolved a win/loss/draw and incurred the
+            // post-battle cooldown (BattleService.StartBattle's abandonedOutcomeCooldown, #1851): the returned
+            // battle's start was anchored to that cooldown's expiry rather than now, so the client must wait it
+            // out before treating the enemy as live — mirroring DefeatEnemy's bundled-next-battle cooldown.
+            var afterStart = DateTime.UtcNow;
+
             return Success(new NewEnemyModel
             {
                 EnemyInstance = EnemyInstance.FromSource(result),
                 // The authoritative zone after any lazy relocation, so the client follows a server-side move
                 // out of a now-unplayable zone instead of repeatedly requesting the stale one.
                 ZoneId = player.CurrentZoneId,
+                Cooldown = state.EnemyCooldown > afterStart ? (state.EnemyCooldown - afterStart).TotalMilliseconds : null,
             });
         }
     }

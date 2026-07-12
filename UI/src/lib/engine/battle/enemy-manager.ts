@@ -280,6 +280,20 @@ export class EnemyManager {
 					// PlayerState never actually abandoned — trust its isBossBattle flag over this fetch
 					// loop's own idle-only assumption so the client routes into the boss loop (#1647).
 					this.mode = result.data.enemyInstance.isBossBattle ? 'boss' : 'idle';
+
+					// A positive cooldown means this call's own abandon resolved a win/loss/draw and the
+					// server anchored the returned battle's start to that cooldown's expiry (#1851) rather
+					// than now — wait it out before presenting the enemy so the client's battle clock doesn't
+					// start ahead of the server's anchor, mirroring the DefeatEnemy/BattleLost cooldown wait.
+					if (result.data.cooldown) {
+						await battleEngine.startLoading(result.data.cooldown);
+						// The awaited cooldown can overlap a stop / superseding transition; re-check before
+						// presenting so a resolved wait can't clobber the fight the supersession moved on to.
+						if (!this.started || generation !== this.fetchGeneration) {
+							return;
+						}
+					}
+
 					this.currentEnemy = result.data.enemyInstance;
 					notifyNewEnemyLoaded(this.currentEnemy);
 					return;
