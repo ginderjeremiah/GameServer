@@ -19,13 +19,13 @@ import { staticData } from '$stores';
 import {
 	SKILL_ACQUISITION_EMPTY,
 	SKILL_SOURCE_LABEL,
+	type EntityStatVM,
 	enemyAccent,
 	formatBaseDamage,
 	formatCooldown,
 	liveEnemies,
 	liveSkills
 } from './codex-display';
-import type { EntityStatVM } from './codex-view.svelte';
 import { type SkillAcquisitionStatus, resolveSkillProvenance } from './skill-provenance';
 import type { StatEntityKind } from '../stats/statistics-view.svelte';
 

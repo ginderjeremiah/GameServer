@@ -19,6 +19,13 @@ export type EnemySort = 'level' | 'name';
 /** A zone's progression status on the Zones rail. */
 export type ZoneStatus = 'cleared' | 'unlocked' | 'locked';
 
+/** A single per-entity statistic row shown in a dossier's "Your record" section
+ *  (shared by the enemy, zone and skill dossiers). */
+export interface EntityStatVM {
+	label: string;
+	value: string;
+}
+
 export const CODEX_TABS: CodexTab[] = ['enemies', 'zones', 'skills'];
 
 export const ENEMY_FILTERS: { key: EnemyFilter; label: string }[] = [

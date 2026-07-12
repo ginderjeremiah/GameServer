@@ -5,8 +5,14 @@
 
 import type { IZone } from '$lib/api';
 import { playerChallenges, staticData, statistics } from '$stores';
-import { type ZoneStatus, formatBand, liveEnemies, liveZones, resolveZoneStatus } from './codex-display';
-import type { EntityStatVM } from './codex-view.svelte';
+import {
+	type EntityStatVM,
+	type ZoneStatus,
+	formatBand,
+	liveEnemies,
+	liveZones,
+	resolveZoneStatus
+} from './codex-display';
 import { spawnShare, zoneTotalWeight } from './enemy-level';
 import type { StatEntityKind } from '../stats/statistics-view.svelte';
 

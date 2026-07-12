@@ -35,6 +35,7 @@ import {
 	type EnemyFilter,
 	type EnemySort,
 	type EnemySubTab,
+	type EntityStatVM,
 	tabAccent,
 	tabLabel
 } from './codex-display';
@@ -90,13 +91,6 @@ export interface CodexTabVM {
 	count: number;
 	accent: string;
 	active: boolean;
-}
-
-/** A single per-entity statistic row shown in a dossier's "Your record" section
- *  (shared by the enemy, zone and skill dossiers). */
-export interface EntityStatVM {
-	label: string;
-	value: string;
 }
 
 /* ── reactive view-model ──────────────────────────────────────────────────── */

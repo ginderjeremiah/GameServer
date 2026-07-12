@@ -10,6 +10,7 @@ import {
 	type EnemyFilter,
 	type EnemySort,
 	type EnemySubTab,
+	type EntityStatVM,
 	enemyAccent,
 	enemyKindLabel,
 	formatBand,
@@ -18,7 +19,6 @@ import {
 	matchesEnemySearch,
 	sortEnemyRows
 } from './codex-display';
-import type { EntityStatVM } from './codex-view.svelte';
 import { type LevelRange, levelRange, spawnShare, zoneTotalWeight } from './enemy-level';
 import type { StatEntityKind } from '../stats/statistics-view.svelte';
 

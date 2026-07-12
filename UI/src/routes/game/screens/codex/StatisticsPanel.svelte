@@ -24,7 +24,7 @@
 </div>
 
 <script lang="ts">
-import type { EntityStatVM } from './codex-view.svelte';
+import type { EntityStatVM } from './codex-display';
 
 interface Props {
 	/** The statistics referencing this entity (label + formatted value). */
