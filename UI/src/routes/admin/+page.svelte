@@ -99,7 +99,7 @@ const backToGame = async () => {
 	}
 };
 
-// Guards the browser Back/Forward buttons, the client-side exit `handleNavigate`/`backToGame`
+// Guards the browser Back/Forward buttons — a client-side exit that handleNavigate/backToGame
 // don't cover (see discard-guard.ts).
 beforeNavigate(createPopStateDiscardGuard(() => workbenchDirty.total));
 
