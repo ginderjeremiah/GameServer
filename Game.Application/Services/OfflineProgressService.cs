@@ -129,9 +129,21 @@ namespace Game.Application.Services
             // window that hasn't actually elapsed for this fight. LastActivity is deliberately left untouched
             // (nothing was persisted), so the away clock keeps counting against the original disconnect until
             // real server time actually resolves the fight.
-            if (await _battleService.ResolveStaleBattle(player, state, cancellationToken) is { } handoff)
+            var (handoff, settledBattleMs) = await _battleService.ResolveStaleBattle(player, state, cancellationToken);
+            if (handoff is not null)
             {
                 return OfflineProgressSummary.StillInProgress(handoff, cappedAwayMs, player.AutoChallengeBoss, player.CurrentZoneId);
+            }
+
+            // The settled battle's own credited duration, plus its post-battle cooldown, is real wall-clock time
+            // that already elapsed inside [LastActivity, now] — deduct it from what the simulator below is
+            // about to replay as fresh battles, or that same span gets credited twice (#1882): once via the
+            // settle above, again as free simulated time.
+            var simulationAwayMs = awayMs;
+            if (settledBattleMs is int credited)
+            {
+                var settledSpanMs = credited + (long)BattleService.PostBattleCooldown.TotalMilliseconds;
+                simulationAwayMs = Math.Max(0, awayMs - settledSpanMs);
             }
 
             // Load the progress aggregate once for the whole offline pass. Its completed challenges (loop/zone
@@ -143,7 +155,7 @@ namespace Game.Application.Services
 
             var (mode, zone) = await ResolveOfflineLoop(player, completedChallengeIds, cancellationToken);
             var proficiencyLevels = ToProficiencyLevels(progress.Proficiencies);
-            var parameters = BuildSimulationParameters(player, mode, zone, awayMs, proficiencyLevels);
+            var parameters = BuildSimulationParameters(player, mode, zone, simulationAwayMs, proficiencyLevels);
 
             var result = _offlineSimulator.Simulate(parameters, cancellationToken);
 

@@ -1471,11 +1471,15 @@ namespace Game.Application.Tests.Services
             await battleService.StartBattle(player, state, zoneId: zone.Id);
             state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
 
-            var handoff = await battleService.ResolveStaleBattle(player, state);
+            var resolution = await battleService.ResolveStaleBattle(player, state);
 
-            Assert.Null(handoff);
+            Assert.Null(resolution.Handoff);
             Assert.False(state.HasActiveBattle);
             Assert.True(player.Exp > expBefore);
+            // The one-shot skill concludes almost instantly, well under the 2-minute cap — regardless of how
+            // stale (10 minutes) the battle's wall-clock age was.
+            Assert.NotNull(resolution.SettledBattleMs);
+            Assert.InRange(resolution.SettledBattleMs.Value, 1, GameConstants.DefaultMaxBattleMs - 1);
         }
 
         [Fact]
@@ -1511,11 +1515,13 @@ namespace Game.Application.Tests.Services
             await battleService.StartBattle(player, state, zoneId: zone.Id);
             state.BattleStartTime = DateTime.UtcNow.AddDays(-30);
 
-            var handoff = await battleService.ResolveStaleBattle(player, state);
+            var resolution = await battleService.ResolveStaleBattle(player, state);
 
-            Assert.Null(handoff);
+            Assert.Null(resolution.Handoff);
             Assert.False(state.HasActiveBattle);
             Assert.True(player.Exp > expBefore);
+            Assert.NotNull(resolution.SettledBattleMs);
+            Assert.InRange(resolution.SettledBattleMs.Value, 1, GameConstants.DefaultMaxBattleMs - 1);
         }
 
         [Fact]
@@ -1556,12 +1562,14 @@ namespace Game.Application.Tests.Services
                 state.BattleStartTime = battleStart;
                 var enemyId = state.ActiveEnemyId;
 
-                var handoff = await battleService.ResolveStaleBattle(player, state);
+                var resolution = await battleService.ResolveStaleBattle(player, state);
 
-                Assert.NotNull(handoff);
-                Assert.Equal(enemyId, handoff.Enemy.Id);
-                Assert.NotNull(handoff.ElapsedOffsetMs);
-                Assert.True(handoff.ElapsedOffsetMs is >= 29_000 and < GameConstants.DefaultMaxBattleMs);
+                Assert.NotNull(resolution.Handoff);
+                Assert.Equal(enemyId, resolution.Handoff.Enemy.Id);
+                Assert.NotNull(resolution.Handoff.ElapsedOffsetMs);
+                Assert.True(resolution.Handoff.ElapsedOffsetMs is >= 29_000 and < GameConstants.DefaultMaxBattleMs);
+                // A handoff means nothing was settled — no credited span for the caller to deduct.
+                Assert.Null(resolution.SettledBattleMs);
                 Assert.True(state.HasActiveBattle);
                 Assert.Equal(enemyId, state.ActiveEnemyId);
                 Assert.Equal(battleStart, state.BattleStartTime);
@@ -1579,11 +1587,13 @@ namespace Game.Application.Tests.Services
                 await battleService.StartBattle(player, state, zoneId: zone.Id);
                 state.BattleStartTime = DateTime.UtcNow.AddMinutes(-20);
 
-                var handoff = await battleService.ResolveStaleBattle(player, state);
+                var resolution = await battleService.ResolveStaleBattle(player, state);
 
-                Assert.Null(handoff);
+                Assert.Null(resolution.Handoff);
                 Assert.False(state.HasActiveBattle);
                 Assert.Equal(expBefore, player.Exp);
+                // A genuine draw is credited at exactly the cap.
+                Assert.Equal(GameConstants.DefaultMaxBattleMs, resolution.SettledBattleMs);
             }
         }
 
