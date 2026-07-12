@@ -124,6 +124,29 @@ describe('SectionTable', () => {
 		expect((screen.getByText('Assign zone').closest('button') as HTMLButtonElement).disabled).toBe(true);
 	});
 
+	it('disables the empty-state Add control (instead of crashing) when the option catalogue is empty', () => {
+		const emptyOptsSection: TableSectionConfig<Row> = {
+			...section,
+			columns: [
+				{ key: 'zoneId', label: 'Zone', type: 'select', options: () => [], unique: true },
+				{ key: 'weight', label: 'Weight', type: 'number', align: 'r' },
+				{ key: '__share', label: 'Share', type: 'share', weightKey: 'weight' }
+			]
+		};
+		const { store, record, baseline } = setup([]);
+		render(SectionTable, {
+			props: {
+				section: emptyOptsSection as unknown as TableSectionConfig<Identified>,
+				record: record as Identified,
+				baseline,
+				store: store as unknown as EntityStore<Identified>
+			}
+		});
+		const button = screen.getByText('Assign zone').closest('button') as HTMLButtonElement;
+		expect(button.disabled).toBe(true);
+		expect(button.title).toBe('Every option is already assigned');
+	});
+
 	it('marks a newly added row with the added edge', () => {
 		const store = new EntityStore(config(), [{ id: 1, spawns: [{ zoneId: 0, weight: 5 }] }]);
 		store.patch(1, (d) => d.spawns.push({ zoneId: 1, weight: 2 }));
