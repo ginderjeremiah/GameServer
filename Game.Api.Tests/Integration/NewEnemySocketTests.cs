@@ -154,7 +154,7 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Data);
             Assert.NotNull(response.Data.EnemyInstance);
             Assert.NotNull(response.Data.Cooldown);
-            Assert.InRange(response.Data.Cooldown!.Value, 1, 5000);
+            Assert.True(response.Data.Cooldown is > 0 and <= 5000);
         }
     }
 }
