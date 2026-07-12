@@ -238,6 +238,48 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveModSlots_DeleteOfOccupiedSlotWithMismatchedItemId_IsGuardedNoOp()
+        {
+            int otherItemId, slotId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var user = await TestDataSeeder.CreateUserAsync(context);
+                var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                var item = await TestDataSeeder.CreateItemAsync(context);
+                var otherItem = await TestDataSeeder.CreateItemAsync(context, name: "Other Item");
+                var slot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id, EItemModType.Prefix);
+                var mod = await TestDataSeeder.CreateItemModAsync(context);
+                await TestDataSeeder.ApplyModToItemAsync(context, player.Id, item.Id, slot.Id, mod.Id);
+
+                otherItemId = otherItem.Id;
+                slotId = slot.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The occupancy guard must agree with the membership guard below it: a delete naming a slot the
+            // stated item doesn't actually have is reconciled away as a no-op, even when that slot happens to
+            // be occupied under its real owning item — not rejected on the occupancy check.
+            var changes = new List<Change<Contracts.ItemModSlot>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Delete,
+                    Item = new Contracts.ItemModSlot { Id = slotId, ItemId = otherItemId },
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            var result = await admin.SaveModSlots(changes);
+
+            Assert.True(result.Succeeded);
+
+            var context2 = scope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.True(await context2.ItemModSlots.AnyAsync(s => s.Id == slotId, CancellationToken));
+        }
+
+        [Fact]
         public async Task SaveModSlots_EditAndDeleteOfNonMemberSlot_AreGuardedNoOps()
         {
             int itemId, slotId;

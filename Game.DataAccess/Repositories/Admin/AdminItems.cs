@@ -267,23 +267,6 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.NotFound("Item");
             }
 
-            // A deleted slot that is still occupied by a player's applied mod would otherwise FK-fault at
-            // commit (or, pre-#1885, cascade-delete every occupying player's AppliedMod row outright). Reject
-            // up front as a graceful failure, mirroring the other content-lifecycle retirement guards.
-            var deletedSlotIds = changes
-                .Where(c => c.ChangeType == EChangeType.Delete)
-                .Select(c => c.Item.Id)
-                .ToList();
-            if (deletedSlotIds.Count > 0)
-            {
-                var occupiedSlotIds = await _appliedMods.GetOccupiedSlotIds(deletedSlotIds).ToHashSetAsync(cancellationToken: cancellationToken);
-                if (occupiedSlotIds.Count > 0)
-                {
-                    return AdminSaveResult.Failure(
-                        $"Item mod slot {occupiedSlotIds.First()} is occupied by at least one player's applied mod and cannot be deleted.");
-                }
-            }
-
             // Memoize each referenced item's current slot-id set so the Edit/Delete membership guard is an
             // O(1) lookup, not a per-change linear scan over the item's slots.
             var slotIdsByItem = new Dictionary<int, HashSet<int>>();
@@ -295,6 +278,26 @@ namespace Game.DataAccess.Repositories.Admin
                     slotIdsByItem[itemId] = ids;
                 }
                 return ids;
+            }
+
+            // A deleted slot that is still occupied by a player's applied mod would otherwise FK-fault at
+            // commit (or, pre-#1885, cascade-delete every occupying player's AppliedMod row outright). Reject
+            // up front as a graceful failure, mirroring the other content-lifecycle retirement guards. Scoped
+            // to deletes that are actual members of their named item — a delete naming a slot the item
+            // doesn't have is reconciled away as a no-op below (the membership guard), never rejected, and
+            // the occupancy check must agree with that rather than rejecting on a mismatched ItemId.
+            var deletedSlotIds = changes
+                .Where(c => c.ChangeType == EChangeType.Delete && SlotIds(c.Item.ItemId).Contains(c.Item.Id))
+                .Select(c => c.Item.Id)
+                .ToList();
+            if (deletedSlotIds.Count > 0)
+            {
+                var occupiedSlotIds = await _appliedMods.GetOccupiedSlotIds(deletedSlotIds).ToHashSetAsync(cancellationToken: cancellationToken);
+                if (occupiedSlotIds.Count > 0)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Item mod slot {occupiedSlotIds.First()} is occupied by at least one player's applied mod and cannot be deleted.");
+                }
             }
 
             return ChangeSetProcessor.Apply(changes,
