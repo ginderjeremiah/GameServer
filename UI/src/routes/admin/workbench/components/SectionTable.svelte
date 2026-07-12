@@ -5,6 +5,7 @@
 		sub={section.emptySub}
 		addLabel={section.addLabel}
 		onAdd={add}
+		{noFree}
 	/>
 {:else}
 	<div>
