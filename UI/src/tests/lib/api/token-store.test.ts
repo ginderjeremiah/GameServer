@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
 	clearTokens,
 	getAccessToken,
@@ -25,6 +25,9 @@ function makeAccessToken(exp: number): string {
 describe('token-store', () => {
 	beforeEach(() => {
 		localStorage.clear();
+		// Reset the module's in-memory mirror/write-failure flag between tests too, since they're
+		// module-level state that would otherwise leak across cases.
+		clearTokens();
 	});
 
 	it('returns null when no tokens are stored', () => {
@@ -150,5 +153,59 @@ describe('token-store', () => {
 
 		expect(getAccessTokenExpiry()).toBeNull();
 		expect(getRoles()).toEqual([]);
+	});
+
+	describe('degraded storage', () => {
+		it('serves the freshly set pair from memory when the storage write throws (quota exceeded)', () => {
+			const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+				throw new DOMException('quota exceeded', 'QuotaExceededError');
+			});
+
+			expect(() => setTokens({ accessToken: 'a', refreshToken: 'r' })).not.toThrow();
+			expect(getTokens()).toEqual({ accessToken: 'a', refreshToken: 'r' });
+			// The write genuinely never landed in storage.
+			expect(localStorage.getItem('gameserver.auth-tokens')).toBeNull();
+
+			spy.mockRestore();
+		});
+
+		it('resumes reading from storage once a write succeeds again after a prior failure', () => {
+			const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+				throw new DOMException('quota exceeded', 'QuotaExceededError');
+			});
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			spy.mockRestore();
+
+			setTokens({ accessToken: 'a2', refreshToken: 'r2' });
+
+			expect(getTokens()).toEqual({ accessToken: 'a2', refreshToken: 'r2' });
+			expect(localStorage.getItem('gameserver.auth-tokens')).toBe(
+				JSON.stringify({ accessToken: 'a2', refreshToken: 'r2' })
+			);
+		});
+
+		it('falls back to memory when reading storage throws', () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+				throw new DOMException('storage blocked', 'SecurityError');
+			});
+
+			expect(getTokens()).toEqual({ accessToken: 'a', refreshToken: 'r' });
+
+			spy.mockRestore();
+		});
+
+		it('clearTokens resets the memory mirror and the write-failure state', () => {
+			const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+				throw new DOMException('quota exceeded', 'QuotaExceededError');
+			});
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			spy.mockRestore();
+
+			clearTokens();
+
+			expect(getTokens()).toBeNull();
+		});
 	});
 });
