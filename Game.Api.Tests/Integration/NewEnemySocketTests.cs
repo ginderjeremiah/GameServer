@@ -1,5 +1,6 @@
 using Game.Api.Models.Enemies;
 using Game.Api.Services;
+using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -15,6 +16,16 @@ namespace Game.Api.Tests.Integration
     public class NewEnemySocketTests : ApiIntegrationTestBase
     {
         public NewEnemySocketTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
+
+        private async Task SetPlayerState(int userId, Action<PlayerState> modifyState)
+        {
+            using var scope = CreateScope();
+            var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
+            sessionService.SetAuthenticatedUser(userId);
+            await sessionService.LoadPlayerState();
+            modifyState(sessionService.PlayerState);
+            await sessionService.SavePlayerStateAsync();
+        }
 
         private async Task<(int UserId, int PlayerId, int ZoneId, int Zone2Id)> SeedBattleDataAsync()
         {
@@ -102,6 +113,48 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Data);
             Assert.NotNull(response.Data.Cooldown);
             Assert.True(response.Data.Cooldown > 0);
+        }
+
+        [Fact]
+        public async Task NewEnemy_AbandonResolvesOutcome_BundlesTheIncurredCooldownWithTheReplacementEnemy()
+        {
+            var (userId, _, _, _) = await SeedBattleDataAsync();
+
+            var wsClient = Factory.Server.CreateWebSocketClient();
+
+            await using (var socketClient1 = new TestSocketClient())
+            {
+                await socketClient1.ConnectAsync(wsClient, userId);
+
+                var newEnemyResponse = await socketClient1.SendCommandAsync<NewEnemyModel>(
+                    "NewEnemy", new { NewZoneId = (int?)null });
+                Assert.Null(newEnemyResponse.Error);
+                Assert.NotNull(newEnemyResponse.Data?.EnemyInstance);
+
+                await socketClient1.CloseAsync();
+            }
+
+            // Backdate the in-flight battle so the next NewEnemy's abandon (#1851) resolves a real outcome
+            // instead of handing it back still in progress (#1595) — mirrors BattleLost_ValidLoss_Succeeds.
+            await SetPlayerState(userId, state =>
+            {
+                state.BattleStartTime = DateTime.UtcNow.AddMinutes(-30);
+            });
+
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            // Regression coverage for #1881: a client that never sends DefeatEnemy/BattleLost and instead
+            // loops NewEnemy (exactly what an idle loss/draw does) must get the just-incurred cooldown on the
+            // SAME response as the fresh enemy, not a fresh enemy silently anchored ahead of it.
+            var response = await socketClient.SendCommandAsync<NewEnemyModel>(
+                "NewEnemy", new { NewZoneId = (int?)null });
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.NotNull(response.Data.EnemyInstance);
+            Assert.NotNull(response.Data.Cooldown);
+            Assert.InRange(response.Data.Cooldown!.Value, 1, 5000);
         }
     }
 }

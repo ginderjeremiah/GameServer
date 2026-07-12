@@ -72,6 +72,7 @@ describe('EnemyManager.getNewEnemy', () => {
 		manager.started = true;
 		vi.mocked(logMessage).mockClear();
 		vi.mocked(delay).mockClear();
+		vi.mocked(battleEngine.startLoading).mockClear();
 		sendSocketCommand = vi.spyOn(apiSocket, 'sendSocketCommand');
 		sendSocketCommand.mockReset();
 	});
@@ -144,6 +145,40 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(delay).toHaveBeenCalledWith(500);
 		expect(manager.currentEnemy).toEqual(makeEnemy(1));
 		expect(logMessage).not.toHaveBeenCalled();
+	});
+
+	// #1881: when this call's own abandon resolved an idle loss/draw's outcome, the server anchors the
+	// returned battle's start to the just-incurred post-battle cooldown (#1851) rather than now. Presenting
+	// the enemy immediately would run the client's battle clock ahead of that anchor, so the client must
+	// wait out the bundled cooldown first — mirroring the DefeatEnemy/BattleLost cooldown/prefetch flow.
+	it('waits out an abandon-incurred cooldown bundled with the enemy before presenting it', async () => {
+		const enemy = makeEnemy(5);
+		sendSocketCommand.mockResolvedValue({
+			id: '1',
+			name: 'NewEnemy',
+			data: { enemyInstance: enemy, cooldown: 4500 }
+		} as IApiSocketResponse<'NewEnemy'>);
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		await manager.getNewEnemy();
+
+		expect(battleEngine.startLoading).toHaveBeenCalledWith(4500);
+		expect(manager.currentEnemy).toEqual(enemy);
+		expect(loaded).toEqual([enemy]);
+	});
+
+	it('presents a freshly spawned enemy immediately when no cooldown is bundled with it', async () => {
+		sendSocketCommand.mockResolvedValue({
+			id: '1',
+			name: 'NewEnemy',
+			data: { enemyInstance: makeEnemy(6), cooldown: 0 }
+		} as IApiSocketResponse<'NewEnemy'>);
+
+		await manager.getNewEnemy();
+
+		expect(battleEngine.startLoading).not.toHaveBeenCalled();
+		expect(manager.currentEnemy).toEqual(makeEnemy(6));
 	});
 
 	it('backs off by the default retry delay on a no-enemy response with cooldown 0 (no tight loop)', async () => {
