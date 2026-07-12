@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
 	state: {
 		lsStore: {} as Record<string, string>,
 		lsAvailable: true,
+		setItemThrows: false,
 		idleTimeLostCb: undefined as ((ms: number) => void) | undefined
 	}
 }));
@@ -19,6 +20,9 @@ vi.mock('$lib/common/local-storage', () => ({
 			? {
 					getItem: (k: string) => h.state.lsStore[k] ?? null,
 					setItem: (k: string, v: string) => {
+						if (h.state.setItemThrows) {
+							throw new DOMException('quota exceeded', 'QuotaExceededError');
+						}
 						h.state.lsStore[k] = v;
 					}
 				}
@@ -52,6 +56,7 @@ describe('BackgroundThrottleMonitor', () => {
 		vi.clearAllMocks();
 		h.state.lsStore = {};
 		h.state.lsAvailable = true;
+		h.state.setItemThrows = false;
 		h.state.idleTimeLostCb = undefined;
 		hidden = false;
 		Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
@@ -173,6 +178,16 @@ describe('BackgroundThrottleMonitor', () => {
 		lose(70_000);
 		goVisible();
 
+		expect(h.toastWarning).toHaveBeenCalledTimes(1);
+	});
+
+	it('still shows the notice when persisting the one-time flag throws (quota exceeded)', () => {
+		h.state.setItemThrows = true;
+		monitor.start();
+		goHidden();
+		lose(70_000);
+
+		expect(() => goVisible()).not.toThrow();
 		expect(h.toastWarning).toHaveBeenCalledTimes(1);
 	});
 
