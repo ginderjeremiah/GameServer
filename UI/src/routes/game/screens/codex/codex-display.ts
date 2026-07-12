@@ -3,6 +3,7 @@
    restyles with the theme. Kept store-free (no reactive state) so the view-model and its tests import
    the types/formatters without a cycle. */
 
+import type { IEnemy, ISkill, IZone } from '$lib/api';
 import { formatNum } from '$lib/common';
 import type { LevelRange } from './enemy-level';
 import type { SkillAcquisitionStatus } from './skill-provenance';
@@ -119,3 +120,16 @@ export function sortEnemyRows(sort: EnemySort): (a: EnemySearchSortFields, b: En
 			return (a, b) => a.level - b.level || a.name.localeCompare(b.name);
 	}
 }
+
+/* ── catalogue helpers (shared by every tab's reactive layer) — retirement keeps a slot resolvable
+   but out of the glossary. ── */
+
+/** Live (non-retired) enemies. */
+export const liveEnemies = (enemies: IEnemy[] | undefined): IEnemy[] => (enemies ?? []).filter((e) => !e.retiredAt);
+
+/** Live (non-retired) zones in authored progression order. */
+export const liveZones = (zones: IZone[] | undefined): IZone[] =>
+	(zones ?? []).filter((z) => !z.retiredAt).sort((a, b) => a.order - b.order);
+
+/** Live (non-retired) skills in catalogue order. */
+export const liveSkills = (skills: ISkill[] | undefined): ISkill[] => (skills ?? []).filter((s) => !s.retiredAt);
