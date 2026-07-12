@@ -582,6 +582,27 @@ describe('BattleEngine', () => {
 			expect(engine.timeElapsed).toBe(DEFAULT_MAX_BATTLE_MS);
 			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.stringContaining('draw'));
 		});
+
+		// Defensive: a malformed hand-back (e.g. a raw away-window offset) must not run the replay past the
+		// 2-minute cap — the loop clamps rather than trusting offsetMs outright.
+		it('clamps an oversized offset to the 2-minute cap instead of replaying past it', () => {
+			mockSkills[0].baseDamage = 0; // a true stalemate: neither side can ever land the killing blow
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				isBossBattle: false,
+				selectedSkills: [0],
+				attributes: [],
+				elapsedOffsetMs: DEFAULT_MAX_BATTLE_MS * 100
+			});
+
+			expect(engine.stage).toBe(BattleStage.Drawn);
+			expect(engine.timeElapsed).toBe(DEFAULT_MAX_BATTLE_MS);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.stringContaining('draw'));
+		});
 	});
 
 	describe('startLoading', () => {

@@ -222,12 +222,14 @@ export class BattleEngine {
 	 * backend `BattleSimulator.Simulate`'s loop exactly (tick death-checks, then the `totalMs - tickSize`
 	 * exit value) so the two stay in lockstep. Resolves into whichever stage {@link logicalUpdate} would
 	 * have reached by that point — defensive: the server only ever hands back an unconcluded, under-cap
-	 * battle (#1595/#1596), but the tick boundary makes replaying a conclusion possible. Bounded by
-	 * `DEFAULT_MAX_BATTLE_MS` (the server never reports a larger offset), so at most ~3000 ticks.
+	 * battle (#1595/#1596), but the tick boundary makes replaying a conclusion possible. Clamped to
+	 * `DEFAULT_MAX_BATTLE_MS` (the server never reports a larger offset, but a malformed hand-back
+	 * shouldn't run the main thread through an unbounded replay), so at most ~3000 ticks.
 	 */
 	private replayToOffset(offsetMs: number) {
+		const cappedOffsetMs = Math.min(offsetMs, DEFAULT_MAX_BATTLE_MS);
 		let totalMs = tickSize;
-		for (; totalMs <= offsetMs; totalMs += tickSize) {
+		for (; totalMs <= cappedOffsetMs; totalMs += tickSize) {
 			battleStep(this.player, this.enemy, tickSize, this.rng);
 			if (this.enemy.isDead || this.player.isDead) {
 				break;
