@@ -296,6 +296,10 @@ namespace Game.Core.Tests.Battle
 
             // Strength = 6 (free pool) + 4 (flat signature passive) = 10.
             Assert.Equal(10, battler.GetAttributeValue(EAttribute.Strength));
+            // The passive lands in the AttributeCollection before the ctor snapshots CurrentHealth (#1933's FE
+            // counterpart), so a passive that raises MaxHealth (Strength feeds it) must not leave the battler
+            // under-full.
+            Assert.Equal(battler.GetAttributeValue(EAttribute.MaxHealth), battler.CurrentHealth);
         }
 
         [Fact]
