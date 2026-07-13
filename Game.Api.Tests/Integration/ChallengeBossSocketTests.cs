@@ -177,5 +177,50 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(second.Data.Cooldown);
             Assert.True(second.Data.Cooldown is > 0 and <= 5000);
         }
+
+        [Fact]
+        public async Task ChallengeBoss_ReChallengedWhileANormalVictorysCooldownIsStillRunning_PacesWithACooldown()
+        {
+            var (userId, bossZoneId, _, _) = await SeedBossDataAsync();
+
+            var wsClient = Factory.Server.CreateWebSocketClient();
+
+            await using (var socketClient1 = new TestSocketClient())
+            {
+                await socketClient1.ConnectAsync(wsClient, userId);
+
+                var first = await socketClient1.SendCommandAsync<NewEnemyModel>(
+                    "ChallengeBoss", new { ZoneId = (int?)bossZoneId });
+                Assert.Null(first.Error);
+                Assert.NotNull(first.Data?.EnemyInstance);
+
+                await socketClient1.CloseAsync();
+            }
+
+            // Mirrors exactly what DefeatEnemy leaves behind on a normal (non-abandoned) victory claim: the
+            // battle cleared and a future post-battle cooldown set — the middle leg of the #1920 ChallengeBoss
+            // -> DefeatEnemy -> ChallengeBoss loop, without depending on the real boss fight's simulated
+            // duration to land the backdated claim's cooldown in the future.
+            await SetPlayerState(userId, state =>
+            {
+                state.ClearBattle();
+                state.SetCooldown(DateTime.UtcNow.AddSeconds(4));
+            });
+
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            // Regression coverage for #1920: unlike the abandon-driven loop above, this re-challenge has no
+            // active battle to abandon (HasActiveBattle is false), so the old code fell straight through to
+            // anchoring at now instead of the still-running cooldown.
+            var reChallenge = await socketClient.SendCommandAsync<NewEnemyModel>(
+                "ChallengeBoss", new { ZoneId = (int?)bossZoneId });
+
+            Assert.Null(reChallenge.Error);
+            Assert.NotNull(reChallenge.Data);
+            Assert.NotNull(reChallenge.Data.EnemyInstance);
+            Assert.NotNull(reChallenge.Data.Cooldown);
+            Assert.True(reChallenge.Data.Cooldown is > 0 and <= 4000);
+        }
     }
 }

@@ -1011,7 +1011,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task StartBossBattle_AbandonResolvesNoOutcomeWithLeftoverCooldown_DoesNotAnchorToTheStaleCooldown()
+        public async Task StartBossBattle_AbandonResolvesNoOutcomeWithLeftoverCooldown_AnchorsToTheLeftoverCooldown()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -1048,14 +1048,58 @@ namespace Game.Application.Tests.Services
             var leftoverCooldown = DateTime.UtcNow.AddSeconds(4);
             state.SetCooldown(leftoverCooldown);
 
-            // Regression coverage for the #1906 review: this abandon resolves no outcome of its own (the
-            // idle battle just started, so real-elapsed time is ~0), so the pre-existing leftover cooldown
-            // must not be mistaken for one this call incurred and used to anchor the boss's start.
+            // Regression coverage for #1920: this abandon resolves no outcome of its own (the idle battle
+            // just started, so real-elapsed time is ~0), but the pre-existing leftover cooldown is still in
+            // effect and must anchor the replacement boss battle's start just the same as one this call's
+            // own abandon incurred — otherwise a challenge landing mid an already-running cooldown skips it
+            // entirely.
             var result = await battleService.StartBossBattle(player, state, zone.Id);
 
             Assert.NotNull(result);
             Assert.Equal(leftoverCooldown, state.EnemyCooldown);
-            Assert.True(state.BattleStartTime < leftoverCooldown);
+            Assert.Equal(leftoverCooldown, state.BattleStartTime);
+        }
+
+        [Fact]
+        public async Task StartBossBattle_NoActiveBattleButCooldownStillRunning_AnchorsToTheCooldown()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var bossSkill = await TestDataSeeder.CreateSkillAsync(context, name: "BossSkill");
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, boss.Id, bossSkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(
+                context, "Boss Zone", levelMin: 10, levelMax: 10, bossEnemyId: boss.Id, bossLevel: 10);
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            // Mirrors exactly what a normal (non-abandoned) victory leaves behind: EndBattleVictory clears the
+            // battle and sets a future post-battle cooldown, so HasActiveBattle is false and the abandon block
+            // never runs — the middle leg of the #1920 ChallengeBoss -> DefeatEnemy -> ChallengeBoss loop.
+            var cooldown = DateTime.UtcNow.AddSeconds(4);
+            state.SetCooldown(cooldown);
+            Assert.False(state.HasActiveBattle);
+
+            // Regression coverage for #1920: with no active battle to abandon, the old code fell straight
+            // through to anchoring at now, letting a scripted client re-challenge the instant the previous
+            // outcome resolved and skip the cooldown entirely.
+            var result = await battleService.StartBossBattle(player, state, zone.Id);
+
+            Assert.NotNull(result);
+            Assert.Equal(cooldown, state.BattleStartTime);
         }
 
         [Fact]
