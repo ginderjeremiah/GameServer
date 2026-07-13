@@ -51,6 +51,10 @@ namespace Game.Application.Content
             private readonly Dictionary<int, Contracts.Challenge> _challenges;
             private readonly Dictionary<int, Contracts.Proficiency> _proficiencies;
 
+            // Tags have no retirement concept (a real hard delete, cascading through the ItemTag/ItemModTag
+            // join tables), so membership is all that needs tracking — no parallel retire map like the sets above.
+            private readonly HashSet<int> _tagIds;
+
             public GraphRun(ContentGraph graph)
             {
                 _graph = graph;
@@ -68,6 +72,7 @@ namespace Game.Application.Content
                 _zones = ById(graph.Zones, z => z.Id);
                 _challenges = ById(graph.Challenges, c => c.Id);
                 _proficiencies = ById(graph.Proficiencies, p => p.Id);
+                _tagIds = graph.Tags.Select(t => t.Id).ToHashSet();
             }
 
             public void Run()
@@ -77,6 +82,7 @@ namespace Game.Application.Content
                 CheckEnemies();
                 CheckClasses();
                 CheckItems();
+                CheckItemMods();
                 CheckProficiencies();
                 CheckSkillRecipes();
                 CheckOrphanSkills();
@@ -84,6 +90,7 @@ namespace Game.Application.Content
                 CheckZoneReachability();
                 CheckSingleHomeZone();
                 CheckEmptyCombatZones();
+                CheckZoneOrderUniqueness();
                 CheckEnemyAttributeConsumption();
                 CheckLessons();
             }
@@ -94,6 +101,14 @@ namespace Game.Application.Content
             {
                 foreach (var zone in Live(_graph.Zones, z => z.RetiredAt))
                 {
+                    // The domain Zone model (Game.Core.Zones.Zone) throws at construction if LevelMin > LevelMax,
+                    // so a mis-authored range doesn't just misbehave in-game — it crashes the zone's own cache
+                    // load. Catching it here, over the committed export, is cheaper than a startup crash.
+                    if (zone.LevelMin > zone.LevelMax)
+                    {
+                        Error("ZoneLevelRange", "Zone", zone.Id, $"has LevelMin {zone.LevelMin} greater than LevelMax {zone.LevelMax}.");
+                    }
+
                     if (zone.BossEnemyId is int bossId)
                     {
                         // A retired boss can no longer be challenged, stranding a live zone's boss action.
@@ -125,6 +140,14 @@ namespace Game.Application.Content
                         Error("ChallengeTarget", "Challenge", challenge.Id, "is a KillsByDamageType challenge with no target damage-type key, so it can never track progress.");
                     }
 
+                    // A goal of zero (or negative) is trivially already met the instant the challenge is
+                    // assigned — the same "always complete" gap the Workbench's own save-time guard exists to
+                    // reject, backstopped here for any authoring path that bypasses it.
+                    if (challenge.ProgressGoal <= 0)
+                    {
+                        Warn("ChallengeProgressGoal", "Challenge", challenge.Id, $"has a progress goal of {challenge.ProgressGoal}, which is trivially already met.");
+                    }
+
                     // A challenge whose completion target is retired can never be completed (unreachable content);
                     // a missing target id is a dangling reference (a genuine break).
                     if (challenge.TargetEntityId is int targetId)
@@ -143,6 +166,14 @@ namespace Game.Application.Content
                                 break;
                             case EEntityType.Zone:
                                 CheckRef("ChallengeTarget", "Challenge", challenge.Id, _zoneRetire, "zone", targetId, ContentGraphSeverity.Error, ContentGraphSeverity.Warning);
+                                // ZonesCleared (the only challenge type that targets Zone) only ever records via
+                                // a dedicated-boss "Challenge Boss" victory (game-design.md § Zone Clears) — a
+                                // boss-less zone can never clear, the exact analogue of the KillsByDamageType
+                                // null-target case above.
+                                if (_zones.TryGetValue(targetId, out var targetZone) && targetZone.RetiredAt is null && targetZone.BossEnemyId is null)
+                                {
+                                    Error("ChallengeTarget", "Challenge", challenge.Id, $"targets zone {targetId}, which has no dedicated boss, so it can never be cleared.");
+                                }
                                 break;
                             case EEntityType.Skill:
                                 CheckRef("ChallengeTarget", "Challenge", challenge.Id, _skillRetire, "skill", targetId, ContentGraphSeverity.Error, ContentGraphSeverity.Warning);
@@ -194,6 +225,17 @@ namespace Game.Application.Content
                         if (_zones.TryGetValue(spawn.ZoneId, out var zone) && zone.RetiredAt is null && zone.IsHome)
                         {
                             Warn("EnemySpawn", "Enemy", enemy.Id, $"spawns in zone {spawn.ZoneId}, which is a no-combat Home zone.");
+                        }
+
+                        // ProbabilityTable rejects a negative weight outright (crashes the whole zone's spawn
+                        // table, not just this entry); a zero weight is merely dead weight — it never draws.
+                        if (spawn.Weight < 0)
+                        {
+                            Error("EnemySpawnWeight", "Enemy", enemy.Id, $"spawns in zone {spawn.ZoneId} with negative weight {spawn.Weight}, which crashes the zone's spawn-table construction.");
+                        }
+                        else if (spawn.Weight == 0)
+                        {
+                            Warn("EnemySpawnWeight", "Enemy", enemy.Id, $"spawns in zone {spawn.ZoneId} with weight 0, so this entry can never be selected.");
                         }
                     }
                 }
@@ -366,6 +408,7 @@ namespace Game.Application.Content
                 foreach (var item in Live(_graph.Items, i => i.RetiredAt))
                 {
                     CheckWeaponStranding(item);
+                    CheckTagReferences("ItemTag", "Item", item.Id, item.Tags);
 
                     if (item.GrantedSkillId is int grantedSkillId)
                     {
@@ -448,6 +491,30 @@ namespace Game.Application.Content
                 if (item.RequiredProficiencyLevel > proficiency.MaxLevel)
                 {
                     Error("ItemProficiencyGate", "Item", item.Id, $"requires proficiency {proficiencyId} at level {item.RequiredProficiencyLevel}, above its max level {proficiency.MaxLevel}.");
+                }
+            }
+
+            // --- Item mods ----------------------------------------------------------------------------------
+
+            private void CheckItemMods()
+            {
+                foreach (var itemMod in Live(_graph.ItemMods, m => m.RetiredAt))
+                {
+                    CheckTagReferences("ItemModTag", "ItemMod", itemMod.Id, itemMod.Tags);
+                }
+            }
+
+            /// <summary>Tags carry no retirement (a real hard delete, cascading through the ItemTag/ItemModTag
+            /// join tables), so the only break possible is a dangling id — always an Error, mirroring how every
+            /// other "missing" reference case in this checker is treated regardless of set.</summary>
+            private void CheckTagReferences(string check, string kind, int entityId, IEnumerable<int> tagIds)
+            {
+                foreach (var tagId in tagIds)
+                {
+                    if (!_tagIds.Contains(tagId))
+                    {
+                        Error(check, kind, entityId, $"references tag {tagId}, which does not exist.");
+                    }
                 }
             }
 
@@ -679,10 +746,13 @@ namespace Game.Application.Content
 
                 // The gating challenge must itself be achievable from already-reachable content. A zone- or
                 // enemy-targeted challenge depends on that target being reachable; anything else (level, battles
-                // won, a skill used) is achievable through general play once any zone is reachable.
+                // won, a skill used) is achievable through general play once any zone is reachable. A ZonesCleared
+                // target additionally needs a dedicated boss to ever clear (mirrors the ChallengeTarget check
+                // above) — a reachable-but-boss-less zone is a target this gate can never actually satisfy.
                 return challenge switch
                 {
-                    { EntityType: EEntityType.Zone, TargetEntityId: int zoneId } => reachableZones.Contains(zoneId),
+                    { EntityType: EEntityType.Zone, TargetEntityId: int zoneId } =>
+                        reachableZones.Contains(zoneId) && _zones.TryGetValue(zoneId, out var targetZone) && targetZone.BossEnemyId is not null,
                     { EntityType: EEntityType.Enemy, TargetEntityId: int enemyId } => IsEnemyReachable(enemyId, reachableZones),
                     _ => true,
                 };
@@ -731,6 +801,20 @@ namespace Game.Application.Content
                 }
             }
 
+            private void CheckZoneOrderUniqueness()
+            {
+                // Order isn't a reference and a collision doesn't strand anyone — it just makes the nav's sort
+                // ambiguous between the tied zones, so this is a Warning rather than the Error the Home-zone
+                // singularity check uses.
+                foreach (var group in Live(_graph.Zones, z => z.RetiredAt).GroupBy(z => z.Order).Where(g => g.Count() > 1))
+                {
+                    foreach (var zone in group)
+                    {
+                        Warn("ZoneOrder", "Zone", zone.Id, $"shares order {zone.Order} with {group.Count() - 1} other live zone(s); navigation sort order is ambiguous.");
+                    }
+                }
+            }
+
             // --- Lessons ----------------------------------------------------------------------------------
 
             /// <summary>Every taught-by-blurb candidate content-design.md §2 names (crit/dodge variance, the
@@ -766,6 +850,27 @@ namespace Game.Application.Content
                     {
                         Error("LessonTrigger", "Lesson", lesson.Id, "names no host screen.");
                     }
+
+                    CheckLessonSteps(lesson);
+                }
+
+                // A duplicated key would let the required-blurb coverage check below match vacuously (either
+                // copy satisfies it), silently hiding a missing real lesson for the other.
+                foreach (var group in Live(_graph.Lessons, l => l.RetiredAt).GroupBy(l => l.Key).Where(g => g.Count() > 1))
+                {
+                    foreach (var lesson in group)
+                    {
+                        Warn("LessonKey", "Lesson", lesson.Id, $"shares key '{lesson.Key}' with {group.Count() - 1} other live lesson(s).");
+                    }
+                }
+
+                // Ordinal collisions don't strand anything — just an ambiguous sort in the Help screen's list.
+                foreach (var group in Live(_graph.Lessons, l => l.RetiredAt).GroupBy(l => l.Ordinal).Where(g => g.Count() > 1))
+                {
+                    foreach (var lesson in group)
+                    {
+                        Warn("LessonOrdinal", "Lesson", lesson.Id, $"shares ordinal {lesson.Ordinal} with {group.Count() - 1} other live lesson(s); the Help screen's list order is ambiguous.");
+                    }
                 }
 
                 var liveKeys = Live(_graph.Lessons, l => l.RetiredAt).Select(l => l.Key).ToHashSet();
@@ -776,6 +881,27 @@ namespace Game.Application.Content
                         // No real lesson backs this finding (that's the point), so there is no id to attach it
                         // to; -1 marks a graph-wide finding rather than a specific row.
                         Warn("LessonCoverage", "Lesson", -1, $"content-design.md's taught-by-blurb candidate '{key}' has no live lesson.");
+                    }
+                }
+            }
+
+            private void CheckLessonSteps(Contracts.Lesson lesson)
+            {
+                var steps = lesson.Steps.OrderBy(s => s.Ordinal).ToList();
+                for (var i = 0; i < steps.Count; i++)
+                {
+                    if (steps[i].Ordinal != i)
+                    {
+                        Warn("LessonStepOrdinal", "Lesson", lesson.Id, $"has non-contiguous step ordinals (expected 0..{steps.Count - 1}); found {steps[i].Ordinal} at position {i}.");
+                        break;
+                    }
+                }
+
+                foreach (var step in lesson.Steps)
+                {
+                    if (string.IsNullOrWhiteSpace(step.Text))
+                    {
+                        Warn("LessonStepText", "Lesson", lesson.Id, $"has a step (ordinal {step.Ordinal}) with empty callout text.");
                     }
                 }
             }

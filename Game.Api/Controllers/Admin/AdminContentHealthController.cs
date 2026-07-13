@@ -22,9 +22,9 @@ namespace Game.Api.Controllers.Admin
         private readonly IContentHealthService _contentHealth = contentHealth;
 
         [HttpGet]
-        public ApiResponse<ContentHealthReport> GetContentHealth()
+        public async Task<ApiResponse<ContentHealthReport>> GetContentHealth()
         {
-            return ApiResponse.Success(_contentHealth.GetReport());
+            return ApiResponse.Success(await _contentHealth.GetReportAsync(HttpContext.RequestAborted));
         }
     }
 }
