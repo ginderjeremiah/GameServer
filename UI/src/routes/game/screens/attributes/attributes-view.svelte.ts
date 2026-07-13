@@ -38,7 +38,8 @@ import { staticData, toastError } from '$stores';
 
 export type AttributeMode = 'guided' | 'theory';
 
-const MODE_STORAGE_KEY = 'ttf.attr.mode';
+/** Per-player prefix (see `readStoredMode`/`storeMode`) — each character keeps its own density mode. */
+const MODE_STORAGE_KEY_PREFIX = 'gameserver.attrMode.';
 
 const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
 /** Rounds a per-point yield to clean floating-point noise while preserving the small increments a
@@ -528,14 +529,20 @@ function computeHexMax(draft: number[], committed: number[]): number {
 	return Math.max(10, Math.ceil((peak * 1.2) / 5) * 5);
 }
 
+/** Keyed by the live player id so switching characters doesn't inherit — or silently overwrite —
+ *  another character's density mode (docs/frontend-screens.md: "persisted per player"). */
+function modeStorageKey(): string {
+	return `${MODE_STORAGE_KEY_PREFIX}${playerManager.id}`;
+}
+
 function readStoredMode(): AttributeMode {
 	// Storage may be null (private mode / SSR); fall back to the default.
-	return safeLocalStorage()?.getItem(MODE_STORAGE_KEY) === 'theory' ? 'theory' : 'guided';
+	return safeLocalStorage()?.getItem(modeStorageKey()) === 'theory' ? 'theory' : 'guided';
 }
 
 function storeMode(mode: AttributeMode): void {
 	try {
-		safeLocalStorage()?.setItem(MODE_STORAGE_KEY, mode);
+		safeLocalStorage()?.setItem(modeStorageKey(), mode);
 	} catch {
 		// Persisting the preference is best-effort; ignore storage failures.
 	}

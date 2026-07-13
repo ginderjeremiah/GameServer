@@ -132,7 +132,7 @@ export class Battler {
 
 	constructor(
 		battlerData?: BattlerData,
-		additionalAtttributes?: IBattlerAttribute[],
+		additionalAttributes?: IBattlerAttribute[],
 		grantedSkillIds?: number[],
 		additionalModifiers?: AttributeModifier[],
 		equippedWeaponType?: EDamageType,
@@ -140,7 +140,7 @@ export class Battler {
 	) {
 		this.reset(
 			battlerData,
-			additionalAtttributes,
+			additionalAttributes,
 			grantedSkillIds,
 			additionalModifiers,
 			equippedWeaponType,
@@ -386,7 +386,7 @@ export class Battler {
 
 	public reset(
 		battlerData?: BattlerData,
-		additionalAtttributes?: IBattlerAttribute[],
+		additionalAttributes?: IBattlerAttribute[],
 		grantedSkillIds?: number[],
 		additionalModifiers?: AttributeModifier[],
 		equippedWeaponType?: EDamageType,
@@ -404,9 +404,7 @@ export class Battler {
 		this.#elapsedMs = 0;
 		this.activeEffects = [];
 		if (battlerData) {
-			const atts = additionalAtttributes
-				? [...battlerData.attributes, ...additionalAtttributes]
-				: battlerData.attributes;
+			const atts = additionalAttributes ? [...battlerData.attributes, ...additionalAttributes] : battlerData.attributes;
 
 			// Proficiency bonuses ride the modifier pipeline (additive/multiplicative by their type), not the
 			// flat base data, so they compose through computeAttributes exactly like the backend's

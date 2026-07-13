@@ -175,7 +175,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 
 		return keys(urlParams)
 			.filter((key) => urlParams[key] !== undefined)
-			.map((key) => key + '=' + window.encodeURIComponent(urlParams[key]))
+			.map((key) => key + '=' + encodeURIComponent(urlParams[key]))
 			.join('&');
 	}
 }
