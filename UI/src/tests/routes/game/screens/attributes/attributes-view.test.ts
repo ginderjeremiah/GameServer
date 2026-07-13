@@ -16,6 +16,7 @@ import {
 // stat-point pool from them live, exactly like the real (statified) PlayerManager.
 const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
 	mockPlayerManager: new (class MockPlayerManager {
+		id = 1;
 		attributes: IBattlerAttribute[] = [];
 		statPointsGained = 0;
 		statPointsUsed = 0;
@@ -104,6 +105,7 @@ beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({ data: { attributes: allFives(), statPointsUsed: 0 } });
 	toastError.mockReset();
 	localStorage.clear();
+	mockPlayerManager.id = 1;
 	mockPlayerManager.attributes = allFives();
 	mockPlayerManager.selectedSkills = [];
 	mockInventoryManager.equipmentStats = [];
@@ -578,11 +580,24 @@ describe('AttributesView mode persistence', () => {
 		expect(view.mode).toBe('guided');
 		view.setMode('theory');
 		expect(view.mode).toBe('theory');
-		expect(localStorage.getItem('ttf.attr.mode')).toBe('theory');
+		expect(localStorage.getItem('gameserver.attrMode.1')).toBe('theory');
 
 		const reopened = new AttributesView();
 		expect(reopened.mode).toBe('theory');
 		reopened.dispose();
+	});
+
+	it('keeps each player id on its own key, so switching characters does not inherit the mode', () => {
+		view.setMode('theory');
+
+		mockPlayerManager.id = 2;
+		const otherCharacter = new AttributesView();
+		expect(otherCharacter.mode).toBe('guided');
+
+		otherCharacter.setMode('theory');
+		expect(localStorage.getItem('gameserver.attrMode.2')).toBe('theory');
+		expect(localStorage.getItem('gameserver.attrMode.1')).toBe('theory');
+		otherCharacter.dispose();
 	});
 });
 

@@ -46,7 +46,7 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
 vi.stubGlobal('fetch', fetchMock);
 // `location` is a minimal stand-in so handleAuthFailure's redirect guard (window.location.pathname) can
 // run without throwing; only the refresh-failure tests below inspect it.
-vi.stubGlobal('window', { encodeURIComponent, location: { href: '', pathname: '/game' } });
+vi.stubGlobal('window', { location: { href: '', pathname: '/game' } });
 
 // The "refresh definitively failed" tests below drive the real refreshTokens/handleAuthFailure so the
 // 401-retry and redirect wiring is exercised end to end; the "recovers from a concurrent tab" test
