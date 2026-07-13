@@ -414,9 +414,9 @@ export class EnemyManager {
 				return;
 			}
 			if (result.data?.enemyInstance) {
-				// A positive cooldown means this call's own abandon resolved a win/loss/draw and the server
-				// anchored the returned boss battle's start to that cooldown's expiry (#1884, the boss-path
-				// variant of #1851/#1881's NewEnemy handshake) rather than now — wait it out before presenting
+				// A positive cooldown means the server anchored the returned boss battle's start to an
+				// in-effect cooldown's expiry rather than now — this call's own abandon resolving a win/loss/
+				// draw, or one already running from an earlier battle (#1920) — wait it out before presenting
 				// the boss so the client's battle clock doesn't start ahead of the server's anchor.
 				if (result.data.cooldown) {
 					await battleEngine.startLoading(result.data.cooldown);

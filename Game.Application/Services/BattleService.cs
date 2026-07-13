@@ -210,37 +210,29 @@ namespace Game.Application.Services
                 return null;
             }
 
-            // Non-null only when the abandoned battle resolved to a win/loss/draw (AbandonBattle just applied
-            // the post-battle cooldown to state.EnemyCooldown, #1851) — mirrors StartBattle's
-            // abandonedOutcomeCooldown (#1884). Without this, a scripted ChallengeBoss loop pays each abandoned
-            // win in full while spawning the next boss battle immediately, farming away the pacing cooldown a
-            // loop through NewEnemy already cannot.
-            DateTime? abandonedOutcomeCooldown = null;
-
             if (state.HasActiveBattle)
             {
-                // Captured before the abandon so the check below can tell "this abandon incurred a fresh
-                // cooldown" apart from "a cooldown was already sitting there." Unlike StartBattle (whose
-                // caller, NewEnemy, gates on IsOnCooldown first), ChallengeBoss has no cooldown gate — a
-                // player can challenge mid an already-running post-battle cooldown (e.g. the prefetched next
-                // idle battle's BattleStartTime is still in the future), in which case AbandonBattle resolves
-                // no outcome (elapsedMs clamps to 0) and leaves EnemyCooldown exactly as it found it.
-                var cooldownBeforeAbandon = state.EnemyCooldown;
-
                 // Deliberate override: challenging the boss always abandons whatever idle battle is running
                 // (even one still genuinely in progress, #1595) and proceeds — unlike NewEnemy, this is an
                 // explicit different action, not "give my existing battle back," so the handoff is discarded.
                 // Nothing was cleared or persisted for a still-in-progress abandon, so overwriting the
-                // in-memory state below with the boss battle is safe either way.
+                // in-memory state below with the boss battle is safe either way. An abandon that resolves an
+                // outcome (win/loss/draw) applies the post-battle cooldown to state.EnemyCooldown (#1851); one
+                // that resolves nothing (e.g. mid an already-running cooldown, where elapsedMs clamps to 0)
+                // leaves EnemyCooldown exactly as it found it. Either way, the general anchor below picks it up.
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
-
-                if (state.EnemyCooldown > cooldownBeforeAbandon)
-                {
-                    abandonedOutcomeCooldown = state.EnemyCooldown;
-                }
             }
 
-            var now = abandonedOutcomeCooldown ?? DateTime.UtcNow;
+            // Anchor to the in-effect cooldown rather than always to now — ChallengeBoss has no command-level
+            // cooldown gate (unlike NewEnemy, gated on IsOnCooldown before it ever reaches StartBattle), so
+            // this anchor is the only thing enforcing the pacing the response's Cooldown handshake promises.
+            // A cooldown can be running here whether or not this call's own abandon (above) just set it — a
+            // normal (non-abandoned) victory/loss from the previous battle, or a mid-cooldown challenge that
+            // resolved no outcome, leave EnemyCooldown just as live. Anchoring to its expiry in all of these
+            // cases, not only the abandon-resolved one, closes the gap where a scripted ChallengeBoss loop paid
+            // only battle duration per kill instead of duration + cooldown (#1920).
+            var utcNow = DateTime.UtcNow;
+            var battleStartTime = state.IsOnCooldown(utcNow) ? state.EnemyCooldown : utcNow;
             var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBossEnemy(zone, _zoneResolution.BossEnemyResolver(zone));
@@ -248,7 +240,7 @@ namespace Game.Application.Services
             var enemySkillIds = enemy.BattleSkills.Select(skill => skill.Id).ToList();
             var snapshot = BattleSnapshot.FromPlayer(player, await CaptureProficiencyLevels(player.Id, cancellationToken));
 
-            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, now, snapshot, zone.Id, isBossBattle: true);
+            state.SetActiveBattle(enemy.Id, enemy.Level, enemySkillIds, seed, battleStartTime, snapshot, zone.Id, isBossBattle: true);
 
             return new BattleStartResult
             {
