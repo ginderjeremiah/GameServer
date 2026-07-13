@@ -4,6 +4,7 @@ using Game.Abstractions.Infrastructure;
 using Game.Core;
 using Game.Core.Events;
 using Game.Core.Players.Events;
+using Game.DataAccess.PlayerUpdates;
 using System.Text.Json;
 
 namespace Game.DataAccess.Repositories.Admin
@@ -128,42 +129,11 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             entry.EventType = envelope.Type;
-            entry.PlayerId = TryReadPlayerId(envelope.Payload);
+            entry.PlayerId = PlayerUpdateEnvelopeReader.TryReadPlayerIdFromPayload(envelope.Payload);
             entry.Reason = _knownEventTypes.Contains(envelope.Type)
                 ? EDeadLetterReason.Replayable
                 : EDeadLetterReason.UnknownEventType;
             return entry;
-        }
-
-        /// <summary>
-        /// Pulls the owning player id out of an event payload generically (every persisted player event
-        /// carries a <c>playerId</c>), without coupling to each concrete event type. Returns null when the
-        /// inner payload is malformed or has no numeric player id.
-        /// </summary>
-        private static int? TryReadPlayerId(string? payload)
-        {
-            if (string.IsNullOrEmpty(payload))
-            {
-                return null;
-            }
-
-            try
-            {
-                using var doc = JsonDocument.Parse(payload);
-                if (doc.RootElement.ValueKind == JsonValueKind.Object
-                    && doc.RootElement.TryGetProperty("playerId", out var property)
-                    && property.ValueKind == JsonValueKind.Number
-                    && property.TryGetInt32(out var playerId))
-                {
-                    return playerId;
-                }
-            }
-            catch (JsonException)
-            {
-                // A malformed inner payload simply has no derivable player id.
-            }
-
-            return null;
         }
 
         private static IReadOnlySet<string> BuildKnownEventTypes()
