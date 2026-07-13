@@ -1,6 +1,7 @@
 using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Enemies;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -247,7 +248,7 @@ namespace Game.Application.Content.Calibration
         {
             var key = $"{zoneId}|{level}|{buildName}|{enemyId}|{drawIndex}";
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(key));
-            return BitConverter.ToUInt32(hash, 0);
+            return BinaryPrimitives.ReadUInt32LittleEndian(hash);
         }
 
         // Evenly-spaced, deduplicated levels across [min, max] — samples ≤ 1 or a single-level range collapse

@@ -206,7 +206,7 @@ namespace Game.Application.Tests.Content.Calibration
         }
 
         [Fact]
-        public void MatchupSeed_DiffersForDifferentBuildNamesWithTheSameHashCode()
+        public void MatchupSeed_DiffersForDifferentBuildNames()
         {
             // .NET's built-in string hashing (used by HashCode.Combine) is randomized per process; MatchupSeed
             // must not derive from it. Distinct matchup keys should (in practice) yield distinct seeds.
