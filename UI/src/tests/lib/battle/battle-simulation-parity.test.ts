@@ -284,8 +284,8 @@ const scenarios: ParityScenario[] = [
 	// (each fire adds another +10). Mirrors the backend `selfStrengthBuffStacksEachFire` scenario.
 	//   Player: Str=10, cdMult=1; skill = Str×1.0 raw, cooldown 400. Effect: Self +10 Strength, permanent.
 	//   Enemy:  Str=10 → MaxHealth=100, no Toughness, no skills.
-	//   Fire 1 deals 10−2=8 then stacks → Str 20; fire 2 deals 18 → Str 30; fire 3 deals 28; fire 4 deals
-	//   38; fire 5 deals 48. Enemy HP 100 → 92,74,46,8,−40: dies on fire 5 at 2000. (Refresh-only: 2800.)
+	//   Fire 1 deals Str(10) then stacks → Str 20; fire 2 deals 20 → Str 30; fire 3 deals 30 → Str 40;
+	//   fire 4 deals 40. Enemy HP 100 → 90,70,40,0: dies on fire 4 at tick 40 → 1600ms.
 	{
 		name: 'selfStrengthBuffStacksEachFire',
 		player: () =>
@@ -306,11 +306,11 @@ const scenarios: ParityScenario[] = [
 
 	// A self CooldownRecovery buff is read live each tick AND stacks on each fire, so the fire interval keeps
 	// shortening as the buff compounds. Mirrors the backend `cdrBuffShortensFireInterval` scenario.
-	//   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400. Each hit deals 18.
+	//   Player: Str=20, base CDR=1 (cdMult=1); skill = Str×1.0 raw, cooldown 400. Each hit deals 20.
 	//     Effect: Self +1.0 CooldownRecovery (additive), permanent — a stack per fire.
 	//   Enemy:  Str=10 → MaxHealth=100, no Toughness, no skills.
-	//   Fire 1 at tick 10 → cdMult=2; next fires 5,4,3,2,2 ticks apart (ticks 15,19,22,24,26). Six 18-dmg
-	//   hits drop the 100-HP enemy on fire 6 at tick 26 → 1040ms. (Refresh-only held cdMult=2 → 1400.)
+	//   Fire 1 at tick 10 (cdMult=1) applies a stack → cdMult=2; next fires 5,4,3,2 ticks apart (ticks
+	//   15,19,22,24). Five 20-dmg hits drop the 100-HP enemy on fire 5 at tick 24 → 960ms.
 	{
 		name: 'cdrBuffShortensFireInterval',
 		player: () =>
@@ -343,7 +343,9 @@ const scenarios: ParityScenario[] = [
 	// the backend `sameTickEarlierSlotBuffsLaterSlot` scenario.
 	//   Player: Str=10; slot0 = Str×1.0 (Self +10 Str, permanent — a stack per fire), slot1 = Str×1.0 (no
 	//     effect), both cooldown 400 (fire ticks 10,20,30…). Enemy: Str=16 → MaxHealth=130, no Toughness, no skills.
-	//   Tick 10: 8 (slot0) + 18 (slot1, Str 20) = 26; tick 20: 18 + 28 = 46; tick 30: 28 + 38 → enemy dies at 1200.
+	//   Tick 10: slot0 deals 10 then stacks Str→20; slot1 deals 20 → 30 (130→100). Tick 20: slot0 deals 20
+	//   then stacks Str→30; slot1 deals 30 → 50 (100→50). Tick 30: slot0 deals 30 then stacks Str→40; slot1
+	//   deals 40 → enemy 50→−20: dies at tick 1200.
 	{
 		name: 'sameTickEarlierSlotBuffsLaterSlot',
 		player: () =>
@@ -366,11 +368,12 @@ const scenarios: ParityScenario[] = [
 	// MaxHealth clamp: an Opponent MaxHealth ×0.5 debuff halves the enemy's maximum and clamps its current
 	// health down to it; the debuff also STACKS on each fire, so MaxHealth keeps halving. Mirrors the backend
 	// `opponentMaxHealthDebuffClamps` scenario.
-	//   Player: skill baseDamage 12, no multiplier → 12−2 = 10 per hit, cooldown 400 (fires tick 10,20…).
+	//   Player: skill baseDamage 12, no multiplier → 12 per hit (no Toughness), cooldown 400 (fires tick 10,20…).
 	//     Effect: Opponent ×0.5 MaxHealth (multiplicative), permanent — a stack per fire.
 	//   Enemy:  Str=10 → MaxHealth=100, no Toughness, no skills.
-	//   Tick 10: 100→90, ×0.5 → 50 (clamp 90→50); tick 20: →40, ×0.5 → 25; tick 30: →15, ×0.5 → 12.5;
-	//   tick 40: →2.5, ×0.5 → 6.25; tick 50: →dead at 2000ms.
+	//   Tick 10: deal 12 (100→88), stack ×0.5 → MaxHealth 50, clamp 88→50. Tick 20: deal 12 (50→38), stack
+	//   → MaxHealth 25, clamp 38→25. Tick 30: deal 12 (25→13), stack → MaxHealth 12.5, clamp 13→12.5.
+	//   Tick 40: deal 12 (12.5→0.5), stack → MaxHealth 6.25 (no clamp). Tick 50: deal 12 → dead at 2000.
 	{
 		name: 'opponentMaxHealthDebuffClamps',
 		player: () =>
@@ -930,8 +933,8 @@ const scenarios: ParityScenario[] = [
 	// PARITY_SEED the first six crit draws are crit,crit,no,no,crit,crit. Mirrors the backend `fractionalCritChance`.
 	//   Player: skill baseDamage 12, cooldown 400 (one crit draw per fire); CriticalDamage base 1.5 + 0.5 = 2.0 →
 	//     a crit deals 12×2 = 24, a non-crit 12 (no Toughness). Enemy: Str 10 → MaxHealth 100, no Toughness, no skills.
-	//   Hits 22,22,10,10,22 (cum 86) then the 6th draw's crit (+22 → 108 ≥ 100) kills on fire 6 → 2400ms; a
-	//   non-crit there (96) would push the kill to fire 7.
+	//   Hits 24,24,12,12,24 (cum 96) then the 6th draw's crit (+24 → 120 ≥ 100) kills on fire 6 → 2400ms.
+	//   The 6th hit being a crit is decisive: a non-crit there (+12 → 108) would still kill on fire 6 here.
 	{
 		name: 'fractionalCritChance',
 		player: () =>
@@ -1099,9 +1102,9 @@ const scenarios: ParityScenario[] = [
 	// backend `itemGrantsSkill` / `twoItemsGrantSameSkill` / `grantedSkillDuplicatesSelected` /
 	// `grantedSkillWithEffects` scenarios.
 
-	// An item grants a skill in addition to a selected one: both fire. Selected (20−2 = 18/hit) and granted
-	// (30−2 = 28/hit) on cooldown 400 fire together (ticks 10,20,30) for 46/tick; the 100-HP enemy dies on the
-	// tick-30 volley → 1200ms. (The selected skill alone — 18/tick — would win only at 2400ms.)
+	// An item grants a skill in addition to a selected one: both fire. Selected (20/hit) and granted (30/hit,
+	// no Toughness) on cooldown 400 fire together (ticks 10,20) for 50/tick; the 100-HP enemy dies on the
+	// tick-20 volley → 800ms. (The selected skill alone — 20/tick — would win only on hit 5 at 2000ms.)
 	{
 		name: 'itemGrantsSkill',
 		player: () => {
@@ -1114,8 +1117,8 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Two equipped items grant the SAME skill: it is de-duplicated to one (not fielded twice). The single
-	// granted skill deals 28/hit (cooldown 400); the 100-HP enemy dies on hit 4 at tick 40 → 1600ms. (Two
-	// un-deduped copies — 56/tick — would kill on hit 2 at 800ms.)
+	// granted skill deals 30/hit (no Toughness, cooldown 400); the 100-HP enemy dies on hit 4 at tick 40 →
+	// 1600ms. (Two un-deduped copies — 60/tick — would kill on hit 2 at 800ms.)
 	{
 		name: 'twoItemsGrantSameSkill',
 		player: () => {
@@ -1127,8 +1130,8 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// A granted skill duplicating a SELECTED skill is de-duplicated (first/selected wins): the player fields it
-	// once (22−2 = 20/hit, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50 → 2000ms. (Without dedupe
-	// the two copies — 40/tick — would kill on hit 3 at 1200ms.)
+	// once (22/hit, no Toughness, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50 → 2000ms. (Without
+	// dedupe the two copies — 44/tick — would kill on hit 3 at 1200ms.)
 	{
 		name: 'grantedSkillDuplicatesSelected',
 		player: () => {
@@ -1140,8 +1143,8 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// The SAME skill selected twice is de-duplicated WITHIN the selected loadout (first wins): the player
-	// fields it once (22−2 = 20/hit, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50 → 2000ms.
-	// (Without intra-selected dedupe the two copies — 40/tick — would kill on hit 3 at 1200ms.) Pins that the
+	// fields it once (22/hit, no Toughness, cooldown 400). The 100-HP enemy dies on hit 5 at tick 50 → 2000ms.
+	// (Without intra-selected dedupe the two copies — 44/tick — would kill on hit 3 at 1200ms.) Pins that the
 	// frontend mirrors the backend's single Distinct() over the full loadout, not just granted-vs-selected.
 	{
 		name: 'duplicateSelectedSkill',
@@ -1155,8 +1158,8 @@ const scenarios: ParityScenario[] = [
 
 	// A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a skill whose
 	// self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw (no Toughness) deals
-	// 8,18,28,38,48,58 (Str climbing 10→60); cumulative 8,26,54,92,140,198 drops the 150-HP enemy on fire 6 at
-	// tick 60 → 2400ms — proving granted skills wrap into a full battle skill (charge + effects).
+	// 10,20,30,40,50 (Str climbing 10→60); cumulative 10,30,60,100,150 drops the 150-HP enemy on fire 5 at
+	// tick 50 → 2000ms — proving granted skills wrap into a full battle skill (charge + effects).
 	{
 		name: 'grantedSkillWithEffects',
 		player: () => {
@@ -1181,7 +1184,7 @@ const scenarios: ParityScenario[] = [
 	// hand-computable. Mirrors the backend `fireAmplification` … `enemyAmplifiesPlayerResists` scenarios.
 
 	// Attacker amplification: a Fire skill with +0.5 FireAmplification deals 20 × 1.5 = 30/hit (no Toughness), so
-	// the 100-HP enemy dies on hit 4 at tick 40 → 1600ms (vs hit 6 / 2400ms un-amplified).
+	// the 100-HP enemy dies on hit 4 at tick 40 → 1600ms (vs hit 5 / 2000ms un-amplified).
 	{
 		name: 'fireAmplification',
 		player: () =>
@@ -1197,7 +1200,7 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Defender resistance: the enemy's +0.5 FireResistance halves a 40-damage Fire hit to 20/hit (no Toughness),
-	// so the 100-HP enemy dies on hit 6 at tick 60 → 2400ms (vs hit 3 / 1200ms un-resisted).
+	// so the 100-HP enemy dies on hit 5 at tick 50 → 2000ms (vs hit 3 / 1200ms un-resisted).
 	{
 		name: 'fireResistance',
 		player: () =>
@@ -1215,7 +1218,7 @@ const scenarios: ParityScenario[] = [
 
 	// Vulnerability (res < 0): a −1.0 FireResistance doubles the incoming Fire hit (factor 1 − (−1) = 2). A
 	// 20-damage hit becomes 40/hit (no Toughness), so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs hit
-	// 6 / 2400ms at res 0). Resistance is deliberately left unclamped.
+	// 5 / 2000ms at res 0). Resistance is deliberately left unclamped.
 	{
 		name: 'fireVulnerability',
 		player: () =>
@@ -1234,7 +1237,7 @@ const scenarios: ParityScenario[] = [
 	// Absorption (res > 1): a +2.0 FireResistance drives the post-resistance hit negative (20 × (1 − 2) = −20),
 	// so an absorbed hit deals no damage — the Toughness curve never applies, and the heal is capped at MaxHealth (the
 	// enemy is already full, so it stays at 100). The enemy never loses health and never dies; dealing no damage
-	// back, the battle runs to the timeout. (At res 0 the player's 18/hit would win by 2400ms.)
+	// back, the battle runs to the timeout. (At res 0 the player's 20/hit would win by 2000ms.)
 	{
 		name: 'fireAbsorption',
 		player: () => makeBattler([], [makeSkill(20, 400, [], [], EDamageType.Fire)]),
@@ -1281,8 +1284,8 @@ const scenarios: ParityScenario[] = [
 
 	// Bidirectional: the ENEMY amplifies and the PLAYER resists. The enemy's +1.0 FireAmplification doubles its
 	// 20-damage Fire skill to 40; the player's +0.5 FireResistance halves that to 20/hit (no Toughness). The
-	// player (no skills) dies on the enemy's hit 6 at tick 60 → 2400ms. (Without the enemy amp it would be
-	// 8/hit → 5200ms; without the player resist, 38/hit → 1200ms.)
+	// player (no skills) dies on the enemy's hit 5 at tick 50 → 2000ms. (Without the enemy amp it would be
+	// 10/hit → slower; without the player resist, 40/hit.)
 	{
 		name: 'enemyAmplifiesPlayerResists',
 		player: () =>

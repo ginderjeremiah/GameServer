@@ -1300,11 +1300,11 @@ namespace Game.Core.Tests.Battle
         private const int Permanent = 1_000_000;
 
         /// <summary>
-        /// The shared battle-RNG seed both simulators construct their <see cref="Mulberry32"/> from. Its value
-        /// is immaterial to the current scenarios (their crit/dodge/block chances are forced to 1/0, so the
-        /// outcome never depends on a draw) but both suites must seed identically — the frontend mirror passes
-        /// the same constant — so the threaded seed is exercised and a future real-probability scenario stays
-        /// in lockstep.
+        /// The shared battle-RNG seed both simulators construct their <see cref="Mulberry32"/> from. Most
+        /// scenarios force their crit/dodge/parry chances to 1/0, so the outcome never depends on a draw, but
+        /// the fractional-chance rows (<c>fractionalCritChance</c>, <c>fractionalParryChance</c>,
+        /// <c>drawOrderEnemyFireAlignsCrit</c>) explicitly depend on the values this seed's Mulberry32 stream
+        /// draws — both suites must seed identically for those rows to stay in lockstep.
         /// </summary>
         private const uint ParitySeed = 0x9E3779B9;
 
