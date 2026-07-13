@@ -380,7 +380,7 @@ namespace Game.Core.Battle
                 // heavier investment trains proportionally more while a single crit claims at most its own
                 // booked hit. Kept separate from the player-facing statistic above. Guarded like every sibling
                 // overlay (#1927): a CriticalDamage debuff at or below 1.0 is a non-positive investment and
-                // trains nothing, rather than booking a negative (or, at exactly 1.0, a −∞) claim.
+                // trains nothing, rather than booking a negative (or, at exactly 0, a −∞) claim.
                 if (critMultiplier > 1.0)
                 {
                     Stats.CriticalBonusDealt += totalBooked * Battler.NormalizeInvestment(critMultiplier - 1.0);
