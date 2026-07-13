@@ -44,12 +44,14 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
 });
 
 vi.stubGlobal('fetch', fetchMock);
+// `location` is a minimal stand-in so handleAuthFailure's redirect guard (window.location.pathname) can
+// run without throwing; only the refresh-failure tests below inspect it.
 vi.stubGlobal('window', { encodeURIComponent, location: { href: '', pathname: '/game' } });
 
 // The "refresh definitively failed" tests below drive the real refreshTokens/handleAuthFailure so the
 // 401-retry and redirect wiring is exercised end to end; the "recovers from a concurrent tab" test
-// needs refreshTokens to resolve null on demand (independent of the fetch mock's timing) to pin the
-// caller-side re-read guard in isolation, so refreshTokens is wrapped rather than driven purely by fetch.
+// needs refreshTokens to resolve a rejection on demand (independent of the fetch mock's timing) to pin
+// the caller-side re-read guard in isolation, so refreshTokens is wrapped rather than driven purely by fetch.
 vi.mock('$lib/api/auth', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/api/auth')>();
 	return { ...actual, refreshTokens: vi.fn(actual.refreshTokens) };
@@ -230,29 +232,53 @@ describe('ApiRequest', () => {
 			expect(response.status).toBe(401);
 		});
 
-		it('clears tokens and redirects to login when the refresh is definitively rejected', async () => {
+		it('clears tokens and redirects when the refresh is definitively rejected (400)', async () => {
 			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'refresh-1' });
+			window.location.href = '';
 
-			fetchResponder = (call) => {
-				if (call.url === '/api/Login/Refresh') {
-					return { status: 400, body: JSON.stringify({ errorMessage: 'invalid refresh token' }) };
-				}
-				return { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) };
-			};
+			fetchResponder = (call) =>
+				call.url === '/api/Login/Refresh'
+					? { status: 400, body: JSON.stringify({ errorMessage: 'Invalid or expired refresh token' }) }
+					: { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) };
 
 			const response = await new ApiRequest('Tags').get();
 
+			// The original 401 is what the caller sees; only one refresh attempt is made (the isRetry guard
+			// prevents `execute` from recursing into a second 401-triggered refresh on the retried request).
 			expect(response.status).toBe(401);
+			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			expect(callsTo('/api/Tags')).toHaveLength(1);
 			expect(getTokens()).toBeNull();
 			expect(window.location.href).toBe('/');
+		});
+
+		it('preserves tokens and does not redirect when the refresh is retryable (5xx)', async () => {
+			const accessToken = makeAccessToken(600);
+			setTokens({ accessToken, refreshToken: 'refresh-1' });
+			window.location.href = '';
+
+			fetchResponder = (call) =>
+				call.url === '/api/Login/Refresh'
+					? { status: 503, body: '' }
+					: { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) };
+
+			const response = await new ApiRequest('Tags').get();
+
+			// A transient refresh failure just surfaces the original 401 — no forced logout, and the isRetry
+			// guard still caps this at a single refresh attempt rather than looping.
+			expect(response.status).toBe(401);
+			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			expect(callsTo('/api/Tags')).toHaveLength(1);
+			expect(getTokens()).toEqual({ accessToken, refreshToken: 'refresh-1' });
+			expect(window.location.href).toBe('');
 		});
 
 		it("recovers using a concurrent tab's rotated pair instead of clearing, when one lands after refreshTokens gives up", async () => {
 			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'refresh-1' });
 			// Simulate the exact residual race: refreshTokens() itself has already concluded the presented
-			// token is dead (mocked null, bypassing its own internal re-read), but by the time the caller
-			// re-checks storage, another tab's rotated pair has since landed.
-			vi.mocked(refreshTokens).mockResolvedValueOnce(null);
+			// token is dead (a mocked rejection, bypassing its own internal re-read), but by the time the
+			// caller re-checks storage, another tab's rotated pair has since landed.
+			vi.mocked(refreshTokens).mockResolvedValueOnce({ status: 'rejected' });
 			setTokens({ accessToken: makeAccessToken(900), refreshToken: 'winner-refresh' });
 
 			let itemsCalls = 0;

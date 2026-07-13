@@ -84,8 +84,9 @@ export class ApiRequest<U extends ApiEndpoint> {
 	 * Sends the request, attaching the bearer access token, and transparently handles token expiry.
 	 * Before authenticated requests the access token is refreshed pre-emptively when it is about to
 	 * expire; if the server still rejects the request as unauthorized (401), the token pair is
-	 * refreshed once and the request is retried. When refresh is impossible the user is routed back to
-	 * the login screen.
+	 * refreshed once and the request is retried. The user is only routed back to the login screen when
+	 * that refresh is definitively rejected (the refresh token is spent/revoked) — a retryable failure
+	 * (network blip, transient server error) just leaves the 401 response for the caller to handle.
 	 */
 	private async execute(
 		method: 'GET' | 'POST',
@@ -98,7 +99,7 @@ export class ApiRequest<U extends ApiEndpoint> {
 		if (this.requiresAuth) {
 			// Refresh pre-emptively if needed and carry the resulting token straight through to send(),
 			// rather than re-reading the token store there.
-			accessToken = await ensureValidAccessToken();
+			accessToken = (await ensureValidAccessToken()).accessToken;
 			// Compute the device fingerprint (once, then cached) so it can be attached below.
 			await ensureDeviceFingerprint();
 		}
@@ -106,18 +107,20 @@ export class ApiRequest<U extends ApiEndpoint> {
 		const response = await this.send(method, url, payload, accessToken);
 
 		if (response.status === 401 && this.requiresAuth && !isRetry) {
-			const refreshed = await refreshTokens();
-			if (refreshed) {
+			const outcome = await refreshTokens();
+			if (outcome.status === 'success') {
 				return this.execute(method, url, payload, true);
 			}
-
-			// A concurrent tab can rotate in a fresh pair in the gap between refreshTokens()'s own
-			// re-read and here; adopt it instead of tearing down a session that's still alive elsewhere.
-			if (getTokens() !== null) {
-				return this.execute(method, url, payload, true);
+			if (outcome.status === 'rejected') {
+				// A concurrent tab can rotate in a fresh pair in the gap between refreshTokens()'s own
+				// re-read and here; adopt it instead of tearing down a session that's still alive elsewhere.
+				if (getTokens() !== null) {
+					return this.execute(method, url, payload, true);
+				}
+				handleAuthFailure();
 			}
-
-			handleAuthFailure();
+			// A retryable failure just surfaces the original 401 to the caller — the stored refresh token
+			// may still be good, so neither tokens nor session are torn down over it.
 		}
 
 		return response;

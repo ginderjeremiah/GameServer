@@ -50,8 +50,8 @@ const webSocketMock = vi.fn(createMockWebSocket);
 vi.stubGlobal('WebSocket', webSocketMock);
 
 import { ApiSocket, fetchSocketData, onSocketError } from '$lib/api/api-socket';
-import { setTokens, getAccessToken, clearTokens } from '$lib/api/token-store';
-import { ensureValidAccessToken, refreshTokens, handleAuthFailure } from '$lib/api/auth';
+import { setTokens, getAccessToken, getTokens, clearTokens } from '$lib/api/token-store';
+import { ensureValidAccessToken, refreshTokens, handleAuthFailure, type AccessTokenResult } from '$lib/api/auth';
 
 // Opening a socket is now asynchronous (it awaits the pre-emptive refresh before `new WebSocket`), so a
 // command no longer creates the socket synchronously. Drain the promise microtask queue to let the
@@ -79,7 +79,9 @@ describe('ApiSocket', () => {
 		// Default: the open path resolves to the currently stored access token (no implicit refresh), so
 		// URL assertions reflect the token in the store rather than triggering the real refresh machinery.
 		vi.mocked(ensureValidAccessToken).mockReset();
-		vi.mocked(ensureValidAccessToken).mockImplementation(() => Promise.resolve(getAccessToken()));
+		vi.mocked(ensureValidAccessToken).mockImplementation(() =>
+			Promise.resolve({ accessToken: getAccessToken(), rejected: false })
+		);
 		apiSocket = new ApiSocket();
 	});
 
@@ -126,7 +128,7 @@ describe('ApiSocket', () => {
 		it('refreshes the access token pre-emptively and opens the handshake with the refreshed token', async () => {
 			setTokens({ accessToken: 'stale', refreshToken: 'r' });
 			// The open path mints a fresh token before building the handshake URL.
-			vi.mocked(ensureValidAccessToken).mockResolvedValue('fresh-token');
+			vi.mocked(ensureValidAccessToken).mockResolvedValue({ accessToken: 'fresh-token', rejected: false });
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
@@ -139,9 +141,9 @@ describe('ApiSocket', () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			// Hold the pre-emptive refresh open so both callers pass the "is there a socket?" check while
 			// awaiting, exercising the single-flight guard.
-			let releaseRefresh: (token: string | null) => void = () => {};
+			let releaseRefresh: (result: AccessTokenResult) => void = () => {};
 			vi.mocked(ensureValidAccessToken).mockReturnValue(
-				new Promise<string | null>((resolve) => {
+				new Promise<AccessTokenResult>((resolve) => {
 					releaseRefresh = resolve;
 				})
 			);
@@ -153,19 +155,19 @@ describe('ApiSocket', () => {
 			expect(webSocketMock).not.toHaveBeenCalled();
 			expect(ensureValidAccessToken).toHaveBeenCalledTimes(1);
 
-			releaseRefresh('a');
+			releaseRefresh({ accessToken: 'a', rejected: false });
 			await flushMicrotasks();
 
 			expect(webSocketMock).toHaveBeenCalledTimes(1);
 		});
 
-		it('routes to auth failure (without opening) when the pre-emptive refresh fails for a logged-in session', async () => {
+		it('routes to auth failure (without opening) when the pre-emptive refresh is definitively rejected', async () => {
 			setTokens({ accessToken: 'expired', refreshToken: 'r' });
 			// Refresh token spent/revoked: no usable token can be obtained. The real ensureValidAccessToken
 			// clears storage itself in this case (via refreshTokens), so the mock mirrors that.
 			vi.mocked(ensureValidAccessToken).mockImplementation(async () => {
 				clearTokens();
-				return null;
+				return { accessToken: null, rejected: true };
 			});
 
 			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
@@ -186,7 +188,7 @@ describe('ApiSocket', () => {
 			// own pre-emptive refresh was still resolving to null.
 			vi.mocked(ensureValidAccessToken).mockImplementation(async () => {
 				setTokens({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
-				return null;
+				return { accessToken: null, rejected: true };
 			});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
@@ -194,6 +196,19 @@ describe('ApiSocket', () => {
 
 			expect(handleAuthFailure).not.toHaveBeenCalled();
 			expect(lastSocketUrl).toBe('/socket?access_token=winner-access');
+		});
+
+		it('leaves the session intact (no logout, no handshake) when the pre-emptive refresh is retryable', async () => {
+			setTokens({ accessToken: 'expired', refreshToken: 'r' });
+			// A network blip / transient server error — not proof the refresh token is dead.
+			vi.mocked(ensureValidAccessToken).mockResolvedValue({ accessToken: null, rejected: false });
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+
+			expect(handleAuthFailure).not.toHaveBeenCalled();
+			expect(webSocketMock).not.toHaveBeenCalled();
+			expect(getTokens()).toEqual({ accessToken: 'expired', refreshToken: 'r' });
 		});
 	});
 
@@ -268,7 +283,10 @@ describe('ApiSocket', () => {
 
 		it('flushes queued-but-unsent commands after an auth-retry reconnect', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
+			vi.mocked(refreshTokens).mockResolvedValue({
+				status: 'success',
+				tokens: { accessToken: 'a2', refreshToken: 'r2' }
+			});
 
 			// First socket is still CONNECTING, so the command sits queued (unsent) rather than in-flight.
 			// A function expression (not an arrow) so the mock can still be invoked with `new WebSocket()`.
@@ -598,7 +616,10 @@ describe('ApiSocket', () => {
 
 		it('refreshes once and reconnects when the handshake is auth-rejected', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
+			vi.mocked(refreshTokens).mockResolvedValue({
+				status: 'success',
+				tokens: { accessToken: 'a2', refreshToken: 'r2' }
+			});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
@@ -614,12 +635,12 @@ describe('ApiSocket', () => {
 			expect(handleAuthFailure).not.toHaveBeenCalled();
 		});
 
-		it('routes to the auth-failure handler when the refresh fails', async () => {
+		it('routes to the auth-failure handler when the refresh is definitively rejected', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			// The real refreshTokens clears storage itself on a definitive failure, so the mock mirrors that.
 			vi.mocked(refreshTokens).mockImplementation(async () => {
 				clearTokens();
-				return null;
+				return { status: 'rejected' };
 			});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
@@ -635,11 +656,11 @@ describe('ApiSocket', () => {
 
 		it("recovers using a concurrent tab's rotated pair instead of routing to auth failure", async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			// refreshTokens() itself gives up (mocked null), but another tab's rotated pair has since
-			// landed in storage by the time the caller re-checks.
+			// refreshTokens() itself gives up (a mocked rejection), but another tab's rotated pair has
+			// since landed in storage by the time the caller re-checks.
 			vi.mocked(refreshTokens).mockImplementation(async () => {
 				setTokens({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
-				return null;
+				return { status: 'rejected' };
 			});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
@@ -654,6 +675,25 @@ describe('ApiSocket', () => {
 			expect(handleAuthFailure).not.toHaveBeenCalled();
 			// Recovers by reconnecting (processCommandQueue), same as a successful refresh.
 			expect(webSocketMock).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not log out and leaves the queue for a later retry when the refresh is retryable', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			vi.mocked(refreshTokens).mockResolvedValue({ status: 'retryable' });
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+			webSocketMock.mockClear();
+
+			closeUnopened(ws);
+			await flushMicrotasks();
+
+			expect(refreshTokens).toHaveBeenCalledTimes(1);
+			expect(handleAuthFailure).not.toHaveBeenCalled();
+			// No reconnect is attempted from this failed attempt itself — the keepalive ping drives the retry.
+			expect(webSocketMock).not.toHaveBeenCalled();
+			expect(getTokens()).toEqual({ accessToken: 'a', refreshToken: 'r' });
 		});
 
 		it('does not retry a socket that had already opened', async () => {
@@ -757,12 +797,12 @@ describe('ApiSocket', () => {
 			expect(refreshTokens).not.toHaveBeenCalled();
 		});
 
-		it('settles an unsent queued command when the reconnect refresh fails', async () => {
+		it('settles an unsent queued command when the reconnect refresh is definitively rejected', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			// The real refreshTokens clears storage itself on a definitive failure, so the mock mirrors that.
 			vi.mocked(refreshTokens).mockImplementation(async () => {
 				clearTokens();
-				return null;
+				return { status: 'rejected' };
 			});
 
 			const promise = queueOnConnectingSocket(apiSocket);
@@ -929,7 +969,10 @@ describe('ApiSocket', () => {
 
 		it('stops refreshing after the retry limit when no reconnect ever becomes stable', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
+			vi.mocked(refreshTokens).mockResolvedValue({
+				status: 'success',
+				tokens: { accessToken: 'a2', refreshToken: 'r2' }
+			});
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
@@ -952,7 +995,10 @@ describe('ApiSocket', () => {
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			try {
 				setTokens({ accessToken: 'a', refreshToken: 'r' });
-				vi.mocked(refreshTokens).mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
+				vi.mocked(refreshTokens).mockResolvedValue({
+					status: 'success',
+					tokens: { accessToken: 'a2', refreshToken: 'r2' }
+				});
 
 				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 				await flushMicrotasks();

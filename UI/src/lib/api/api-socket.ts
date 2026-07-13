@@ -133,24 +133,32 @@ export class ApiSocket {
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
 		const hadRefreshToken = getRefreshToken() !== null;
-		let accessToken = await ensureValidAccessToken();
-		// A logged-in session whose pre-emptive refresh failed (refresh token spent/revoked) is
-		// unrecoverable: route to the auth-failure handler rather than opening a doomed handshake the close
-		// handler can no longer recover from (its refresh token is now gone). A never-logged-in caller
-		// (no prior refresh token) still opens an unauthenticated socket below.
+		const ensured = await ensureValidAccessToken();
+		let accessToken = ensured.accessToken;
+		// A logged-in session (one that had a refresh token) whose pre-emptive refresh didn't yield a
+		// token: bail out without opening rather than handing the server a stale/missing token. A
+		// never-logged-in caller (no prior refresh token) still opens an unauthenticated socket below.
 		if (!accessToken && hadRefreshToken) {
-			// A concurrent tab can rotate in a fresh pair in the gap between ensureValidAccessToken()'s
-			// internal re-read and here; adopt it instead of tearing down a session that's still alive
-			// elsewhere.
+			if (!ensured.rejected) {
+				// The failure was retryable (network blip, transient server error): leave the queue and
+				// tokens intact and just bail out — the keepalive ping's next ensureSocket() call retries
+				// the connect rather than forcing a logout over a transient failure.
+				return;
+			}
+			// A concurrent tab can rotate in a fresh pair in the gap between the refresh's own re-read
+			// and here; adopt it instead of tearing down a session that's still alive elsewhere.
 			accessToken = getTokens()?.accessToken ?? null;
-		}
-		if (!accessToken && hadRefreshToken) {
-			this.stopPingInterval();
-			// Terminal: nothing will reconnect and re-flush the queue, so settle it here too (mirroring every
-			// other terminal branch in handleClose) rather than stranding a caller mid-connect.
-			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
-			handleAuthFailure();
-			return;
+			if (!accessToken) {
+				// Definitively rejected with no adoptable pair: unrecoverable, so route to the auth-failure
+				// handler rather than opening a doomed handshake the close handler can no longer recover
+				// from (its refresh token is now gone). Terminal: nothing will reconnect and re-flush the
+				// queue, so settle it here too (mirroring every other terminal branch in handleClose)
+				// rather than stranding a caller mid-connect.
+				this.stopPingInterval();
+				this.settleQueuedRequests(CONNECTION_LOST_ERROR);
+				handleAuthFailure();
+				return;
+			}
 		}
 		// Browsers can't set an Authorization header on the WebSocket handshake, so the access token
 		// is passed as a query-string parameter (the standard ASP.NET Core token-over-WS pattern).
@@ -417,14 +425,18 @@ export class ApiSocket {
 		}
 
 		this.socketAuthRetries++;
-		refreshTokens().then((tokens) => {
-			// A concurrent tab can rotate in a fresh pair in the gap between refreshTokens()'s own re-read
-			// and here; adopt it instead of tearing down a session that's still alive elsewhere.
-			if (tokens || getTokens() !== null) {
+		refreshTokens().then((outcome) => {
+			if (outcome.status === 'success') {
 				// processCommandQueue ensures the socket (now with the freshly refreshed token) and flushes
 				// any queued-but-unsent commands.
 				void this.processCommandQueue();
-			} else {
+			} else if (outcome.status === 'rejected') {
+				// A concurrent tab can rotate in a fresh pair in the gap between refreshTokens()'s own
+				// re-read and here; adopt it instead of tearing down a session that's still alive elsewhere.
+				if (getTokens() !== null) {
+					void this.processCommandQueue();
+					return;
+				}
 				// Refresh is spent/revoked — the session is unrecoverable. Stop the keepalive before routing
 				// to login so it can't fire a reconnect on the now-cleared token during the teardown, and
 				// settle the unsent queue since nothing will re-flush it.
@@ -432,6 +444,9 @@ export class ApiSocket {
 				this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 				handleAuthFailure();
 			}
+			// Otherwise the refresh attempt was retryable (network blip, transient server error): leave the
+			// queue and tokens intact — the keepalive ping's next ensureSocket() call retries the reconnect,
+			// which will attempt the refresh again, rather than forcing a logout over a transient failure.
 		});
 	}
 
