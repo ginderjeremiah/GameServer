@@ -1,8 +1,13 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
 using Game.Application.Services;
 using Game.Core;
 using Game.Core.Battle;
+using Game.Core.Battle.Offline;
+using Game.Core.Events;
 using Game.Core.Players;
+using Game.DataAccess;
+using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -131,6 +136,112 @@ namespace Game.Application.Tests.Services
             Assert.Single(summary.CompletedChallenges, c => c.ChallengeId == challenge.Id);
             Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
             Assert.Contains(player.Inventory.UnlockedItems, u => u.ItemId == item.Id);
+        }
+
+        [Fact]
+        public async Task SimulateOfflineProgress_SharedFlushFails_LeavesChallengeAndStatisticsUnpersistedForRetry()
+        {
+            // #1921: ApplyOfflineRewards's progress save and the final SavePlayer must share one flush. Before
+            // the fix, the progress save flushed on its own inside ApplyOfflineRewards, so a failure in the
+            // later, separate SavePlayer flush left the challenge/statistics already durably committed while
+            // the player's exp/unlocks never persisted — permanently stranding the challenge reward and
+            // double-counting statistics on a retry. This pins that both saves now fail together, so a retry
+            // against the untouched persisted state replays the same window exactly once.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var setup = await SeedWinningScenarioAsync(scope, reload: false);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var challenge = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 3m, rewardItemId: item.Id);
+            await ReloadReferenceCachesAsync();
+
+            var healthyPlayerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+
+            // Durably persist the stale LastActivity first (a real prior save), so the reload after the failed
+            // attempt below reflects this away window rather than whatever the seeded player's default was.
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+            await healthyPlayerRepo.SavePlayer(player, CancellationToken);
+
+            // A repository whose flush always fails stands in for a transient Redis blip on the *player* save's
+            // flush specifically — mirroring PlayerWriteBehindTests' ThrowingPubSubService — sharing the same
+            // scoped PlayerUpdateBatch (via the progress repo resolved from this same scope) so the progress
+            // save reached through ApplyOfflineRewards joins the same doomed flush instead of publishing first.
+            var throwingPlayerRepo = new PlayerRepository(
+                context,
+                scope.ServiceProvider.GetRequiredService<ICacheService>(),
+                new ThrowingPubSubService(),
+                scope.ServiceProvider.GetRequiredService<IDomainEventDispatcher>(),
+                scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>(),
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<IItemMods>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>());
+
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var brokenOfflineService = new OfflineProgressService(
+                throwingPlayerRepo,
+                progressRepo,
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<IItemMods>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>(),
+                scope.ServiceProvider.GetRequiredService<IProficiencies>(),
+                scope.ServiceProvider.GetRequiredService<IClasses>(),
+                scope.ServiceProvider.GetRequiredService<IEnemies>(),
+                scope.ServiceProvider.GetRequiredService<OfflineProgressSimulator>(),
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
+                scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>(),
+                scope.ServiceProvider.GetRequiredService<ZoneResolutionService>(),
+                scope.ServiceProvider.GetRequiredService<BattleService>());
+
+            await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(
+                () => brokenOfflineService.SimulateOfflineProgress(player, state, CancellationToken));
+
+            // Nothing from the doomed window is durably committed: the challenge is not completed and no
+            // statistics were recorded, because the progress save's cache advance is deferred until the shared
+            // flush succeeds — which it never does here.
+            Assert.DoesNotContain(challenge.Id, await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
+            Assert.Empty(await progressRepo.GetStatistics(setup.PlayerId));
+
+            // A retry mirrors the socket layer's forced reload after PlayerPersistenceFlushFailedException: a
+            // fresh Player (from the durably-persisted pre-window state) and a fresh session, not the poisoned
+            // in-memory objects the failed attempt left behind.
+            var reloadedPlayer = await healthyPlayerRepo.GetPlayer(setup.PlayerId);
+            Assert.NotNull(reloadedPlayer);
+            var freshState = new PlayerState { PlayerId = setup.PlayerId };
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(reloadedPlayer, freshState, CancellationToken);
+
+            Assert.Single(summary.CompletedChallenges, c => c.ChallengeId == challenge.Id);
+            Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
+            Assert.Contains(reloadedPlayer.Inventory.UnlockedItems, u => u.ItemId == item.Id);
+
+            // Statistics reflect exactly this one retry's worth of kills, not a doubled count left over from
+            // the stranded first pass.
+            var kills = Assert.Single(await progressRepo.GetStatistics(setup.PlayerId),
+                s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
+            Assert.Equal((decimal)summary.BattlesWon, kills.Value);
+        }
+
+        // Stands in for a transient Redis blip on the flush, mirroring PlayerWriteBehindTests' ThrowingPubSubService.
+        private sealed class ThrowingPubSubService : IPubSubService
+        {
+            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Wake(string channel) => throw new InvalidOperationException("Simulated transient publish failure.");
+            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) =>
+                throw new NotImplementedException();
+            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) =>
+                throw new NotImplementedException();
+            public Task UnSubscribe(string channel, string id) => throw new NotImplementedException();
+            public IPubSubQueue GetQueue(string queueName) => throw new NotImplementedException();
         }
 
         [Fact]

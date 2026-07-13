@@ -82,6 +82,8 @@ namespace Game.DataAccess.Repositories
             return PlayerCacheMapper.ToCore(model, _items, _itemMods, _skills);
         }
 
+        public IDisposable BeginBatch() => _updateBatch.BeginPlayerSave();
+
         public async Task SavePlayer(Player player, CancellationToken cancellationToken = default)
         {
             // Dispatching the player's events buffers each one into the scoped PlayerUpdateBatch (via

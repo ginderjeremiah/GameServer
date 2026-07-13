@@ -128,14 +128,14 @@ namespace Game.DataAccess.Repositories
             }
             else
             {
-                // Standalone progress save (e.g. the offline-rewards batch): flush our own event, then advance
-                // the cache — preserving publish-before-cache so the write is never stranded. FlushAsync leaves
-                // the event buffered for the next flush attempt if the publish itself fails, rather than losing
-                // it (#1494). A genuine (non-cancellation) flush failure is wrapped the same way SavePlayer's is
-                // (PlayerPersistenceFlushFailedException), so the socket layer forces the connection's in-memory
-                // Player to reload afterward — otherwise the caller's already-applied in-memory mutations (e.g.
-                // offline exp/levels granted before this Save) would silently ride along un-persisted and could
-                // be re-credited by a same-connection retry (#1819).
+                // Standalone progress save (no player-save batch scope is open): flush our own event, then
+                // advance the cache — preserving publish-before-cache so the write is never stranded. FlushAsync
+                // leaves the event buffered for the next flush attempt if the publish itself fails, rather than
+                // losing it (#1494). A genuine (non-cancellation) flush failure is wrapped the same way
+                // SavePlayer's is (PlayerPersistenceFlushFailedException), so the socket layer forces the
+                // connection's in-memory Player to reload afterward — otherwise the caller's already-applied
+                // in-memory mutations would silently ride along un-persisted and could be re-credited by a
+                // same-connection retry (#1819).
                 try
                 {
                     await _updateBatch.FlushAsync(_pubsub, cancellationToken);

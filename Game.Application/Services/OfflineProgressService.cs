@@ -169,14 +169,24 @@ namespace Game.Application.Services
 
             var levelBefore = player.Level;
             var statPointsBefore = player.StatPoints.StatPointsGained;
-            var rewards = await ApplyOfflineRewards(player, progress, result, awayWindowEnd, cancellationToken);
 
-            // Re-anchor the away clock and persist the player (exp/levels/unlocks) in one save. The exp batch
-            // already raised its own single core update in ApplyOfflineRewards; this re-anchor raises one more.
-            // Both are absolute write-behind writes (the final state persists regardless), and two is still
-            // nowhere near the per-victory flood decision 6 avoids.
-            player.StampActivity(now);
-            await _playerRepo.SavePlayer(player, cancellationToken);
+            OfflineRewards rewards;
+            // The progress save inside ApplyOfflineRewards and the player save below are logically one unit —
+            // exp/unlocks on the player and the completed challenges/statistics/proficiency levels on progress
+            // all come from the same simulated window. Sharing one batch scope means the progress save defers
+            // into it instead of flushing on its own, so a failure in the shared flush leaves both stranded for
+            // retry together rather than progress already being durably committed while the player save fails
+            // (#1921) — the same failure atomicity SavePlayer already gives a progress save reached through its
+            // own domain-event dispatch on the live battle-completion path.
+            using (_playerRepo.BeginBatch())
+            {
+                rewards = await ApplyOfflineRewards(player, progress, result, awayWindowEnd, cancellationToken);
+
+                // Re-anchor the away clock and persist the player (exp/levels/unlocks), sharing the batch's
+                // single flush with the progress save above.
+                player.StampActivity(now);
+                await _playerRepo.SavePlayer(player, cancellationToken);
+            }
 
             return new OfflineProgressSummary
             {
