@@ -9,7 +9,7 @@ import {
 } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { staticData, playerProficiencies } from '$stores';
-import { ELogType, EDamageType, IBattlerAttribute, IEnemyInstance, ISkillDamagePortion } from '$lib/api';
+import { ELogType, EAttribute, EDamageType, IBattlerAttribute, IEnemyInstance, ISkillDamagePortion } from '$lib/api';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
 import { logMessage } from '../log';
 import {
@@ -290,6 +290,10 @@ export class BattleEngine {
 		// composePlayerBattleAttributes canonicalises. The data-less re-arm above keeps this modifier (setData
 		// isn't re-run), so it is applied only here, on a full rebuild.
 		applySignaturePassive(this.player.attributes, (resolve) => playerManager.battleSignaturePassiveModifier(resolve));
+		// reset() already snapshotted currentHealth off MaxHealth before the passive above could touch it
+		// (#1933) — re-snapshot now so a passive that raises MaxHealth doesn't leave the battler under-full,
+		// matching the backend's Battler ctor which snapshots CurrentHealth after the passive is composed in.
+		this.player.currentHealth = this.player.attributes.getValue(EAttribute.MaxHealth);
 		this.lastEquipmentStats = equipmentStats;
 		this.lastPlayerAttributes = attributes;
 		this.lastSelectedSkills = selectedSkills;

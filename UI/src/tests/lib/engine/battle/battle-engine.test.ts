@@ -1666,6 +1666,9 @@ describe('BattleEngine', () => {
 			// The full rebuild composes the passive last: Strength = 50 (alloc) + 7 (passive), added exactly once.
 			engine.start();
 			expect(engine.player.attributes.getValue(EAttribute.Strength)).toBe(57);
+			// #1933: Strength feeds MaxHealth, so the passive raises it too — the battler must start full
+			// against the post-passive MaxHealth, not the value reset() snapshotted before the passive landed.
+			expect(engine.player.currentHealth).toBe(engine.player.attributes.getValue(EAttribute.MaxHealth));
 
 			// A data-less re-arm (unchanged inputs) skips setData, so the already-composed passive persists — it is
 			// neither lost (→ 50) nor re-applied (→ 64).
@@ -1679,6 +1682,7 @@ describe('BattleEngine', () => {
 				isBossBattle: false
 			});
 			expect(engine.player.attributes.getValue(EAttribute.Strength)).toBe(57);
+			expect(engine.player.currentHealth).toBe(engine.player.attributes.getValue(EAttribute.MaxHealth));
 		});
 
 		// The additionalModifiers passed to reset must be [...lockedBase, ...proficiency] in that order — the
