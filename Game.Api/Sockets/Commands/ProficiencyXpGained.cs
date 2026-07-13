@@ -11,7 +11,7 @@ namespace Game.Api.Sockets.Commands
     /// <c>ProficiencyXpGained</c> listener can update its proficiency store and surface level-ups/milestones
     /// — mirroring <see cref="ChallengeCompleted"/>.
     /// </summary>
-    public class ProficiencyXpGained : AbstractSocketCommand<ProficiencyXpGainedModel, ProficiencyXpGainedModel>, IServerInitiatedCommand
+    public class ProficiencyXpGained : AbstractSocketCommand<ProficiencyXpGainedModel, ProficiencyXpGainedModel>, IReplayableServerCommand
     {
         public override string Name { get; set; } = nameof(ProficiencyXpGained);
 

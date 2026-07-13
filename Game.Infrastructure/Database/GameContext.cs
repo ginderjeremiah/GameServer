@@ -85,6 +85,15 @@ namespace Game.Infrastructure.Database
             modelBuilder.Entity<AppliedMod>(entity =>
             {
                 entity.HasKey(am => new { am.PlayerId, am.ItemId, am.ItemModSlotId });
+
+                // ItemModSlot is legitimately hard-deletable (AdminItems.SaveModSlots), unlike the retire-only
+                // Player/Item/ItemMod it also references. Restrict instead of the convention's Cascade, so a
+                // slot delete can never silently destroy every player's applied mod occupying it — the DB-level
+                // backstop behind SaveModSlots' own in-use rejection.
+                entity.HasOne(am => am.ItemModSlot)
+                    .WithMany()
+                    .HasForeignKey(am => am.ItemModSlotId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Attribute>(entity =>

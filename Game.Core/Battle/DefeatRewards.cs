@@ -45,9 +45,22 @@ namespace Game.Core.Battle
         /// production call site by the time a victory is recorded.
         /// </summary>
         public DefeatRewards(Battler playerBattler, Enemy enemy)
+            : this(CombatRating.Rate(playerBattler, isPlayer: true), CombatRating.Rate(enemy.ToBattler(), isPlayer: false))
         {
-            EnemyRating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
-            PlayerRating = CombatRating.Rate(playerBattler, isPlayer: true);
+        }
+
+        /// <summary>
+        /// Computes the rewards directly from already-known combat ratings, skipping the
+        /// <see cref="CombatRating.Rate"/> re-derivation the <see cref="Battler"/>-based constructor performs. For
+        /// a caller that replays many battles against an unchanged player build and/or a deterministic enemy (the
+        /// offline simulator, #1730 — the player's rating is invariant between level-ups, and a boss's rating is
+        /// invariant for the whole run), computing each rating once and passing it here is the identical reward
+        /// math with the redundant rating work removed.
+        /// </summary>
+        public DefeatRewards(double playerRating, double enemyRating)
+        {
+            PlayerRating = playerRating;
+            EnemyRating = enemyRating;
 
             // (enemyRating / playerRating)² is the time-to-kill ratio (spike #1526 Decision 1), so clamping the
             // ratio at 1 before squaring is what makes the curve saturate at a matched-or-easier fight rather than

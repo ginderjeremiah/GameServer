@@ -8,20 +8,23 @@ import { SvelteURL } from 'svelte/reactivity';
 // `SvelteURL` (created in beforeEach, mutated in place by `setPath`) makes the `.pathname` read inside
 // the effect track it. The URL is filled in beforeEach because vi.hoisted runs before module imports
 // resolve, so `SvelteURL` isn't available inside the factory.
-const { goto, getTokens, onSocketError, resumeSession, playerManager, page } = vi.hoisted(() => ({
-	goto: vi.fn(() => Promise.resolve()),
-	getTokens: vi.fn(),
-	onSocketError: vi.fn(),
-	resumeSession: vi.fn(),
-	playerManager: { name: '' },
-	page: { url: new URL('http://localhost/') as URL }
-}));
+const { goto, getTokens, onSocketError, listenCommand, handleSocketReplaced, resumeSession, playerManager, page } =
+	vi.hoisted(() => ({
+		goto: vi.fn(() => Promise.resolve()),
+		getTokens: vi.fn(),
+		onSocketError: vi.fn(),
+		listenCommand: vi.fn(),
+		handleSocketReplaced: vi.fn(),
+		resumeSession: vi.fn(),
+		playerManager: { name: '' },
+		page: { url: new URL('http://localhost/') as URL }
+	}));
 
 vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve: (p: string) => p }));
 vi.mock('$app/state', () => ({ page }));
-vi.mock('$lib/api', () => ({ getTokens, onSocketError }));
-vi.mock('$lib/engine', () => ({ playerManager }));
+vi.mock('$lib/api', () => ({ getTokens, onSocketError, apiSocket: { listenCommand } }));
+vi.mock('$lib/engine', () => ({ playerManager, handleSocketReplaced }));
 vi.mock('$lib/engine/session', () => ({ resumeSession }));
 vi.mock('$stores', () => ({ toastError: vi.fn() }));
 vi.mock('$components', () => ({
@@ -31,6 +34,9 @@ vi.mock('$components', () => ({
 }));
 
 import Layout from '../../routes/+layout.svelte';
+// Deliberately NOT mocked: the boot gate's `bootState.markBooted()` call is the seam #1898's fix on
+// `/game` hinges on (see the test below), so this suite asserts against the real module.
+import { bootState } from '$lib/engine/boot-state.svelte';
 
 const childSnippet = createRawSnippet(() => ({
 	render: () => '<div data-testid="child">child content</div>'
@@ -54,6 +60,14 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe('root layout socket listeners', () => {
+	it('registers a SocketReplaced listener once for the whole app session, independent of the game route (#1836)', () => {
+		renderLayout();
+
+		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced, true);
+	});
+});
 
 describe('root layout boot gate', () => {
 	it('renders the route content (no splash) and does not resume when there is no stored session', async () => {
@@ -81,6 +95,28 @@ describe('root layout boot gate', () => {
 
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/game'));
 		expect(resumeSession).toHaveBeenCalledTimes(1);
+	});
+
+	it('marks the shared boot state resolved on both the no-tokens short-circuit and a token-bearing resume (#1898)', async () => {
+		// Both branches hit the same `finally`, which is the seam a route mounted independently of this
+		// layout (e.g. `/game`) relies on to know the boot decision has resolved. Spying on the call
+		// (rather than only reading the resulting boolean) catches a regression that removes/misplaces
+		// the call even though `bootState.booted` — once true — never resets and would otherwise mask it
+		// via an earlier test's render.
+		const markBooted = vi.spyOn(bootState, 'markBooted');
+
+		renderLayout();
+		await waitFor(() => expect(markBooted).toHaveBeenCalledTimes(1));
+		expect(bootState.booted).toBe(true);
+
+		markBooted.mockClear();
+		getTokens.mockReturnValue({ accessToken: 'a', refreshToken: 'r' });
+		resumeSession.mockResolvedValue('game');
+		renderLayout();
+		await waitFor(() => expect(goto).toHaveBeenCalledWith('/game'));
+		expect(markBooted).toHaveBeenCalledTimes(1);
+
+		markBooted.mockRestore();
 	});
 
 	it('keeps a fully-restorable session on the route it refreshed on (e.g. /admin)', async () => {

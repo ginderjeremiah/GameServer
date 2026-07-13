@@ -10,7 +10,7 @@ namespace Game.Api.Sockets.Commands
     /// The payload arrives as the command parameters and is echoed straight back as the response data, so
     /// the client's <c>ChallengeCompleted</c> listener can unlock the rewards locally.
     /// </summary>
-    public class ChallengeCompleted : AbstractSocketCommand<ChallengeCompletedModel, ChallengeCompletedModel>, IServerInitiatedCommand
+    public class ChallengeCompleted : AbstractSocketCommand<ChallengeCompletedModel, ChallengeCompletedModel>, IReplayableServerCommand
     {
         public override string Name { get; set; } = nameof(ChallengeCompleted);
 

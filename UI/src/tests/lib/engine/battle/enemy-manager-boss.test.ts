@@ -215,6 +215,49 @@ describe('EnemyManager boss mode', () => {
 		expect(loaded).toEqual([bossInstance]);
 	});
 
+	it('waits out the anchored cooldown before presenting a boss the abandon paced (#1884)', async () => {
+		// A positive cooldown means this call's own abandon resolved a win/loss/draw and the server
+		// anchored the returned boss battle's start to that cooldown's expiry (#1884, the boss-path
+		// variant of #1851/#1881) — the client must wait it out before treating the boss as live,
+		// mirroring the idle loop's identical NewEnemy handshake.
+		send.mockImplementation((name: string) =>
+			name === 'ChallengeBoss'
+				? Promise.resolve(resp('ChallengeBoss', { enemyInstance: bossInstance, cooldown: 2000 }))
+				: Promise.resolve(newEnemyResponse)
+		);
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		await manager.challengeBoss();
+
+		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(2000);
+		expect(manager.currentEnemy).toEqual(bossInstance);
+		expect(loaded).toEqual([bossInstance]);
+	});
+
+	it('abandons presenting the boss when a retreat lands during the anchored cooldown wait', async () => {
+		let releaseCooldown!: () => void;
+		const cooldownGate = new Promise<void>((resolve) => (releaseCooldown = resolve));
+		h.battleEngine.startLoading.mockReturnValueOnce(cooldownGate);
+		send.mockImplementation((name: string) =>
+			name === 'ChallengeBoss'
+				? Promise.resolve(resp('ChallengeBoss', { enemyInstance: bossInstance, cooldown: 2000 }))
+				: Promise.resolve(newEnemyResponse)
+		);
+
+		const challenge = manager.challengeBoss();
+		await flush(); // parked on the anchored cooldown wait
+
+		const retreat = manager.retreatFromBoss(); // supersedes: bumps the transition generation
+		releaseCooldown();
+		await Promise.all([challenge, retreat]);
+
+		// The retreat won: idle loop with a fresh normal enemy; the challenge's cooldown wait abandoned
+		// instead of clobbering it with the paced boss.
+		expect(manager.mode).toBe('idle');
+		expect(manager.currentEnemy).toEqual(normalInstance);
+	});
+
 	it('falls back to the idle loop when the zone has no boss', async () => {
 		send.mockImplementation((name: string) =>
 			name === 'ChallengeBoss' ? Promise.resolve(challengeError) : Promise.resolve(newEnemyResponse)

@@ -106,6 +106,22 @@ describe('TableCell — select type', () => {
 		expect(zone1?.disabled).toBe(false);
 	});
 
+	it('passes the full row to the options provider, alongside the current value', () => {
+		const options = vi.fn(() => [{ value: 1, text: 'Zone A' }]);
+		render(TableCell, {
+			props: {
+				col: makeSelectCol({ options }),
+				row: { zoneId: 1, kind: 2 },
+				idx: 0,
+				rows: [{ zoneId: 1, kind: 2 }],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		expect(options).toHaveBeenCalledWith(1, { zoneId: 1, kind: 2 });
+	});
+
 	it('adds the "dirty" class to the select when dirty=true', () => {
 		const { container } = render(TableCell, {
 			props: {
@@ -223,6 +239,42 @@ describe('TableCell — text type', () => {
 			}
 		});
 		expect(container.querySelector('input')!.classList.contains('dirty')).toBe(true);
+	});
+
+	it('calls onChange with undefined (not "") when an optional column is cleared to blank', async () => {
+		const onChange = vi.fn();
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol({ optional: true }),
+				row: { text: 'nav-fight' },
+				idx: 0,
+				rows: [{ text: 'nav-fight' }],
+				record: {},
+				dirty: false,
+				onChange
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: '' } });
+		expect(onChange).toHaveBeenCalledWith(undefined);
+	});
+
+	it('calls onChange with "" (not undefined) when a non-optional column is cleared to blank', async () => {
+		const onChange = vi.fn();
+		const { container } = render(TableCell, {
+			props: {
+				col: makeTextCol(),
+				row: { text: 'a' },
+				idx: 0,
+				rows: [{ text: 'a' }],
+				record: {},
+				dirty: false,
+				onChange
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: '' } });
+		expect(onChange).toHaveBeenCalledWith('');
 	});
 });
 

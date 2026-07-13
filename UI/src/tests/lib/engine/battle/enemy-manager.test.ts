@@ -14,7 +14,7 @@ vi.mock('$lib/engine/log', () => ({ logMessage: vi.fn() }));
 // index ('../'). Stub it so importing the unit doesn't spin up the whole engine — getNewEnemy only
 // reads playerManager.currentZone, and entering Home calls battleEngine.rest().
 vi.mock('$lib/engine', () => ({
-	battleEngine: { stage: 0, startLoading: vi.fn(), rest: vi.fn() },
+	battleEngine: { stage: 0, timeElapsed: 0, startLoading: vi.fn(), rest: vi.fn() },
 	BattleStage: { Idle: 0, Victorious: 1, Defeated: 2 },
 	onBattleStageChanged: vi.fn(() => () => {}),
 	playerManager: { currentZone: 3 }
@@ -70,8 +70,10 @@ describe('EnemyManager.getNewEnemy', () => {
 		// The retry loop runs while the manager is started; flip it on directly (start() would also
 		// hook battle-stage changes, which these focused unit tests don't exercise).
 		manager.started = true;
+		battleEngine.timeElapsed = 0;
 		vi.mocked(logMessage).mockClear();
 		vi.mocked(delay).mockClear();
+		vi.mocked(battleEngine.startLoading).mockClear();
 		sendSocketCommand = vi.spyOn(apiSocket, 'sendSocketCommand');
 		sendSocketCommand.mockReset();
 	});
@@ -144,6 +146,40 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(delay).toHaveBeenCalledWith(500);
 		expect(manager.currentEnemy).toEqual(makeEnemy(1));
 		expect(logMessage).not.toHaveBeenCalled();
+	});
+
+	// #1881: when this call's own abandon resolved an idle loss/draw's outcome, the server anchors the
+	// returned battle's start to the just-incurred post-battle cooldown (#1851) rather than now. Presenting
+	// the enemy immediately would run the client's battle clock ahead of that anchor, so the client must
+	// wait out the bundled cooldown first — mirroring the DefeatEnemy/BattleLost cooldown/prefetch flow.
+	it('waits out an abandon-incurred cooldown bundled with the enemy before presenting it', async () => {
+		const enemy = makeEnemy(5);
+		sendSocketCommand.mockResolvedValue({
+			id: '1',
+			name: 'NewEnemy',
+			data: { enemyInstance: enemy, cooldown: 4500 }
+		} as IApiSocketResponse<'NewEnemy'>);
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		await manager.getNewEnemy();
+
+		expect(battleEngine.startLoading).toHaveBeenCalledWith(4500);
+		expect(manager.currentEnemy).toEqual(enemy);
+		expect(loaded).toEqual([enemy]);
+	});
+
+	it('presents a freshly spawned enemy immediately when no cooldown is bundled with it', async () => {
+		sendSocketCommand.mockResolvedValue({
+			id: '1',
+			name: 'NewEnemy',
+			data: { enemyInstance: makeEnemy(6), cooldown: 0 }
+		} as IApiSocketResponse<'NewEnemy'>);
+
+		await manager.getNewEnemy();
+
+		expect(battleEngine.startLoading).not.toHaveBeenCalled();
+		expect(manager.currentEnemy).toEqual(makeEnemy(6));
 	});
 
 	it('backs off by the default retry delay on a no-enemy response with cooldown 0 (no tight loop)', async () => {
@@ -275,6 +311,39 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(loaded).toEqual([enemy]);
 		expect(manager.currentEnemy).toEqual(enemy);
 	});
+
+	// #1883: a fresh battleEngine's timeElapsed is a genuine 0, not "no history" — the loop's first-ever
+	// NewEnemy request must omit clientBattleMs rather than send that 0, or the backend reads it as "the
+	// client never fought this battle" and silently drops whatever stale battle it may still be holding
+	// (e.g. a sub-5-minute reconnect the welcome-back gate didn't resume directly).
+	it("omits clientBattleMs on the loop's first NewEnemy request even though timeElapsed is genuinely 0", async () => {
+		battleEngine.timeElapsed = 0;
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy(1)));
+
+		await manager.getNewEnemy();
+
+		expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', {
+			newZoneId: 3,
+			clientBattleMs: undefined,
+			forceAbandon: false
+		});
+	});
+
+	it('reports the real elapsed time on a later fetch once the loop has already made its first request', async () => {
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy(1)));
+		await manager.getNewEnemy(); // consumes the first-fetch omission
+
+		battleEngine.timeElapsed = 4200;
+		sendSocketCommand.mockClear();
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy(2)));
+		await manager.getNewEnemy(); // e.g. an idle loss/draw reporting genuine elapsed time
+
+		expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', {
+			newZoneId: 3,
+			clientBattleMs: 4200,
+			forceAbandon: false
+		});
+	});
 });
 
 describe('EnemyManager.start', () => {
@@ -283,6 +352,7 @@ describe('EnemyManager.start', () => {
 
 	beforeEach(() => {
 		manager = new EnemyManager();
+		battleEngine.timeElapsed = 0;
 		vi.mocked(logMessage).mockClear();
 		sendSocketCommand = vi.spyOn(apiSocket, 'sendSocketCommand');
 		sendSocketCommand.mockReset();
@@ -330,6 +400,29 @@ describe('EnemyManager.start', () => {
 		expect(manager.mode).toBe('boss');
 		expect(manager.currentEnemy).toEqual(activeBossBattle);
 	});
+
+	// #1883: the first-fetch omission is re-armed per start() (e.g. a character switch), not consumed once
+	// for the manager's whole lifetime — a fresh loop always has no history for whatever battle the server
+	// may still be holding for the newly-selected character.
+	it('re-arms the first-fetch omission on a fresh start() after a stop()', async () => {
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy(1)));
+		manager.start();
+		await vi.waitFor(() => expect(manager.currentEnemy).toEqual(makeEnemy(1)));
+		manager.stop();
+
+		sendSocketCommand.mockClear();
+		battleEngine.timeElapsed = 9000; // stale from the previous character's fight; must not leak through
+		sendSocketCommand.mockResolvedValue(enemyResponse(makeEnemy(2)));
+		manager.start();
+
+		await vi.waitFor(() =>
+			expect(sendSocketCommand).toHaveBeenCalledWith('NewEnemy', {
+				newZoneId: 3,
+				clientBattleMs: undefined,
+				forceAbandon: false
+			})
+		);
+	});
 });
 
 describe('EnemyManager Home zone', () => {
@@ -342,6 +435,7 @@ describe('EnemyManager Home zone', () => {
 	beforeEach(() => {
 		manager = new EnemyManager();
 		manager.started = true;
+		battleEngine.timeElapsed = 0;
 		staticData.zones = [];
 		staticData.zones[COMBAT_ZONE] = { isHome: false } as (typeof staticData.zones)[number];
 		staticData.zones[HOME_ZONE] = { isHome: true } as (typeof staticData.zones)[number];

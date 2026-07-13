@@ -59,7 +59,7 @@ namespace Game.Api.Sockets.Commands
                     }
                 }
 
-                context.Session.SavePlayerState();
+                await context.Session.SavePlayerStateAsync(cancellationToken);
 
                 var now = DateTime.UtcNow;
                 return Success(new DefeatEnemyResponse

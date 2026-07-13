@@ -1,0 +1,25 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Trace"
+    }
+  },
+  "HashPepper": "dev-only-pepper-change-me",
+  "Jwt": {
+    "SigningKey": "dev-only-jwt-signing-key-change-me-at-least-32-bytes-long",
+    "Issuer": "game-server-api",
+    "Audience": "game-server-api"
+  },
+  "Cors": {
+    "AllowedOrigins": [ "http://localhost:5173" ]
+  },
+  "DataAccessOptions": {
+    "DatabaseSystem": 1,
+    "EnableSensitiveLogging": true,
+    "CacheSystem": 0,
+    "PubSubSystem": 0,
+    "DbConnectionString": "Host=localhost;Port=5432;Database=game;Username=<user>;Password=<password>",
+    "CacheConnectionString": "localhost:6379",
+    "PubSubConnectionString": "localhost:6379"
+  }
+}

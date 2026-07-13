@@ -148,7 +148,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 42);
+            await session.CreateSession(userId: 1, playerId: 42);
 
             // The Subscribe failure propagates out of RegisterSocket...
             await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session, isAdmin: false));
@@ -197,7 +197,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 77);
+            await session.CreateSession(userId: 1, playerId: 77);
             var context = await manager.RegisterSocket(socket, session, isAdmin: false);
 
             // The unsubscribe fault during teardown must be swallowed, not propagated...
@@ -244,7 +244,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             // RegisterSocket wires the real processor into the fake pub/sub via RegisterSocketCommandListener,
             // so the captured callback is the production GetSocketCommandProcessor closure under test.
             manager.RegisterSocket(socket, session, isAdmin: false).GetAwaiter().GetResult();
@@ -434,6 +434,7 @@ namespace Game.Api.Tests.Unit
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
+            public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
         }
 
         /// <summary>A pub/sub whose <c>Subscribe</c> throws, to drive the registration-rollback path
@@ -500,6 +501,7 @@ namespace Game.Api.Tests.Unit
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
+            public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
         }
 
         private sealed class NoOpHostLifetime : IHostApplicationLifetime
@@ -514,6 +516,7 @@ namespace Game.Api.Tests.Unit
         {
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
             public void Update(PlayerState sessionData, int playerId) { }
+            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public void Clear(int userId) { }
         }
 

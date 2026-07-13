@@ -1046,8 +1046,8 @@ namespace Game.Core
         /// <summary>Not acquirable through any channel.</summary>
         None = 0,
 
-        /// <summary>Permanently granted to the player and added to the unlocked loadout pool — by a proficiency
-        /// milestone reward or a tree-seed skill (challenges no longer grant skills; spike #982 area D/I).</summary>
+        /// <summary>Permanently granted to the player and added to the unlocked loadout pool — a proficiency
+        /// milestone reward or a starter-kit skill (challenges no longer grant skills; spike #982 area D/I).</summary>
         Player = 1,
 
         /// <summary>Grantable by an equipped item.</summary>

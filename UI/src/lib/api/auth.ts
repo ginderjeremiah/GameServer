@@ -3,6 +3,7 @@ import {
 	getAccessToken,
 	getAccessTokenExpiry,
 	getRefreshToken,
+	getTokens,
 	setTokens,
 	type StoredTokens
 } from './token-store';
@@ -28,7 +29,7 @@ const EXPIRY_LEEWAY_SECONDS = 30;
 /**
  * A refresh attempt's outcome, distinguishing a definitive rejection from a merely failed attempt:
  *
- *  - `success` — a fresh token pair was minted.
+ *  - `success` — a fresh token pair was minted (or another tab's rotated pair was adopted).
  *  - `rejected` — either there is no stored refresh token to present, or the backend affirmatively
  *    rejected the one presented (`Login/Refresh` returns 400 for "Invalid or expired refresh token" —
  *    its only failure path). Both are a definitively dead session, not something a retry can fix.
@@ -64,7 +65,15 @@ const performRefresh = async (refreshToken: string): Promise<RefreshOutcome> => 
 		return response.status === 400 ? { status: 'rejected' } : { status: 'retryable' };
 	}
 
-	const body = (await response.json()) as { data?: Partial<StoredTokens> };
+	let body: { data?: Partial<StoredTokens> };
+	try {
+		body = (await response.json()) as { data?: Partial<StoredTokens> };
+	} catch {
+		// A 2xx whose body isn't parseable JSON (a proxy/captive-portal interception, a truncated
+		// response) is a transient-intermediary failure, not proof the refresh token is dead.
+		return { status: 'retryable' };
+	}
+
 	const tokens = body.data;
 	if (tokens?.accessToken && tokens?.refreshToken) {
 		return { status: 'success', tokens: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken } };
@@ -76,9 +85,14 @@ const performRefresh = async (refreshToken: string): Promise<RefreshOutcome> => 
 
 /**
  * Exchanges the stored refresh token for a fresh pair and persists the rotated tokens. Concurrent
- * callers share a single request so the single-use refresh token is only consumed once. Stored tokens
- * are cleared only on a definitive rejection — a retryable failure (network blip, transient server
- * error) leaves them in place so a later attempt can still use the still-possibly-valid refresh token.
+ * callers **within this tab** share a single request so the single-use refresh token is only consumed
+ * once — but the token pair lives in shared `localStorage`, and two tabs are a supported state (see
+ * `SocketReplaced`), so a failed attempt is re-checked against storage before it stands: if another
+ * tab has since rotated in a different refresh token, that tab won the race (spending the token this
+ * one presented) and its rotated pair is the live session, so it is adopted as a `success` instead of
+ * failing a session that's still alive elsewhere. Stored tokens are cleared only on a definitive
+ * rejection with no adoptable pair — a retryable failure (network blip, transient server error) leaves
+ * them in place so a later attempt can still use the still-possibly-valid refresh token.
  */
 export const refreshTokens = (): Promise<RefreshOutcome> => {
 	if (inFlightRefresh) {
@@ -91,12 +105,24 @@ export const refreshTokens = (): Promise<RefreshOutcome> => {
 	}
 
 	inFlightRefresh = performRefresh(refreshToken)
-		.then((outcome) => {
+		.then((outcome): RefreshOutcome => {
 			if (outcome.status === 'success') {
 				setTokens(outcome.tokens);
-			} else if (outcome.status === 'rejected') {
+				return outcome;
+			}
+
+			// A failure isn't necessarily ours: another tab may have raced this one through a refresh
+			// (spending the token we presented reads as a 400 rejection here). If storage now holds a
+			// different refresh token than the one presented, adopt that rotated pair.
+			const current = getTokens();
+			if (current !== null && current.refreshToken !== refreshToken) {
+				return { status: 'success', tokens: current };
+			}
+
+			if (outcome.status === 'rejected') {
 				clearTokens();
 			}
+
 			return outcome;
 		})
 		.finally(() => {
@@ -126,9 +152,14 @@ export const ensureValidAccessToken = async (): Promise<AccessTokenResult> => {
 };
 
 /**
- * Handles an unrecoverable auth failure (refresh exhausted): clears the stored tokens and returns the
- * user to the login screen. A full-page navigation tears down all in-memory game state, mirroring the
- * logout flow. The redirect is skipped when already on the login page to avoid a reload loop.
+ * Handles an unrecoverable auth failure (refresh definitively rejected): clears the stored tokens and
+ * returns the user to the login screen. A full-page navigation tears down all in-memory game state,
+ * mirroring the logout flow. The redirect is skipped when already on the login page to avoid a reload loop.
+ *
+ * This always clears — a caller reacting to a rejected refresh must re-read storage itself first (as
+ * `execute`/`openSocket`/`handleClose` do) and skip calling this at all if a concurrent tab has since
+ * rotated in a fresh pair, otherwise this unconditional clear would wipe out a session that's still
+ * alive elsewhere.
  */
 export const handleAuthFailure = (): void => {
 	clearTokens();

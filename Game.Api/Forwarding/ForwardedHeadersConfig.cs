@@ -39,6 +39,19 @@ namespace Game.Api.Forwarding
         public bool HasTrustedProxies => KnownProxies.Count > 0 || KnownNetworks.Count > 0;
 
         /// <summary>
+        /// Whether every configured <see cref="KnownProxies"/>/<see cref="KnownNetworks"/> entry parses.
+        /// Validated at startup (<c>ValidateOnStart</c>) so a config typo — e.g. a hostname in
+        /// <c>KnownProxies</c>, or a CIDR put in the wrong list — fails fast instead of being silently
+        /// dropped by <see cref="Apply"/>. Without this check, an all-unparseable config would leave
+        /// <see cref="HasTrustedProxies"/> true (the raw strings are still present) while the framework's
+        /// trust lists end up empty — the exact state that makes ASP.NET Core's forwarded-headers
+        /// middleware trust <c>X-Forwarded-For</c> unconditionally.
+        /// </summary>
+        public bool AllEntriesParse =>
+            KnownProxies.All(proxy => IPAddress.TryParse(proxy, out _)) &&
+            KnownNetworks.All(network => System.Net.IPNetwork.TryParse(network, out _));
+
+        /// <summary>
         /// Projects this config onto the framework's <see cref="ForwardedHeadersOptions"/>, honouring only
         /// <c>X-Forwarded-For</c> from the configured proxies/networks. ASP.NET Core defaults the known
         /// proxies/networks to loopback, so the framework lists are cleared first and repopulated solely

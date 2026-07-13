@@ -153,6 +153,27 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task Close_SocketInCloseReceived_CompletesTheHandshakeWithNormalClosure()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            // Mirrors the read loop's terminal Close after ReceiveAsync returns a client-initiated Close
+            // frame: the socket is already in CloseReceived, not Open.
+            var socket = new GatedCloseWebSocket { StateOverride = WebSocketState.CloseReceived };
+            var context = CreateContext(socket);
+
+            var closeTask = context.Close(ESocketCloseReason.Finished, cancellationToken);
+            await socket.CloseStarted.WaitAsync(WaitTimeout, cancellationToken);
+            socket.CompleteClose();
+            await closeTask.WaitAsync(WaitTimeout, cancellationToken);
+
+            // CloseAsync is called (completing the handshake with a reciprocal close frame) rather than
+            // being skipped because the state isn't Open (#1759).
+            Assert.True(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.CloseStatusUsed);
+            await context.WaitSocketClosed().WaitAsync(WaitTimeout, cancellationToken);
+        }
+
+        [Fact]
         public async Task SendData_WedgedSend_AbortsInsteadOfHangingForever()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -469,6 +490,7 @@ namespace Game.Api.Tests.Unit
         {
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
             public void Update(PlayerState sessionData, int playerId) { }
+            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public void Clear(int userId) { }
         }
     }

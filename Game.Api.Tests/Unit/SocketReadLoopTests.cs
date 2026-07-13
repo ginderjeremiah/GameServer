@@ -104,10 +104,12 @@ namespace Game.Api.Tests.Unit
             await handler.Completion.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
 
             // The close frame was consumed (one read) and the loop exited via the CloseReceived state to
-            // complete teardown, without retrying. SocketContext.Close only emits a close frame from the Open
-            // state, so on CloseReceived it settles the close without re-sending one (no CloseAsync).
+            // complete teardown, without retrying. SocketContext.Close now allows CloseAsync from CloseReceived
+            // (not just Open), so the handshake actually completes with a reciprocal close frame (#1759).
             Assert.Equal(1, socket.ReceiveAttempts);
-            Assert.Equal(WebSocketState.CloseReceived, socket.State);
+            Assert.True(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.CloseStatusUsed);
+            Assert.Equal(WebSocketState.Closed, socket.State);
             // A clean client close is not an error.
             Assert.DoesNotContain(_logs.Entries, e => e.Level == LogLevel.Error);
         }
@@ -145,7 +147,7 @@ namespace Game.Api.Tests.Unit
         private (SocketContext Context, SocketHandler Handler) CreateHandler(WebSocket socket, Action? onActivity = null)
         {
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(), _scopeFactory,
                 _loggerFactory.CreateLogger<SocketHandler>(), onActivity ?? (() => { }));
@@ -254,6 +256,7 @@ namespace Game.Api.Tests.Unit
         {
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
             public void Update(PlayerState sessionData, int playerId) { }
+            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public void Clear(int userId) { }
         }
 

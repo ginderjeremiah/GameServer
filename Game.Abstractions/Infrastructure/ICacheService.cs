@@ -76,5 +76,13 @@
         /// rows that changed instead of re-serializing an entire aggregate.
         /// </summary>
         public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry);
+        /// <summary>
+        /// Same as <see cref="HashSetAndForget"/>, but a no-op (fields untouched, TTL untouched) if
+        /// <paramref name="key"/> does not currently exist. Lets a caller that only ever holds a *partial*
+        /// view of the hash (e.g. this save's dirty rows) advance an existing cache entry without resurrecting
+        /// one that was evicted or deleted out from under it — creating a hash from a partial view would leave
+        /// it silently missing every row the caller didn't touch this call.
+        /// </summary>
+        public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry);
     }
 }

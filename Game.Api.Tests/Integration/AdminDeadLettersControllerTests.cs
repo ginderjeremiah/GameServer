@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.Infrastructure;
 using Game.Api.Models.Common;
+using Game.Api.Models.Progress;
 using Game.Api.Sockets.Commands;
 using Game.Core;
 using Game.TestInfrastructure.Fixtures;
@@ -121,7 +122,7 @@ namespace Game.Api.Tests.Integration
         {
             await SeedSocketDeadLettersAsync(
                 "not-json",
-                SocketEnvelope(playerId: 42, new SocketReplacedInfo()));
+                SocketEnvelope(playerId: 42, new ChallengeCompletedInfo(new ChallengeCompletedModel { ChallengeId = 1 })));
 
             using var client = AdminClient();
             var response = await client.GetAsync("/api/AdminTools/GetSocketCommandDeadLetters", CancellationToken);
@@ -136,8 +137,25 @@ namespace Game.Api.Tests.Integration
 
             var replayable = result.Data.Entries[1];
             Assert.Equal(EDeadLetterReason.Replayable, replayable.Reason);
-            Assert.Equal(nameof(SocketReplaced), replayable.EventType);
+            Assert.Equal(nameof(ChallengeCompleted), replayable.EventType);
             Assert.Equal(42, replayable.PlayerId);
+        }
+
+        [Fact]
+        public async Task GetSocketCommandDeadLetters_ClassifiesASessionLifecycleCommandAsNotReplayable()
+        {
+            await SeedSocketDeadLettersAsync(SocketEnvelope(playerId: 42, new SocketReplacedInfo()));
+
+            using var client = AdminClient();
+            var response = await client.GetAsync("/api/AdminTools/GetSocketCommandDeadLetters", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<DeadLetterInspection>>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.Data);
+            var entry = Assert.Single(result.Data.Entries);
+            Assert.Equal(EDeadLetterReason.NotReplayable, entry.Reason);
+            Assert.Equal(nameof(SocketReplaced), entry.EventType);
         }
 
         [Fact]
@@ -148,7 +166,7 @@ namespace Game.Api.Tests.Integration
             var socketId = Guid.NewGuid().ToString();
             await cache.Set($"{PlayerSocketPresencePrefix}_601", socketId, TimeSpan.FromMinutes(1));
 
-            var entry = SocketEnvelope(601, new SocketReplacedInfo());
+            var entry = SocketEnvelope(601, new ChallengeCompletedInfo(new ChallengeCompletedModel { ChallengeId = 1 }));
             await SeedSocketDeadLettersAsync(entry);
 
             using var client = AdminClient();

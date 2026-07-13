@@ -58,8 +58,22 @@ export const resolveNewIds = (
 	return idFor;
 };
 
-/** Resolve a possibly-local id through the new-id map (returns the input when already persisted). */
-export const resolveId = (id: number, idMap: Map<number, number>): number => idMap.get(id) ?? id;
+/**
+ * Resolve a possibly-local id through the new-id map (passes through an already-persisted id
+ * unchanged — entity ids are 0-based, so `0` is a legitimate persisted id, not a sentinel). Throws
+ * if `id` is a local (negative) id absent from the map — the refetch that should have confirmed its
+ * add landed didn't, so the caller must not silently write against the stale local id.
+ */
+export const resolveId = (id: number, idMap: Map<number, number>): number => {
+	const resolved = idMap.get(id);
+	if (resolved !== undefined) {
+		return resolved;
+	}
+	if (id < 0) {
+		throw new Error(`No persisted id found for record (local id ${id})`);
+	}
+	return id;
+};
 
 /** Returns whether it actually wrote — a no-op (unchanged collection) must report `false`. */
 type ChildSaver<T> = (id: number, record: T, baseline: T | undefined) => Promise<boolean>;
@@ -142,7 +156,7 @@ export async function persistEntity<T extends Identified, D>(opts: PersistOption
 		const idFor = resolveNewIds(fresh, diff.existingIds, diff.added);
 
 		const childTargets: { id: number; record: T; baseline: T | undefined }[] = [
-			...diff.added.map((record) => ({ id: idFor.get(record.id) ?? record.id, record, baseline: undefined })),
+			...diff.added.map((record) => ({ id: resolveId(record.id, idFor), record, baseline: undefined })),
 			...diff.modified.map(({ record, baseline }) => ({ id: record.id, record, baseline }))
 		];
 

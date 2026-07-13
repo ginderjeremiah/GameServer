@@ -148,7 +148,7 @@ export type ApiRequestTypes = {
 	'AdminTools/SetEnemySpawns': ISetEnemySpawnsData;
 	'AdminTools/SetLessonSteps': ISetLessonStepsData;
 	'AdminTools/SetProficiencyModifiers': ISetProficiencyModifiersData;
-	'AdminTools/SetProficiencyPrerequisites': ISetProficiencyPrerequisitesData;
+	'AdminTools/SetProficiencyPrerequisites': ISetProficiencyPrerequisitesData[];
 	'AdminTools/SetProficiencyRewards': ISetProficiencyRewardsData;
 	'AdminTools/SetSkillEffects': ISetSkillEffectsData;
 	'AdminTools/SetSkillMultipliers': IAddEditAttributesData;

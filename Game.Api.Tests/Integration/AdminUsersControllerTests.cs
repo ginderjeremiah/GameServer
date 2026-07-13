@@ -49,7 +49,7 @@ namespace Game.Api.Tests.Integration
                 await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
             }
 
-            return (CreateAuthenticatedClient(user.Id, player.Id, roles), user.Id);
+            return (await CreateAuthenticatedClient(user.Id, player.Id, roles), user.Id);
         }
 
         private static async Task<AdminUserSearchResults> GetUsersAsync(HttpClient client, string query = "")

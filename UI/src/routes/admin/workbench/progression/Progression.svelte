@@ -34,30 +34,37 @@
 		</div>
 	</div>
 
-	{#if !store.loaded}
-		<div class="prog-loading"><Loading loading={true} delay={120} /></div>
-	{:else if view === 'map'}
-		<ProgressionMap {store} onNavigate={() => (view = 'list')} />
-	{:else}
-		<div class="prog-body">
-			<ProgressionList {store} />
-
-			<div class="detail-col">
-				{#if store.drilledTier}
-					<TierDetail {store} />
-				{:else if store.selectedPath}
-					<PathDetail {store} />
-				{:else}
-					<div class="empty-detail" data-testid="progression-empty">
-						<div class="glyph"><WorkbenchIcon kind="rune" size={22} /></div>
-						<div class="et">No path selected</div>
-						<button type="button" class="btn primary sm" onclick={() => store.addPath()}>
-							<WorkbenchIcon kind="plus" size={12} />New path
-						</button>
-					</div>
-				{/if}
-			</div>
+	{#if store.error}
+		<div class="prog-error" role="alert" data-testid="progression-error">
+			<p>{store.error}</p>
+			<button type="button" class="btn" onclick={() => store.load()}>Refresh</button>
 		</div>
+	{:else if !store.loaded}
+		<div class="prog-loading"><Loading loading={true} delay={120} /></div>
+	{:else}
+		{#if view === 'map'}
+			<ProgressionMap {store} onNavigate={() => (view = 'list')} />
+		{:else}
+			<div class="prog-body">
+				<ProgressionList {store} />
+
+				<div class="detail-col">
+					{#if store.drilledTier}
+						<TierDetail {store} />
+					{:else if store.selectedPath}
+						<PathDetail {store} />
+					{:else}
+						<div class="empty-detail" data-testid="progression-empty">
+							<div class="glyph"><WorkbenchIcon kind="rune" size={22} /></div>
+							<div class="et">No path selected</div>
+							<button type="button" class="btn primary sm" onclick={() => store.addPath()}>
+								<WorkbenchIcon kind="plus" size={12} />New path
+							</button>
+						</div>
+					{/if}
+				</div>
+			</div>
+		{/if}
 
 		<div class="save-bar">
 			<div class="save-summary">
@@ -207,6 +214,23 @@ $effect(() => {
 .prog-loading {
 	flex: 1;
 	min-height: 0;
+}
+.prog-error {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	padding: 20px;
+	text-align: center;
+
+	p {
+		max-width: 480px;
+		color: var(--error);
+		font-size: 13px;
+	}
 }
 .prog-body {
 	display: flex;

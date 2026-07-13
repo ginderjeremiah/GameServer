@@ -47,7 +47,14 @@ const { mockSkills, mockEnemies, mockAttributes, mockPlayerManager, mockInventor
 				amount: 0,
 				type: 1,
 				source: 9
-			})
+			}),
+			// Every log type enabled by default, mirroring the real manager's `?? true` fallback. Typed with
+			// the real `ELogType` param (type-only, erased at runtime) so tests can override with a
+			// type-checked predicate without referencing the enum's runtime value from this hoisted factory.
+			logTypeEnabled: (logType: ELogType) => {
+				void logType;
+				return true;
+			}
 		};
 		const mockInventoryManager = {
 			equipmentStats: [] as { attributeId: number; amount: number }[],
@@ -582,6 +589,27 @@ describe('BattleEngine', () => {
 			expect(engine.timeElapsed).toBe(DEFAULT_MAX_BATTLE_MS);
 			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.stringContaining('draw'));
 		});
+
+		// Defensive: a malformed hand-back (e.g. a raw away-window offset) must not run the replay past the
+		// 2-minute cap — the loop clamps rather than trusting offsetMs outright.
+		it('clamps an oversized offset to the 2-minute cap instead of replaying past it', () => {
+			mockSkills[0].baseDamage = 0; // a true stalemate: neither side can ever land the killing blow
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				isBossBattle: false,
+				selectedSkills: [0],
+				attributes: [],
+				elapsedOffsetMs: DEFAULT_MAX_BATTLE_MS * 100
+			});
+
+			expect(engine.stage).toBe(BattleStage.Drawn);
+			expect(engine.timeElapsed).toBe(DEFAULT_MAX_BATTLE_MS);
+			expect(logMessage).toHaveBeenCalledWith(ELogType.EnemyDefeated, expect.stringContaining('draw'));
+		});
 	});
 
 	describe('startLoading', () => {
@@ -722,6 +750,34 @@ describe('BattleEngine', () => {
 				'player-hit',
 				undefined
 			);
+		});
+
+		it('skips building the damage log line when the Damage log type is disabled, but still floats the hit', () => {
+			mockPlayerManager.logTypeEnabled = (logType: ELogType) => logType !== ELogType.Damage;
+			const events: CombatFloatEvent[] = [];
+			const unhook = onCombatFloat((event) => events.push(event));
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				isBossBattle: false
+			});
+
+			logicalUpdateCallbacks[0](500);
+			unhook();
+			mockPlayerManager.logTypeEnabled = () => true;
+
+			expect(logMessage).not.toHaveBeenCalledWith(
+				ELogType.Damage,
+				expect.anything(),
+				expect.anything(),
+				expect.anything()
+			);
+			expect(events).toContainEqual(expect.objectContaining({ target: 'enemy', kind: 'hit' }));
 		});
 
 		it('surfaces the damage type and resist outcome for a typed hit on a resistant defender (#1320)', () => {
@@ -874,6 +930,37 @@ describe('BattleEngine', () => {
 			expect(logMessage).toHaveBeenCalledWith(ELogType.SkillEffect, expect.stringContaining('empowered'));
 		});
 
+		it('skips building skill-effect log lines when the SkillEffect log type is disabled', () => {
+			mockSkills[0].effects = [
+				{
+					id: 1,
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.Strength,
+					modifierTypeId: EModifierType.Additive,
+					amount: 15,
+					durationMs: 1000,
+					scalingAttributeId: EAttribute.Strength,
+					scalingAmount: 0
+				}
+			];
+			mockPlayerManager.logTypeEnabled = (logType: ELogType) => logType !== ELogType.SkillEffect;
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				isBossBattle: false
+			});
+
+			logicalUpdateCallbacks[0](500); // the 500ms-cooldown skill fires, applying its self buff
+
+			mockPlayerManager.logTypeEnabled = () => true;
+			expect(logMessage).not.toHaveBeenCalledWith(ELogType.SkillEffect, expect.anything());
+		});
+
 		it('aggregates damage-over-time into a single per-second summary line', () => {
 			mockSkills[0].baseDamage = 0; // keep the focus on DoT — no skill kill
 			engine.start();
@@ -976,6 +1063,75 @@ describe('BattleEngine', () => {
 			const effectCalls = vi.mocked(logMessage).mock.calls.filter(([type]) => type === ELogType.SkillEffect);
 			expect(effectCalls).toContainEqual([ELogType.SkillEffect, 'You took 6 damage over time.']);
 			expect(effectCalls).toContainEqual([ELogType.SkillEffect, 'Goblin recovered 5 health.']);
+		});
+
+		it('flushes a partial-second DoT window when the player rests (retreat / Home / zone swap, #1857)', () => {
+			mockSkills[0].baseDamage = 0; // keep the focus on DoT — no skill kill
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				isBossBattle: false,
+				selectedSkills: [0],
+				attributes: [
+					{ attributeId: EAttribute.Endurance, amount: 200 }, // survive the partial window
+					{ attributeId: EAttribute.BleedDamagePerSecond, amount: 25 }
+				]
+			});
+
+			// 10 ticks of 40ms = 400ms — under the 1-second auto-flush threshold, so nothing has logged yet.
+			for (let i = 0; i < 10; i++) {
+				logicalUpdateCallbacks[0](40);
+			}
+			expect(logMessage).not.toHaveBeenCalledWith(ELogType.SkillEffect, expect.stringContaining('damage over time'));
+
+			engine.rest();
+
+			const dotCalls = vi
+				.mocked(logMessage)
+				.mock.calls.filter(([type, msg]) => type === ELogType.SkillEffect && String(msg).includes('damage over time'));
+			expect(dotCalls).toHaveLength(1);
+			expect(dotCalls[0][1]).toBe('Goblin took 10 damage over time.');
+		});
+
+		it('flushes a partial-second DoT window from the abandoned battle when the next one is armed (#1857)', () => {
+			mockSkills[0].baseDamage = 0;
+			engine.start();
+			enemyLoadedCallbacks[0]({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				isBossBattle: false,
+				selectedSkills: [0],
+				attributes: [
+					{ attributeId: EAttribute.Endurance, amount: 200 },
+					{ attributeId: EAttribute.BleedDamagePerSecond, amount: 25 }
+				]
+			});
+
+			for (let i = 0; i < 10; i++) {
+				logicalUpdateCallbacks[0](40);
+			}
+			expect(logMessage).not.toHaveBeenCalledWith(ELogType.SkillEffect, expect.stringContaining('damage over time'));
+
+			engine.reset({
+				id: 1,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				isBossBattle: false
+			});
+
+			const dotCalls = vi
+				.mocked(logMessage)
+				.mock.calls.filter(([type, msg]) => type === ELogType.SkillEffect && String(msg).includes('damage over time'));
+			expect(dotCalls).toHaveLength(1);
+			expect(dotCalls[0][1]).toBe('Goblin took 10 damage over time.');
 		});
 
 		// The player-only crit/dodge outcomes (#178) and deterministic reflection (#1330) surface through the

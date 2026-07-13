@@ -56,9 +56,16 @@ namespace Game.Application.Services
 
         public async Task<BattleStartResult> StartBattle(Player player, PlayerState state, int zoneId, int? newZoneId = null, DateTime? scheduledStartTime = null, int? clientBattleMs = null, bool forceAbandon = false, CancellationToken cancellationToken = default)
         {
+            // Non-null only when the abandoned battle resolved to a win/loss/draw (AbandonBattle just applied
+            // the post-battle cooldown to state.EnemyCooldown, #1851) — used below to anchor the replacement
+            // battle to that cooldown's expiry instead of now, exactly like PrepareNextIdleBattle does for the
+            // natural end-of-battle flow. Otherwise this abandon-then-respawn round trip would let a caller
+            // (NewEnemy) skip the cooldown it just incurred by spawning the next battle immediately.
+            DateTime? abandonedOutcomeCooldown = null;
+
             if (state.HasActiveBattle)
             {
-                var handoff = await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+                var (handoff, _) = await AbandonBattle(player, state, clientBattleMs, cancellationToken);
                 if (handoff is not null && !forceAbandon)
                 {
                     // A still-in-progress handoff (#1595) means the existing battle hasn't concluded yet —
@@ -67,6 +74,14 @@ namespace Game.Application.Services
                     // applies for ChallengeBoss (#1690). Nothing was cleared or persisted for a
                     // still-in-progress abandon, so proceeding to overwrite it below is safe either way.
                     return handoff;
+                }
+
+                // Callers only reach StartBattle with an already-active battle via NewEnemy, which gates on
+                // state.IsOnCooldown before calling in, so a pre-existing cooldown can never still be in the
+                // future here — a future EnemyCooldown at this point can only be the one AbandonBattle just set.
+                if (handoff is null && state.EnemyCooldown > DateTime.UtcNow)
+                {
+                    abandonedOutcomeCooldown = state.EnemyCooldown;
                 }
             }
 
@@ -98,10 +113,12 @@ namespace Game.Application.Services
             var zone = _zones.GetDomainZone(zoneId);
 
             // Anchor the battle's start to the scheduled time when prefetching the next idle battle during
-            // the post-battle cooldown (its deterministic expiry); otherwise to now. Anchoring a prefetched
-            // battle to its scheduled start — not now — keeps the elapsed-time victory check and the
-            // following cooldown correct (see PrepareNextIdleBattle).
-            var battleStartTime = scheduledStartTime ?? DateTime.UtcNow;
+            // the post-battle cooldown (its deterministic expiry), or when this call's own abandon just
+            // incurred that cooldown (abandonedOutcomeCooldown); otherwise to now. Anchoring to the scheduled
+            // start rather than now keeps the elapsed-time victory check and the following cooldown correct
+            // (see PrepareNextIdleBattle) — and, for the abandon case, is what makes the cooldown just applied
+            // actually pace the replacement battle instead of being immediately bypassed (#1851).
+            var battleStartTime = scheduledStartTime ?? abandonedOutcomeCooldown ?? DateTime.UtcNow;
             var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBattleEnemy(
@@ -193,17 +210,37 @@ namespace Game.Application.Services
                 return null;
             }
 
+            // Non-null only when the abandoned battle resolved to a win/loss/draw (AbandonBattle just applied
+            // the post-battle cooldown to state.EnemyCooldown, #1851) — mirrors StartBattle's
+            // abandonedOutcomeCooldown (#1884). Without this, a scripted ChallengeBoss loop pays each abandoned
+            // win in full while spawning the next boss battle immediately, farming away the pacing cooldown a
+            // loop through NewEnemy already cannot.
+            DateTime? abandonedOutcomeCooldown = null;
+
             if (state.HasActiveBattle)
             {
+                // Captured before the abandon so the check below can tell "this abandon incurred a fresh
+                // cooldown" apart from "a cooldown was already sitting there." Unlike StartBattle (whose
+                // caller, NewEnemy, gates on IsOnCooldown first), ChallengeBoss has no cooldown gate — a
+                // player can challenge mid an already-running post-battle cooldown (e.g. the prefetched next
+                // idle battle's BattleStartTime is still in the future), in which case AbandonBattle resolves
+                // no outcome (elapsedMs clamps to 0) and leaves EnemyCooldown exactly as it found it.
+                var cooldownBeforeAbandon = state.EnemyCooldown;
+
                 // Deliberate override: challenging the boss always abandons whatever idle battle is running
                 // (even one still genuinely in progress, #1595) and proceeds — unlike NewEnemy, this is an
                 // explicit different action, not "give my existing battle back," so the handoff is discarded.
                 // Nothing was cleared or persisted for a still-in-progress abandon, so overwriting the
                 // in-memory state below with the boss battle is safe either way.
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+
+                if (state.EnemyCooldown > cooldownBeforeAbandon)
+                {
+                    abandonedOutcomeCooldown = state.EnemyCooldown;
+                }
             }
 
-            var now = DateTime.UtcNow;
+            var now = abandonedOutcomeCooldown ?? DateTime.UtcNow;
             var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBossEnemy(zone, _zoneResolution.BossEnemyResolver(zone));
@@ -369,13 +406,15 @@ namespace Game.Application.Services
         /// Resolves a stale in-flight battle left by a mid-battle disconnect, crediting it exactly like an
         /// abandon (re-simulate capped at the elapsed wall-clock, pay a win out in full, else record the
         /// loss/draw) and clearing it — or, when the replay hasn't concluded within the 2-minute cap, handing
-        /// it back still active with its elapsed offset (#1595) instead of booking a phantom draw. Returns
-        /// null when the battle was resolved (or there was none to resolve); returns the handoff otherwise.
-        /// Used by the offline-rewards flow to settle the disconnected battle before it simulates the away
-        /// window — so the window's simulation, and the idle loop that follows the welcome-back gate, both
-        /// start from a clean state.
+        /// it back still active with its elapsed offset (#1595) instead of booking a phantom draw.
+        /// <see cref="StaleBattleResolution.Handoff"/> is null when the battle was resolved (or there was none
+        /// to resolve); non-null otherwise. <see cref="StaleBattleResolution.SettledBattleMs"/> carries the
+        /// resolved battle's own credited duration (null when nothing was resolved, e.g. a handoff or no active
+        /// battle at all) — the caller (the offline-rewards flow) must deduct that span, plus its post-battle
+        /// cooldown, from the away window it is about to simulate, since the settled battle's span already
+        /// falls inside that same window and must not be credited twice (#1882).
         /// </summary>
-        public Task<BattleStartResult?> ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        public Task<StaleBattleResolution> ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             // No client elapsed for an offline/disconnect resolution — the abandon falls back to wall-clock
             // (capped at DefaultMaxBattleMs), exactly as before.
@@ -413,14 +452,18 @@ namespace Game.Application.Services
             };
         }
 
-        // Returns null when the stale battle was resolved (win/loss/draw, or nothing to resolve) and has
-        // already been cleared/persisted. Returns a non-null BattleStartResult — the same enemy/seed, plus
+        // Handoff is null when the stale battle was resolved (win/loss/draw, or nothing to resolve) and has
+        // already been cleared/persisted. Handoff is a non-null BattleStartResult — the same enemy/seed, plus
         // the real elapsed offset since BattleStartTime — when the battle is instead handed back still active
         // (#1595): the caller must leave PlayerState untouched in that case (nothing was cleared or saved).
-        private async Task<BattleStartResult?> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
+        // SettledBattleMs carries the resolved battle's own credited duration (its BattleResult.TotalMs) only
+        // when an outcome was actually recorded; null for a handoff and for "nothing to resolve" alike.
+        private async Task<StaleBattleResolution> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
-            var wallClockMs = (int)(now - state.BattleStartTime).TotalMilliseconds;
+            // A stale battle can be far older than int.MaxValue ms (~24.9 days), so clamp before narrowing —
+            // an unchecked out-of-range double-to-int cast is unspecified rather than a safe saturation.
+            var wallClockMs = (int)Math.Clamp((now - state.BattleStartTime).TotalMilliseconds, 0, int.MaxValue);
 
             // Bound the re-simulation by how long the client actually simulated the battle being abandoned,
             // when it reports it — so a battle the client never fought (e.g. a server-prefetched next battle
@@ -443,7 +486,7 @@ namespace Game.Application.Services
             if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, simulateMs))
             {
                 state.ClearBattle();
-                return null;
+                return new StaleBattleResolution(null, null);
             }
 
             if (result.Victory)
@@ -465,23 +508,30 @@ namespace Game.Application.Services
                 // snapshot, BattleStartTime unchanged) and hand it back with its elapsed offset instead of
                 // booking a phantom draw. Only a battle whose real elapsed time reaches the cap is a genuine
                 // draw, regardless of what the client claims to have simulated.
-                return new BattleStartResult
-                {
-                    Enemy = enemy,
-                    Seed = state.BattleSeed ?? 0,
-                    ElapsedOffsetMs = wallClockMs,
-                    IsBossBattle = state.IsBossBattle,
-                };
+                return new StaleBattleResolution(
+                    new BattleStartResult
+                    {
+                        Enemy = enemy,
+                        Seed = state.BattleSeed ?? 0,
+                        ElapsedOffsetMs = wallClockMs,
+                        IsBossBattle = state.IsBossBattle,
+                    },
+                    null);
             }
             else
             {
                 player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
             }
 
+            // Both outcome branches above (won or lost/drew) reach here — the still-in-progress branch
+            // above returns early instead. Mirror EndBattleVictory/EndBattleLoss's pacing cooldown so an
+            // outcome resolved via abandon can't skip it (#1851): without this, a client that never sends
+            // DefeatEnemy and instead loops NewEnemy farms every kill's cooldown away.
+            state.SetCooldown(now + PostBattleCooldown);
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
-            return null;
+            return new StaleBattleResolution(null, result.TotalMs);
         }
 
         // Books a victory: grants the earned exp and records the win (kills, zone clears, and the
@@ -671,4 +721,12 @@ namespace Game.Application.Services
         public bool IsBossBattle { get; set; }
     }
 
+    /// <summary>
+    /// The outcome of <see cref="BattleService.ResolveStaleBattle"/>: either the stale battle is handed back
+    /// still active (<see cref="Handoff"/> non-null, <see cref="SettledBattleMs"/> null), or it was resolved —
+    /// crediting a win/loss/draw and clearing it (<see cref="Handoff"/> null) — in which case
+    /// <see cref="SettledBattleMs"/> carries the credited battle's own duration, or stays null if there was no
+    /// active battle to resolve in the first place.
+    /// </summary>
+    public record StaleBattleResolution(BattleStartResult? Handoff, int? SettledBattleMs);
 }

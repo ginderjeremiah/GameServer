@@ -46,10 +46,20 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
 vi.stubGlobal('fetch', fetchMock);
 // `location` is a minimal stand-in so handleAuthFailure's redirect guard (window.location.pathname) can
 // run without throwing; only the refresh-failure tests below inspect it.
-vi.stubGlobal('window', { encodeURIComponent, location: { pathname: '/game', href: '' } });
+vi.stubGlobal('window', { encodeURIComponent, location: { href: '', pathname: '/game' } });
+
+// The "refresh definitively failed" tests below drive the real refreshTokens/handleAuthFailure so the
+// 401-retry and redirect wiring is exercised end to end; the "recovers from a concurrent tab" test
+// needs refreshTokens to resolve a rejection on demand (independent of the fetch mock's timing) to pin
+// the caller-side re-read guard in isolation, so refreshTokens is wrapped rather than driven purely by fetch.
+vi.mock('$lib/api/auth', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/api/auth')>();
+	return { ...actual, refreshTokens: vi.fn(actual.refreshTokens) };
+});
 
 import { ApiRequest } from '$lib/api/api-request';
 import { setTokens, getTokens } from '$lib/api/token-store';
+import { refreshTokens } from '$lib/api/auth';
 
 // Builds a JWT-shaped access token whose `exp` claim is `secondsFromNow` in the future, so the
 // request layer treats it as valid and attaches it without attempting a pre-emptive refresh.
@@ -67,6 +77,8 @@ describe('ApiRequest', () => {
 		fetchCalls = [];
 		fetchResponder = null;
 		localStorage.clear();
+		window.location.href = '';
+		vi.mocked(refreshTokens).mockClear();
 	});
 
 	const lastCall = () => fetchCalls[fetchCalls.length - 1];
@@ -258,6 +270,32 @@ describe('ApiRequest', () => {
 			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
 			expect(callsTo('/api/Tags')).toHaveLength(1);
 			expect(getTokens()).toEqual({ accessToken, refreshToken: 'refresh-1' });
+			expect(window.location.href).toBe('');
+		});
+
+		it("recovers using a concurrent tab's rotated pair instead of clearing, when one lands after refreshTokens gives up", async () => {
+			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'refresh-1' });
+			// Simulate the exact residual race: refreshTokens() itself has already concluded the presented
+			// token is dead (a mocked rejection, bypassing its own internal re-read), but by the time the
+			// caller re-checks storage, another tab's rotated pair has since landed.
+			vi.mocked(refreshTokens).mockResolvedValueOnce({ status: 'rejected' });
+			setTokens({ accessToken: makeAccessToken(900), refreshToken: 'winner-refresh' });
+
+			let itemsCalls = 0;
+			fetchResponder = () => {
+				itemsCalls += 1;
+				return itemsCalls === 1
+					? { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) }
+					: { status: 200, body: JSON.stringify({ data: 'retried' }) };
+			};
+
+			const response = await new ApiRequest('Tags').get();
+
+			expect(callsTo('/api/Login/Refresh')).toHaveLength(0);
+			expect(response.status).toBe(200);
+			expect(response.data as unknown).toBe('retried');
+			// The winner's pair is left intact — never cleared.
+			expect(getTokens()).toEqual({ accessToken: expect.any(String), refreshToken: 'winner-refresh' });
 			expect(window.location.href).toBe('');
 		});
 	});

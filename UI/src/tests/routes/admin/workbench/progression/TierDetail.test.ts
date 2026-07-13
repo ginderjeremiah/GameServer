@@ -207,6 +207,25 @@ describe('TierDetail — tab bodies', () => {
 		expect(screen.getByText(/Starter tier/)).toBeTruthy();
 	});
 
+	it('disables the Gateways tab for a non-root tier with no prerequisites', () => {
+		const store = makeStore(tier({ pathOrdinal: 1, prerequisiteIds: [] }), { tierTab: 'milestones' });
+		render(TierDetail, { props: { store } });
+
+		const tab = screen.getByText('Gateways').closest('button');
+		expect(tab?.hasAttribute('disabled')).toBe(true);
+	});
+
+	it('keeps the Gateways tab enabled for a non-root tier that still carries prerequisites (e.g. reordered off root)', async () => {
+		const store = makeStore(tier({ pathOrdinal: 1, prerequisiteIds: [3] }), { tierTab: 'milestones' });
+		render(TierDetail, { props: { store } });
+
+		const tab = screen.getByText('Gateways').closest('button');
+		expect(tab?.hasAttribute('disabled')).toBe(false);
+
+		await fireEvent.click(tab!);
+		expect(store.setTierTab).toHaveBeenCalledWith('gateways');
+	});
+
 	it('lists an existing prerequisite chip, removes it, and adds a new one', async () => {
 		// staticData.proficiencies is index-addressed (the zero-based-id/index invariant), so each
 		// entry must sit at its own id as the array index.

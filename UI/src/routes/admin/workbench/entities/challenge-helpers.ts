@@ -1,6 +1,7 @@
 import {
 	EChallengeGoalComparison,
 	EChallengeType,
+	EDamageTypeKey,
 	EEntityType,
 	EStatisticType,
 	type IChallenge,
@@ -164,5 +165,8 @@ export function deriveFromType(c: IChallenge, types: IChallengeType[], typeId: E
 	c.challengeTypeId = typeId;
 	c.statisticType = stat?.id;
 	c.entityType = stat?.entityType ?? EEntityType.None;
-	c.targetEntityId = undefined;
+	// A DamageType-scoped statistic writes only per-damage-type-key rows (no global row), so
+	// Global is never a valid target for it — default to the first key rather than landing on
+	// the state the backend hard-rejects. Every other dimension defaults to Global as before.
+	c.targetEntityId = c.entityType === EEntityType.DamageType ? EDamageTypeKey.Physical : undefined;
 }

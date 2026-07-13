@@ -15,10 +15,11 @@ import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import { onMount } from 'svelte';
 import { TooltipBase, ToastContainer, ModalHost } from '$components';
-import { getTokens, onSocketError } from '$lib/api';
-import { playerManager } from '$lib/engine';
+import { apiSocket, getTokens, onSocketError } from '$lib/api';
+import { handleSocketReplaced, playerManager } from '$lib/engine';
 import { resumeSession } from '$lib/engine/session';
 import { bootRedirect, shouldReturnToLogin } from '$lib/engine/boot-redirect';
+import { bootState } from '$lib/engine/boot-state.svelte';
 import { toastError } from '$stores';
 import BootSplash from './BootSplash.svelte';
 import '$styles/common.scss';
@@ -38,6 +39,11 @@ onMount(() => {
 // layout init (the root layout lives for the whole app session), so we opt into
 // the hook's onDestroy cleanup; a single subscription covers every screen.
 onSocketError((message) => toastError(message), true);
+
+// A session-takeover push must be handled no matter which route is mounted — the game engine's own
+// lifecycle previously owned this listener, so it went unheard while parked outside /game (e.g. /admin,
+// #1836). Registered here instead, once for the whole app session, independent of the game engines.
+apiSocket.listenCommand('SocketReplaced', handleSocketReplaced, true);
 
 // Boot gate. On a fresh page load (refresh or deep link) the in-memory game state is gone, so we
 // attempt to restore the session and decide where to land — keeping a fully-restored session on the
@@ -75,6 +81,9 @@ onMount(async () => {
 		// gate can never strand the player on the splash.
 		booting = false;
 		booted = true;
+		// Signals routes mounted independently of this layout (e.g. #1898) that the boot decision has
+		// resolved at least once, so their own pre-boot mount can defer non-idempotent work.
+		bootState.markBooted();
 	}
 });
 

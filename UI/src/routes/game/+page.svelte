@@ -40,6 +40,7 @@ import { NavSidebar, LogPanel, TourPlayer } from '$components';
 import { GAME_SCREENS, visibleScreens } from './screens/screen-defs';
 import PlaceholderScreen from './screens/PlaceholderScreen.svelte';
 import { startGame, stopEngines, enemyManager } from '$lib/engine';
+import { bootState } from '$lib/engine/boot-state.svelte';
 import { refreshPlayer } from '$lib/engine/session';
 import { evaluateScreenTrigger, closeTutorialTour } from '$lib/engine/tutorials';
 import { navigation, requiresRemount, tutorialTour } from '$stores';
@@ -76,9 +77,25 @@ const welcome = new WelcomeBackView({
 if (browser) {
 	// Cleanup is registered once at init (the gate may start the loops later, after an await, where
 	// onDestroy can't be called); stopEngines is idempotent, so it's safe even if the loops never ran.
-	onDestroy(stopEngines);
+	// welcome.cancel() guards against welcome.run()'s async continuation (still in flight on a slow
+	// GetOfflineProgress) starting the engines after this page has already unmounted.
+	onDestroy(() => {
+		stopEngines();
+		welcome.cancel();
+	});
 	onMount(() => {
-		void welcome.run();
+		// The root layout's boot gate (`+layout.svelte`) resolves after this page's own `onMount`
+		// (Svelte mounts children before the parent), so a direct load/refresh of `/game` would
+		// otherwise fire `GetOfflineProgress` — a non-idempotent command — before the boot gate has
+		// even started resuming the session, then get unmounted mid-flight when the gate's splash
+		// takes over (see `welcome.cancel()` above). Skipping the pre-boot mount here is safe: the
+		// boot gate's `{#if booting}` toggle always tears this page down and remounts it once resolved
+		// (#1898), so the post-boot remount runs `welcome.run()` for real. A route reached by normal
+		// in-app navigation (e.g. from character-select) finds the boot gate already resolved and runs
+		// this on its only mount, same as before.
+		if (bootState.booted) {
+			void welcome.run();
+		}
 	});
 }
 

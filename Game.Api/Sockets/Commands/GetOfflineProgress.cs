@@ -30,7 +30,7 @@ namespace Game.Api.Sockets.Commands
             var summary = await _offlineProgressService.SimulateOfflineProgress(player, state, cancellationToken);
 
             // Resolving a stale in-flight battle clears it from the session state, so persist the state.
-            context.Session.SavePlayerState();
+            await context.Session.SavePlayerStateAsync(cancellationToken);
 
             return Success(OfflineProgressModel.FromSource(summary));
         }

@@ -34,12 +34,14 @@ namespace Game.Infrastructure
         // promptly rather than relying on a non-synchronized field.
         private volatile bool _isRunning = false;
 
-        // Gate for the async worker loop. Unlike the sync callback (which returns only once loopAction completes,
-        // so the thread pool re-arms the wait after the run finishes), an async callback returns to the pool at its
-        // first incomplete await — re-arming the wait mid-run. A Start() during an in-flight async run would then fire
-        // a second concurrent loopAction and the finishing run's trailing IsRunning = false could clobber it. This
-        // gate admits a single async run at a time and coalesces any signal that arrives mid-run into one trailing
-        // run. It is held only for the brief state transitions, never across the awaited loopAction.
+        // Gate for the worker loop. ThreadPool.RegisterWaitForSingleObject re-arms the wait independent of whether
+        // the callback delegate has finished running, so a Set() that lands while a run is still executing can
+        // dispatch a second, genuinely concurrent invocation — for both the sync and async callback (#1822; #1136
+        // first caught this for the async case, where an incomplete await also re-arms the wait mid-run). Two
+        // concurrent loopAction calls could then race, and the finishing run's trailing IsRunning = false could
+        // clobber the newer run's true. This gate admits a single run at a time and coalesces any signal that
+        // arrives mid-run into one trailing run. It is held only for the brief state transitions, never across the
+        // awaited loopAction.
         private readonly object _runLock = new();
         private bool _runActive = false;
         private bool _runPending = false;
@@ -64,9 +66,12 @@ namespace Game.Infrastructure
         /// <param name="logger"></param>
         /// <param name="action"></param>
         public BackgroundWorker(ILogger<BackgroundWorker> logger, Action action)
+            : this(logger, () =>
+            {
+                action();
+                return Task.CompletedTask;
+            })
         {
-            _logger = logger;
-            _workerHandle = RegisterWorker(CreateWorkerLoop(action));
         }
 
         /// <summary>
@@ -77,7 +82,7 @@ namespace Game.Infrastructure
         public BackgroundWorker(ILogger<BackgroundWorker> logger, Func<Task> action)
         {
             _logger = logger;
-            _workerHandle = RegisterWorker(CreateAsyncWorkerLoop(action));
+            _workerHandle = RegisterWorker(CreateWorkerLoop(action));
         }
 
         /// <summary>
@@ -165,31 +170,12 @@ namespace Game.Infrastructure
             return ThreadPool.RegisterWaitForSingleObject(_resetEvent, callback, null, -1, false);
         }
 
-        private WaitOrTimerCallback CreateWorkerLoop(Action loopAction)
-        {
-            return (state, timedOut) =>
-            {
-                try
-                {
-                    loopAction();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "An error occurred while executing the worker loop for background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
-                }
-
-                IsRunning = false;
-                _logger.LogTrace("Sleeping background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
-            };
-        }
-
-        private WaitOrTimerCallback CreateAsyncWorkerLoop(Func<Task> loopAction)
+        private WaitOrTimerCallback CreateWorkerLoop(Func<Task> loopAction)
         {
             return async (state, timedOut) =>
             {
-                // The thread pool re-arms this wait when the callback returns — which for an async callback is at the
-                // first incomplete await, not at task completion. If a run is already active, record that another pass
-                // is needed and bow out so two loopAction calls never overlap; the active run will pick it up.
+                // If a run is already active, record that another pass is needed and bow out so two loopAction
+                // calls never overlap; the active run will pick it up (see _runLock above).
                 lock (_runLock)
                 {
                     if (_runActive)
@@ -212,7 +198,7 @@ namespace Game.Infrastructure
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "An error occurred while executing the async worker loop for background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
+                        _logger.LogError(ex, "An error occurred while executing the worker loop for background worker '{Name}' ({UniqueId}).", Name, _uniqueId);
                     }
 
                     // A signal that arrived during the run leaves _runPending set; consume it and loop again rather than

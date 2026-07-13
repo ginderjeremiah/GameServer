@@ -44,7 +44,7 @@ namespace Game.Api.Sockets.Commands
                 // round-trips NewEnemy when none is bundled.
                 var next = await _battleService.TryPrepareNextIdleBattle(player, state, cancellationToken);
 
-                context.Session.SavePlayerState();
+                await context.Session.SavePlayerStateAsync(cancellationToken);
 
                 var now = DateTime.UtcNow;
                 return Success(new BattleLostResponse

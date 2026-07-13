@@ -180,6 +180,7 @@ export class BattleEngine {
 	 */
 	public rest() {
 		this.finishLoading?.();
+		this.flushEffectDamage();
 		this.timeElapsed = 0;
 		this.setBattleStage(Idle);
 	}
@@ -201,7 +202,7 @@ export class BattleEngine {
 		// Seed the battle RNG from the enemy instance's seed (the same value the backend simulates against),
 		// so the crit/dodge/block draws stay in lockstep with the anti-cheat replay.
 		this.rng = new Mulberry32(enemyInstance.seed);
-		this.resetEffectDamage();
+		this.flushEffectDamage();
 		this.resetPlayer();
 		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });
 		// A non-null elapsedOffsetMs (#1595/#1596) means the server handed back a battle already in
@@ -221,12 +222,14 @@ export class BattleEngine {
 	 * backend `BattleSimulator.Simulate`'s loop exactly (tick death-checks, then the `totalMs - tickSize`
 	 * exit value) so the two stay in lockstep. Resolves into whichever stage {@link logicalUpdate} would
 	 * have reached by that point — defensive: the server only ever hands back an unconcluded, under-cap
-	 * battle (#1595/#1596), but the tick boundary makes replaying a conclusion possible. Bounded by
-	 * `DEFAULT_MAX_BATTLE_MS` (the server never reports a larger offset), so at most ~3000 ticks.
+	 * battle (#1595/#1596), but the tick boundary makes replaying a conclusion possible. Clamped to
+	 * `DEFAULT_MAX_BATTLE_MS` (the server never reports a larger offset, but a malformed hand-back
+	 * shouldn't run the main thread through an unbounded replay), so at most ~3000 ticks.
 	 */
 	private replayToOffset(offsetMs: number) {
+		const cappedOffsetMs = Math.min(offsetMs, DEFAULT_MAX_BATTLE_MS);
 		let totalMs = tickSize;
-		for (; totalMs <= offsetMs; totalMs += tickSize) {
+		for (; totalMs <= cappedOffsetMs; totalMs += tickSize) {
 			battleStep(this.player, this.enemy, tickSize, this.rng);
 			if (this.enemy.isDead || this.player.isDead) {
 				break;
@@ -363,29 +366,35 @@ export class BattleEngine {
 		if (this.stage === Active) {
 			this.timeElapsed += timeDelta;
 			const activations = battleStep(this.player, this.enemy, timeDelta, this.rng, this.stepLog);
+			const damageLogEnabled = playerManager.logTypeEnabled(ELogType.Damage);
 			for (const { skill, damage, byPlayer, crit, dodged, parried, counter, reflected } of activations) {
 				const outcome = damageLogOutcome(byPlayer, crit, dodged, parried, counter);
 				const damageType = skill.primaryDamageType;
-				// Classify the hit's resist outcome from the defender's live resistance to its type (a dodged or
-				// parried hit never resolved, so it can't be resisted). Computed here, not in the parity-critical
-				// battleStep, so the headless simulator stays byte-identical — like the existing crit/dodge log flags.
-				const resist =
-					dodged || parried
-						? 'normal'
-						: classifyResist(resistanceTotal(damageType, (byPlayer ? this.enemy : this.player).attributes), damage);
-				logMessage(
-					ELogType.Damage,
-					damageLogMessage(skill.name, damage, outcome, damageType, resist, this.enemy.name),
-					outcome,
-					resist === 'normal' ? undefined : resist
-				);
+				// Skip the resist classification and message formatting when the Damage log is disabled — it's
+				// the busiest channel in a hidden tab, and `logMessage` would only discard the built string
+				// anyway. Classification is computed here, not in the parity-critical battleStep, so the
+				// headless simulator stays byte-identical — like the existing crit/dodge log flags.
+				if (damageLogEnabled) {
+					const resist =
+						dodged || parried
+							? 'normal'
+							: classifyResist(resistanceTotal(damageType, (byPlayer ? this.enemy : this.player).attributes), damage);
+					logMessage(
+						ELogType.Damage,
+						damageLogMessage(skill.name, damage, outcome, damageType, resist, this.enemy.name),
+						outcome,
+						resist === 'normal' ? undefined : resist
+					);
+				}
 				notifyCombatFloat(combatFloatEvent(outcome, damage, damageType, skill.damagePortions));
 				// Deterministic reflection (#1330): the defender returned part of this hit to the attacker. The
 				// reflector is the opposite side of the activation — a player hit is reflected by the enemy, and an
 				// enemy hit by the player — and it deals raw, untyped damage, so the line carries no resist note.
 				if (reflected > 0) {
-					const reflectOutcome: ReflectOutcome = byPlayer ? 'enemy-reflect' : 'player-reflect';
-					logMessage(ELogType.Damage, reflectLogMessage(reflectOutcome, reflected, this.enemy.name), reflectOutcome);
+					if (damageLogEnabled) {
+						const reflectOutcome: ReflectOutcome = byPlayer ? 'enemy-reflect' : 'player-reflect';
+						logMessage(ELogType.Damage, reflectLogMessage(reflectOutcome, reflected, this.enemy.name), reflectOutcome);
+					}
 					// Float the returned damage over the original attacker (the side that took it): a player hit
 					// reflected by the enemy lands back on the player, an enemy hit reflected by the player on the enemy.
 					notifyCombatFloat({ target: byPlayer ? 'player' : 'enemy', kind: 'reflect', amount: reflected });
@@ -435,6 +444,9 @@ export class BattleEngine {
 	 *  follows the shared `.find`-by-id convention (#297), falling back to the formatted enum name when
 	 *  the reference set is unavailable. */
 	private logEffectApplications() {
+		if (!playerManager.logTypeEnabled(ELogType.SkillEffect)) {
+			return;
+		}
 		for (const { effect, onPlayer, amount } of this.stepLog.appliedEffects) {
 			const name = attributeName(effect.attributeId, staticData.attributes);
 			const isHarmful = attributeIsHarmful(effect.attributeId, staticData.attributes);

@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ELogType, type ILogPreference } from '$lib/api';
 
-// Mutable player-manager stand-in: `save()` reassigns `logPreferences`, so it is
-// a plain writable property (not a getter). `vi.hoisted` keeps it initialised
-// before the hoisted vi.mock factory runs.
+// Mutable player-manager stand-in: `save()` reassigns `logPreferences`, and the view reads it
+// live (not just at construction, #1809), so it must be reactive like the real (statified)
+// PlayerManager — declared as a class instance (not an object literal) so `statify` applies.
+// `vi.hoisted` keeps it initialised before the hoisted vi.mock factory runs.
 const { mockPlayerManager, mockSendSocketCommand, toastError } = vi.hoisted(() => ({
-	mockPlayerManager: { logPreferences: [] as ILogPreference[] },
+	mockPlayerManager: new (class MockPlayerManager {
+		logPreferences: ILogPreference[] = [];
+	})(),
 	mockSendSocketCommand: vi.fn(),
 	toastError: vi.fn()
 }));
 
-vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager }));
+vi.mock('$lib/engine', async () => {
+	const { statify } = await import('$lib/common');
+	return { playerManager: statify(mockPlayerManager) };
+});
 vi.mock('$stores', () => ({ toastError }));
 vi.mock('$components', () => ({
 	logColors: {
@@ -230,6 +236,28 @@ describe('OptionsView.save', () => {
 		expect(toastError).not.toHaveBeenCalled();
 	});
 
+	it('does not resurrect an already-discarded toggle when an external resync lands mid-flight during a successful save', async () => {
+		let resolveSend: (value: unknown) => void = () => {};
+		mockSendSocketCommand.mockReturnValue(new Promise((resolve) => (resolveSend = resolve)));
+
+		view.setOne(ELogType.Damage, false);
+		const saving = view.save();
+
+		// An external resync (unrelated to this save) reassigns logPreferences while the request
+		// is still in flight — this already discards the pending toggle per the class's
+		// external-resync policy.
+		mockPlayerManager.logPreferences = [{ id: ELogType.Exp, enabled: false }];
+
+		resolveSend({});
+		await saving;
+
+		// The save still succeeds and its own result is adopted, but the already-discarded
+		// toggle must not reappear as a pending change.
+		expect(mockPlayerManager.logPreferences.find((p) => p.id === ELogType.Damage)?.enabled).toBe(false);
+		expect(view.isDirty).toBe(false);
+		expect(view.changedPreferences).toEqual([]);
+	});
+
 	it('toggling after a save clears the saved flash', async () => {
 		view.setOne(ELogType.Damage, false);
 		await view.save();
@@ -237,5 +265,45 @@ describe('OptionsView.save', () => {
 
 		view.setOne(ELogType.Damage, true);
 		expect(view.saved).toBe(false);
+	});
+});
+
+describe('OptionsView mid-session resync (#1809)', () => {
+	it('follows a resync of the underlying preferences while idle instead of going stale', () => {
+		expect(view.isOn(ELogType.Damage)).toBe(true);
+
+		// A background resync (e.g. playerManager.initialize() after a dead-lettered event)
+		// reassigns logPreferences wholesale, with no interaction from this screen.
+		mockPlayerManager.logPreferences = [{ id: ELogType.Damage, enabled: false }];
+
+		expect(view.isOn(ELogType.Damage)).toBe(false);
+		expect(view.isDirty).toBe(false);
+	});
+
+	it('clears a stale dirty state when a resync reveals a lost save actually applied', () => {
+		view.setOne(ELogType.Damage, false);
+		expect(view.isDirty).toBe(true);
+
+		// A later background resync reveals the server actually holds the toggled-off value.
+		mockPlayerManager.logPreferences = [{ id: ELogType.Damage, enabled: false }];
+
+		expect(view.isOn(ELogType.Damage)).toBe(false);
+		expect(view.isDirty).toBe(false);
+	});
+
+	it('discards an in-progress unsaved toggle when an external resync arrives, so a stale diff is never sent', () => {
+		view.setOne(ELogType.Damage, false); // unsaved local edit
+		expect(view.isDirty).toBe(true);
+
+		// An external resync (unrelated to this toggle, and not this view's own save) reassigns
+		// logPreferences wholesale. The now-unreliable pending toggle can't be trusted to still
+		// apply cleanly against a baseline it was never computed against, so it is discarded
+		// outright rather than layered onto the fresh baseline (#1809).
+		mockPlayerManager.logPreferences = [{ id: ELogType.Exp, enabled: false }];
+
+		expect(view.isOn(ELogType.Exp)).toBe(false);
+		expect(view.isOn(ELogType.Damage)).toBe(true); // back to the (defaulted-enabled) baseline
+		expect(view.isDirty).toBe(false);
+		expect(view.changedPreferences).toEqual([]);
 	});
 });

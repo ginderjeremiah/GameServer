@@ -181,6 +181,7 @@ export enum EDeadLetterReason {
 	Malformed = 0,
 	UnknownEventType = 1,
 	Replayable = 2,
+	NotReplayable = 3,
 }
 
 export enum EEntityType {

@@ -65,6 +65,27 @@ describe('auth', () => {
 			expect(getTokens()).toBeNull();
 		});
 
+		it("adopts another tab's rotated pair instead of clearing when storage no longer holds the presented token", async () => {
+			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => {
+					// Simulate another tab winning the race and rotating storage while this tab's
+					// (now stale) refresh request is in flight — the backend 400s the spent token.
+					setTokens({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
+					return { ok: false, status: 400, json: async () => ({}) };
+				})
+			);
+
+			const result = await refreshTokens();
+
+			expect(result).toEqual({
+				status: 'success',
+				tokens: { accessToken: 'winner-access', refreshToken: 'winner-refresh' }
+			});
+			expect(getTokens()).toEqual({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
+		});
+
 		it('keeps storage and returns retryable on a network error (fetch throws)', async () => {
 			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
 			vi.stubGlobal(
@@ -98,6 +119,26 @@ describe('auth', () => {
 			vi.stubGlobal(
 				'fetch',
 				vi.fn(async () => ({ ok: false, status: 429, json: async () => ({}) }))
+			);
+
+			const result = await refreshTokens();
+
+			expect(result).toEqual({ status: 'retryable' });
+			expect(getTokens()).toEqual({ accessToken: 'old', refreshToken: 'old-refresh' });
+		});
+
+		it('keeps storage and returns retryable when a 2xx body fails to parse', async () => {
+			setTokens({ accessToken: 'old', refreshToken: 'old-refresh' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => ({
+					ok: true,
+					status: 200,
+					json: async () => {
+						// A proxy/captive portal can intercept with an HTML body that isn't JSON.
+						throw new SyntaxError('Unexpected token < in JSON');
+					}
+				}))
 			);
 
 			const result = await refreshTokens();

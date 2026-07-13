@@ -3,17 +3,20 @@ import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { EAttribute, EDamageType, type IAttribute, type IBattlerAttribute, type ISkill } from '$lib/api';
 import { makeAttribute } from '../../../../fixtures/attributes';
 
+// Declared as a class instance (not an object literal) so `statify` can make its fields
+// reactive — the view reads it live (not just at construction, #1809), exactly like the real
+// (statified) PlayerManager.
 const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, staticData } = vi.hoisted(() => ({
-	mockPlayerManager: {
-		attributes: [] as IBattlerAttribute[],
-		statPointsGained: 0,
-		statPointsUsed: 0,
-		level: 0,
-		exp: 0,
-		nextLevelThreshold: 0,
-		playerRating: 0,
-		selectedSkills: [] as number[]
-	},
+	mockPlayerManager: new (class MockPlayerManager {
+		attributes: IBattlerAttribute[] = [];
+		statPointsGained = 0;
+		statPointsUsed = 0;
+		level = 0;
+		exp = 0;
+		nextLevelThreshold = 0;
+		playerRating = 0;
+		selectedSkills: number[] = [];
+	})(),
 	mockInventoryManager: {
 		equipmentStats: [] as IBattlerAttribute[],
 		grantedSkillIds: [] as number[],
@@ -24,7 +27,10 @@ const { mockPlayerManager, mockInventoryManager, sendSocketCommand, toastError, 
 	staticData: { attributes: [] as IAttribute[], skills: [] as ISkill[] }
 }));
 
-vi.mock('$lib/engine', () => ({ playerManager: mockPlayerManager, inventoryManager: mockInventoryManager }));
+vi.mock('$lib/engine', async () => {
+	const { statify } = await import('$lib/common');
+	return { playerManager: statify(mockPlayerManager), inventoryManager: mockInventoryManager };
+});
 vi.mock('$stores', () => ({ staticData, toastError }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;

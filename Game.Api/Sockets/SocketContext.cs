@@ -221,7 +221,7 @@ namespace Game.Api.Sockets
         {
             try
             {
-                if (_socket.State is WebSocketState.Open)
+                if (_socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
                 {
                     // The close frame is a send too, so take the same lock to avoid overlapping an in-flight
                     // SendData; re-check state inside the lock so a racing close only sends one close frame.
@@ -248,7 +248,7 @@ namespace Game.Api.Sockets
                     {
                         try
                         {
-                            if (_socket.State is WebSocketState.Open)
+                            if (_socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
                             {
                                 try
                                 {

@@ -50,7 +50,7 @@ const webSocketMock = vi.fn(createMockWebSocket);
 vi.stubGlobal('WebSocket', webSocketMock);
 
 import { ApiSocket, fetchSocketData, onSocketError } from '$lib/api/api-socket';
-import { setTokens, getAccessToken, getTokens } from '$lib/api/token-store';
+import { setTokens, getAccessToken, getTokens, clearTokens } from '$lib/api/token-store';
 import { ensureValidAccessToken, refreshTokens, handleAuthFailure, type AccessTokenResult } from '$lib/api/auth';
 
 // Opening a socket is now asynchronous (it awaits the pre-emptive refresh before `new WebSocket`), so a
@@ -163,16 +163,39 @@ describe('ApiSocket', () => {
 
 		it('routes to auth failure (without opening) when the pre-emptive refresh is definitively rejected', async () => {
 			setTokens({ accessToken: 'expired', refreshToken: 'r' });
-			// Refresh token spent/revoked: no usable token can be obtained.
-			vi.mocked(ensureValidAccessToken).mockResolvedValue({ accessToken: null, rejected: true });
+			// Refresh token spent/revoked: no usable token can be obtained. The real ensureValidAccessToken
+			// clears storage itself in this case (via refreshTokens), so the mock mirrors that.
+			vi.mocked(ensureValidAccessToken).mockImplementation(async () => {
+				clearTokens();
+				return { accessToken: null, rejected: true };
+			});
 
-			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
 			// No doomed unauthenticated handshake is opened, and the keepalive is not left running.
 			expect(webSocketMock).not.toHaveBeenCalled();
 			expect(internals(apiSocket).pingIntervalId).toBeNull();
+			// The queued command was never sent (no socket ever opened) and nothing will reconnect to
+			// re-flush it, so it must settle with an error rather than await a response forever.
+			await expect(promise).resolves.toMatchObject({ error: expect.any(String) });
+		});
+
+		it("recovers using a concurrent tab's rotated pair instead of tearing down the session", async () => {
+			setTokens({ accessToken: 'expired', refreshToken: 'r' });
+			// Simulate another tab winning the refresh race and rotating in a fresh pair while this tab's
+			// own pre-emptive refresh was still resolving to null.
+			vi.mocked(ensureValidAccessToken).mockImplementation(async () => {
+				setTokens({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
+				return { accessToken: null, rejected: true };
+			});
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+
+			expect(handleAuthFailure).not.toHaveBeenCalled();
+			expect(lastSocketUrl).toBe('/socket?access_token=winner-access');
 		});
 
 		it('leaves the session intact (no logout, no handshake) when the pre-emptive refresh is retryable', async () => {
@@ -614,7 +637,11 @@ describe('ApiSocket', () => {
 
 		it('routes to the auth-failure handler when the refresh is definitively rejected', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			vi.mocked(refreshTokens).mockResolvedValue({ status: 'rejected' });
+			// The real refreshTokens clears storage itself on a definitive failure, so the mock mirrors that.
+			vi.mocked(refreshTokens).mockImplementation(async () => {
+				clearTokens();
+				return { status: 'rejected' };
+			});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
@@ -625,6 +652,29 @@ describe('ApiSocket', () => {
 
 			expect(refreshTokens).toHaveBeenCalledTimes(1);
 			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
+		});
+
+		it("recovers using a concurrent tab's rotated pair instead of routing to auth failure", async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			// refreshTokens() itself gives up (a mocked rejection), but another tab's rotated pair has
+			// since landed in storage by the time the caller re-checks.
+			vi.mocked(refreshTokens).mockImplementation(async () => {
+				setTokens({ accessToken: 'winner-access', refreshToken: 'winner-refresh' });
+				return { status: 'rejected' };
+			});
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+			webSocketMock.mockClear();
+
+			closeUnopened(ws);
+			await flushMicrotasks();
+
+			expect(refreshTokens).toHaveBeenCalledTimes(1);
+			expect(handleAuthFailure).not.toHaveBeenCalled();
+			// Recovers by reconnecting (processCommandQueue), same as a successful refresh.
+			expect(webSocketMock).toHaveBeenCalledTimes(1);
 		});
 
 		it('does not log out and leaves the queue for a later retry when the refresh is retryable', async () => {
@@ -749,7 +799,11 @@ describe('ApiSocket', () => {
 
 		it('settles an unsent queued command when the reconnect refresh is definitively rejected', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			vi.mocked(refreshTokens).mockResolvedValue({ status: 'rejected' });
+			// The real refreshTokens clears storage itself on a definitive failure, so the mock mirrors that.
+			vi.mocked(refreshTokens).mockImplementation(async () => {
+				clearTokens();
+				return { status: 'rejected' };
+			});
 
 			const promise = queueOnConnectingSocket(apiSocket);
 			await flushMicrotasks();
@@ -841,6 +895,68 @@ describe('ApiSocket', () => {
 
 			expect(internals(apiSocket).pingIntervalId).toBeNull();
 			expect(ws.close).toHaveBeenCalledWith(1000);
+		});
+	});
+
+	describe('half-open detection (missed pongs)', () => {
+		it('closes the socket once MAX_MISSED_PONGS consecutive pings go unanswered', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				// readyState stays OPEN throughout (the mock never flips it) — exactly the half-open case:
+				// nothing ever answers the pings. 1st tick sends the first ping; 2nd–4th ticks each find the
+				// prior ping still unanswered (3 consecutive misses), so the 4th tick closes the socket.
+				vi.advanceTimersByTime(40000);
+
+				expect(ws.close).toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('does not close the socket while every ping keeps getting answered', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				for (let i = 0; i < 5; i++) {
+					vi.advanceTimersByTime(10000);
+					receive(ws, 'pong');
+				}
+
+				expect(ws.close).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('a pong resets the missed-pong streak, so an isolated slow round trip does not close the socket', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				// Two ticks with no pong (one miss shy of the threshold), then a late pong arrives and
+				// resets the streak before it can accumulate further.
+				vi.advanceTimersByTime(20000);
+				receive(ws, 'pong');
+
+				// Two more unanswered ticks after the reset stay well under the threshold.
+				vi.advanceTimersByTime(20000);
+
+				expect(ws.close).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 

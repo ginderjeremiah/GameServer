@@ -1,5 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, waitFor, fireEvent } from '@testing-library/svelte';
+
+// jsdom has no ResizeObserver; ProgressionMap observes its container on mount.
+class ResizeObserverStub {
+	observe() {}
+	unobserve() {}
+	disconnect() {}
+}
+
+beforeAll(() => {
+	(globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub;
+});
 
 // Mirrors progression-store.test.ts's fake in-memory backend — Progression.svelte owns its own
 // ProgressionStore instance (no store prop to inject), so the socket-read layer is mocked the same
@@ -51,5 +62,37 @@ describe('Progression — unsaved-change reporting', () => {
 
 		unmount();
 		expect(workbenchDirty.total).toBe(0);
+	});
+});
+
+describe('Progression — load-failure recovery', () => {
+	it('shows a persistent error panel with a retry affordance instead of spinning forever, and recovers on retry', async () => {
+		fetchMock.mockRejectedValueOnce(new Error('network down'));
+		fetchMock.mockResolvedValue([]);
+		render(Progression);
+
+		await waitFor(() => expect(screen.getByTestId('progression-error')).toBeTruthy());
+		expect(screen.getByTestId('progression-error').textContent).toContain('network down');
+		expect(screen.queryByTestId('progression-new-path')).toBeNull();
+
+		await fireEvent.click(screen.getByText('Refresh'));
+
+		await waitFor(() => expect(screen.getByTestId('progression-new-path')).toBeTruthy());
+		expect(screen.queryByTestId('progression-error')).toBeNull();
+	});
+});
+
+describe('Progression — Map view save bar', () => {
+	it('keeps the save bar (and its unsaved-change count) visible after switching to Map view', async () => {
+		render(Progression);
+		await waitFor(() => expect(screen.getByTestId('progression-new-path')).toBeTruthy());
+
+		await fireEvent.click(screen.getByTestId('progression-new-path'));
+		await waitFor(() => expect(workbenchDirty.total).toBeGreaterThan(0));
+
+		await fireEvent.click(screen.getByTestId('progression-map-toggle'));
+		await waitFor(() => expect(screen.getByTestId('progression-map')).toBeTruthy());
+
+		expect(screen.getByTestId('progression-save')).toBeTruthy();
 	});
 });

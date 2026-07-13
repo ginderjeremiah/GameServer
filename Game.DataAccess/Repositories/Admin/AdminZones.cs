@@ -50,6 +50,17 @@ namespace Game.DataAccess.Repositories.Admin
                     return AdminSaveResult.Failure("The Home zone cannot have a boss. Home is a no-combat sanctuary where no enemies spawn.");
                 }
 
+                // SetEnemies / AdminEnemies.SetSpawns block populating a Home zone's spawn table going
+                // forward, but neither fires against this save's own flip — an edit that sets IsHome on a
+                // combat zone whose spawn table is already populated would otherwise leave the sanctuary with
+                // live spawns. An Add can never carry pre-existing spawns, so this only applies to edits.
+                if (change.ChangeType == EChangeType.Edit
+                    && change.Item.IsHome
+                    && _zones.LookupZone(change.Item.Id) is { ZoneEnemies.Count: > 0 })
+                {
+                    return AdminSaveResult.Failure("The Home zone cannot have enemy spawns. Home is a no-combat sanctuary where no enemies spawn; clear the zone's spawn table before making it Home.");
+                }
+
                 // Challenges are zero-based-id reference data, so a valid id is an in-range index (an O(1)
                 // check, like the enemy/zone validators above).
                 if (change.Item.UnlockChallengeId is int unlockChallengeId
@@ -141,6 +152,16 @@ namespace Game.DataAccess.Repositories.Admin
             if (zone is null)
             {
                 return AdminSaveResult.NotFound("Zone");
+            }
+
+            // Anti-tamper: a negative weight commits cleanly but throws inside ProbabilityTable's
+            // constructor when the enemy snapshot next rebuilds, permanently poisoning every instance's
+            // reload (and boot) since the Workbench's own corrective save then collides with the already-
+            // committed row. Reject it up front. Zero is safe — ProbabilityTable treats an all-zero set
+            // as uniform.
+            if (data.ZoneEnemies.Any(ze => ze.Weight < 0))
+            {
+                return AdminSaveResult.Failure("A zone enemy's spawn weight cannot be negative.");
             }
 
             // The Home zone is a no-combat sanctuary: no enemies spawn there and never will. Reject assigning

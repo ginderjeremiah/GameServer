@@ -156,6 +156,15 @@ describe('resolveNewIds & resolveId', () => {
 		expect(resolveId(-1, map)).toBe(7);
 		expect(resolveId(3, map)).toBe(3);
 	});
+
+	it('resolveId throws when a local (negative) id has no persisted match', () => {
+		const map = new Map([[-1, 7]]);
+		expect(() => resolveId(-2, map)).toThrow();
+	});
+
+	it('resolveId passes through 0 unchanged — entity ids are 0-based, so 0 is a real persisted id', () => {
+		expect(resolveId(0, new Map())).toBe(0);
+	});
 });
 
 interface Row extends Identified {
@@ -334,6 +343,44 @@ describe('persistEntity', () => {
 				]
 			})
 		).rejects.toBe(cause);
+	});
+
+	it('aborts child savers (as PersistFailedError) when an add refetch returns fewer new records than expected', async () => {
+		const diff: SaveDiff<Row> = {
+			added: [
+				{ id: -1, name: 'A' },
+				{ id: -2, name: 'B' }
+			],
+			modified: [],
+			deleted: [],
+			existingIds: [0]
+		};
+		// Stale refetch: only one of the two adds shows up as a new id, so the second add's id can't
+		// be resolved positionally.
+		const fresh: Row[] = [
+			{ id: 0, name: 'X' },
+			{ id: 2, name: 'A' }
+		];
+		const childCalls: number[] = [];
+
+		await expect(
+			persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => ({ id: r.id, name: r.name }),
+				postPrimary: async () => undefined,
+				refresh: async () => fresh,
+				childSavers: [
+					async (id) => {
+						childCalls.push(id);
+						return true;
+					}
+				]
+			})
+		).rejects.toBeInstanceOf(PersistFailedError);
+
+		// The resolvable first add must not have its child saver run either — the whole batch aborts
+		// before any child saver sees an unresolved-id record, rather than partially applying.
+		expect(childCalls).toEqual([]);
 	});
 
 	it('wraps a post-commit refresh failure as PersistFailedError', async () => {

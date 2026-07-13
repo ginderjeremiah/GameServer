@@ -40,8 +40,65 @@ let serverProfs: Rec[];
 
 const nextId = (set: Rec[]) => (set.length ? Math.max(...set.map((r) => r.id)) + 1 : 0);
 
+/**
+ * Mirrors the backend's AdminPaths.FindRetiredPathGatingLiveGateway guard: rejects newly retiring a
+ * path if, against the *current* server graph, one of its tiers still gates a live gateway. Lets
+ * save-orchestration tests exercise the real ordering hazard from #1776 instead of asserting it away.
+ */
+const findRetiredPathGatingLiveGatewayRejection = (changes: Rec[]): string | undefined => {
+	for (const change of changes) {
+		if (change.changeType !== EChangeType.Edit || !change.item.retiredAt) {
+			continue;
+		}
+		const path = serverPaths.find((p) => p.id === change.item.id);
+		if (!path || path.retiredAt) {
+			continue;
+		}
+		const retiredTierIds = new Set(serverProfs.filter((p) => p.pathId === path.id).map((p) => p.id));
+		for (const gateway of serverProfs) {
+			if (gateway.retiredAt || retiredTierIds.has(gateway.id)) {
+				continue;
+			}
+			if (gateway.prerequisiteIds.some((id: number) => retiredTierIds.has(id))) {
+				return `Retiring path '${path.name}' would soft-lock live proficiency '${gateway.name}'.`;
+			}
+		}
+	}
+	return undefined;
+};
+
+/**
+ * Mirrors the backend's AdminProficiencies.FindShrunkenMaxLevelViolation guard: rejects an identity
+ * Edit whose new MaxLevel falls below the level of a modifier/reward the proficiency *currently has
+ * persisted* (i.e. as of this call, not this request's own child-collection changes).
+ */
+const findShrunkenMaxLevelRejection = (changes: Rec[]): string | undefined => {
+	for (const change of changes) {
+		if (change.changeType !== EChangeType.Edit) {
+			continue;
+		}
+		const existing = serverProfs.find((p) => p.id === change.item.id);
+		if (!existing) {
+			continue;
+		}
+		const highest = Math.max(
+			-Infinity,
+			...existing.levelModifiers.map((m: Rec) => m.level),
+			...existing.levelRewards.map((r: Rec) => r.level)
+		);
+		if (highest > change.item.maxLevel) {
+			return `Proficiency '${existing.name}' has a payout at level ${highest}, above the new cap of ${change.item.maxLevel}.`;
+		}
+	}
+	return undefined;
+};
+
 const applyPost = (endpoint: string, body: Rec) => {
 	if (endpoint === 'AdminTools/AddEditPaths') {
+		const rejection = findRetiredPathGatingLiveGatewayRejection(body as Rec[]);
+		if (rejection) {
+			throw new Error(rejection);
+		}
 		let id = nextId(serverPaths);
 		for (const change of body as Rec[]) {
 			if (change.changeType === EChangeType.Add) {
@@ -57,6 +114,10 @@ const applyPost = (endpoint: string, body: Rec) => {
 			}
 		}
 	} else if (endpoint === 'AdminTools/AddEditProficiencies') {
+		const rejection = findShrunkenMaxLevelRejection(body as Rec[]);
+		if (rejection) {
+			throw new Error(rejection);
+		}
 		let id = nextId(serverProfs);
 		for (const change of body as Rec[]) {
 			if (change.changeType === EChangeType.Add) {
@@ -92,9 +153,11 @@ const applyPost = (endpoint: string, body: Rec) => {
 			prof.levelRewards = body.rewards;
 		}
 	} else if (endpoint === 'AdminTools/SetProficiencyPrerequisites') {
-		const prof = serverProfs.find((p) => p.id === body.id);
-		if (prof) {
-			prof.prerequisiteIds = body.prerequisiteIds;
+		for (const change of body as Rec[]) {
+			const prof = serverProfs.find((p) => p.id === change.id);
+			if (prof) {
+				prof.prerequisiteIds = change.prerequisiteIds;
+			}
 		}
 	}
 };
@@ -147,6 +210,29 @@ describe('load & normalization', () => {
 		expect(store.paths).toHaveLength(1);
 		expect(store.selectedPathId).toBe(0);
 		expect(store.totalChanges).toBe(0);
+	});
+
+	it('surfaces a persistent error and stays unloaded when the initial load fails', async () => {
+		fetchMock.mockRejectedValue(new Error('network down'));
+		const store = new ProgressionStore();
+		await store.load();
+
+		expect(store.loaded).toBe(false);
+		expect(store.error).toBe('network down');
+		expect(toastErrorMock).toHaveBeenCalledWith('network down');
+	});
+
+	it('clears the error and loads once a retry succeeds', async () => {
+		fetchMock.mockRejectedValueOnce(new Error('network down'));
+		const store = new ProgressionStore();
+		await store.load();
+		expect(store.error).toBe('network down');
+
+		seedServer();
+		await store.load();
+
+		expect(store.error).toBeNull();
+		expect(store.loaded).toBe(true);
 	});
 });
 
@@ -278,6 +364,182 @@ describe('save orchestration', () => {
 		expect(mods.id).toBe(0);
 		expect(mods.modifiers[0].level).toBe(3);
 		expect(serverProfs[0].levelModifiers).toHaveLength(1);
+	});
+
+	it('batches cross-path prerequisite changes into one call so a gateway swap posts as a single combined set', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0', prerequisiteIds: [1] }),
+			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Swap the gateway: tier 0 drops its prerequisite on tier 1, tier 1 gains one on tier 0. Posted
+		// per tier in submission order, the backend would see tier 0's still-live edge and tier 1's new
+		// one at the same time and reject it as a cycle — batching avoids that entirely.
+		store.removePrerequisite(0, 1);
+		store.addPrerequisite(1, 0);
+
+		await store.save();
+
+		const prereqCalls = callsTo('AdminTools/SetProficiencyPrerequisites');
+		expect(prereqCalls).toHaveLength(1);
+		expect(prereqCalls[0]).toEqual([
+			{ id: 0, prerequisiteIds: [] },
+			{ id: 1, prerequisiteIds: [0] }
+		]);
+		expect(serverProfs.find((p) => p.id === 0)?.prerequisiteIds).toEqual([]);
+		expect(serverProfs.find((p) => p.id === 1)?.prerequisiteIds).toEqual([0]);
+	});
+
+	it('a non-retiring save keeps every prerequisite change in one batch, even spanning a brand-new tier', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0', prerequisiteIds: [1] }),
+			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Reverse the persisted 0/1 edge (tier 0 drops its prerequisite on tier 1, tier 1 gains one on
+		// tier 0) while tier 0 *also* gains a prerequisite on a brand-new tier added in this same save.
+		// No path is being retired, so the early-post split from #1776 must not kick in here: splitting
+		// this into two POSTs (tier 1's change resolvable now, tier 0's and the new tier's deferred for
+		// id remap) would have the backend see tier 0's still-live edge on tier 1 and tier 1's new edge
+		// on tier 0 at the same time and reject the whole save as a transient cycle, even though neither
+		// intermediate state nor the final one actually cycles.
+		const newTierId = store.addTier(0);
+		store.removePrerequisite(0, 1);
+		store.addPrerequisite(0, newTierId);
+		store.addPrerequisite(1, 0);
+
+		await store.save();
+
+		const prereqCalls = callsTo('AdminTools/SetProficiencyPrerequisites');
+		expect(prereqCalls).toHaveLength(1);
+		expect(prereqCalls[0]).toEqual([
+			{ id: 2, prerequisiteIds: [] },
+			{ id: 0, prerequisiteIds: [2] },
+			{ id: 1, prerequisiteIds: [0] }
+		]);
+		expect(serverProfs.find((p) => p.id === 0)?.prerequisiteIds).toEqual([2]);
+		expect(serverProfs.find((p) => p.id === 1)?.prerequisiteIds).toEqual([0]);
+	});
+
+	it('retiring a path and removing the gateway prerequisite it now soft-locks succeeds in one save (#1776)', async () => {
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'd', activityKey: EActivityKey.Water, retiredAt: null }
+		];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0' }),
+			fullTier({ id: 1, pathId: 1, pathOrdinal: 0, name: 'Water T0', prerequisiteIds: [0] })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Retiring path 0 (Fire) would soft-lock the live gateway (Water T0) unless its prerequisite on
+		// Fire T0 is also dropped in the same save.
+		store.retirePath(0, true);
+		store.removePrerequisite(1, 0);
+
+		await store.save();
+
+		expect(toastErrorMock).not.toHaveBeenCalled();
+		expect(store.pathBaseline(0)?.retiredAt).toBeTruthy();
+		expect(store.profBaseline(1)?.prerequisiteIds).toEqual([]);
+
+		// The prerequisite removal must land before the path retire commits, or the backend's guard
+		// (simulated above) would reject the retire against its still-live edge.
+		const pathCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/AddEditPaths');
+		const prereqCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyPrerequisites');
+		expect(prereqCallIndex).toBeGreaterThanOrEqual(0);
+		expect(pathCallIndex).toBeGreaterThan(prereqCallIndex);
+	});
+
+	it('retiring a path that still gates a live gateway (prerequisite untouched) is rejected, same as before', async () => {
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'd', activityKey: EActivityKey.Water, retiredAt: null }
+		];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0' }),
+			fullTier({ id: 1, pathId: 1, pathOrdinal: 0, name: 'Water T0', prerequisiteIds: [0] })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.retirePath(0, true);
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		// Rejected pre-commit: nothing wrote, so the local retire edit is preserved for a clean retry.
+		expect(store.paths.find((p) => p.id === 0)?.retiredAt).toBeTruthy();
+		expect(serverPaths.find((p) => p.id === 0)?.retiredAt).toBeFalsy();
+	});
+
+	it('lowering MaxLevel and removing the now out-of-range payout in one save succeeds (#1827/#1804)', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({
+				id: 0,
+				pathId: 0,
+				pathOrdinal: 0,
+				name: 'Fire T0',
+				maxLevel: 10,
+				levelModifiers: [{ level: 8, attributeId: 0, modifierTypeId: 0, amount: 5 }],
+				levelRewards: [{ level: 8, rewardSkillId: 3 }]
+			})
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.patchProf(0, (d) => (d.maxLevel = 5));
+		store.removePayout(0, 8);
+
+		await store.save();
+
+		expect(toastErrorMock).not.toHaveBeenCalled();
+		expect(store.profBaseline(0)?.maxLevel).toBe(5);
+		expect(store.profBaseline(0)?.levelModifiers).toHaveLength(0);
+		expect(store.profBaseline(0)?.levelRewards).toHaveLength(0);
+
+		// Both child collections' removals must land before the identity Edit commits, or the backend's
+		// guard (simulated above) would reject the shrink against the still-persisted level-8 payout.
+		const modifiersCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyModifiers');
+		const rewardsCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/SetProficiencyRewards');
+		const identityCallIndex = postMock.mock.calls.findIndex((c) => c[0] === 'AdminTools/AddEditProficiencies');
+		expect(modifiersCallIndex).toBeGreaterThanOrEqual(0);
+		expect(rewardsCallIndex).toBeGreaterThanOrEqual(0);
+		expect(identityCallIndex).toBeGreaterThan(modifiersCallIndex);
+		expect(identityCallIndex).toBeGreaterThan(rewardsCallIndex);
+	});
+
+	it('lowering MaxLevel without removing the offending payout is still rejected, same as before', async () => {
+		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		serverProfs = [
+			fullTier({
+				id: 0,
+				pathId: 0,
+				pathOrdinal: 0,
+				name: 'Fire T0',
+				maxLevel: 10,
+				levelModifiers: [{ level: 8, attributeId: 0, modifierTypeId: 0, amount: 5 }]
+			})
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.patchProf(0, (d) => (d.maxLevel = 5));
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		// Rejected pre-commit: nothing wrote, so the local edit is preserved for a clean retry.
+		expect(store.profs.find((p) => p.id === 0)?.maxLevel).toBe(5);
+		expect(serverProfs.find((p) => p.id === 0)?.maxLevel).toBe(10);
 	});
 
 	it('preserves edits and surfaces an error when the first write fails (pre-commit)', async () => {
@@ -428,5 +690,32 @@ describe('navigation & detail mutations', () => {
 		expect(store.totalChanges).toBe(0);
 
 		store.dispose();
+	});
+
+	it('mutators no-op while a save is in flight so a keystroke landing mid-save cannot be silently discarded', async () => {
+		seedServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.saving = true;
+
+		store.patchPath(0, (d) => (d.name = 'raced'));
+		expect(reqPath(store, 0).name).toBe('Fire');
+
+		store.patchProf(0, (d) => (d.name = 'raced'));
+		expect(reqProf(store, 0).name).toBe('Fire T0');
+
+		store.addPath();
+		expect(store.paths).toHaveLength(1);
+
+		const beforeTierCount = store.profs.length;
+		expect(store.addTier(0)).toBe(0);
+		expect(store.profs).toHaveLength(beforeTierCount);
+
+		store.reorderTiers(0, 0, 0);
+		store.removePath(0);
+		expect(store.paths).toHaveLength(1);
+		store.removeTier(0);
+		expect(store.profs).toHaveLength(beforeTierCount);
 	});
 });

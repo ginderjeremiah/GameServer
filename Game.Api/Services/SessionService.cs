@@ -122,12 +122,22 @@ namespace Game.Api.Services
             _playerNeedsReload = true;
         }
 
-        public void CreateSession(int userId, int playerId)
+        /// <summary>
+        /// Establishes the session binding for <paramref name="playerId"/> (login's <c>SelectPlayer</c>, or an
+        /// in-game <c>SwitchPlayer</c>) and primes the session cache here — before any socket exists — so the
+        /// subsequent Status/socket reads hit the cache instead of rehydrating. When the cache already holds
+        /// state for this same player (a credential re-login, or switching back to the character already bound),
+        /// that cached state is kept rather than overwritten, since it may carry a cache-only in-flight battle
+        /// snapshot that exists nowhere else. A genuinely different (or absent) cached player still gets a
+        /// fresh <see cref="PlayerState"/>.
+        /// </summary>
+        public async Task CreateSession(int userId, int playerId, CancellationToken cancellationToken = default)
         {
             UserId = userId;
-            // Login establishes the binding before any socket exists, so it primes the session cache here; the
-            // subsequent Status/socket reads then hit the cache instead of rehydrating.
-            PlayerState = new PlayerState { PlayerId = playerId };
+            var existing = await _sessionStore.GetSession(userId, cancellationToken);
+            PlayerState = existing is not null && existing.PlayerId == playerId
+                ? existing
+                : new PlayerState { PlayerId = playerId };
             _sessionStore.Update(PlayerState, UserId);
         }
 
@@ -144,9 +154,16 @@ namespace Game.Api.Services
             PlayerState = new PlayerState { PlayerId = playerId };
         }
 
-        public void SavePlayerState()
+        /// <summary>
+        /// Persists the in-flight <see cref="PlayerState"/> to the session cache — awaited, not fire-and-forget,
+        /// because this is the reconnect/rehydration path's source of truth for the in-flight battle. The
+        /// battle-lifecycle commands call this <em>after</em> durably crediting a battle's outcome and clearing
+        /// it off <see cref="PlayerState"/>; a dropped write here would leave the stale session showing the
+        /// already-credited battle as still active, so a reconnect's next battle-end would re-credit it.
+        /// </summary>
+        public async Task SavePlayerStateAsync(CancellationToken cancellationToken = default)
         {
-            _sessionStore.Update(PlayerState, UserId);
+            await _sessionStore.UpdateAsync(PlayerState, UserId, cancellationToken);
         }
     }
 }
