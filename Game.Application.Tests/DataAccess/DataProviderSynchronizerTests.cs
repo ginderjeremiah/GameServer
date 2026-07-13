@@ -1481,6 +1481,9 @@ namespace Game.Application.Tests.DataAccess
             // Models the Redis reliable-queue semantics: items wait on _items (head = First), a reserve moves the
             // head onto _processing, and an acknowledge removes it; a reclaim restores the processing list to the
             // queue head in order. GetNextAsync destructively pops the queue head (used to assert the queue is drained).
+            // Every member locks _gate — Redis ops are atomic, and the bounded-concurrency drain (#1701) really does
+            // acknowledge from multiple lanes at once, which would corrupt an unsynchronized LinkedList.
+            private readonly object _gate = new();
             private readonly LinkedList<string?> _items;
             private readonly LinkedList<string?> _processing = new();
 
@@ -1491,85 +1494,121 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
-                if (_items.First is null)
+                lock (_gate)
                 {
-                    return Task.FromResult<string?>(null);
-                }
+                    if (_items.First is null)
+                    {
+                        return Task.FromResult<string?>(null);
+                    }
 
-                var value = _items.First.Value;
-                _items.RemoveFirst();
-                return Task.FromResult(value);
+                    var value = _items.First.Value;
+                    _items.RemoveFirst();
+                    return Task.FromResult(value);
+                }
             }
 
             public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
             {
-                if (_items.First is null)
+                lock (_gate)
                 {
-                    return Task.FromResult<string?>(null);
-                }
+                    if (_items.First is null)
+                    {
+                        return Task.FromResult<string?>(null);
+                    }
 
-                var value = _items.First.Value;
-                _items.RemoveFirst();
-                _processing.AddLast(value);
-                return Task.FromResult(value);
+                    var value = _items.First.Value;
+                    _items.RemoveFirst();
+                    _processing.AddLast(value);
+                    return Task.FromResult(value);
+                }
             }
 
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default)
             {
-                _processing.Remove(value);
-                return Task.CompletedTask;
+                lock (_gate)
+                {
+                    _processing.Remove(value);
+                    return Task.CompletedTask;
+                }
             }
 
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default)
             {
-                long reclaimed = 0;
-                while (_processing.Last is not null)
+                lock (_gate)
                 {
-                    _items.AddFirst(_processing.Last.Value);
-                    _processing.RemoveLast();
-                    reclaimed++;
-                }
+                    long reclaimed = 0;
+                    while (_processing.Last is not null)
+                    {
+                        _items.AddFirst(_processing.Last.Value);
+                        _processing.RemoveLast();
+                        reclaimed++;
+                    }
 
-                return Task.FromResult(reclaimed);
+                    return Task.FromResult(reclaimed);
+                }
             }
 
-            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_items.Count);
+                }
+            }
 
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_processing.Count);
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_processing.Count);
+                }
+            }
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default)
             {
-                IReadOnlyList<string> head = count <= 0
-                    ? []
-                    : _items.Where(item => item is not null).Take((int)count).Cast<string>().ToList();
-                return Task.FromResult(head);
+                lock (_gate)
+                {
+                    IReadOnlyList<string> head = count <= 0
+                        ? []
+                        : _items.Where(item => item is not null).Take((int)count).Cast<string>().ToList();
+                    return Task.FromResult(head);
+                }
             }
 
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default)
             {
-                var node = _items.Find(value);
-                if (node is null)
+                lock (_gate)
                 {
-                    return Task.FromResult(false);
-                }
+                    var node = _items.Find(value);
+                    if (node is null)
+                    {
+                        return Task.FromResult(false);
+                    }
 
-                _items.Remove(node);
-                return Task.FromResult(true);
+                    _items.Remove(node);
+                    return Task.FromResult(true);
+                }
             }
 
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default)
             {
-                _items.AddLast(value);
-                return Task.CompletedTask;
+                lock (_gate)
+                {
+                    _items.AddLast(value);
+                    return Task.CompletedTask;
+                }
             }
 
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default)
             {
-                foreach (var value in values)
+                lock (_gate)
                 {
-                    _items.AddLast(value);
+                    foreach (var value in values)
+                    {
+                        _items.AddLast(value);
+                    }
+                    return Task.CompletedTask;
                 }
-                return Task.CompletedTask;
             }
 
             // Not exercised by DataProviderSynchronizer.ProcessQueue.
