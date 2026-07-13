@@ -56,13 +56,13 @@ describe('classEntity.refresh', () => {
 			}
 		];
 
-		const result = await classEntity.refresh();
+		await classEntity.refresh();
 
-		expect(staticData.classes).toBe(result);
+		expect(staticData.classes).toBe(socket.classes);
 		expect(staticData.classes[0]).toMatchObject({ name: 'Warrior', starterSkillIds: [3] });
 	});
 
-	it('normalises a missing scaling attribute to the -1 sentinel in the written-through copy', async () => {
+	it('normalises a missing scaling attribute to the -1 sentinel only in the returned editable copy, keeping staticData.classes raw', async () => {
 		socket.classes = [
 			{
 				id: 0,
@@ -80,9 +80,10 @@ describe('classEntity.refresh', () => {
 			}
 		];
 
-		await classEntity.refresh();
+		const result = await classEntity.refresh();
 
-		expect(staticData.classes[0].passiveScalingAttributeId).toBe(-1);
+		expect(result[0].passiveScalingAttributeId).toBe(-1);
+		expect(staticData.classes[0].passiveScalingAttributeId).toBeUndefined();
 	});
 });
 

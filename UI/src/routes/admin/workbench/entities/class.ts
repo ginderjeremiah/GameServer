@@ -23,14 +23,14 @@ export interface WorkbenchClass extends Omit<IClass, 'passiveScalingAttributeId'
 }
 
 // Classes load over the socket; the admin filter invalidates this cache on every write server-side, so a
-// plain refetch returns the freshly-saved list. The optional scaling attribute is normalised to the select's
-// "None" sentinel (-1) for the editable copy. Written through to staticData.classes so retire-confirm's
-// reference computation (starter-skill/starter-equipment groups) sees post-save edits (#1633).
+// plain refetch returns the freshly-saved list. Written through to staticData.classes so retire-confirm's
+// reference computation (starter-skill/starter-equipment groups) sees post-save edits (#1633). staticData.classes
+// stays raw (undefined = none) for the game/other screens, mirroring item.ts; the optional scaling attribute is
+// normalised to the select's "None" sentinel (-1) only in the returned editable copy.
 const refresh = async (): Promise<WorkbenchClass[]> => {
 	const classes = await fetchSocketData('GetClasses');
-	const workbenchClasses = classes.map((c) => ({ ...c, passiveScalingAttributeId: c.passiveScalingAttributeId ?? -1 }));
-	staticData.classes = workbenchClasses;
-	return workbenchClasses;
+	staticData.classes = classes;
+	return classes.map((c) => ({ ...c, passiveScalingAttributeId: c.passiveScalingAttributeId ?? -1 }));
 };
 
 export const classEntity: EntityConfig<WorkbenchClass> = {
