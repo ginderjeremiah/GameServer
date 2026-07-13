@@ -481,6 +481,15 @@ namespace Game.Api.Sockets
 
                     await ExecuteCommand(commandInfo);
                 }
+                else
+                {
+                    // A frame containing the JSON literal "null" deserializes to a null commandInfo without
+                    // throwing, so it would otherwise fall through silently — no response and no close. It
+                    // carries no request id to correlate a structured rejection to, so close instead, mirroring
+                    // the JsonException path below.
+                    _logger.LogWarning("Received socket frame that deserialized to null; closing the socket: {Message}", message);
+                    await _context.Close(ESocketCloseReason.MalformedFrame);
+                }
             }
             catch (JsonException)
             {
