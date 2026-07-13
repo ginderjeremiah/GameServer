@@ -28,6 +28,10 @@ interface MockWebSocket {
 
 let socketInstances: MockWebSocket[] = [];
 let lastSocketUrl: string | undefined;
+// Every mock socket ever created, never reset per-test — unlike socketInstances, which each test clears.
+// Only the module-level `apiSocket` singleton (see the fetchSocketData describe below) needs this: it
+// outlives any one test, so its own leftover socket has to be findable to force it closed.
+const allCreatedSockets: MockWebSocket[] = [];
 
 function createMockWebSocket(url?: string): MockWebSocket {
 	lastSocketUrl = url;
@@ -43,6 +47,7 @@ function createMockWebSocket(url?: string): MockWebSocket {
 		onclose: null
 	};
 	socketInstances.push(ws);
+	allCreatedSockets.push(ws);
 	return ws;
 }
 
@@ -66,10 +71,6 @@ describe('ApiSocket', () => {
 	let apiSocket: ApiSocket;
 
 	beforeEach(() => {
-		// Force any socket left from a previous test to read as CLOSED so ensureSocket creates a fresh one.
-		for (const s of socketInstances) {
-			s.readyState = s.CLOSED;
-		}
 		socketInstances = [];
 		lastSocketUrl = undefined;
 		webSocketMock.mockClear();
@@ -550,7 +551,16 @@ describe('ApiSocket', () => {
 
 	// fetchSocketData wraps the module-level `apiSocket` singleton (not the per-test instance above),
 	// driving it through the same mocked WebSocket. It mirrors ApiRequest.get's throw-on-error contract.
+	// Unlike the per-test instance, the singleton survives across these tests (it's a module import), so
+	// its own leftover socket from a prior test in this block must be marked closed before each one runs
+	// or ensureSocket sees it as still open and skips creating a fresh mock WebSocket to assert against.
 	describe('fetchSocketData', () => {
+		beforeEach(() => {
+			for (const s of allCreatedSockets) {
+				s.readyState = s.CLOSED;
+			}
+		});
+
 		it('resolves with the response data when the command succeeds', async () => {
 			const promise = fetchSocketData('GetZones');
 			await flushMicrotasks();
