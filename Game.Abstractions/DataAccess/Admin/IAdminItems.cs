@@ -17,9 +17,9 @@ namespace Game.Abstractions.DataAccess.Admin
         AdminSaveResult SetAttributes(AddEditAttributesData data);
 
         /// <summary>Applies an Add/Edit/Delete change set to item mod slots. Fails (applying nothing) if an
-        /// add targets an item that does not exist; an edit/delete of a slot the named item does not have is
-        /// a guarded no-op.</summary>
-        AdminSaveResult SaveModSlots(IReadOnlyList<Change<ItemModSlot>> changes);
+        /// add targets an item that does not exist, or a delete targets a slot occupied by at least one
+        /// player's applied mod; an edit/delete of a slot the named item does not have is a guarded no-op.</summary>
+        Task<AdminSaveResult> SaveModSlots(IReadOnlyList<Change<ItemModSlot>> changes, CancellationToken cancellationToken = default);
 
         /// <summary>Replaces an item's tag associations. Fails if the item does not exist.</summary>
         Task<AdminSaveResult> SetTags(SetTagsData data, CancellationToken cancellationToken = default);

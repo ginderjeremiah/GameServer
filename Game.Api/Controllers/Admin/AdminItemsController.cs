@@ -33,9 +33,9 @@ namespace Game.Api.Controllers.Admin
         }
 
         [HttpPost]
-        public ApiResponse AddEditItemModSlots([FromBody] List<Change<ItemModSlot>> changes)
+        public async Task<ApiResponse> AddEditItemModSlots([FromBody] List<Change<ItemModSlot>> changes)
         {
-            return _adminItems.SaveModSlots(changes);
+            return await _adminItems.SaveModSlots(changes, HttpContext.RequestAborted);
         }
 
         [HttpPost]

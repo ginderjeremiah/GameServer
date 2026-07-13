@@ -119,12 +119,12 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveModSlots_AddForUnknownItem_ReturnsNotFound()
+        public async Task SaveModSlots_AddForUnknownItem_ReturnsNotFound()
         {
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
 
-            var result = admin.SaveModSlots(
+            var result = await admin.SaveModSlots(
             [
                 new Change<Contracts.ItemModSlot>
                 {
@@ -177,7 +177,7 @@ namespace Game.Application.Tests.DataAccess
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminItems>();
-                Assert.True(admin.SaveModSlots(changes).Succeeded);
+                Assert.True((await admin.SaveModSlots(changes)).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
 
@@ -192,6 +192,91 @@ namespace Game.Application.Tests.DataAccess
                 Assert.DoesNotContain(slots, s => s.Id == removedSlotId);
                 Assert.Equal((int)EItemModType.Suffix, slots.Single(s => s.Id == editedSlotId).ItemModSlotTypeId);
             }
+        }
+
+        [Fact]
+        public async Task SaveModSlots_DeleteOfSlotOccupiedByAppliedMod_ReturnsFailureWithoutPersisting()
+        {
+            int itemId, slotId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var user = await TestDataSeeder.CreateUserAsync(context);
+                var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                var item = await TestDataSeeder.CreateItemAsync(context);
+                var slot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id, EItemModType.Prefix);
+                var mod = await TestDataSeeder.CreateItemModAsync(context);
+                await TestDataSeeder.ApplyModToItemAsync(context, player.Id, item.Id, slot.Id, mod.Id);
+
+                itemId = item.Id;
+                slotId = slot.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // #1885: deleting a slot a player currently has a mod applied to must not cascade-destroy that
+            // player's AppliedMod row — reject the delete up front as a graceful failure instead.
+            var changes = new List<Change<Contracts.ItemModSlot>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Delete,
+                    Item = new Contracts.ItemModSlot { Id = slotId, ItemId = itemId },
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            var result = await admin.SaveModSlots(changes);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                $"Item mod slot {slotId} is occupied by at least one player's applied mod and cannot be deleted.",
+                result.ErrorMessage);
+
+            var context2 = scope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.True(await context2.ItemModSlots.AnyAsync(s => s.Id == slotId, CancellationToken));
+        }
+
+        [Fact]
+        public async Task SaveModSlots_DeleteOfOccupiedSlotWithMismatchedItemId_IsGuardedNoOp()
+        {
+            int otherItemId, slotId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var user = await TestDataSeeder.CreateUserAsync(context);
+                var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+                var item = await TestDataSeeder.CreateItemAsync(context);
+                var otherItem = await TestDataSeeder.CreateItemAsync(context, name: "Other Item");
+                var slot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id, EItemModType.Prefix);
+                var mod = await TestDataSeeder.CreateItemModAsync(context);
+                await TestDataSeeder.ApplyModToItemAsync(context, player.Id, item.Id, slot.Id, mod.Id);
+
+                otherItemId = otherItem.Id;
+                slotId = slot.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The occupancy guard must agree with the membership guard below it: a delete naming a slot the
+            // stated item doesn't actually have is reconciled away as a no-op, even when that slot happens to
+            // be occupied under its real owning item — not rejected on the occupancy check.
+            var changes = new List<Change<Contracts.ItemModSlot>>
+            {
+                new()
+                {
+                    ChangeType = EChangeType.Delete,
+                    Item = new Contracts.ItemModSlot { Id = slotId, ItemId = otherItemId },
+                },
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminItems>();
+            var result = await admin.SaveModSlots(changes);
+
+            Assert.True(result.Succeeded);
+
+            var context2 = scope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.True(await context2.ItemModSlots.AnyAsync(s => s.Id == slotId, CancellationToken));
         }
 
         [Fact]
@@ -228,7 +313,7 @@ namespace Game.Application.Tests.DataAccess
             using (var writeScope = CreateScope())
             {
                 var admin = writeScope.ServiceProvider.GetRequiredService<IAdminItems>();
-                Assert.True(admin.SaveModSlots(changes).Succeeded);
+                Assert.True((await admin.SaveModSlots(changes)).Succeeded);
                 await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
             }
 
