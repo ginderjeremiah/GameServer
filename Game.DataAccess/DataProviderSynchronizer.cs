@@ -19,10 +19,10 @@ namespace Game.DataAccess
         private static readonly TimeSpan DefaultDrainTimeout = TimeSpan.FromSeconds(5);
 
         /// <summary>
-        /// How long a drain pass must find the processing list still non-empty (with nothing left to reserve
-        /// from the main queue) before opportunistically reclaiming it. Comfortably longer than a healthy
-        /// apply — including its retry backoff (<see cref="PlayerUpdateRetryPolicy"/>) — so this doesn't
-        /// routinely race a genuinely in-flight item on another instance.
+        /// How long the processing list's head item must persist there unacknowledged (with nothing left to
+        /// reserve from the main queue) before it is opportunistically reclaimed. Comfortably longer than a
+        /// healthy apply — including its retry backoff (<see cref="PlayerUpdateRetryPolicy"/>) — so this
+        /// doesn't routinely race a genuinely in-flight item on another instance.
         /// </summary>
         private static readonly TimeSpan DefaultReclaimGracePeriod = TimeSpan.FromSeconds(30);
 
@@ -51,11 +51,17 @@ namespace Game.DataAccess
         private readonly TimeProvider _timeProvider;
         private readonly int _maxConcurrentDrainItems;
 
-        // When a drain pass finds the main queue empty but the processing list non-empty, this is the instant
-        // that state was first observed. Reset to null whenever the processing list is seen empty (including
-        // right after an opportunistic reclaim). Touched only under the serialized drain (the gate below), so
-        // it needs no lock — the same rationale as _lastReportedDeadLetterDepth.
-        private DateTimeOffset? _strandedProcessingObservedAt;
+        // When a drain pass finds the main queue empty but the processing list non-empty, this is the identity
+        // and first-observed instant of whichever item currently sits at the processing list's head (its
+        // oldest, least-recently-reserved entry). Reset to null whenever the processing list is seen empty
+        // (including right after an opportunistic reclaim), or when a different item now occupies the head
+        // (the tracked one was acknowledged/reclaimed and something else took its place). Tracking the
+        // specific item — rather than mere list occupancy — means a busy multi-instance deployment, where the
+        // shared list rarely reads empty, only reclaims an item that has itself dwelled at the head past the
+        // grace period, instead of treating steady per-instance churn as staleness. Touched only under the
+        // serialized drain (the gate below), so it needs no lock — the same rationale as
+        // _lastReportedDeadLetterDepth.
+        private (string Value, DateTimeOffset ObservedAt)? _strandedProcessingHead;
 
         // Cancelled on shutdown to signal any in-flight drain (the startup drain or a pub/sub wake) to stop
         // reserving new items and unwind at a clean item boundary, and to make a late wake a no-op.
@@ -440,38 +446,47 @@ namespace Game.DataAccess
         /// <summary>
         /// Reclaims items stranded on the processing list — orphaned not by a crash (the startup reclaim's
         /// job) but by <c>ProcessMessage</c>'s own escape paths faulting after a durable apply (the dead-letter
-        /// write or the acknowledge itself hitting a Redis blip) — once they've sat there, with nothing left on
-        /// the main queue, for at least <see cref="_reclaimGracePeriod"/>. The grace period exists only to
-        /// avoid needlessly racing an item another live instance is still genuinely applying; reclaiming it
-        /// regardless would still be safe under the queue's idempotent at-least-once contract. Returns whether
-        /// anything was reclaimed, so the caller knows to keep draining. Callers must settle their own
-        /// in-flight items first — this reads the shared processing list, which cannot distinguish a stranded
-        /// item from one this pass is still applying.
+        /// write or the acknowledge itself hitting a Redis blip) — once the item actually sitting at the
+        /// processing list's head has persisted there, with nothing left on the main queue, for at least
+        /// <see cref="_reclaimGracePeriod"/>. Tracking is keyed to that specific head item rather than mere
+        /// list occupancy: a busy multi-instance deployment can keep the shared list continuously non-empty
+        /// with items other instances are genuinely working through, and a clock keyed only on "is the list
+        /// non-empty" would never reset there, eventually reclaiming healthy in-flight work. Comparing the head
+        /// item across polls restarts the clock whenever a different item takes its place, so a reclaim only
+        /// fires once one item has genuinely dwelled past the grace period — which exists only to avoid
+        /// needlessly racing an item another live instance is still applying; reclaiming it regardless would
+        /// still be safe under the queue's idempotent at-least-once contract, so reclaiming the whole list (not
+        /// just the stale head item) once that threshold is crossed is safe too, and cheaper than reclaiming
+        /// one item at a time. Returns whether anything was reclaimed, so the caller knows to keep draining.
+        /// Callers must settle their own in-flight items first — this reads the shared processing list, which
+        /// cannot distinguish a stranded item from one this pass is still applying.
         /// </summary>
         private async Task<bool> TryReclaimStrandedProcessingAsync(IPubSubQueue queue, CancellationToken cancellationToken)
         {
-            var processingCount = await queue.GetProcessingCountAsync(cancellationToken);
-            if (processingCount == 0)
+            var head = await queue.PeekProcessingAsync(1, cancellationToken);
+            if (head.Count == 0)
             {
-                _strandedProcessingObservedAt = null;
+                _strandedProcessingHead = null;
                 return false;
             }
 
             var now = _timeProvider.GetUtcNow();
-            if (_strandedProcessingObservedAt is null)
+            if (_strandedProcessingHead is not { } tracked || tracked.Value != head[0])
             {
-                // First sighting: start the clock rather than reclaiming immediately.
-                _strandedProcessingObservedAt = now;
+                // Either the first sighting of a non-empty processing list, or a different item now occupies
+                // the head (the previously-tracked one was acknowledged/reclaimed) — start its clock rather
+                // than reclaiming immediately.
+                _strandedProcessingHead = (head[0], now);
                 return false;
             }
 
-            if (now - _strandedProcessingObservedAt.Value < _reclaimGracePeriod)
+            if (now - tracked.ObservedAt < _reclaimGracePeriod)
             {
                 return false;
             }
 
             var reclaimed = await queue.ReclaimProcessingAsync(cancellationToken);
-            _strandedProcessingObservedAt = null;
+            _strandedProcessingHead = null;
             if (reclaimed > 0)
             {
                 _logger.LogInformation(

@@ -47,6 +47,15 @@
         public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Returns up to <paramref name="count"/> items from the head of the processing list (oldest
+        /// reserved first) WITHOUT removing them — the processing-list counterpart to <see cref="PeekAsync"/>.
+        /// Lets a caller identify the specific item currently stranded there (rather than merely that the list
+        /// is non-empty), so it can detect whether that same item is still there on a later poll. A
+        /// non-positive count returns an empty list.
+        /// </summary>
+        public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Removes a single occurrence of <paramref name="value"/> from this queue, returning true when one
         /// was removed. Used to acknowledge a dead-letter entry off the queue once it has been re-enqueued
         /// for replay; a no-op (false) when no matching entry remains.

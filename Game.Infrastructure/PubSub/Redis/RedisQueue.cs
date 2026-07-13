@@ -129,6 +129,18 @@ namespace Game.Infrastructure.PubSub.Redis
             return Array.ConvertAll(values, value => value.ToString());
         }
 
+        public async Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default)
+        {
+            if (count <= 0)
+            {
+                return [];
+            }
+
+            // Same non-destructive LRANGE as PeekAsync, against the processing list instead of the main queue.
+            var values = await RedisCommandBudget.Read(_redis.ListRangeAsync(ProcessingQueueName, 0, count - 1), cancellationToken);
+            return Array.ConvertAll(values, value => value.ToString());
+        }
+
         public async Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default)
         {
             // LREM count 1 removes a single matching occurrence; returns false (a no-op) when none remain.
