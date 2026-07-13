@@ -11,20 +11,20 @@
 				{#if reference.loaded}
 					<ContentHealthConsole />
 				{:else}
-					<Loading loading={true} delay={50} />
+					{@render referenceGate()}
 				{/if}
 			{:else if active === PROGRESSION_TOOL_KEY}
 				{#if reference.loaded}
 					<Progression />
 				{:else}
-					<Loading loading={true} delay={50} />
+					{@render referenceGate()}
 				{/if}
 			{:else if reference.loaded && activeEntity}
 				{#key active}
 					<Workbench entity={activeEntity} groupLabel={groupLabelFor(active)} />
 				{/key}
 			{:else}
-				<Loading loading={true} delay={50} />
+				{@render referenceGate()}
 			{/if}
 		</div>
 
@@ -38,6 +38,17 @@
 		/>
 	</div>
 {/if}
+
+{#snippet referenceGate()}
+	{#if loadError}
+		<div class="admin-load-error" role="alert" data-testid="admin-reference-error">
+			<p>{loadError}</p>
+			<button type="button" class="btn" onclick={loadReference}>Refresh</button>
+		</div>
+	{:else}
+		<Loading loading={true} delay={50} />
+	{/if}
+{/snippet}
 
 <script lang="ts">
 import { onMount } from 'svelte';
@@ -70,17 +81,27 @@ let sidebarPinned = $state(false);
 // (no token available) shows nothing, and a non-admin who deep-links here is redirected before the
 // workbench mounts or its reference data loads.
 let authorized = $state(false);
+let loadError = $state<string | null>(null);
 
 const activeEntity = $derived(entityByKey(active));
+
+async function loadReference() {
+	loadError = null;
+	try {
+		await reference.load();
+	} catch (ex) {
+		const message = ex instanceof Error ? ex.message : 'Failed to load admin reference data.';
+		loadError = message;
+		toastError(message);
+	}
+}
 
 // Guard the route to Admins, then load the shared reference catalogues (used by every entity's
 // select options, tag UI, and derived spawn shares) before rendering any workbench.
 onMount(() => {
 	authorized = ensureAdminAccess();
 	if (authorized && !reference.loaded) {
-		reference.load().catch((ex) => {
-			toastError(ex instanceof Error ? ex.message : 'Failed to load admin reference data.');
-		});
+		void loadReference();
 	}
 });
 
@@ -140,5 +161,45 @@ $effect(() => {
 	overflow: hidden;
 	// No outer padding: the Workbench is full-bleed (list pane flush to the rail,
 	// full-width header/save bar) and supplies its own internal insets.
+}
+
+.admin-load-error {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	padding: 20px;
+	text-align: center;
+
+	p {
+		max-width: 480px;
+		color: var(--error);
+		font-size: 13px;
+	}
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	background: transparent;
+	border: 1px solid var(--border-light);
+	color: var(--text-secondary);
+	font-family: var(--mono);
+	font-size: 11.5px;
+	letter-spacing: 0.6px;
+	text-transform: uppercase;
+	padding: 8px 15px;
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.14s ease;
+	white-space: nowrap;
+
+	&:hover:not(:disabled) {
+		border-color: color-mix(in srgb, var(--white) 32%, transparent);
+	}
 }
 </style>
