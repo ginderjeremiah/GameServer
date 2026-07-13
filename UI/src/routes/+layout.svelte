@@ -19,6 +19,7 @@ import { apiSocket, getTokens, onSocketError } from '$lib/api';
 import { handleSocketReplaced, playerManager } from '$lib/engine';
 import { resumeSession } from '$lib/engine/session';
 import { bootRedirect, shouldReturnToLogin } from '$lib/engine/boot-redirect';
+import { bootState } from '$lib/engine/boot-state.svelte';
 import { toastError } from '$stores';
 import BootSplash from './BootSplash.svelte';
 import '$styles/common.scss';
@@ -80,6 +81,9 @@ onMount(async () => {
 		// gate can never strand the player on the splash.
 		booting = false;
 		booted = true;
+		// Signals routes mounted independently of this layout (e.g. #1898) that the boot decision has
+		// resolved at least once, so their own pre-boot mount can defer non-idempotent work.
+		bootState.markBooted();
 	}
 });
 

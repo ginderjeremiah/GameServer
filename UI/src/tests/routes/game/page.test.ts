@@ -29,7 +29,8 @@ const {
 	startGame,
 	stopEngines,
 	confirmQuit,
-	goto
+	goto,
+	bootState
 } = vi.hoisted(() => ({
 	sendSocketCommand: vi.fn(),
 	getRoles: vi.fn<() => string[]>(() => []),
@@ -38,12 +39,16 @@ const {
 	startGame: vi.fn(),
 	stopEngines: vi.fn(),
 	confirmQuit: vi.fn(),
-	goto: vi.fn()
+	goto: vi.fn(),
+	// Defaults to already-resolved, matching every mount except a direct/refresh load of `/game`
+	// (the scenario the #1898 regression test below overrides this for).
+	bootState: { booted: true }
 }));
 
 vi.mock('$app/environment', () => ({ browser: true }));
 vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('$lib/engine/boot-state.svelte', () => ({ bootState }));
 vi.mock('$lib/api', async (importOriginal) => {
 	const actual = (await importOriginal()) as Record<string, unknown>;
 	return { ...actual, apiSocket: { sendSocketCommand }, getRoles };
@@ -105,6 +110,7 @@ beforeEach(() => {
 	navigation.clear();
 	tutorialTour.clear();
 	mountTracker.fight = 0;
+	bootState.booted = true;
 });
 
 afterEach(cleanup);
@@ -247,5 +253,23 @@ describe('game +page.svelte shell', () => {
 		await Promise.resolve();
 
 		expect(startGame).not.toHaveBeenCalled();
+	});
+
+	it('does not run the welcome-back gate on a pre-boot mount, but does on the post-boot remount the layout always performs (#1898)', async () => {
+		// A direct load/refresh of `/game` mounts this page before the root layout's boot gate has
+		// resolved (children mount before the parent's onMount).
+		bootState.booted = false;
+		const { unmount } = render(GamePage);
+		await Promise.resolve();
+
+		expect(sendSocketCommand).not.toHaveBeenCalled();
+
+		// The boot gate's `{#if booting}` toggle always tears this page down and remounts it once the
+		// boot decision resolves — simulated here as the layout would drive it.
+		unmount();
+		bootState.booted = true;
+
+		render(GamePage);
+		await waitFor(() => expect(sendSocketCommand).toHaveBeenCalledWith('GetOfflineProgress'));
 	});
 });

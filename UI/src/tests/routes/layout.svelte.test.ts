@@ -34,6 +34,9 @@ vi.mock('$components', () => ({
 }));
 
 import Layout from '../../routes/+layout.svelte';
+// Deliberately NOT mocked: the boot gate's `bootState.markBooted()` call is the seam #1898's fix on
+// `/game` hinges on (see the test below), so this suite asserts against the real module.
+import { bootState } from '$lib/engine/boot-state.svelte';
 
 const childSnippet = createRawSnippet(() => ({
 	render: () => '<div data-testid="child">child content</div>'
@@ -92,6 +95,28 @@ describe('root layout boot gate', () => {
 
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/game'));
 		expect(resumeSession).toHaveBeenCalledTimes(1);
+	});
+
+	it('marks the shared boot state resolved on both the no-tokens short-circuit and a token-bearing resume (#1898)', async () => {
+		// Both branches hit the same `finally`, which is the seam a route mounted independently of this
+		// layout (e.g. `/game`) relies on to know the boot decision has resolved. Spying on the call
+		// (rather than only reading the resulting boolean) catches a regression that removes/misplaces
+		// the call even though `bootState.booted` — once true — never resets and would otherwise mask it
+		// via an earlier test's render.
+		const markBooted = vi.spyOn(bootState, 'markBooted');
+
+		renderLayout();
+		await waitFor(() => expect(markBooted).toHaveBeenCalledTimes(1));
+		expect(bootState.booted).toBe(true);
+
+		markBooted.mockClear();
+		getTokens.mockReturnValue({ accessToken: 'a', refreshToken: 'r' });
+		resumeSession.mockResolvedValue('game');
+		renderLayout();
+		await waitFor(() => expect(goto).toHaveBeenCalledWith('/game'));
+		expect(markBooted).toHaveBeenCalledTimes(1);
+
+		markBooted.mockRestore();
 	});
 
 	it('keeps a fully-restorable session on the route it refreshed on (e.g. /admin)', async () => {
