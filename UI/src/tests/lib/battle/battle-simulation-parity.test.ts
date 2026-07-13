@@ -933,8 +933,8 @@ const scenarios: ParityScenario[] = [
 	// PARITY_SEED the first six crit draws are crit,crit,no,no,crit,crit. Mirrors the backend `fractionalCritChance`.
 	//   Player: skill baseDamage 12, cooldown 400 (one crit draw per fire); CriticalDamage base 1.5 + 0.5 = 2.0 →
 	//     a crit deals 12×2 = 24, a non-crit 12 (no Toughness). Enemy: Str 10 → MaxHealth 100, no Toughness, no skills.
-	//   Hits 22,22,10,10,22 (cum 86) then the 6th draw's crit (+22 → 108 ≥ 100) kills on fire 6 → 2400ms; a
-	//   non-crit there (96) would push the kill to fire 7.
+	//   Hits 24,24,12,12,24 (cum 96) then the 6th draw's crit (+24 → 120 ≥ 100) kills on fire 6 → 2400ms.
+	//   The 6th hit being a crit is decisive: a non-crit there (+12 → 108) would still kill on fire 6 here.
 	{
 		name: 'fractionalCritChance',
 		player: () =>
@@ -1158,8 +1158,8 @@ const scenarios: ParityScenario[] = [
 
 	// A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a skill whose
 	// self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw (no Toughness) deals
-	// 8,18,28,38,48,58 (Str climbing 10→60); cumulative 8,26,54,92,140,198 drops the 150-HP enemy on fire 6 at
-	// tick 60 → 2400ms — proving granted skills wrap into a full battle skill (charge + effects).
+	// 10,20,30,40,50 (Str climbing 10→60); cumulative 10,30,60,100,150 drops the 150-HP enemy on fire 5 at
+	// tick 50 → 2000ms — proving granted skills wrap into a full battle skill (charge + effects).
 	{
 		name: 'grantedSkillWithEffects',
 		player: () => {
@@ -1184,7 +1184,7 @@ const scenarios: ParityScenario[] = [
 	// hand-computable. Mirrors the backend `fireAmplification` … `enemyAmplifiesPlayerResists` scenarios.
 
 	// Attacker amplification: a Fire skill with +0.5 FireAmplification deals 20 × 1.5 = 30/hit (no Toughness), so
-	// the 100-HP enemy dies on hit 4 at tick 40 → 1600ms (vs hit 6 / 2400ms un-amplified).
+	// the 100-HP enemy dies on hit 4 at tick 40 → 1600ms (vs hit 5 / 2000ms un-amplified).
 	{
 		name: 'fireAmplification',
 		player: () =>
@@ -1200,7 +1200,7 @@ const scenarios: ParityScenario[] = [
 	},
 
 	// Defender resistance: the enemy's +0.5 FireResistance halves a 40-damage Fire hit to 20/hit (no Toughness),
-	// so the 100-HP enemy dies on hit 6 at tick 60 → 2400ms (vs hit 3 / 1200ms un-resisted).
+	// so the 100-HP enemy dies on hit 5 at tick 50 → 2000ms (vs hit 3 / 1200ms un-resisted).
 	{
 		name: 'fireResistance',
 		player: () =>
@@ -1218,7 +1218,7 @@ const scenarios: ParityScenario[] = [
 
 	// Vulnerability (res < 0): a −1.0 FireResistance doubles the incoming Fire hit (factor 1 − (−1) = 2). A
 	// 20-damage hit becomes 40/hit (no Toughness), so the 100-HP enemy dies on hit 3 at tick 30 → 1200ms (vs hit
-	// 6 / 2400ms at res 0). Resistance is deliberately left unclamped.
+	// 5 / 2000ms at res 0). Resistance is deliberately left unclamped.
 	{
 		name: 'fireVulnerability',
 		player: () =>
@@ -1237,7 +1237,7 @@ const scenarios: ParityScenario[] = [
 	// Absorption (res > 1): a +2.0 FireResistance drives the post-resistance hit negative (20 × (1 − 2) = −20),
 	// so an absorbed hit deals no damage — the Toughness curve never applies, and the heal is capped at MaxHealth (the
 	// enemy is already full, so it stays at 100). The enemy never loses health and never dies; dealing no damage
-	// back, the battle runs to the timeout. (At res 0 the player's 18/hit would win by 2400ms.)
+	// back, the battle runs to the timeout. (At res 0 the player's 20/hit would win by 2000ms.)
 	{
 		name: 'fireAbsorption',
 		player: () => makeBattler([], [makeSkill(20, 400, [], [], EDamageType.Fire)]),
@@ -1284,8 +1284,8 @@ const scenarios: ParityScenario[] = [
 
 	// Bidirectional: the ENEMY amplifies and the PLAYER resists. The enemy's +1.0 FireAmplification doubles its
 	// 20-damage Fire skill to 40; the player's +0.5 FireResistance halves that to 20/hit (no Toughness). The
-	// player (no skills) dies on the enemy's hit 6 at tick 60 → 2400ms. (Without the enemy amp it would be
-	// 8/hit → 5200ms; without the player resist, 38/hit → 1200ms.)
+	// player (no skills) dies on the enemy's hit 5 at tick 50 → 2000ms. (Without the enemy amp it would be
+	// 10/hit → slower; without the player resist, 40/hit.)
 	{
 		name: 'enemyAmplifiesPlayerResists',
 		player: () =>
