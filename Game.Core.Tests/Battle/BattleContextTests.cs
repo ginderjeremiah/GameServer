@@ -312,6 +312,38 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
+        public void DamageTarget_PlayerCritWithZeroCriticalDamage_BooksNoBonus()
+        {
+            // A CriticalDamage debuff can drive the attribute to exactly 0: investment m−1 = −1 sits on
+            // NormalizeInvestment's pole (#1927) — guarded like every sibling overlay, the hit still records as
+            // a crit (the roll is independent of CriticalDamage) but claims no Precision training.
+            var player = MakeBattlerWith((CriticalDamage, -1.5)); // CriticalDamage 0
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20 × 0 = 0 dealt
+
+            Assert.Equal(1, context.Stats.CriticalHits);
+            Assert.Equal(0, context.Stats.CriticalBonusDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerCritWithCriticalDamageBelowBase_BooksNoNegativeBonus()
+        {
+            // A CriticalDamage debuff into (0, 1) (base 1.5, debuffed by 1.0 here) is a non-positive investment
+            // (m−1 = −0.5). Before the #1927 guard this booked a negative claim, eroding Precision training
+            // legitimately accrued earlier in the same battle; guarded, it books nothing.
+            var player = MakeBattlerWith((CriticalDamage, -1.0)); // CriticalDamage 0.5
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 1); // 20 × 0.5 = 10 dealt
+
+            Assert.Equal(1, context.Stats.CriticalHits);
+            Assert.Equal(0, context.Stats.CriticalBonusDealt, 0.001);
+        }
+
+        [Fact]
         public void DamageTarget_PlayerDodge_RecordsDodgeAndPostMitigationDamageAvoided()
         {
             var player = MakeBattlerWith((DodgeChance, 1)); // Toughness 0

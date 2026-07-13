@@ -378,8 +378,13 @@ namespace Game.Core.Battle
                 // The Precision training signal (#1448, reshaped by #1481): the same share claim as the other
                 // overlays, on the whole crit hit's booked damage — φ on the crit-damage investment, so a
                 // heavier investment trains proportionally more while a single crit claims at most its own
-                // booked hit. Kept separate from the player-facing statistic above.
-                Stats.CriticalBonusDealt += totalBooked * Battler.NormalizeInvestment(critMultiplier - 1.0);
+                // booked hit. Kept separate from the player-facing statistic above. Guarded like every sibling
+                // overlay (#1927): a CriticalDamage debuff at or below 1.0 is a non-positive investment and
+                // trains nothing, rather than booking a negative (or, at exactly 0, a −∞) claim.
+                if (critMultiplier > 1.0)
+                {
+                    Stats.CriticalBonusDealt += totalBooked * Battler.NormalizeInvestment(critMultiplier - 1.0);
+                }
             }
 
             if (totalNet > Stats.HighestPlayerAttack)
