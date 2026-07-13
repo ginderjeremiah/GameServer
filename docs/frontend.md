@@ -6,7 +6,7 @@ All frontend code lives in `UI`:
   - **`components`** — shared components. Several reusable primitives are worth composing over re-implementing — the collapsible side rails (`components/sidebar`), the tooltip chrome (`components/tooltip`, incl. `AttributeTooltip`), and the progress/fill `Bar` (with specialised variants like `HpBar`). **Extend an existing primitive rather than copying it**, and check here before hand-rolling a new one; each primitive's own API lives in its code/props.
   - **`lib`** — non-UI logic: `api` (HTTP/WebSocket client + generated client types), `battle` (battle-sim domain objects + the shared domain mirrors backing the breakdown/inventory screens), `card-game` (pure "Initiative Loom" mechanics, DOM-free), `common` (shared utilities), `engine` (render/logical engines, battle engine, player/enemy managers).
   - **`routes`** — pages and route-specific components. In-game screens under `routes/game/screens` use a config-driven **screen registry** (`screen-defs.ts`); adding a screen means registering it there. Per-screen detail lives in [frontend-screens.md](./frontend-screens.md).
-  - **`stores`** — Svelte stores. NOTE: most stateful data is moving to reactive classes in `lib` made reactive via `statify`; prefer a reactive class over a new store.
+  - **`stores`** — rune-based (`$state`) UI state modules (no classic `svelte/store` stores remain). NOTE: most stateful data is moving to reactive classes in `lib` made reactive via `statify`; prefer a reactive class over a new store module.
   - **`styles`** — global styles and theming.
   - **`tests`** — unit tests for lib/pages/components.
 - **`static`** — assets. Item/skill icons live in `static/img` — see [icon-art.md](./icon-art.md) before creating or regenerating any.
@@ -14,7 +14,7 @@ All frontend code lives in `UI`:
 
 # General Frontend Guidelines
 
-- There is ongoing work both to reach feature parity with the old frontend and to redesign the UI/UX; not all new UI/UX decisions are final.
+- The UI/UX is being redesigned incrementally; not all UI/UX decisions are final.
 - Keep components small. If a component grows large or you find yourself commenting each section, break it into subcomponents (in their own folder if there are several), even if only the parent uses them.
 - Use [statify](../UI/src/lib/common/statify.svelte.ts) to make a logic class reactive in Svelte — it keeps complex state/logic (e.g. battle simulation) in object-oriented classes while staying reactive, rather than pushing it into stores or components.
 
