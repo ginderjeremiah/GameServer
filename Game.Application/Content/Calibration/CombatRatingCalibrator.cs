@@ -1,6 +1,9 @@
 using Game.Core;
 using Game.Core.Battle;
 using Game.Core.Enemies;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Game.Application.Content.Calibration
 {
@@ -227,7 +230,7 @@ namespace Game.Application.Content.Calibration
             {
                 for (var i = 0; i < seedsPerMatchup; i++)
                 {
-                    var seed = unchecked((uint)HashCode.Combine(zone.ZoneId, level, build.Name, spawn.EnemyId, i));
+                    var seed = MatchupSeed(zone.ZoneId, level, build.Name, spawn.EnemyId, i);
                     var result = new BattleSimulator(build.BuildBattler(level), spawn.Resolve(level).ToBattler(), seed).Simulate();
 
                     weightedWins += spawn.Weight * (result.Victory ? 1 : 0);
@@ -237,6 +240,15 @@ namespace Game.Application.Content.Calibration
             }
 
             return weightUnits > 0 ? (weightedWins / weightUnits, weightedMs / weightUnits / 1000.0) : (0.0, 0.0);
+        }
+
+        // A seed that's stable across processes, unlike HashCode.Combine (which reseeds itself, and hashes
+        // strings, randomly per process) — required for the report to actually be reproducible run-to-run.
+        internal static uint MatchupSeed(int zoneId, int level, string buildName, int enemyId, int drawIndex)
+        {
+            var key = $"{zoneId}|{level}|{buildName}|{enemyId}|{drawIndex}";
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(key));
+            return BinaryPrimitives.ReadUInt32LittleEndian(hash);
         }
 
         // Evenly-spaced, deduplicated levels across [min, max] — samples ≤ 1 or a single-level range collapse
