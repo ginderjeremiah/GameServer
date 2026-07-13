@@ -135,7 +135,7 @@ namespace Game.Core.Tests.Battle
             Assert.True(CombatRating.Rate(strong, isPlayer: true) > CombatRating.Rate(weak, isPlayer: true));
         }
 
-        // ── Rate: enemy asymmetry (crit/dodge/parry/riposte gated off) ──────
+        // ── Rate: enemy asymmetry (crit/dodge/parry/riposte/execute gated off) ──
 
         [Fact]
         public void Rate_EnemyWithAuthoredCriticalChance_IsUnaffectedByCrit()
@@ -153,6 +153,26 @@ namespace Game.Core.Tests.Battle
         {
             var asPlayer = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 50, criticalChance: 1.0)]);
             var asEnemy = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 50, criticalChance: 1.0)]);
+
+            Assert.True(CombatRating.Rate(asPlayer, isPlayer: true) > CombatRating.Rate(asEnemy, isPlayer: false));
+        }
+
+        [Fact]
+        public void Rate_EnemyWithAuthoredExecuteBonus_IsUnaffectedByExecute()
+        {
+            var withExecute = MakeBattlerWithSkills([(ExecuteBonus, 1.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+            var withoutExecute = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+
+            Assert.Equal(
+                CombatRating.Rate(withoutExecute, isPlayer: false),
+                CombatRating.Rate(withExecute, isPlayer: false), 6);
+        }
+
+        [Fact]
+        public void Rate_PlayerWithAuthoredExecuteBonus_RatesHigherThanEnemyEquivalent()
+        {
+            var asPlayer = MakeBattlerWithSkills([(ExecuteBonus, 1.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+            var asEnemy = MakeBattlerWithSkills([(ExecuteBonus, 1.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
 
             Assert.True(CombatRating.Rate(asPlayer, isPlayer: true) > CombatRating.Rate(asEnemy, isPlayer: false));
         }
