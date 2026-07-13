@@ -129,14 +129,19 @@ export async function createAccountAndStartGame(page: Page, prefix = 'e') {
 /**
  * A fresh account's first visit to the (default) Fight screen auto-plays the screen-anchored
  * `idle-loop-basics` tutorial tour (a full-screen coach-mark overlay), which would otherwise swallow
- * the very next click every journey makes. Dismiss it via its Skip control if it appeared, so tests
- * interact with the screen underneath rather than asserting anything about tutorial content — that's
- * covered by tutorial.test.ts.
+ * the very next click every journey makes. Dismiss it via Escape if it appeared, so tests interact
+ * with the screen underneath rather than asserting anything about tutorial content — that's covered
+ * by tutorial.test.ts (which exercises the Skip control itself).
  *
  * The tour opens from the welcome-back gate's async `entered` transition, not synchronously with the
  * `/game` navigation, so this waits for it rather than taking an immediate (and racy) snapshot —
  * mirroring how {@link selectFirstCharacter} waits out the similarly-async session-takeover modal.
  * Swallows the timeout if no tour appears (e.g. the lesson is retired later), rather than failing.
+ *
+ * Dismisses via Escape rather than clicking the Skip control: Escape routes through `focusTrap`'s
+ * `window`-level keydown listener (`onEscape`), so it needs no element-visibility/stability check —
+ * unlike a click, which on WebKit can time out waiting for the callout to pass its stability check
+ * while it's still repositioning (#1930).
  */
 export async function dismissTutorialTourIfPresent(page: Page) {
 	const tour = page.getByTestId('tutorial-tour');
@@ -145,7 +150,7 @@ export async function dismissTutorialTourIfPresent(page: Page) {
 	} catch {
 		return;
 	}
-	await page.getByTestId('tutorial-tour-skip').click();
+	await page.keyboard.press('Escape');
 	await expect(tour).not.toBeVisible();
 }
 
