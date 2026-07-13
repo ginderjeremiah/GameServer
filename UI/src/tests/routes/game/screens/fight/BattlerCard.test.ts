@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { EAttribute, type IAttribute } from '$lib/api';
-import { getTutorialAnchor } from '$components';
+import { getTutorialAnchor, TOUR_ANCHOR_KEYS } from '$components';
 
 // The card renders a Skills -> SkillTooltip subtree, which imports the battle engine and the
 // reference-data store at module load; both are mocked even though no hover happens here. The player
@@ -172,5 +172,22 @@ describe('BattlerCard', () => {
 
 		const enemy = render(BattlerCard, { props: { battler: makeBattler({ name: 'Dire Wolf' }), side: 'enemy' } });
 		expect(getTutorialAnchor('fight-hp-bar-enemy')).toBe(enemy.getByTestId('enemy-card').querySelector('.hp-bar-slot'));
+	});
+
+	// Frontend half of #1592/#1788: the screen-defs suite already checks lesson content ⊆ TOUR_ANCHOR_KEYS
+	// (every authored anchorKey resolves to a registered key). This closes the other direction — every
+	// registered key actually resolves to a live `use:tutorialAnchor` site — so a renamed/removed anchor
+	// can't silently drift from the registry. BattlerCard composes both CombatFloaters and Skills, so
+	// mounting one card per side registers all six keys.
+	it('resolves every TOUR_ANCHOR_KEYS entry to a live registration once both cards are mounted', () => {
+		const player = render(BattlerCard, { props: { battler: makeBattler(), side: 'player' } });
+		const enemy = render(BattlerCard, { props: { battler: makeBattler({ name: 'Dire Wolf' }), side: 'enemy' } });
+
+		for (const key of TOUR_ANCHOR_KEYS) {
+			expect(getTutorialAnchor(key)).toBeInstanceOf(HTMLElement);
+		}
+
+		player.unmount();
+		enemy.unmount();
 	});
 });
