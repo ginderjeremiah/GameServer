@@ -75,6 +75,14 @@ The login-tracking IP (an audit surface) is read from `HttpContext.Connection.Re
 - A real deployment behind a load balancer / ingress must set the relevant proxy IPs or CIDRs so the player's true client IP is recorded.
 - **`ForwardLimit`** sets the trust-chain depth — how many `X-Forwarded-For` entries are walked back. It defaults to **1** (a single proxy), so single-proxy deployments need not set it. A legitimate multi-hop chain (e.g. CDN → ingress) must raise it to the chain length **and** trust every hop, or only the last entry is consumed and the recorded IP is the nearest proxy rather than the real client. `null` disables the limit (walk every entry) — only safe when every hop is on the allowlist. Validated on start (`null` or ≥ 1) so a misconfigured zero/negative fails fast.
 
+## Production deployment topology (Railway)
+
+The root **`Dockerfile`** (nginx-only, templating `nginx.conf`) is the **edge proxy image** — a separate deploy artifact from the API image (`Game.Api/Dockerfile`). It fronts two Railway services reached over Railway's private network (`*.railway.internal`, via Railway's IPv6 resolver): requests to `/api` and `/socket` route to the .NET API service, everything else routes to the SvelteKit SSR service.
+
+Because every request reaches the API through this nginx hop, `HttpContext.Connection.RemoteIpAddress` (the [login-tracking IP](#trusted-reverse-proxies-x-forwarded-for) and the auth rate-limiter's partition key) resolves to the **nginx sidecar's** address, not the player's, unless the deployment configures `ForwardedHeaders:KnownProxies`/`KnownNetworks` above to trust that hop. Left unconfigured, every player collapses into one shared per-IP auth rate-limit partition — exhausted under ordinary traffic, surfacing as login failures — and login-tracking records the proxy's IP instead of the real client's. Nothing fails loudly when this is missed: the app boots and plays normally, only the abuse/audit signal is silently wrong.
+
+A production deploy behind this edge nginx therefore needs, beyond the CORS/JWT/connection-string settings already covered here: the public-facing CORS origin(s), and `ForwardedHeaders:KnownProxies`/`KnownNetworks` covering the edge nginx's address.
+
 ## Battle-simulation performance tests
 
 The backend re-simulates **every** battle after the client reports it (the anti-cheat replay — see [game-design.md](./game-design.md#battle-mechanics)), so the battle hot path must stay cheap as new mechanics are added. `Game.Core.Tests/Battle/Performance` guards that with tests that measure **relatively** rather than against absolute wall-clock times, because raw machine speed varies wildly between a dev box and a CI runner (#283).
