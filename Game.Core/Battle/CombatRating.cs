@@ -13,7 +13,7 @@ namespace Game.Core.Battle
     /// </summary>
     public enum ECombatRatingClassification
     {
-        /// <summary>Feeds <see cref="CombatRating"/>'s offense rate (amplification, ExecuteBonus, …).</summary>
+        /// <summary>Feeds <see cref="CombatRating"/>'s offense rate (amplification, DamageReflection, …).</summary>
         Offense,
 
         /// <summary>Feeds <see cref="CombatRating"/>'s survivability (MaxHealth, resistances, Toughness, regen, …).</summary>
@@ -25,7 +25,7 @@ namespace Game.Core.Battle
         /// <summary>Deliberately unpriced — inert by design (obsolete) or read structurally rather than as a scalar term.</summary>
         NeutralByDesign,
 
-        /// <summary>Priced only for a player battler; skipped entirely for an enemy (crit/dodge/parry).</summary>
+        /// <summary>Priced only for a player battler; skipped entirely for an enemy (crit/dodge/parry/execute).</summary>
         AsymmetryGated,
     }
 
@@ -139,7 +139,7 @@ namespace Game.Core.Battle
                 DaggerAmplification => ECombatRatingClassification.Offense,
                 UnarmedAmplification => ECombatRatingClassification.Offense,
                 DamageReflection => ECombatRatingClassification.Offense,
-                ExecuteBonus => ECombatRatingClassification.Offense,
+                ExecuteBonus => ECombatRatingClassification.AsymmetryGated,
                 ParryChance => ECombatRatingClassification.AsymmetryGated,
                 ParryChanceMultiplier => ECombatRatingClassification.AsymmetryGated,
                 DodgeChanceMultiplier => ECombatRatingClassification.AsymmetryGated,
@@ -239,7 +239,12 @@ namespace Game.Core.Battle
                 ? 1.0 + skill.CriticalChance * effectiveCaster.GetAttributeValue(CriticalChanceMultiplier)
                       * (effectiveCaster.GetAttributeValue(CriticalDamage) - 1.0)
                 : 1.0;
-            var executeExpectation = 1.0 + effectiveCaster.GetAttributeValue(ExecuteBonus) * 0.5;
+            // Enemies never execute in this engine either — ResolvePlayerHit (BattleContext.DamageTarget) is the
+            // only pipeline that applies the Cull execute multiplier, so an authored enemy ExecuteBonus is never
+            // priced as a capability that cannot fire (the same asymmetry as critExpectation above).
+            var executeExpectation = isPlayer
+                ? 1.0 + effectiveCaster.GetAttributeValue(ExecuteBonus) * 0.5
+                : 1.0;
 
             return afterMitigation * critExpectation * executeExpectation;
         }
