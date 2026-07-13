@@ -172,6 +172,39 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task PeekProcessingAsync_ReturnsHeadItemsOldestFirst_WithoutRemovingThem()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddRangeToQueueAsync(["a", "b", "c"]);
+            Assert.Equal("a", await queue.ReserveNextAsync());
+            Assert.Equal("b", await queue.ReserveNextAsync());
+
+            // A non-destructive read returns the processing list's oldest (least-recently-reserved) item
+            // first and leaves it in place.
+            Assert.Equal(["a"], await queue.PeekProcessingAsync(1));
+            Assert.Equal(["a", "b"], await queue.PeekProcessingAsync(10));
+            Assert.Equal(2, await queue.GetProcessingCountAsync());
+        }
+
+        [Fact]
+        public async Task PeekProcessingAsync_NonPositiveCount_ReturnsEmptyWithoutTouchingTheQueue()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddToQueueAsync("a");
+            Assert.Equal("a", await queue.ReserveNextAsync());
+
+            Assert.Empty(await queue.PeekProcessingAsync(0));
+            Assert.Empty(await queue.PeekProcessingAsync(-5));
+            Assert.Equal(1, await queue.GetProcessingCountAsync());
+        }
+
+        [Fact]
         public async Task ReadReserveReclaimOps_WhenTokenAlreadyCancelled_ThrowOperationCanceled()
         {
             using var scope = CreateScope();
@@ -189,6 +222,7 @@ namespace Game.Application.Tests.DataAccess
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.GetLengthAsync(AlreadyCancelled()));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.GetProcessingCountAsync(AlreadyCancelled()));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.PeekAsync(1, AlreadyCancelled()));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.PeekProcessingAsync(1, AlreadyCancelled()));
 
             // None of the throwing ops consumed the seeded item — a cancelled budget leaves the queue untouched.
             Assert.Equal("seed", await queue.GetNextAsync());

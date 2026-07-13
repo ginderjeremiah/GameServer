@@ -950,6 +950,52 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_DifferentItemReplacesProcessingHeadWithinGracePeriod_RestartsClockInsteadOfReclaiming()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+
+            // Model a busy multi-instance deployment: the processing list is continuously non-empty, but the
+            // specific item at its head keeps changing as other instances reserve and finish their own work —
+            // the shape #1746 exists to fix (a clock keyed only on "list is non-empty" never resets here).
+            var queue = new InMemoryPubSubQueue();
+            await queue.AddToQueueAsync("stranded-a");
+            Assert.NotNull(await queue.ReserveNextAsync());
+
+            // First pass only starts the clock against "stranded-a".
+            await synchronizer.ProcessQueue(queue);
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+
+            // "stranded-a" gets acknowledged (by this instance or another) and a different item takes its
+            // place at the head, all before the original clock's grace period would have elapsed.
+            await queue.AcknowledgeAsync("stranded-a");
+            await queue.AddToQueueAsync("stranded-b");
+            Assert.NotNull(await queue.ReserveNextAsync());
+
+            timeProvider.Advance(TimeSpan.FromSeconds(31));
+
+            // A clock keyed only on list occupancy would reclaim here, since the list has been non-empty for
+            // over the grace period — but "stranded-b" has only just arrived at the head, so tracking must
+            // restart against it rather than reclaiming a fresh item.
+            await synchronizer.ProcessQueue(queue);
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+            Assert.Equal(1, await queue.GetProcessingCountAsync());
+
+            // Only once "stranded-b" has itself dwelled at the head past the grace period does it reclaim.
+            timeProvider.Advance(TimeSpan.FromSeconds(31));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("stranded"));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Equal(0, await queue.GetProcessingCountAsync());
+        }
+
+        [Fact]
         public async Task ProcessQueue_ProcessingListStrandedPastGracePeriod_ReclaimsAndAppliesTheEvent()
         {
             using var scope = CreateScope();
@@ -1575,6 +1621,20 @@ namespace Game.Application.Tests.DataAccess
                 }
             }
 
+            public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    // _processing is ordered oldest-first (reserve appends via AddLast, reclaim pops from
+                    // Last), matching Redis's LMOVE-based processing list — the same orientation PeekAsync
+                    // reads for the main queue.
+                    IReadOnlyList<string> head = count <= 0
+                        ? []
+                        : _processing.Where(item => item is not null).Take((int)count).Cast<string>().ToList();
+                    return Task.FromResult(head);
+                }
+            }
+
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default)
             {
                 lock (_gate)
@@ -1703,6 +1763,16 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    IReadOnlyList<string> head = count <= 0
+                        ? []
+                        : _processing.Where(item => item is not null).Take((int)count).Cast<string>().ToList();
+                    return Task.FromResult(head);
+                }
+            }
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -1798,6 +1868,16 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    IReadOnlyList<string> head = count <= 0
+                        ? []
+                        : _processing.Where(item => item is not null).Take((int)count).Cast<string>().ToList();
+                    return Task.FromResult(head);
+                }
+            }
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -1935,6 +2015,8 @@ namespace Game.Application.Tests.DataAccess
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default) =>
+                Task.FromResult<IReadOnlyList<string>>(count <= 0 ? [] : _processing.Take((int)count).ToList());
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -1966,6 +2048,7 @@ namespace Game.Application.Tests.DataAccess
             public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => inner.GetProcessingCountAsync(cancellationToken);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => inner.GetNextAsync(cancellationToken);
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => inner.PeekAsync(count, cancellationToken);
+            public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default) => inner.PeekProcessingAsync(count, cancellationToken);
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => inner.RemoveAsync(value, cancellationToken);
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => inner.AddToQueueAsync(value, cancellationToken);
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => inner.AddRangeToQueueAsync(values, cancellationToken);
@@ -2059,6 +2142,14 @@ namespace Game.Application.Tests.DataAccess
             }
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    IReadOnlyList<string> head = count <= 0 ? [] : _processing.Take((int)count).ToList();
+                    return Task.FromResult(head);
+                }
+            }
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -2090,6 +2181,7 @@ namespace Game.Application.Tests.DataAccess
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
