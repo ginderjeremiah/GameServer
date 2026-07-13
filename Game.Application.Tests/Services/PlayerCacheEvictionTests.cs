@@ -134,23 +134,11 @@ namespace Game.Application.Tests.Services
         // Polls the key's TTL until it satisfies the predicate (defaults to "any TTL is set"), tolerating the
         // fire-and-forget write not having landed yet. KeyTimeToLiveAsync returns null both for a missing key
         // and a key with no expiry, so a non-null result proves an expiry is attached.
-        private async Task<TimeSpan?> WaitForTtlAsync(IDatabase db, string key, Func<TimeSpan, bool>? predicate = null)
+        private static Task<TimeSpan?> WaitForTtlAsync(IDatabase db, string key, Func<TimeSpan, bool>? predicate = null)
         {
             predicate ??= _ => true;
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            TimeSpan? ttl = null;
-            while (DateTime.UtcNow < deadline)
-            {
-                ttl = await db.KeyTimeToLiveAsync(key);
-                if (ttl is not null && predicate(ttl.Value))
-                {
-                    return ttl;
-                }
-
-                await Task.Delay(25, CancellationToken);
-            }
-
-            return ttl;
+            return PollingHelper.PollUntilAsync(
+                () => db.KeyTimeToLiveAsync(key), ttl => ttl is not null && predicate(ttl.Value));
         }
     }
 }

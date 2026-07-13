@@ -96,18 +96,9 @@ namespace Game.Application.Tests.DataAccess
 
         private static async Task AssertKeyEventuallyDeletedAsync(ICacheService cache, string key)
         {
-            var deadline = DateTime.UtcNow.AddSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                if (await cache.Get(key) is null)
-                {
-                    return;
-                }
+            var value = await PollingHelper.PollUntilAsync(() => cache.Get(key), v => v is null);
 
-                await Task.Delay(25);
-            }
-
-            Assert.Fail($"Expected the fire-and-forget null write to delete key '{key}' within the timeout.");
+            Assert.True(value is null, $"Expected the fire-and-forget null write to delete key '{key}' within the timeout.");
         }
 
         [Fact]

@@ -187,18 +187,10 @@ namespace Game.Api.Tests.Integration
 
         private async Task WaitForSentMessageAsync(FakeWebSocket socket, Func<string, bool> predicate)
         {
-            var deadline = DateTime.UtcNow + WaitTimeout;
-            while (DateTime.UtcNow < deadline)
-            {
-                if (socket.SentMessages.Any(predicate))
-                {
-                    return;
-                }
+            var found = await PollingHelper.PollUntilAsync(
+                () => Task.FromResult(socket.SentMessages.Any(predicate)), sent => sent, (int)WaitTimeout.TotalMilliseconds);
 
-                await Task.Delay(20, CancellationToken);
-            }
-
-            Assert.Fail("Timed out waiting for the expected message to be sent.");
+            Assert.True(found, "Timed out waiting for the expected message to be sent.");
         }
 
         /// <summary>
