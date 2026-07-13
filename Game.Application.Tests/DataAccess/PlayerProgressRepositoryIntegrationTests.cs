@@ -191,10 +191,10 @@ namespace Game.Application.Tests.DataAccess
             var batch = scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>();
 
             // A repository built with a pubsub that throws for a reason other than cancellation stands in for a
-            // transient Redis blip on a *standalone* progress save's flush (e.g. the offline-rewards batch,
-            // outside any player save) — Save must wrap it the same way SavePlayer does, so the socket layer can
-            // force the connection's in-memory Player to reload afterward rather than letting the caller's
-            // already-applied mutations ride along un-persisted (#1819).
+            // transient Redis blip on a *standalone* progress save's flush (no player-save batch scope open) —
+            // Save must wrap it the same way SavePlayer does, so the socket layer can force the connection's
+            // in-memory Player to reload afterward rather than letting the caller's already-applied mutations
+            // ride along un-persisted (#1819).
             var throwingRepo = new PlayerProgressRepository(context, challenges, cache, new ThrowingPubSubService(), batch);
 
             var progress = await throwingRepo.Load(MakeDomainPlayer(playerId));
@@ -210,14 +210,6 @@ namespace Game.Application.Tests.DataAccess
             var readRepo = readScope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var stats = await readRepo.GetStatistics(playerId);
             Assert.DoesNotContain(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
-        }
-
-        // Stands in for a transient Redis blip on a standalone progress save's own flush, mirroring
-        // PlayerWriteBehindTests' ThrowingPubSubService for the player-save path.
-        private sealed class ThrowingPubSubService : NotSupportedPubSubService
-        {
-            public override Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) =>
-                throw new InvalidOperationException("Simulated transient publish failure.");
         }
 
         [Fact]

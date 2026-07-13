@@ -506,6 +506,14 @@ namespace Game.Api.Tests.Unit
             }
 
             public Task SavePlayer(Player player, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+            public IDisposable BeginBatch() => NoOpScope.Instance;
+
+            private sealed class NoOpScope : IDisposable
+            {
+                public static readonly NoOpScope Instance = new();
+                public void Dispose() { }
+            }
         }
     }
 }
