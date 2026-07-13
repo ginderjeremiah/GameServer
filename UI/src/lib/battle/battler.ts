@@ -111,6 +111,19 @@ export class Battler {
 	 *  intact (a reactive array would deep-proxy its elements). */
 	#effectModifiers = new Map<string, AttributeModifier>();
 
+	/** This battler's elapsed simulated time in ms, advanced one tick at a time by
+	 *  {@link Battler.advanceEffects}. Mirrors the backend `Battler._elapsedMs`. Active effects store an
+	 *  absolute expiry against this clock in {@link Battler.effectExpiry}, so expiry is a comparison rather
+	 *  than a per-tick countdown. */
+	#elapsedMs = 0;
+
+	/** Each active attribute's shared absolute expiry (`elapsedMs` at which its stack lapses), keyed by
+	 *  attribute — mirrors the backend `AttributeEffectStack.ExpiresAtMs`. Both modifier types on the same
+	 *  attribute share one entry, matching {@link Battler.applyEffect}'s shared-expiry reset. Kept off the
+	 *  reactive {@link Battler.activeEffects} views (a private field, like {@link Battler.effectModifiers})
+	 *  since it is bookkeeping, not display data; `remainingMs` is derived from it for the views that need it. */
+	#effectExpiry = new Map<EAttribute, number>();
+
 	/** Live read of the CooldownRecovery-derived multiplier (mirrors the backend), so a
 	 *  mid-battle CDR change takes effect on the next tick rather than being frozen at reset. */
 	public get cdMultiplier(): number {
@@ -289,7 +302,6 @@ export class Battler {
 		if (view) {
 			view.totalAmount = combinedAmount;
 			view.count++;
-			view.durationMs = effect.durationMs;
 			foldSourceContribution(view.sources, effect.id, amount, isMultiplicative);
 		} else {
 			view = {
@@ -305,12 +317,13 @@ export class Battler {
 			this.activeEffects.push(view);
 		}
 
-		// Re-applying any effect on this attribute resets the whole stack's shared remaining to the new
-		// application's duration (it may extend a longer-lived application or cut a shorter one short). The
-		// backend mirror keys this off an absolute ExpiresAtMs clock; under the fixed tick size the two expire
-		// on the same tick (see advanceEffects).
+		// Re-applying any effect on this attribute resets the whole stack's shared expiry to the new
+		// application's duration (it may extend a longer-lived application or cut a shorter one short) —
+		// mirrors the backend `Battler.applyEffect`'s `stack.ExpiresAtMs = _elapsedMs + effect.DurationMs`.
+		this.#effectExpiry.set(effect.attributeId, this.#elapsedMs + effect.durationMs);
 		for (const v of this.activeEffects) {
 			if (v.attribute === effect.attributeId) {
+				v.durationMs = effect.durationMs;
 				v.remainingMs = effect.durationMs;
 				v.renderRemainingMs = effect.durationMs;
 			}
@@ -319,17 +332,19 @@ export class Battler {
 		this.clampHealthToMaxHealth();
 	}
 
-	/** Advances every active effect by `timeDelta`, removing any whose duration has elapsed (its modifier
-	 *  is removed and the totals recomputed). Called at the start of each tick before any skill fires, so
-	 *  an effect influences exactly `durationMs / tickSize` ticks counting the one it was applied on.
-	 *
-	 *  Parity note: this decrements `remainingMs` per tick where the backend (`Battler.AdvanceEffects`)
-	 *  instead keys expiry to an absolute `_elapsedMs` clock. The two are **value-equal only under the
-	 *  current fixed tick size** — they are not algebraically identical under any future variable-tick or
-	 *  fractional-accumulation change, so they must stay in lockstep (or the FE be converted to the
-	 *  backend's absolute-expiry model). The mirrored parity matrix covers the apply→expire→re-apply
-	 *  cycle where the two bookkeeping models are most likely to drift by a tick. */
+	/** Advances this battler's simulated-time clock by `timeDelta` and removes any active effect whose
+	 *  shared expiry (in {@link Battler.effectExpiry}) has been reached — its modifier removed and the
+	 *  totals recomputed — keying expiry to the absolute {@link Battler.elapsedMs} clock rather than a
+	 *  per-tick countdown. Mirrors the backend `Battler.AdvanceEffects`, so the two are algebraically
+	 *  identical rather than merely value-equal under a fixed tick size. Called at the start of each tick
+	 *  before any skill fires, so an effect influences exactly `durationMs / tickSize` ticks counting the
+	 *  one it was applied on. */
 	public advanceEffects(timeDelta: number) {
+		// Advance the clock every tick, even with no active effects, so an effect applied on a later tick
+		// still computes its absolute expiry from the correct elapsed time — mirrors the backend's
+		// unconditional `_elapsedMs += ms` ahead of its early-return check.
+		this.#elapsedMs += timeDelta;
+
 		if (this.activeEffects.length === 0) {
 			return;
 		}
@@ -337,16 +352,21 @@ export class Battler {
 		let removedAny = false;
 		for (let i = this.activeEffects.length - 1; i >= 0; i--) {
 			const view = this.activeEffects[i];
-			view.remainingMs -= timeDelta;
-			if (view.remainingMs <= 0) {
+			// Every active view's attribute has a stored expiry (set by applyEffect); the elapsedMs fallback
+			// is defensive only, and treats a missing entry as already-expired rather than stuck forever.
+			const expiresAtMs = this.#effectExpiry.get(view.attribute) ?? this.#elapsedMs;
+			if (expiresAtMs <= this.#elapsedMs) {
 				const key = effectModifierKey(view.attribute, view.modifierType);
 				const modifier = this.#effectModifiers.get(key);
 				if (modifier) {
 					this.attributes.removeModifier(modifier);
 					this.#effectModifiers.delete(key);
 				}
+				this.#effectExpiry.delete(view.attribute);
 				this.activeEffects.splice(i, 1);
 				removedAny = true;
+			} else {
+				view.remainingMs = expiresAtMs - this.#elapsedMs;
 			}
 		}
 
@@ -378,6 +398,10 @@ export class Battler {
 			this.attributes.removeModifier(modifier);
 		}
 		this.#effectModifiers.clear();
+		this.#effectExpiry.clear();
+		// The backend constructs a fresh Battler (and so a fresh _elapsedMs) per battle; this instance is
+		// reused across battles (#811), so its clock must be rewound explicitly here instead.
+		this.#elapsedMs = 0;
 		this.activeEffects = [];
 		if (battlerData) {
 			const atts = additionalAtttributes

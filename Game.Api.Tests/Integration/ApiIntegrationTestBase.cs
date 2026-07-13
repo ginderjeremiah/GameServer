@@ -57,13 +57,13 @@ namespace Game.Api.Tests.Integration
         /// set to <paramref name="playerId"/>) for the given user ID and any granted roles, with a player
         /// session pre-created in the cache.
         /// </summary>
-        protected HttpClient CreateAuthenticatedClient(int userId, int playerId, params string[] roles)
+        protected async Task<HttpClient> CreateAuthenticatedClient(int userId, int playerId, params string[] roles)
         {
             var client = Factory.CreateClient();
             TestAuthHelper.AddAuthHeader(client, userId, playerId, roles);
             using var scope = Factory.Services.CreateScope();
             var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
-            sessionService.CreateSession(userId, playerId);
+            await sessionService.CreateSession(userId, playerId);
             return client;
         }
 

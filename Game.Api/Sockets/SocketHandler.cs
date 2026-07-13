@@ -43,10 +43,13 @@ namespace Game.Api.Sockets
         private readonly TimeSpan _commandTimeout;
 
         /// <summary>How long a socket may go without inbound traffic before the watchdog closes it.</summary>
-        private static readonly TimeSpan InactivityTimeout = TimeSpan.FromSeconds(60);
+        private static readonly TimeSpan DefaultInactivityTimeout = TimeSpan.FromSeconds(60);
 
         /// <summary>How often the inactivity watchdog re-checks the last-activity timestamp.</summary>
-        private static readonly TimeSpan InactivityPollInterval = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan DefaultInactivityPollInterval = TimeSpan.FromSeconds(10);
+
+        private readonly TimeSpan _inactivityTimeout;
+        private readonly TimeSpan _inactivityPollInterval;
 
         // Written by the read loop and read by the inactivity loop on separate threads, so it is accessed via
         // Interlocked to give the cross-thread happens-before edge a plain DateTime field would lack — a
@@ -64,7 +67,8 @@ namespace Game.Api.Sockets
         /// <summary>Completes once both the read and inactivity loops have wound down.</summary>
         public Task Completion => _loops;
 
-        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Action onActivity, TimeSpan? commandTimeout = null)
+        public SocketHandler(SocketContext context, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILogger<SocketHandler> logger, Action onActivity,
+            TimeSpan? commandTimeout = null, TimeSpan? inactivityTimeout = null, TimeSpan? inactivityPollInterval = null)
         {
             _context = context;
             _commandFactory = commandFactory;
@@ -72,6 +76,8 @@ namespace Game.Api.Sockets
             _logger = logger;
             _onActivity = onActivity;
             _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
+            _inactivityTimeout = inactivityTimeout ?? DefaultInactivityTimeout;
+            _inactivityPollInterval = inactivityPollInterval ?? DefaultInactivityPollInterval;
         }
 
         /// <summary>
@@ -94,20 +100,14 @@ namespace Game.Api.Sockets
         /// <summary>
         /// Gracefully closes the socket for a host shutdown: sends a <see cref="ESocketCloseReason.ServerShuttingDown"/>
         /// close frame so the client reconnects to a healthy instance rather than hanging on a half-open
-        /// socket, then waits for the loops to wind down. <paramref name="drainDeadline"/> bounds the close
-        /// frame's own send; the loops are awaited unconditionally since they never fault on cancellation.
+        /// socket, then waits for the loops to wind down. <paramref name="drainDeadline"/> bounds the close;
+        /// past that (or past <see cref="SocketContext"/>'s own internal close-abort bound), <see cref="SocketContext.Close"/>
+        /// aborts the connection outright rather than throwing, so this never needs to catch a cancellation —
+        /// the loops are then awaited unconditionally since they never fault on cancellation (#1726).
         /// </summary>
         public async Task ShutdownAsync(CancellationToken drainDeadline)
         {
-            try
-            {
-                await _context.Close(ESocketCloseReason.ServerShuttingDown, drainDeadline);
-            }
-            catch (OperationCanceledException)
-            {
-                // The drain window elapsed mid-close; the read loop is aborted via the same token below.
-            }
-
+            await _context.Close(ESocketCloseReason.ServerShuttingDown, drainDeadline);
             await Completion;
         }
 
@@ -231,8 +231,13 @@ namespace Game.Api.Sockets
                 // A cancellation that is NOT the per-command timeout (handled above with the
                 // cts.IsCancellationRequested guard) is a lifetime/teardown cancellation, not a command
                 // defect: log it as a teardown rather than surfacing a misleading "Internal Server Error",
-                // and send no response since the socket is unwinding (#671).
+                // and send no response since the socket is unwinding (#671). It may still have unwound the
+                // command mid-SavePlayer (a leaked dependency cancellation, not the command's own budget),
+                // leaving a mutation that never reached the write-behind queue — mark the in-memory Player
+                // for reload the same as a genuine flush failure; harmless even when nothing was mutated yet,
+                // since the reload just re-reads the last persisted state (#1849).
                 _logger.LogDebug(ex, "Socket command cancelled during teardown: {CommandInfo} on socket: {Id}", commandInfo, Id);
+                _context.Session.MarkPlayerNeedsReload();
                 return (SocketCommandOutcome.TornDown, ex);
             }
             catch (MalformedSocketCommandParametersException ex)
@@ -310,7 +315,17 @@ namespace Game.Api.Sockets
         {
             _ = commandTask.ContinueWith(task =>
             {
-                if (task.Exception is { } fault)
+                if (task.IsCanceled)
+                {
+                    // An unhandled OperationCanceledException marks the whole task Canceled rather than
+                    // Faulted (regardless of which token it carries), so a cancellation mid-SavePlayer
+                    // (dispatch or flush) never reaches the fault branch below — it settles here instead. The
+                    // in-memory Player may already hold a mutation that never reached the write-behind queue,
+                    // so mark it for reload the same as a genuine flush failure; harmless even when nothing
+                    // was actually mutated yet, since the reload just re-reads the last persisted state (#1849).
+                    _context.Session.MarkPlayerNeedsReload();
+                }
+                else if (task.Exception is { } fault)
                 {
                     // The abandoned flush faulted for a non-cancellation reason after the command's timeout
                     // already ran: the in-memory Player may hold mutations that never reached the write-behind
@@ -321,12 +336,10 @@ namespace Game.Api.Sockets
                         _context.Session.MarkPlayerNeedsReload();
                     }
 
-                    // The client already received a timeout response; a cooperative cancellation surfaces here as
-                    // the expected OperationCanceledException, while any other fault is genuine and worth logging.
-                    if (fault.InnerExceptions.Any(e => e is not OperationCanceledException))
-                    {
-                        _logger.LogError(fault, "Abandoned socket command faulted after its timeout response was sent: {CommandInfo} on socket: {Id}.", commandInfo, Id);
-                    }
+                    // The client already received a timeout response; a cancellation reaching here would have
+                    // settled the task as Canceled (handled above), so any fault reaching this branch is genuine
+                    // and worth logging.
+                    _logger.LogError(fault, "Abandoned socket command faulted after its timeout response was sent: {CommandInfo} on socket: {Id}.", commandInfo, Id);
                 }
 
                 cts.Dispose();
@@ -338,9 +351,9 @@ namespace Game.Api.Sockets
         {
             try
             {
-                while (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResponseTicks) < InactivityTimeout.Ticks && _context.State is Open)
+                while (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResponseTicks) < _inactivityTimeout.Ticks && _context.State is Open)
                 {
-                    await Task.Delay(InactivityPollInterval, hostStopping);
+                    await Task.Delay(_inactivityPollInterval, hostStopping);
                 }
             }
             catch (OperationCanceledException)
@@ -413,8 +426,8 @@ namespace Game.Api.Sockets
             // abandoning while still open (the terminal-fault break above), and settle WaitSocketClosed for
             // an abrupt disconnect (Aborted) so the middleware awaiting it always unblocks and tears down the
             // registration. Unconditional: Close() re-checks state itself and only sends a close frame when
-            // still Open, so this is a no-op send on an already-closed/aborted socket but always settles the
-            // TCS.
+            // Open or CloseReceived, so this is a no-op send on an already-closed/aborted socket but always
+            // settles the TCS.
             await _context.Close(ESocketCloseReason.Finished);
         }
 

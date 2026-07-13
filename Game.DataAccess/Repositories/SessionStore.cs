@@ -17,8 +17,8 @@ namespace Game.DataAccess.Repositories
         /// Written on every <see cref="Update"/> and slid on every <see cref="GetSession"/> hit, mirroring the
         /// player-aggregate eviction policy (#439) so an active session never ages out while a dormant one is
         /// reclaimed instead of occupying Redis forever (#537). The user→player binding is reconstructable
-        /// (a miss is rehydrated from the database by <c>SessionLoaderMiddleware</c>, so it is never a silent
-        /// logout — authentication derives from the token, not this cache), but the in-flight battle snapshot
+        /// (a miss is rehydrated in-memory by <c>SessionInitializer</c> from the token's selected-player claim,
+        /// so it is never a silent logout — authentication derives from the token, not this cache), but the in-flight battle snapshot
         /// it also carries is cache-only and lost on eviction. The budget is therefore the refresh-token
         /// lifetime as a genuine floor: an active player's in-flight battle should not be dropped while their
         /// refresh token is still valid (see docs/backend-persistence.md → Caching and Pub/Sub).
@@ -48,6 +48,11 @@ namespace Game.DataAccess.Repositories
         public void Update(PlayerState playerState, int userId)
         {
             _cache.SetAndForget(SessionKey(userId), playerState, SessionCacheTtl);
+        }
+
+        public async Task UpdateAsync(PlayerState playerState, int userId, CancellationToken cancellationToken = default)
+        {
+            await _cache.Set(SessionKey(userId), playerState, SessionCacheTtl, cancellationToken);
         }
 
         public void Clear(int userId)

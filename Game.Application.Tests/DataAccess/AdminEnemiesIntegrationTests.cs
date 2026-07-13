@@ -468,6 +468,37 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetSpawns_NegativeWeight_ReturnsFailure()
+        {
+            int enemyId, zoneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                var zone = await TestDataSeeder.CreateZoneAsync(context);
+                enemyId = enemy.Id;
+                zoneId = zone.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A negative weight would otherwise commit and then throw inside ProbabilityTable's constructor
+            // when the enemy snapshot next rebuilds — reject it up front instead.
+            var data = new SetEnemySpawnsData
+            {
+                EnemyId = enemyId,
+                Spawns = [new Contracts.EnemySpawn { ZoneId = zoneId, Weight = -1 }],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SetSpawns(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("A spawn's weight cannot be negative.", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveEnemies_RetiringLastActiveEnemyOfLiveZone_ReturnsFailure()
         {
             int enemyId;

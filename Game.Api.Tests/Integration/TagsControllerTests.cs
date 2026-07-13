@@ -102,7 +102,7 @@ namespace Game.Api.Tests.Integration
             }
 
             // Non-admin token: the endpoints are gated by AdminRoleAuthorizationFilter (#690).
-            using var client = CreateAuthenticatedClient(userId, playerId);
+            using var client = await CreateAuthenticatedClient(userId, playerId);
 
             var response = await client.GetAsync(url, CancellationToken);
 

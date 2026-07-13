@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
+using System.Text;
 using Xunit;
 
 namespace Game.Api.Tests.Integration
@@ -82,6 +83,29 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task DrainAsync_SendWedgedByStalledClient_AbortsInsteadOfHangingForever()
+        {
+            // Reproduces #1726: a client that stops reading mid-frame (a TCP zero-window) can wedge a
+            // SendAsync — which deliberately ignores its own cancellation once a frame has begun (see
+            // SocketContext.SendData) — while holding the per-socket send lock. Before the fix, the drain
+            // deadline cancelling Close's *wait* for that lock did not unblock the wedged send itself, so
+            // DrainAsync's post-timeout `await drain` hung forever. The fix (an Abort() fallback in
+            // SocketContext.Close) must let the drain complete within its bounded window regardless.
+            using var scope = CreateScope();
+            var (socket, handler) = CreateWedgedSendHandler(scope);
+            var registry = CreateRegistry(scope, TimeSpan.FromMilliseconds(300));
+
+            await registry.Register(handler);
+            socket.DeliverPing();
+            await socket.SendWedged.WaitAsync(WaitTimeout, CancellationToken);
+
+            await registry.DrainAsync().WaitAsync(WaitTimeout, CancellationToken);
+
+            Assert.True(socket.AbortCalled);
+            Assert.True(handler.Completion.IsCompleted);
+        }
+
+        [Fact]
         public async Task RegisterSocket_ThenDrain_ClosesSocketThroughTheRealServiceWiring()
         {
             // Drive the real RegisterSocket → registry path (Redis presence, pub/sub subscribe, the singleton
@@ -90,7 +114,7 @@ namespace Game.Api.Tests.Integration
             // surface this behaviour deterministically.
             using var scope = CreateScope();
             var session = scope.ServiceProvider.GetRequiredService<SessionService>();
-            session.CreateSession(userId: 4242, playerId: 4242);
+            await session.CreateSession(userId: 4242, playerId: 4242);
             var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
             var registry = Factory.Services.GetRequiredService<SocketConnectionRegistry>();
 
@@ -179,6 +203,91 @@ namespace Game.Api.Tests.Integration
             var lifetime = scope.ServiceProvider.GetRequiredService<IHostApplicationLifetime>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<SocketConnectionRegistry>>();
             return new SocketConnectionRegistry(lifetime, logger, drainTimeout);
+        }
+
+        private (WedgedSendWebSocket Socket, SocketHandler Handler) CreateWedgedSendHandler(IServiceScope scope)
+        {
+            var session = scope.ServiceProvider.GetRequiredService<SessionService>();
+            var contextLogger = scope.ServiceProvider.GetRequiredService<ILogger<SocketContext>>();
+            var handlerLogger = scope.ServiceProvider.GetRequiredService<ILogger<SocketHandler>>();
+            var commandFactory = scope.ServiceProvider.GetRequiredService<SocketCommandFactory>();
+            var scopeFactory = scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+
+            var socket = new WedgedSendWebSocket();
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, contextLogger);
+            var handler = new SocketHandler(context, commandFactory, scopeFactory, handlerLogger, () => { });
+            return (socket, handler);
+        }
+
+        /// <summary>
+        /// A <see cref="WebSocket"/> stand-in whose <see cref="SendAsync"/> never completes on its own —
+        /// mirroring a client stalled with a TCP zero-window mid-frame — and ignores its cancellation token,
+        /// exactly like the mid-frame chunk sends in <see cref="SocketContext.SendData"/> do. Only
+        /// <see cref="Abort"/> unblocks it. <see cref="DeliverPing"/> lets a test drive one inbound "ping",
+        /// whose "pong" reply is what wedges inside the send.
+        /// </summary>
+        private sealed class WedgedSendWebSocket : WebSocket
+        {
+            private readonly TaskCompletionSource<WebSocketReceiveResult> _pingReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource<WebSocketReceiveResult> _idleReceive = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource _sendGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource _sendWedged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private byte[] _pingBytes = [];
+            private int _receiveCount;
+            private WebSocketState _state = WebSocketState.Open;
+
+            /// <summary>Completes once a send has begun and is now wedged (parked on the never-released gate).</summary>
+            public Task SendWedged => _sendWedged.Task;
+            public bool AbortCalled { get; private set; }
+
+            public void DeliverPing()
+            {
+                _pingBytes = Encoding.UTF8.GetBytes("ping");
+                _pingReceived.TrySetResult(new WebSocketReceiveResult(_pingBytes.Length, WebSocketMessageType.Text, endOfMessage: true));
+            }
+
+            public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
+            {
+                if (Interlocked.Increment(ref _receiveCount) == 1)
+                {
+                    var result = await _pingReceived.Task;
+                    _pingBytes.CopyTo(buffer.Array.AsSpan(buffer.Offset));
+                    return result;
+                }
+
+                // Every receive after the first "ping" just idles — nothing else is ever sent — until the
+                // caller's token cancels or Abort() faults it.
+                using var registration = cancellationToken.Register(() => _idleReceive.TrySetCanceled(cancellationToken));
+                return await _idleReceive.Task;
+            }
+
+            public override async Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+            {
+                _sendWedged.TrySetResult();
+                await _sendGate.Task;
+            }
+
+            public override void Abort()
+            {
+                AbortCalled = true;
+                _state = WebSocketState.Aborted;
+                var abortException = new WebSocketException(WebSocketError.InvalidState, "Aborted");
+                _sendGate.TrySetException(abortException);
+                _idleReceive.TrySetException(abortException);
+            }
+
+            public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+            {
+                _state = WebSocketState.Closed;
+                return Task.CompletedTask;
+            }
+
+            public override WebSocketState State => _state;
+            public override WebSocketCloseStatus? CloseStatus => null;
+            public override string? CloseStatusDescription => null;
+            public override string? SubProtocol => null;
+            public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => Task.CompletedTask;
+            public override void Dispose() { }
         }
 
         /// <summary>

@@ -113,7 +113,12 @@ export class BackgroundThrottleMonitor {
 			return;
 		}
 		// Persist before showing so the one-time guarantee holds even if the toast is dismissed instantly.
-		storage?.setItem(NOTICE_SHOWN_KEY, '1');
+		try {
+			storage?.setItem(NOTICE_SHOWN_KEY, '1');
+		} catch {
+			// Quota exceeded or storage blocked — the notice still shows this session; a persistence
+			// failure here just means the one-time guarantee may not survive a reload.
+		}
 		toastWarning(backgroundThrottleGuidance(), { duration: 0 });
 	}
 }

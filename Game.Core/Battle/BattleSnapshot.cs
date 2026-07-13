@@ -47,11 +47,10 @@ namespace Game.Core.Battle
         /// <summary>
         /// The player's proficiency levels at battle start (one entry per proficiency the player has trained).
         /// Captured so the per-level/milestone attribute bonuses bake into the snapshot exactly like the stat
-        /// allocations — a level gained while idling takes effect on the next battle. Unlike the snapshot's
-        /// captured player <see cref="Level"/> (which the offline simulator grows mid-window, #1601), these
-        /// stay frozen at their window-start values for the whole away period (spike #982 decision 7;
-        /// un-freezing them too is the committed follow-up, #1602). Defaults to empty so a snapshot built
-        /// without proficiency state carries no proficiency bonus.
+        /// allocations — a level gained while idling takes effect on the next battle. Like the snapshot's
+        /// captured player <see cref="Level"/> (#1601), the offline simulator grows a working copy of these
+        /// mid-window (#1602); the snapshot's own list stays the frozen window-start capture. Defaults to
+        /// empty so a snapshot built without proficiency state carries no proficiency bonus.
         /// </summary>
         public List<ProficiencyLevelSnapshot> ProficiencyLevels { get; set; } = [];
 
@@ -116,20 +115,35 @@ namespace Game.Core.Battle
         /// </summary>
         public Battler ToBattler(
             Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill?> resolveSkill,
+            Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null) =>
+            GetBattlerMaterials(resolveItem, resolveMod, resolveSkill, resolveProficiency, resolveClass).Build();
+
+        /// <summary>
+        /// Composes this snapshot's battler assembly ingredients without the final, always-fresh
+        /// <see cref="AttributeCollection"/>/<see cref="Battler"/> construction — everything <see cref="ToBattler"/>
+        /// otherwise redoes on every call. A <see cref="Battler"/> is single-use (simulation mutates its health
+        /// and active effects), but the resolver/LINQ composition behind it is invariant for as long as this
+        /// snapshot's <see cref="StatAllocations"/>, <see cref="EquippedItems"/>, <see cref="SkillIds"/>,
+        /// <see cref="Level"/>, and <see cref="ProficiencyLevels"/> are — so a caller replaying many battles
+        /// against the same snapshot state (the offline simulator, #1730) can cache the returned
+        /// <see cref="BattlerMaterials"/> and call <see cref="BattlerMaterials.Build"/> per battle instead of
+        /// re-walking this composition every time.
+        /// </summary>
+        public BattlerMaterials GetBattlerMaterials(
+            Func<int, Item> resolveItem, Func<int, ItemMod> resolveMod, Func<int, Skill?> resolveSkill,
             Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
         {
-            var attributes = new AttributeCollection(GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass));
-            if (ResolveSignaturePassive(attributes, resolveClass) is { } passive)
-            {
-                attributes.AddModifier(passive);
-            }
+            var baseModifiers = GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass).ToList();
+            var signaturePassive = ResolveSignaturePassive(new AttributeCollection(baseModifiers), resolveClass);
+
             // The weapon-match gate reads each fielded id's type via the same resolver; an id that resolves to
             // no skill (a leftover/unauthored grant such as an unseeded punch) yields a null type and is dropped
             // by OrderSkillIds, so the following Select only ever sees ids that resolve (OfType filters the
             // never-null nullable away without a null-forgiving operator).
             var skills = GetBattleSkillIds(resolveItem, id => resolveSkill(id)?.PrimaryDamageType)
                 .Select(resolveSkill)
-                .OfType<Skill>();
+                .OfType<Skill>()
+                .ToList();
 
             // The parry counter skill (#1457): the equipped weapon's signature — the virtual fists' punch
             // bare-handed — resolved once at assembly like the weapon-match gate. An unresolvable id (an
@@ -138,7 +152,7 @@ namespace Game.Core.Battle
             var weapon = ResolveEquippedWeapon(resolveItem);
             var counterSkill = resolveSkill(weapon?.GrantedSkillId ?? GameConstants.PunchSkillId);
 
-            return new Battler(attributes, skills, Level, counterSkill);
+            return new BattlerMaterials(baseModifiers, signaturePassive, skills, counterSkill, Level);
         }
 
         /// <summary>
@@ -334,5 +348,29 @@ namespace Game.Core.Battle
         /// The IDs of item mods applied to this item at battle start.
         /// </summary>
         public required List<int> AppliedModIds { get; set; }
+    }
+
+    /// <summary>
+    /// The reusable ingredients of a <see cref="BattleSnapshot"/>'s battler assembly — its composed base
+    /// attribute modifiers, resolved signature passive, fielded skills, and counter skill — everything
+    /// <see cref="BattleSnapshot.ToBattler"/> composes except the final, always-fresh
+    /// <see cref="AttributeCollection"/>/<see cref="Battler"/> construction (<see cref="Build"/>). See
+    /// <see cref="BattleSnapshot.GetBattlerMaterials"/> for when it is safe to cache and reuse an instance.
+    /// </summary>
+    public sealed class BattlerMaterials(
+        IReadOnlyList<AttributeModifier> baseModifiers, AttributeModifier? signaturePassive,
+        IReadOnlyList<Skill> skills, Skill? counterSkill, int level)
+    {
+        /// <summary>Builds a fresh, single-use <see cref="Battler"/> from these materials.</summary>
+        public Battler Build()
+        {
+            var attributes = new AttributeCollection(baseModifiers);
+            if (signaturePassive is not null)
+            {
+                attributes.AddModifier(signaturePassive);
+            }
+
+            return new Battler(attributes, skills, level, counterSkill);
+        }
     }
 }

@@ -310,6 +310,23 @@ describe('Battler skill-effect bookkeeping', () => {
 		expect(battler.activeEffects[0].sources).toEqual([{ sourceId: 1, amount: 10, count: 2 }]);
 	});
 
+	it('adopts the new duration on a sibling view when a shared-expiry reset crosses modifier types', () => {
+		const battler = makeBattler();
+
+		battler.applyEffect(effect(1, EAttribute.Strength, EModifierType.Additive, 5, 5000));
+		battler.applyEffect(effect(2, EAttribute.Strength, EModifierType.Multiplicative, 2, 5000));
+		expect(battler.activeEffects).toHaveLength(2);
+
+		// Re-applying the multiplicative effect at a shorter duration resets the shared remaining for
+		// both views; the additive sibling's durationMs must move with it, not stay pinned at 5000, or
+		// its countdown ring renders against the wrong denominator.
+		battler.applyEffect(effect(2, EAttribute.Strength, EModifierType.Multiplicative, 2, 2000));
+
+		const additiveView = battler.activeEffects.find((v) => v.modifierType === EModifierType.Additive);
+		expect(additiveView?.durationMs).toBe(2000);
+		expect(additiveView?.remainingMs).toBe(2000);
+	});
+
 	it('folds different source effects on one attribute+type into one view with a per-source breakdown', () => {
 		const battler = makeBattler();
 

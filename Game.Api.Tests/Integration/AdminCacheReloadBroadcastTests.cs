@@ -34,7 +34,7 @@ namespace Game.Api.Tests.Integration
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var user = await TestDataSeeder.CreateUserAsync(context, "adminuser", "adminpass");
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            using var authClient = CreateAuthenticatedClient(user.Id, player.Id, nameof(ERole.Admin));
+            using var authClient = await CreateAuthenticatedClient(user.Id, player.Id, nameof(ERole.Admin));
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);

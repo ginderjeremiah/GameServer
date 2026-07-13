@@ -5,7 +5,13 @@
 		<div class="es">{sub}</div>
 	</div>
 	{#if onAdd && addLabel}
-		<button type="button" class="btn sm" onclick={onAdd}>
+		<button
+			type="button"
+			class="btn sm"
+			onclick={onAdd}
+			disabled={noFree}
+			title={noFree ? 'Every option is already assigned' : undefined}
+		>
 			<WorkbenchIcon kind="plus" size={12} />{addLabel}
 		</button>
 	{/if}
@@ -20,7 +26,8 @@ interface Props {
 	sub: string;
 	addLabel?: string;
 	onAdd?: () => void;
+	noFree?: boolean;
 }
 
-const { icon, title, sub, addLabel, onAdd }: Props = $props();
+const { icon, title, sub, addLabel, onAdd, noFree = false }: Props = $props();
 </script>

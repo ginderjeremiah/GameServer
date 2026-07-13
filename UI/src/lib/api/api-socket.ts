@@ -8,7 +8,7 @@ import {
 import { ApiSocketRequest } from './api-socket-request';
 import { createHook } from '../common/hooks';
 import { Action } from '../common/types';
-import { getAccessToken, getRefreshToken } from './token-store';
+import { getAccessToken, getRefreshToken, getTokens } from './token-store';
 import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
 
 /** WebSocket close code for a clean, intentional shutdown — never an auth failure. */
@@ -17,6 +17,12 @@ const NORMAL_CLOSURE = 1000;
 /** Keepalive / latency-probe cadence. Also doubles as a background reconnect for an idle session whose
  *  socket dropped, so it is deliberately torn down (not just left firing) once the session ends. */
 const PING_INTERVAL_MS = 10000;
+
+/** A `readyState` of OPEN doesn't mean the connection is alive — after a laptop sleep/wake or a NAT drop
+ *  the browser can be unaware the underlying TCP connection is dead for minutes. This many consecutive
+ *  pings that never get a pong back is treated as proof the socket is half-open (not just a single slow
+ *  round trip), at which point it's closed so the keepalive's own reconnect logic takes over. */
+const MAX_MISSED_PONGS = 3;
 
 /** A handshake auth-rejection refreshes the token pair and reconnects, but only this many times in a row
  *  before giving up — so a server that keeps rejecting a freshly-refreshed token (a flapping or broken
@@ -80,6 +86,10 @@ export class ApiSocket {
 		[key in ApiSocketCommand]: ReturnType<typeof createHook<[IApiSocketResponse<key>]>>;
 	}> = {};
 	private lastPing = 0;
+	// Set when a ping is sent, cleared when its pong arrives; consecutive misses drive the half-open
+	// detection in attemptPing (see MAX_MISSED_PONGS).
+	private awaitingPong = false;
+	private missedPongs = 0;
 	private socketOpened = false;
 	// Consecutive handshake-auth refresh/reconnect attempts since the last *stable* open; bounded by
 	// MAX_SOCKET_AUTH_RETRIES so a flapping/post-open-rejecting server can't loop and burn refresh tokens.
@@ -117,17 +127,28 @@ export class ApiSocket {
 
 	private async openSocket(): Promise<void> {
 		this.socketOpened = false;
+		this.awaitingPong = false;
+		this.missedPongs = 0;
 		// Pre-emptively refresh an access token that is missing or about to expire (mirroring the HTTP
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
 		const hadRefreshToken = getRefreshToken() !== null;
-		const accessToken = await ensureValidAccessToken();
+		let accessToken = await ensureValidAccessToken();
 		// A logged-in session whose pre-emptive refresh failed (refresh token spent/revoked) is
 		// unrecoverable: route to the auth-failure handler rather than opening a doomed handshake the close
 		// handler can no longer recover from (its refresh token is now gone). A never-logged-in caller
 		// (no prior refresh token) still opens an unauthenticated socket below.
 		if (!accessToken && hadRefreshToken) {
+			// A concurrent tab can rotate in a fresh pair in the gap between ensureValidAccessToken()'s
+			// internal re-read and here; adopt it instead of tearing down a session that's still alive
+			// elsewhere.
+			accessToken = getTokens()?.accessToken ?? null;
+		}
+		if (!accessToken && hadRefreshToken) {
 			this.stopPingInterval();
+			// Terminal: nothing will reconnect and re-flush the queue, so settle it here too (mirroring every
+			// other terminal branch in handleClose) rather than stranding a caller mid-connect.
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			handleAuthFailure();
 			return;
 		}
@@ -184,7 +205,25 @@ export class ApiSocket {
 		}
 		void this.ensureSocket();
 		if (socket && socket.readyState === socket.OPEN) {
+			if (this.awaitingPong) {
+				this.missedPongs++;
+				if (this.missedPongs >= MAX_MISSED_PONGS) {
+					// readyState alone can't tell a half-open socket from a live one; MAX_MISSED_PONGS
+					// consecutive silent pings is the signal. Close it so handleClose's existing
+					// reconnect machinery takes over, rather than leaving every command to eat the full
+					// per-request timeout until the OS notices the connection is dead.
+					console.warn(`Socket missed ${this.missedPongs} consecutive pongs; closing the half-open connection.`);
+					this.awaitingPong = false;
+					this.missedPongs = 0;
+					// Deliberately code-less: handleClose only stops the keepalive on ev.code ===
+					// NORMAL_CLOSURE, so this must surface as 1005/1006 to fall through to its
+					// reconnect branch. Passing NORMAL_CLOSURE here would silently disable auto-reconnect.
+					socket.close();
+					return;
+				}
+			}
 			this.lastPing = performance.now();
+			this.awaitingPong = true;
 			socket.send('ping');
 		}
 	}
@@ -246,6 +285,8 @@ export class ApiSocket {
 	private receiveResponse(ev: MessageEvent) {
 		const now = performance.now();
 		if (ev.data == 'pong') {
+			this.awaitingPong = false;
+			this.missedPongs = 0;
 			pingHook.notify(now - this.lastPing);
 			return;
 		} else if (ev.data === 'ping') {
@@ -377,7 +418,9 @@ export class ApiSocket {
 
 		this.socketAuthRetries++;
 		refreshTokens().then((tokens) => {
-			if (tokens) {
+			// A concurrent tab can rotate in a fresh pair in the gap between refreshTokens()'s own re-read
+			// and here; adopt it instead of tearing down a session that's still alive elsewhere.
+			if (tokens || getTokens() !== null) {
 				// processCommandQueue ensures the socket (now with the freshly refreshed token) and flushes
 				// any queued-but-unsent commands.
 				void this.processCommandQueue();

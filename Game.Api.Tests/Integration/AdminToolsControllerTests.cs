@@ -30,7 +30,7 @@ namespace Game.Api.Tests.Integration
             await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
 
             var roles = admin ? new[] { nameof(ERole.Admin) } : [];
-            var client = CreateAuthenticatedClient(user.Id, player.Id, roles);
+            var client = await CreateAuthenticatedClient(user.Id, player.Id, roles);
 
             // Tests seed their reference data directly before calling this, so reload the caches to mirror
             // the production invariant that they are warm before any admin action. The admin write path

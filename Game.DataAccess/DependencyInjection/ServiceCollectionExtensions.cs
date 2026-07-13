@@ -53,6 +53,8 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<PlayerUpdateBatch>()
                 // Entity store (admin tools)
                 .AddScoped<IEntityStore, EntityStore>()
+                // Applied-mod occupancy queries (admin tools: is an item mod slot in use before deleting it?)
+                .AddScoped<IAppliedModQueries, AppliedModQueries>()
                 // Bulk content seeder: reconstructs the static content graph on a fresh DB from the export.
                 .AddScoped<IContentSeeder, ContentSeeder>()
                 // UnitOfWork (stats/challenges persistence)

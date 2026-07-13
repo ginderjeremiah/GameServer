@@ -76,6 +76,22 @@ describe('DeadLetterConsole', () => {
 		expect(screen.queryByTestId('dl-empty')).toBeNull();
 	});
 
+	it('collapses an expanded row on refresh instead of leaking it onto whatever entry now sits at that position', async () => {
+		getMock.mockResolvedValueOnce(inspection([entry({ index: 0, rawPayload: 'old-payload' })], 1));
+		render(DeadLetterConsole);
+
+		await waitFor(() => expect(screen.getByTestId('dl-table')).toBeTruthy());
+		await fireEvent.click(screen.getByTestId('dl-row-expand'));
+		expect(screen.getByTestId('dl-row-payload').textContent).toContain('old-payload');
+
+		// A different entry now occupies queue position 0 after the refresh.
+		getMock.mockResolvedValueOnce(inspection([entry({ index: 0, rawPayload: 'new-payload' })], 1));
+		await fireEvent.click(screen.getByTestId('dl-refresh'));
+
+		await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+		expect(screen.queryByTestId('dl-row-payload')).toBeNull();
+	});
+
 	it('disables replay-selected until entries are selected', async () => {
 		getMock.mockResolvedValue(inspection([entry({ index: 0 })]));
 		render(DeadLetterConsole);

@@ -119,4 +119,75 @@ describe('WelcomeBackView', () => {
 
 		expect(deps.enterGame).toHaveBeenCalledWith(undefined);
 	});
+
+	// #1807: the game page's onDestroy cancels the gate so a run() continuation that resolves after
+	// unmount (e.g. a slow GetOfflineProgress round-trip) can't start the engines behind an already-left
+	// screen, and enter() can't be invoked afterwards either.
+	describe('cancellation (#1807)', () => {
+		it('does not reconcile mode or enter the game when cancelled before fetchProgress resolves', async () => {
+			let resolveFetch: (value: IOfflineProgressModel | null) => void = () => {};
+			deps = {
+				fetchProgress: vi.fn(() => new Promise<IOfflineProgressModel | null>((resolve) => (resolveFetch = resolve))),
+				resyncPlayer: vi.fn(() => Promise.resolve()),
+				reconcileMode: vi.fn(),
+				enterGame: vi.fn()
+			};
+			const view = new WelcomeBackView(deps as unknown as WelcomeBackDeps);
+
+			const runPromise = view.run();
+			view.cancel();
+			resolveFetch(progress({ hasProgress: false }));
+			await runPromise;
+
+			expect(deps.reconcileMode).not.toHaveBeenCalled();
+			expect(deps.enterGame).not.toHaveBeenCalled();
+			expect(view.phase).toBe('checking');
+		});
+
+		it('does not show the summary gate when cancelled during the post-progress resync', async () => {
+			let resolveResync: () => void = () => {};
+			deps = {
+				fetchProgress: vi.fn(() => Promise.resolve(progress())),
+				resyncPlayer: vi.fn(() => new Promise<void>((resolve) => (resolveResync = resolve))),
+				reconcileMode: vi.fn(),
+				enterGame: vi.fn()
+			};
+			const view = new WelcomeBackView(deps as unknown as WelcomeBackDeps);
+
+			const runPromise = view.run();
+			// Flush the microtask queue until run() is parked at the resyncPlayer await (reconcileMode
+			// already ran by then), then cancel before letting the resync settle.
+			await Promise.resolve();
+			await Promise.resolve();
+			view.cancel();
+			resolveResync();
+			await runPromise;
+
+			expect(deps.reconcileMode).toHaveBeenCalledTimes(1);
+			expect(view.phase).toBe('checking');
+			expect(view.summary).toBeNull();
+		});
+
+		it('enter() is a no-op once cancelled, even from the "no reward window" fast path', async () => {
+			const view = makeView(progress({ hasProgress: false }));
+			view.cancel();
+
+			await view.run();
+
+			expect(deps.enterGame).not.toHaveBeenCalled();
+			expect(view.phase).toBe('checking');
+		});
+
+		it('enter() is a no-op once cancelled after the summary gate is already showing', async () => {
+			const view = makeView(progress());
+			await view.run();
+			expect(view.phase).toBe('summary');
+
+			view.cancel();
+			view.enter();
+
+			expect(deps.enterGame).not.toHaveBeenCalled();
+			expect(view.phase).toBe('summary');
+		});
+	});
 });

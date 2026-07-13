@@ -105,6 +105,12 @@ namespace Game.Application.Services
             var awayMs = (long)(now - player.LastActivity).TotalMilliseconds;
             var cappedAwayMs = Math.Min(awayMs, (long)MaximumOfflineSimulation.TotalMilliseconds);
 
+            // The simulated window's end — captured from LastActivity before anything below can re-anchor it.
+            // Challenge completions during this pass are stamped here rather than at "now": when a long absence
+            // is clamped to MaximumOfflineSimulation, "now" could be hours past the point the window's replay
+            // actually simulated the completion.
+            var awayWindowEnd = player.LastActivity + TimeSpan.FromMilliseconds(cappedAwayMs);
+
             // Below the threshold there are no offline rewards. Re-anchor LastActivity (so the next away period
             // starts fresh and an immediate re-claim is a no-op) and return an empty summary. Any stale
             // in-flight battle is left for the idle loop's first StartBattle to abandon, exactly as on a normal
@@ -123,9 +129,21 @@ namespace Game.Application.Services
             // window that hasn't actually elapsed for this fight. LastActivity is deliberately left untouched
             // (nothing was persisted), so the away clock keeps counting against the original disconnect until
             // real server time actually resolves the fight.
-            if (await _battleService.ResolveStaleBattle(player, state, cancellationToken) is { } handoff)
+            var (handoff, settledBattleMs) = await _battleService.ResolveStaleBattle(player, state, cancellationToken);
+            if (handoff is not null)
             {
                 return OfflineProgressSummary.StillInProgress(handoff, cappedAwayMs, player.AutoChallengeBoss, player.CurrentZoneId);
+            }
+
+            // The settled battle's own credited duration, plus its post-battle cooldown, is real wall-clock time
+            // that already elapsed inside [LastActivity, now] — deduct it from what the simulator below is
+            // about to replay as fresh battles, or that same span gets credited twice (#1882): once via the
+            // settle above, again as free simulated time.
+            var simulationAwayMs = awayMs;
+            if (settledBattleMs is int credited)
+            {
+                var settledSpanMs = credited + (long)BattleService.PostBattleCooldown.TotalMilliseconds;
+                simulationAwayMs = Math.Max(0, awayMs - settledSpanMs);
             }
 
             // Load the progress aggregate once for the whole offline pass. Its completed challenges (loop/zone
@@ -137,7 +155,7 @@ namespace Game.Application.Services
 
             var (mode, zone) = await ResolveOfflineLoop(player, completedChallengeIds, cancellationToken);
             var proficiencyLevels = ToProficiencyLevels(progress.Proficiencies);
-            var parameters = BuildSimulationParameters(player, mode, zone, awayMs, proficiencyLevels);
+            var parameters = BuildSimulationParameters(player, mode, zone, simulationAwayMs, proficiencyLevels);
 
             var result = _offlineSimulator.Simulate(parameters, cancellationToken);
 
@@ -147,11 +165,11 @@ namespace Game.Application.Services
             // path persists PlayerState afterward, the switch path's mutation is (like the existing ClearBattle
             // above) discarded when the switch immediately creates a fresh session for the newly selected
             // character regardless.
-            var activeBattle = ApplyTrailingRemainder(state, result.IsBossBattle, zone.Id, parameters.Snapshot, result, now);
+            var activeBattle = ApplyTrailingRemainder(state, result.IsBossBattle, zone.Id, result, now);
 
             var levelBefore = player.Level;
             var statPointsBefore = player.StatPoints.StatPointsGained;
-            var rewards = await ApplyOfflineRewards(player, progress, result, cancellationToken);
+            var rewards = await ApplyOfflineRewards(player, progress, result, awayWindowEnd, cancellationToken);
 
             // Re-anchor the away clock and persist the player (exp/levels/unlocks) in one save. The exp batch
             // already raised its own single core update in ApplyOfflineRewards; this re-anchor raises one more.
@@ -240,18 +258,19 @@ namespace Game.Application.Services
         // The simulator already tells the two cases apart:
         // - PendingBattle: the away boundary fell inside a battle the simulator drew but could not credit (its
         //   own duration didn't fit the remaining budget) — hand it back active at its true elapsed offset
-        //   (same enemy/seed the simulator already simulated), exactly like a still-in-progress stale-battle
-        //   hand-back (#1595), so the client resumes it via replay-to-offset (#1597).
+        //   (same enemy/seed and the possibly-grown snapshot the simulator already simulated it against, #1758),
+        //   exactly like a still-in-progress stale-battle hand-back (#1595), so the client resumes it via
+        //   replay-to-offset (#1597).
         // - RemainderMs: the boundary fell inside a completed battle's post-battle cooldown — no battle is
         //   active yet even in the model, so just set the residual PlayerState cooldown; the live idle loop's
         //   first NewEnemy after the gate naturally waits it out (the existing cooldown gate).
         // Returns null when there is nothing to carry.
         private BattleStartResult? ApplyTrailingRemainder(
-            PlayerState state, bool isBossBattle, int zoneId, BattleSnapshot snapshot, OfflineProgressResult result, DateTime now)
+            PlayerState state, bool isBossBattle, int zoneId, OfflineProgressResult result, DateTime now)
         {
             if (result.PendingBattle is { } pending)
             {
-                return _battleService.HandBackPendingBattle(state, pending, snapshot, zoneId, isBossBattle, now);
+                return _battleService.HandBackPendingBattle(state, pending, zoneId, isBossBattle, now);
             }
 
             if (result.RemainderMs > 0)
@@ -269,7 +288,8 @@ namespace Game.Application.Services
         // (the summary is the notification). Returns the completed challenges and the folded proficiency gains
         // (spike #982 decision 9 — the offline accrual's notification rides the summary, not a per-battle push).
         private async Task<OfflineRewards> ApplyOfflineRewards(
-            Player player, PlayerProgress progress, OfflineProgressResult result, CancellationToken cancellationToken)
+            Player player, PlayerProgress progress, OfflineProgressResult result, DateTime timestamp,
+            CancellationToken cancellationToken)
         {
             if (result.BattlesSimulated == 0)
             {
@@ -328,7 +348,7 @@ namespace Game.Application.Services
             }
             _proficiencyRewards.GrantRewardSkills(proficiencyResult, player);
 
-            var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, notify: false);
+            var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, timestamp, notify: false);
 
             await _progressRepo.Save(progress, cancellationToken);
             return new OfflineRewards(completed, proficiencyResult);

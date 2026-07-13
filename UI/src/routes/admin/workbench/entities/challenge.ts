@@ -86,9 +86,18 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 			desc: 'What the player must do to complete it',
 			kind: 'challenge-condition',
 			// Statistic & entity are fully determined by the type, so they can't be
-			// inconsistent — the only condition-level slip is a non-positive goal.
+			// inconsistent — the remaining condition-level slips are a non-positive goal and a
+			// DamageType-scoped statistic left Global (it has no global row; the backend hard-rejects it).
 			dirtyKeys: ['challengeTypeId', 'statisticType', 'entityType', 'targetEntityId', 'progressGoal'],
-			warn: (c) => (!c.progressGoal || c.progressGoal <= 0 ? 'Goal must be greater than zero' : null)
+			warn: (c) => {
+				if (!c.progressGoal || c.progressGoal <= 0) {
+					return 'Goal must be greater than zero';
+				}
+				if (c.entityType === EEntityType.DamageType && c.targetEntityId == null) {
+					return 'Must target a damage type — this statistic has no global total';
+				}
+				return null;
+			}
 		},
 		{
 			key: 'reward',

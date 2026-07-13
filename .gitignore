@@ -13,6 +13,9 @@
 # Backing-service marker written by .claude/hooks/session-start.sh in constrained sandboxes
 .container-info.json
 
+# Local developer secrets (see Game.Api/appsettings.Development.json.example for the template)
+Game.Api/appsettings.Development.json
+
 # Transient isolated git worktrees created for background agents
 .claude/worktrees/
 

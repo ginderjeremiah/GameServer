@@ -587,6 +587,23 @@ describe('SkillsView — persistence failure', () => {
 		mockPlayerManager.setSelectedSkills([3]); // external write
 		await vi.waitFor(() => expect(view.equipped).toEqual([3]));
 	});
+
+	it('rolls back a later failed edit to a settled external resync, not the pre-resync baseline', async () => {
+		// A resync (e.g. a dead-lettered-command resync replacing the authoritative loadout) lands while a
+		// commit is in flight and is still in effect once that commit settles. A further edit that fails
+		// must roll back to the resynced loadout — not the stale pre-resync baseline `committed` was seeded
+		// with at construction (the bug: nothing ever re-seeded `committed` from an idle external change).
+		view.toggle(0); // [0, 1, 2] → [1, 2], in flight, succeeds
+		mockPlayerManager.setSelectedSkills([3]); // external resync lands mid-flight
+		await vi.waitFor(() => expect(view.equipped).toEqual([3])); // settles once the commit resolves
+
+		sendSocketCommand.mockResolvedValueOnce({ error: 'nope' });
+		view.toggle(0); // edit from the resynced loadout → [3, 0], fails
+		expect(view.equipped).toEqual([3, 0]); // optimistic
+		await vi.waitFor(() => expect(toastError).toHaveBeenCalled());
+		expect(view.equipped).toEqual([3]); // rolls back to the resynced loadout, not [1, 2]
+		expect(mockPlayerManager.selectedSkills).toEqual([3]);
+	});
 });
 
 describe('SkillsView — compare-vs toughness', () => {

@@ -62,9 +62,15 @@ export async function selectFirstCharacter(page: Page) {
 export async function createFirstCharacter(page: Page, name = 'Hero') {
 	await expect(page).toHaveURL('/select', { timeout: 10000 });
 
+	// The panel (and its create-form-vs-"+ New character" branch) mounts asynchronously after the URL
+	// changes, so an immediate `isVisible()` snapshot can catch neither element rendered yet and
+	// wrongly fall through to a "show-create" click that never appears (the create form ends up open
+	// instead). Wait for either to actually exist before branching on which one it is.
 	const nameInput = page.getByTestId('new-name-input');
+	const showCreateButton = page.getByTestId('show-create');
+	await nameInput.or(showCreateButton).waitFor({ timeout: 10000 });
 	if (!(await nameInput.isVisible())) {
-		await page.getByTestId('show-create').click();
+		await showCreateButton.click();
 	}
 	// A class is required to create, so wait for the picker to load (it defaults to the first class)
 	// before submitting — the Create button stays disabled until a class is selected.

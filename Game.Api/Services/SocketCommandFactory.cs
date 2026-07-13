@@ -8,6 +8,7 @@ namespace Game.Api.Services
     {
         private static readonly ConcurrentDictionary<string, Func<IServiceProvider, AbstractSocketCommand>> _socketCommandGenerators = [];
         private static readonly ConcurrentDictionary<string, byte> _serverInitiatedCommandNames = [];
+        private static readonly ConcurrentDictionary<string, byte> _replayableCommandNames = [];
 
         /// <summary>
         /// Whether the named command is server-initiated only (<see cref="IServerInitiatedCommand"/>) and
@@ -17,6 +18,16 @@ namespace Game.Api.Services
         public bool IsServerInitiatedOnly(string commandName)
         {
             return _serverInitiatedCommandNames.ContainsKey(commandName);
+        }
+
+        /// <summary>
+        /// Whether the named command has opted into dead-letter replay eligibility
+        /// (<see cref="IReplayableServerCommand"/>). Narrower than <see cref="IsServerInitiatedOnly"/> — a
+        /// session-lifecycle command (e.g. <c>SocketReplaced</c>) is server-initiated but never replayable.
+        /// </summary>
+        public bool IsReplayable(string commandName)
+        {
+            return _replayableCommandNames.ContainsKey(commandName);
         }
 
         /// <summary>
@@ -72,6 +83,11 @@ namespace Game.Api.Services
                 if (type.IsAssignableTo(typeof(IServerInitiatedCommand)))
                 {
                     _serverInitiatedCommandNames.TryAdd(type.Name, 0);
+                }
+
+                if (type.IsAssignableTo(typeof(IReplayableServerCommand)))
+                {
+                    _replayableCommandNames.TryAdd(type.Name, 0);
                 }
             }
         }

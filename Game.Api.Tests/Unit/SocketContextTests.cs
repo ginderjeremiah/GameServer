@@ -93,6 +93,53 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task Close_SendLockHeldByWedgedSend_AbortsInsteadOfHangingForever()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new WedgeableSendWebSocket();
+            var context = CreateContext(socket, closeAbortTimeout: TimeSpan.FromMilliseconds(100));
+
+            // Start a send that never completes on its own (mirrors a client stalled with a TCP zero-window),
+            // holding the send lock indefinitely.
+            var wedgedSend = context.SendData("stuck", CancellationToken.None);
+            await socket.SendStarted.WaitAsync(WaitTimeout, cancellationToken);
+
+            // Close cannot acquire the send lock within its bound; it must abort the connection rather than
+            // hang forever waiting for a send that will never release the lock on its own (#1726).
+            await context.Close(ESocketCloseReason.Inactivity).WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.True(socket.AbortCalled);
+            await context.WaitSocketClosed().WaitAsync(WaitTimeout, cancellationToken);
+
+            // The abort unblocks the wedged send too, since it faults the underlying SendAsync call.
+            var sent = await wedgedSend.WaitAsync(WaitTimeout, cancellationToken);
+            Assert.False(sent);
+        }
+
+        [Fact]
+        public async Task Close_CallerTokenCancelsMidWait_AbortsInsteadOfPropagatingCancellation()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new WedgeableSendWebSocket();
+            // A generous internal bound, so only the caller's token below can be what trips the fallback.
+            var context = CreateContext(socket, closeAbortTimeout: WaitTimeout);
+
+            var wedgedSend = context.SendData("stuck", CancellationToken.None);
+            await socket.SendStarted.WaitAsync(WaitTimeout, cancellationToken);
+
+            using var callerCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+            // Mirrors SocketHandler.ShutdownAsync passing the shutdown drain's deadline token: once it fires,
+            // Close must abort rather than letting the cancellation propagate and leaving the caller to somehow
+            // unwedge the connection itself.
+            await context.Close(ESocketCloseReason.ServerShuttingDown, callerCts.Token).WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.True(socket.AbortCalled);
+            await context.WaitSocketClosed().WaitAsync(WaitTimeout, cancellationToken);
+            await wedgedSend.WaitAsync(WaitTimeout, cancellationToken);
+        }
+
+        [Fact]
         public async Task Close_WhenSocketNotOpen_SettlesWithoutSendingCloseFrame()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -103,6 +150,44 @@ namespace Game.Api.Tests.Unit
 
             Assert.False(socket.CloseAsyncCalled);
             await context.WaitSocketClosed().WaitAsync(WaitTimeout, cancellationToken);
+        }
+
+        [Fact]
+        public async Task Close_SocketInCloseReceived_CompletesTheHandshakeWithNormalClosure()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            // Mirrors the read loop's terminal Close after ReceiveAsync returns a client-initiated Close
+            // frame: the socket is already in CloseReceived, not Open.
+            var socket = new GatedCloseWebSocket { StateOverride = WebSocketState.CloseReceived };
+            var context = CreateContext(socket);
+
+            var closeTask = context.Close(ESocketCloseReason.Finished, cancellationToken);
+            await socket.CloseStarted.WaitAsync(WaitTimeout, cancellationToken);
+            socket.CompleteClose();
+            await closeTask.WaitAsync(WaitTimeout, cancellationToken);
+
+            // CloseAsync is called (completing the handshake with a reciprocal close frame) rather than
+            // being skipped because the state isn't Open (#1759).
+            Assert.True(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, socket.CloseStatusUsed);
+            await context.WaitSocketClosed().WaitAsync(WaitTimeout, cancellationToken);
+        }
+
+        [Fact]
+        public async Task SendData_WedgedSend_AbortsInsteadOfHangingForever()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var socket = new WedgeableSendWebSocket();
+            var context = CreateContext(socket, sendAbortTimeout: TimeSpan.FromMilliseconds(100));
+
+            // Mirrors a client stalled with a TCP zero-window: the send never completes on its own, holding
+            // the send lock (and, in RunCommandUnderLock's case, the per-socket command lock too) indefinitely
+            // unless SendData itself falls back to Abort() the same way Close() already does (#1741) — closing
+            // the gap that fix left on this, the far more common send path (#1760).
+            var sent = await context.SendData("stuck").WaitAsync(WaitTimeout, cancellationToken);
+
+            Assert.False(sent);
+            Assert.True(socket.AbortCalled);
         }
 
         [Fact]
@@ -220,10 +305,10 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(WebSocketCloseStatus.MessageTooBig, socket.CloseStatusUsed);
         }
 
-        private static SocketContext CreateContext(WebSocket socket, bool isAdmin = false)
+        private static SocketContext CreateContext(WebSocket socket, bool isAdmin = false, TimeSpan? closeAbortTimeout = null, TimeSpan? sendAbortTimeout = null)
         {
             var session = new SessionService(new NoOpSessionStore());
-            return new SocketContext(socket, playerId: 1, session, isAdmin, NullLogger<SocketContext>.Instance);
+            return new SocketContext(socket, playerId: 1, session, isAdmin, NullLogger<SocketContext>.Instance, closeAbortTimeout, sendAbortTimeout);
         }
 
         /// <summary>
@@ -353,10 +438,59 @@ namespace Game.Api.Tests.Unit
             public override void Dispose() { }
         }
 
+        /// <summary>
+        /// A <see cref="WebSocket"/> stand-in whose <see cref="SendAsync"/> never completes on its own —
+        /// mirroring a client stalled with a TCP zero-window — and deliberately ignores its cancellation
+        /// token, exactly like the mid-frame chunk sends in <see cref="SocketContext.SendData"/> do. Only
+        /// <see cref="Abort"/> unblocks it, so a test can prove <see cref="SocketContext.Close"/> falls back
+        /// to it instead of hanging forever (#1726).
+        /// </summary>
+        private sealed class WedgeableSendWebSocket : WebSocket
+        {
+            private readonly TaskCompletionSource _sendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource _sendGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private WebSocketState _state = WebSocketState.Open;
+
+            /// <summary>Completes once a <see cref="SendAsync"/> call has begun (and is now wedged).</summary>
+            public Task SendStarted => _sendStarted.Task;
+            public bool AbortCalled { get; private set; }
+            public bool CloseAsyncCalled { get; private set; }
+
+            public override async Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+            {
+                _sendStarted.TrySetResult();
+                await _sendGate.Task;
+            }
+
+            public override void Abort()
+            {
+                AbortCalled = true;
+                _state = WebSocketState.Aborted;
+                _sendGate.TrySetException(new WebSocketException(WebSocketError.InvalidState, "Aborted"));
+            }
+
+            public override Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+            {
+                CloseAsyncCalled = true;
+                _state = WebSocketState.Closed;
+                return Task.CompletedTask;
+            }
+
+            public override WebSocketState State => _state;
+            public override WebSocketCloseStatus? CloseStatus => null;
+            public override string? CloseStatusDescription => null;
+            public override string? SubProtocol => null;
+            public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
+                => new TaskCompletionSource<WebSocketReceiveResult>().Task;
+            public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => Task.CompletedTask;
+            public override void Dispose() { }
+        }
+
         private sealed class NoOpSessionStore : ISessionStore
         {
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
             public void Update(PlayerState sessionData, int playerId) { }
+            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public void Clear(int userId) { }
         }
     }

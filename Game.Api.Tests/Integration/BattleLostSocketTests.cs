@@ -24,7 +24,7 @@ namespace Game.Api.Tests.Integration
             sessionService.SetAuthenticatedUser(userId);
             await sessionService.LoadPlayerState();
             modifyState(sessionService.PlayerState);
-            sessionService.SavePlayerState();
+            await sessionService.SavePlayerStateAsync();
         }
 
         private async Task<int> SeedWeakPlayerVsStrongEnemyAsync()

@@ -2,7 +2,7 @@
 --
 -- The static reference-data content the end-to-end (Playwright) suite needs is now seeded by the API
 -- itself on startup from the source-controlled export (content/*.json, DataAccessOptions__SeedContentOnStartup;
--- see docker-compose.yml and docs/backend.md "Content export"). This file carries only the e2e admin-role
+-- see docker-compose.yml and docs/backend-content.md "Content export"). This file carries only the e2e admin-role
 -- fixture that used to live at the tail of e2e-seed.sql — it is test-harness infrastructure, not game content,
 -- so it stays out of the app and is applied by the CI workflow against the e2e Postgres.
 --

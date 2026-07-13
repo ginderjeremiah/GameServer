@@ -29,14 +29,15 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<EquipItemResponse>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var player = context.Session.Player;
-            var success = await _playerService.EquipItem(
+            var (success, proficiencyLevels) = await _playerService.EquipItem(
                 player, Parameters.ItemId, (EEquipmentSlot)Parameters.EquipmentSlotId, cancellationToken);
 
             // Both outcomes carry the authoritative post-command rating so the client can always reconcile
-            // onto it, mirroring UpdatePlayerStats.
+            // onto it, mirroring UpdatePlayerStats. Reuses the proficiency levels the gear gate above already
+            // loaded rather than re-reading the same Redis hash (#1729).
             var result = new EquipItemResponse
             {
-                PlayerRating = await _battleService.RatePlayer(player, cancellationToken),
+                PlayerRating = _battleService.RatePlayer(player, proficiencyLevels),
             };
 
             return success ? Success(result) : ErrorWithData("Failed to equip item.", result);

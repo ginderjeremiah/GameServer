@@ -150,22 +150,23 @@ export class SkillsView {
 	dragIndex = $state<number | null>(null);
 
 	constructor() {
-		this.syncFromPlayer();
-	}
-
-	/** (Re)seed the committed baseline + inspector selection from the player manager. */
-	syncFromPlayer(): void {
-		this.committed = [...playerManager.selectedSkills];
-		this.pendingLoadout = null;
-		if (this.selectedId < 0) {
-			this.selectedId = this.equipped[0] ?? staticData.skills?.[0]?.id ?? -1;
-		}
+		// Reading `equipped` seeds `committed` via its idle branch below.
+		this.selectedId = this.equipped[0] ?? staticData.skills?.[0]?.id ?? -1;
 	}
 
 	/** Working equipped loadout, ordered by priority: the pending optimistic edit while a commit is in
 	 *  flight, otherwise the player manager's committed loadout — so an external loadout change (e.g. a
-	 *  challenge skill unlock or server reconciliation) is reflected once no edit is pending. */
-	readonly equipped = $derived(this.pendingLoadout ?? [...playerManager.selectedSkills]);
+	 *  challenge skill unlock or server reconciliation) is reflected once no edit is pending. While idle
+	 *  (no edit pending), this also re-seeds {@link committed} from the manager, so an external resync
+	 *  becomes the rollback target for the next edit rather than a stale pre-resync baseline — every edit
+	 *  path reads {@link equipped} before calling {@link commit}, so `committed` is always current by then. */
+	readonly equipped = $derived.by(() => {
+		if (this.pendingLoadout !== null) {
+			return this.pendingLoadout;
+		}
+		this.committed = [...playerManager.selectedSkills];
+		return this.committed;
+	});
 
 	/** The loadout cap (number of equip slots) — the single generated game constant. */
 	readonly cap = MAX_SELECTED_SKILLS;

@@ -2310,7 +2310,7 @@ namespace Game.Infrastructure.Migrations
                     b.HasOne("Game.Infrastructure.Entities.ItemModSlot", "ItemModSlot")
                         .WithMany()
                         .HasForeignKey("ItemModSlotId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Game.Infrastructure.Entities.Player", "Player")

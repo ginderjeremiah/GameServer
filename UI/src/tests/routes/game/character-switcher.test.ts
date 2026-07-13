@@ -5,16 +5,25 @@ import { render, fireEvent, cleanup, screen, waitFor } from '@testing-library/sv
 // switch/create), and the socket teardown, engine stop, token storage, and takeover are mocked so the
 // overlay can be driven without real I/O. window.location is replaced so the commit/recovery reloads are
 // observable instead of throwing in jsdom.
-const { getMock, postMock, disconnectMock, stopEnginesMock, getRefreshTokenMock, setTokensMock, confirmTakeoverMock } =
-	vi.hoisted(() => ({
-		getMock: vi.fn(),
-		postMock: vi.fn(),
-		disconnectMock: vi.fn(),
-		stopEnginesMock: vi.fn(),
-		getRefreshTokenMock: vi.fn(),
-		setTokensMock: vi.fn(),
-		confirmTakeoverMock: vi.fn()
-	}));
+const {
+	getMock,
+	postMock,
+	disconnectMock,
+	stopEnginesMock,
+	ensureValidAccessTokenMock,
+	getRefreshTokenMock,
+	setTokensMock,
+	confirmTakeoverMock
+} = vi.hoisted(() => ({
+	getMock: vi.fn(),
+	postMock: vi.fn(),
+	disconnectMock: vi.fn(),
+	stopEnginesMock: vi.fn(),
+	ensureValidAccessTokenMock: vi.fn(),
+	getRefreshTokenMock: vi.fn(),
+	setTokensMock: vi.fn(),
+	confirmTakeoverMock: vi.fn()
+}));
 
 // Spread the real module so the enums/values the class picker's display helpers read at import stay
 // intact; only the I/O entry points are replaced with spies.
@@ -26,6 +35,7 @@ vi.mock('$lib/api', async (importOriginal) => ({
 		post = (body: unknown) => postMock(this.route, body);
 	},
 	apiSocket: { disconnect: disconnectMock },
+	ensureValidAccessToken: ensureValidAccessTokenMock,
 	getRefreshToken: getRefreshTokenMock,
 	setTokens: setTokensMock
 }));
@@ -71,6 +81,7 @@ beforeEach(() => {
 	postMock.mockReset();
 	disconnectMock.mockReset();
 	stopEnginesMock.mockReset();
+	ensureValidAccessTokenMock.mockReset().mockResolvedValue('a');
 	getRefreshTokenMock.mockReset().mockReturnValue('r');
 	setTokensMock.mockReset();
 	confirmTakeoverMock.mockReset().mockResolvedValue(true);
@@ -116,6 +127,27 @@ describe('CharacterSwitcher', () => {
 		expect(setTokensMock).toHaveBeenCalledWith({ accessToken: 'a2', refreshToken: 'r2' });
 		await waitFor(() => expect(confirmTakeoverMock).toHaveBeenCalled());
 		await waitFor(() => expect(window.location.href).toBe('/'));
+	});
+
+	it('reads the refresh token after settling any pre-emptive refresh, not before', async () => {
+		// Simulate ApiRequest's own pre-emptive refresh rotating the token pair while it settles, the
+		// exact race #1767 fixed: reading the token first would capture the now-stale 'r'.
+		ensureValidAccessTokenMock.mockImplementation(async () => {
+			getRefreshTokenMock.mockReturnValue('rotated');
+			return 'a2';
+		});
+		postMock.mockResolvedValue({
+			status: 200,
+			data: { tokens: { accessToken: 'a2', refreshToken: 'r2' }, player: { id: 2, name: 'Rogue' } }
+		});
+		render(CharacterSwitcher, { open: true, onClose: vi.fn() });
+
+		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
+		await fireEvent.click(screen.getAllByTestId('player-card')[0]);
+
+		await waitFor(() =>
+			expect(postMock).toHaveBeenCalledWith('Login/SwitchPlayer', { playerId: 2, refreshToken: 'rotated' })
+		);
 	});
 
 	it('recovers with a reload when the switch fails after teardown', async () => {

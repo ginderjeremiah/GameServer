@@ -4,6 +4,7 @@ import {
 	EChallengeGoalComparison,
 	EDamageTypeKey,
 	EEntityType,
+	EEquipmentSlot,
 	EItemCategory,
 	EItemModType,
 	ELessonTriggerType,
@@ -276,6 +277,39 @@ describe('granted-skill picker options', () => {
 		expect(reference.grantedSkillOptions(2)).toContainEqual({ value: 2, text: 'Smite · retired' });
 		// …and a Player-only skill that was somehow already authored stays selectable rather than vanishing.
 		expect(reference.grantedSkillOptions(1)).toContainEqual({ value: 1, text: 'Fireball' });
+	});
+});
+
+describe('equipment slot / item category', () => {
+	it('maps each equipment slot to the item category it accepts', () => {
+		expect(reference.equipmentSlotCategory(EEquipmentSlot.HelmSlot)).toBe(EItemCategory.Helm);
+		expect(reference.equipmentSlotCategory(EEquipmentSlot.ChestSlot)).toBe(EItemCategory.Chest);
+		expect(reference.equipmentSlotCategory(EEquipmentSlot.LegSlot)).toBe(EItemCategory.Leg);
+		expect(reference.equipmentSlotCategory(EEquipmentSlot.BootSlot)).toBe(EItemCategory.Boot);
+		expect(reference.equipmentSlotCategory(EEquipmentSlot.WeaponSlot)).toBe(EItemCategory.Weapon);
+		expect(reference.equipmentSlotCategory(EEquipmentSlot.AccessorySlot)).toBe(EItemCategory.Accessory);
+	});
+
+	it('narrows the item picker to only items matching the slot category', () => {
+		// staticData.items: Iron Helm (Helm) and Dragon Blade (Weapon).
+		expect(reference.itemOptionsForSlot(EEquipmentSlot.HelmSlot)).toEqual([{ value: 0, text: 'Iron Helm' }]);
+		expect(reference.itemOptionsForSlot(EEquipmentSlot.WeaponSlot)).toEqual([{ value: 1, text: 'Dragon Blade' }]);
+		expect(reference.itemOptionsForSlot(EEquipmentSlot.ChestSlot)).toEqual([]);
+	});
+
+	it('keeps a category-mismatched current value visible in the narrowed picker', () => {
+		// Dragon Blade (Weapon) kept as the current value on a Helm-slot row, as a backstop for
+		// already-authored bad data — the section warn is what actually flags it.
+		expect(reference.itemOptionsForSlot(EEquipmentSlot.HelmSlot, 1)).toEqual([
+			{ value: 0, text: 'Iron Helm' },
+			{ value: 1, text: 'Dragon Blade' }
+		]);
+	});
+
+	it('resolves an item id to its category', () => {
+		expect(reference.itemCategoryOf(0)).toBe(EItemCategory.Helm);
+		expect(reference.itemCategoryOf(1)).toBe(EItemCategory.Weapon);
+		expect(reference.itemCategoryOf(99)).toBeUndefined();
 	});
 });
 

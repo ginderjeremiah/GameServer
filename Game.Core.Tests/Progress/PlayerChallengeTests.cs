@@ -6,12 +6,14 @@ namespace Game.Core.Tests.Progress
 {
     public class PlayerChallengeTests
     {
+        private static readonly DateTime Timestamp = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         [Fact]
         public void UpdateProgress_BelowGoal_StoresProgressAndStaysIncomplete()
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(4m, hasData: true);
+            playerChallenge.UpdateProgress(4m, hasData: true, Timestamp);
 
             Assert.Equal(4m, playerChallenge.Progress);
             Assert.False(playerChallenge.Completed);
@@ -23,11 +25,11 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(10m, hasData: true);
+            playerChallenge.UpdateProgress(10m, hasData: true, Timestamp);
 
             Assert.Equal(10m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
-            Assert.NotNull(playerChallenge.CompletedAt);
+            Assert.Equal(Timestamp, playerChallenge.CompletedAt);
         }
 
         [Fact]
@@ -35,7 +37,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(15m, hasData: true);
+            playerChallenge.UpdateProgress(15m, hasData: true, Timestamp);
 
             Assert.Equal(10m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
@@ -46,13 +48,11 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10);
 
-            playerChallenge.UpdateProgress(10m, hasData: true);
-            var firstCompletedAt = playerChallenge.CompletedAt;
-
-            playerChallenge.UpdateProgress(20m, hasData: true);
+            playerChallenge.UpdateProgress(10m, hasData: true, Timestamp);
+            playerChallenge.UpdateProgress(20m, hasData: true, Timestamp.AddDays(1));
 
             Assert.True(playerChallenge.Completed);
-            Assert.Equal(firstCompletedAt, playerChallenge.CompletedAt);
+            Assert.Equal(Timestamp, playerChallenge.CompletedAt);
         }
 
         // ── "At most" goals (e.g. time trials) ───────────────────────────────
@@ -62,11 +62,11 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(7m, hasData: true);
+            playerChallenge.UpdateProgress(7m, hasData: true, Timestamp);
 
             Assert.Equal(7m, playerChallenge.Progress);
             Assert.True(playerChallenge.Completed);
-            Assert.NotNull(playerChallenge.CompletedAt);
+            Assert.Equal(Timestamp, playerChallenge.CompletedAt);
         }
 
         [Fact]
@@ -74,7 +74,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(10m, hasData: true);
+            playerChallenge.UpdateProgress(10m, hasData: true, Timestamp);
 
             Assert.True(playerChallenge.Completed);
         }
@@ -84,7 +84,7 @@ namespace Game.Core.Tests.Progress
         {
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(15m, hasData: true);
+            playerChallenge.UpdateProgress(15m, hasData: true, Timestamp);
 
             Assert.Equal(15m, playerChallenge.Progress);
             Assert.False(playerChallenge.Completed);
@@ -98,7 +98,7 @@ namespace Game.Core.Tests.Progress
             // 0 is at or below the goal — the absence of data, not the value, is what blocks completion.
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(0m, hasData: false);
+            playerChallenge.UpdateProgress(0m, hasData: false, Timestamp);
 
             Assert.False(playerChallenge.Completed);
             Assert.Null(playerChallenge.CompletedAt);
@@ -111,7 +111,7 @@ namespace Game.Core.Tests.Progress
             // reads as the best possible progress, so writing it would surface a misleading 0 best.
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial, initialProgress: 42m);
 
-            playerChallenge.UpdateProgress(0m, hasData: false);
+            playerChallenge.UpdateProgress(0m, hasData: false, Timestamp);
 
             Assert.Equal(42m, playerChallenge.Progress);
         }
@@ -123,10 +123,10 @@ namespace Game.Core.Tests.Progress
             // must complete — the old "0 means no data" sentinel made this case unwinnable.
             var playerChallenge = MakePlayerChallenge(goal: 10, type: EChallengeType.TimeTrial);
 
-            playerChallenge.UpdateProgress(0m, hasData: true);
+            playerChallenge.UpdateProgress(0m, hasData: true, Timestamp);
 
             Assert.True(playerChallenge.Completed);
-            Assert.NotNull(playerChallenge.CompletedAt);
+            Assert.Equal(Timestamp, playerChallenge.CompletedAt);
         }
 
         private static PlayerChallenge MakePlayerChallenge(decimal goal, EChallengeType type = EChallengeType.EnemiesKilled, decimal initialProgress = 0m)

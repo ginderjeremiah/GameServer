@@ -114,4 +114,28 @@ describe('challengeEntity', () => {
 
 		expect(postBodyTo('AdminTools/AddEditChallenges')[0].item).toEqual(record);
 	});
+
+	describe('condition section warn (#1781)', () => {
+		const conditionWarn = challengeEntity.sections.find((s) => s.key === 'condition')?.warn;
+
+		it('flags a non-positive goal', () => {
+			const c = { ...challengeEntity.newItem(1), progressGoal: 0 };
+			expect(conditionWarn?.(c)).toBe('Goal must be greater than zero');
+		});
+
+		it('flags a DamageType-scoped statistic left Global — the backend has no global row for it', () => {
+			const c = { ...challengeEntity.newItem(1), entityType: EEntityType.DamageType, targetEntityId: undefined };
+			expect(conditionWarn?.(c)).toBe('Must target a damage type — this statistic has no global total');
+		});
+
+		it('passes once a DamageType-scoped statistic is targeted', () => {
+			const c = { ...challengeEntity.newItem(1), entityType: EEntityType.DamageType, targetEntityId: 0 };
+			expect(conditionWarn?.(c)).toBeNull();
+		});
+
+		it('does not require a target for a non-DamageType statistic', () => {
+			const c = { ...challengeEntity.newItem(1), entityType: EEntityType.Enemy, targetEntityId: undefined };
+			expect(conditionWarn?.(c)).toBeNull();
+		});
+	});
 });

@@ -669,6 +669,51 @@ namespace Game.Core.Tests.Battle.Offline
         }
 
         [Fact]
+        public void Simulate_PendingBattle_SnapshotReflectsMidWindowGrowth_NotTheWindowStartSnapshot()
+        {
+            // #1758: the boundary battle carried forward as PendingBattle was simulated against whatever the
+            // player had grown to by that point in the window (#1601), not the frozen window-start snapshot —
+            // the hand-back must carry that same grown state forward, since the client resumes (and the server
+            // later anti-cheat-replays) the fight from post-growth stats, not window-start ones.
+            var snapshot = ClassPlayerSnapshot(level: 1, classId: 2);
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1),
+                Snapshot = snapshot,
+                ResolveEnemy = FreeFarmEnemy,
+            };
+            var resolveClass = ClassResolver(2, Distribution(Endurance, baseAmount: -5m, amountPerLevel: 5m));
+
+            OfflineProgressResult Run(long awayMs) =>
+                _simulator.Simulate(IdleParameters(awayMs, scenario, capMs: TenHoursMs) with { ResolveClass = resolveClass });
+
+            // FreeFarmEnemy never draws or beats the player, and only Endurance (defense) grows here — never
+            // the player's Strength-driven offense — so every credited battle costs the same real duration
+            // regardless of how many levels the run has produced by then. PlayerRating, in contrast, only ever
+            // moves when a level-up rebuilds the rating battler (#1601): the first battle whose recorded rating
+            // differs from the opening one is the first credited after a level-up has landed.
+            var probe = Run(TenHoursMs);
+            var wins = probe.Battles.Where(b => b.Result.Victory).ToList();
+            var growthIndex = wins.FindIndex(b => b.PlayerRating != wins[0].PlayerRating);
+            Assert.True(growthIndex > 0, "The probe run produced no mid-window level-up to build on.");
+
+            var battleMs = wins[0].Result.TotalMs;
+            var stepMs = battleMs + CooldownMs;
+            // growthIndex fully credited battles — enough for the level-up to have already landed — then a
+            // sliver too small for the next battle's own duration to fit, so the boundary falls mid-fight
+            // (a PendingBattle) rather than mid-cooldown, and that next battle is drawn against grown state.
+            var awayMs = (stepMs * growthIndex) + (battleMs / 2);
+
+            var result = Run(awayMs);
+
+            Assert.Equal(growthIndex, result.BattlesSimulated);
+            Assert.NotNull(result.PendingBattle);
+            Assert.True(result.PendingBattle.Snapshot.Level > snapshot.Level,
+                "The pending battle's hand-back snapshot must reflect mid-window growth, not the window-start level.");
+            Assert.Equal(result.EndingLevel, result.PendingBattle.Snapshot.Level);
+        }
+
+        [Fact]
         public void Simulate_NonZeroStartingExp_CarriesIntoTheFirstLevelThreshold()
         {
             // StartingExp exists so a player already partway to their next level doesn't get an extra free

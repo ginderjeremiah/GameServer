@@ -63,11 +63,12 @@ namespace Game.Api.Services.Admin
             foreach (var payload in targets)
             {
                 var envelope = TryDeserialize(payload);
-                // Malformed and UnknownEventType entries are poison — the same classification Classify
-                // computes — so they stay queued rather than being delivered and dropped; only Replayable
-                // (a known server-initiated command) reaches EmitSocketCommand, whose bool result gates the
-                // removal on the same live-socket lookup rather than a separate check-then-act pair.
-                if (envelope is null || !_commandFactory.IsServerInitiatedOnly(envelope.Command.Name))
+                // Malformed, UnknownEventType, and NotReplayable entries are poison — the same classification
+                // Classify computes — so they stay queued rather than being delivered and dropped; only
+                // Replayable (a command that has opted into IReplayableServerCommand) reaches
+                // EmitSocketCommand, whose bool result gates the removal on the same live-socket lookup rather
+                // than a separate check-then-act pair.
+                if (envelope is null || !_commandFactory.IsReplayable(envelope.Command.Name))
                 {
                     continue;
                 }
@@ -126,9 +127,11 @@ namespace Game.Api.Services.Admin
 
             entry.EventType = envelope.Command.Name;
             entry.PlayerId = envelope.PlayerId;
-            entry.Reason = _commandFactory.IsServerInitiatedOnly(envelope.Command.Name)
-                ? EDeadLetterReason.Replayable
-                : EDeadLetterReason.UnknownEventType;
+            entry.Reason = !_commandFactory.IsServerInitiatedOnly(envelope.Command.Name)
+                ? EDeadLetterReason.UnknownEventType
+                : _commandFactory.IsReplayable(envelope.Command.Name)
+                    ? EDeadLetterReason.Replayable
+                    : EDeadLetterReason.NotReplayable;
             return entry;
         }
 

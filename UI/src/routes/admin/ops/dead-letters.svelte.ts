@@ -56,6 +56,12 @@ const REASON_META: Record<EDeadLetterReason, ReasonMeta> = {
 		hint: 'Exhausted its retries or delivery attempts — safe to replay once the cause is fixed.',
 		replayable: true,
 		tone: 'ok'
+	},
+	[EDeadLetterReason.NotReplayable]: {
+		label: 'Not replayable',
+		hint: 'Only meaningful at the moment it was originally emitted — replaying it now would act on stale intent.',
+		replayable: false,
+		tone: 'warn'
 	}
 };
 
@@ -90,6 +96,13 @@ export class DeadLetterConsoleState {
 	loaded = $state(false);
 	error = $state<string | null>(null);
 	readonly selected = new SvelteSet<number>();
+
+	/**
+	 * Bumped on every successful {@link load}. `entry.index` is only a queue position, reused by whatever
+	 * entry now sits there, so the console keys rows by `generation` + `index` rather than `index` alone —
+	 * otherwise a row's local expanded-payload state would leak onto a different entry after a refresh.
+	 */
+	generation = $state(0);
 
 	private readonly routes: QueueRoutes;
 
@@ -160,6 +173,7 @@ export class DeadLetterConsoleState {
 			});
 			this.totalCount = inspection.totalCount;
 			this.entries = inspection.entries;
+			this.generation++;
 			this.clearSelection();
 			this.loaded = true;
 			return true;

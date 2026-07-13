@@ -93,6 +93,13 @@ namespace Game.Api
                 .Validate(
                     options => options.ForwardLimit is null || options.ForwardLimit >= 1,
                     "ForwardedHeaders:ForwardLimit must be null (no limit) or at least 1")
+                // An unparseable KnownProxies/KnownNetworks entry (e.g. a hostname, or a CIDR in the wrong
+                // list) would otherwise be silently dropped by Apply, which can leave the middleware enabled
+                // with empty framework trust lists — trusting X-Forwarded-For unconditionally rather than
+                // trusting nothing. Fail fast instead so the misconfiguration surfaces at deploy time.
+                .Validate(
+                    options => options.AllEntriesParse,
+                    "ForwardedHeaders:KnownProxies/KnownNetworks contains an entry that failed to parse")
                 .ValidateOnStart();
             builder.Services.AddOptions<ForwardedHeadersOptions>()
                 .Configure<IOptions<ForwardedHeadersConfig>>((options, config) => config.Value.Apply(options));
@@ -138,6 +145,9 @@ namespace Game.Api
             builder.Services.AddEndpointsApiExplorer()
                 .AddSwaggerGen()
                 .AddHttpContextAccessor()
+                // Backs LoginTrackingMiddleware's short-lived per-device dedupe memo (instance-local is
+                // fine — a session sticks to one instance, per the single-connection architecture).
+                .AddMemoryCache()
                 .AddDataAccess()
                 .AddDomainEventDispatcher()
                 .AddApplication()

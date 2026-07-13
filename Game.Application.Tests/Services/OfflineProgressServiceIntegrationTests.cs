@@ -134,6 +134,42 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SimulateOfflineProgress_AwayLongerThanSimulationCap_StampsChallengeCompletedAtWithinCappedWindow()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var setup = await SeedWinningScenarioAsync(scope, reload: false);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var challenge = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 3m, rewardItemId: item.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            // Well beyond MaximumOfflineSimulation (10h): the simulated window is clamped to the cap, so a
+            // challenge completed within it must be stamped at the capped window's end, not at this claim
+            // (which is ~10h later than the window it was actually simulated within).
+            var lastActivity = DateTime.UtcNow.AddHours(-20);
+            player.LastActivity = lastActivity;
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.Single(summary.CompletedChallenges, c => c.ChallengeId == challenge.Id);
+            var challenges = await progressRepo.GetChallenges(setup.PlayerId);
+            var playerChallenge = Assert.Single(challenges, c => c.Challenge.Id == challenge.Id);
+            Assert.NotNull(playerChallenge.CompletedAt);
+
+            var expectedWindowEnd = lastActivity + OfflineProgressService.MaximumOfflineSimulation;
+            Assert.True(
+                Math.Abs((playerChallenge.CompletedAt!.Value - expectedWindowEnd).TotalSeconds) < 5,
+                $"Expected CompletedAt near the capped window end {expectedWindowEnd:O}, got {playerChallenge.CompletedAt:O}.");
+            Assert.True(DateTime.UtcNow - playerChallenge.CompletedAt!.Value > TimeSpan.FromHours(9));
+        }
+
+        [Fact]
         public async Task SimulateOfflineProgress_MixedWinLossWindow_CompletesAWinTrackingChallengeCrossedByEarlyWins()
         {
             using var scope = CreateScope();
@@ -275,6 +311,52 @@ namespace Game.Application.Tests.Services
                 Assert.True(state.BattleStartTime > staleBattleStart, "The stale battle must not still be active.");
             }
             Assert.True(summary.HasProgress);
+        }
+
+        [Fact]
+        public async Task SimulateOfflineProgress_StaleBattleSettles_DeductsItsSpanFromTheAwayBudget()
+        {
+            // #1882: the away budget handed to the simulator must exclude the wall-clock span the just-settled
+            // stale battle (plus its post-battle cooldown) already consumed. Before the fix, that whole span
+            // was replayed a second time as extra free simulated battles.
+            using var scope = CreateScope();
+            var setup = await SeedWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+
+            var battleMs = await ComputeBattleDurationMsAsync(scope, setup);
+            var cooldownMs = (int)BattleService.PostBattleCooldown.TotalMilliseconds;
+            var stepMs = battleMs + cooldownMs;
+            // Measured before LastActivity is anchored below — like the other precisely-timed tests in this
+            // file, nothing awaited may sit between anchoring LastActivity and calling the service, or the real
+            // I/O latency of an intervening await drifts the away window past the exact boundary this test pins.
+            var expPerWin = await ComputeExpPerWinAsync(scope, setup);
+
+            // Leave a battle in-flight far enough in the past that its replay concludes as a win well within
+            // the 2-minute cap (its own duration is a fraction of a second).
+            await battleService.StartBattle(player, state, zoneId: setup.ZoneId);
+            Assert.True(state.HasActiveBattle);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // Size the away window as exactly the settled battle's span (one stepMs) plus 100 more whole
+            // battle+cooldown cycles — enough to comfortably clear the 5-minute login floor regardless of the
+            // measured battle duration — so a correct implementation wins exactly 100, not 101, which is what
+            // re-simulating the settled battle's own span as extra free time would produce, with nothing left
+            // over to carry forward.
+            const int simulatedBattles = 100;
+            var awayMs = (long)stepMs * (simulatedBattles + 1);
+            player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            // The settled stale battle's win is credited separately (via player.Exp, not the summary below) —
+            // the simulator itself must win exactly the five battles the deducted budget actually allows for.
+            Assert.Equal(simulatedBattles, summary.BattlesWon);
+            Assert.Equal((long)simulatedBattles * expPerWin, summary.TotalExp);
+            Assert.Null(summary.ActiveBattle);
+            Assert.False(state.HasActiveBattle);
         }
 
         [Fact]
@@ -459,6 +541,44 @@ namespace Game.Application.Tests.Services
 
             await offlineProgressService.SimulateSwitchProgress(player, state, CancellationToken);
 
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task SimulateSwitchProgress_StaleBattleSettles_DeductsItsSpanFromTheAwayBudget()
+        {
+            // #1882: the switch path drops the away-time floor entirely, so double-crediting the settled
+            // battle's span is worse here — a deliberate A/B character-switch cycle could otherwise repeat the
+            // over-credit on every switch. Same fix, same assertion shape as the login-path pin above.
+            using var scope = CreateScope();
+            var setup = await SeedWinningScenarioAsync(scope);
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+
+            var battleMs = await ComputeBattleDurationMsAsync(scope, setup);
+            var cooldownMs = (int)BattleService.PostBattleCooldown.TotalMilliseconds;
+            var stepMs = battleMs + cooldownMs;
+            // Measured before LastActivity is anchored below — see the login-path pin above for why nothing
+            // awaited may sit between anchoring LastActivity and calling the service.
+            var expPerWin = await ComputeExpPerWinAsync(scope, setup);
+
+            await battleService.StartBattle(player, state, zoneId: setup.ZoneId);
+            Assert.True(state.HasActiveBattle);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // Exactly the settled battle's span (one stepMs) plus three more whole cycles — well under the
+            // 5-minute login floor the switch path deliberately ignores.
+            const int simulatedBattles = 3;
+            var awayMs = (long)stepMs * (simulatedBattles + 1);
+            player.LastActivity = DateTime.UtcNow.AddMilliseconds(-awayMs);
+
+            var summary = await offlineProgressService.SimulateSwitchProgress(player, state, CancellationToken);
+
+            Assert.Equal(simulatedBattles, summary.BattlesWon);
+            Assert.Equal((long)simulatedBattles * expPerWin, summary.TotalExp);
+            Assert.Null(summary.ActiveBattle);
             Assert.False(state.HasActiveBattle);
         }
 

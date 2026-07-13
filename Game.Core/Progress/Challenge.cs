@@ -25,17 +25,17 @@ namespace Game.Core.Progress
         /// resolvable by id so existing references (and completions) stay valid. Null while active.</summary>
         public DateTime? RetiredAt { get; init; }
 
-        public void UpdateChallengeProgress(PlayerChallenge playerChallenge, PlayerProgress playerProgress)
+        public void UpdateChallengeProgress(PlayerChallenge playerChallenge, PlayerProgress playerProgress, DateTime timestamp)
         {
             if (Type.StatisticType is not null)
             {
                 var hasData = playerProgress.TryGetStatisticValue(Type.StatisticType.Id, TargetEntityId, out var value);
-                playerChallenge.UpdateProgress(value, hasData);
+                playerChallenge.UpdateProgress(value, hasData, timestamp);
             }
             else if (Type.Id is EChallengeType.LevelReached)
             {
                 // The player's level is always present, so the progress value is always real data.
-                playerChallenge.UpdateProgress(playerProgress.Player.Level, hasData: true);
+                playerChallenge.UpdateProgress(playerProgress.Player.Level, hasData: true, timestamp);
             }
             else
             {

@@ -620,8 +620,8 @@ const scenarios: ParityScenario[] = [
 
 	// Effect apply → expire → re-apply (#941): a periodic poison whose duration (80ms = 2 ticks) is shorter than
 	// its skill's cooldown (120ms = 3 ticks), so each application fully LAPSES for a tick before re-applying — the
-	// cycle where the frontend's decrementing remainingMs and the backend's absolute ExpiresAtMs clock are most
-	// likely to drift by a tick. Mirrors the backend `effectExpiresThenReapplies` scenario.
+	// cycle where the two simulators' shared-expiry bookkeeping is most likely to drift by a tick (both key
+	// expiry to an absolute elapsed-ms clock, #1705). Mirrors the backend `effectExpiresThenReapplies` scenario.
 	//   Player: skill baseDamage 0, cooldown 120, Opponent +250 PoisonDamagePerSecond for 80ms → 10/tick. Fires at
 	//     ticks 120,240,360. Enemy: MaxHealth 50, no skills.
 	//   Active 120,160 (50→30), lapse 200, re-apply 240,280 (30→10), lapse 320, re-apply 360 (→0): dies at 360ms.

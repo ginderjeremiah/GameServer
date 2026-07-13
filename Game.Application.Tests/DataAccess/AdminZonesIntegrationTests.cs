@@ -115,6 +115,37 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetEnemies_NegativeWeight_ReturnsFailure()
+        {
+            int zoneId, enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var zone = await TestDataSeeder.CreateZoneAsync(context);
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                zoneId = zone.Id;
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A negative weight would otherwise commit and then throw inside ProbabilityTable's constructor
+            // when the enemy snapshot next rebuilds — reject it up front instead.
+            var data = new SetZoneEnemiesData
+            {
+                ZoneId = zoneId,
+                ZoneEnemies = [new Contracts.ZoneEnemy { EnemyId = enemyId, Weight = -1 }],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SetEnemies(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("A zone enemy's spawn weight cannot be negative.", result.ErrorMessage);
+        }
+
+        [Fact]
         public void SetEnemies_UnknownZone_ReturnsNotFound()
         {
             using var scope = CreateScope();
@@ -315,6 +346,52 @@ namespace Game.Application.Tests.DataAccess
             Assert.False(result.Succeeded);
             Assert.Equal(
                 "Only one Home zone is allowed. Another non-retired Home zone already exists; retire it first or make this a combat zone.",
+                result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveZones_FlipZoneToHomeWithSpawns_ReturnsFailure()
+        {
+            int combatZoneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var zone = await TestDataSeeder.CreateZoneAsync(context, "Wilds");
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id, weight: 1);
+                combatZoneId = zone.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // Flipping an already-spawn-populated combat zone to Home is the third way to leave the
+            // sanctuary with live spawns (the other two — a Home boss, and SetEnemies against a Home zone —
+            // are already guarded). The guard reasons over the zone's currently cached spawn table, not this
+            // save's own payload, since SaveZones never carries spawn data.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SaveZones(
+            [
+                new Change<Contracts.Zone>
+                {
+                    ChangeType = EChangeType.Edit,
+                    Item = new Contracts.Zone
+                    {
+                        Id = combatZoneId,
+                        Name = "Wilds",
+                        Description = "",
+                        DesignerNotes = "",
+                        LevelMin = 1,
+                        LevelMax = 10,
+                        BossLevel = 1,
+                        IsHome = true,
+                    },
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(
+                "The Home zone cannot have enemy spawns. Home is a no-combat sanctuary where no enemies spawn; clear the zone's spawn table before making it Home.",
                 result.ErrorMessage);
         }
 

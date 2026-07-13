@@ -139,7 +139,7 @@ namespace Game.Core.Progress
             return [.. _dirtyStatistics];
         }
 
-        public List<CompletedChallenge> EvaluateChallenges(IEnumerable<Challenge> challenges)
+        public List<CompletedChallenge> EvaluateChallenges(IEnumerable<Challenge> challenges, DateTime timestamp)
         {
             var completed = new List<CompletedChallenge>();
 
@@ -169,7 +169,7 @@ namespace Game.Core.Progress
                 var beforeProgress = playerChallenge.Progress;
                 var beforeCompleted = playerChallenge.Completed;
 
-                challenge.UpdateChallengeProgress(playerChallenge, this);
+                challenge.UpdateChallengeProgress(playerChallenge, this, timestamp);
 
                 if (playerChallenge.Progress != beforeProgress || playerChallenge.Completed != beforeCompleted)
                 {
@@ -242,6 +242,18 @@ namespace Game.Core.Progress
         /// <returns><c>true</c> when a row exists for the proficiency; otherwise <c>false</c>.</returns>
         public bool TryGetProficiency(int proficiencyId, [MaybeNullWhen(false)] out PlayerProficiency proficiency) =>
             _proficiencies.TryGetValue(proficiencyId, out proficiency);
+
+        /// <summary>
+        /// Clears the dirty-row tracking, so a subsequent save of this same aggregate re-enqueues and
+        /// re-persists only rows mutated since <em>this</em> point rather than every row dirtied since load.
+        /// Called by the repository once a save's envelope has been buffered.
+        /// </summary>
+        public void AcceptChanges()
+        {
+            _dirtyStatistics.Clear();
+            _dirtyChallenges.Clear();
+            _dirtyProficiencies.Clear();
+        }
 
         /// <summary>
         /// Sets a proficiency's absolute level and accumulated XP, creating the row on first training, and

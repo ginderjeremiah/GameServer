@@ -3,6 +3,7 @@ import {
 	getAccessToken,
 	getAccessTokenExpiry,
 	getRefreshToken,
+	getTokens,
 	setTokens,
 	type StoredTokens
 } from './token-store';
@@ -53,8 +54,14 @@ const performRefresh = async (refreshToken: string): Promise<StoredTokens | null
 
 /**
  * Exchanges the stored refresh token for a fresh pair and persists the rotated tokens. Concurrent
- * callers share a single request so the single-use refresh token is only consumed once. On failure
- * the stored tokens are cleared (the refresh token is spent or revoked, so the session is dead).
+ * callers **within this tab** share a single request so the single-use refresh token is only
+ * consumed once — but the token pair lives in shared `localStorage`, and two tabs are a supported
+ * state (see `SocketReplaced`), so a failure here doesn't necessarily mean the presented token was
+ * genuinely spent/revoked: another tab may have already raced it through a refresh of its own. Before
+ * treating a failure as fatal, re-read storage — if it now holds a different refresh token than the
+ * one just presented, that tab won the race and its rotated pair is the live session, so adopt it
+ * instead of clearing a session that's still alive elsewhere. Only when storage still holds the same
+ * token we presented (no other tab rotated it) is the session actually dead.
  */
 export const refreshTokens = (): Promise<StoredTokens | null> => {
 	if (inFlightRefresh) {
@@ -70,10 +77,16 @@ export const refreshTokens = (): Promise<StoredTokens | null> => {
 		.then((tokens) => {
 			if (tokens) {
 				setTokens(tokens);
-			} else {
-				clearTokens();
+				return tokens;
 			}
-			return tokens;
+
+			const current = getTokens();
+			if (current !== null && current.refreshToken !== refreshToken) {
+				return current;
+			}
+
+			clearTokens();
+			return null;
 		})
 		.finally(() => {
 			inFlightRefresh = null;
@@ -103,6 +116,11 @@ export const ensureValidAccessToken = async (): Promise<string | null> => {
  * Handles an unrecoverable auth failure (refresh exhausted): clears the stored tokens and returns the
  * user to the login screen. A full-page navigation tears down all in-memory game state, mirroring the
  * logout flow. The redirect is skipped when already on the login page to avoid a reload loop.
+ *
+ * This always clears — a caller reacting to a failed refresh must re-read storage itself first (as
+ * `execute`/`openSocket`/`handleClose` do) and skip calling this at all if a concurrent tab has since
+ * rotated in a fresh pair, otherwise this unconditional clear would wipe out a session that's still
+ * alive elsewhere.
  */
 export const handleAuthFailure = (): void => {
 	clearTokens();

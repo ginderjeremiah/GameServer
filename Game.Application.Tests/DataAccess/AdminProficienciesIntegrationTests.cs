@@ -237,6 +237,146 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveProficiencies_ShrinksMaxLevelBelowPersistedModifier_ReturnsFailure()
+        {
+            int proficiencyId, pathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var proficiency = await SeedProficiencyAsync(seedScope);
+                proficiencyId = proficiency.Id;
+                pathId = proficiency.PathId;
+
+                context.ProficiencyLevelModifiers.Add(new Entities.ProficiencyLevelModifier
+                {
+                    ProficiencyId = proficiencyId,
+                    Level = 7,
+                    AttributeId = (int)EAttribute.Strength,
+                    ModifierType = (int)EModifierType.Additive,
+                    Amount = 1m,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: proficiencyId, pathId: pathId, maxLevel: 5) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("payout at level 7", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_ShrinksMaxLevelBelowPersistedReward_ReturnsFailure()
+        {
+            int proficiencyId, pathId, skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await SeedSkillAsync(context, ESkillAcquisition.Player)).Id;
+                var proficiency = await SeedProficiencyAsync(seedScope);
+                proficiencyId = proficiency.Id;
+                pathId = proficiency.PathId;
+
+                context.Set<Entities.ProficiencyLevelReward>().Add(new Entities.ProficiencyLevelReward
+                {
+                    ProficiencyId = proficiencyId,
+                    Level = 8,
+                    RewardSkillId = skillId,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: proficiencyId, pathId: pathId, maxLevel: 5) },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("payout at level 8", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_ShrinksMaxLevelAboveEveryPersistedPayout_IsAccepted()
+        {
+            int proficiencyId, pathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var proficiency = await SeedProficiencyAsync(seedScope);
+                proficiencyId = proficiency.Id;
+                pathId = proficiency.PathId;
+
+                context.ProficiencyLevelModifiers.Add(new Entities.ProficiencyLevelModifier
+                {
+                    ProficiencyId = proficiencyId,
+                    Level = 3,
+                    AttributeId = (int)EAttribute.Strength,
+                    ModifierType = (int)EModifierType.Additive,
+                    Amount = 1m,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: proficiencyId, pathId: pathId, maxLevel: 5) },
+            ]);
+
+            Assert.True(result.Succeeded, result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_ShrinksMaxLevelToExactlyThePersistedPayoutLevel_IsAccepted()
+        {
+            // The guard rejects only a payout strictly above the new cap (`level > MaxLevel`), matching
+            // FindLevelOutOfRange's own `level > proficiency.MaxLevel` boundary — a payout landing exactly
+            // on the new cap is still reachable and must not be rejected.
+            int proficiencyId, pathId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var proficiency = await SeedProficiencyAsync(seedScope);
+                proficiencyId = proficiency.Id;
+                pathId = proficiency.PathId;
+
+                context.ProficiencyLevelModifiers.Add(new Entities.ProficiencyLevelModifier
+                {
+                    ProficiencyId = proficiencyId,
+                    Level = 5,
+                    AttributeId = (int)EAttribute.Strength,
+                    ModifierType = (int)EModifierType.Additive,
+                    Amount = 1m,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: proficiencyId, pathId: pathId, maxLevel: 5) },
+            ]);
+
+            Assert.True(result.Succeeded, result.ErrorMessage);
+        }
+
+        [Fact]
         public void SetModifiers_UnknownProficiency_ReturnsNotFound()
         {
             using var scope = CreateScope();
@@ -454,11 +594,11 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
 
-            var result = admin.SetPrerequisites(new SetProficiencyPrerequisitesData
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
             {
                 Id = proficiencyId,
                 PrerequisiteIds = [proficiencyId],
-            });
+            }]);
 
             Assert.False(result.Succeeded);
             Assert.Contains("cannot be its own prerequisite", result.ErrorMessage);
@@ -489,14 +629,83 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
 
-            var result = admin.SetPrerequisites(new SetProficiencyPrerequisitesData
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
             {
                 Id = prerequisiteId,
                 PrerequisiteIds = [gatedId],
-            });
+            }]);
 
             Assert.False(result.Succeeded);
             Assert.Contains("cycle", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetPrerequisites_BatchNamesTheSameProficiencyTwice_ReturnsFailure()
+        {
+            int proficiencyId, otherId;
+            using (var seedScope = CreateScope())
+            {
+                proficiencyId = (await SeedProficiencyAsync(seedScope)).Id;
+                otherId = (await SeedProficiencyAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SetPrerequisites([
+                new SetProficiencyPrerequisitesData { Id = proficiencyId, PrerequisiteIds = [] },
+                new SetProficiencyPrerequisitesData { Id = proficiencyId, PrerequisiteIds = [otherId] },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("more than once", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SetPrerequisites_BatchedGatewaySwap_AcceptsTheCombinedAcyclicResult()
+        {
+            // Reproduces the false-cycle rejection this batch endpoint exists to fix: A currently gates on B
+            // (A -> B). The swap reverses the gateway in one save — A drops its prerequisite on B while B
+            // gains one on A — an edit whose end state (B -> A only) is acyclic. Processed one-at-a-time in
+            // submission order, whichever change posts first would see the other side's edge still live and
+            // false-reject the swap as a cycle; batched, both edges are judged against the same combined,
+            // final graph.
+            int aId, bId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var a = await SeedProficiencyAsync(seedScope);
+                var b = await SeedProficiencyAsync(seedScope);
+                aId = a.Id;
+                bId = b.Id;
+
+                context.Set<Entities.ProficiencyPrerequisite>().Add(new Entities.ProficiencyPrerequisite
+                {
+                    ProficiencyId = aId,
+                    PrerequisiteProficiencyId = bId,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+                var result = admin.SetPrerequisites([
+                    new SetProficiencyPrerequisitesData { Id = aId, PrerequisiteIds = [] },
+                    new SetProficiencyPrerequisitesData { Id = bId, PrerequisiteIds = [aId] },
+                ]);
+
+                Assert.True(result.Succeeded, result.ErrorMessage);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var edges = await assertContext.Set<Entities.ProficiencyPrerequisite>().ToListAsync(CancellationToken);
+            Assert.DoesNotContain(edges, e => e.ProficiencyId == aId);
+            Assert.Contains(edges, e => e.ProficiencyId == bId && e.PrerequisiteProficiencyId == aId);
         }
 
         private async Task<Entities.Path> SeedPathAsync(IServiceScope scope)
@@ -571,7 +780,7 @@ namespace Game.Application.Tests.DataAccess
             Amount = amount,
         };
 
-        private static Contracts.Proficiency NewProficiency(int id = 0, string name = "Blades", int pathId = 0, int pathOrdinal = 0) => new()
+        private static Contracts.Proficiency NewProficiency(int id = 0, string name = "Blades", int pathId = 0, int pathOrdinal = 0, int maxLevel = 10) => new()
         {
             Id = id,
             Name = name,
@@ -583,7 +792,7 @@ namespace Game.Application.Tests.DataAccess
             Translation = "",
             PathId = pathId,
             PathOrdinal = pathOrdinal,
-            MaxLevel = 10,
+            MaxLevel = maxLevel,
             BaseXp = 100m,
             XpGrowth = 2m,
             LevelModifiers = [],

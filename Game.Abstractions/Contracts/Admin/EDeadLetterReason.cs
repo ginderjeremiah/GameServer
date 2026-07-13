@@ -18,5 +18,10 @@ namespace Game.Abstractions.Contracts.Admin
         /// <summary>A well-formed, known entry that exhausted its retries (or delivery attempts) on a
         /// transient failure; worth replaying once the underlying cause is fixed.</summary>
         Replayable = 2,
+
+        /// <summary>A well-formed, known entry whose command is session-lifecycle-only (e.g. a socket-close
+        /// signal) and is only ever meaningful at the moment it was originally emitted; replaying it later
+        /// would act on stale intent rather than recover a legitimately dropped delivery.</summary>
+        NotReplayable = 3,
     }
 }

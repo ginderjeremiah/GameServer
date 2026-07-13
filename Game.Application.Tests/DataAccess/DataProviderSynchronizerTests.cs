@@ -924,6 +924,86 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_ProcessingListStrandedWithinGracePeriod_DoesNotReclaimYet()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+
+            // Model an item stranded on the processing list without a crash (e.g. the dead-letter write or the
+            // acknowledge itself faulting after a durable apply): reserved but never acknowledged, with nothing
+            // else left on the main queue.
+            var queue = new InMemoryPubSubQueue("malformed");
+            var stranded = await queue.ReserveNextAsync();
+            Assert.NotNull(stranded);
+
+            // A drain pass immediately after finds the main queue empty and the processing list non-empty, but
+            // the grace period hasn't elapsed yet, so it only starts the clock without reclaiming.
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+            Assert.Equal(1, await queue.ReclaimProcessingAsync());
+        }
+
+        [Fact]
+        public async Task ProcessQueue_ProcessingListStrandedPastGracePeriod_ReclaimsAndAppliesTheEvent()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+
+            var validEvent = new PlayerCoreUpdatedEvent(
+                PlayerId: player.Id,
+                Level: 33,
+                Exp: 3333,
+                CurrentZoneId: 0,
+                StatPointsGained: 100,
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow,
+                AutoChallengeBoss: false);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+
+            // Reserve without acknowledging, stranding the event on the processing list with nothing left on
+            // the main queue — the same stranding shape as the crashed-run test above, but here modelling a
+            // still-live instance whose acknowledge (not the apply) faulted.
+            var queue = new InMemoryPubSubQueue(Serialize(validEvent));
+            Assert.NotNull(await queue.ReserveNextAsync());
+
+            // First pass only starts the grace clock.
+            await synchronizer.ProcessQueue(queue);
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+
+            // Once the grace period has elapsed, the next drain pass reclaims it and applies it — without
+            // waiting for the process to restart.
+            timeProvider.Advance(TimeSpan.FromSeconds(31));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("stranded"));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+            Assert.Equal(0, await queue.ReclaimProcessingAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(33, persisted.Level);
+            Assert.Equal(3333, persisted.Exp);
+        }
+
+        [Fact]
         public async Task StartAsync_ReclaimsInFlightItemOrphanedByCrashedRun_AndApplies()
         {
             using var scope = CreateScope();
@@ -1252,6 +1332,101 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Fact]
+        public async Task ProcessQueue_ItemFaultsPastCompactionThreshold_LaterSamePlayerItemStaysBlockedForReclaim()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var userA = await TestDataSeeder.CreateUserAsync(context, username: "fault-lane-user-a");
+            var playerA = await TestDataSeeder.CreatePlayerAsync(context, userA.Id, level: 5, zoneId: 0);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerA.Id, item.Id, equipmentSlot: null);
+
+            var userB = await TestDataSeeder.CreateUserAsync(context, username: "fault-lane-user-b");
+            var playerB = await TestDataSeeder.CreatePlayerAsync(context, userB.Id, level: 3, zoneId: 0);
+
+            // Player A's equip applies durably but its acknowledge faults (a Redis blip), leaving the item
+            // reserved and its lane dead. Enough filler events from player B follow to push the pass over the
+            // compaction threshold (max(2 * 8, 32) = 32) before player A's unequip is reserved — so this pins
+            // that compaction never evicts the faulted lane. If it did, the unequip would start a fresh lane
+            // and apply AHEAD of the failed equip's eventual reclaim/re-apply, re-equipping the item once the
+            // reclaimed equip replays — same-player ordering broken exactly on the fault path.
+            var equip = Serialize(new ItemEquippedEvent(playerA.Id, item.Id, (int)EEquipmentSlot.HelmSlot));
+            var messages = new List<string> { equip };
+            messages.AddRange(Enumerable.Range(1, 34).Select(i =>
+                Serialize(new PlayerCoreUpdatedEvent(playerB.Id, 3, 100 + i, 0, 100, 100, DateTime.UtcNow, false))));
+            messages.Add(Serialize(new ItemUnequippedEvent(playerA.Id, item.Id)));
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, maxConcurrentDrainItems: 2);
+
+            var queue = new FaultingAcknowledgeQueue(new InMemoryPubSubQueue([.. messages]), value => value == equip);
+
+            await synchronizer.ProcessQueue(queue);
+
+            // The faulted lane is surfaced once at pass end, not silently swallowed.
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("faulted while applying"));
+
+            // Both of player A's items stay reserved on the processing list for the reclaim: the equip because
+            // its acknowledge faulted, the unequip because it chained onto the dead lane and never applied.
+            Assert.Equal(2, await queue.GetProcessingCountAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await verifyContext.UnlockedItems
+                .SingleAsync(ui => ui.PlayerId == playerA.Id && ui.ItemId == item.Id, CancellationToken);
+
+            // The unequip did NOT apply ahead of the failed equip — the slot still holds the equip's write.
+            Assert.Equal((int)EEquipmentSlot.HelmSlot, row.EquipmentSlotId);
+
+            // Player B's independent lane was unaffected by A's fault: every filler applied.
+            var persistedB = await verifyContext.Players.FindAsync([playerB.Id], CancellationToken);
+            Assert.NotNull(persistedB);
+            Assert.Equal(134, persistedB.Exp);
+        }
+
+        [Fact]
+        public async Task StopAsync_MultipleInFlightApplies_AwaitsEveryOneBeforeReleasing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user1 = await TestDataSeeder.CreateUserAsync(context, username: "stop-inflight-user-1");
+            var player1 = await TestDataSeeder.CreatePlayerAsync(context, user1.Id, level: 5, zoneId: 0);
+            var user2 = await TestDataSeeder.CreateUserAsync(context, username: "stop-inflight-user-2");
+            var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5, zoneId: 0);
+
+            var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
+            var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var queue = new MultiGatedAcknowledgeQueue(expectedParked: 2, Serialize(evt1), Serialize(evt2));
+            var pubsub = new SingleQueuePubSubService(queue);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(30), maxConcurrentDrainItems: 2);
+
+            var startTask = synchronizer.StartAsync(CancellationToken.None);
+
+            // Two distinct players' items are mid-apply concurrently (parked inside their acknowledges,
+            // each holding one of the two concurrency slots) when the stop arrives.
+            await queue.AllAcknowledgesParked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var stopTask = synchronizer.StopAsync(CancellationToken.None);
+
+            // The stop must hold the drain gate until EVERY in-flight item finishes — not just the first.
+            await Task.Delay(100, CancellationToken);
+            Assert.False(stopTask.IsCompleted);
+
+            queue.ReleaseAcknowledges.SetResult();
+            await startTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Both items finished cleanly before the stop returned: acknowledged, no boundary-timeout warning.
+            Assert.Equal(2, queue.AcknowledgedCount);
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning);
+        }
+
         private static void AssertSkillState(IEnumerable<Infrastructure.Entities.PlayerSkill> rows, int skillId, bool selected, int order)
         {
             var row = Assert.Single(rows, ps => ps.SkillId == skillId);
@@ -1359,6 +1534,8 @@ namespace Game.Application.Tests.DataAccess
             }
 
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
+
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_processing.Count);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default)
             {
@@ -1468,6 +1645,14 @@ namespace Game.Application.Tests.DataAccess
                 }
             }
 
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_processing.Count);
+                }
+            }
+
             // The drained-queue assertion uses GetNextAsync to confirm nothing is left waiting.
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
@@ -1552,6 +1737,14 @@ namespace Game.Application.Tests.DataAccess
                 lock (_gate)
                 {
                     return Task.FromResult((long)_items.Count);
+                }
+            }
+
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_processing.Count);
                 }
             }
 
@@ -1699,7 +1892,132 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_processing.Count);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
+
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// Wraps an <see cref="InMemoryPubSubQueue"/> but faults the acknowledge of any value matching the
+        /// predicate — modelling a Redis blip after a durable apply, which leaves the item reserved on the
+        /// processing list and its player lane dead for the rest of the pass.
+        /// </summary>
+        private sealed class FaultingAcknowledgeQueue(InMemoryPubSubQueue inner, Func<string, bool> shouldFault) : IPubSubQueue
+        {
+            public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default) => inner.ReserveNextAsync(cancellationToken);
+
+            public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default)
+            {
+                if (shouldFault(value))
+                {
+                    throw new InvalidOperationException("Simulated Redis blip on acknowledge.");
+                }
+
+                return inner.AcknowledgeAsync(value, cancellationToken);
+            }
+
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => inner.ReclaimProcessingAsync(cancellationToken);
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => inner.GetLengthAsync(cancellationToken);
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => inner.GetProcessingCountAsync(cancellationToken);
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => inner.GetNextAsync(cancellationToken);
+            public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => inner.PeekAsync(count, cancellationToken);
+            public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => inner.RemoveAsync(value, cancellationToken);
+            public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => inner.AddToQueueAsync(value, cancellationToken);
+            public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => inner.AddRangeToQueueAsync(values, cancellationToken);
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// An <see cref="IPubSubQueue"/> that parks EVERY acknowledge behind one shared release gate, signalling
+        /// <see cref="AllAcknowledgesParked"/> once the expected number are parked at the same time — so a test
+        /// can hold several distinct players' items mid-apply concurrently, trigger a stop, and then release
+        /// them all to verify the stop waited for every one.
+        /// </summary>
+        private sealed class MultiGatedAcknowledgeQueue : IPubSubQueue
+        {
+            private readonly object _gate = new();
+            private readonly Queue<string> _items;
+            private readonly List<string> _processing = [];
+            private readonly int _expectedParked;
+            private int _parked;
+
+            public TaskCompletionSource AllAcknowledgesParked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public TaskCompletionSource ReleaseAcknowledges { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public int AcknowledgedCount { get; private set; }
+
+            public MultiGatedAcknowledgeQueue(int expectedParked, params string[] items)
+            {
+                _expectedParked = expectedParked;
+                _items = new Queue<string>(items);
+            }
+
+            public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    if (_items.Count == 0)
+                    {
+                        return Task.FromResult<string?>(null);
+                    }
+
+                    var value = _items.Dequeue();
+                    _processing.Add(value);
+                    return Task.FromResult<string?>(value);
+                }
+            }
+
+            public async Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    _parked++;
+                    if (_parked == _expectedParked)
+                    {
+                        AllAcknowledgesParked.SetResult();
+                    }
+                }
+
+                await ReleaseAcknowledges.Task;
+
+                lock (_gate)
+                {
+                    _processing.Remove(value);
+                    AcknowledgedCount++;
+                }
+            }
+
+            public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
+
+            public Task<long> GetLengthAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_items.Count);
+                }
+            }
+
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult((long)_processing.Count);
+                }
+            }
+
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
+            {
+                lock (_gate)
+                {
+                    return Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
+                }
+            }
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -1729,6 +2047,7 @@ namespace Game.Application.Tests.DataAccess
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
+            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -1737,6 +2056,16 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
+
+        /// <summary>A controllable <see cref="TimeProvider"/> so the opportunistic-reclaim grace period can be
+        /// crossed deterministically instead of relying on wall-clock delays.</summary>
+        private sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
+        {
+            private DateTimeOffset _now = start;
+
+            public override DateTimeOffset GetUtcNow() => _now;
+            public void Advance(TimeSpan delta) => _now += delta;
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>

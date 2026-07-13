@@ -181,6 +181,29 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task ExecuteCommand_ResponseSendWedges_AbortsAndReleasesTheCommandLockForTheNextCommand()
+        {
+            // RunCommandUnderLock awaits the response send after the per-command timeout budget has already
+            // elapsed, still holding the per-socket command lock. A peer that stalls its read side (a zero TCP
+            // receive window) while still sending inbound traffic wedges that send forever unless SendData
+            // itself falls back to Abort() — otherwise the command lock, the handler, and the in-memory Player
+            // stay pinned until process shutdown (#1760).
+            var socket = new FakeWebSocket(new TaskCompletionSource().Task);
+            var session = new SessionService(new NoOpSessionStore());
+            await session.CreateSession(userId: 1, playerId: 1);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>(),
+                sendAbortTimeout: TimeSpan.FromMilliseconds(50));
+            var handler = new SocketHandler(context, new StubCommandFactory(_ => null), _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => { });
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c1" }).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(socket.AbortCalled);
+
+            // The command lock must not still be held by the abandoned send — a second command has to be able
+            // to run rather than hanging until the process shuts down.
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c2" }).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
         public async Task ExecuteServerCommand_ResponseNotDelivered_ReturnsNotDeliveredAndLogsWarning()
         {
             var (socket, handler) = CreateHandler(_ => null);
@@ -252,7 +275,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(
                 context,
@@ -287,7 +310,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var release = new TaskCompletionSource();
             var handler = new SocketHandler(
@@ -330,7 +353,7 @@ namespace Game.Api.Tests.Unit
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            await session.CreateSession(userId: 1, playerId: 1);
             session.SetPlayer(originalPlayer);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(
@@ -360,7 +383,7 @@ namespace Game.Api.Tests.Unit
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
-            session.CreateSession(userId: 1, playerId: 1);
+            session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(throwOn, throwOnCreate, selfDelivering), _scopeFactory,
                 _loggerFactory.CreateLogger<SocketHandler>(), () => { });
@@ -459,6 +482,7 @@ namespace Game.Api.Tests.Unit
         {
             public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
             public void Update(PlayerState sessionData, int playerId) { }
+            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public void Clear(int userId) { }
         }
 

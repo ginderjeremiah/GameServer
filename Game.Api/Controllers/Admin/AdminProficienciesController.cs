@@ -41,9 +41,9 @@ namespace Game.Api.Controllers.Admin
         }
 
         [HttpPost]
-        public ApiResponse SetProficiencyPrerequisites([FromBody] SetProficiencyPrerequisitesData changeData)
+        public ApiResponse SetProficiencyPrerequisites([FromBody] List<SetProficiencyPrerequisitesData> changes)
         {
-            return _adminProficiencies.SetPrerequisites(changeData);
+            return _adminProficiencies.SetPrerequisites(changes);
         }
     }
 }

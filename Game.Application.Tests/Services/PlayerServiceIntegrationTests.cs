@@ -42,7 +42,7 @@ namespace Game.Application.Tests.Services
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var equipped = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+            var (equipped, _) = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
 
             Assert.False(equipped);
             Assert.DoesNotContain(player.Inventory.EquipmentSlots, s => s.ItemId == item.Id);
@@ -68,10 +68,13 @@ namespace Game.Application.Tests.Services
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var equipped = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+            var (equipped, proficiencyLevels) = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
 
             Assert.True(equipped);
             Assert.Contains(player.Inventory.EquipmentSlots, s => s.ItemId == item.Id);
+            // The returned levels are the same read the gear gate used, so callers (e.g. EquipItem's socket
+            // command computing PlayerRating) can reuse them instead of re-reading the proficiency hash (#1729).
+            Assert.Contains(proficiencyLevels, p => p.ProficiencyId == proficiency.Id && p.Level == 5);
         }
 
         [Fact]
@@ -537,7 +540,7 @@ namespace Game.Application.Tests.Services
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var success = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+            var (success, _) = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
             Assert.True(success);
 
             // Drain the write-behind queue (the hosted worker is disabled in the harness) so the change
@@ -571,7 +574,7 @@ namespace Game.Application.Tests.Services
             var player = await playerService.LoadPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var success = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
+            var (success, _) = await playerService.EquipItem(player, item.Id, EEquipmentSlot.WeaponSlot);
 
             Assert.False(success);
         }

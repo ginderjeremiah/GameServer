@@ -41,7 +41,7 @@
 
 <script lang="ts">
 import { onMount } from 'svelte';
-import { goto } from '$app/navigation';
+import { beforeNavigate, goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { Loading } from '$components';
 import AdminSidebar from './AdminSidebar.svelte';
@@ -61,7 +61,7 @@ import {
 } from './workbench/nav';
 import { reference } from './workbench/reference.svelte';
 import { ensureAdminAccess } from './admin-access';
-import { confirmDiscard, guardBeforeUnload } from './discard-guard';
+import { confirmDiscard, createPopStateDiscardGuard, guardBeforeUnload } from './discard-guard';
 import { toastError } from '$stores';
 
 let active = $state('enemies');
@@ -98,6 +98,10 @@ const backToGame = async () => {
 		goto(resolve('/game'));
 	}
 };
+
+// Guards the browser Back/Forward buttons — a client-side exit that handleNavigate/backToGame
+// don't cover (see discard-guard.ts).
+beforeNavigate(createPopStateDiscardGuard(() => workbenchDirty.total));
 
 $effect(() => {
 	const handler = (event: BeforeUnloadEvent) => guardBeforeUnload(event, workbenchDirty.total);

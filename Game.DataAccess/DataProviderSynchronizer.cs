@@ -19,6 +19,14 @@ namespace Game.DataAccess
         private static readonly TimeSpan DefaultDrainTimeout = TimeSpan.FromSeconds(5);
 
         /// <summary>
+        /// How long a drain pass must find the processing list still non-empty (with nothing left to reserve
+        /// from the main queue) before opportunistically reclaiming it. Comfortably longer than a healthy
+        /// apply — including its retry backoff (<see cref="PlayerUpdateRetryPolicy"/>) — so this doesn't
+        /// routinely race a genuinely in-flight item on another instance.
+        /// </summary>
+        private static readonly TimeSpan DefaultReclaimGracePeriod = TimeSpan.FromSeconds(30);
+
+        /// <summary>
         /// Default upper bound on how many player-update events this instance applies concurrently within one
         /// drain pass. Same-player ordering is preserved regardless (see <see cref="ProcessReservedItemAsync"/>),
         /// so this only relaxes the cross-player serialization that otherwise ceilings single-instance
@@ -39,7 +47,15 @@ namespace Game.DataAccess
         private readonly ILogger<DataProviderSynchronizer> _logger;
         private readonly PlayerUpdateRetryPolicy _retryPolicy;
         private readonly TimeSpan _drainTimeout;
+        private readonly TimeSpan _reclaimGracePeriod;
+        private readonly TimeProvider _timeProvider;
         private readonly int _maxConcurrentDrainItems;
+
+        // When a drain pass finds the main queue empty but the processing list non-empty, this is the instant
+        // that state was first observed. Reset to null whenever the processing list is seen empty (including
+        // right after an opportunistic reclaim). Touched only under the serialized drain (the gate below), so
+        // it needs no lock — the same rationale as _lastReportedDeadLetterDepth.
+        private DateTimeOffset? _strandedProcessingObservedAt;
 
         // Cancelled on shutdown to signal any in-flight drain (the startup drain or a pub/sub wake) to stop
         // reserving new items and unwind at a clean item boundary, and to make a late wake a no-op.
@@ -70,13 +86,23 @@ namespace Game.DataAccess
         // from re-spamming the log on every drain. Touched only under the serialized drain, so it needs no lock.
         private long _lastReportedDeadLetterDepth;
 
-        public DataProviderSynchronizer(IServiceProvider services, IPubSubService pubsub, ILogger<DataProviderSynchronizer> logger, PlayerUpdateRetryPolicy retryPolicy, TimeSpan? drainTimeout = null, int? maxConcurrentDrainItems = null)
+        public DataProviderSynchronizer(
+            IServiceProvider services,
+            IPubSubService pubsub,
+            ILogger<DataProviderSynchronizer> logger,
+            PlayerUpdateRetryPolicy retryPolicy,
+            TimeSpan? drainTimeout = null,
+            TimeSpan? reclaimGracePeriod = null,
+            TimeProvider? timeProvider = null,
+            int? maxConcurrentDrainItems = null)
         {
             _services = services;
             _pubsub = pubsub;
             _logger = logger;
             _retryPolicy = retryPolicy;
             _drainTimeout = drainTimeout ?? DefaultDrainTimeout;
+            _reclaimGracePeriod = reclaimGracePeriod ?? DefaultReclaimGracePeriod;
+            _timeProvider = timeProvider ?? TimeProvider.System;
             _maxConcurrentDrainItems = maxConcurrentDrainItems ?? DefaultMaxConcurrentDrainItems;
         }
 
@@ -264,6 +290,26 @@ namespace Game.DataAccess
                     if (next is null)
                     {
                         concurrencyGate.Release();
+
+                        // Nothing left to reserve. Before consulting the stranded-processing reclaim (#1702),
+                        // settle everything this pass itself still has in flight — an item legitimately sits on
+                        // the processing list while it applies, so counting our own in-flight work would start
+                        // (or trip) the stranded clock for items that aren't stranded at all. The barrier costs
+                        // nothing throughput-wise: the queue is empty, so there is no other work this loop
+                        // could be overlapping with.
+                        await SettleInFlightItemsAsync(playerLanes, inFlight);
+
+                        // Opportunistically reclaim anything genuinely stranded on the processing list (past
+                        // the grace period) instead of waiting for the next process restart to recover it
+                        // (#1702), and keep draining if that surfaced fresh work. The settle above reset the
+                        // lanes, so a reclaimed item — including one whose own apply faulted moments ago —
+                        // re-runs on a fresh lane rather than chaining onto its predecessor's dead lane and
+                        // re-faulting without ever reaching ProcessMessage.
+                        if (await TryReclaimStrandedProcessingAsync(queue, cancellationToken))
+                        {
+                            continue;
+                        }
+
                         break;
                     }
 
@@ -286,10 +332,8 @@ namespace Game.DataAccess
                 // for an in-progress apply to finish. Without this, ProcessQueue's caller could release the
                 // drain gate (and StopAsync could return) while an item was still applying, which is exactly
                 // the "cut off mid-SaveChanges" outcome the gate exists to prevent (docs/backend-persistence.md).
-                if (inFlight.Count > 0)
-                {
-                    await Task.WhenAll(inFlight);
-                }
+                // The settle never throws, so an exception already unwinding this frame is never masked.
+                await SettleInFlightItemsAsync(playerLanes, inFlight);
             }
 
             // Skip the extra Redis round-trip if we stopped early; the depth is surfaced again on the next drain.
@@ -300,20 +344,25 @@ namespace Game.DataAccess
         }
 
         /// <summary>
-        /// Drops already-finished tasks from <paramref name="inFlight"/> and <paramref name="playerLanes"/> so a
+        /// Drops finished tasks from <paramref name="inFlight"/> and <paramref name="playerLanes"/> so a
         /// large-backlog pass retains roughly the concurrency budget rather than growing to the whole pass's
-        /// item count. Only a lane whose <em>current</em> (most recently chained) task has completed is
-        /// evicted — a still-running or not-yet-started successor for that player is left untouched, so a later
-        /// item for the same player still correctly chains onto it rather than a stale completed entry.
+        /// item count. Only <em>successfully</em> completed tasks are evicted: a faulted (or canceled) lane
+        /// head must stay in the map so a later same-player item chains onto it and faults in turn — staying
+        /// reserved for the reclaim — rather than starting a fresh lane and applying <em>ahead</em> of the
+        /// failed item's eventual reclaim/re-apply, which would break same-player ordering exactly on the
+        /// fault path. Keeping them in <paramref name="inFlight"/> likewise keeps the drain-exit settle aware
+        /// of them. A lane is only evicted when its <em>current</em> (most recently chained) task has
+        /// completed — a still-running or not-yet-started successor for that player is left untouched, so a
+        /// later item for the same player still correctly chains onto it rather than a stale completed entry.
         /// </summary>
         private static void CompactCompletedItems(Dictionary<int, Task> playerLanes, List<Task> inFlight)
         {
-            inFlight.RemoveAll(task => task.IsCompleted);
+            inFlight.RemoveAll(task => task.IsCompletedSuccessfully);
 
             List<int>? completedLanes = null;
             foreach (var (playerId, task) in playerLanes)
             {
-                if (task.IsCompleted)
+                if (task.IsCompletedSuccessfully)
                 {
                     (completedLanes ??= []).Add(playerId);
                 }
@@ -328,6 +377,40 @@ namespace Game.DataAccess
             {
                 playerLanes.Remove(playerId);
             }
+        }
+
+        /// <summary>
+        /// Awaits every item task this pass has started, then resets both tracking collections so subsequent
+        /// work starts on fresh lanes. Never throws: an item task only faults when a Redis queue op (the
+        /// acknowledge or a dead-letter enqueue) escapes <see cref="ProcessMessage"/>, or when its predecessor
+        /// on the same lane did — either way the item is still reserved on the processing list, so the
+        /// stranded-processing reclaim (or the next startup) re-applies it rather than losing it. Faults are
+        /// logged here once; cancellations (a stop mid-retry-backoff) are the normal shutdown contract and
+        /// need no logging.
+        /// </summary>
+        private async Task SettleInFlightItemsAsync(Dictionary<int, Task> playerLanes, List<Task> inFlight)
+        {
+            if (inFlight.Count > 0)
+            {
+                try
+                {
+                    await Task.WhenAll(inFlight);
+                }
+                catch (Exception ex) when (inFlight.Any(task => task.IsFaulted))
+                {
+                    _logger.LogError(ex,
+                        "{Count} player update(s) faulted while applying on queue '{Queue}'; they remain reserved and will be reclaimed and re-applied.",
+                        inFlight.Count(task => task.IsFaulted), Constants.PUBSUB_PLAYER_QUEUE);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Only canceled items (a stop abandoning a retry backoff); they stay reserved and are
+                    // reclaimed on the next startup — the standard stop contract.
+                }
+            }
+
+            playerLanes.Clear();
+            inFlight.Clear();
         }
 
         /// <summary>
@@ -352,6 +435,51 @@ namespace Game.DataAccess
             {
                 concurrencyGate.Release();
             }
+        }
+
+        /// <summary>
+        /// Reclaims items stranded on the processing list — orphaned not by a crash (the startup reclaim's
+        /// job) but by <c>ProcessMessage</c>'s own escape paths faulting after a durable apply (the dead-letter
+        /// write or the acknowledge itself hitting a Redis blip) — once they've sat there, with nothing left on
+        /// the main queue, for at least <see cref="_reclaimGracePeriod"/>. The grace period exists only to
+        /// avoid needlessly racing an item another live instance is still genuinely applying; reclaiming it
+        /// regardless would still be safe under the queue's idempotent at-least-once contract. Returns whether
+        /// anything was reclaimed, so the caller knows to keep draining. Callers must settle their own
+        /// in-flight items first — this reads the shared processing list, which cannot distinguish a stranded
+        /// item from one this pass is still applying.
+        /// </summary>
+        private async Task<bool> TryReclaimStrandedProcessingAsync(IPubSubQueue queue, CancellationToken cancellationToken)
+        {
+            var processingCount = await queue.GetProcessingCountAsync(cancellationToken);
+            if (processingCount == 0)
+            {
+                _strandedProcessingObservedAt = null;
+                return false;
+            }
+
+            var now = _timeProvider.GetUtcNow();
+            if (_strandedProcessingObservedAt is null)
+            {
+                // First sighting: start the clock rather than reclaiming immediately.
+                _strandedProcessingObservedAt = now;
+                return false;
+            }
+
+            if (now - _strandedProcessingObservedAt.Value < _reclaimGracePeriod)
+            {
+                return false;
+            }
+
+            var reclaimed = await queue.ReclaimProcessingAsync(cancellationToken);
+            _strandedProcessingObservedAt = null;
+            if (reclaimed > 0)
+            {
+                _logger.LogInformation(
+                    "Opportunistically reclaimed {Count} player update(s) stranded on the processing list for over {GracePeriod} on queue '{Queue}'.",
+                    reclaimed, _reclaimGracePeriod, Constants.PUBSUB_PLAYER_QUEUE);
+            }
+
+            return reclaimed > 0;
         }
 
         /// <summary>

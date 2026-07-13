@@ -2,7 +2,7 @@
 	<td style:min-width="{col.min ?? 160}px">
 		<div class="fld">
 			<select class="sel" class:dirty value={row[col.key] as number} onchange={(e) => onChange(+e.currentTarget.value)}>
-				{#each col.options?.(row[col.key] as number) ?? [] as option (option.value)}
+				{#each col.options?.(row[col.key] as number, row) ?? [] as option (option.value)}
 					<option value={option.value} disabled={taken.has(option.value) && option.value !== row[col.key]}>
 						{option.text}
 					</option>
@@ -16,7 +16,7 @@
 	<td style:min-width="{col.min ?? 160}px">
 		<AttributePicker
 			value={row[col.key] as number}
-			options={col.options?.(row[col.key] as number) ?? []}
+			options={col.options?.(row[col.key] as number, row) ?? []}
 			onChange={(v) => onChange(v)}
 			ariaLabel={col.label}
 			disabledValues={col.unique ? taken : undefined}
@@ -44,7 +44,7 @@
 				aria-label={col.label}
 				placeholder={col.placeholder}
 				value={(row[col.key] as string) ?? ''}
-				oninput={(e) => onChange(e.currentTarget.value)}
+				oninput={(e) => onChange(col.optional ? e.currentTarget.value || undefined : e.currentTarget.value)}
 			/>
 			{#if dirty}<DirtyDot />{/if}
 		</div>
@@ -59,7 +59,7 @@
 {/if}
 
 <script lang="ts">
-import type { ColumnConfig } from '../entities/types';
+import type { ColumnConfig, TableRow } from '../entities/types';
 import Bar from '$components/Bar.svelte';
 import NumInput from './NumInput.svelte';
 import SelectCaret from './SelectCaret.svelte';
@@ -68,12 +68,12 @@ import AttributePicker from './AttributePicker.svelte';
 
 interface Props {
 	col: ColumnConfig;
-	row: Record<string, number | string>;
+	row: TableRow;
 	idx: number;
-	rows: Record<string, number | string>[];
+	rows: TableRow[];
 	record: unknown;
 	dirty: boolean;
-	onChange: (value: number | string) => void;
+	onChange: (value: number | string | undefined) => void;
 }
 
 const { col, row, idx, rows, record, dirty, onChange }: Props = $props();

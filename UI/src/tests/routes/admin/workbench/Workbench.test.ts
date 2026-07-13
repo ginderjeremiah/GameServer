@@ -109,6 +109,31 @@ describe('Workbench', () => {
 		expect(screen.getByText('Admin Console · Combat')).toBeTruthy();
 	});
 
+	it('shows an error state with a Refresh action when the seed load fails, instead of spinning forever', async () => {
+		const { toastError } = await import('$stores');
+		const entity = makeConfig({ refresh: vi.fn(async () => Promise.reject(new Error('socket unreachable'))) });
+		render(Workbench, { props: { entity } });
+
+		await waitFor(() => expect(screen.getByTestId('workbench-error')).toBeTruthy());
+		expect(screen.getByTestId('workbench-error').textContent).toContain('socket unreachable');
+		expect(screen.queryByTestId('workbench-title')).toBeNull();
+		expect(toastError).toHaveBeenCalledWith('socket unreachable');
+	});
+
+	it('retries the seed load when Refresh is clicked after a failure, and renders normally once it succeeds', async () => {
+		const refresh = vi.fn().mockRejectedValueOnce(new Error('socket unreachable')).mockResolvedValueOnce(seed);
+		const entity = makeConfig({ refresh });
+		render(Workbench, { props: { entity } });
+
+		await waitFor(() => expect(screen.getByTestId('workbench-error')).toBeTruthy());
+
+		await fireEvent.click(screen.getByText('Refresh'));
+
+		await waitFor(() => expect(screen.getByTestId('workbench-title')).toBeTruthy());
+		expect(screen.queryByTestId('workbench-error')).toBeNull();
+		expect(refresh).toHaveBeenCalledTimes(2);
+	});
+
 	it('follows a newly-added record to its persisted id after save, instead of jumping to the first record', async () => {
 		const persist = vi.fn(async (diff: { added: Identified[] }) => [
 			...seed,
