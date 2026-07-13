@@ -544,19 +544,11 @@ namespace Game.Api.Tests.Integration
         // until the departed character's level reflects the simulated away window.
         private async Task AssertPlayerLeveledAboveAsync(int playerId, int levelBefore)
         {
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                var persisted = await GetPersistedPlayerAsync(playerId);
-                if (persisted.Level > levelBefore)
-                {
-                    return;
-                }
+            var persisted = await PollingHelper.PollUntilAsync(
+                () => GetPersistedPlayerAsync(playerId), p => p.Level > levelBefore, timeoutMs: 5000);
 
-                await Task.Delay(25, CancellationToken);
-            }
-
-            Assert.Fail("The departed character was not credited (its level did not advance) after the switch.");
+            Assert.True(persisted.Level > levelBefore,
+                "The departed character was not credited (its level did not advance) after the switch.");
         }
 
         // The inverse of AssertPlayerLeveledAboveAsync: gives any write-behind credit a window to surface and
@@ -564,14 +556,11 @@ namespace Game.Api.Tests.Integration
         // this window, so a regression (credit not skipped while a socket is live) is caught here.
         private async Task AssertPlayerNotCreditedAsync(int playerId, int levelBefore)
         {
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
-            while (DateTime.UtcNow < deadline)
-            {
-                var persisted = await GetPersistedPlayerAsync(playerId);
-                Assert.False(persisted.Level > levelBefore,
-                    "The departed character was credited despite holding a live socket; the off-lock credit should have been skipped.");
-                await Task.Delay(25, CancellationToken);
-            }
+            var persisted = await PollingHelper.PollUntilAsync(
+                () => GetPersistedPlayerAsync(playerId), p => p.Level > levelBefore, timeoutMs: 2000);
+
+            Assert.False(persisted.Level > levelBefore,
+                "The departed character was credited despite holding a live socket; the off-lock credit should have been skipped.");
         }
 
         [Fact]
@@ -1088,18 +1077,10 @@ namespace Game.Api.Tests.Integration
         {
             using var scope = CreateScope();
             var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                if (await sessionStore.GetSession(userId) is not null)
-                {
-                    return;
-                }
+            var session = await PollingHelper.PollUntilAsync(
+                () => sessionStore.GetSession(userId), s => s is not null, timeoutMs: 5000);
 
-                await Task.Delay(25, CancellationToken);
-            }
-
-            Assert.Fail("The session was not established in the cache after login.");
+            Assert.True(session is not null, "The session was not established in the cache after login.");
         }
 
         // The Clear on logout is fire-and-forget, so poll until the session disappears.
@@ -1107,18 +1088,10 @@ namespace Game.Api.Tests.Integration
         {
             using var scope = CreateScope();
             var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                if (await sessionStore.GetSession(userId) is null)
-                {
-                    return;
-                }
+            var session = await PollingHelper.PollUntilAsync(
+                () => sessionStore.GetSession(userId), s => s is null, timeoutMs: 5000);
 
-                await Task.Delay(25, CancellationToken);
-            }
-
-            Assert.Fail("The session was not evicted from the cache on logout.");
+            Assert.True(session is null, "The session was not evicted from the cache on logout.");
         }
 
         [Fact]

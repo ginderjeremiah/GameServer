@@ -254,21 +254,8 @@ namespace Game.Api.Tests.Integration
         }
 
         /// <summary>Polls the condition until it holds or a short timeout elapses; returns whether it held.</summary>
-        private async Task<bool> WaitUntilAsync(Func<Task<bool>> condition, int timeoutMs = 5000)
-        {
-            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (DateTime.UtcNow < deadline)
-            {
-                if (await condition())
-                {
-                    return true;
-                }
-
-                await Task.Delay(100, CancellationToken);
-            }
-
-            return await condition();
-        }
+        private static Task<bool> WaitUntilAsync(Func<Task<bool>> condition, int timeoutMs = 5000) =>
+            PollingHelper.PollUntilAsync(condition, held => held, timeoutMs);
 
         private static string PresenceKey(int playerId)
         {
