@@ -144,6 +144,29 @@ namespace Game.Api.Tests.Unit
             await handler.Completion.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
         }
 
+        [Fact]
+        public async Task HandleMessage_FrameDeserializesToNull_ClosesAsMalformedFrame()
+        {
+            // A frame containing the JSON literal "null" deserializes to a null SocketCommandInfo without
+            // throwing, so it carries no request id to correlate a structured rejection to. It must close the
+            // socket like the JsonException path rather than silently dropping the frame and stranding the
+            // client on its 30s request timeout (#1928).
+            var socket = new ScriptedReadWebSocket();
+            socket.QueueMessage("null");
+            var (context, handler) = CreateHandler(socket);
+
+            using var inactivityStop = new CancellationTokenSource();
+            handler.Listen(hostStopping: inactivityStop.Token);
+
+            await context.WaitSocketClosed().WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
+            inactivityStop.Cancel();
+            await handler.Completion.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
+
+            Assert.True(socket.CloseAsyncCalled);
+            Assert.Equal(WebSocketCloseStatus.InvalidPayloadData, socket.CloseStatusUsed);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("deserialized to null"));
+        }
+
         private (SocketContext Context, SocketHandler Handler) CreateHandler(WebSocket socket, Action? onActivity = null)
         {
             var session = new SessionService(new NoOpSessionStore());

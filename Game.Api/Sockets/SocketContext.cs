@@ -259,6 +259,16 @@ namespace Game.Api.Sockets
                                     _logger.LogWarning("Timed out sending the close frame on socket ({Id}); aborting the connection.", SocketId);
                                     _socket.Abort();
                                 }
+                                catch (Exception ex)
+                                {
+                                    // A transport fault (e.g. the peer RST-ing between the state re-check above and
+                                    // this write) must not escape Close: every caller — including the read loop's
+                                    // unconditional terminal close and the inactivity watchdog — calls it unguarded,
+                                    // so an uncaught throw here would fault their loop tasks. Mirrors SendData's
+                                    // never-throws contract.
+                                    _logger.LogWarning(ex, "Failed to send the close frame on socket ({Id}); aborting the connection.", SocketId);
+                                    _socket.Abort();
+                                }
                             }
                         }
                         finally

@@ -55,8 +55,11 @@ namespace Game.Api.Tests.Unit
 
             socket.FailClose(new WebSocketException("close frame send failed"));
 
-            // The send fault propagates out of Close, but the waiter is still released (best-effort).
-            await Assert.ThrowsAsync<WebSocketException>(() => closeTask);
+            // The send fault (e.g. a peer RST) is caught and the connection aborted rather than propagating
+            // out of Close — every caller invokes it unguarded, so an escaping exception would fault their
+            // loop task (#1928) — and the waiter is still released (best-effort).
+            await closeTask.WaitAsync(WaitTimeout, cancellationToken);
+            Assert.True(socket.AbortCalled);
             await waitClosed.WaitAsync(WaitTimeout, cancellationToken);
             Assert.True(waitClosed.IsCompletedSuccessfully);
         }
@@ -412,6 +415,7 @@ namespace Game.Api.Tests.Unit
             /// <summary>Completes once <see cref="CloseAsync"/> has begun (and is blocking on the gate).</summary>
             public Task CloseStarted => _closeStarted.Task;
             public bool CloseAsyncCalled { get; private set; }
+            public bool AbortCalled { get; private set; }
             public WebSocketCloseStatus? CloseStatusUsed { get; private set; }
             public WebSocketState StateOverride { get; init; } = WebSocketState.Open;
 
@@ -434,7 +438,7 @@ namespace Game.Api.Tests.Unit
             public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken) => throw new NotSupportedException();
             public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken) => Task.CompletedTask;
             public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => Task.CompletedTask;
-            public override void Abort() { }
+            public override void Abort() => AbortCalled = true;
             public override void Dispose() { }
         }
 
