@@ -10,8 +10,8 @@
     {
       "name": "svelte-ui",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "dev", "--port", "5174"],
-      "port": 5174,
+      "runtimeArgs": ["vite", "dev", "--port", "5173"],
+      "port": 5173,
       "cwd": "UI"
     }
   ]
