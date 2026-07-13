@@ -185,7 +185,7 @@ namespace Game.Api.Tests.Integration
             return (socket, handler, scopeFactory);
         }
 
-        private async Task WaitForSentMessageAsync(FakeWebSocket socket, Func<string, bool> predicate)
+        private static async Task WaitForSentMessageAsync(FakeWebSocket socket, Func<string, bool> predicate)
         {
             var found = await PollingHelper.PollUntilAsync(
                 () => Task.FromResult(socket.SentMessages.Any(predicate)), sent => sent, (int)WaitTimeout.TotalMilliseconds);
