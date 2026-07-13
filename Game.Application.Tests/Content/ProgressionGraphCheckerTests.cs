@@ -105,6 +105,54 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Challenge_ZonesClearedTargetingBossLessZone_IsError()
+        {
+            // Zone 0's dedicated boss is what ZonesCleared records against (game-design.md § Zone Clears); a
+            // boss-less target can never clear, the exact analogue of the KillsByDamageType null-target case.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                Challenges = [Challenge(0, challengeTypeId: EChallengeType.ZonesCleared, entityType: EEntityType.Zone, targetEntityId: 0)],
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "ChallengeTarget", ContentGraphSeverity.Error, "Challenge", 0);
+        }
+
+        [Fact]
+        public void Challenge_ZonesClearedTargetingBossedZone_ProducesNoChallengeTargetFinding()
+        {
+            Assert.DoesNotContain(_checker.Check(HealthyGraph()), f => f.Check == "ChallengeTarget");
+        }
+
+        [Fact]
+        public void Challenge_ZonesClearedTargetingBossLessZone_AlsoMakesGatedZoneUnreachable()
+        {
+            // Zone 1's unlock is gated on clearing boss-less zone 0, which can never happen — the gate never
+            // opens, so zone 1 is unreachable too (mirrors the ChallengeTarget finding on the challenge itself).
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                Challenges = [Challenge(0, challengeTypeId: EChallengeType.ZonesCleared, entityType: EEntityType.Zone, targetEntityId: 0)],
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "ZoneReachability", ContentGraphSeverity.Warning, "Zone", 1);
+        }
+
+        [Fact]
+        public void Challenge_ProgressGoalZero_IsWarning()
+        {
+            var graph = HealthyGraph() with { Challenges = [Challenge(0, progressGoal: 0)] };
+            AssertHasFinding(graph, "ChallengeProgressGoal", ContentGraphSeverity.Warning, "Challenge", 0);
+        }
+
+        [Fact]
+        public void Challenge_ProgressGoalNegative_IsWarning()
+        {
+            var graph = HealthyGraph() with { Challenges = [Challenge(0, progressGoal: -5)] };
+            AssertHasFinding(graph, "ChallengeProgressGoal", ContentGraphSeverity.Warning, "Challenge", 0);
+        }
+
+        [Fact]
         public void Challenge_KillsByDamageTypeWithValidTarget_ProducesNoFinding()
         {
             var graph = HealthyGraph() with
@@ -226,6 +274,27 @@ namespace Game.Application.Tests.Content
                 Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1), (2, 1)]), Enemy(1, isBoss: true)],
             };
             AssertHasFinding(graph, "EnemySpawn", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_SpawnWithNegativeWeight_IsError()
+        {
+            // ProbabilityTable rejects a negative weight outright, crashing the whole zone's spawn-table build.
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, -1), (1, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemySpawnWeight", ContentGraphSeverity.Error, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_SpawnWithZeroWeight_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 0), (1, 1)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemySpawnWeight", ContentGraphSeverity.Warning, "Enemy", 0);
         }
 
         // --- Enemy attribute consumption (dead-stat XP inflation, #1529) ------------------------------
@@ -490,6 +559,44 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ItemProficiencyGate", ContentGraphSeverity.Error, "Item", 0);
         }
 
+        [Fact]
+        public void Item_ReferencingMissingTag_IsError()
+        {
+            var graph = HealthyGraph() with { Items = [Item(0, grantedSkillId: 3, tags: [99])] };
+            AssertHasFinding(graph, "ItemTag", ContentGraphSeverity.Error, "Item", 0);
+        }
+
+        [Fact]
+        public void Item_ReferencingExistingTag_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with { Tags = [Tag(0)], Items = [Item(0, grantedSkillId: 3, tags: [0])] };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "ItemTag");
+        }
+
+        // --- Item mods ----------------------------------------------------------------------------------
+
+        [Fact]
+        public void ItemMod_ReferencingMissingTag_IsError()
+        {
+            var graph = HealthyGraph() with { ItemMods = [ItemMod(0, tags: [99])] };
+            AssertHasFinding(graph, "ItemModTag", ContentGraphSeverity.Error, "ItemMod", 0);
+        }
+
+        [Fact]
+        public void ItemMod_ReferencingExistingTag_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with { Tags = [Tag(0)], ItemMods = [ItemMod(0, tags: [0])] };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "ItemModTag");
+        }
+
+        [Fact]
+        public void ItemMod_Retired_IsNotCheckedAsSource()
+        {
+            // A retired item mod is out of circulation, so a dangling tag it carries is harmless.
+            var graph = HealthyGraph() with { ItemMods = [ItemMod(0, tags: [99], retiredAt: Retired)] };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "ItemModTag");
+        }
+
         // --- Proficiencies ----------------------------------------------------------------------------
 
         [Fact]
@@ -650,6 +757,28 @@ namespace Game.Application.Tests.Content
                 Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1)]), Enemy(1, isBoss: true)],
             };
             AssertHasFinding(graph, "EmptyCombatZone", ContentGraphSeverity.Warning, "Zone", 1);
+        }
+
+        [Fact]
+        public void Zone_DuplicateOrder_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0, bossEnemyId: 1, order: 0), Zone(1, unlockChallengeId: 0, order: 0), Zone(2, isHome: true, order: 2)],
+            };
+            AssertHasFinding(graph, "ZoneOrder", ContentGraphSeverity.Warning, "Zone", 0);
+            AssertHasFinding(graph, "ZoneOrder", ContentGraphSeverity.Warning, "Zone", 1);
+        }
+
+        [Fact]
+        public void Zone_LevelMinGreaterThanLevelMax_IsError()
+        {
+            // The domain Zone model throws at construction on this, so it's a build-crashing Error, not a Warning.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0, bossEnemyId: 1, levelMin: 10, levelMax: 5), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+            };
+            AssertHasFinding(graph, "ZoneLevelRange", ContentGraphSeverity.Error, "Zone", 0);
         }
 
         [Fact]
@@ -963,6 +1092,63 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Lesson_DuplicateKey_IsWarning()
+        {
+            // A duplicate key would let the required-blurb coverage check match vacuously against either copy.
+            var graph = HealthyGraph() with
+            {
+                Lessons = TaughtByBlurbLessons()
+                    .Append(Lesson(3, "cooldown-charging", ELessonTriggerType.MechanicEvent, mechanicEvent: EMechanicEvent.FirstCooldownRecharge))
+                    .ToList(),
+            };
+            AssertHasFinding(graph, "LessonKey", ContentGraphSeverity.Warning, "Lesson", 2);
+            AssertHasFinding(graph, "LessonKey", ContentGraphSeverity.Warning, "Lesson", 3);
+        }
+
+        [Fact]
+        public void Lesson_DuplicateOrdinal_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Lessons = TaughtByBlurbLessons()
+                    .Append(Lesson(3, "extra-lesson", ELessonTriggerType.MechanicEvent, mechanicEvent: EMechanicEvent.FirstCooldownRecharge, ordinal: 2))
+                    .ToList(),
+            };
+            AssertHasFinding(graph, "LessonOrdinal", ContentGraphSeverity.Warning, "Lesson", 2);
+            AssertHasFinding(graph, "LessonOrdinal", ContentGraphSeverity.Warning, "Lesson", 3);
+        }
+
+        [Fact]
+        public void Lesson_NonContiguousStepOrdinals_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Lessons = TaughtByBlurbLessons()
+                    .Append(Lesson(3, "extra-lesson", ELessonTriggerType.MechanicEvent, mechanicEvent: EMechanicEvent.FirstCooldownRecharge, ordinal: 3,
+                        steps:
+                        [
+                            new Contracts.LessonStep { Ordinal = 0, Text = "Step 0", AnchorKey = null },
+                            new Contracts.LessonStep { Ordinal = 2, Text = "Step 2", AnchorKey = null },
+                        ]))
+                    .ToList(),
+            };
+            AssertHasFinding(graph, "LessonStepOrdinal", ContentGraphSeverity.Warning, "Lesson", 3);
+        }
+
+        [Fact]
+        public void Lesson_EmptyStepText_IsWarning()
+        {
+            var graph = HealthyGraph() with
+            {
+                Lessons = TaughtByBlurbLessons()
+                    .Append(Lesson(3, "extra-lesson", ELessonTriggerType.MechanicEvent, mechanicEvent: EMechanicEvent.FirstCooldownRecharge, ordinal: 3,
+                        steps: [new Contracts.LessonStep { Ordinal = 0, Text = "   ", AnchorKey = null }]))
+                    .ToList(),
+            };
+            AssertHasFinding(graph, "LessonStepText", ContentGraphSeverity.Warning, "Lesson", 3);
+        }
+
+        [Fact]
         public void Finding_ToString_IsHumanReadable()
         {
             var finding = new ContentGraphFinding(ContentGraphSeverity.Error, "ZoneBoss", "Zone", 3, "references enemy 9, which does not exist.");
@@ -992,10 +1178,13 @@ namespace Game.Application.Tests.Content
                     Skill(3, ESkillAcquisition.Item),    // item grant
                     Skill(5, ESkillAcquisition.Player),  // milestone
                 ],
+                Tags: [],
                 Items: [Item(0, grantedSkillId: 3)],
                 ItemMods: [],
                 Enemies: [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
-                Zones: [Zone(0), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                // Zone 0 carries a boss (enemy 1) so the default ZonesCleared challenge below can actually
+                // clear it — a boss-less Zone target is itself a lint finding (ChallengeTarget).
+                Zones: [Zone(0, bossEnemyId: 1), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
                 Challenges: [Challenge(0, entityType: EEntityType.Zone, targetEntityId: 0)],
                 Classes: [Class(0, starterSkills: [1])],
                 Paths: [Path(0)],
@@ -1050,6 +1239,7 @@ namespace Game.Application.Tests.Content
             EDamageType? weaponType = null,
             int? requiredProficiencyId = null,
             int requiredProficiencyLevel = 0,
+            int[]? tags = null,
             DateTime? retiredAt = null) => new()
             {
                 Id = id,
@@ -1060,7 +1250,7 @@ namespace Game.Application.Tests.Content
                 IconPath = "",
                 Attributes = [],
                 ModSlots = [],
-                Tags = [],
+                Tags = tags ?? [],
                 GrantedSkillId = grantedSkillId,
                 WeaponType = weaponType,
                 RequiredProficiencyId = requiredProficiencyId,
@@ -1068,6 +1258,21 @@ namespace Game.Application.Tests.Content
                 DesignerNotes = "",
                 RetiredAt = retiredAt,
             };
+
+        private static Contracts.ItemMod ItemMod(int id, int[]? tags = null, DateTime? retiredAt = null) => new()
+        {
+            Id = id,
+            Name = $"ItemMod {id}",
+            Description = "",
+            ItemModTypeId = EItemModType.Prefix,
+            RarityId = ERarity.Common,
+            Attributes = [],
+            Tags = tags ?? [],
+            DesignerNotes = "",
+            RetiredAt = retiredAt,
+        };
+
+        private static Contracts.Tag Tag(int id) => new() { Id = id, Name = $"Tag {id}", TagCategoryId = (int)ETagCategory.Accessory };
 
         private static Contracts.Enemy Enemy(
             int id,
@@ -1095,14 +1300,17 @@ namespace Game.Application.Tests.Content
             int? bossEnemyId = null,
             int bossLevel = 1,
             int? unlockChallengeId = null,
+            int? order = null,
+            int levelMin = 1,
+            int levelMax = 10,
             DateTime? retiredAt = null) => new()
             {
                 Id = id,
                 Name = $"Zone {id}",
                 Description = "",
-                Order = id,
-                LevelMin = 1,
-                LevelMax = 10,
+                Order = order ?? id,
+                LevelMin = levelMin,
+                LevelMax = levelMax,
                 BossEnemyId = bossEnemyId,
                 BossLevel = bossLevel,
                 UnlockChallengeId = unlockChallengeId,
@@ -1118,6 +1326,7 @@ namespace Game.Application.Tests.Content
             int? rewardItemId = null,
             int? rewardItemModId = null,
             DateTime? retiredAt = null,
+            decimal progressGoal = 1,
             EChallengeType challengeTypeId = EChallengeType.ZonesCleared) => new()
             {
                 Id = id,
@@ -1127,7 +1336,7 @@ namespace Game.Application.Tests.Content
                 StatisticType = EStatisticType.ZonesCleared,
                 EntityType = entityType,
                 TargetEntityId = targetEntityId,
-                ProgressGoal = 1,
+                ProgressGoal = progressGoal,
                 RewardItemId = rewardItemId,
                 RewardItemModId = rewardItemModId,
                 DesignerNotes = "",
@@ -1205,7 +1414,9 @@ namespace Game.Application.Tests.Content
             ELessonTriggerType triggerType,
             EMechanicEvent? mechanicEvent = null,
             string screenKey = "fight",
-            DateTime? retiredAt = null) => new()
+            DateTime? retiredAt = null,
+            int? ordinal = null,
+            IEnumerable<Contracts.LessonStep>? steps = null) => new()
             {
                 Id = id,
                 Key = key,
@@ -1213,10 +1424,10 @@ namespace Game.Application.Tests.Content
                 TriggerType = triggerType,
                 ScreenKey = screenKey,
                 TriggerMechanicEvent = mechanicEvent,
-                Ordinal = id,
+                Ordinal = ordinal ?? id,
                 DesignerNotes = "",
                 RetiredAt = retiredAt,
-                Steps = [new Contracts.LessonStep { Ordinal = 0, Text = "Step", AnchorKey = null }],
+                Steps = steps ?? [new Contracts.LessonStep { Ordinal = 0, Text = "Step", AnchorKey = null }],
             };
 
         /// <summary>The three taught-by-blurb candidates, healthy by default; a test overrides one entry to

@@ -14,6 +14,7 @@ namespace Game.Application.Content
         {
             return new ContentGraph(
                 await ReadAsync<Contracts.Skill>(contentDirectory, "skills.json", cancellationToken),
+                await ReadAsync<Contracts.Tag>(contentDirectory, "tags.json", cancellationToken),
                 await ReadAsync<Contracts.Item>(contentDirectory, "items.json", cancellationToken),
                 await ReadAsync<Contracts.ItemMod>(contentDirectory, "item-mods.json", cancellationToken),
                 await ReadAsync<Contracts.Enemy>(contentDirectory, "enemies.json", cancellationToken),

@@ -11,7 +11,8 @@ namespace Game.Application.Content
     public interface IContentHealthService
     {
         /// <summary>Builds a <see cref="ContentGraph"/> from the reference caches, checks it, and returns the
-        /// report. Purely read-only — it touches no write path and mutates nothing.</summary>
-        ContentHealthReport GetReport();
+        /// report. Purely read-only — it touches no write path and mutates nothing. Tags are the one set not
+        /// held in a reference cache, so this reads them from the DB, hence async.</summary>
+        Task<ContentHealthReport> GetReportAsync(CancellationToken cancellationToken = default);
     }
 }

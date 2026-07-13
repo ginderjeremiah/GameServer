@@ -1,5 +1,6 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess;
+using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Application.Content
 {
@@ -8,6 +9,7 @@ namespace Game.Application.Content
     {
         private readonly IProgressionGraphChecker _checker;
         private readonly ISkills _skills;
+        private readonly ITags _tags;
         private readonly IItems _items;
         private readonly IItemMods _itemMods;
         private readonly IEnemies _enemies;
@@ -21,6 +23,7 @@ namespace Game.Application.Content
         public ContentHealthService(
             IProgressionGraphChecker checker,
             ISkills skills,
+            ITags tags,
             IItems items,
             IItemMods itemMods,
             IEnemies enemies,
@@ -33,6 +36,7 @@ namespace Game.Application.Content
         {
             _checker = checker;
             _skills = skills;
+            _tags = tags;
             _items = items;
             _itemMods = itemMods;
             _enemies = enemies;
@@ -44,18 +48,26 @@ namespace Game.Application.Content
             _lessons = lessons;
         }
 
-        public ContentHealthReport GetReport()
+        public async Task<ContentHealthReport> GetReportAsync(CancellationToken cancellationToken = default)
         {
-            return ToReport(_checker.Check(BuildGraph()));
+            return ToReport(_checker.Check(await BuildGraphAsync(cancellationToken)));
         }
 
         /// <summary>Assembles the whole static graph from the in-memory reference caches — the same published
-        /// projection the client and Workbench receive. Mirrors <see cref="ContentExporter"/>'s set list, minus
-        /// tags (the lint's <see cref="ContentGraph"/> resolves tag joins through items/mods, not a tag set).</summary>
-        private ContentGraph BuildGraph()
+        /// projection the client and Workbench receive. Mirrors <see cref="ContentExporter"/>'s set list; tags
+        /// are the one set not held in a reference cache, so they're materialized from the DB read stream like
+        /// the exporter does.</summary>
+        private async Task<ContentGraph> BuildGraphAsync(CancellationToken cancellationToken)
         {
+            var tags = new List<Contracts.Tag>();
+            await foreach (var tag in _tags.All().WithCancellation(cancellationToken))
+            {
+                tags.Add(tag);
+            }
+
             return new ContentGraph(
                 Skills: _skills.AllSkills(),
+                Tags: tags,
                 Items: _items.All(),
                 ItemMods: _itemMods.All(),
                 Enemies: _enemies.All(),
