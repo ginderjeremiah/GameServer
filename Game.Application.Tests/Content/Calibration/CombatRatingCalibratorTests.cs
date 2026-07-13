@@ -193,6 +193,29 @@ namespace Game.Application.Tests.Content.Calibration
             Assert.Equal(first[0].AvgBattleSeconds, second[0].AvgBattleSeconds, 6);
         }
 
+        // ── MatchupSeed ──────────────────────────────────────────────────────
+
+        [Fact]
+        public void MatchupSeed_IsPinnedAcrossProcesses()
+        {
+            // In-process determinism alone doesn't catch the bug this guards against: HashCode.Combine is also
+            // stable within a single process (it reseeds once at process start), so a same-process comparison
+            // would have passed even with the old, non-reproducible implementation. Pinning the literal value
+            // is the only way a unit test can assert stability *across* processes/runs.
+            Assert.Equal(3800752286u, CombatRatingCalibrator.MatchupSeed(3, 5, "Build A", 7, 2));
+        }
+
+        [Fact]
+        public void MatchupSeed_DiffersForDifferentBuildNamesWithTheSameHashCode()
+        {
+            // .NET's built-in string hashing (used by HashCode.Combine) is randomized per process; MatchupSeed
+            // must not derive from it. Distinct matchup keys should (in practice) yield distinct seeds.
+            var seedA = CombatRatingCalibrator.MatchupSeed(0, 1, "Build A", 0, 0);
+            var seedB = CombatRatingCalibrator.MatchupSeed(0, 1, "Build B", 0, 0);
+
+            Assert.NotEqual(seedA, seedB);
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private static ZonePlacementRow MakeZonePlacementRow(
