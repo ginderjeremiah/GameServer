@@ -59,8 +59,6 @@ export interface IApiSocketResponse<T extends ApiSocketCommand | void = void> {
 	data?: T extends ApiSocketCommand ? ApiSocketResponseTypes[T] : never;
 }
 
-let socket: WebSocket;
-
 const errorHook = createHook<[string]>();
 export const onSocketError = errorHook.onNotified;
 
@@ -76,6 +74,9 @@ type InFlightRequest = {
 };
 
 export class ApiSocket {
+	// Instance state, not module-level: each ApiSocket owns exactly one connection, so two instances can
+	// never silently fight over the same socket.
+	private socket?: WebSocket;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous queue of requests for differing commands; ApiSocketRequest<T> is invariant in T so a common supertype isn't expressible.
 	private socketCommandQueue: ApiSocketRequest<any>[] = [];
 	// Keyed by command id so a response is an O(1) lookup and a settled request can be pruned (rather
@@ -113,7 +114,7 @@ export class ApiSocket {
 	 * race to create (and leak) two sockets.
 	 */
 	private ensureSocket(): Promise<void> {
-		if (socket && socket.readyState !== socket.CLOSED) {
+		if (this.socket && this.socket.readyState !== this.socket.CLOSED) {
 			return Promise.resolve();
 		}
 		if (this.connecting) {
@@ -163,7 +164,8 @@ export class ApiSocket {
 		// Browsers can't set an Authorization header on the WebSocket handshake, so the access token
 		// is passed as a query-string parameter (the standard ASP.NET Core token-over-WS pattern).
 		const url = accessToken ? `/socket?access_token=${encodeURIComponent(accessToken)}` : '/socket';
-		socket = new WebSocket(url);
+		const socket = new WebSocket(url);
+		this.socket = socket;
 		socket.onopen = this.onStart.bind(this);
 		socket.onmessage = this.receiveResponse.bind(this);
 		socket.onerror = this.handleError.bind(this);
@@ -212,7 +214,7 @@ export class ApiSocket {
 			return;
 		}
 		void this.ensureSocket();
-		if (socket && socket.readyState === socket.OPEN) {
+		if (this.socket && this.socket.readyState === this.socket.OPEN) {
 			if (this.awaitingPong) {
 				this.missedPongs++;
 				if (this.missedPongs >= MAX_MISSED_PONGS) {
@@ -226,13 +228,13 @@ export class ApiSocket {
 					// Deliberately code-less: handleClose only stops the keepalive on ev.code ===
 					// NORMAL_CLOSURE, so this must surface as 1005/1006 to fall through to its
 					// reconnect branch. Passing NORMAL_CLOSURE here would silently disable auto-reconnect.
-					socket.close();
+					this.socket.close();
 					return;
 				}
 			}
 			this.lastPing = performance.now();
 			this.awaitingPong = true;
-			socket.send('ping');
+			this.socket.send('ping');
 		}
 	}
 
@@ -245,8 +247,8 @@ export class ApiSocket {
 	public disconnect() {
 		this.stopPingInterval();
 		this.clearConnectionStableTimer();
-		if (socket && socket.readyState !== socket.CLOSED) {
-			socket.close(NORMAL_CLOSURE);
+		if (this.socket && this.socket.readyState !== this.socket.CLOSED) {
+			this.socket.close(NORMAL_CLOSURE);
 		}
 	}
 
@@ -277,7 +279,7 @@ export class ApiSocket {
 
 	private async processCommandQueue() {
 		await this.ensureSocket();
-		if (socket && socket.readyState === socket.OPEN) {
+		if (this.socket && this.socket.readyState === this.socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
 				// Arm the timeout only now that the command is actually sent — a command can sit queued
@@ -285,7 +287,7 @@ export class ApiSocket {
 				const id = request.id;
 				const timer = setTimeout(() => this.timeoutRequest(id), REQUEST_TIMEOUT_MS);
 				this.inFlightRequests.set(id, { startTime: performance.now(), timer, command: request });
-				socket.send(JSON.stringify(request.getCommandInfo()));
+				this.socket.send(JSON.stringify(request.getCommandInfo()));
 			}
 		}
 	}
@@ -298,7 +300,7 @@ export class ApiSocket {
 			pingHook.notify(now - this.lastPing);
 			return;
 		} else if (ev.data === 'ping') {
-			socket.send('pong');
+			this.socket?.send('pong');
 			return;
 		}
 
