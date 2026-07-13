@@ -210,17 +210,37 @@ namespace Game.Application.Services
                 return null;
             }
 
+            // Non-null only when the abandoned battle resolved to a win/loss/draw (AbandonBattle just applied
+            // the post-battle cooldown to state.EnemyCooldown, #1851) — mirrors StartBattle's
+            // abandonedOutcomeCooldown (#1884). Without this, a scripted ChallengeBoss loop pays each abandoned
+            // win in full while spawning the next boss battle immediately, farming away the pacing cooldown a
+            // loop through NewEnemy already cannot.
+            DateTime? abandonedOutcomeCooldown = null;
+
             if (state.HasActiveBattle)
             {
+                // Captured before the abandon so the check below can tell "this abandon incurred a fresh
+                // cooldown" apart from "a cooldown was already sitting there." Unlike StartBattle (whose
+                // caller, NewEnemy, gates on IsOnCooldown first), ChallengeBoss has no cooldown gate — a
+                // player can challenge mid an already-running post-battle cooldown (e.g. the prefetched next
+                // idle battle's BattleStartTime is still in the future), in which case AbandonBattle resolves
+                // no outcome (elapsedMs clamps to 0) and leaves EnemyCooldown exactly as it found it.
+                var cooldownBeforeAbandon = state.EnemyCooldown;
+
                 // Deliberate override: challenging the boss always abandons whatever idle battle is running
                 // (even one still genuinely in progress, #1595) and proceeds — unlike NewEnemy, this is an
                 // explicit different action, not "give my existing battle back," so the handoff is discarded.
                 // Nothing was cleared or persisted for a still-in-progress abandon, so overwriting the
                 // in-memory state below with the boss battle is safe either way.
                 await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+
+                if (state.EnemyCooldown > cooldownBeforeAbandon)
+                {
+                    abandonedOutcomeCooldown = state.EnemyCooldown;
+                }
             }
 
-            var now = DateTime.UtcNow;
+            var now = abandonedOutcomeCooldown ?? DateTime.UtcNow;
             var seed = CreateBattleSeed();
 
             var enemy = _battleFactory.CreateBossEnemy(zone, _zoneResolution.BossEnemyResolver(zone));
