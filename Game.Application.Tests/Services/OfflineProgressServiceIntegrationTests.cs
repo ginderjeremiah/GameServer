@@ -165,9 +165,9 @@ namespace Game.Application.Tests.Services
             await healthyPlayerRepo.SavePlayer(player, CancellationToken);
 
             // A repository whose flush always fails stands in for a transient Redis blip on the *player* save's
-            // flush specifically — mirroring PlayerWriteBehindTests' ThrowingPubSubService — sharing the same
-            // scoped PlayerUpdateBatch (via the progress repo resolved from this same scope) so the progress
-            // save reached through ApplyOfflineRewards joins the same doomed flush instead of publishing first.
+            // flush specifically, sharing the same scoped PlayerUpdateBatch (via the progress repo resolved from
+            // this same scope) so the progress save reached through ApplyOfflineRewards joins the same doomed
+            // flush instead of publishing first.
             var throwingPlayerRepo = new PlayerRepository(
                 context,
                 scope.ServiceProvider.GetRequiredService<ICacheService>(),
@@ -222,26 +222,6 @@ namespace Game.Application.Tests.Services
             var kills = Assert.Single(await progressRepo.GetStatistics(setup.PlayerId),
                 s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
             Assert.Equal((decimal)summary.BattlesWon, kills.Value);
-        }
-
-        // Stands in for a transient Redis blip on the flush, mirroring PlayerWriteBehindTests' ThrowingPubSubService.
-        private sealed class ThrowingPubSubService : IPubSubService
-        {
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) =>
-                throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) =>
-                throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) =>
-                throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) =>
-                throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Wake(string channel) => throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) =>
-                throw new NotImplementedException();
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) =>
-                throw new NotImplementedException();
-            public Task UnSubscribe(string channel, string id) => throw new NotImplementedException();
-            public IPubSubQueue GetQueue(string queueName) => throw new NotImplementedException();
         }
 
         [Fact]

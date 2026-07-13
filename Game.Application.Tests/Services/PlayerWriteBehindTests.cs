@@ -217,19 +217,6 @@ namespace Game.Application.Tests.Services
                 throw new NotImplementedException();
         }
 
-        private sealed class ThrowingPubSubService : IPubSubService
-        {
-            public Task Publish(string channel, string message, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Publish(string channel, string queueName, string queueData, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Wake(string channel) => throw new InvalidOperationException("Simulated transient publish failure.");
-            public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotImplementedException();
-            public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new NotImplementedException();
-            public Task UnSubscribe(string channel, string id) => throw new NotImplementedException();
-            public IPubSubQueue GetQueue(string queueName) => throw new NotImplementedException();
-        }
-
         private record SimpleAttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
     }
 }

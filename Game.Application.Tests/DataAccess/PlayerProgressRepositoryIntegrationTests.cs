@@ -212,14 +212,6 @@ namespace Game.Application.Tests.DataAccess
             Assert.DoesNotContain(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
         }
 
-        // Stands in for a transient Redis blip on a standalone progress save's own flush, mirroring
-        // PlayerWriteBehindTests' ThrowingPubSubService for the player-save path.
-        private sealed class ThrowingPubSubService : NotSupportedPubSubService
-        {
-            public override Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) =>
-                throw new InvalidOperationException("Simulated transient publish failure.");
-        }
-
         [Fact]
         public async Task Save_DuringAPlayerSave_DefersToTheSharedBatchFlush_InsteadOfItsOwnRoundTrip()
         {
