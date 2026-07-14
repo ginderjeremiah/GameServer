@@ -6,8 +6,8 @@ namespace Game.Core.Skills
     /// over the three skill representations that each carry a portion split under different property names and
     /// weight numeric types (the domain <see cref="Skill.DamagePortions"/>, the read contract, and the
     /// persisted entity) so all three resolve through one implementation instead of drifting independently.
-    /// Takes an indexable list (not <see cref="IEnumerable{T}"/>) so the domain call site — on the per-fire
-    /// hot path — allocates nothing.
+    /// Takes an indexable list (not <see cref="IEnumerable{T}"/>) so the call sites — battler assembly and
+    /// admin-save validation — allocate nothing.
     /// </summary>
     public static class PrimaryDamageTypeResolver
     {
