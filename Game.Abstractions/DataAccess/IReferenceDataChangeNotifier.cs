@@ -9,7 +9,11 @@ namespace Game.Abstractions.DataAccess
     /// </summary>
     public interface IReferenceDataChangeNotifier
     {
-        /// <summary>Publishes the notification; delivery is a fire-and-forget broadcast over the backplane.</summary>
+        /// <summary>
+        /// Publishes the notification. The publish itself is awaited (a genuine send failure throws rather than
+        /// vanishing silently), but delivery to subscribers remains Redis pub/sub's ordinary at-most-once
+        /// guarantee — a subscriber mid-reconnect can still miss the message (#1888).
+        /// </summary>
         Task NotifyChangedAsync();
     }
 }
