@@ -13,6 +13,11 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# No job needs more than read access to repo contents (checkout); this also caps the third-party
+# dorny/paths-filter@v3 action (flagged above as uncertified) to the same least-privilege default.
+permissions:
+  contents: read
+
 # Cancel any in-progress run for the same ref (PR branch or main) when a newer push lands. The
 # heaviest path is the 3-browser test-e2e matrix, so superseding stale runs frees those minutes
 # for the run that actually matters.
