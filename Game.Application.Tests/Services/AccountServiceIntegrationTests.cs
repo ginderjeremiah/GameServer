@@ -56,6 +56,10 @@ namespace Game.Application.Tests.Services
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
+            // NewPlayerFactory.StartingZoneId is 0 — seed a zone so it lands there and the real creation path
+            // can resolve the new player's CurrentZoneId FK.
+            await TestDataSeeder.CreateZoneAsync(context);
+
             // The class kit (starter skills 0/1/2 + base-5 spread over the six core attributes) is the parameter
             // that drives creation; its skills must exist for the player-skill FK. Reload caches so IClasses sees it.
             var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
@@ -119,6 +123,10 @@ namespace Game.Application.Tests.Services
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // NewPlayerFactory.StartingZoneId is 0 — seed a zone so it lands there and the real creation path
+            // can resolve the new player's CurrentZoneId FK.
+            await TestDataSeeder.CreateZoneAsync(context);
 
             // A class whose kit includes a weapon carrying an innate (granted) skill, equipped at creation —
             // the one net-new mechanism of #1222 (new players carried no inventory before).
@@ -556,6 +564,11 @@ namespace Game.Application.Tests.Services
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // NewPlayerFactory.StartingZoneId is 0 — seed a zone so it lands there and the real creation path
+            // can resolve the new player's CurrentZoneId FK.
+            await TestDataSeeder.CreateZoneAsync(context);
+
             // The class kit (its starter skills) must exist for the new player's player-skill FK.
             var chosenClass = await TestDataSeeder.CreateStandardCreatableClassAsync(context);
             await ReloadReferenceCachesAsync();

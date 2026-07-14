@@ -36,7 +36,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             var validEvent = new PlayerCoreUpdatedEvent(
                 PlayerId: player.Id,
@@ -114,7 +114,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             var validEvent = new PlayerCoreUpdatedEvent(
                 PlayerId: player.Id,
@@ -211,7 +211,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var skill = await TestDataSeeder.CreateSkillAsync(context);
 
             var evt = new SkillUnlockedEvent(player.Id, skill.Id);
@@ -246,7 +246,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var skill0 = await TestDataSeeder.CreateSkillAsync(context, name: "S0");
             var skill1 = await TestDataSeeder.CreateSkillAsync(context, name: "S1");
             var skill2 = await TestDataSeeder.CreateSkillAsync(context, name: "S2");
@@ -291,7 +291,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var skill0 = await TestDataSeeder.CreateSkillAsync(context, name: "S0");
             var skill1 = await TestDataSeeder.CreateSkillAsync(context, name: "S1");
 
@@ -326,7 +326,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var skill0 = await TestDataSeeder.CreateSkillAsync(context, name: "S0");
             var skill1 = await TestDataSeeder.CreateSkillAsync(context, name: "S1");
 
@@ -363,7 +363,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var item = await TestDataSeeder.CreateItemAsync(context);
 
             var evt = new ItemUnlockedEvent(player.Id, item.Id);
@@ -398,7 +398,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var occupant = await TestDataSeeder.CreateItemAsync(context, name: "Occupant");
             var incoming = await TestDataSeeder.CreateItemAsync(context, name: "Incoming");
 
@@ -438,7 +438,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var item = await TestDataSeeder.CreateItemAsync(context);
 
             // The item starts equipped in the Helm slot; the event re-equips it into the Chest slot.
@@ -470,7 +470,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var mod = await TestDataSeeder.CreateItemModAsync(context);
 
             var evt = new ModUnlockedEvent(player.Id, mod.Id);
@@ -502,7 +502,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             // An item with one Prefix mod slot, and a mod to apply into it.
             var item = await TestDataSeeder.CreateItemAsync(context);
@@ -545,7 +545,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             var item = await TestDataSeeder.CreateItemAsync(context);
             var modSlot = new Infrastructure.Entities.ItemModSlot
@@ -589,7 +589,7 @@ namespace Game.Application.Tests.DataAccess
 
             var user = await TestDataSeeder.CreateUserAsync(context);
             // The seeder gives the player Strength = 50 and Endurance = 50 allocations to start.
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             // One event exercising all three branches: update an existing allocation (Strength),
             // delete an existing one by zeroing it (Endurance), and insert a brand-new one (Agility).
@@ -632,7 +632,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             // The player already has an enabled Damage-log preference; the event toggles it off.
             await TestDataSeeder.AddLogPreferenceAsync(context, player.Id, ELogType.Damage, enabled: true);
@@ -667,7 +667,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             // No preference row exists yet for this log type: the first apply must insert it, the second update it.
             var evt = new LogPreferenceChangedEvent(player.Id, ELogType.Exp, Enabled: false);
@@ -715,7 +715,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             var validEvent = new PlayerCoreUpdatedEvent(
                 PlayerId: player.Id,
@@ -881,7 +881,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             var validEvent = new PlayerCoreUpdatedEvent(
                 PlayerId: player.Id,
@@ -1002,7 +1002,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             var validEvent = new PlayerCoreUpdatedEvent(
                 PlayerId: player.Id,
@@ -1056,7 +1056,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
             var validEvent = new PlayerCoreUpdatedEvent(
                 PlayerId: player.Id,
@@ -1177,7 +1177,7 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user = await TestDataSeeder.CreateUserAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
             var item = await TestDataSeeder.CreateItemAsync(context);
             await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, item.Id, equipmentSlot: null);
 
@@ -1219,9 +1219,9 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user1 = await TestDataSeeder.CreateUserAsync(context, username: "concurrent-user-1");
-            var player1 = await TestDataSeeder.CreatePlayerAsync(context, user1.Id, level: 5, zoneId: 0);
+            var player1 = await TestDataSeeder.CreatePlayerAsync(context, user1.Id, level: 5);
             var user2 = await TestDataSeeder.CreateUserAsync(context, username: "concurrent-user-2");
-            var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5, zoneId: 0);
+            var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5);
 
             var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
             var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
@@ -1256,12 +1256,12 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var userA = await TestDataSeeder.CreateUserAsync(context, username: "lane-user-a");
-            var playerA = await TestDataSeeder.CreatePlayerAsync(context, userA.Id, level: 5, zoneId: 0);
+            var playerA = await TestDataSeeder.CreatePlayerAsync(context, userA.Id, level: 5);
             var item = await TestDataSeeder.CreateItemAsync(context);
             await TestDataSeeder.LinkItemToPlayerAsync(context, playerA.Id, item.Id, equipmentSlot: null);
 
             var userB = await TestDataSeeder.CreateUserAsync(context, username: "lane-user-b");
-            var playerB = await TestDataSeeder.CreatePlayerAsync(context, userB.Id, level: 3, zoneId: 0);
+            var playerB = await TestDataSeeder.CreatePlayerAsync(context, userB.Id, level: 3);
 
             // Player B's unrelated event sits between player A's order-sensitive equip/unequip pair. Bounded
             // cross-player concurrency (#1701) may run B's event alongside A's, but A's own pair is chained
@@ -1344,7 +1344,7 @@ namespace Game.Application.Tests.DataAccess
             for (var i = 0; i < playerCount; i++)
             {
                 var user = await TestDataSeeder.CreateUserAsync(context, username: $"backlog-user-{i}");
-                var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5, zoneId: 0);
+                var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
                 await TestDataSeeder.LinkItemToPlayerAsync(context, player.Id, item.Id, equipmentSlot: null);
                 players.Add(player);
             }
@@ -1385,12 +1385,12 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var userA = await TestDataSeeder.CreateUserAsync(context, username: "fault-lane-user-a");
-            var playerA = await TestDataSeeder.CreatePlayerAsync(context, userA.Id, level: 5, zoneId: 0);
+            var playerA = await TestDataSeeder.CreatePlayerAsync(context, userA.Id, level: 5);
             var item = await TestDataSeeder.CreateItemAsync(context);
             await TestDataSeeder.LinkItemToPlayerAsync(context, playerA.Id, item.Id, equipmentSlot: null);
 
             var userB = await TestDataSeeder.CreateUserAsync(context, username: "fault-lane-user-b");
-            var playerB = await TestDataSeeder.CreatePlayerAsync(context, userB.Id, level: 3, zoneId: 0);
+            var playerB = await TestDataSeeder.CreatePlayerAsync(context, userB.Id, level: 3);
 
             // Player A's equip applies durably but its acknowledge faults (a Redis blip), leaving the item
             // reserved and its lane dead. Enough filler events from player B follow to push the pass over the
@@ -1440,9 +1440,9 @@ namespace Game.Application.Tests.DataAccess
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 
             var user1 = await TestDataSeeder.CreateUserAsync(context, username: "stop-inflight-user-1");
-            var player1 = await TestDataSeeder.CreatePlayerAsync(context, user1.Id, level: 5, zoneId: 0);
+            var player1 = await TestDataSeeder.CreatePlayerAsync(context, user1.Id, level: 5);
             var user2 = await TestDataSeeder.CreateUserAsync(context, username: "stop-inflight-user-2");
-            var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5, zoneId: 0);
+            var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5);
 
             var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
             var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);

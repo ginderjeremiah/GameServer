@@ -624,6 +624,11 @@ namespace Game.Api.Tests.Integration
             int classId;
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // NewPlayerFactory.StartingZoneId is 0 — seed a zone so it lands there and the real creation path
+            // can resolve the new player's CurrentZoneId FK.
+            await TestDataSeeder.CreateZoneAsync(context);
+
             classId = (await TestDataSeeder.CreateStandardCreatableClassAsync(context)).Id;
             var user = await TestDataSeeder.CreateUserAsync(context, "creatorctrl", "pass");
             await ReloadReferenceCachesAsync();
