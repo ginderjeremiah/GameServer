@@ -951,7 +951,13 @@ namespace Game.Infrastructure.Database
         // write-behind path, where a save touches 1–2 rows per battle tick per connected player.
         private static readonly ConcurrentDictionary<IModel, IReadOnlyDictionary<IEntityType, ZeroBasedFixup>> ZeroBasedFixupsByModel = new();
 
-        internal sealed record ZeroBasedFixup(string? KeyProperty, IReadOnlyList<string> ForeignKeyProperties);
+        internal sealed record ZeroBasedFixup(string? KeyProperty, IReadOnlyList<ForeignKeyFixup> ForeignKeyProperties);
+
+        // A non-nullable int FK targeting a zero-based-identity principal, paired with that principal's entity
+        // type so the FK branch below can tell apart the two reasons EF might mark such an FK temporary (#1824):
+        // a genuinely unset FK (misread as record 0) versus a real reference to a same-save Added principal
+        // whose own id is still pending — see PrincipalEntityType's use in ApplyZeroBasedIdentityFixups.
+        internal sealed record ForeignKeyFixup(string PropertyName, IEntityType PrincipalEntityType);
 
         internal void ApplyZeroBasedIdentityFixups()
         {
@@ -959,6 +965,23 @@ namespace Game.Infrastructure.Database
             if (fixups.Count == 0)
             {
                 return;
+            }
+
+            // Same-save Added zero-based-identity principals still carry a temporary key (their real id isn't
+            // assigned until the insert commits). A dependent FK pointing at one of these is legitimately
+            // temporary — EF's own relationship fixup propagated that exact temp value — so the FK branch below
+            // must leave it alone and let EF resolve it to the principal's real generated id, rather than
+            // ForceZero silently repointing it at record 0 (#1824).
+            var addedPrincipalTempKeys = new HashSet<(IEntityType EntityType, object TempValue)>();
+            foreach (var entry in ChangeTracker.Entries())
+            {
+                if (entry.State == EntityState.Added
+                    && fixups.TryGetValue(entry.Metadata, out var principalFixup)
+                    && principalFixup.KeyProperty is not null
+                    && entry.Property(principalFixup.KeyProperty) is { IsTemporary: true, CurrentValue: { } tempValue })
+                {
+                    addedPrincipalTempKeys.Add((entry.Metadata, tempValue));
+                }
             }
 
             foreach (var entry in ChangeTracker.Entries())
@@ -986,10 +1009,20 @@ namespace Game.Infrastructure.Database
                     ForceZero(entry.Property(fixup.KeyProperty));
                 }
 
-                // FK branch: a non-nullable int FK pointing at record 0 of a zero-based principal.
-                foreach (var foreignKeyProperty in fixup.ForeignKeyProperties)
+                // FK branch: a non-nullable int FK pointing at record 0 of a zero-based principal — unless its
+                // temporary value is actually propagated from a same-save Added principal (see
+                // addedPrincipalTempKeys above), in which case it is left for EF to resolve to that principal's
+                // real generated id instead of being forced to 0.
+                foreach (var foreignKey in fixup.ForeignKeyProperties)
                 {
-                    ForceZero(entry.Property(foreignKeyProperty));
+                    var property = entry.Property(foreignKey.PropertyName);
+                    if (property is { IsTemporary: true, CurrentValue: { } fkTempValue }
+                        && addedPrincipalTempKeys.Contains((foreignKey.PrincipalEntityType, fkTempValue)))
+                    {
+                        continue;
+                    }
+
+                    ForceZero(property);
                 }
             }
         }
@@ -1020,7 +1053,7 @@ namespace Game.Infrastructure.Database
                         .FirstOrDefault(p => p.Name == nameof(IZeroBasedIdentityEntity.Id))?.Name;
                 }
 
-                var foreignKeyProperties = new List<string>();
+                var foreignKeyProperties = new List<ForeignKeyFixup>();
                 foreach (var property in entityType.GetProperties())
                 {
                     if (property.ClrType != typeof(int) || !property.IsForeignKey())
@@ -1033,7 +1066,7 @@ namespace Game.Infrastructure.Database
                     if (containingForeignKey is not null
                         && containingForeignKey.PrincipalEntityType.ClrType.IsAssignableTo(typeof(IZeroBasedIdentityEntity)))
                     {
-                        foreignKeyProperties.Add(property.Name);
+                        foreignKeyProperties.Add(new ForeignKeyFixup(property.Name, containingForeignKey.PrincipalEntityType));
                     }
                 }
 
