@@ -65,14 +65,17 @@ export const resolveNewIds = <T extends { id: number }>(
 			delete key.id;
 			return JSON.stringify(canonicalize(key));
 		};
+		// Precompute each candidate's key once so matching is a linear key comparison, not a stringify-per-compare.
+		const remainingKeys = remaining.map(keyOf);
 		const stillUnmatched: T[] = [];
 		for (const record of added) {
-			const matchIndex = remaining.findIndex((candidate) => keyOf(candidate) === keyOf(record));
+			const matchIndex = remainingKeys.indexOf(keyOf(record));
 			if (matchIndex === -1) {
 				stillUnmatched.push(record);
 			} else {
 				idFor.set(record.id, remaining[matchIndex].id);
 				remaining.splice(matchIndex, 1);
+				remainingKeys.splice(matchIndex, 1);
 			}
 		}
 		unmatched = stillUnmatched;
