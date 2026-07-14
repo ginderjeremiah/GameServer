@@ -1,5 +1,6 @@
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
+using Game.Core.Classes;
 using Game.Core.Skills;
 using static Game.Core.EAttribute;
 
@@ -48,13 +49,25 @@ namespace Game.Core.Battle
         /// </summary>
         public Skill? CounterSkill { get; }
 
-        public Battler(AttributeCollection attributes, IEnumerable<Skill> skills, int level, Skill? counterSkill = null)
+        /// <summary>
+        /// The class signature passive this battler's <see cref="EAttributeModifierSource.Class"/> modifier was
+        /// resolved from, or <c>null</c> for a battler assembled without one (an enemy, or a hand-built test
+        /// battler). Carried only so <see cref="CloneWithAttributeDelta"/> can re-resolve an attribute-scaled
+        /// passive against the clone's bumped attributes — the live simulation never reads this, since the
+        /// modifier is already folded into <paramref name="attributes"/> at construction.
+        /// </summary>
+        private readonly ClassSignaturePassive? _signaturePassive;
+
+        public Battler(
+            AttributeCollection attributes, IEnumerable<Skill> skills, int level, Skill? counterSkill = null,
+            ClassSignaturePassive? signaturePassive = null)
         {
             _attributes = attributes;
             CurrentHealth = _attributes[MaxHealth];
             Skills = skills.Select(s => new BattleSkill(s)).ToList();
             Level = level;
             CounterSkill = counterSkill;
+            _signaturePassive = signaturePassive;
         }
 
         public void Update(BattleContext context)
@@ -175,13 +188,20 @@ namespace Game.Core.Battle
         /// not used by the live battle simulation. Excludes any live <see cref="EAttributeModifierSource.SkillEffect"/>
         /// modifiers (the marginal prices a permanent investment, not an in-battle timed-buff snapshot) and the
         /// static modifiers themselves — copying those too would double them, since the fresh
-        /// <see cref="AttributeCollection"/> constructor re-adds them automatically.
+        /// <see cref="AttributeCollection"/> constructor re-adds them automatically. The frozen
+        /// <see cref="EAttributeModifierSource.Class"/> signature-passive modifier is excluded too and, when this
+        /// battler carries a <see cref="_signaturePassive"/>, re-resolved against the clone's bumped attributes —
+        /// composed last, mirroring <see cref="BattlerMaterials.Build"/> — so an attribute-scaled
+        /// passive re-derives exactly like a real allocation would instead of copying through at its
+        /// already-resolved (pre-bump) amount (#1862).
         /// </summary>
         public Battler CloneWithAttributeDelta(EAttribute attribute, double delta)
         {
             var staticModifiers = new HashSet<AttributeModifier>(StaticAttributeModifiers.All);
             var modifiers = _attributes.AllModifiers()
-                .Where(m => m.Source != EAttributeModifierSource.SkillEffect && !staticModifiers.Contains(m))
+                .Where(m => m.Source != EAttributeModifierSource.SkillEffect
+                    && m.Source != EAttributeModifierSource.Class
+                    && !staticModifiers.Contains(m))
                 .ToList();
             modifiers.Add(new AttributeModifier
             {
@@ -191,7 +211,13 @@ namespace Game.Core.Battle
                 Source = EAttributeModifierSource.BaseValue,
             });
 
-            return new Battler(new AttributeCollection(modifiers), Skills.Select(s => s.Skill), Level, CounterSkill);
+            var attributes = new AttributeCollection(modifiers);
+            if (_signaturePassive is not null)
+            {
+                attributes.AddModifier(_signaturePassive.GetModifier(attributes.GetAttributeValue));
+            }
+
+            return new Battler(attributes, Skills.Select(s => s.Skill), Level, CounterSkill, _signaturePassive);
         }
 
         /// <summary>

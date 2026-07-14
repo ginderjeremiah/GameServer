@@ -134,7 +134,8 @@ namespace Game.Core.Battle
             Func<int, Proficiency>? resolveProficiency = null, Func<int, Class>? resolveClass = null)
         {
             var baseModifiers = GetModifiers(resolveItem, resolveMod, resolveProficiency, resolveClass).ToList();
-            var signaturePassive = ResolveSignaturePassive(new AttributeCollection(baseModifiers), resolveClass);
+            var signaturePassiveDefinition = ResolveSignaturePassiveDefinition(resolveClass);
+            var signaturePassive = signaturePassiveDefinition?.GetModifier(new AttributeCollection(baseModifiers).GetAttributeValue);
 
             // The weapon-match gate reads each fielded id's type via the same resolver; an id that resolves to
             // no skill (a leftover/unauthored grant such as an unseeded punch) yields a null type and is dropped
@@ -152,7 +153,7 @@ namespace Game.Core.Battle
             var weapon = ResolveEquippedWeapon(resolveItem);
             var counterSkill = resolveSkill(weapon?.GrantedSkillId ?? GameConstants.PunchSkillId);
 
-            return new BattlerMaterials(baseModifiers, signaturePassive, skills, counterSkill, Level);
+            return new BattlerMaterials(baseModifiers, signaturePassive, signaturePassiveDefinition, skills, counterSkill, Level);
         }
 
         /// <summary>
@@ -181,6 +182,19 @@ namespace Game.Core.Battle
         /// </summary>
         private AttributeModifier? ResolveSignaturePassive(AttributeCollection attributes, Func<int, Class>? resolveClass)
         {
+            return ResolveSignaturePassiveDefinition(resolveClass)?.GetModifier(attributes.GetAttributeValue);
+        }
+
+        /// <summary>
+        /// The captured class's signature-passive <b>definition</b> (not yet resolved against any attributes),
+        /// or <c>null</c> when the snapshot carries no class state. Split out from <see cref="ResolveSignaturePassive"/>
+        /// so <see cref="GetBattlerMaterials"/> can hand the definition itself to <see cref="BattlerMaterials"/> —
+        /// which threads it onto the built <see cref="Battler"/> so <see cref="Battler.CloneWithAttributeDelta"/>
+        /// can re-resolve an attribute-scaled passive against a bumped clone (#1862) — while still resolving the
+        /// modifier once here for the battler's own initial assembly.
+        /// </summary>
+        private ClassSignaturePassive? ResolveSignaturePassiveDefinition(Func<int, Class>? resolveClass)
+        {
             if (ClassId is not int classId)
             {
                 return null;
@@ -192,7 +206,7 @@ namespace Game.Core.Battle
                     "A battle snapshot with a captured class requires a class resolver to compose its signature passive.");
             }
 
-            return resolveClass(classId).SignaturePassive.GetModifier(attributes.GetAttributeValue);
+            return resolveClass(classId).SignaturePassive;
         }
 
         /// <summary>
@@ -359,7 +373,7 @@ namespace Game.Core.Battle
     /// </summary>
     public sealed class BattlerMaterials(
         IReadOnlyList<AttributeModifier> baseModifiers, AttributeModifier? signaturePassive,
-        IReadOnlyList<Skill> skills, Skill? counterSkill, int level)
+        ClassSignaturePassive? signaturePassiveDefinition, IReadOnlyList<Skill> skills, Skill? counterSkill, int level)
     {
         /// <summary>Builds a fresh, single-use <see cref="Battler"/> from these materials.</summary>
         public Battler Build()
@@ -370,7 +384,7 @@ namespace Game.Core.Battle
                 attributes.AddModifier(signaturePassive);
             }
 
-            return new Battler(attributes, skills, level, counterSkill);
+            return new Battler(attributes, skills, level, counterSkill, signaturePassiveDefinition);
         }
     }
 }
