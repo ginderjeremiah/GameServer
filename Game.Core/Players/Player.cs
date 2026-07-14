@@ -466,29 +466,31 @@ namespace Game.Core.Players
         // Records a non-victory (loss/draw) battle outcome. No combat ratings are threaded onto the event —
         // XP only accrues on a win — so a victory MUST go through RecordBattleVictory instead, which requires
         // them; that split (rather than a defaultable parameter) makes a victory caller forgetting the ratings
-        // a compile error instead of a silent zero-XP accrual.
-        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp)
+        // a compile error instead of a silent zero-XP accrual. notify mirrors CompleteChallenge's live-push
+        // toggle: the offline/switch settlement of a stale battle has no socket to push to, so it passes false.
+        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp, bool notify = true)
         {
-            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating: 0, enemyRating: 0);
+            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating: 0, enemyRating: 0, notify);
         }
 
         // Records a victorious battle outcome, threading the combat ratings the win was rated against so the
         // progress handler can normalize proficiency accrual by max(playerRating, enemyRating) (spike #1526
         // Decision 5). Both current victory paths route through BattleService.RecordVictory, which supplies them.
+        // notify mirrors RecordBattleCompleted's live-push toggle.
         public void RecordBattleVictory(
             Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
-            double playerRating, double enemyRating)
+            double playerRating, double enemyRating, bool notify = true)
         {
-            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating, enemyRating);
+            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating, enemyRating, notify);
         }
 
         private void RecordBattleOutcome(
             Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
-            double playerRating, double enemyRating)
+            double playerRating, double enemyRating, bool notify)
         {
             RaiseEvent(new BattleCompletedEvent(
                 this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId,
-                playerRating, enemyRating));
+                playerRating, enemyRating, notify));
 
             // Backstop mirroring the online auto-fight-off: a recorded dedicated-boss loss or draw drops the
             // persisted loop back to idle, so the offline sim doesn't resume boss-farming a loop the player has

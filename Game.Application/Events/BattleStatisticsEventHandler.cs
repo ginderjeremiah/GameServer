@@ -28,19 +28,21 @@ namespace Game.Application.Events
 
             // Evaluate only the challenges whose tracked statistic this battle actually moved (plus the
             // statistic-independent ones) and apply their rewards, raising the live per-challenge push. The
-            // offline-rewards batch runs this same step with the push suppressed.
+            // offline-rewards batch runs this same step with the push suppressed; a live battle whose completion
+            // was instead settled by the offline/switch stale-battle resolution (BattleService.ResolveStaleBattle)
+            // suppresses it here too, via domainEvent.Notify, since that settlement has no socket to push to.
             _challengeRewards.EvaluateAndApply(
-                progress, touchedStatistics, domainEvent.Player, DateTime.UtcNow, notify: true);
+                progress, touchedStatistics, domainEvent.Player, DateTime.UtcNow, notify: domainEvent.Notify);
 
             // Accrue proficiency XP on a victory: each path claims pie × activity ÷ max(playerRating,
             // enemyRating), routed to its frontier tier (the effect-based model, spike #1318, max-normalized per
-            // spike #1526 Decision 5). Raises the live per-battle push; the offline batch runs the same accrual
-            // with it suppressed.
+            // spike #1526 Decision 5). Raises the live per-battle push; the offline batch (and the stale-battle
+            // settlement above) runs the same accrual with it suppressed.
             if (domainEvent.Victory)
             {
                 var ratingDenominator = Math.Max(domainEvent.PlayerRating, domainEvent.EnemyRating);
                 _proficiencyRewards.AccrueAndApply(
-                    progress, domainEvent.Stats, ratingDenominator, domainEvent.Player, notify: true);
+                    progress, domainEvent.Stats, ratingDenominator, domainEvent.Player, notify: domainEvent.Notify);
             }
 
             await _progressRepo.Save(progress, cancellationToken);

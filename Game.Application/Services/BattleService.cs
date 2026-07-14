@@ -65,7 +65,7 @@ namespace Game.Application.Services
 
             if (state.HasActiveBattle)
             {
-                var (handoff, _) = await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+                var (handoff, _) = await AbandonBattle(player, state, clientBattleMs, cancellationToken: cancellationToken);
                 if (handoff is not null && !forceAbandon)
                 {
                     // A still-in-progress handoff (#1595) means the existing battle hasn't concluded yet —
@@ -220,7 +220,7 @@ namespace Game.Application.Services
                 // outcome (win/loss/draw) applies the post-battle cooldown to state.EnemyCooldown (#1851); one
                 // that resolves nothing (e.g. mid an already-running cooldown, where elapsedMs clamps to 0)
                 // leaves EnemyCooldown exactly as it found it. Either way, the general anchor below picks it up.
-                await AbandonBattle(player, state, clientBattleMs, cancellationToken);
+                await AbandonBattle(player, state, clientBattleMs, cancellationToken: cancellationToken);
             }
 
             // Anchor to the in-effect cooldown rather than always to now — ChallengeBoss has no command-level
@@ -409,8 +409,12 @@ namespace Game.Application.Services
         public Task<StaleBattleResolution> ResolveStaleBattle(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
             // No client elapsed for an offline/disconnect resolution — the abandon falls back to wall-clock
-            // (capped at DefaultMaxBattleMs), exactly as before.
-            return AbandonBattle(player, state, cancellationToken: cancellationToken);
+            // (capped at DefaultMaxBattleMs), exactly as before. Both callers (the login welcome-back gate and
+            // the character-switch credit) resolve a player who by construction has no live socket right now,
+            // so the outcome is recorded but the live push is suppressed (#1859) — mirroring the offline
+            // window's own notify: false, rather than tripping SocketManagerService's no-active-socket warning
+            // on every routine switch/reconnect.
+            return AbandonBattle(player, state, notify: false, cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -450,7 +454,11 @@ namespace Game.Application.Services
         // (#1595): the caller must leave PlayerState untouched in that case (nothing was cleared or saved).
         // SettledBattleMs carries the resolved battle's own credited duration (its BattleResult.TotalMs) only
         // when an outcome was actually recorded; null for a handoff and for "nothing to resolve" alike.
-        private async Task<StaleBattleResolution> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, CancellationToken cancellationToken = default)
+        // notify is the live client-push toggle threaded down to the recorded outcome (#1859): StartBattle and
+        // StartBossBattle abandon a still-live player's existing battle to start a new one, so they keep the
+        // default true; ResolveStaleBattle's offline/switch settlement passes false since that player has no
+        // socket by construction.
+        private async Task<StaleBattleResolution> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, bool notify = true, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
             // A stale battle can be far older than int.MaxValue ms (~24.9 days), so clamp before narrowing —
@@ -487,7 +495,7 @@ namespace Game.Application.Services
                 // abandon resolved as a real victory. Pay it out exactly like EndBattleVictory (exp +
                 // win/clear/challenge credit) rather than booking the win while silently withholding the
                 // earned exp (#206).
-                RecordVictory(player, enemy, result, state, now);
+                RecordVictory(player, enemy, result, state, now, notify);
             }
             else if (!result.PlayerDied && wallClockMs < GameConstants.DefaultMaxBattleMs)
             {
@@ -512,7 +520,7 @@ namespace Game.Application.Services
             }
             else
             {
-                player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
+                player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now, notify);
             }
 
             // Both outcome branches above (won or lost/drew) reach here — the still-in-progress branch
@@ -543,7 +551,7 @@ namespace Game.Application.Services
         // EndBattleVictory returns only a client-facing DefeatResult, and the BattleStats this mutates is
         // carried on the BattleCompletedEvent, which the dispatcher clears after handling — leaving no other
         // seam to observe that result.Stats.PlayerRating is set from the snapshot rather than the live aggregate.
-        internal DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp)
+        internal DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp, bool notify = true)
         {
             // Rate the player for the reward from the same frozen snapshot the battle was simulated against, not
             // the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps) can shift live
@@ -571,7 +579,7 @@ namespace Game.Application.Services
             // (spike #1526 Decision 5) — the same snapshot-measured ratings the exp reward above used.
             player.RecordBattleVictory(
                 enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp,
-                rewards.PlayerRating, rewards.EnemyRating);
+                rewards.PlayerRating, rewards.EnemyRating, notify);
 
             return rewards;
         }

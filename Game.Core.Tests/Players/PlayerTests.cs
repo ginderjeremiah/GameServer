@@ -910,6 +910,32 @@ namespace Game.Core.Tests.Players
             Assert.Equal(0, evt.EnemyRating);
         }
 
+        [Fact]
+        public void RecordBattleCompleted_DefaultsToNotifyTrue()
+        {
+            var player = MakePlayer();
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow);
+
+            Assert.True(Assert.Single(player.DomainEvents.OfType<BattleCompletedEvent>()).Notify);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_NotifyFalse_RaisesEventWithNotifySuppressed()
+        {
+            var player = MakePlayer();
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+
+            // The offline/switch stale-battle settlement (BattleService.ResolveStaleBattle, #1859) has no live
+            // socket to push to by construction, so it settles with notify: false — the statistics/challenge
+            // recording BattleStatisticsEventHandler drives off this event still runs regardless; only the
+            // live challenge-completion/proficiency-xp pushes it raises are suppressed.
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow, notify: false);
+
+            Assert.False(Assert.Single(player.DomainEvents.OfType<BattleCompletedEvent>()).Notify);
+        }
+
         // ── RecordBattleVictory ──────────────────────────────────────────────
 
         [Fact]
@@ -944,6 +970,22 @@ namespace Game.Core.Tests.Players
             var coreUpdated = player.DomainEvents.OfType<PlayerCoreUpdatedEvent>().SingleOrDefault();
             Assert.NotNull(coreUpdated);
             Assert.Equal(timestamp, coreUpdated.LastActivity);
+        }
+
+        [Fact]
+        public void RecordBattleVictory_NotifyFalse_RaisesEventWithNotifySuppressed()
+        {
+            var player = MakePlayer();
+            var enemy = MakeEnemy(id: 5);
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, Stats: new BattleStats());
+
+            // Mirrors RecordBattleCompleted_NotifyFalse_RaisesEventWithNotifySuppressed: the won-abandon path
+            // through BattleService.AbandonBattle threads the same suppressed notify onto a victory.
+            player.RecordBattleVictory(
+                enemy, result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow,
+                playerRating: 1, enemyRating: 1, notify: false);
+
+            Assert.False(Assert.Single(player.DomainEvents.OfType<BattleCompletedEvent>()).Notify);
         }
 
         // ── StampActivity ────────────────────────────────────────────────────
