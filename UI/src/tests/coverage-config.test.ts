@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coverageThresholds, projectCoverageExclude } from '../../coverage.config';
+import { globToRegExp } from '../../scripts/coverage-glob';
 
 // Enumerate every instrumented source file. Vite resolves this glob at transform time against the
 // package root, so the test sees the real tree. Declaration files carry no executable logic, so v8
@@ -8,32 +9,6 @@ const sourceFiles = Object.keys(import.meta.glob('/src/**/*.{ts,js,svelte}'))
 	.map((path) => path.replace(/^\//, ''))
 	.filter((path) => !path.endsWith('.d.ts'))
 	.sort();
-
-// Minimal glob matcher for the vocabulary the coverage config uses: `**` (any number of path
-// segments, including none), `*` (anything within a single segment), and literal characters. This
-// mirrors how Vitest itself buckets files without pulling in an untyped runtime glob dependency.
-function globToRegExp(glob: string): RegExp {
-	let source = '';
-	for (let i = 0; i < glob.length; i++) {
-		const char = glob[i];
-		if (char === '*' && glob[i + 1] === '*') {
-			i++;
-			if (glob[i + 1] === '/') {
-				i++;
-				source += '(?:.*/)?';
-			} else {
-				source += '.*';
-			}
-		} else if (char === '*') {
-			source += '[^/]*';
-		} else if ('.+^${}()|[]\\'.includes(char)) {
-			source += `\\${char}`;
-		} else {
-			source += char;
-		}
-	}
-	return new RegExp(`^${source}$`);
-}
 
 const areaMatchers = Object.keys(coverageThresholds).map((glob) => ({ glob, regExp: globToRegExp(glob) }));
 const excludeMatchers = projectCoverageExclude.map(globToRegExp);

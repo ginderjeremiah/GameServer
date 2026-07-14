@@ -49,8 +49,5 @@
 		"vite": "^8.0.14",
 		"vitest": "^4.1.7"
 	},
-	"type": "module",
-	"dependencies": {
-		"micromatch": "^4.0.8"
-	}
+	"type": "module"
 }
