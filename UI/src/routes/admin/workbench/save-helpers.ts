@@ -38,19 +38,48 @@ export const childChanged = <T>(current: T, baseline: T | undefined): boolean =>
 	baseline === undefined || !listsEqual(current, baseline);
 
 /**
- * Map the local (negative) ids of added records to their persisted ids. The backend appends adds in
- * send order, so the k-th added record maps to the k-th lowest id absent from the pre-save set.
+ * Map the local (negative) ids of added records to their persisted ids. Purely positional pairing (the
+ * k-th added record maps to the k-th lowest id absent from the pre-save set) assumes only this session's
+ * own adds appear as new ids in the refetch — a concurrent add from another admin breaks that assumption
+ * and can pair a child saver against the wrong record (#1856). When `identityKey` is supplied, an added
+ * record is instead matched to the fresh record whose identity key (everything the key builder returns,
+ * excluding `id`) is equal; positional pairing is used only as a fallback, and only among whatever's left
+ * once identity matching is exhausted — e.g. several adds that still share identical, undiverged identity
+ * fields, which is unambiguous either way since nothing distinguishes them by content.
  */
-export const resolveNewIds = (
-	fresh: { id: number }[],
+export const resolveNewIds = <T extends { id: number }>(
+	fresh: T[],
 	existingIds: Iterable<number>,
-	added: { id: number }[]
+	added: T[],
+	identityKey?: (record: T) => unknown
 ): Map<number, number> => {
 	const existing = new Set(existingIds);
 	const newlyPersisted = fresh.filter((record) => !existing.has(record.id)).sort((a, b) => a.id - b.id);
 	const idFor = new Map<number, number>();
-	added.forEach((record, index) => {
-		const persisted = newlyPersisted[index];
+	const remaining = [...newlyPersisted];
+	let unmatched = added;
+
+	if (identityKey) {
+		const keyOf = (record: T) => {
+			const key = { ...(identityKey(record) as Record<string, unknown>) };
+			delete key.id;
+			return JSON.stringify(canonicalize(key));
+		};
+		const stillUnmatched: T[] = [];
+		for (const record of added) {
+			const matchIndex = remaining.findIndex((candidate) => keyOf(candidate) === keyOf(record));
+			if (matchIndex === -1) {
+				stillUnmatched.push(record);
+			} else {
+				idFor.set(record.id, remaining[matchIndex].id);
+				remaining.splice(matchIndex, 1);
+			}
+		}
+		unmatched = stillUnmatched;
+	}
+
+	unmatched.forEach((record, index) => {
+		const persisted = remaining[index];
 		if (persisted) {
 			idFor.set(record.id, persisted.id);
 		}
@@ -152,8 +181,10 @@ export async function persistEntity<T extends Identified, D>(opts: PersistOption
 
 		const fresh = await refresh();
 
-		// Records present after save but absent before are the persisted adds.
-		const idFor = resolveNewIds(fresh, diff.existingIds, diff.added);
+		// Records present after save but absent before are the persisted adds. Disambiguate by identity
+		// content (not just position) so a concurrent add from another admin can't steal this session's
+		// child writes — see resolveNewIds.
+		const idFor = resolveNewIds(fresh, diff.existingIds, diff.added, toPrimaryDto);
 
 		const childTargets: { id: number; record: T; baseline: T | undefined }[] = [
 			...diff.added.map((record) => ({ id: resolveId(record.id, idFor), record, baseline: undefined })),

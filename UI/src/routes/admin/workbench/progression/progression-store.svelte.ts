@@ -489,11 +489,14 @@ export class ProgressionStore {
 			}
 
 			// 4. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
+			// Identity-content matching (not just position) keeps this correct when another admin's
+			// concurrent add lands in the same refetch (#1856).
 			const freshPaths = await fetchSocketData('GetPaths');
 			const pathIdMap = resolveNewIds(
 				freshPaths,
 				this.basePaths.map((p) => p.id),
-				pathDiff.added
+				pathDiff.added,
+				pathIdentityDto
 			);
 
 			// 5. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
@@ -513,11 +516,13 @@ export class ProgressionStore {
 			}
 
 			// 6. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
+			// Identity-content matching keeps this correct under the same concurrent-add race (#1856).
 			const freshProfs = await fetchSocketData('GetProficiencies');
 			const profIdMap = resolveNewIds(
 				freshProfs,
 				this.baseProfs.map((p) => p.id),
-				profDiff.added
+				profDiff.added,
+				profIdentityDto
 			);
 
 			// 7. Proficiency child collections — modifiers and rewards per tier, minus the ones already
