@@ -209,7 +209,7 @@ namespace Game.Api.Services
 
         private async Task UnRegisterSocketCommandListener(string socketId)
         {
-            await _pubSub.UnSubscribe(SocketChannel(socketId), socketId);
+            await _pubSub.UnSubscribe(socketId);
         }
 
         private async Task RegisterSocketCommandListener(SocketHandler handler)

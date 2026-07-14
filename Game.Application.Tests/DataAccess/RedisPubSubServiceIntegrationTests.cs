@@ -10,7 +10,7 @@ namespace Game.Application.Tests.DataAccess
     /// Covers the keyed-subscription registry branches of the Redis-backed <see cref="IPubSubService"/>
     /// (RedisPubSubService) that the write-behind/backplane integration tests don't reach: rejecting a
     /// duplicate handle id (across both the plain and the queue/worker overloads), the remove-vs-unknown
-    /// branches of <see cref="IPubSubService.UnSubscribe(string, string)"/>, and the batched-publish path
+    /// branches of <see cref="IPubSubService.UnSubscribe(string)"/>, and the batched-publish path
     /// (<see cref="IPubSubService.PublishBatch{T}"/> — the multi-value LPUSH and its empty no-op). These are
     /// genuine logic (not connection-failure simulation), so per the testing guidelines they are pinned
     /// through an integration test against the DI-resolved service rather than mocked. Each test uses unique
@@ -78,7 +78,7 @@ namespace Game.Application.Tests.DataAccess
             }
             finally
             {
-                await pubsub.UnSubscribe(channel, id);
+                await pubsub.UnSubscribe(id);
             }
         }
 
@@ -100,7 +100,7 @@ namespace Game.Application.Tests.DataAccess
             }
             finally
             {
-                await pubsub.UnSubscribe(channel, id);
+                await pubsub.UnSubscribe(id);
             }
         }
 
@@ -113,11 +113,11 @@ namespace Game.Application.Tests.DataAccess
             var id = $"handle-{Guid.NewGuid()}";
 
             await pubsub.Subscribe(channel, _ => { }, id);
-            await pubsub.UnSubscribe(channel, id);
+            await pubsub.UnSubscribe(id);
 
             // Re-subscribing with the same id only succeeds because UnSubscribe removed the prior handle.
             await pubsub.Subscribe(channel, _ => { }, id);
-            await pubsub.UnSubscribe(channel, id);
+            await pubsub.UnSubscribe(id);
         }
 
         [Fact]
@@ -127,7 +127,33 @@ namespace Game.Application.Tests.DataAccess
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
 
             // Removing an id that was never registered takes the not-found branch and must not throw.
-            await pubsub.UnSubscribe($"pubsub-test-{Guid.NewGuid()}", $"missing-{Guid.NewGuid()}");
+            await pubsub.UnSubscribe($"missing-{Guid.NewGuid()}");
+        }
+
+        [Fact]
+        public async Task UnSubscribe_UnsubscribesTheChannelRecordedAtSubscribeTime()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var channel = $"pubsub-test-{Guid.NewGuid()}";
+            var id = $"handle-{Guid.NewGuid()}";
+            var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            // UnSubscribe no longer takes a channel argument (#1825) — it can only tear down the channel this
+            // handle actually subscribed to, recorded at Subscribe time, so there is nothing left for a caller
+            // to mismatch.
+            await pubsub.Subscribe(channel, args => received.TrySetResult(args.message), id);
+            await pubsub.Publish(channel, "before-unsubscribe");
+            Assert.Equal("before-unsubscribe", await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+
+            await pubsub.UnSubscribe(id);
+
+            // A message published after UnSubscribe must never reach the handler — proving the real Redis
+            // subscription on `channel` was torn down, not left dangling under a stale/empty channel.
+            received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            await pubsub.Publish(channel, "after-unsubscribe");
+            var completed = await Task.WhenAny(received.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+            Assert.NotSame(received.Task, completed);
         }
     }
 }

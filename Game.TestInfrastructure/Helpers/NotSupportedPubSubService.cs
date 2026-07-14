@@ -16,7 +16,7 @@ namespace Game.TestInfrastructure.Helpers
         public virtual Task Wake(string channel) => throw new NotSupportedException();
         public virtual Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new NotSupportedException();
         public virtual Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new NotSupportedException();
-        public virtual Task UnSubscribe(string channel, string id) => throw new NotSupportedException();
+        public virtual Task UnSubscribe(string id) => throw new NotSupportedException();
         public virtual IPubSubQueue GetQueue(string queueName) => throw new NotSupportedException();
     }
 }

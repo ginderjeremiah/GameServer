@@ -134,7 +134,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 // Dispose doesn't remove the subscription StartAsync registered, so clean it up to avoid
                 // leaking a handler on the shared channel for later tests.
-                await pubsub.UnSubscribe(Constants.PUBSUB_REFERENCE_DATA_CHANNEL, synchronizer.InstanceId);
+                await pubsub.UnSubscribe(synchronizer.InstanceId);
             }
         }
 

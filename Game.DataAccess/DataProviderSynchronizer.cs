@@ -170,7 +170,7 @@ namespace Game.DataAccess
             // Remove this instance's worker subscription first so no further wakes arrive mid-drain, disposing the
             // worker's OS wait handle (id-scoped, so it tears down only this handler) — the teardown the leaked
             // id-less subscription could never reach (#954).
-            await _pubsub.UnSubscribe(Constants.PUBSUB_PLAYER_CHANNEL, InstanceId);
+            await _pubsub.UnSubscribe(InstanceId);
 
             // Signal the in-flight drain (startup or a pub/sub wake) to stop reserving new items and unwind at
             // a clean item boundary, then wait for it to release the gate so an in-progress apply finishes
