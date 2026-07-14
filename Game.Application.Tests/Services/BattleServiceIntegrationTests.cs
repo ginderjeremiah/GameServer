@@ -4,6 +4,7 @@ using Game.Application.Services;
 using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Battle;
+using Game.Core.Battle.Events;
 using Game.Core.Battle.Offline;
 using Game.Core.Players;
 using Game.Core.TestInfrastructure.Builders;
@@ -1618,6 +1619,43 @@ namespace Game.Application.Tests.Services
             // stale (10 minutes) the battle's wall-clock age was.
             Assert.NotNull(resolution.SettledBattleMs);
             Assert.InRange(resolution.SettledBattleMs.Value, 1, GameConstants.DefaultMaxBattleMs - 1);
+        }
+
+        [Fact]
+        public async Task RecordVictory_NotifyFalse_RaisesBattleCompletedEventWithNotifySuppressed()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // BattleService.ResolveStaleBattle (the offline/switch stale-battle settlement, #1859) threads
+            // notify: false down through AbandonBattle into this call, since that settlement's player has no
+            // live socket by construction — verified here directly against RecordVictory (bypassing SavePlayer's
+            // dispatch, which would otherwise clear the event before this assertion could observe it).
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await ReloadReferenceCachesAsync();
+
+            var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            var coreEnemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(enemy.Id, level: 1);
+            Assert.NotNull(coreEnemy);
+            coreEnemy.SelectAllBattleSkills();
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, new BattleStats());
+
+            battleService.RecordVictory(player, coreEnemy, result, state, DateTime.UtcNow, notify: false);
+
+            var evt = Assert.Single(player.DomainEvents.OfType<BattleCompletedEvent>());
+            Assert.True(evt.Victory);
+            Assert.False(evt.Notify);
         }
 
         [Fact]

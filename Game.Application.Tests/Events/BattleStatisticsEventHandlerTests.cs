@@ -402,6 +402,49 @@ namespace Game.Application.Tests.Events
             Assert.Equal(Math.Round((decimal)(ServerGameConstants.ProficiencyXpPerVictory * 1.5), 3, MidpointRounding.AwayFromZero), live.Xp);
         }
 
+        [Fact]
+        public async Task Victory_NotifyFalse_StillCompletesChallengeAndAccruesProficiency_ButSuppressesLivePushes()
+        {
+            using var scope = CreateScope();
+            var setup = await SeedScenarioAsync(scope, itemReward: true, modReward: false);
+
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skill = await TestDataSeeder.CreateSkillAsync(context, name: "Firebolt");
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, setup.PlayerId, skill.Id);
+            var proficiency = await TestDataSeeder.CreateProficiencyAsync(context, name: "Fire");
+            await TestDataSeeder.LinkSkillToProficiencyAsync(context, proficiency.Id, skill.Id);
+            await ReferenceCacheReloader.ReloadAllAsync(scope.ServiceProvider);
+
+            var player = await scope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(setup.PlayerId);
+            Assert.NotNull(player);
+            var enemy = scope.ServiceProvider.GetRequiredService<IEnemies>().GetDomainEnemy(setup.EnemyId, level: 1);
+            Assert.NotNull(enemy);
+
+            const double power = 100.0;
+            var stats = new BattleStats { SkillStats = { [skill.Id] = new SkillStats { Uses = 1, TotalDamage = power } } };
+            stats.AddTypedDamageDealt(EDamageType.Physical, power);
+
+            // Mirrors BattleService.ResolveStaleBattle's offline/switch settlement (#1859): the player has no
+            // live socket, so the event carries Notify: false.
+            var battleEvent = new BattleCompletedEvent(
+                player, enemy, Victory: true, PlayerDied: false, TotalMs: 5000,
+                Stats: stats, IsBossBattle: false, ZoneId: player.CurrentZoneId, PlayerRating: power, Notify: false);
+
+            await MakeHandler(scope).HandleAsync(battleEvent, CancellationToken);
+
+            // The underlying statistics/challenge-completion/proficiency-accrual recording still happens
+            // regardless of Notify — only the live client pushes are suppressed.
+            Assert.Contains(setup.ItemId, player.Inventory.UnlockedItems.Select(u => u.ItemId));
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            Assert.NotEmpty(await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
+            var proficiencyRow = Assert.Single(await progressRepo.GetProficiencies(setup.PlayerId));
+            Assert.Equal(proficiency.Id, proficiencyRow.ProficiencyId);
+            Assert.True(proficiencyRow.Xp > 0);
+
+            Assert.Empty(player.DomainEvents.OfType<ChallengeCompletedEvent>());
+            Assert.Empty(player.DomainEvents.OfType<ProficiencyXpGainedEvent>());
+        }
+
         private BattleStatisticsEventHandler MakeHandler(IServiceScope scope) => new(
             scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>(),
             scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),

@@ -18,7 +18,13 @@ namespace Game.Core.Battle.Events
         // for the effect-based proficiency accrual (spike #1526 Decision 5, #1532). Meaningful only on a
         // victory — XP accrues on wins — so the loss/abandon paths leave both at the default, and a default of
         // 0/0 yields no accrual (the normalization guard treats a non-positive denominator as no claim).
-        double PlayerRating = 0, double EnemyRating = 0) : IDomainEvent, ILoggableDomainEvent
+        double PlayerRating = 0, double EnemyRating = 0,
+        // Live client-push toggle for the challenge-completion and proficiency-xp pushes this event drives
+        // (mirrors Player.CompleteChallenge's notify). The offline/switch settlement of a stale battle
+        // (BattleService.ResolveStaleBattle) has no socket to push to by construction, so it settles with
+        // false; the statistics/challenge/proficiency recording itself still runs either way — only the live
+        // push is suppressed.
+        bool Notify = true) : IDomainEvent, ILoggableDomainEvent
     {
         // Curated safe scalars only — never the Player/Enemy aggregates, stats, or inventory.
         public IReadOnlyList<KeyValuePair<string, object?>> GetLogProperties() =>
