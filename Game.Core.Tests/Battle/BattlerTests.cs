@@ -1,6 +1,7 @@
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
+using Game.Core.Classes;
 using Game.Core.Skills;
 using Xunit;
 
@@ -283,6 +284,53 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(80, battler.TakeDamage(40, EDamageType.Physical), 0.001);
         }
 
+        // ── CloneWithAttributeDelta: signature-passive re-derivation (#1862) ────
+
+        [Fact]
+        public void CloneWithAttributeDelta_AttributeScaledSignaturePassive_ReDerivesAgainstBumpedAttribute()
+        {
+            // The passive scales off Endurance (+0.5 Toughness per point) on top of the static 2×Endurance
+            // derivation. Bumping Endurance by 10 must re-derive the passive's own contribution too, not copy
+            // through its pre-bump amount — the exact defect #1862 reports.
+            var passive = new ClassSignaturePassive
+            {
+                Attribute = EAttribute.Toughness,
+                Amount = 0m,
+                ScalingAttribute = EAttribute.Endurance,
+                ScalingAmount = 0.5m,
+                ModifierType = EModifierType.Additive,
+            };
+            var battler = MakeBattlerWithSignaturePassive(passive, (EAttribute.Endurance, 20));
+            Assert.Equal(50, battler.GetAttributeValue(EAttribute.Toughness), 0.001); // 2×20 + 0.5×20
+
+            var bumped = battler.CloneWithAttributeDelta(EAttribute.Endurance, 10);
+
+            // Endurance 30: static 2×30 = 60, passive re-derived at 0.5×30 = 15 → 75. A frozen-passive bug would
+            // instead yield 60 + 10 (the pre-bump amount) = 70.
+            Assert.Equal(75, bumped.GetAttributeValue(EAttribute.Toughness), 0.001);
+        }
+
+        [Fact]
+        public void CloneWithAttributeDelta_FlatSignaturePassive_CarriesThroughUnaffectedByAnUnrelatedBump()
+        {
+            // A flat (non-scaled) passive has nothing to re-derive; bumping an unrelated attribute must still
+            // leave its contribution exactly as assembled, with no duplication from the exclude/re-add swap.
+            var passive = new ClassSignaturePassive
+            {
+                Attribute = EAttribute.Strength,
+                Amount = 7m,
+                ScalingAttribute = null,
+                ScalingAmount = 0m,
+                ModifierType = EModifierType.Additive,
+            };
+            var battler = MakeBattlerWithSignaturePassive(passive, (EAttribute.Endurance, 5));
+            Assert.Equal(7, battler.GetAttributeValue(EAttribute.Strength), 0.001);
+
+            var bumped = battler.CloneWithAttributeDelta(EAttribute.Endurance, 10);
+
+            Assert.Equal(7, bumped.GetAttributeValue(EAttribute.Strength), 0.001);
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
@@ -303,6 +351,31 @@ namespace Game.Core.Tests.Battle
                 .ToList();
 
             return new Battler(new AttributeCollection(modifiers), [], 1);
+        }
+
+        /// <summary>
+        /// Builds a <see cref="Battler"/> like <see cref="MakeBattler"/>, plus a resolved
+        /// <see cref="EAttributeModifierSource.Class"/> signature-passive modifier composed last (mirroring
+        /// <see cref="BattlerMaterials.Build"/>) and carried through for <see cref="Battler.CloneWithAttributeDelta"/>
+        /// to re-resolve.
+        /// </summary>
+        private static Battler MakeBattlerWithSignaturePassive(
+            ClassSignaturePassive passive, params (EAttribute Attribute, double Amount)[] attributes)
+        {
+            var modifiers = attributes
+                .Select(a => new AttributeModifier
+                {
+                    Attribute = a.Attribute,
+                    Amount = a.Amount,
+                    Type = EModifierType.Additive,
+                    Source = EAttributeModifierSource.AttributeDistribution,
+                })
+                .ToList();
+
+            var collection = new AttributeCollection(modifiers);
+            collection.AddModifier(passive.GetModifier(collection.GetAttributeValue));
+
+            return new Battler(collection, [], 1, signaturePassive: passive);
         }
     }
 }
