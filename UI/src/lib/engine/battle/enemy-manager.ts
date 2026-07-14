@@ -205,7 +205,12 @@ export class EnemyManager {
 	 */
 	public async getNewEnemy(prepared?: PreparedBattle, forceAbandon = false): Promise<void> {
 		const generation = this.fetchGeneration;
-		if (this.fetchingEnemy) {
+		// Looped (not a one-shot if): a fetch already running when we arrive is checked again after each
+		// wait. Two same-generation callers can both queue behind an older, superseded fetch — the first
+		// to resume starts a fresh fetch (synchronously re-arming fetchingEnemy/fetchingGeneration before
+		// its first await), and looping back here is what lets the second recognize that new fetch as its
+		// own genuine re-entrant duplicate instead of racing it into a double spawn.
+		while (this.fetchingEnemy) {
 			// A fetch is already running. If it captured this same generation it's a genuine re-entrant
 			// duplicate — overlapping stage handlers (e.g. an idle victory racing an Idle/Defeated change)
 			// each request-and-notify a spawn, and a double-spawn has anti-cheat consequences (the backend
@@ -215,7 +220,7 @@ export class EnemyManager {
 			}
 			// Otherwise this call's generation is newer, so the running fetch has been superseded (a
 			// transition bumped the generation) and will abandon without spawning. Wait for it to tear
-			// down, then fall through and fetch fresh so this fallback spawn isn't dropped by the guard.
+			// down, then loop back and re-check rather than assuming the guard is now clear.
 			await this.inFlightFetch;
 			// The wait can overlap a stop or a further supersession; bail if either landed meanwhile.
 			if (!this.started || generation !== this.fetchGeneration) {
