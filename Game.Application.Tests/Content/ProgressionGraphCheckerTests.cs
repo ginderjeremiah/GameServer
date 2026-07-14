@@ -479,6 +479,57 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "EnemyInertAttribute", ContentGraphSeverity.Warning, "Enemy", 9);
         }
 
+        // --- Enemy bounty cap (silent MaxExpPerGrant truncation, #1860) --------------------------------
+
+        [Fact]
+        public void Enemy_MatchedBountyAtOrAboveMaxExpPerGrant_IsWarning()
+        {
+            // A grossly over-authored Strength distribution drives the rating (and so the matched-fight
+            // bounty XpScaleK × EnemyRating) far past MaxExpPerGrant.
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Strength, 100_000_000_000, 0)]), Enemy(1, isBoss: true)],
+            };
+            AssertHasFinding(graph, "EnemyBountyCap", ContentGraphSeverity.Warning, "Enemy", 0);
+        }
+
+        [Fact]
+        public void Enemy_MatchedBountyBelowMaxExpPerGrant_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)], attributeDistribution: [(EAttribute.Strength, 50, 1)]), Enemy(1, isBoss: true)],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyBountyCap");
+        }
+
+        [Fact]
+        public void Enemy_RetiredWithOverCapBounty_ProducesNoFinding()
+        {
+            // A retired enemy is out of circulation, so its bounty is never actually paid out.
+            var graph = HealthyGraph() with
+            {
+                Enemies = HealthyGraph().Enemies
+                    .Append(Enemy(9, skillPool: [2], spawns: [(0, 1)], retiredAt: Retired, attributeDistribution: [(EAttribute.Strength, 100_000_000_000, 0)]))
+                    .ToList(),
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyBountyCap");
+        }
+
+        [Fact]
+        public void Enemy_NotPlacedWithOverCapBounty_ProducesNoFinding()
+        {
+            // No spawn table entry and no dedicated-boss slot means no representative level to rate at, so
+            // the check is skipped rather than rating at a made-up level — mirrors CheckEnemyAttributeConsumption.
+            var graph = HealthyGraph() with
+            {
+                Enemies = HealthyGraph().Enemies
+                    .Append(Enemy(9, skillPool: [2], spawns: [], attributeDistribution: [(EAttribute.Strength, 100_000_000_000, 0)]))
+                    .ToList(),
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "EnemyBountyCap");
+        }
+
         // --- Classes ----------------------------------------------------------------------------------
 
         [Fact]

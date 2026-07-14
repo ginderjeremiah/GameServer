@@ -31,11 +31,16 @@ namespace Game.Core
         public const double XpScaleK = 0.3262;
 
         /// <summary>
-        /// Defensive ceiling on the experience a single <c>Player.GrantExp</c> call applies. Legitimate
-        /// per-battle exp is already clamped well below this by <see cref="MaxExpRewardMultiplier"/>; this
-        /// is a backstop that bounds the level-up loop (and its per-level event burst) against a
-        /// tampered/replayed grant, keeping a single command's work on the serialized per-player path
-        /// finite regardless of the caller.
+        /// Defensive ceiling on the experience a single <c>Player.GrantExp</c> call applies — bounds the
+        /// level-up loop (and its per-level event burst) against a tampered/replayed grant, keeping a single
+        /// command's work on the serialized per-player path finite regardless of the caller.
+        /// <see cref="MaxExpRewardMultiplier"/> no longer bounds legitimate exp (it's calibration-legacy
+        /// only, see its own doc comment); the live ceiling on a matched-or-easier victory's reward is
+        /// <c><see cref="XpScaleK"/> × EnemyRating</c> (<see cref="Battle.DefeatRewards"/>), bounded only by
+        /// authored enemy power. An enemy whose combat rating exceeds
+        /// <c>MaxExpPerGrant ÷ XpScaleK</c> (currently ≈306k) has its legitimate reward silently cut to this
+        /// clamp — the <c>EnemyBountyCap</c> content-health lint (<c>ProgressionGraphChecker</c>, docs/backend-content.md)
+        /// flags any live enemy whose bounty would be truncated.
         /// </summary>
         public const int MaxExpPerGrant = 100_000;
 
