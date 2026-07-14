@@ -468,6 +468,36 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetSpawns_UnknownZone_ReturnsFailure()
+        {
+            int enemyId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+                enemyId = enemy.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A desired spawn referencing a zone that doesn't exist would otherwise FK-fault at commit
+            // instead of rejecting gracefully (the prior IsHome pattern match silently let a missing zone
+            // through since neither branch matched).
+            var data = new SetEnemySpawnsData
+            {
+                EnemyId = enemyId,
+                Spawns = [new Contracts.EnemySpawn { ZoneId = 99999, Weight = 1 }],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminEnemies>();
+
+            var result = admin.SetSpawns(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Zone 99999 does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SetSpawns_NegativeWeight_ReturnsFailure()
         {
             int enemyId, zoneId;

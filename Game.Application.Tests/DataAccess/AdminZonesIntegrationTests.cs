@@ -190,6 +190,35 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetEnemies_UnknownEnemy_ReturnsFailure()
+        {
+            int zoneId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var zone = await TestDataSeeder.CreateZoneAsync(context);
+                zoneId = zone.Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A desired spawn referencing an enemy that doesn't exist would otherwise FK-fault at commit
+            // instead of rejecting gracefully.
+            var data = new SetZoneEnemiesData
+            {
+                ZoneId = zoneId,
+                ZoneEnemies = [new Contracts.ZoneEnemy { EnemyId = 99999, Weight = 1 }],
+            };
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SetEnemies(data);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Enemy 99999 does not exist.", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveZones_HomeZoneWithBoss_ReturnsFailure()
         {
             int bossEnemyId;
