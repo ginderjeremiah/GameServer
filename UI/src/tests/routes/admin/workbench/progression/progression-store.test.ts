@@ -336,6 +336,48 @@ describe('save orchestration', () => {
 		expect(store.totalChanges).toBe(0);
 	});
 
+	it('resolves a same-save-new-path proficiency by identity content, not position, when a concurrent add lands at a lower id (#1856)', async () => {
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.addPath();
+		const pathLocal = store.selectedPathId as number;
+		store.patchPath(pathLocal, (d) => {
+			d.name = 'Fire';
+			d.activityKey = EActivityKey.Fire;
+		});
+		const tierLocal = store.currentTiers[0].id;
+		store.patchProf(tierLocal, (d) => {
+			d.name = 'Fire T0';
+			d.word = 'fyr';
+			d.pronunciation = 'fyoor';
+			d.translation = 'Fire';
+			d.iconPath = 'fire.png';
+		});
+		store.addModifier(tierLocal, 2);
+
+		// Simulate another admin's proficiency add landing, with a lower id than this session's own
+		// about-to-be-persisted tier, in the window between this session's AddEditProficiencies POST
+		// and its refetch. Since the tier's own path is *also* new in this save, its `pathId` in the
+		// diff still carries the path's local (negative) id — the scenario the review on #1856 flagged.
+		postMock.mockImplementation(async (endpoint: string, body: Rec) => {
+			if (endpoint === 'AdminTools/AddEditProficiencies') {
+				serverProfs.push(fullTier({ id: nextId(serverProfs), pathId: 0, pathOrdinal: 5, name: 'Not mine' }));
+			}
+			applyPost(endpoint, body);
+			return {};
+		});
+
+		await store.save();
+
+		// The foreign tier must be untouched; this session's own modifier must land on its own tier,
+		// not the foreign one that happened to sort to a lower id.
+		const mine = serverProfs.find((p) => p.name === 'Fire T0');
+		const foreign = serverProfs.find((p) => p.name === 'Not mine');
+		expect(mine?.levelModifiers).toHaveLength(1);
+		expect(foreign?.levelModifiers).toHaveLength(0);
+	});
+
 	it('sends only an identity Edit when just the path identity changed', async () => {
 		seedServer();
 		const store = new ProgressionStore();
