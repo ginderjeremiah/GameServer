@@ -17,6 +17,8 @@ export interface ToastData {
 	id: number;
 	message: string;
 	type: ToastType;
+	/** Auto-dismiss delay in ms this toast was created with; preserved across duplicate-collapses. */
+	duration: number;
 	/** Whether a manual dismiss control is shown for the toast. */
 	dismissible: boolean;
 	/** Optional inline action button. */
@@ -100,14 +102,15 @@ export const showToast = (message: string, options: ToastOptions = {}): number =
 	// stacking identical messages on top of each other.
 	for (const toast of toastData.values()) {
 		if (toast.message === message && toast.type === type) {
-			// Collapsing keeps the existing toast's action/onDismiss; differing ones on a duplicate are ignored.
-			scheduleDismiss(toast.id, duration);
+			// Collapsing keeps the existing toast's own duration/action/onDismiss; a duplicate's differing
+			// duration is ignored so it can't turn a persistent toast timed or vice versa.
+			scheduleDismiss(toast.id, toast.duration);
 			return toast.id;
 		}
 	}
 
 	const id = nextId++;
-	toastData.set(id, { id, message, type, dismissible, action, onDismiss });
+	toastData.set(id, { id, message, type, duration, dismissible, action, onDismiss });
 	scheduleDismiss(id, duration);
 	return id;
 };

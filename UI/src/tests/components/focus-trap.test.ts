@@ -87,6 +87,25 @@ describe('focusTrap', () => {
 		expect(document.body.classList.contains('test-lock')).toBe(false);
 	});
 
+	it('refcounts a scroll-lock class shared by stacked traps, only unlocking once the last one destroys', () => {
+		mount('<button>a</button>', { scrollLockClass: 'test-lock' });
+		expect(document.body.classList.contains('test-lock')).toBe(true);
+
+		const innerNode = document.createElement('div');
+		innerNode.innerHTML = '<button>b</button>';
+		document.body.appendChild(innerNode);
+		const innerHandle = focusTrap(innerNode, { scrollLockClass: 'test-lock' });
+
+		// Still locked while the outer trap is destroyed — the inner one still holds a reference.
+		handle?.destroy();
+		handle = undefined;
+		expect(document.body.classList.contains('test-lock')).toBe(true);
+
+		innerHandle.destroy();
+		innerNode.remove();
+		expect(document.body.classList.contains('test-lock')).toBe(false);
+	});
+
 	it('restores focus to the previously focused element on destroy', () => {
 		const outside = document.createElement('button');
 		document.body.appendChild(outside);

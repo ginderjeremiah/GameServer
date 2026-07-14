@@ -75,6 +75,28 @@ describe('toast store', () => {
 		expect(current()).toHaveLength(0);
 	});
 
+	it('keeps a persistent toast persistent when a timed duplicate collapses into it', () => {
+		showToast('Connection error', { type: 'error', duration: 0 });
+		showToast('Connection error', { type: 'error', duration: 1000 });
+
+		vi.advanceTimersByTime(60_000);
+		expect(current()).toHaveLength(1);
+	});
+
+	it('keeps auto-dismissing a timed toast when a persistent duplicate collapses into it', () => {
+		showToast('Connection error', { type: 'error', duration: 1000 });
+		vi.advanceTimersByTime(800);
+
+		// Collapsing refreshes the timer (as any duplicate does) but must reuse the toast's own 1000ms
+		// duration, not the duplicate's 0 (which would otherwise make it persistent forever).
+		showToast('Connection error', { type: 'error', duration: 0 });
+		vi.advanceTimersByTime(999);
+		expect(current()).toHaveLength(1);
+
+		vi.advanceTimersByTime(1);
+		expect(current()).toHaveLength(0);
+	});
+
 	it('does not collapse identical messages of different types', () => {
 		showToast('Same text', { type: 'error' });
 		showToast('Same text', { type: 'success' });
