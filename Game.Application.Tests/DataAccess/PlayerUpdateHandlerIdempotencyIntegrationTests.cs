@@ -616,10 +616,10 @@ namespace Game.Application.Tests.DataAccess
             // The first apply enters boss mode; the second returns to idle. Asserting the column between the
             // two applies proves the set (true) direction actually reached the column (the final false alone
             // wouldn't — false is the column default, so it would pass even if the set→false write were dropped).
-            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110, LastActivity: firstActivity, AutoChallengeBoss: true));
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 7, Exp: 120, CurrentZoneId: zoneId, StatPointsGained: 130, StatPointsUsed: 110, LastActivity: firstActivity, AutoChallengeBoss: true, LastCreditedBattleSeed: null));
             await AssertAutoChallengeBossAsync(playerId, expected: true);
 
-            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140, LastActivity: latestActivity, AutoChallengeBoss: false));
+            await ApplyAsync(new PlayerCoreUpdatedEvent(playerId, Level: 9, Exp: 250, CurrentZoneId: zoneId, StatPointsGained: 160, StatPointsUsed: 140, LastActivity: latestActivity, AutoChallengeBoss: false, LastCreditedBattleSeed: null));
 
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();

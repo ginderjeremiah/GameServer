@@ -76,6 +76,7 @@ namespace Game.DataAccess.Mapping
                 CurrentZoneId = player.CurrentZoneId,
                 LastActivity = player.LastActivity,
                 AutoChallengeBoss = player.AutoChallengeBoss,
+                LastCreditedBattleSeed = player.LastCreditedBattleSeed,
                 StatPointsGained = player.StatPoints.StatPointsGained,
                 StatPointsUsed = player.StatPoints.StatPointsUsed,
                 StatAllocations = player.StatPoints.StatAllocations,
@@ -170,6 +171,7 @@ namespace Game.DataAccess.Mapping
                 CurrentZoneId = model.CurrentZoneId,
                 LastActivity = model.LastActivity,
                 AutoChallengeBoss = model.AutoChallengeBoss,
+                LastCreditedBattleSeed = model.LastCreditedBattleSeed,
                 StatPoints = new PlayerStatPoints
                 {
                     StatAllocations = model.StatAllocations,

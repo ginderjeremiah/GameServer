@@ -20,6 +20,7 @@ namespace Game.Core.TestInfrastructure.Builders
         private int _currentZoneId = 0;
         private DateTime _lastActivity = DateTime.UtcNow;
         private bool _autoChallengeBoss = false;
+        private uint? _lastCreditedBattleSeed = null;
         private List<StatAllocation> _statAllocations = [];
         private int _statPointsGained = 0;
         private int _statPointsUsed = 0;
@@ -68,6 +69,12 @@ namespace Game.Core.TestInfrastructure.Builders
         public PlayerBuilder WithAutoChallengeBoss(bool enabled)
         {
             _autoChallengeBoss = enabled;
+            return this;
+        }
+
+        public PlayerBuilder WithLastCreditedBattleSeed(uint? seed)
+        {
+            _lastCreditedBattleSeed = seed;
             return this;
         }
 
@@ -123,6 +130,7 @@ namespace Game.Core.TestInfrastructure.Builders
             CurrentZoneId = _currentZoneId,
             LastActivity = _lastActivity,
             AutoChallengeBoss = _autoChallengeBoss,
+            LastCreditedBattleSeed = _lastCreditedBattleSeed,
             StatPoints = new PlayerStatPoints
             {
                 StatAllocations = _statAllocations,

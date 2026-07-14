@@ -48,6 +48,9 @@ namespace Game.Infrastructure.Entities
         /// <inheritdoc cref="Core.Players.Player.AutoChallengeBoss"/>
         public bool AutoChallengeBoss { get; set; }
 
+        /// <inheritdoc cref="Core.Players.Player.LastCreditedBattleSeed"/>
+        public uint? LastCreditedBattleSeed { get; set; }
+
         public virtual User User { get => field ?? throw new NotLoadedException(nameof(User)); set; }
         public virtual List<PlayerAttribute> PlayerAttributes { get => field ?? throw new NotLoadedException(nameof(PlayerAttributes)); set; }
         public virtual List<UnlockedItem> UnlockedItems { get => field ?? throw new NotLoadedException(nameof(UnlockedItems)); set; }

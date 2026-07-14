@@ -46,7 +46,8 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBoss: false);
+                AutoChallengeBoss: false,
+                LastCreditedBattleSeed: null);
 
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
@@ -88,8 +89,8 @@ namespace Game.Application.Tests.DataAccess
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
 
-            var firstEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false);
-            var secondEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100, DateTime.UtcNow, false);
+            var firstEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false, null);
+            var secondEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100, DateTime.UtcNow, false, null);
             var queue = new InMemoryPubSubQueue(Serialize(firstEvent), Serialize(secondEvent));
 
             await synchronizer.ProcessQueue(queue);
@@ -124,7 +125,8 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBoss: false);
+                AutoChallengeBoss: false,
+                LastCreditedBattleSeed: null);
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
@@ -725,7 +727,8 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBoss: false);
+                AutoChallengeBoss: false,
+                LastCreditedBattleSeed: null);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
@@ -838,7 +841,7 @@ namespace Game.Application.Tests.DataAccess
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, slowBackoff);
 
-            var queue = new InMemoryPubSubQueue(Serialize(new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false)));
+            var queue = new InMemoryPubSubQueue(Serialize(new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false, null)));
 
             using var cts = new CancellationTokenSource();
             var drainTask = synchronizer.ProcessQueue(queue, cts.Token);
@@ -891,7 +894,8 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBoss: false);
+                AutoChallengeBoss: false,
+                LastCreditedBattleSeed: null);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
 
@@ -1012,7 +1016,8 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBoss: false);
+                AutoChallengeBoss: false,
+                LastCreditedBattleSeed: null);
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
@@ -1066,7 +1071,8 @@ namespace Game.Application.Tests.DataAccess
                 StatPointsGained: 100,
                 StatPointsUsed: 100,
                 LastActivity: DateTime.UtcNow,
-                AutoChallengeBoss: false);
+                AutoChallengeBoss: false,
+                LastCreditedBattleSeed: null);
 
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
@@ -1223,8 +1229,8 @@ namespace Game.Application.Tests.DataAccess
             var user2 = await TestDataSeeder.CreateUserAsync(context, username: "concurrent-user-2");
             var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5);
 
-            var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
-            var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
+            var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false, null);
+            var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false, null);
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
@@ -1267,7 +1273,7 @@ namespace Game.Application.Tests.DataAccess
             // cross-player concurrency (#1701) may run B's event alongside A's, but A's own pair is chained
             // onto the same per-player lane, so it must still apply strictly in order.
             var equip = new ItemEquippedEvent(playerA.Id, item.Id, (int)EEquipmentSlot.HelmSlot);
-            var unrelated = new PlayerCoreUpdatedEvent(playerB.Id, 7, 500, 0, 100, 100, DateTime.UtcNow, false);
+            var unrelated = new PlayerCoreUpdatedEvent(playerB.Id, 7, 500, 0, 100, 100, DateTime.UtcNow, false, null);
             var unequip = new ItemUnequippedEvent(playerA.Id, item.Id);
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
@@ -1401,7 +1407,7 @@ namespace Game.Application.Tests.DataAccess
             var equip = Serialize(new ItemEquippedEvent(playerA.Id, item.Id, (int)EEquipmentSlot.HelmSlot));
             var messages = new List<string> { equip };
             messages.AddRange(Enumerable.Range(1, 34).Select(i =>
-                Serialize(new PlayerCoreUpdatedEvent(playerB.Id, 3, 100 + i, 0, 100, 100, DateTime.UtcNow, false))));
+                Serialize(new PlayerCoreUpdatedEvent(playerB.Id, 3, 100 + i, 0, 100, 100, DateTime.UtcNow, false, null))));
             messages.Add(Serialize(new ItemUnequippedEvent(playerA.Id, item.Id)));
 
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
@@ -1444,8 +1450,8 @@ namespace Game.Application.Tests.DataAccess
             var user2 = await TestDataSeeder.CreateUserAsync(context, username: "stop-inflight-user-2");
             var player2 = await TestDataSeeder.CreatePlayerAsync(context, user2.Id, level: 5);
 
-            var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
-            var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false);
+            var evt1 = new PlayerCoreUpdatedEvent(player1.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false, null);
+            var evt2 = new PlayerCoreUpdatedEvent(player2.Id, 9, 1000, 0, 100, 100, DateTime.UtcNow, false, null);
 
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var queue = new MultiGatedAcknowledgeQueue(expectedParked: 2, Serialize(evt1), Serialize(evt2));
