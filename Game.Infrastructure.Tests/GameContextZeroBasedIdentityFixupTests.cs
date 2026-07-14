@@ -60,6 +60,24 @@ namespace Game.Infrastructure.Tests
         }
 
         [Fact]
+        public void BuildZeroBasedFixups_IdentifiesPlayerCurrentZoneIdAndClassId()
+        {
+            using var context = CreateContext();
+
+            var fixups = GameContext.BuildZeroBasedFixups(context.Model);
+
+            // Player.CurrentZoneId/ClassId (#1823) are required FKs to store-generated zero-based principals
+            // (Zone, Class), so a player parked on either's record 0 (e.g. a brand-new character, whose starting
+            // zone is 0) must not have its FK misread as an unset store-generated value on save.
+            var playerType = context.Model.FindEntityType(typeof(Player));
+            Assert.NotNull(playerType);
+            Assert.True(fixups.TryGetValue(playerType, out var playerFixup));
+            Assert.Equal(
+                [nameof(Player.ClassId), nameof(Player.CurrentZoneId)],
+                playerFixup.ForeignKeyProperties.OrderBy(p => p));
+        }
+
+        [Fact]
         public void BuildZeroBasedFixups_ExcludesEntitiesWithoutAZeroBasedKeyOrForeignKey()
         {
             using var context = CreateContext();

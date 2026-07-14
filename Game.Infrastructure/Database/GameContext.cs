@@ -378,6 +378,21 @@ namespace Game.Infrastructure.Database
             {
                 entity.Property(p => p.Name)
                     .HasMaxLength(20);
+
+                // The current zone is a required, navigation-less reference. Zones are retire-only (no hard
+                // delete), so Restrict never blocks a legitimate operation — it only guards against a bugged
+                // write or seed/migration mistake leaving a dangling reference.
+                entity.HasOne<Zone>()
+                    .WithMany()
+                    .HasForeignKey(p => p.CurrentZoneId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // The class is a required, navigation-less reference. Classes are retire-only (no hard delete),
+                // so Restrict never blocks a legitimate operation.
+                entity.HasOne<Class>()
+                    .WithMany()
+                    .HasForeignKey(p => p.ClassId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<PlayerChallenge>(entity =>
@@ -794,6 +809,14 @@ namespace Game.Infrastructure.Database
                 entity.HasIndex(ui => new { ui.PlayerId, ui.EquipmentSlotId })
                     .IsUnique()
                     .HasFilter("\"EquipmentSlotId\" IS NOT NULL");
+
+                // The equipped slot is an optional, navigation-less reference. Navigation-less FK (like the
+                // zone boss/unlock-challenge references): deleting the referenced slot clears the item's
+                // equipped state (SetNull) rather than blocking the delete.
+                entity.HasOne<EquipmentSlot>()
+                    .WithMany()
+                    .HasForeignKey(ui => ui.EquipmentSlotId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<UnlockedMod>(entity =>

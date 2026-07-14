@@ -41,7 +41,7 @@ namespace Game.TestInfrastructure.Helpers
             int userId,
             string name = "TestPlayer",
             int level = 5,
-            int zoneId = 0,
+            int? zoneId = null,
             int? classId = null)
         {
             // Every player references a resolvable class — battle assembly composes the class locked base from
@@ -50,6 +50,10 @@ namespace Game.TestInfrastructure.Helpers
             // allocations + gear and existing reward/exp expectations are unaffected.
             var resolvedClassId = classId ?? (await CreateClassAsync(context)).Id;
 
+            // CurrentZoneId is a required FK, so a directly-seeded player needs a resolvable zone. Reuse the
+            // caller-supplied zone, or seed a minimal one.
+            var resolvedZoneId = zoneId ?? (await CreateZoneAsync(context)).Id;
+
             var player = new Player
             {
                 UserId = userId,
@@ -57,7 +61,7 @@ namespace Game.TestInfrastructure.Helpers
                 Name = name,
                 Level = level,
                 Exp = 0,
-                CurrentZoneId = zoneId,
+                CurrentZoneId = resolvedZoneId,
                 StatPointsGained = 100,
                 StatPointsUsed = 100,
                 LastActivity = DateTime.UtcNow,
