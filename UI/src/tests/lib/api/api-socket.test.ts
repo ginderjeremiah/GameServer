@@ -361,6 +361,62 @@ describe('ApiSocket', () => {
 			}
 		});
 
+		it('closes the likely half-open socket when a request times out while a pong is already overdue', async () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				// readyState stays OPEN throughout and no pong ever answers: the first keepalive ping (t=10s)
+				// goes unanswered by the second tick (t=20s), registering one missed pong — short of
+				// attemptPing's own MAX_MISSED_PONGS threshold, so it hasn't closed the socket on its own yet.
+				vi.advanceTimersByTime(20000);
+				expect(ws.close).not.toHaveBeenCalled();
+
+				// The request's own 30s backstop fires next, by which point a pong is already overdue —
+				// corroborating evidence of a half-open socket, so this closes it immediately rather than
+				// waiting out the rest of attemptPing's slower detection window.
+				vi.advanceTimersByTime(10000);
+
+				const response = await promise;
+				expect(response.error).toBe('Timed out waiting for the server.');
+				expect(ws.close).toHaveBeenCalled();
+				expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pong was already overdue'));
+			} finally {
+				vi.useRealTimers();
+				warnSpy.mockRestore();
+			}
+		});
+
+		it('does not close a healthy socket when a single request times out with no pong overdue', async () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+
+				// Every keepalive ping is answered promptly, so missedPongs never leaves 0 even though this
+				// one command's own response never arrives — a single slow-but-alive command must not close
+				// an otherwise healthy connection.
+				for (let i = 0; i < 3; i++) {
+					vi.advanceTimersByTime(10000);
+					receive(ws, 'pong');
+				}
+
+				const response = await promise;
+				expect(response.error).toBe('Timed out waiting for the server.');
+				expect(ws.close).not.toHaveBeenCalled();
+			} finally {
+				vi.useRealTimers();
+				warnSpy.mockRestore();
+			}
+		});
+
 		it('does not time out a queued-but-unsent command while the socket is still connecting', async () => {
 			vi.useFakeTimers();
 			try {

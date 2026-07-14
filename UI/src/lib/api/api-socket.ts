@@ -39,7 +39,9 @@ const STABLE_CONNECTION_MS = 10000;
  *  response simply never arrives (e.g. the server processed the command but failed to send a reply,
  *  or sent one that failed to parse). Without it the in-flight entry — and the caller's await — would
  *  sit forever. Kept generous so legitimately-slow commands (e.g. a heavy admin reference read) aren't
- *  spuriously failed; a real reply normally lands in well under a second. */
+ *  spuriously failed; a real reply normally lands in well under a second. A timeout landing while a
+ *  pong is already overdue is also treated as half-open evidence (see `closeIfLikelyHalfOpen`), so a
+ *  half-open socket with commands in flight doesn't have to wait out the ping-only detection window. */
 const REQUEST_TIMEOUT_MS = 30000;
 
 /** Surfaced via the resolve-with-error contract when a sent request exceeds REQUEST_TIMEOUT_MS. */
@@ -128,8 +130,7 @@ export class ApiSocket {
 
 	private async openSocket(): Promise<void> {
 		this.socketOpened = false;
-		this.awaitingPong = false;
-		this.missedPongs = 0;
+		this.resetPongTracking();
 		// Pre-emptively refresh an access token that is missing or about to expire (mirroring the HTTP
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
@@ -223,12 +224,7 @@ export class ApiSocket {
 					// reconnect machinery takes over, rather than leaving every command to eat the full
 					// per-request timeout until the OS notices the connection is dead.
 					console.warn(`Socket missed ${this.missedPongs} consecutive pongs; closing the half-open connection.`);
-					this.awaitingPong = false;
-					this.missedPongs = 0;
-					// Deliberately code-less: handleClose only stops the keepalive on ev.code ===
-					// NORMAL_CLOSURE, so this must surface as 1005/1006 to fall through to its
-					// reconnect branch. Passing NORMAL_CLOSURE here would silently disable auto-reconnect.
-					this.socket.close();
+					this.closeHalfOpenSocket();
 					return;
 				}
 			}
@@ -266,6 +262,34 @@ export class ApiSocket {
 		}
 	}
 
+	private resetPongTracking() {
+		this.awaitingPong = false;
+		this.missedPongs = 0;
+	}
+
+	/** Closes a socket believed to be half-open (missed-pong threshold or a corroborated request
+	 *  timeout — see `closeIfLikelyHalfOpen`) so `handleClose`'s reconnect machinery takes over. */
+	private closeHalfOpenSocket() {
+		this.resetPongTracking();
+		// Deliberately code-less: handleClose only stops the keepalive on ev.code === NORMAL_CLOSURE, so
+		// this must surface as 1005/1006 to fall through to its reconnect branch. Passing NORMAL_CLOSURE
+		// here would silently disable auto-reconnect.
+		this.socket?.close();
+	}
+
+	/** A single request timeout doesn't by itself prove the socket is half-open — a legitimately heavy
+	 *  command can outlast the cap on an otherwise healthy connection — so this only closes the socket
+	 *  when the timeout coincides with an already-overdue pong, which corroborates that pings (not just
+	 *  this one command) are going unanswered. Closing here lets a half-open socket with commands in
+	 *  flight recover as soon as the first request times out, rather than waiting out the rest of
+	 *  attemptPing's own (slower) missed-pong detection window. */
+	private closeIfLikelyHalfOpen() {
+		if (this.socket && this.socket.readyState === this.socket.OPEN && this.missedPongs > 0) {
+			console.warn('A request timed out while a pong was already overdue; closing the likely half-open connection.');
+			this.closeHalfOpenSocket();
+		}
+	}
+
 	private getOrCreateHook<T extends ApiSocketCommand>(commandName: T) {
 		const hook = this.commandHooks[commandName];
 		if (!hook) {
@@ -295,8 +319,7 @@ export class ApiSocket {
 	private receiveResponse(ev: MessageEvent) {
 		const now = performance.now();
 		if (ev.data == 'pong') {
-			this.awaitingPong = false;
-			this.missedPongs = 0;
+			this.resetPongTracking();
 			pingHook.notify(now - this.lastPing);
 			return;
 		} else if (ev.data === 'ping') {
@@ -364,6 +387,7 @@ export class ApiSocket {
 		this.inFlightRequests.delete(id);
 		inFlight.command.settleWithError(REQUEST_TIMEOUT_ERROR);
 		console.warn(`Request '${inFlight.command.commandName}' timed out after ${REQUEST_TIMEOUT_MS}ms.`);
+		this.closeIfLikelyHalfOpen();
 	}
 
 	private handleError(ev: Event) {
