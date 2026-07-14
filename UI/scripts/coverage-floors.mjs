@@ -30,11 +30,13 @@ function blank() {
 }
 
 // Strip everything before the `src/` root so an absolute (or Windows-backslashed) path from the
-// summary matches the same repo-relative form the area/exclude globs are anchored against.
+// summary matches the same repo-relative form the area/exclude globs are anchored against. Anchors
+// on `/src/` (leading slash) rather than `src/` so a parent directory ending in `src` (e.g.
+// `.../mysrc/UI/src/lib/...`) doesn't match its own trailing `src/` prematurely.
 function toRelative(file) {
 	const norm = file.split('\\').join('/');
-	const idx = norm.indexOf('src/');
-	return idx === -1 ? norm : norm.slice(idx);
+	const idx = norm.indexOf('/src/');
+	return idx === -1 ? norm : norm.slice(idx + 1);
 }
 
 const unmatched = [];
