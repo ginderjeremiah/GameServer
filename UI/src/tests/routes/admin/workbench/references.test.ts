@@ -494,10 +494,16 @@ describe('formatReferenceBody', () => {
 		).toContain('a prerequisite for 1 proficiency (Advanced Blades)');
 	});
 
-	it('phrases a path soft-lock reference (#1863) and closes with the strong-reference fix-first wording', () => {
+	it('phrases a path soft-lock reference (#1863) as owning the gating tier, not being the prerequisite itself, and closes with the strong-reference fix-first wording', () => {
 		const groups: ReferenceGroup[] = [{ kind: 'prerequisiteOf', names: ['Runeforging'], strong: true }];
 		const body = formatReferenceBody('paths', 'Blades', groups);
-		expect(body).toContain('a prerequisite for 1 proficiency (Runeforging)');
+		expect(body).toContain('home to a tier that gates 1 proficiency (Runeforging)');
 		expect(body).toContain('re-point the affected records first if that consequence is unintended');
+	});
+
+	it('keeps the proficiency-retire prerequisiteOf phrasing unchanged (the proficiency itself is the prerequisite)', () => {
+		expect(
+			formatReferenceBody('proficiencies', 'Blades', [{ kind: 'prerequisiteOf', names: ['Advanced Blades'] }])
+		).toContain('a prerequisite for 1 proficiency (Advanced Blades)');
 	});
 });

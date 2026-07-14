@@ -234,7 +234,11 @@ const clauseFor = (entityKey: string, ref: ReferenceGroup): string => {
 		case 'recipeCondition':
 			return `a condition of ${count(n, 'synthesis recipe')} (${names})`;
 		case 'prerequisiteOf':
-			return `a prerequisite for ${count(n, 'proficiency', 'proficiencies')} (${names})`;
+			// A path's tier is the prerequisite, not the path itself — phrase that case distinctly
+			// rather than implying the path is directly gating the referencing proficiency.
+			return entityKey === 'paths'
+				? `home to a tier that gates ${count(n, 'proficiency', 'proficiencies')} (${names})`
+				: `a prerequisite for ${count(n, 'proficiency', 'proficiencies')} (${names})`;
 	}
 };
 
