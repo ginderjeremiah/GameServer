@@ -493,6 +493,72 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Fact]
+        public async Task GetStatistics_CalledTwiceInTheSameScope_ServesTheSecondCallFromTheScopedMemo()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            using var scope = CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            // First read: cache miss -> DB reload (no rows yet), populating this scope's memo (#1820).
+            var first = await repo.GetStatistics(playerId);
+            Assert.Empty(first);
+
+            // A different scope's repository (a separate command) records and saves a kill — a genuine
+            // out-of-band cache change.
+            using (var otherScope = CreateScope())
+            {
+                var otherRepo = otherScope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = await otherRepo.Load(MakeDomainPlayer(playerId));
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
+                await otherRepo.Save(progress);
+            }
+
+            // The original scope's repo still reports no kills on a second call — it is served from this
+            // scope's own memo rather than re-reading the cache the other scope just changed.
+            var second = await repo.GetStatistics(playerId);
+            Assert.Empty(second);
+
+            // A brand-new scope, with no memo of its own, sees the change — the memo is per-scope, not global.
+            using var freshScope = CreateScope();
+            var freshRepo = freshScope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+            var fresh = await freshRepo.GetStatistics(playerId);
+            Assert.Contains(fresh, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null && s.Value == 1m);
+        }
+
+        [Fact]
+        public async Task Save_ThenGetProficienciesInTheSameScope_ReflectsTheJustSavedValueImmediately()
+        {
+            var playerId = await SeedPlayerAsync();
+            int proficiencyId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                proficiencyId = (await TestDataSeeder.CreateProficiencyAsync(context)).Id;
+            }
+
+            using var scope2 = CreateScope();
+            var repo = scope2.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            // Mirrors the live battle-completion path (#1820): load, mutate (proficiency accrual), save.
+            var progress = await repo.Load(MakeDomainPlayer(playerId));
+            progress.SetProficiencyProgress(proficiencyId, level: 2, xp: 130m);
+            await repo.Save(progress);
+
+            // A read on the SAME repository instance immediately afterward — no delay, no polling for the
+            // fire-and-forget HSET to land — mirrors the idle-victory prefetch's proficiency capture, which
+            // runs right after the battle-completion handler's Save in the same command scope. This only
+            // passes deterministically because Save keeps the scope's memo warm; re-reading the cache here
+            // would race the fire-and-forget advance.
+            var proficiencies = await repo.GetProficiencies(playerId);
+            var proficiency = Assert.Single(proficiencies);
+            Assert.Equal(proficiencyId, proficiency.ProficiencyId);
+            Assert.Equal(2, proficiency.Level);
+            Assert.Equal(130m, proficiency.Xp);
+        }
+
         private async Task<ConnectionMultiplexer> ConnectRedisAsync()
         {
             var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);

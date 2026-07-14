@@ -35,6 +35,15 @@ namespace Game.DataAccess.Repositories
 
         private static string ProgressKey(int playerId) => $"{Constants.CACHE_PROGRESS_PREFIX}_{playerId}";
 
+        // Per-scope read memo (#1820): a socket command opens one DI scope, so this repository instance is
+        // shared by every read/save within that single command. Battle-lifecycle commands read the same
+        // progress hash more than once per command (e.g. the zone-unlock gate then the battle-snapshot
+        // proficiency capture, or the battle-completion handler's Load then the bundled next-battle prefetch's
+        // proficiency capture) — memoizing the snapshot for the scope's lifetime turns those into one HGETALL.
+        // Save keeps this warm by merging in the rows it just changed rather than invalidating it, since the
+        // prefetch case reads again *after* a Save — an invalidate-only memo would still pay a second read there.
+        private (int PlayerId, CachedPlayerProgress Progress)? _memo;
+
         // Redis can't represent a hash key with zero fields, so a brand-new player's empty DB reload writes
         // this instead — a field name sharing no prefix with the row kinds below (S_/C_/P_), so
         // FromHashFields silently ignores it on every read. See GetCachedProgress for why the key must exist.
@@ -117,7 +126,20 @@ namespace Game.DataAccess.Repositories
             // that never falls through to the DB (#1761). GetCachedProgress's miss-reload path is the one
             // place that legitimately creates the key, since it rebuilds the whole set from the DB first.
             var fields = ToHashFields(changed);
-            void AdvanceCache() => _cache.HashSetIfExistsAndForget(ProgressKey(playerId), fields, ProgressCacheTtl);
+            void AdvanceCache()
+            {
+                _cache.HashSetIfExistsAndForget(ProgressKey(playerId), fields, ProgressCacheTtl);
+
+                // Keep this scope's memo (if one is warm) in sync with what was just persisted, so a later
+                // read in the same command sees this save's rows immediately rather than racing the cache
+                // advance's fire-and-forget HSET above. Bundled with the advance (rather than run right after
+                // AcceptChanges) so a failed/deferred flush can never leak an uncommitted row into the memo —
+                // this only runs once the flush this save's event rode has actually succeeded.
+                if (_memo is { } memo && memo.PlayerId == playerId)
+                {
+                    MergeInto(memo.Progress, changed);
+                }
+            }
 
             if (_updateBatch.PlayerSaveInProgress)
             {
@@ -151,8 +173,14 @@ namespace Game.DataAccess.Repositories
 
         private async Task<CachedPlayerProgress> GetCachedProgress(int playerId, CancellationToken cancellationToken)
         {
+            if (_memo is { } memo && memo.PlayerId == playerId)
+            {
+                return memo.Progress;
+            }
+
             var key = ProgressKey(playerId);
             var raw = await _cache.HashGetAllIfExists(key, cancellationToken);
+            CachedPlayerProgress progress;
             if (raw is null)
             {
                 // This reload just read the authoritative full state from the DB, so it's the one place that
@@ -161,15 +189,19 @@ namespace Game.DataAccess.Repositories
                 // HSET, but the key still needs to exist afterward so that player's first-ever Save (whose
                 // dirty rows equal the player's entire state at that point) is able to create it rather than
                 // silently no-op forever — so an empty reload writes the presence marker field instead.
-                var loaded = await LoadFromDb(playerId, cancellationToken);
-                var fields = ToHashFields(loaded);
+                progress = await LoadFromDb(playerId, cancellationToken);
+                var fields = ToHashFields(progress);
                 _cache.HashSetAndForget(key, fields.Count > 0 ? fields : PresenceMarkerFields, ProgressCacheTtl);
-                return loaded;
+            }
+            else
+            {
+                // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
+                _cache.ExpireAndForget(key, ProgressCacheTtl);
+                progress = FromHashFields(raw);
             }
 
-            // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
-            _cache.ExpireAndForget(key, ProgressCacheTtl);
-            return FromHashFields(raw);
+            _memo = (playerId, progress);
+            return progress;
         }
 
         private async Task<CachedPlayerProgress> LoadFromDb(int playerId, CancellationToken cancellationToken)
@@ -253,6 +285,51 @@ namespace Game.DataAccess.Repositories
                     Xp = p.Xp,
                 }).ToList(),
             };
+
+        // Upserts a save's changed rows into the scope's memoized snapshot by natural key, mirroring the hash
+        // fields' own identity (StatField/ChallengeField/ProficiencyField) so a row already in the memo is
+        // overwritten in place rather than duplicated.
+        private static void MergeInto(CachedPlayerProgress target, CachedPlayerProgress changed)
+        {
+            foreach (var stat in changed.Statistics)
+            {
+                var index = target.Statistics.FindIndex(s => s.StatisticTypeId == stat.StatisticTypeId && s.EntityId == stat.EntityId);
+                if (index >= 0)
+                {
+                    target.Statistics[index] = stat;
+                }
+                else
+                {
+                    target.Statistics.Add(stat);
+                }
+            }
+
+            foreach (var challenge in changed.Challenges)
+            {
+                var index = target.Challenges.FindIndex(c => c.ChallengeId == challenge.ChallengeId);
+                if (index >= 0)
+                {
+                    target.Challenges[index] = challenge;
+                }
+                else
+                {
+                    target.Challenges.Add(challenge);
+                }
+            }
+
+            foreach (var proficiency in changed.Proficiencies)
+            {
+                var index = target.Proficiencies.FindIndex(p => p.ProficiencyId == proficiency.ProficiencyId);
+                if (index >= 0)
+                {
+                    target.Proficiencies[index] = proficiency;
+                }
+                else
+                {
+                    target.Proficiencies.Add(proficiency);
+                }
+            }
+        }
 
         // Field-key prefixes double as the discriminator on read: each row's own kind is self-describing, so
         // FromHashFields never needs the caller to track kind alongside field name. The row's natural key
