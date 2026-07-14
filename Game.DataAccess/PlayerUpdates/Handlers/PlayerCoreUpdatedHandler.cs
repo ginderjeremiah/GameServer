@@ -17,7 +17,8 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                     .SetProperty(p => p.StatPointsGained, evt.StatPointsGained)
                     .SetProperty(p => p.StatPointsUsed, evt.StatPointsUsed)
                     .SetProperty(p => p.LastActivity, evt.LastActivity)
-                    .SetProperty(p => p.AutoChallengeBoss, evt.AutoChallengeBoss));
+                    .SetProperty(p => p.AutoChallengeBoss, evt.AutoChallengeBoss)
+                    .SetProperty(p => p.LastCreditedBattleSeed, evt.LastCreditedBattleSeed));
         }
     }
 }

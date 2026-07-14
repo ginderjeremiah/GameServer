@@ -50,6 +50,17 @@ namespace Game.Core.Players
         public required List<LogPreference> LogPreferences { get; set; }
         public required List<PlayerLesson> Lessons { get; set; }
 
+        /// <summary>
+        /// The RNG seed of the most recently durably-credited battle (win/loss/draw), an idempotency backstop
+        /// for the reconnect race in <see cref="Game.Application.Services.BattleService"/>'s abandon path
+        /// (#1874): a crash between a battle's durable credit and the session's awaited cache save can leave
+        /// the stale session still showing that exact battle active, and the next reconnect's abandon would
+        /// otherwise replay and re-credit it. Persisted alongside the other core fields so it survives the
+        /// crash that creates the gap. Only the single latest seed is kept — at most one battle can be
+        /// credited-but-not-yet-session-cleared for a player at a time, so there is nothing to retain beyond it.
+        /// </summary>
+        public required uint? LastCreditedBattleSeed { get; set; }
+
         public void ChangeZone(int zoneId)
         {
             CurrentZoneId = zoneId;
@@ -468,29 +479,39 @@ namespace Game.Core.Players
         // them; that split (rather than a defaultable parameter) makes a victory caller forgetting the ratings
         // a compile error instead of a silent zero-XP accrual. notify mirrors CompleteChallenge's live-push
         // toggle: the offline/switch settlement of a stale battle has no socket to push to, so it passes false.
-        public void RecordBattleCompleted(Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp, bool notify = true)
+        // battleSeed is the credited battle's RNG seed (PlayerState.BattleSeed), recorded onto
+        // LastCreditedBattleSeed (#1874) — null only for callers with no seed to thread (none today).
+        public void RecordBattleCompleted(
+            Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
+            uint? battleSeed = null, bool notify = true)
         {
-            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating: 0, enemyRating: 0, notify);
+            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating: 0, enemyRating: 0, battleSeed, notify);
         }
 
         // Records a victorious battle outcome, threading the combat ratings the win was rated against so the
         // progress handler can normalize proficiency accrual by max(playerRating, enemyRating) (spike #1526
         // Decision 5). Both current victory paths route through BattleService.RecordVictory, which supplies them.
-        // notify mirrors RecordBattleCompleted's live-push toggle.
+        // notify mirrors RecordBattleCompleted's live-push toggle; battleSeed mirrors its idempotency marker.
         public void RecordBattleVictory(
             Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
-            double playerRating, double enemyRating, bool notify = true)
+            double playerRating, double enemyRating, uint? battleSeed = null, bool notify = true)
         {
-            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating, enemyRating, notify);
+            RecordBattleOutcome(enemy, result, isBossBattle, zoneId, timestamp, playerRating, enemyRating, battleSeed, notify);
         }
 
         private void RecordBattleOutcome(
             Enemy enemy, BattleResult result, bool isBossBattle, int zoneId, DateTime timestamp,
-            double playerRating, double enemyRating, bool notify)
+            double playerRating, double enemyRating, uint? battleSeed, bool notify)
         {
             RaiseEvent(new BattleCompletedEvent(
                 this, enemy, result.Victory, result.PlayerDied, result.TotalMs, result.Stats, isBossBattle, zoneId,
                 playerRating, enemyRating, notify));
+
+            // Idempotency backstop (#1874): remember this battle's seed so a stale-session replay of the exact
+            // same fight (see LastCreditedBattleSeed) can be recognized as already-credited rather than paid
+            // out a second time. Set unconditionally here; the caller (BattleService) is the sole gatekeeper
+            // that decides whether to call this method at all for a given seed.
+            LastCreditedBattleSeed = battleSeed;
 
             // Backstop mirroring the online auto-fight-off: a recorded dedicated-boss loss or draw drops the
             // persisted loop back to idle, so the offline sim doesn't resume boss-farming a loop the player has
@@ -521,7 +542,8 @@ namespace Game.Core.Players
         {
             RaiseEvent(new PlayerCoreUpdatedEvent(
                 Id, Level, Exp, CurrentZoneId,
-                StatPoints.StatPointsGained, StatPoints.StatPointsUsed, LastActivity, AutoChallengeBoss));
+                StatPoints.StatPointsGained, StatPoints.StatPointsUsed, LastActivity, AutoChallengeBoss,
+                LastCreditedBattleSeed));
         }
     }
 }

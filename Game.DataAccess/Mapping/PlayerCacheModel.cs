@@ -27,6 +27,7 @@ namespace Game.DataAccess.Mapping
         public required int CurrentZoneId { get; init; }
         public required DateTime LastActivity { get; init; }
         public required bool AutoChallengeBoss { get; init; }
+        public required uint? LastCreditedBattleSeed { get; init; }
         public required int StatPointsGained { get; init; }
         public required int StatPointsUsed { get; init; }
         public required List<StatAllocation> StatAllocations { get; init; }

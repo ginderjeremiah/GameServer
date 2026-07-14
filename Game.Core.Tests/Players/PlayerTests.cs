@@ -1100,6 +1100,62 @@ namespace Game.Core.Tests.Players
             Assert.False(coreUpdated.AutoChallengeBoss);
         }
 
+        // ── LastCreditedBattleSeed (#1874 idempotency backstop) ──────────────
+
+        [Fact]
+        public void RecordBattleCompleted_RecordsBattleSeedOntoLastCreditedBattleSeed()
+        {
+            var player = MakePlayer();
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow, battleSeed: 42u);
+
+            Assert.Equal(42u, player.LastCreditedBattleSeed);
+        }
+
+        [Fact]
+        public void RecordBattleVictory_RecordsBattleSeedOntoLastCreditedBattleSeed()
+        {
+            var player = MakePlayer();
+            var enemy = MakeEnemy(id: 5);
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, Stats: new BattleStats());
+
+            player.RecordBattleVictory(
+                enemy, result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow,
+                playerRating: 1, enemyRating: 1, battleSeed: 7u);
+
+            Assert.Equal(7u, player.LastCreditedBattleSeed);
+        }
+
+        [Fact]
+        public void RecordBattleVictory_CarriesLastCreditedBattleSeedOntoCoreUpdatedEvent()
+        {
+            // The write-behind handler persists this event's fields, including LastCreditedBattleSeed — the
+            // backstop only survives a crash if it rides the same durable save as the rest of the credit.
+            var player = MakePlayer();
+            var enemy = MakeEnemy(id: 5);
+            var result = new BattleResult(Victory: true, PlayerDied: false, TotalMs: 1000, Stats: new BattleStats());
+
+            player.RecordBattleVictory(
+                enemy, result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow,
+                playerRating: 1, enemyRating: 1, battleSeed: 99u);
+
+            var coreUpdated = Assert.Single(player.DomainEvents.OfType<PlayerCoreUpdatedEvent>());
+            Assert.Equal(99u, coreUpdated.LastCreditedBattleSeed);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_OverwritesAPreviouslyCreditedSeed()
+        {
+            var player = MakePlayer();
+            var result = new BattleResult(Victory: false, PlayerDied: true, TotalMs: 1000, Stats: new BattleStats());
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow, battleSeed: 1u);
+
+            player.RecordBattleCompleted(MakeEnemy(), result, isBossBattle: false, zoneId: 3, timestamp: DateTime.UtcNow, battleSeed: 2u);
+
+            Assert.Equal(2u, player.LastCreditedBattleSeed);
+        }
+
         // ── ClearEvents ──────────────────────────────────────────────────────
 
         [Fact]

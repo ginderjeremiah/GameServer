@@ -33,6 +33,7 @@ namespace Game.DataAccess.Repositories
                 CurrentZoneId = p.CurrentZoneId,
                 LastActivity = p.LastActivity,
                 AutoChallengeBoss = p.AutoChallengeBoss,
+                LastCreditedBattleSeed = p.LastCreditedBattleSeed,
                 StatPointsGained = p.StatPointsGained,
                 StatPointsUsed = p.StatPointsUsed,
                 StatAllocations = p.PlayerAttributes

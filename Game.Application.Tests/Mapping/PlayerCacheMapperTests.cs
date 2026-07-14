@@ -142,6 +142,18 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
+        public void ToCore_MapsLastCreditedBattleSeed()
+        {
+            // The idempotency backstop (#1874) must survive a cache round-trip, or a battle credited just
+            // before a crash would be re-creditable again after the player reloads from a cold cache.
+            var model = BuildModel(lastCreditedBattleSeed: 12345u);
+
+            var player = PlayerCacheMapper.ToCore(model, Catalog(), Catalog(), Catalog());
+
+            Assert.Equal(12345u, player.LastCreditedBattleSeed);
+        }
+
+        [Fact]
         public void ToCore_OrphanedItemReference_ThrowsDiagnosableException()
         {
             // Player 1 owns item 11, which the catalog can no longer resolve (a content-data mistake).
@@ -280,6 +292,7 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(player.CurrentZoneId, rehydrated.CurrentZoneId);
             Assert.Equal(player.LastActivity, rehydrated.LastActivity);
             Assert.True(rehydrated.AutoChallengeBoss);
+            Assert.Equal(player.LastCreditedBattleSeed, rehydrated.LastCreditedBattleSeed);
             Assert.Equal(player.StatPoints.StatPointsGained, rehydrated.StatPoints.StatPointsGained);
             Assert.Equal(player.StatPoints.StatPointsUsed, rehydrated.StatPoints.StatPointsUsed);
             Assert.Equal(5d, rehydrated.StatPoints.StatAllocations.Single(a => a.Attribute == EAttribute.Strength).Amount);
@@ -317,7 +330,8 @@ namespace Game.Application.Tests.Mapping
             List<StatAllocation>? statAllocations = null,
             List<LogPreference>? logPreferences = null,
             List<PlayerLesson>? lessons = null,
-            bool autoChallengeBoss = false) => new()
+            bool autoChallengeBoss = false,
+            uint? lastCreditedBattleSeed = null) => new()
             {
                 Id = 1,
                 ClassId = 2,
@@ -329,6 +343,7 @@ namespace Game.Application.Tests.Mapping
                 StatPointsUsed = 0,
                 LastActivity = MappedLastActivity,
                 AutoChallengeBoss = autoChallengeBoss,
+                LastCreditedBattleSeed = lastCreditedBattleSeed,
                 StatAllocations = statAllocations ?? [],
                 UnlockedItems = unlockedItems ?? [],
                 AppliedMods = appliedMods ?? [],
@@ -379,6 +394,7 @@ namespace Game.Application.Tests.Mapping
                 CurrentZoneId = 4,
                 LastActivity = MappedLastActivity,
                 AutoChallengeBoss = true,
+                LastCreditedBattleSeed = 999u,
                 StatPoints = new PlayerStatPoints
                 {
                     StatPointsGained = 10,

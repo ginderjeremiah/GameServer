@@ -1300,6 +1300,94 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task StartBattle_AbandoningAWonBattle_RecordsTheBattleSeedAsLastCredited()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            var creditedSeed = state.BattleSeed;
+
+            // Backdate so the abandon (triggered by starting the next battle) resolves as a real win.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // The idempotency backstop (#1874) only protects a reconnect if the credited seed is durably
+            // recorded alongside the rest of the outcome — this pins that it actually gets set.
+            Assert.Equal(creditedSeed, player.LastCreditedBattleSeed);
+        }
+
+        [Fact]
+        public async Task StartBattle_AbandoningABattleAlreadyCreditedWithMatchingSeed_DoesNotReCreditIt()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            // Pin the encounter level so the rolled enemy yields a deterministic, non-zero exp reward (see
+            // StartBattle_AbandoningAWonBattle_GrantsExpForTheVictory for why a random level would be flaky).
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 10, levelMax: 10);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            var battleSeed = state.BattleSeed;
+
+            // Backdate so a replay of this exact battle resolves as a win.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // Simulate the residual crash gap #1874 targets: the durable credit already happened (the player's
+            // LastCreditedBattleSeed reflects it) but the session's PlayerState was never cleared/saved — e.g.
+            // the process died between the awaited player save and the awaited session-cache save
+            // (docs/backend-persistence.md → Write-behind player cache). The reconnected session therefore
+            // still shows this exact battle (same seed) active.
+            player.LastCreditedBattleSeed = battleSeed;
+            var expBefore = player.Exp;
+
+            // On reconnect the client's next action starts a new battle, which abandons the stale one.
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+
+            // The stale replay must not pay out the same battle a second time.
+            Assert.Equal(expBefore, player.Exp);
+            // The session still catches up: the stale battle is cleared and a fresh one is active.
+            Assert.True(state.HasActiveBattle);
+            Assert.NotEqual(battleSeed, state.BattleSeed);
+        }
+
+        [Fact]
         public async Task StartBattle_AbandoningADrawnBattle_SetsPostBattleCooldown()
         {
             using var scope = CreateScope();

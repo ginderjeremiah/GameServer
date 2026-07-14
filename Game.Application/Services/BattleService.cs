@@ -384,7 +384,7 @@ namespace Game.Application.Services
                 return false;
             }
 
-            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now);
+            player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now, state.BattleSeed);
 
             state.SetCooldown(now + PostBattleCooldown);
             state.ClearBattle();
@@ -489,6 +489,18 @@ namespace Game.Application.Services
                 return new StaleBattleResolution(null, null);
             }
 
+            // Idempotency backstop (#1874): this exact battle was already durably credited by an earlier
+            // command whose session-state clear never reached the cache (e.g. a crash between the durable
+            // credit and the now-awaited session save, docs/backend-persistence.md → Write-behind player
+            // cache). The stale session is re-presenting an already-resolved battle on reconnect; crediting
+            // it again would double-pay the same fight. The durable write already happened, so the session
+            // only needs to catch up — clear it without replaying the credit.
+            if (state.BattleSeed is uint seed && seed == player.LastCreditedBattleSeed)
+            {
+                state.ClearBattle();
+                return new StaleBattleResolution(null, null);
+            }
+
             if (result.Victory)
             {
                 // The enemy died within the (wall-clock-capped) elapsed time the client simulated, so this
@@ -520,7 +532,7 @@ namespace Game.Application.Services
             }
             else
             {
-                player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now, notify);
+                player.RecordBattleCompleted(enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, now, state.BattleSeed, notify);
             }
 
             // Both outcome branches above (won or lost/drew) reach here — the still-in-progress branch
@@ -579,7 +591,7 @@ namespace Game.Application.Services
             // (spike #1526 Decision 5) — the same snapshot-measured ratings the exp reward above used.
             player.RecordBattleVictory(
                 enemy, result, state.IsBossBattle, state.BattleZoneId ?? player.CurrentZoneId, timestamp,
-                rewards.PlayerRating, rewards.EnemyRating, notify);
+                rewards.PlayerRating, rewards.EnemyRating, state.BattleSeed, notify);
 
             return rewards;
         }
