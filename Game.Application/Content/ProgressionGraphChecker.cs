@@ -92,6 +92,7 @@ namespace Game.Application.Content
                 CheckEmptyCombatZones();
                 CheckZoneOrderUniqueness();
                 CheckEnemyAttributeConsumption();
+                CheckEnemyBountyCap();
                 CheckLessons();
             }
 
@@ -259,21 +260,10 @@ namespace Game.Application.Content
                     // No live placement (spawn table or dedicated boss slot) means no representative encounter
                     // level to rate the enemy at — mirrors the combat-rating calibration report's own omission
                     // of unplaced enemies from its pricing pass.
-                    if (ResolveRatingLevel(enemy) is not int level)
+                    if (ResolveRatingBattler(enemy) is not Battler battler)
                     {
                         continue;
                     }
-
-                    var kit = new List<Contracts.Skill>();
-                    foreach (var skillId in enemy.SkillPool)
-                    {
-                        if (_skills.TryGetValue(skillId, out var skill) && skill.RetiredAt is null)
-                        {
-                            kit.Add(skill);
-                        }
-                    }
-
-                    var battler = BuildRatingBattler(enemy, kit, level);
 
                     foreach (var distribution in enemy.AttributeDistribution)
                     {
@@ -330,6 +320,31 @@ namespace Game.Application.Content
             }
 
             /// <summary>
+            /// Assembles the rating <see cref="Battler"/> for a live enemy at its representative level
+            /// (<see cref="ResolveRatingLevel"/>), or <c>null</c> if it has no live placement to rate at.
+            /// Shared by <see cref="CheckEnemyAttributeConsumption"/> and <see cref="CheckEnemyBountyCap"/> —
+            /// both need the same rated battler, just different terms read off it.
+            /// </summary>
+            private Battler? ResolveRatingBattler(Contracts.Enemy enemy)
+            {
+                if (ResolveRatingLevel(enemy) is not int level)
+                {
+                    return null;
+                }
+
+                var kit = new List<Contracts.Skill>();
+                foreach (var skillId in enemy.SkillPool)
+                {
+                    if (_skills.TryGetValue(skillId, out var skill) && skill.RetiredAt is null)
+                    {
+                        kit.Add(skill);
+                    }
+                }
+
+                return BuildRatingBattler(enemy, kit, level);
+            }
+
+            /// <summary>
             /// Assembles a rating <see cref="Battler"/> for a live enemy's full authored kit (every live skill in
             /// <see cref="Contracts.Enemy.SkillPool"/>, not a random per-encounter draw — the check asks whether
             /// anything in the <em>kit</em> consumes the attribute) at <paramref name="level"/>. Mirrors
@@ -378,6 +393,31 @@ namespace Game.Application.Content
                         ScalingAmount = (double)e.ScalingAmount,
                     }).ToList(),
             };
+
+            /// <summary>
+            /// Flags a live enemy whose matched-or-harder-fight bounty (<c>XpScaleK × EnemyRating</c> —
+            /// <see cref="DefeatRewards"/>'s reward at <c>DifficultyMultiplier == 1</c>, its ceiling for this
+            /// enemy) would be silently truncated by <see cref="ServerGameConstants.MaxExpPerGrant"/>. Reuses
+            /// <see cref="ResolveRatingBattler"/> — no live placement means no representative level, so an
+            /// unplaced enemy is skipped here too, same as <see cref="CheckEnemyAttributeConsumption"/> (#1529).
+            /// </summary>
+            private void CheckEnemyBountyCap()
+            {
+                foreach (var enemy in Live(_graph.Enemies, e => e.RetiredAt))
+                {
+                    if (ResolveRatingBattler(enemy) is not Battler battler)
+                    {
+                        continue;
+                    }
+
+                    var bounty = ServerGameConstants.XpScaleK * CombatRating.Rate(battler, isPlayer: false);
+                    if (bounty >= ServerGameConstants.MaxExpPerGrant)
+                    {
+                        Warn("EnemyBountyCap", "Enemy", enemy.Id,
+                            $"has a matched-fight bounty of {bounty:F0} XP, at or above the {ServerGameConstants.MaxExpPerGrant} MaxExpPerGrant clamp — its victory reward is silently truncated.");
+                    }
+                }
+            }
 
             // --- Classes ----------------------------------------------------------------------------------
 
