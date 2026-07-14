@@ -292,6 +292,45 @@ describe('EnemyManager.getNewEnemy', () => {
 		expect(loaded).toEqual([]);
 	});
 
+	// #1934: two same-generation callers can both queue behind an older, superseded fetch (e.g. entering
+	// Home bumps the generation while a NewEnemy is in flight, then leaving Home calls getNewEnemy twice
+	// before the superseded fetch tears down). Both must not fall through past the guard and launch the
+	// current generation's fetch — the first genuinely restarts it, the second must recognize that as its
+	// own re-entrant duplicate and drop.
+	it('drops the second of two same-generation callers queued behind a superseded fetch', async () => {
+		let resolveOld!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		sendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveOld = resolve)));
+		const enemy = makeEnemy(13);
+		let resolveNew!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		sendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveNew = resolve)));
+		const loaded: IEnemyInstance[] = [];
+		onNewEnemyLoaded((e) => loaded.push(e), false);
+
+		const oldFetch = manager.getNewEnemy(); // starts the old-generation fetch
+		await flush(); // park it on the in-flight NewEnemy request
+
+		// Supersede it (e.g. enterHome/challengeBoss bumping the generation) while it's still in flight.
+		(manager as unknown as { interruptFetch(): void }).interruptFetch();
+
+		// Two same-generation callers both arrive while the superseded fetch is still tearing down.
+		const callerA = manager.getNewEnemy();
+		const callerB = manager.getNewEnemy();
+
+		// The superseded fetch's own request now resolves; its generation check makes it abandon without
+		// spawning, releasing the guard for the two waiters queued behind it.
+		resolveOld(enemyResponse(makeEnemy(0)));
+		await flush();
+
+		// Only one NewEnemy request should have gone out for the current generation.
+		expect(sendSocketCommand).toHaveBeenCalledTimes(2);
+		resolveNew(enemyResponse(enemy));
+		await Promise.all([oldFetch, callerA, callerB]);
+
+		expect(sendSocketCommand).toHaveBeenCalledTimes(2);
+		expect(loaded).toEqual([enemy]);
+		expect(manager.currentEnemy).toEqual(enemy);
+	});
+
 	it('drops a concurrent re-entrant call so a stage-change race spawns a single enemy', async () => {
 		// Two overlapping stage handlers (e.g. an idle victory racing an Idle change) can both reach
 		// getNewEnemy; each would request-and-notify an enemy, double-counting the spawn. Since the
