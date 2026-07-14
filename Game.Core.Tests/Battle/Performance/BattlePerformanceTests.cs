@@ -64,7 +64,7 @@ namespace Game.Core.Tests.Battle.Performance
     public class BattlePerformanceTests
     {
         // Per-tick cost cancels the tick count, so the scaling gates use a modest fixed length to stay
-        // fast; the backstop uses the simulator's real default cap (DefaultMaxBattleMs / MsPerTick = 10000).
+        // fast; the backstop uses the simulator's real default cap (DefaultMaxBattleMs / MsPerTick).
         private const int ScalingTicks = 800;
         private const int WorstCaseTicks = GameConstants.DefaultMaxBattleMs / GameConstants.MsPerTick;
 
@@ -98,7 +98,7 @@ namespace Game.Core.Tests.Battle.Performance
         private const int TypicalBattleTicks = 750;         // ~30s at MsPerTick = 40
 
         // Coarse catastrophic-regression ceiling for the realistic worst-case battle (the typical full
-        // loadout — 4 skills, 2 multipliers + a churning effect each — run to the 10,000-tick cap). This is
+        // loadout — 4 skills, 2 multipliers + a churning effect each — run to the WorstCaseTicks cap). This is
         // the one machine-dependent gate: a uniform per-tick regression inflates every battle equally, which
         // the ratio gates cannot see. The margin is deliberately huge (the battle measures ~10ms on a dev
         // box, an order of magnitude under the ceiling); if extreme runner contention ever makes it flake,
