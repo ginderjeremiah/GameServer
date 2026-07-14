@@ -17,6 +17,31 @@
 const trapStack: HTMLElement[] = [];
 
 /**
+ * Refcounts per scroll-lock class name, so two stacked traps sharing a class (e.g. both `Popover`s
+ * using `popover-open`) don't unlock background scroll when the inner one destroys while the outer
+ * is still open.
+ */
+const scrollLockRefs = new Map<string, number>();
+
+function acquireScrollLock(className: string) {
+	const count = (scrollLockRefs.get(className) ?? 0) + 1;
+	scrollLockRefs.set(className, count);
+	if (count === 1) {
+		document.body.classList.add(className);
+	}
+}
+
+function releaseScrollLock(className: string) {
+	const count = (scrollLockRefs.get(className) ?? 0) - 1;
+	if (count <= 0) {
+		scrollLockRefs.delete(className);
+		document.body.classList.remove(className);
+	} else {
+		scrollLockRefs.set(className, count);
+	}
+}
+
+/**
  * Tab-reachable elements. Intentionally broader than a bare `button` so a modal/popover containing a
  * link, input, or `[tabindex]` element still traps and anchors onto it.
  */
@@ -70,7 +95,7 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
 	trapStack.push(node);
 	window.addEventListener('keydown', onKeydown);
 	if (opts.scrollLockClass) {
-		document.body.classList.add(opts.scrollLockClass);
+		acquireScrollLock(opts.scrollLockClass);
 	}
 
 	return {
@@ -78,10 +103,10 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
 			// Swap the scroll-lock class if it changed (rare); options are otherwise read live.
 			if (opts.scrollLockClass !== next.scrollLockClass) {
 				if (opts.scrollLockClass) {
-					document.body.classList.remove(opts.scrollLockClass);
+					releaseScrollLock(opts.scrollLockClass);
 				}
 				if (next.scrollLockClass) {
-					document.body.classList.add(next.scrollLockClass);
+					acquireScrollLock(next.scrollLockClass);
 				}
 			}
 			opts = next;
@@ -93,7 +118,7 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
 			}
 			window.removeEventListener('keydown', onKeydown);
 			if (opts.scrollLockClass) {
-				document.body.classList.remove(opts.scrollLockClass);
+				releaseScrollLock(opts.scrollLockClass);
 			}
 			restoreFocus?.focus();
 		}

@@ -63,6 +63,56 @@ describe('TourPlayer', () => {
 		anchorEl.remove();
 	});
 
+	it('recomputes the callout position for a step sharing the same anchor as the prior step', async () => {
+		const anchorEl = document.createElement('button');
+		document.body.appendChild(anchorEl);
+		const action = tutorialAnchor(anchorEl, 'skill-bar');
+		vi.spyOn(anchorEl, 'getBoundingClientRect').mockReturnValue({
+			top: 480,
+			left: 100,
+			width: 40,
+			height: 20,
+			bottom: 500,
+			right: 140,
+			x: 100,
+			y: 480,
+			toJSON: () => ({})
+		} as DOMRect);
+
+		const steps: TourStep[] = [
+			{ text: 'Short', anchorKey: 'skill-bar' },
+			{ text: 'A much longer line of tour text that renders a visibly taller callout box', anchorKey: 'skill-bar' }
+		];
+		const { container, getByRole } = setup(steps);
+		await tick();
+
+		const shell = container.querySelector('.tour-callout') as HTMLElement;
+		// jsdom never lays out real box sizes; stand in a height that tracks the current step's own text
+		// (not the surrounding chrome, which is present on every step) so a real difference is observable
+		// (short fits below the anchor, tall overflows the viewport and flips above it), then force one
+		// recompute so the effect picks up the getter.
+		Object.defineProperty(shell, 'offsetHeight', {
+			configurable: true,
+			get: () => {
+				const stepText = shell.querySelector('.tour-callout__text')?.textContent ?? '';
+				return stepText.length > 20 ? 300 : 60;
+			}
+		});
+		Object.defineProperty(shell, 'offsetWidth', { configurable: true, value: 300 });
+		await fireEvent(window, new Event('resize'));
+		await tick();
+		const firstTop = shell.style.top;
+
+		await fireEvent.click(getByRole('button', { name: 'Next' }));
+		await tick();
+		const secondTop = shell.style.top;
+
+		expect(secondTop).not.toBe(firstTop);
+
+		action.destroy();
+		anchorEl.remove();
+	});
+
 	it('navigates forward and back, disabling Back on the first step', async () => {
 		const { getByText, getByRole } = setup(threeSteps);
 

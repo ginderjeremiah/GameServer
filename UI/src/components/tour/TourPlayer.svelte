@@ -125,6 +125,10 @@ const SPOTLIGHT_PADDING = 6;
 
 $effect(() => {
 	void resizeTick;
+	// Re-run on every step change too, not just anchor/viewport changes: consecutive steps sharing an
+	// anchorKey (or both unanchored) leave `anchorEl` unchanged, but the callout's rendered height can
+	// still differ with the new step's text.
+	void stepIndex;
 	if (!open || !anchorEl) {
 		spotlightRect = null;
 		calloutPos = null;
