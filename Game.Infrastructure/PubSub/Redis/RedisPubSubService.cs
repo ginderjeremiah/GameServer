@@ -32,12 +32,13 @@ namespace Game.Infrastructure.PubSub.Redis
             _logger = loggerFactory.CreateLogger<RedisPubSubService>();
         }
 
-        // The durable queue writes below honour the per-command budget cooperatively inside the queue op itself
-        // (see RedisQueue / RedisCommandBudget, #558). This bare publish is a fire-and-forget wake signal, so it
-        // only needs WaitAsync to unwind the await promptly on cancellation — there is no durable write to observe.
+        // Deliberately NOT fire-and-forget (#1888): this overload backs broadcasts with no durable write behind
+        // them (e.g. the reference-data invalidation channel), so a genuine send failure must propagate to the
+        // caller rather than vanish silently the way CommandFlags.FireAndForget would swallow it. Contrast with
+        // Wake below, whose fire-and-forget is safe because a durable queue write already backs it.
         public async Task Publish(string channel, string message, CancellationToken cancellationToken = default)
         {
-            await Redis.PublishAsync(RedisChannel.Literal(channel), message, CommandFlags.FireAndForget).WaitAsync(cancellationToken);
+            await Redis.PublishAsync(RedisChannel.Literal(channel), message).WaitAsync(cancellationToken);
         }
 
         // A bare channel wake: a fire-and-forget empty publish that only nudges the consumer to drain its queue.
