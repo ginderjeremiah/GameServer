@@ -81,7 +81,7 @@ beforeEach(() => {
 	postMock.mockReset();
 	disconnectMock.mockReset();
 	stopEnginesMock.mockReset();
-	ensureValidAccessTokenMock.mockReset().mockResolvedValue('a');
+	ensureValidAccessTokenMock.mockReset().mockResolvedValue({ accessToken: 'a', rejected: false });
 	getRefreshTokenMock.mockReset().mockReturnValue('r');
 	setTokensMock.mockReset();
 	confirmTakeoverMock.mockReset().mockResolvedValue(true);
@@ -134,7 +134,7 @@ describe('CharacterSwitcher', () => {
 		// exact race #1767 fixed: reading the token first would capture the now-stale 'r'.
 		ensureValidAccessTokenMock.mockImplementation(async () => {
 			getRefreshTokenMock.mockReturnValue('rotated');
-			return 'a2';
+			return { accessToken: 'a2', rejected: false };
 		});
 		postMock.mockResolvedValue({
 			status: 200,
