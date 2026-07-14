@@ -35,7 +35,7 @@ namespace Game.Core
         /// level-up loop (and its per-level event burst) against a tampered/replayed grant, keeping a single
         /// command's work on the serialized per-player path finite regardless of the caller.
         /// <see cref="MaxExpRewardMultiplier"/> no longer bounds legitimate exp (it's calibration-legacy
-        /// only, see its own doc comment); the live ceiling on a matched-or-easier victory's reward is
+        /// only, see its own doc comment); the live ceiling on a matched-or-harder victory's reward is
         /// <c><see cref="XpScaleK"/> × EnemyRating</c> (<see cref="Battle.DefeatRewards"/>), bounded only by
         /// authored enemy power. An enemy whose combat rating exceeds
         /// <c>MaxExpPerGrant ÷ XpScaleK</c> (currently ≈306k) has its legitimate reward silently cut to this

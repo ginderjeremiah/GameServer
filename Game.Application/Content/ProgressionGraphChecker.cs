@@ -395,7 +395,7 @@ namespace Game.Application.Content
             };
 
             /// <summary>
-            /// Flags a live enemy whose matched-or-easier-fight bounty (<c>XpScaleK × EnemyRating</c> —
+            /// Flags a live enemy whose matched-or-harder-fight bounty (<c>XpScaleK × EnemyRating</c> —
             /// <see cref="DefeatRewards"/>'s reward at <c>DifficultyMultiplier == 1</c>, its ceiling for this
             /// enemy) would be silently truncated by <see cref="ServerGameConstants.MaxExpPerGrant"/>. Reuses
             /// <see cref="ResolveRatingBattler"/> — no live placement means no representative level, so an
