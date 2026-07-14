@@ -363,6 +363,38 @@ describe('computeReferences — proficiencies', () => {
 	});
 });
 
+describe('computeReferences — paths', () => {
+	it('lists a live gateway that would soft-lock, naming the gating tier by its own tier name', () => {
+		const src = {
+			...sources(),
+			proficiencies: [
+				proficiency(0, 'Blades', { pathId: 5 }),
+				proficiency(1, 'Advanced Blades', { pathId: 5 }),
+				proficiency(6, 'Runeforging', { pathId: 9, prerequisiteIds: [0] })
+			]
+		};
+		expect(computeReferences('paths', 5, src)).toEqual([
+			{ kind: 'prerequisiteOf', names: ['Runeforging'], strong: true }
+		]);
+	});
+
+	it('ignores a prerequisite edge between two tiers of the same path being retired', () => {
+		const src = {
+			...sources(),
+			proficiencies: [
+				proficiency(0, 'Blades', { pathId: 5 }),
+				proficiency(1, 'Advanced Blades', { pathId: 5, prerequisiteIds: [0] })
+			]
+		};
+		expect(computeReferences('paths', 5, src)).toEqual([]);
+	});
+
+	it('returns nothing for a path whose tiers gate nothing', () => {
+		const src = { ...sources(), proficiencies: [proficiency(0, 'Blades', { pathId: 5 })] };
+		expect(computeReferences('paths', 5, src)).toEqual([]);
+	});
+});
+
 describe('computeReferences — unknown entity', () => {
 	it('returns no references for an unrecognized entity key', () => {
 		expect(computeReferences('widgets', 0, sources())).toEqual([]);
@@ -457,6 +489,19 @@ describe('formatReferenceBody', () => {
 		expect(formatReferenceBody('proficiencies', 'Blades', [{ kind: 'recipeCondition', names: ['Meteor'] }])).toContain(
 			'a condition of 1 synthesis recipe (Meteor)'
 		);
+		expect(
+			formatReferenceBody('proficiencies', 'Blades', [{ kind: 'prerequisiteOf', names: ['Advanced Blades'] }])
+		).toContain('a prerequisite for 1 proficiency (Advanced Blades)');
+	});
+
+	it('phrases a path soft-lock reference (#1863) as owning the gating tier, not being the prerequisite itself, and closes with the strong-reference fix-first wording', () => {
+		const groups: ReferenceGroup[] = [{ kind: 'prerequisiteOf', names: ['Runeforging'], strong: true }];
+		const body = formatReferenceBody('paths', 'Blades', groups);
+		expect(body).toContain('home to a tier that gates 1 proficiency (Runeforging)');
+		expect(body).toContain('re-point the affected records first if that consequence is unintended');
+	});
+
+	it('keeps the proficiency-retire prerequisiteOf phrasing unchanged (the proficiency itself is the prerequisite)', () => {
 		expect(
 			formatReferenceBody('proficiencies', 'Blades', [{ kind: 'prerequisiteOf', names: ['Advanced Blades'] }])
 		).toContain('a prerequisite for 1 proficiency (Advanced Blades)');

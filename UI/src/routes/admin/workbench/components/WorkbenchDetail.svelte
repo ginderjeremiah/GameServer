@@ -156,6 +156,15 @@ const { entity, store, record, baseline, tab, onTab, onNew }: Props = $props();
  * surface is computed from the cached reference sets (no backend round-trip); an unreferenced record
  * retires without an extra prompt. Advisory only — confirming proceeds, and the record stays
  * resolvable by id either way (see references.ts).
+ *
+ * Sourced from `staticData` (last-saved), not this pane's own live `store.items`: every reference
+ * fn here reads a *sibling* catalogue (an enemy is referenced by zones/challenges, an item by
+ * challenges/classes, …), never the one this pane edits, and `store.items` isn't dense-by-id once a
+ * record's been added this session (`EntityStore.addItem` prepends negative ids) — indexing it by
+ * id, as `enemies[id]?.spawns` and `nameByIndex(skills, …)` do, would resolve the wrong record. See
+ * the progression editor's `{ proficiencies: store.profs }` override for the shape this pane would
+ * need (index-safe access to every referencing catalogue's own live store) to close this gap
+ * generically — tracked as a follow-up rather than attempted here.
  */
 const onRetire = (rec: Identified) =>
 	retireWithConfirm({

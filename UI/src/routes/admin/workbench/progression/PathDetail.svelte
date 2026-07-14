@@ -14,7 +14,7 @@
 		activeTab={store.pathTab}
 		onTab={(k) => store.setPathTab(k as PathTab)}
 		onReset={store.pathStatus(path) === 'modified' ? () => store.resetPath(path.id) : undefined}
-		onRetire={() => store.retirePath(path.id, true)}
+		onRetire={() => onRetire(path)}
 		onReinstate={() => store.retirePath(path.id, false)}
 		onRemove={() => store.removePath(path.id)}
 	/>
@@ -68,8 +68,10 @@
 {/if}
 
 <script lang="ts">
+import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
 import { activityKeyGroups, hasTierCollision, pathWarnings } from './progression-helpers';
+import type { WorkbenchPath } from './types';
 import DetailHeader from './DetailHeader.svelte';
 import ProgInput from './ProgInput.svelte';
 import ProgSelect from './ProgSelect.svelte';
@@ -80,6 +82,21 @@ interface Props {
 }
 
 const { store }: Props = $props();
+
+/**
+ * Retire a path, first surfacing any live gateway one of its tiers would soft-lock — the same
+ * check the backend guard (`AdminPaths.FindRetiredPathGatingLiveGateway`) rejects the save on.
+ * Previously bypassed the confirm entirely (#1863), unlike every other retire path.
+ */
+const onRetire = (rec: WorkbenchPath) =>
+	retireWithConfirm({
+		entityKey: 'paths',
+		id: rec.id,
+		name: rec.name || 'Unnamed path',
+		title: 'Retire path?',
+		sources: referenceSourcesFromStatic({ proficiencies: store.profs }),
+		onConfirmed: () => store.retirePath(rec.id, true)
+	});
 
 const path = $derived(store.selectedPath);
 const baseline = $derived(path ? store.pathBaseline(path.id) : undefined);

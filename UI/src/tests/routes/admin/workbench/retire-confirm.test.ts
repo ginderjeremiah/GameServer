@@ -42,6 +42,19 @@ describe('referenceSourcesFromStatic', () => {
 		expect(sources.skills).toBe(staticData.skills);
 		expect(sources.zones).toEqual([]);
 	});
+
+	it('substitutes an override for the one catalogue the caller is live-editing, leaving the rest on staticData (#1863)', () => {
+		staticData.enemies = [{ id: 0, name: 'Cave Bat (last saved)' }];
+		staticData.proficiencies = [{ id: 0, name: 'Blades (last saved)' }];
+		const liveProficiencies = [
+			{ id: 0, name: 'Blades (unsaved edit)' }
+		] as unknown as ReferenceSources['proficiencies'];
+
+		const sources = referenceSourcesFromStatic({ proficiencies: liveProficiencies });
+
+		expect(sources.proficiencies).toBe(liveProficiencies);
+		expect(sources.enemies).toBe(staticData.enemies);
+	});
 });
 
 describe('retireWithConfirm', () => {

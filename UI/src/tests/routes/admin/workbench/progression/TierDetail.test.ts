@@ -50,6 +50,7 @@ const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency =>
 const makeStore = (drilledTier: WorkbenchProficiency, overrides: Record<string, unknown> = {}) =>
 	({
 		drilledTier,
+		profs: [drilledTier],
 		tierTab: 'identity',
 		selectedPath: { name: 'Fire Path' },
 		selectedLevel: 1,
@@ -158,6 +159,22 @@ describe('TierDetail — retire confirm dialog', () => {
 		expect(screen.queryByText('Retire')).toBeNull();
 		await fireEvent.click(screen.getByText('Reinstate'));
 		expect(store.retireProf).toHaveBeenCalledWith(5, false);
+	});
+
+	it('sources the prerequisite reference from the live store, not the stale staticData snapshot (#1863)', async () => {
+		dangerModal.mockResolvedValue(true);
+		// staticData.proficiencies stays empty (last-saved state) — the gating edge only exists in
+		// this session's unsaved edits, held on the store's live `profs`.
+		const gatingTier = tier({ id: 6, name: 'Advanced Blades', prerequisiteIds: [5] });
+		const store = makeStore(tier(), { profs: [tier(), gatingTier] });
+		render(TierDetail, { props: { store } });
+
+		await fireEvent.click(screen.getByText('Retire'));
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		const body = dangerModal.mock.calls[0][0].body as string;
+		expect(body).toContain('Advanced Blades');
+		await waitFor(() => expect(store.retireProf).toHaveBeenCalledWith(5, true));
 	});
 });
 
