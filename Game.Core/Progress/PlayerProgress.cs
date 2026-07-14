@@ -348,16 +348,19 @@ namespace Game.Core.Progress
 
             var stat = GetOrCreate(type, entityId, out _);
             stat.Value += amount;
+            _dirtyStatistics.Add((type, entityId));
         }
 
         private void SetMax(EStatisticType type, int? entityId, decimal value)
         {
             var stat = GetOrCreate(type, entityId, out var created);
             // Record on the first write (created) or a strictly greater value, so the first recorded value
-            // wins outright instead of racing the 0 a fresh row starts at.
+            // wins outright instead of racing the 0 a fresh row starts at. An unimproved value carries no
+            // new information, so it is neither persisted nor re-enters the challenge-eval touched set.
             if (created || value > stat.Value)
             {
                 stat.Value = value;
+                _dirtyStatistics.Add((type, entityId));
             }
         }
 
@@ -366,10 +369,12 @@ namespace Game.Core.Progress
             var stat = GetOrCreate(type, entityId, out var created);
             // Record on the first write (created) or a strictly lesser value. Keying off the explicit
             // created flag — not "Value == 0" — lets a legitimate 0 minimum lock in rather than being
-            // overwritten forever as if it were the empty placeholder.
+            // overwritten forever as if it were the empty placeholder. An unimproved value carries no new
+            // information, so it is neither persisted nor re-enters the challenge-eval touched set.
             if (created || value < stat.Value)
             {
                 stat.Value = value;
+                _dirtyStatistics.Add((type, entityId));
             }
         }
 
@@ -383,11 +388,6 @@ namespace Game.Core.Progress
                 _statistics[key] = stat;
             }
 
-            // GetOrCreate is reached only from the mutators (Increment/SetMax/SetMin); reads use
-            // GetStatisticValue/TryGetStatisticValue, which never land here. So marking dirty here covers
-            // exactly the mutated stats. A no-op SetMax/SetMin over-marks at worst, which is harmless — the
-            // persist is an idempotent absolute write.
-            _dirtyStatistics.Add(key);
             return stat;
         }
     }

@@ -976,6 +976,61 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_UnimprovedMaxStatisticOnExistingRow_LeavesItCleanAndUntouched()
+        {
+            // An aggregate loaded with a prior HighestSingleAttackDamage records a battle whose attack
+            // doesn't beat it: the existing row's value is unchanged, so — like the zero-delta Sum case —
+            // it must stay out of both the persist set and the touched keys, not just get a no-op re-mark.
+            var progress = MakeProgress(statistics: [Stat(EStatisticType.HighestSingleAttackDamage, null, 40m)]);
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats { HighestPlayerAttack = 25.0 }, isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(40m, progress.GetStatisticValue(EStatisticType.HighestSingleAttackDamage, null));
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.HighestSingleAttackDamage);
+            Assert.DoesNotContain((EStatisticType.HighestSingleAttackDamage, (int?)null), touched);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_UnimprovedMinStatisticOnExistingRow_LeavesItCleanAndUntouched()
+        {
+            // An aggregate loaded with a prior FastestVictory (global and per-enemy) records a slower
+            // victory against the same enemy: the existing rows' values are unchanged, so they must stay
+            // out of both the persist set and the touched keys — the Min/Max analogue of the zero-delta Sum
+            // skip (#1821).
+            var enemy = MakeEnemy(id: 1);
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.FastestVictory, null, 3m),
+                Stat(EStatisticType.FastestVictory, 1, 3m),
+            ]);
+
+            var touched = progress.RecordBattleCompleted(enemy, victory: true, playerDied: false,
+                totalMs: 8000, new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(3m, progress.GetStatisticValue(EStatisticType.FastestVictory, null));
+            Assert.Equal(3m, progress.GetStatisticValue(EStatisticType.FastestVictory, 1));
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.FastestVictory);
+            Assert.DoesNotContain((EStatisticType.FastestVictory, (int?)null), touched);
+            Assert.DoesNotContain((EStatisticType.FastestVictory, (int?)1), touched);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_ImprovedMaxStatisticOnExistingRow_IsRecordedDirtiedAndTouched()
+        {
+            // The unimproved-value skip must not swallow a real improvement: a battle that beats the prior
+            // HighestSingleAttackDamage still records, dirties, and touches the stat.
+            var progress = MakeProgress(statistics: [Stat(EStatisticType.HighestSingleAttackDamage, null, 20m)]);
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats { HighestPlayerAttack = 35.0 }, isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(35m, progress.GetStatisticValue(EStatisticType.HighestSingleAttackDamage, null));
+            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.HighestSingleAttackDamage && s.EntityId == null);
+            Assert.Contains((EStatisticType.HighestSingleAttackDamage, (int?)null), touched);
+        }
+
+        [Fact]
         public void RecordBattleCompleted_ZeroDamageSkill_RecordsItsUsesButNoDamageDealtRow()
         {
             // A used utility skill that dealt no damage: the per-skill use count is a real delta, while its
