@@ -57,7 +57,13 @@ export class InventoryManager {
 	 * Reactive published view of `unlockedItems`. The manager is the single owner of the item objects
 	 * and the only place they are mutated. `statify` makes each item's fields (and this array) reactive
 	 * in place, so the array is rebuilt (`publish`) only when the item *set* changes; in-place field
-	 * edits (equip, favorite, mods) propagate to consumers on their own without a rebuild.
+	 * edits (equip, favorite, mods) propagate to consumers on their own without a rebuild. This relies on
+	 * `Item`/`ItemMod` being classes (not plain object literals): `statify` gives a class instance its
+	 * own reactive field accessors, defined once and shared by every container that references it —
+	 * `unlockedItems`, `items`, and `equippedSlots` all read/write the same object. A plain-object item
+	 * would instead pick up Svelte's own deep-proxy per container, giving the "same" item a different
+	 * proxied identity in the Map than in this array — mutations through one would be invisible to
+	 * consumers reading the other (#1957).
 	 */
 	public items: Item[] = [];
 
