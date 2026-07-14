@@ -151,6 +151,52 @@ describe('resolveNewIds & resolveId', () => {
 		expect(map.get(-2)).toBe(2);
 	});
 
+	it('with an identityKey, matches an added record to its persisted counterpart by content instead of position', () => {
+		const added = [
+			{ id: -1, name: 'Mine' },
+			{ id: -2, name: 'Also mine' }
+		];
+		// A concurrent add from another admin ("Theirs") landed with a lower id than either of this
+		// session's adds — purely positional pairing would wrongly bind it to "Mine".
+		const fresh = [
+			{ id: 0, name: 'Theirs' },
+			{ id: 1, name: 'Mine' },
+			{ id: 2, name: 'Also mine' }
+		];
+		const map = resolveNewIds(fresh, [], added, (r) => ({ name: r.name }));
+		expect(map.get(-1)).toBe(1);
+		expect(map.get(-2)).toBe(2);
+	});
+
+	it('falls back to positional pairing only among the leftovers an identityKey could not disambiguate', () => {
+		const added = [
+			{ id: -1, name: 'Dup' },
+			{ id: -2, name: 'Dup' }
+		];
+		// Both adds share identical content, so identity matching can't tell them apart — harmless
+		// since they're indistinguishable by content either way.
+		const fresh = [
+			{ id: 0, name: 'Dup' },
+			{ id: 1, name: 'Dup' }
+		];
+		const map = resolveNewIds(fresh, [], added, (r) => ({ name: r.name }));
+		expect(map.get(-1)).toBe(0);
+		expect(map.get(-2)).toBe(1);
+	});
+
+	it('leaves an added record unresolved when the refetch has no leftover candidate for it at all', () => {
+		// Stale refetch: two adds were sent, but only one new id shows up — content matching can pair
+		// the one that matches; there's nothing left, positionally or otherwise, for the other.
+		const added = [
+			{ id: -1, name: 'Persisted' },
+			{ id: -2, name: 'Missing' }
+		];
+		const fresh = [{ id: 0, name: 'Persisted' }];
+		const map = resolveNewIds(fresh, [], added, (r) => ({ name: r.name }));
+		expect(map.get(-1)).toBe(0);
+		expect(map.has(-2)).toBe(false);
+	});
+
 	it('resolveId passes through an already-persisted id', () => {
 		const map = new Map([[-1, 7]]);
 		expect(resolveId(-1, map)).toBe(7);
@@ -230,6 +276,39 @@ describe('persistEntity', () => {
 		// refresh runs after the primary save and again after children.
 		expect(refresh).toHaveBeenCalledTimes(2);
 		expect(result).toEqual(fresh);
+	});
+
+	it('resolves child-saver ids by identity content, not position, so a concurrent add from another admin cannot steal a write (#1856)', async () => {
+		const diff: SaveDiff<Row> = {
+			added: [{ id: -1, name: 'Mine' }],
+			modified: [],
+			deleted: [],
+			existingIds: [0]
+		};
+
+		// Another admin's concurrent add ("Theirs") landed with a lower id than this session's own add —
+		// purely positional pairing (lowest new id first) would wrongly bind the child saver to it.
+		const fresh: Row[] = [
+			{ id: 0, name: 'X' },
+			{ id: 1, name: 'Theirs' },
+			{ id: 2, name: 'Mine' }
+		];
+		const childCalls: { id: number; name: string }[] = [];
+
+		await persistEntity<Row, Row>({
+			diff,
+			toPrimaryDto: (record) => ({ id: record.id, name: record.name }),
+			postPrimary: async () => undefined,
+			refresh: async () => fresh,
+			childSavers: [
+				async (id, record) => {
+					childCalls.push({ id, name: record.name });
+					return true;
+				}
+			]
+		});
+
+		expect(childCalls).toEqual([{ id: 2, name: 'Mine' }]);
 	});
 
 	it('skips the primary call when nothing is added, edited, or deleted', async () => {
