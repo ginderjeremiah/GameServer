@@ -15,5 +15,5 @@ namespace Game.Core.Players.Events
         int StatPointsUsed,
         DateTime LastActivity,
         bool AutoChallengeBoss,
-        uint? LastCreditedBattleSeed = null) : IDomainEvent;
+        uint? LastCreditedBattleSeed) : IDomainEvent;
 }
