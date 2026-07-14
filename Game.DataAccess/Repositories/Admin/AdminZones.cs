@@ -172,6 +172,16 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.Failure("The Home zone cannot have enemy spawns. Home is a no-combat sanctuary where no enemies spawn.");
             }
 
+            // A desired spawn must reference an existing enemy; otherwise the insert FK-faults at commit
+            // instead of rejecting gracefully. Mirrors AdminEnemies.SetSkills' up-front skill-existence check.
+            foreach (var zoneEnemy in data.ZoneEnemies)
+            {
+                if (_enemies.GetEnemy(zoneEnemy.EnemyId) is null)
+                {
+                    return AdminSaveResult.Failure($"Enemy {zoneEnemy.EnemyId} does not exist.");
+                }
+            }
+
             return ChildCollectionReconciler.Reconcile(
                 existing: zone.ZoneEnemies,
                 desired: data.ZoneEnemies,

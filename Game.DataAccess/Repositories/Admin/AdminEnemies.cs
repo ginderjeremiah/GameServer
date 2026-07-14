@@ -145,15 +145,22 @@ namespace Game.DataAccess.Repositories.Admin
                 return AdminSaveResult.Failure("A spawn's weight cannot be negative.");
             }
 
-            // Authoring guard: the Home zone is a no-combat sanctuary where no enemies spawn (and never will),
-            // so reject a spawn that targets one. Mirrors the per-zone guard in AdminZones.SetEnemies so neither
-            // authoring direction can populate Home's spawn table.
+            // Every desired spawn must reference an existing zone; otherwise the insert FK-faults at commit
+            // instead of rejecting gracefully. Also enforces the Home-zone authoring guard (a no-combat
+            // sanctuary where no enemies spawn) — mirrors the per-zone guard in AdminZones.SetEnemies so
+            // neither authoring direction can populate Home's spawn table.
             foreach (var spawn in data.Spawns)
             {
-                if (_zones.LookupZone(spawn.ZoneId) is { IsHome: true } homeZone)
+                var zone = _zones.LookupZone(spawn.ZoneId);
+                if (zone is null)
+                {
+                    return AdminSaveResult.Failure($"Zone {spawn.ZoneId} does not exist.");
+                }
+
+                if (zone.IsHome)
                 {
                     return AdminSaveResult.Failure(
-                        $"'{enemy.Name}' cannot spawn in the Home zone ('{homeZone.Name}'). Home is a no-combat sanctuary where no enemies spawn.");
+                        $"'{enemy.Name}' cannot spawn in the Home zone ('{zone.Name}'). Home is a no-combat sanctuary where no enemies spawn.");
                 }
             }
 

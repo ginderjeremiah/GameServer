@@ -66,5 +66,46 @@ namespace Game.Application.Tests.DataAccess
             Assert.Empty(store.Inserted);
             Assert.Empty(store.Updated);
         }
+
+        [Fact]
+        public void SaveTags_AddWithUndefinedCategory_ReturnsFailureWithoutStaging()
+        {
+            var store = new RecordingEntityStore();
+            var adminTags = new AdminTags(store);
+
+            // TagCategoryId 0 has no backing ETagCategory member (the enum starts at 1); without the up-front
+            // guard this would 500 on the FK at commit instead of rejecting gracefully.
+            var result = adminTags.SaveTags([Change(EChangeType.Add, id: 0, name: "Fire", categoryId: 0)]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("0 is not a valid tag category.", result.ErrorMessage);
+            Assert.Empty(store.Inserted);
+        }
+
+        [Fact]
+        public void SaveTags_EditWithUndefinedCategory_ReturnsFailureWithoutStaging()
+        {
+            var store = new RecordingEntityStore();
+            var adminTags = new AdminTags(store);
+
+            var result = adminTags.SaveTags([Change(EChangeType.Edit, id: 7, name: "Ice", categoryId: 99)]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("99 is not a valid tag category.", result.ErrorMessage);
+            Assert.Empty(store.Updated);
+        }
+
+        [Fact]
+        public void SaveTags_DeleteWithUndefinedCategoryPayload_Succeeds()
+        {
+            var store = new RecordingEntityStore();
+            var adminTags = new AdminTags(store);
+
+            // Deletes carry no meaningful category payload (the field just defaults to 0), so the reference
+            // guard skips them like every other change-type it's applied to.
+            var result = adminTags.SaveTags([Change(EChangeType.Delete, id: 42)]);
+
+            Assert.True(result.Succeeded);
+        }
     }
 }
