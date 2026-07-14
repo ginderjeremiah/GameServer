@@ -56,7 +56,7 @@ namespace Game.Infrastructure.Tests
             Assert.Null(enemySkillFixup.KeyProperty);
             Assert.Equal(
                 [nameof(EnemySkill.EnemyId), nameof(EnemySkill.SkillId)],
-                enemySkillFixup.ForeignKeyProperties.OrderBy(p => p));
+                enemySkillFixup.ForeignKeyProperties.Select(fk => fk.PropertyName).OrderBy(p => p));
         }
 
         [Fact]
@@ -74,7 +74,7 @@ namespace Game.Infrastructure.Tests
             Assert.True(fixups.TryGetValue(playerType, out var playerFixup));
             Assert.Equal(
                 [nameof(Player.ClassId), nameof(Player.CurrentZoneId)],
-                playerFixup.ForeignKeyProperties.OrderBy(p => p));
+                playerFixup.ForeignKeyProperties.Select(fk => fk.PropertyName).OrderBy(p => p));
         }
 
         [Fact]
@@ -151,6 +151,48 @@ namespace Game.Infrastructure.Tests
 
             Assert.False(enemyIdEntry.IsTemporary);
             Assert.Equal(0, enemyIdEntry.CurrentValue);
+            Assert.False(skillIdEntry.IsTemporary);
+            Assert.Equal(0, skillIdEntry.CurrentValue);
+        }
+
+        [Fact]
+        public void ApplyZeroBasedIdentityFixups_ForNavigationAddedChildOfANewPrincipal_LeavesThePropagatedForeignKeyTemporary()
+        {
+            using var context = CreateContext();
+
+            // Adding a brand-new Enemy together with an EnemySkill attached via navigation, mirroring #1824's
+            // failure scenario: EF's own relationship fixup propagates the new Enemy's still-pending temp key
+            // onto EnemySkill.EnemyId. Before the fix, ForceZero blindly rewrote any temporary FK to the literal
+            // 0, which would have silently repointed this insert at the existing record 0 instead of the real
+            // new Enemy once its id is generated.
+            var enemy = new Enemy
+            {
+                Id = 0,
+                Name = "New enemy",
+                DesignerNotes = "",
+                EnemySkills = [new EnemySkill { SkillId = 0 }],
+            };
+            context.Add(enemy);
+
+            var enemyKeyEntry = context.Entry(enemy).Property(nameof(Enemy.Id));
+            Assert.True(enemyKeyEntry.IsTemporary, "Precondition: the new Enemy's key should be temporary until insert.");
+
+            var enemySkill = enemy.EnemySkills[0];
+            var enemyIdEntry = context.Entry(enemySkill).Property(nameof(EnemySkill.EnemyId));
+            var skillIdEntry = context.Entry(enemySkill).Property(nameof(EnemySkill.SkillId));
+            Assert.True(enemyIdEntry.IsTemporary, "Precondition: EF should propagate the new Enemy's temp key onto EnemyId.");
+            Assert.True(skillIdEntry.IsTemporary, "Precondition: EF should mark the FK to record 0 temporary.");
+
+            context.ApplyZeroBasedIdentityFixups();
+
+            // EnemyId must be left untouched — still the propagated temp value, not forced to 0 — so EF's own
+            // key-fixup (which runs during the real SaveChanges insert) can still resolve it to the new Enemy's
+            // real generated id.
+            Assert.True(enemyIdEntry.IsTemporary);
+            Assert.Equal(enemyKeyEntry.CurrentValue, enemyIdEntry.CurrentValue);
+
+            // SkillId is unrelated to any Added principal in this save (no Skill is being added), so the FK
+            // branch still forces it to the literal 0 as before.
             Assert.False(skillIdEntry.IsTemporary);
             Assert.Equal(0, skillIdEntry.CurrentValue);
         }
