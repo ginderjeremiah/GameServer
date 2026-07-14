@@ -5,9 +5,11 @@ import { computeReferences, formatReferenceBody, type ReferenceSources } from '.
  * Builds a {@link ReferenceSources} snapshot from the cached last-saved catalogues in `staticData`
  * — the one place both retire-confirm call sites (the generic Workbench detail pane and the
  * progression editor) assemble the full set, so a new reference-carrying catalogue only needs
- * adding here.
+ * adding here. `overrides` lets a caller substitute its own live (unsaved-edits-included) records
+ * for the one catalogue it's currently editing, since `staticData` only ever reflects last-saved
+ * state — every other catalogue still comes from `staticData` as usual.
  */
-export function referenceSourcesFromStatic(): ReferenceSources {
+export function referenceSourcesFromStatic(overrides: Partial<ReferenceSources> = {}): ReferenceSources {
 	return {
 		enemies: staticData.enemies ?? [],
 		zones: staticData.zones ?? [],
@@ -16,7 +18,8 @@ export function referenceSourcesFromStatic(): ReferenceSources {
 		classes: staticData.classes ?? [],
 		skillRecipes: staticData.skillRecipes ?? [],
 		proficiencies: staticData.proficiencies ?? [],
-		skills: staticData.skills ?? []
+		skills: staticData.skills ?? [],
+		...overrides
 	};
 }
 

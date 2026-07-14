@@ -95,7 +95,7 @@ const onRetire = (rec: WorkbenchProficiency) =>
 		id: rec.id,
 		name: rec.name || 'Unnamed tier',
 		title: 'Retire tier?',
-		sources: referenceSourcesFromStatic(),
+		sources: referenceSourcesFromStatic({ proficiencies: store.profs }),
 		onConfirmed: () => store.retireProf(rec.id, true)
 	});
 const baseline = $derived(tier ? store.profBaseline(tier.id) : undefined);

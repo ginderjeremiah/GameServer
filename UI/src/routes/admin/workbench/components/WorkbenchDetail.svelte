@@ -133,6 +133,7 @@
 import { fieldsOf, type EntityConfig, type Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';
+import type { ReferenceSources } from '../references';
 import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import { sectionWarnings } from '../validation';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
@@ -152,6 +153,35 @@ interface Props {
 const { entity, store, record, baseline, tab, onTab, onNew }: Props = $props();
 
 /**
+ * The catalogue this detail pane is currently editing, live (unsaved edits included) — substituted
+ * for `staticData`'s last-saved copy of that one slot so a reference computed from this session's
+ * own pending edits (e.g. a just-added spawn-table entry) isn't missed (#1863). Only entity keys
+ * that map to a {@link ReferenceSources} slot need one; the rest (itemMods, tags, lessons) aren't
+ * themselves reference sources, so they fall through unchanged.
+ */
+const liveOverride = (): Partial<ReferenceSources> => {
+	const live = store.items.filter((rec) => store.status(rec) !== 'deleted');
+	switch (entity.key) {
+		case 'enemies':
+			return { enemies: live as unknown as ReferenceSources['enemies'] };
+		case 'zones':
+			return { zones: live as unknown as ReferenceSources['zones'] };
+		case 'challenges':
+			return { challenges: live as unknown as ReferenceSources['challenges'] };
+		case 'items':
+			return { items: live as unknown as ReferenceSources['items'] };
+		case 'classes':
+			return { classes: live as unknown as ReferenceSources['classes'] };
+		case 'skillRecipes':
+			return { skillRecipes: live as unknown as ReferenceSources['skillRecipes'] };
+		case 'skills':
+			return { skills: live as unknown as ReferenceSources['skills'] };
+		default:
+			return {};
+	}
+};
+
+/**
  * Retire a saved reference record, first surfacing what currently references it. The referenced-by
  * surface is computed from the cached reference sets (no backend round-trip); an unreferenced record
  * retires without an extra prompt. Advisory only — confirming proceeds, and the record stays
@@ -163,7 +193,7 @@ const onRetire = (rec: Identified) =>
 		id: rec.id,
 		name: entity.title?.(rec) || rec.name || entity.blankName,
 		title: `Retire ${entity.singular}?`,
-		sources: referenceSourcesFromStatic(),
+		sources: referenceSourcesFromStatic(liveOverride()),
 		onConfirmed: () => store.setRetired(rec.id, true)
 	});
 

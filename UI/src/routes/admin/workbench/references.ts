@@ -143,6 +143,20 @@ const proficiencyReferences = (
 	];
 };
 
+/**
+ * A path is referenced through its tiers: another (still-live) proficiency naming one of this
+ * path's tiers as a cross-path prerequisite. Retiring the path freezes those tiers, so such a
+ * gateway could then never open — the same soft-lock `AdminPaths.FindRetiredPathGatingLiveGateway`
+ * rejects server-side. Marked `strong` since this is a real (not just advisory) save-time block.
+ */
+const pathReferences = (id: number, { proficiencies }: ReferenceSources): ReferenceGroup[] => {
+	const tierIds = new Set(proficiencies.filter((p) => p.pathId === id).map((p) => p.id));
+	const prerequisiteOf = proficiencies
+		.filter((p) => p.pathId !== id && p.prerequisiteIds.some((prereqId) => tierIds.has(prereqId)))
+		.map((p) => p.name);
+	return group('prerequisiteOf', prerequisiteOf, true);
+};
+
 /** Every record that references the given retireable record, grouped by relationship (empty when none). */
 export function computeReferences(entityKey: string, id: number, sources: ReferenceSources): ReferenceGroup[] {
 	switch (entityKey) {
@@ -160,6 +174,8 @@ export function computeReferences(entityKey: string, id: number, sources: Refere
 			return skillReferences(id, sources);
 		case 'proficiencies':
 			return proficiencyReferences(id, sources);
+		case 'paths':
+			return pathReferences(id, sources);
 		default:
 			return [];
 	}
