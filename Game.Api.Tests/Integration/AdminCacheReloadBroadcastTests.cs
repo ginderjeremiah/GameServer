@@ -70,7 +70,7 @@ namespace Game.Api.Tests.Integration
             }
             finally
             {
-                await pubsub.UnSubscribe(ReferenceDataChannel, subscriptionId);
+                await pubsub.UnSubscribe(subscriptionId);
             }
         }
     }

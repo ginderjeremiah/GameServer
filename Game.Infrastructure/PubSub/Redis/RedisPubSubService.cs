@@ -12,7 +12,9 @@ namespace Game.Infrastructure.PubSub.Redis
     // or when it is discarded because its id was already taken — which is the correct ownership boundary.
     internal class RedisPubSubService : IPubSubService
     {
-        private static readonly ConcurrentDictionary<string, (Action<RedisChannel, RedisValue> handler, BackgroundWorker? worker)> _handles = [];
+        // Records the channel a handle was subscribed on, so UnSubscribe never has to trust a caller-supplied
+        // channel that might not match (#1825).
+        private static readonly ConcurrentDictionary<string, (string channel, Action<RedisChannel, RedisValue> handler, BackgroundWorker? worker)> _handles = [];
 
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<RedisPubSubService> _logger;
@@ -88,7 +90,7 @@ namespace Game.Infrastructure.PubSub.Redis
         public async Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null)
         {
             _logger.LogInformation("Creating redis subscriber on channel '{Channel}'.", channel);
-            if (id is not null && !_handles.TryAdd(id, (handle, null)))
+            if (id is not null && !_handles.TryAdd(id, (channel, handle, null)))
             {
                 throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
             }
@@ -135,7 +137,7 @@ namespace Game.Infrastructure.PubSub.Redis
         // its OS wait handle (#954).
         private async Task SubscribeWithWorker(string channel, BackgroundWorker worker, string id)
         {
-            if (!_handles.TryAdd(id, (handle, worker)))
+            if (!_handles.TryAdd(id, (channel, handle, worker)))
             {
                 worker.Dispose();
                 throw new InvalidOperationException($"Cannot create handle with id: {id} because one already exists.");
@@ -158,7 +160,7 @@ namespace Game.Infrastructure.PubSub.Redis
             }
         }
 
-        public async Task UnSubscribe(string channel, string id)
+        public async Task UnSubscribe(string id)
         {
             if (_handles.TryRemove(id, out var handle))
             {
@@ -166,7 +168,9 @@ namespace Game.Infrastructure.PubSub.Redis
                 // so disposing first leaves a window where a message still routed to the (now-removed-but-still-
                 // subscribed) handler calls Start() on a disposed worker — an ObjectDisposedException thrown on the
                 // StackExchange.Redis subscriber thread. Removing the subscription first closes that window.
-                await Subscriber.UnsubscribeAsync(RedisChannel.Literal(channel), handle.handler);
+                // The channel comes from the registered handle, not a caller-supplied argument, so it can never
+                // mismatch the channel the handler was actually subscribed on (#1825).
+                await Subscriber.UnsubscribeAsync(RedisChannel.Literal(handle.channel), handle.handler);
                 handle.worker?.Dispose();
             }
         }

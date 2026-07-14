@@ -385,7 +385,7 @@ namespace Game.Api.Tests.Unit
             public Task Publish<T>(string channel, string queueName, T queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task Wake(string channel) => Task.CompletedTask;
-            public Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public Task UnSubscribe(string id) => Task.CompletedTask;
             public IPubSubQueue GetQueue(string queueName) => DeadLetterQueue;
         }
 
@@ -446,7 +446,7 @@ namespace Game.Api.Tests.Unit
         {
             public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw toThrow;
 
-            public override Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public override Task UnSubscribe(string id) => Task.CompletedTask;
         }
 
         /// <summary>A pub/sub whose <c>Subscribe</c> succeeds but <c>UnSubscribe</c> throws, to drive the
@@ -454,7 +454,7 @@ namespace Game.Api.Tests.Unit
         private sealed class ThrowingUnsubscribePubSubService(Exception toThrow) : NotSupportedPubSubService
         {
             public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
-            public override Task UnSubscribe(string channel, string id) => throw toThrow;
+            public override Task UnSubscribe(string id) => throw toThrow;
         }
 
         /// <summary>Records the presence-key writes and releases so a rollback test can assert the exact

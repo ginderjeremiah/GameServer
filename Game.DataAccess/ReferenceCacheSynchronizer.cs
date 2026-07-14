@@ -42,7 +42,7 @@ namespace Game.DataAccess
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await _pubsub.UnSubscribe(Constants.PUBSUB_REFERENCE_DATA_CHANNEL, InstanceId);
+            await _pubsub.UnSubscribe(InstanceId);
             _stopping.Cancel();
             await _reloadLoop;
         }

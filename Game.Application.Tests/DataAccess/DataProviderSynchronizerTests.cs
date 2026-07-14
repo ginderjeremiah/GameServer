@@ -1942,7 +1942,7 @@ namespace Game.Application.Tests.DataAccess
             public Task Wake(string channel) => inner.Wake(channel);
             public Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
             public Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
-            public Task UnSubscribe(string channel, string id) => inner.UnSubscribe(channel, id);
+            public Task UnSubscribe(string id) => inner.UnSubscribe(id);
             public IPubSubQueue GetQueue(string queueName) => inner.GetQueue(queueName);
         }
 
@@ -1959,7 +1959,7 @@ namespace Game.Application.Tests.DataAccess
 
             public override Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
             public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => Task.CompletedTask;
-            public override Task UnSubscribe(string channel, string id) => Task.CompletedTask;
+            public override Task UnSubscribe(string id) => Task.CompletedTask;
         }
 
         /// <summary>
