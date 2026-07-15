@@ -687,8 +687,11 @@ export class EnemyManager {
 		// getNewEnemy call and clobber the fight the supersession already started (#1696).
 		const generation = this.transitionGeneration;
 		// Record the loss explicitly (turning auto-fight off) and drop back to the boss-available
-		// state — the normal idle farm loop — honoring the post-loss cooldown.
-		const lostResponse = await apiSocket.sendSocketCommand('BattleLost');
+		// state — the normal idle farm loop — honoring the post-loss cooldown. Report the duration the
+		// client simulated alongside the claim, mirroring claimVictory's diagnostic-only clientTotalMs.
+		const lostResponse = await apiSocket.sendSocketCommand('BattleLost', {
+			clientTotalMs: battleEngine.timeElapsed
+		});
 		// A retreat/challenge superseded this resolution while BattleLost was in flight; the superseding
 		// transition already owns the loop's state, so abandon rather than clobber it below.
 		if (!this.transitionCurrent(generation)) {

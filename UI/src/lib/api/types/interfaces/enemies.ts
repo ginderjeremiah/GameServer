@@ -3,6 +3,10 @@
 
 import type { IBattlerAttribute } from '../';
 
+export interface IBattleLostRequest {
+	clientTotalMs?: number;
+}
+
 export interface IBattleLostResponse {
 	cooldown: number;
 	nextEnemy?: IEnemyInstance;

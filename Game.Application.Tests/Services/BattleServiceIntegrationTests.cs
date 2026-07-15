@@ -933,6 +933,95 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task EndBattleLoss_DivergentClientTotalMs_IsDiagnosticOnly_StillReturnsTrue()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 1m, cooldownMs: 2000);
+            var strongEnemy = await TestDataSeeder.CreateStrongEnemyAsync(context);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Crush", baseDamage: 100m, cooldownMs: 500);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, strongEnemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, strongEnemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id, level: 1);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            // Override player attributes to be weak
+            var existingAttrs = context.PlayerAttributes.Where(pa => pa.PlayerId == playerEntity.Id);
+            context.PlayerAttributes.RemoveRange(existingAttrs);
+            context.PlayerAttributes.AddRange(
+                new Infrastructure.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Core.EAttribute.Strength, Amount = 1m },
+                new Infrastructure.Entities.PlayerAttribute { PlayerId = playerEntity.Id, AttributeId = (int)Core.EAttribute.Endurance, Amount = 1m });
+            playerEntity.StatPointsGained = 2;
+            playerEntity.StatPointsUsed = 2;
+            await context.SaveChangesAsync(CancellationToken);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // A wildly divergent client-reported duration is logged but never gates the claim — the field
+            // is diagnostic only, not anti-cheat — so the loss must still resolve to true.
+            var result = await battleService.EndBattleLoss(player, state, clientTotalMs: int.MaxValue);
+
+            Assert.True(result);
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task EndBattleLoss_ReplayWasVictory_ReturnsFalseAndLeavesStateActive()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            // Backdate the battle start so the elapsed-time gate is satisfied — the rejection under test is
+            // the outcome mismatch below, not the too-early-claim gate.
+            state.BattleStartTime = DateTime.UtcNow.AddMinutes(-10);
+
+            // The default player/enemy matchup is a straightforward win (mirrors
+            // EndBattleVictory_EnoughTimeElapsed_ReturnsDefeatResult), so a BattleLost claim against this
+            // exact battle is the client/server divergence the parity invariant says must be surfaced —
+            // rejected rather than silently booking a loss for what the server replayed as a win.
+            var result = await battleService.EndBattleLoss(player, state);
+
+            Assert.False(result);
+            Assert.True(state.HasActiveBattle);
+        }
+
+        [Fact]
         public async Task StartBossBattle_ZoneWithBoss_StartsDeterministicBossBattle()
         {
             using var scope = CreateScope();
