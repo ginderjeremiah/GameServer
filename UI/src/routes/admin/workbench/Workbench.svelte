@@ -29,10 +29,7 @@
 			/>
 		</div>
 	{:else if error}
-		<div class="workbench-error" role="alert" data-testid="workbench-error">
-			<p>{error}</p>
-			<button type="button" class="btn" onclick={loadSeed}>Refresh</button>
-		</div>
+		<AdminLoadError testid="workbench-error" message={error} onRetry={loadSeed} />
 	{:else}
 		<Loading loading={true} delay={150} />
 	{/if}
@@ -49,6 +46,7 @@ import { EntityStore } from './entity-store.svelte';
 import WorkbenchIcon from './WorkbenchIcon.svelte';
 import WorkbenchList from './components/WorkbenchList.svelte';
 import WorkbenchDetail from './components/WorkbenchDetail.svelte';
+import AdminLoadError from '../AdminLoadError.svelte';
 
 interface Props {
 	entity: EntityConfig<Identified>;
@@ -136,22 +134,5 @@ const newItem = () => {
 }
 .unsaved {
 	color: var(--text-secondary);
-}
-.workbench-error {
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: 14px;
-	padding: 20px;
-	text-align: center;
-
-	p {
-		max-width: 480px;
-		color: var(--error);
-		font-size: 13px;
-	}
 }
 </style>
