@@ -130,6 +130,13 @@ namespace Game.Core.Players.Inventories
                 return false;
             }
 
+            // Anti-cheat: the client only offers a mod once per item across all its slots (mirror that
+            // rule here) — reject a tampered client applying the same mod to a second slot of one item.
+            if (unlocked.AppliedMods.Any(a => a.ItemModId == itemModId && a.ItemModSlotId != itemModSlotId))
+            {
+                return false;
+            }
+
             // Replace any existing mod in the slot
             var existing = unlocked.AppliedMods.FirstOrDefault(a => a.ItemModSlotId == itemModSlotId);
             if (existing is not null)

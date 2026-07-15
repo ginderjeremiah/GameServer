@@ -149,6 +149,40 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task ApplyMod_SameModAlreadyOnAnotherSlot_ReturnsErrorAndDoesNotDuplicate()
+        {
+            // Anti-cheat (#1994): the client's mod picker forbids applying the same mod to a second slot
+            // of one item, so a tampered client sending it directly over the socket must be rejected too.
+            var firstSlotId = 0;
+            var secondSlotId = 0;
+            var modId = 0;
+            var (userId, playerId, itemId) = await SeedPlayerWithInventoryAsync("dupmoduser", "dupmodpass",
+                async (context, playerId, item) =>
+                {
+                    var firstSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
+                    var secondSlot = await TestDataSeeder.AddItemModSlotAsync(context, item.Id);
+                    await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, item.Id, EEquipmentSlot.WeaponSlot);
+                    var mod = await TestDataSeeder.CreateItemModAsync(context, attributeId: EAttribute.Dexterity, attributeAmount: 7m);
+                    await TestDataSeeder.LinkModToPlayerAsync(context, playerId, mod.Id);
+                    await TestDataSeeder.ApplyModToItemAsync(context, playerId, item.Id, firstSlot.Id, mod.Id);
+                    firstSlotId = firstSlot.Id;
+                    secondSlotId = secondSlot.Id;
+                    modId = mod.Id;
+                });
+            await LoginAsync("dupmoduser", "dupmodpass");
+            await using var socketClient = await ConnectSocketAsync(userId);
+
+            var parameters = new { itemId, itemModId = modId, itemModSlotId = secondSlotId };
+            var response = await socketClient.SendCommandRawAsync("ApplyMod", parameters);
+
+            Assert.NotNull(response.Error);
+            var data = await GetPersistedPlayerAsync(playerId);
+            var appliedMods = data.InventoryData.UnlockedItems.Single(i => i.ItemId == itemId).AppliedMods;
+            var applied = Assert.Single(appliedMods);
+            Assert.Equal(firstSlotId, applied.ItemModSlotId);
+        }
+
+        [Fact]
         public async Task RemoveMod_AppliedMod_Succeeds()
         {
             var modSlotId = 0;
