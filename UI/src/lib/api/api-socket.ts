@@ -450,9 +450,11 @@ export class ApiSocket {
 			return;
 		}
 
-		this.socketAuthRetries++;
 		refreshTokens().then((outcome) => {
 			if (outcome.status === 'success') {
+				// Only a rotation that still failed to open spends budget — a retryable outage never burns
+				// a refresh token, so it must not count toward the bound that exists to stop that burn.
+				this.socketAuthRetries++;
 				// processCommandQueue ensures the socket (now with the freshly refreshed token) and flushes
 				// any queued-but-unsent commands.
 				void this.processCommandQueue();
@@ -471,8 +473,9 @@ export class ApiSocket {
 				handleAuthFailure();
 			}
 			// Otherwise the refresh attempt was retryable (network blip, transient server error): leave the
-			// queue and tokens intact — the keepalive ping's next ensureSocket() call retries the reconnect,
-			// which will attempt the refresh again, rather than forcing a logout over a transient failure.
+			// queue and tokens intact and spend no budget — the keepalive ping's next ensureSocket() call
+			// retries the reconnect, which will attempt the refresh again, rather than forcing a logout over
+			// a transient failure.
 		});
 	}
 
