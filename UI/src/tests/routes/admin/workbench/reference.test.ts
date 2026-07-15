@@ -157,6 +157,14 @@ describe('reference-data-backed select options', () => {
 		]);
 	});
 
+	it('keeps the current boss picker value visible after it loses the isBoss flag (#1996)', () => {
+		// Cave Bat (id 0) isn't a boss, but it's the zone's currently-authored value — it must
+		// stay selectable/visible rather than silently vanishing from the option list.
+		expect(reference.bossEnemyOptions(0)).toContainEqual({ value: 0, text: 'Cave Bat' });
+		// Dropping `keep` (or picking a different current value) excludes it again.
+		expect(reference.bossEnemyOptions().map((o) => o.value)).not.toContain(0);
+	});
+
 	it('prefixes the unlock-gate picker with an always-open sentinel and lists every challenge', () => {
 		expect(reference.unlockChallengeOptions()).toEqual([
 			{ value: -1, text: 'None (always open)' },
@@ -337,6 +345,12 @@ describe('entityOptions / entityCatalog target-entity picker', () => {
 	it('ignores the boss-only flag for non-enemy dimensions', () => {
 		expect(reference.entityOptions(EEntityType.Zone, true).map((o) => o.value)).toEqual([0, 1]);
 		expect(reference.entityOptions(EEntityType.Skill, true).map((o) => o.value)).toEqual([0, 1]);
+	});
+
+	it('keeps a boss-only target visible after it loses the isBoss flag (#1996)', () => {
+		// Cave Bat (id 0) isn't a boss, but it's the challenge's currently-authored target.
+		expect(reference.entityOptions(EEntityType.Enemy, true, 0)).toContainEqual({ value: 0, text: 'Cave Bat' });
+		expect(reference.entityOptions(EEntityType.Enemy, true).map((o) => o.value)).not.toContain(0);
 	});
 
 	it('returns an empty catalogue for the None / unknown dimension', () => {

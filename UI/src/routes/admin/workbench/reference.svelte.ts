@@ -159,11 +159,15 @@ class WorkbenchReference {
 	zoneOptions = (keep?: number): SelectOption[] =>
 		this.retireableOptions(staticData.zones ?? [], keep, (z) => `${z.name} · L${z.levelMin}–${z.levelMax}`);
 	enemyOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.enemies ?? [], keep);
-	/** Dedicated-boss picker options: a "None" sentinel (-1) plus every active boss enemy. */
+	/**
+	 * Dedicated-boss picker options: a "None" sentinel (-1) plus every active boss enemy. The
+	 * current value stays visible even if it's since lost the boss flag, so an already-authored
+	 * assignment isn't silently dropped from the list.
+	 */
 	bossEnemyOptions = (keep?: number): SelectOption[] => [
 		{ value: -1, text: 'None' },
 		...this.retireableOptions(
-			(staticData.enemies ?? []).filter((e) => e.isBoss),
+			(staticData.enemies ?? []).filter((e) => e.isBoss || e.id === keep),
 			keep
 		)
 	];
@@ -277,19 +281,19 @@ class WorkbenchReference {
 	/**
 	 * The reference records backing a statistic's entity dimension (Enemy / Zone / Skill).
 	 * When `bossOnly` is set (a boss-only statistic such as BossesDefeated) the Enemy
-	 * dimension is restricted to enemies flagged `isBoss`, so the editor can't author a
-	 * challenge against a non-boss that the statistic would never increment for.
+	 * dimension is restricted to enemies flagged `isBoss` — plus `keep`, so a current target
+	 * that's since lost the flag stays visible instead of silently vanishing from the picker.
 	 */
-	private entityRecords = (entityType: EEntityType, bossOnly: boolean): RetireableRef[] =>
+	private entityRecords = (entityType: EEntityType, bossOnly: boolean, keep?: number): RetireableRef[] =>
 		entityType === EEntityType.Enemy
-			? (staticData.enemies ?? []).filter((e) => !bossOnly || e.isBoss)
+			? (staticData.enemies ?? []).filter((e) => !bossOnly || e.isBoss || e.id === keep)
 			: (this.entitySource(entityType) ?? []);
 
 	entityCatalog = (entityType: EEntityType, bossOnly = false): { id: number; name: string }[] =>
 		this.entityRecords(entityType, bossOnly).map((e) => ({ id: e.id, name: e.name }));
 	/** Target-entity picker options. Retired records are excluded unless `keep` is the current target. */
 	entityOptions = (entityType: EEntityType, bossOnly = false, keep?: number): SelectOption[] =>
-		this.retireableOptions(this.entityRecords(entityType, bossOnly), keep);
+		this.retireableOptions(this.entityRecords(entityType, bossOnly, keep), keep);
 	entityName = (entityType: EEntityType, id: number): string | null =>
 		this.entitySource(entityType)?.[id]?.name ?? null;
 
