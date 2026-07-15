@@ -541,6 +541,50 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task EndBattleVictory_BattleAlreadyCredited_ReturnsNullAndClearsStaleSession()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            // Simulate the residual crash gap #1874/#1993 targets: the durable credit already happened (the
+            // player's LastCreditedBattleSeed reflects it) but the session's PlayerState was never cleared/
+            // saved, and the reconnected client calls EndBattleVictory directly instead of going through the
+            // natural AbandonBattle reconnect path. Deliberately not backdating BattleStartTime: the seed
+            // check must reject this before the elapsed-time gate (or any replay) is ever reached.
+            player.LastCreditedBattleSeed = state.BattleSeed;
+            var expBefore = player.Exp;
+
+            var result = await battleService.EndBattleVictory(player, state);
+
+            Assert.Null(result);
+            Assert.Equal(expBefore, player.Exp);
+            // The session still catches up: the stale battle is cleared even though the claim was rejected.
+            Assert.False(state.HasActiveBattle);
+        }
+
+        [Fact]
         public async Task EndBattleVictory_CooldownAnchoredToBattleCompletion_NotServerClock()
         {
             using var scope = CreateScope();
@@ -842,6 +886,50 @@ namespace Game.Application.Tests.Services
 
             Assert.False(result);
             Assert.True(state.HasActiveBattle);
+        }
+
+        [Fact]
+        public async Task EndBattleLoss_BattleAlreadyCredited_ReturnsFalseAndClearsStaleSession()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, skill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, playerEntity.Id, skill.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+            var state = new PlayerState();
+
+            await battleService.StartBattle(player, state, zoneId: zone.Id);
+            Assert.True(state.HasActiveBattle);
+
+            // Simulate the residual crash gap #1874/#1993 targets: the durable credit already happened (the
+            // player's LastCreditedBattleSeed reflects it) but the session's PlayerState was never cleared/
+            // saved, and the reconnected client calls EndBattleLoss directly instead of going through the
+            // natural AbandonBattle reconnect path. Deliberately not backdating BattleStartTime: the seed
+            // check must reject this before the elapsed-time gate (or any replay) is ever reached.
+            player.LastCreditedBattleSeed = state.BattleSeed;
+
+            var result = await battleService.EndBattleLoss(player, state);
+
+            Assert.False(result);
+            // Unlike the ClaimedBeforeBattleCouldFinish rejection above (which leaves the battle active for a
+            // legitimate retry later), this rejection clears the stale battle: it is not a premature claim,
+            // it is one the server already durably credited, so there is nothing left to retry.
+            Assert.False(state.HasActiveBattle);
         }
 
         [Fact]

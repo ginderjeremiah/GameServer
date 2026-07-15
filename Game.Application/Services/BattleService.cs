@@ -283,6 +283,20 @@ namespace Game.Application.Services
 
         public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, int? clientTotalMs = null, CancellationToken cancellationToken = default)
         {
+            // Idempotency backstop (#1874/#1993): a reconnecting client can re-present an already-durably-
+            // credited battle directly through this command instead of the natural AbandonBattle reconnect
+            // path (see BattleAlreadyCredited), so the same guard applies here before paying for the replay
+            // below.
+            if (BattleAlreadyCredited(state, player))
+            {
+                _logger.LogWarning(
+                    "EndBattleVictory rejected for player {PlayerId}: battle seed {Seed} was already "
+                    + "credited (stale session re-presenting a resolved battle).",
+                    player.Id, state.BattleSeed);
+                state.ClearBattle();
+                return null;
+            }
+
             if (!TryResolveActiveBattle(state, out var enemy, out var result, out var playerMaterials))
             {
                 // No battle to resolve. After the caller's HasActiveBattle gate this means a torn state
@@ -356,6 +370,17 @@ namespace Game.Application.Services
 
         public async Task<bool> EndBattleLoss(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
+            // Idempotency backstop (#1874/#1993): mirrors EndBattleVictory's guard — see BattleAlreadyCredited.
+            if (BattleAlreadyCredited(state, player))
+            {
+                _logger.LogWarning(
+                    "EndBattleLoss rejected for player {PlayerId}: battle seed {Seed} was already credited "
+                    + "(stale session re-presenting a resolved battle).",
+                    player.Id, state.BattleSeed);
+                state.ClearBattle();
+                return false;
+            }
+
             if (!TryResolveActiveBattle(state, out var enemy, out var result, out _))
             {
                 return false;
@@ -460,6 +485,20 @@ namespace Game.Application.Services
         // socket by construction.
         private async Task<StaleBattleResolution> AbandonBattle(Player player, PlayerState state, int? clientBattleMs = null, bool notify = true, CancellationToken cancellationToken = default)
         {
+            // Idempotency backstop (#1874): this exact battle was already durably credited by an earlier
+            // command whose session-state clear never reached the cache (e.g. a crash between the durable
+            // credit and the now-awaited session save, docs/backend-persistence.md → Write-behind player
+            // cache). The stale session is re-presenting an already-resolved battle on reconnect; crediting
+            // it again would double-pay the same fight. The durable write already happened, so the session
+            // only needs to catch up — clear it without replaying the credit. Checked first — needs only the
+            // seed, not a replay — so this reconnect path stays O(1) instead of paying for the full
+            // re-simulation below only to discard it (#1993).
+            if (BattleAlreadyCredited(state, player))
+            {
+                state.ClearBattle();
+                return new StaleBattleResolution(null, null);
+            }
+
             var now = DateTime.UtcNow;
             // A stale battle can be far older than int.MaxValue ms (~24.9 days), so clamp before narrowing —
             // an unchecked out-of-range double-to-int cast is unspecified rather than a safe saturation.
@@ -484,18 +523,6 @@ namespace Game.Application.Services
             // No active battle (nothing to resolve) or no elapsed window to re-simulate against — clear
             // and return without recording an outcome or persisting.
             if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, out var playerMaterials, simulateMs))
-            {
-                state.ClearBattle();
-                return new StaleBattleResolution(null, null);
-            }
-
-            // Idempotency backstop (#1874): this exact battle was already durably credited by an earlier
-            // command whose session-state clear never reached the cache (e.g. a crash between the durable
-            // credit and the now-awaited session save, docs/backend-persistence.md → Write-behind player
-            // cache). The stale session is re-presenting an already-resolved battle on reconnect; crediting
-            // it again would double-pay the same fight. The durable write already happened, so the session
-            // only needs to catch up — clear it without replaying the credit.
-            if (state.BattleSeed is uint seed && seed == player.LastCreditedBattleSeed)
             {
                 state.ClearBattle();
                 return new StaleBattleResolution(null, null);
@@ -676,6 +703,16 @@ namespace Game.Application.Services
             battleCompletedAt = battleStartTime.AddMilliseconds(replayTotalMs);
             return now < battleCompletedAt - ElapsedBattleTimeTolerance;
         }
+
+        // Idempotency backstop (#1874/#1993): true when this exact battle was already durably credited by an
+        // earlier command whose session-state clear never reached the cache (e.g. a crash between the
+        // durable credit and the now-awaited session save, docs/backend-persistence.md → Write-behind player
+        // cache). Shared by all three battle-end paths — EndBattleVictory, EndBattleLoss, and AbandonBattle —
+        // so a client re-presenting an already-credited battle can't double-pay it via whichever path it
+        // calls directly, not just the reconnect-driven abandon path. Needs only the seed, so every caller
+        // checks this before any replay work.
+        private static bool BattleAlreadyCredited(PlayerState state, Player player) =>
+            state.BattleSeed is uint seed && seed == player.LastCreditedBattleSeed;
 
         // Shared anti-cheat preamble for the three battle-end paths: guards that a battle is active, resolves
         // the snapshotted enemy, and replays the fight once. Returns false (with no outputs) when there is no
