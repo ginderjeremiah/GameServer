@@ -39,7 +39,7 @@ namespace Game.Application.Tests.Services
 
             sessionStore.Update(new PlayerState { PlayerId = 7 }, userId);
 
-            var ttl = await WaitForTtlAsync(db, sessionKey);
+            var ttl = await TtlPollingHelper.WaitForTtlAsync(db, sessionKey);
             Assert.NotNull(ttl);
             Assert.True(ttl > TtlFloor, $"expected a generous idle TTL, got {ttl}");
         }
@@ -56,7 +56,7 @@ namespace Game.Application.Tests.Services
 
             // Prime the session, then shrink the TTL to a sliver to stand in for a key that has aged.
             sessionStore.Update(new PlayerState { PlayerId = 9 }, userId);
-            await WaitForTtlAsync(db, sessionKey);
+            await TtlPollingHelper.WaitForTtlAsync(db, sessionKey);
             await db.KeyExpireAsync(sessionKey, TimeSpan.FromSeconds(30));
 
             // A read hit must slide the TTL back up to the full idle budget and round-trip the state.
@@ -64,7 +64,7 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(session);
             Assert.Equal(9, session.PlayerId);
 
-            var ttl = await WaitForTtlAsync(db, sessionKey, predicate: t => t > TtlFloor);
+            var ttl = await TtlPollingHelper.WaitForTtlAsync(db, sessionKey, predicate: t => t > TtlFloor);
             Assert.NotNull(ttl);
             Assert.True(ttl > TtlFloor, $"expected the hit to refresh the TTL, got {ttl}");
         }
@@ -109,15 +109,5 @@ namespace Game.Application.Tests.Services
         }
 
         private static string SessionKey(int userId) => $"{Constants.CACHE_SESSION_PREFIX}_{userId}";
-
-        // Polls the key's TTL until it satisfies the predicate (defaults to "any TTL is set"), tolerating the
-        // fire-and-forget write not having landed yet. KeyTimeToLiveAsync returns null both for a missing key
-        // and a key with no expiry, so a non-null result proves an expiry is attached.
-        private static Task<TimeSpan?> WaitForTtlAsync(IDatabase db, string key, Func<TimeSpan, bool>? predicate = null)
-        {
-            predicate ??= _ => true;
-            return PollingHelper.PollUntilAsync(
-                () => db.KeyTimeToLiveAsync(key), ttl => ttl is not null && predicate(ttl.Value));
-        }
     }
 }

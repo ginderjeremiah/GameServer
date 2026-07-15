@@ -12,7 +12,16 @@ namespace Game.TestInfrastructure.Helpers
         /// on the read value. Returns the last read value even if <paramref name="satisfied"/> never holds
         /// before <paramref name="timeoutMs"/> elapses, leaving the pass/fail decision to the caller.
         /// </summary>
-        public static async Task<T> PollUntilAsync<T>(Func<Task<T>> read, Func<T, bool> satisfied, int timeoutMs = 5000)
+        public static Task<T> PollUntilAsync<T>(Func<Task<T>> read, Func<T, bool> satisfied, int timeoutMs = 5000)
+            => PollUntilAsync(read, satisfied, CancellationToken.None, timeoutMs);
+
+        /// <summary>
+        /// Overload of <see cref="PollUntilAsync{T}(Func{Task{T}}, Func{T, bool}, int)"/> that flows
+        /// <paramref name="cancellationToken"/> into the poll delay, so a caller can abort the wait early
+        /// instead of always riding out the full <paramref name="timeoutMs"/>.
+        /// </summary>
+        public static async Task<T> PollUntilAsync<T>(
+            Func<Task<T>> read, Func<T, bool> satisfied, CancellationToken cancellationToken, int timeoutMs = 5000)
         {
             var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
             T value;
@@ -24,7 +33,7 @@ namespace Game.TestInfrastructure.Helpers
                     return value;
                 }
 
-                await Task.Delay(25);
+                await Task.Delay(25, cancellationToken);
             } while (DateTime.UtcNow < deadline);
 
             return value;
