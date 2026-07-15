@@ -10,6 +10,7 @@ using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using Xunit;
 
@@ -140,7 +141,8 @@ namespace Game.Application.Tests.Services
                 scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>(),
                 scope.ServiceProvider.GetRequiredService<IItems>(),
                 scope.ServiceProvider.GetRequiredService<IItemMods>(),
-                scope.ServiceProvider.GetRequiredService<ISkills>());
+                scope.ServiceProvider.GetRequiredService<ISkills>(),
+                scope.ServiceProvider.GetRequiredService<ILogger<PlayerRepository>>());
 
             player.ChangeZone(1);
             var ex = await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(() => throwingRepo.SavePlayer(player));
@@ -185,7 +187,8 @@ namespace Game.Application.Tests.Services
                 batch,
                 scope.ServiceProvider.GetRequiredService<IItems>(),
                 scope.ServiceProvider.GetRequiredService<IItemMods>(),
-                scope.ServiceProvider.GetRequiredService<ISkills>());
+                scope.ServiceProvider.GetRequiredService<ISkills>(),
+                scope.ServiceProvider.GetRequiredService<ILogger<PlayerRepository>>());
 
             player.ChangeZone(1);
             var ex = await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(() => throwingRepo.SavePlayer(player));

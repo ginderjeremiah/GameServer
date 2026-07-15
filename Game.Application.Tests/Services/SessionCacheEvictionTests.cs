@@ -87,6 +87,27 @@ namespace Game.Application.Tests.Services
             Assert.False(await db.KeyExistsAsync(sessionKey));
         }
 
+        [Fact]
+        public async Task GetSession_OnCorruptCacheEntry_DeletesKeyAndReturnsNull()
+        {
+            using var scope = CreateScope();
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            var db = multiplexer.GetDatabase();
+            const int userId = 4104;
+            var sessionKey = SessionKey(userId);
+
+            // Stand in for a corrupted/unparsable blob (e.g. a truncated write) with malformed JSON that
+            // reliably throws on deserialize.
+            await db.StringSetAsync(sessionKey, "{not valid json");
+
+            // A corrupt entry must self-heal (delete + treat as a miss) rather than throw on every read (#1924).
+            var session = await sessionStore.GetSession(userId);
+
+            Assert.Null(session);
+            Assert.False(await db.KeyExistsAsync(sessionKey));
+        }
+
         private static string SessionKey(int userId) => $"{Constants.CACHE_SESSION_PREFIX}_{userId}";
 
         // Polls the key's TTL until it satisfies the predicate (defaults to "any TTL is set"), tolerating the

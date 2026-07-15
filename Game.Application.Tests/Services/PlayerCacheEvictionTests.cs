@@ -129,6 +129,33 @@ namespace Game.Application.Tests.Services
             Assert.True(ttl > TtlFloor, $"expected the reload to re-cache with a TTL, got {ttl}");
         }
 
+        [Fact]
+        public async Task GetPlayer_OnCorruptCacheEntry_DeletesKeyAndReloadsFromDb()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Corrupted");
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            var db = multiplexer.GetDatabase();
+            var playerKey = PlayerKey(playerEntity.Id);
+
+            // Stand in for a corrupted/unparsable blob (e.g. a PlayerCacheModel shape change hitting an
+            // already-cached value, or a truncated write) with malformed JSON that reliably throws on deserialize.
+            await db.StringSetAsync(playerKey, "{not valid json");
+
+            // A corrupt entry must self-heal (delete + DB reload) rather than throw and lock the player out (#1924).
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+            Assert.Equal("Corrupted", player.Name);
+
+            var ttl = await WaitForTtlAsync(db, playerKey);
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TtlFloor, $"expected the self-heal reload to re-cache with a TTL, got {ttl}");
+        }
+
         private static string PlayerKey(int playerId) => $"{Constants.CACHE_PLAYER_PREFIX}_{playerId}";
 
         // Polls the key's TTL until it satisfies the predicate (defaults to "any TTL is set"), tolerating the

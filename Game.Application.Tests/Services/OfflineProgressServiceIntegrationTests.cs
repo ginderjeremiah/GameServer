@@ -13,6 +13,7 @@ using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Game.Application.Tests.Services
@@ -176,7 +177,8 @@ namespace Game.Application.Tests.Services
                 scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>(),
                 scope.ServiceProvider.GetRequiredService<IItems>(),
                 scope.ServiceProvider.GetRequiredService<IItemMods>(),
-                scope.ServiceProvider.GetRequiredService<ISkills>());
+                scope.ServiceProvider.GetRequiredService<ISkills>(),
+                scope.ServiceProvider.GetRequiredService<ILogger<PlayerRepository>>());
 
             var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
             var brokenOfflineService = new OfflineProgressService(

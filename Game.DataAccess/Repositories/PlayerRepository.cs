@@ -6,6 +6,8 @@ using Game.Core.Players;
 using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Game.DataAccess.Repositories
 {
@@ -35,6 +37,7 @@ namespace Game.DataAccess.Repositories
         private readonly IItems _items;
         private readonly IItemMods _itemMods;
         private readonly ISkills _skills;
+        private readonly ILogger<PlayerRepository> _logger;
 
         public PlayerRepository(
             GameContext context,
@@ -44,7 +47,8 @@ namespace Game.DataAccess.Repositories
             PlayerUpdateBatch updateBatch,
             IItems items,
             IItemMods itemMods,
-            ISkills skills)
+            ISkills skills,
+            ILogger<PlayerRepository> logger)
         {
             _context = context;
             _cache = cache;
@@ -54,6 +58,7 @@ namespace Game.DataAccess.Repositories
             _items = items;
             _itemMods = itemMods;
             _skills = skills;
+            _logger = logger;
         }
 
         public async Task<Player?> GetPlayer(int playerId, CancellationToken cancellationToken = default)
@@ -62,7 +67,22 @@ namespace Game.DataAccess.Repositories
             // The cache and the database both yield the lean PlayerCacheModel, so the reference graph is
             // re-resolved from the in-memory catalogs through one rehydration path regardless of the source —
             // a cached player can never serve stale reference data (#1155).
-            var model = await _cache.Get<PlayerCacheModel>(playerKey, cancellationToken);
+            PlayerCacheModel? model;
+            try
+            {
+                model = await _cache.Get<PlayerCacheModel>(playerKey, cancellationToken);
+            }
+            catch (JsonException ex)
+            {
+                // A blob that no longer deserializes (e.g. a shape change to PlayerCacheModel's required
+                // members) is corruption, not data - Postgres remains the durable copy, so this self-heals
+                // the same way HashGetAllIfExists treats a wrong-representation key: delete it and fall
+                // through to the DB reload below instead of locking the player out for the rest of the TTL (#1924).
+                _logger.LogError(ex, "Cached player {PlayerId} at key '{Key}' failed to deserialize; deleting the key and reloading from the database.", playerId, playerKey);
+                await _cache.Delete(playerKey, cancellationToken);
+                model = null;
+            }
+
             if (model is null)
             {
                 model = await GetPlayerModelFromDb(playerId, cancellationToken);
