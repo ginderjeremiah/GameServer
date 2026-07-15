@@ -1,5 +1,5 @@
 import { EChallengeType, type IChallengeType } from '$lib/api';
-import { normalizeText, tintColor } from './functions';
+import { normalizeText } from './functions';
 
 /*
  * Single source of truth for challenge-type accent visuals. The hues are
@@ -27,10 +27,6 @@ const CHALLENGE_TYPE_KEY: Record<EChallengeType, string> = {
 /** Themeable challenge-type accent hue, e.g. `var(--challenge-enemies-killed)`. */
 export const challengeTypeColor = (id: EChallengeType): string =>
 	`var(--challenge-${CHALLENGE_TYPE_KEY[id] ?? 'enemies-killed'})`;
-
-/** The challenge-type accent at a given opacity (themeable via `color-mix`). */
-export const challengeTypeTint = (id: EChallengeType, alpha: number): string =>
-	tintColor(challengeTypeColor(id), alpha);
 
 /**
  * The challenge type's display name — the authored name from the `ChallengeTypes` reference set
