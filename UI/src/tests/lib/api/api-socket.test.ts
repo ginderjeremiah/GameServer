@@ -1056,6 +1056,27 @@ describe('ApiSocket', () => {
 			warnSpy.mockRestore();
 		});
 
+		it('never exhausts the budget or logs out across a long outage of only-retryable refresh failures', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			vi.mocked(refreshTokens).mockResolvedValue({ status: 'retryable' });
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+
+			// Every reconnect attempt during the outage fails pre-open (e.g. code 1006, network down), and
+			// each refresh comes back retryable (no rotation spent) — well past MAX_SOCKET_AUTH_RETRIES (5)
+			// worth of cycles, since a retryable outcome must never count toward the budget.
+			for (let i = 0; i < 10; i++) {
+				rejectHandshake(lastWs());
+				await flushMicrotasks();
+			}
+
+			expect(refreshTokens).toHaveBeenCalledTimes(10);
+			expect(internals(apiSocket).socketAuthRetries).toBe(0);
+			expect(handleAuthFailure).not.toHaveBeenCalled();
+			expect(getTokens()).toEqual({ accessToken: 'a', refreshToken: 'r' });
+		});
+
 		it('stops the keepalive and routes to re-auth when the retry budget is exhausted', async () => {
 			vi.useFakeTimers();
 			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
