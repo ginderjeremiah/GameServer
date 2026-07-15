@@ -69,6 +69,8 @@ namespace Game.Api.Tests.Architecture
 
         private static bool IsAdminSurfaceController(Type type)
         {
+            // Off-convention admin controllers (ones that don't route under /api/AdminTools) must be
+            // special-cased here too, or they silently fall outside this guard's coverage.
             if (type == typeof(TagsController))
             {
                 return true;
