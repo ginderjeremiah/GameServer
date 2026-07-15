@@ -50,15 +50,45 @@ describe('WelcomeBackView', () => {
 		expect(view.summary).toBeNull();
 	});
 
-	it('enters the game and skips reconciliation when the offline check fails', async () => {
+	it('enters the game and skips reconciliation when the offline check fails twice in a row', async () => {
 		const view = makeView(null);
 
 		await view.run();
 
+		// One retry (#1999): a transient failure gets a second chance before reconciliation is skipped.
+		expect(deps.fetchProgress).toHaveBeenCalledTimes(2);
 		expect(deps.reconcileMode).not.toHaveBeenCalled();
 		expect(deps.resyncPlayer).not.toHaveBeenCalled();
 		expect(deps.enterGame).toHaveBeenCalledTimes(1);
 		expect(view.phase).toBe('entered');
+	});
+
+	it('retries once and reconciles mode when the retry succeeds (#1999)', async () => {
+		deps = {
+			fetchProgress: vi
+				.fn<WelcomeBackDeps['fetchProgress']>()
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce(progress({ hasProgress: false, autoChallengeBoss: true })),
+			resyncPlayer: vi.fn(() => Promise.resolve()),
+			reconcileMode: vi.fn(),
+			enterGame: vi.fn()
+		};
+		const view = new WelcomeBackView(deps as unknown as WelcomeBackDeps);
+
+		await view.run();
+
+		expect(deps.fetchProgress).toHaveBeenCalledTimes(2);
+		expect(deps.reconcileMode).toHaveBeenCalledWith(true);
+		expect(deps.enterGame).toHaveBeenCalledTimes(1);
+		expect(view.phase).toBe('entered');
+	});
+
+	it('does not retry when the first fetch succeeds', async () => {
+		const view = makeView(progress({ hasProgress: false }));
+
+		await view.run();
+
+		expect(deps.fetchProgress).toHaveBeenCalledTimes(1);
 	});
 
 	it('re-syncs state and shows the summary gate without starting the game when there is progress', async () => {
@@ -139,6 +169,30 @@ describe('WelcomeBackView', () => {
 			resolveFetch(progress({ hasProgress: false }));
 			await runPromise;
 
+			expect(deps.reconcileMode).not.toHaveBeenCalled();
+			expect(deps.enterGame).not.toHaveBeenCalled();
+			expect(view.phase).toBe('checking');
+		});
+
+		it('does not retry or enter the game when cancelled between the first fetch and its retry (#1999)', async () => {
+			let resolveFirstFetch: (value: IOfflineProgressModel | null) => void = () => {};
+			const fetchProgress = vi
+				.fn<WelcomeBackDeps['fetchProgress']>()
+				.mockImplementationOnce(() => new Promise((resolve) => (resolveFirstFetch = resolve)));
+			deps = {
+				fetchProgress,
+				resyncPlayer: vi.fn(() => Promise.resolve()),
+				reconcileMode: vi.fn(),
+				enterGame: vi.fn()
+			};
+			const view = new WelcomeBackView(deps as unknown as WelcomeBackDeps);
+
+			const runPromise = view.run();
+			view.cancel();
+			resolveFirstFetch(null);
+			await runPromise;
+
+			expect(fetchProgress).toHaveBeenCalledTimes(1);
 			expect(deps.reconcileMode).not.toHaveBeenCalled();
 			expect(deps.enterGame).not.toHaveBeenCalled();
 			expect(view.phase).toBe('checking');

@@ -36,11 +36,22 @@ export class WelcomeBackView {
 	 * Runs the gate flow. Fetches the offline summary, reconciles the persisted loop mode (always — even a
 	 * sub-threshold return should restore a boss-farmer's toggle), then passes straight through to the game
 	 * when there is no progress, or re-syncs state and shows the summary gate when there is.
+	 *
+	 * A failed fetch is retried once before giving up: `GetOfflineProgress` re-anchors the server's away-time
+	 * clock on every call (even a sub-threshold one), so an immediate retry is safe and turns a transient
+	 * failure into a normal empty-progress result instead of silently skipping reconciliation (#1999) — a
+	 * boss-farmer would otherwise enter with auto-fight off while the backend still thinks they're farming.
 	 */
 	async run(): Promise<void> {
-		const progress = await this.deps.fetchProgress();
+		let progress = await this.deps.fetchProgress();
 		if (this.cancelled) {
 			return;
+		}
+		if (!progress) {
+			progress = await this.deps.fetchProgress();
+			if (this.cancelled) {
+				return;
+			}
 		}
 
 		if (progress) {
