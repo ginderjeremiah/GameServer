@@ -12,7 +12,7 @@
 		<div class="chips">
 			{#each tier.prerequisiteIds as prereqId (prereqId)}
 				<span class="chip">
-					{reference.proficiencyName(prereqId) ?? `#${prereqId}`}
+					{prereqName(prereqId)}
 					<span class="star">✦</span>
 					<button
 						type="button"
@@ -39,7 +39,6 @@
 
 <script lang="ts">
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
-import { reference } from '../reference.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
 import type { WorkbenchProficiency } from './types';
 import ProgSelect from './ProgSelect.svelte';
@@ -51,12 +50,22 @@ interface Props {
 
 const { store, tier }: Props = $props();
 
-const ADD_PLACEHOLDER = -1;
+// Draft (never-saved) tiers count down from -1 (ProgressionStore.nextId), so the placeholder can't
+// live in that range without colliding with a real unsaved tier's id.
+const ADD_PLACEHOLDER = -Infinity;
 let addPick = $state(ADD_PLACEHOLDER);
+
+/**
+ * Sourced from the store's live draft tiers (not the last-saved `reference` snapshot) so a tier
+ * added or renamed earlier in this session is offered/labelled correctly (#1997).
+ */
+const prereqName = (id: number) => store.profs.find((p) => p.id === id)?.name || `#${id}`;
 
 const addOptions = $derived([
 	{ value: ADD_PLACEHOLDER, text: '+ Add prerequisite…' },
-	...reference.proficiencyOptions().filter((o) => o.value !== tier.id && !tier.prerequisiteIds.includes(o.value))
+	...store.profs
+		.filter((p) => p.id !== tier.id && !p.retiredAt && !tier.prerequisiteIds.includes(p.id))
+		.map((p) => ({ value: p.id, text: p.name || 'Unnamed tier' }))
 ]);
 
 const onAddPrereq = (value: number) => {

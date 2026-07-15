@@ -244,13 +244,10 @@ describe('TierDetail — tab bodies', () => {
 	});
 
 	it('lists an existing prerequisite chip, removes it, and adds a new one', async () => {
-		// staticData.proficiencies is index-addressed (the zero-based-id/index invariant), so each
-		// entry must sit at its own id as the array index.
-		const byId: unknown[] = [];
-		byId[3] = { id: 3, name: 'Basics' };
-		byId[7] = { id: 7, name: 'Advanced' };
-		staticData.proficiencies = byId;
-		const store = makeStore(tier({ prerequisiteIds: [3] }), { tierTab: 'gateways' });
+		const basics = tier({ id: 3, name: 'Basics', prerequisiteIds: [] });
+		const advanced = tier({ id: 7, name: 'Advanced', prerequisiteIds: [] });
+		const gatedTier = tier({ prerequisiteIds: [3] });
+		const store = makeStore(gatedTier, { profs: [gatedTier, basics, advanced], tierTab: 'gateways' });
 		render(TierDetail, { props: { store } });
 
 		expect(screen.getByText('Basics')).toBeTruthy();
@@ -259,5 +256,27 @@ describe('TierDetail — tab bodies', () => {
 
 		await fireEvent.change(screen.getByLabelText('Add prerequisite'), { target: { value: '7' } });
 		expect(store.addPrerequisite).toHaveBeenCalledWith(5, 7);
+	});
+
+	it('offers an unsaved tier (negative id, never in staticData) as a prerequisite option (#1997)', async () => {
+		// id -1 is the first id ProgressionStore.nextId hands out to a brand-new tier — deliberately
+		// chosen here to also pin that it doesn't collide with the picker's own placeholder value.
+		const draftTier = tier({ id: -1, name: 'Brand New Tier', prerequisiteIds: [] });
+		const gatedTier = tier({ prerequisiteIds: [] });
+		const store = makeStore(gatedTier, { profs: [gatedTier, draftTier], tierTab: 'gateways' });
+		render(TierDetail, { props: { store } });
+
+		await fireEvent.change(screen.getByLabelText('Add prerequisite'), { target: { value: '-1' } });
+		expect(store.addPrerequisite).toHaveBeenCalledWith(5, -1);
+	});
+
+	it('excludes a retired tier from the prerequisite options', () => {
+		const retiredTier = tier({ id: 3, name: 'Retired Tier', retiredAt: '2026-01-01T00:00:00Z' });
+		const gatedTier = tier({ prerequisiteIds: [] });
+		const store = makeStore(gatedTier, { profs: [gatedTier, retiredTier], tierTab: 'gateways' });
+		render(TierDetail, { props: { store } });
+
+		const select = screen.getByLabelText('Add prerequisite') as HTMLSelectElement;
+		expect(Array.from(select.options).some((o) => o.text.includes('Retired Tier'))).toBe(false);
 	});
 });
