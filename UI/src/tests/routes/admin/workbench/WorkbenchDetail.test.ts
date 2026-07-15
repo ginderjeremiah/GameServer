@@ -59,6 +59,8 @@ beforeEach(() => {
 	staticData.zones = [];
 	staticData.enemies = [];
 	staticData.challenges = [];
+	staticData.items = [];
+	staticData.itemMods = [];
 	dangerModal.mockReset();
 });
 afterEach(cleanup);
@@ -297,5 +299,64 @@ describe('WorkbenchDetail — retire confirm dialog', () => {
 
 		expect(dangerModal).not.toHaveBeenCalled();
 		expect(s.isRetired(s.items.find((r) => r.id === rec.id)!)).toBe(true);
+	});
+});
+
+describe('WorkbenchDetail — delete confirm dialog (tags)', () => {
+	const renderTag = (s: EntityStore<Identified>, rec: Identified) =>
+		render(WorkbenchDetail, {
+			props: {
+				entity: makeConfig(false, 'tags'),
+				store: s,
+				record: rec,
+				baseline: s.baselineOf(rec.id),
+				tab: 'identity',
+				onTab: vi.fn(),
+				onNew: vi.fn()
+			}
+		});
+
+	it('opens a confirm dialog enumerating applied items/mods and deletes only on confirm', async () => {
+		staticData.items = [{ id: 0, name: 'Iron Helm', tags: [1] }];
+		dangerModal.mockResolvedValue(true);
+
+		const s = new EntityStore(makeConfig(false, 'tags'), seed);
+		const rec = s.items[0];
+		renderTag(s, rec);
+
+		await fireEvent.click(screen.getByText('Delete'));
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		const call = dangerModal.mock.calls[0][0];
+		expect(call.body).toContain('Iron Helm');
+		expect(call.confirmLabel).toBe('Delete anyway');
+		await waitFor(() => expect(s.status(rec)).toBe('deleted'));
+	});
+
+	it('does not delete when the confirm dialog is cancelled', async () => {
+		staticData.items = [{ id: 0, name: 'Iron Helm', tags: [1] }];
+		dangerModal.mockResolvedValue(false);
+
+		const s = new EntityStore(makeConfig(false, 'tags'), seed);
+		const rec = s.items[0];
+		renderTag(s, rec);
+
+		await fireEvent.click(screen.getByText('Delete'));
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		expect(s.status(rec)).toBe('clean');
+	});
+
+	it('deletes an unapplied tag without prompting', async () => {
+		dangerModal.mockResolvedValue(true);
+
+		const s = new EntityStore(makeConfig(false, 'tags'), seed);
+		const rec = s.items[0];
+		renderTag(s, rec);
+
+		await fireEvent.click(screen.getByText('Delete'));
+
+		expect(dangerModal).not.toHaveBeenCalled();
+		expect(s.status(rec)).toBe('deleted');
 	});
 });

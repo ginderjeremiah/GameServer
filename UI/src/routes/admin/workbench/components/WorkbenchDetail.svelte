@@ -50,7 +50,7 @@
 							</button>
 						{/if}
 					{:else}
-						<button type="button" class="hdr-action danger" onclick={() => store.removeItem(record.id)}>
+						<button type="button" class="hdr-action danger" onclick={() => onDelete(record)}>
 							<WorkbenchIcon kind="x" size={11} />Delete
 						</button>
 					{/if}
@@ -133,7 +133,7 @@
 import { fieldsOf, type EntityConfig, type Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';
-import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
+import { deleteWithConfirm, referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import { sectionWarnings } from '../validation';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import SectionRenderer from './SectionRenderer.svelte';
@@ -174,6 +174,20 @@ const onRetire = (rec: Identified) =>
 		title: `Retire ${entity.singular}?`,
 		sources: referenceSourcesFromStatic(),
 		onConfirmed: () => store.setRetired(rec.id, true)
+	});
+
+/**
+ * Hard-delete confirm for the one non-retireable entity (tags): surfaces what currently applies
+ * the tag before the cascade strips it from every one of them (see `references.ts`'s tag case).
+ */
+const onDelete = (rec: Identified) =>
+	deleteWithConfirm({
+		entityKey: entity.key,
+		id: rec.id,
+		name: entity.title?.(rec) || rec.name || entity.blankName,
+		title: `Delete ${entity.singular}?`,
+		sources: referenceSourcesFromStatic(),
+		onConfirmed: () => store.removeItem(rec.id)
 	});
 
 const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): boolean => {
