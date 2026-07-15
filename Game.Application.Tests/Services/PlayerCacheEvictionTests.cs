@@ -43,7 +43,7 @@ namespace Game.Application.Tests.Services
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var ttl = await WaitForTtlAsync(db, playerKey);
+            var ttl = await TtlPollingHelper.WaitForTtlAsync(db, playerKey);
             Assert.NotNull(ttl);
             Assert.True(ttl > TtlFloor, $"expected a generous idle TTL, got {ttl}");
         }
@@ -68,7 +68,7 @@ namespace Game.Application.Tests.Services
             player.ChangeZone(1);
             await playerRepo.SavePlayer(player);
 
-            var ttl = await WaitForTtlAsync(db, playerKey);
+            var ttl = await TtlPollingHelper.WaitForTtlAsync(db, playerKey);
             Assert.NotNull(ttl);
             Assert.True(ttl > TtlFloor, $"expected a generous idle TTL, got {ttl}");
         }
@@ -88,14 +88,14 @@ namespace Game.Application.Tests.Services
 
             // Prime the cache, then shrink the TTL to a sliver to stand in for a key that has aged.
             await playerRepo.GetPlayer(playerEntity.Id);
-            await WaitForTtlAsync(db, playerKey);
+            await TtlPollingHelper.WaitForTtlAsync(db, playerKey);
             await db.KeyExpireAsync(playerKey, TimeSpan.FromSeconds(30));
 
             // A cache hit must slide the TTL back up to the full idle budget.
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            var ttl = await WaitForTtlAsync(db, playerKey, predicate: t => t > TtlFloor);
+            var ttl = await TtlPollingHelper.WaitForTtlAsync(db, playerKey, predicate: t => t > TtlFloor);
             Assert.NotNull(ttl);
             Assert.True(ttl > TtlFloor, $"expected the hit to refresh the TTL, got {ttl}");
         }
@@ -115,7 +115,7 @@ namespace Game.Application.Tests.Services
 
             // Prime the cache, then delete the key to simulate the TTL lapsing / an eviction.
             await playerRepo.GetPlayer(playerEntity.Id);
-            await WaitForTtlAsync(db, playerKey);
+            await TtlPollingHelper.WaitForTtlAsync(db, playerKey);
             await db.KeyDeleteAsync(playerKey);
             Assert.False(await db.KeyExistsAsync(playerKey));
 
@@ -124,7 +124,7 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(reloaded);
             Assert.Equal("Evicted", reloaded.Name);
 
-            var ttl = await WaitForTtlAsync(db, playerKey);
+            var ttl = await TtlPollingHelper.WaitForTtlAsync(db, playerKey);
             Assert.NotNull(ttl);
             Assert.True(ttl > TtlFloor, $"expected the reload to re-cache with a TTL, got {ttl}");
         }
@@ -151,21 +151,11 @@ namespace Game.Application.Tests.Services
             Assert.NotNull(player);
             Assert.Equal("Corrupted", player.Name);
 
-            var ttl = await WaitForTtlAsync(db, playerKey);
+            var ttl = await TtlPollingHelper.WaitForTtlAsync(db, playerKey);
             Assert.NotNull(ttl);
             Assert.True(ttl > TtlFloor, $"expected the self-heal reload to re-cache with a TTL, got {ttl}");
         }
 
         private static string PlayerKey(int playerId) => $"{Constants.CACHE_PLAYER_PREFIX}_{playerId}";
-
-        // Polls the key's TTL until it satisfies the predicate (defaults to "any TTL is set"), tolerating the
-        // fire-and-forget write not having landed yet. KeyTimeToLiveAsync returns null both for a missing key
-        // and a key with no expiry, so a non-null result proves an expiry is attached.
-        private static Task<TimeSpan?> WaitForTtlAsync(IDatabase db, string key, Func<TimeSpan, bool>? predicate = null)
-        {
-            predicate ??= _ => true;
-            return PollingHelper.PollUntilAsync(
-                () => db.KeyTimeToLiveAsync(key), ttl => ttl is not null && predicate(ttl.Value));
-        }
     }
 }
