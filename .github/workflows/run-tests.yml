@@ -166,8 +166,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
 
     - name: Install .NET Core
       uses: actions/setup-dotnet@v5
@@ -196,13 +194,6 @@ jobs:
       shell: pwsh
       run: ./build/coverage.ps1 -NoBuild
 
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: backend-test-results
-        path: '**/TestResults/'
-
     - name: Upload coverage report
       if: always()
       uses: actions/upload-artifact@v7
@@ -225,8 +216,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
 
     - name: Set up Node
       uses: actions/setup-node@v6
@@ -272,8 +261,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
 
     - name: Start backing stack (API + Postgres + Redis)
       # Build is parallelized across the matrix jobs, so it stays off the serial critical path.

@@ -16,6 +16,5 @@
       "line": 94,
       "branch": 92
     }
-  },
-  "measureOnly": ["Game.Api", "Game.Infrastructure", "Game.Abstractions"]
+  }
 }
