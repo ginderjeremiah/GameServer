@@ -1,4 +1,6 @@
 using Game.Infrastructure.Redis;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Game.Infrastructure.Tests
@@ -111,7 +113,7 @@ namespace Game.Infrastructure.Tests
             cache["cache:6379"] = first;
             cache["pubsub:6380"] = second;
 
-            await RedisMultiplexerFactory.DisposeAllAsync(cache, syncRoot);
+            await RedisMultiplexerFactory.DisposeAllAsync(cache, syncRoot, NullLogger.Instance);
 
             // Every cached connection is disposed and the cache is emptied so a later request reconnects fresh —
             // the graceful-shutdown teardown the hosted service drives.
@@ -125,19 +127,84 @@ namespace Game.Infrastructure.Tests
         {
             var cache = new Dictionary<string, FakeAsyncDisposable>();
 
-            await RedisMultiplexerFactory.DisposeAllAsync(cache, new object());
+            await RedisMultiplexerFactory.DisposeAllAsync(cache, new object(), NullLogger.Instance);
 
             Assert.Empty(cache);
         }
 
-        private sealed class FakeAsyncDisposable : IAsyncDisposable
+        [Fact]
+        public async Task DisposeAllAsync_OneEntryFaultsOnDispose_StillDisposesTheRestAndClearsTheCache()
+        {
+            var cache = new Dictionary<string, FakeAsyncDisposable>();
+            var syncRoot = new object();
+            var faulting = new FakeAsyncDisposable(throwOnDispose: true);
+            var healthy = new FakeAsyncDisposable();
+            cache["cache:6379"] = faulting;
+            cache["pubsub:6380"] = healthy;
+            var logger = new CapturingLogger();
+
+            // The contract documented on DisposeAllAsync: one faulting close must not abort the rest of the drain,
+            // and must not throw out of the caller (the host's graceful-shutdown hook).
+            await RedisMultiplexerFactory.DisposeAllAsync(cache, syncRoot, logger);
+
+            Assert.Equal(1, faulting.DisposeCount);
+            Assert.Equal(1, healthy.DisposeCount);
+            Assert.Empty(cache);
+
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Error, entry.Level);
+            Assert.NotNull(entry.Exception);
+        }
+
+        private sealed class FakeAsyncDisposable(bool throwOnDispose = false) : IAsyncDisposable
         {
             public int DisposeCount { get; private set; }
 
             public ValueTask DisposeAsync()
             {
                 DisposeCount++;
+                if (throwOnDispose)
+                {
+                    throw new InvalidOperationException("redis close wedged");
+                }
+
                 return ValueTask.CompletedTask;
+            }
+        }
+
+        // A minimal capturing logger mirroring RedisCommandBudgetTests' CapturingLogger: the dispose-loop's only
+        // observable effect on a faulting entry is the error log, so the level and exception presence are recorded.
+        private sealed class CapturingLogger : ILogger
+        {
+            private readonly object _gate = new();
+            private readonly List<(LogLevel Level, Exception? Exception)> _entries = [];
+
+            public IReadOnlyList<(LogLevel Level, Exception? Exception)> Entries
+            {
+                get
+                {
+                    lock (_gate)
+                    {
+                        return _entries.ToList();
+                    }
+                }
+            }
+
+            public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                lock (_gate)
+                {
+                    _entries.Add((logLevel, exception));
+                }
+            }
+
+            private sealed class NullScope : IDisposable
+            {
+                public static readonly NullScope Instance = new();
+                public void Dispose() { }
             }
         }
     }
