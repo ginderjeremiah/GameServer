@@ -628,6 +628,24 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task UnbanUser_AlreadyUnbanned_IsANoOpSuccess()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int targetId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var target = await TestDataSeeder.CreateUserAsync(context, "neverbanned", "pw");
+                targetId = target.Id;
+            }
+
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnbanUser", new { UserId = targetId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
         public async Task AdminUsers_Unauthenticated_Returns401()
         {
             var response = await Client.GetAsync("/api/AdminTools/GetUsers", CancellationToken);
