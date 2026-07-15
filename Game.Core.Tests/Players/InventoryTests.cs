@@ -335,6 +335,70 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
+        public void TryApplyMod_SameModAlreadyOnAnotherSlot_ReturnsFalseAndDoesNotMutate()
+        {
+            // Anti-cheat: the client's mod picker forbids applying the same mod to a second slot of one
+            // item (#1994); the server must reject a tampered client that sends it anyway.
+            var inventory = new Inventory();
+            var item = MakeItem(1, modSlots:
+            [
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 1, Type = EItemModType.Prefix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix));
+
+            var result = inventory.TryApplyMod(1, 10, 1, MakeMod(10, EItemModType.Prefix));
+
+            Assert.False(result);
+            var applied = inventory.UnlockedItems.Single().AppliedMods;
+            Assert.Single(applied);
+            Assert.Equal(0, applied[0].ItemModSlotId);
+        }
+
+        [Fact]
+        public void TryApplyMod_SameModReappliedToSameSlot_Succeeds()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, modSlots:
+            [
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix));
+
+            var result = inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix));
+
+            Assert.True(result);
+            var applied = inventory.UnlockedItems.Single().AppliedMods;
+            Assert.Single(applied);
+            Assert.Equal(10, applied[0].ItemModId);
+        }
+
+        [Fact]
+        public void TryApplyMod_DifferentModsOnDifferentSlots_Succeeds()
+        {
+            var inventory = new Inventory();
+            var item = MakeItem(1, modSlots:
+            [
+                new ItemModSlot { Id = 0, Type = EItemModType.Prefix },
+                new ItemModSlot { Id = 1, Type = EItemModType.Prefix },
+            ]);
+            AddUnlockedItem(inventory, item);
+            inventory.UnlockMod(10);
+            inventory.UnlockMod(11);
+            inventory.TryApplyMod(1, 10, 0, MakeMod(10, EItemModType.Prefix));
+
+            var result = inventory.TryApplyMod(1, 11, 1, MakeMod(11, EItemModType.Prefix));
+
+            Assert.True(result);
+            var applied = inventory.UnlockedItems.Single().AppliedMods;
+            Assert.Equal(2, applied.Count);
+        }
+
+        [Fact]
         public void TryApplyMod_ItemNotUnlocked_ReturnsFalse()
         {
             var inventory = new Inventory();
