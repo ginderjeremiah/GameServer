@@ -101,6 +101,8 @@ export type ApiResponseTypes = {
 	'AdminTools/SetTagsForItemMod': undefined;
 	'AdminTools/SetUserRoles': undefined;
 	'AdminTools/SetZoneEnemies': undefined;
+	'AdminTools/UnarchiveUser': undefined;
+	'AdminTools/UnbanUser': undefined;
 	'Login': ILoginResult;
 	'Login/ActiveSession': IActiveSessionResult;
 	'Login/CharacterCreationData': ICreatableClass[];
@@ -159,6 +161,8 @@ export type ApiRequestTypes = {
 	'AdminTools/SetTagsForItemMod': ISetTagsData;
 	'AdminTools/SetUserRoles': ISetUserRolesData;
 	'AdminTools/SetZoneEnemies': ISetZoneEnemiesData;
+	'AdminTools/UnarchiveUser': IUserActionData;
+	'AdminTools/UnbanUser': IUserActionData;
 	'Login': ILoginCredentials;
 	'Login/CreateAccount': ICreateAccountRequest;
 	'Login/CreatePlayer': ICreatePlayerRequest;

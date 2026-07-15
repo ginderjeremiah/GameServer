@@ -439,6 +439,213 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task UnarchiveUser_RestoresActiveState()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int recoveredId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var recovered = await TestDataSeeder.CreateUserAsync(context, "recovered", "pw");
+                recoveredId = recovered.Id;
+            }
+
+            var archive = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = recoveredId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, archive.StatusCode);
+
+            var unarchive = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnarchiveUser", new { UserId = recoveredId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, unarchive.StatusCode);
+
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var reloaded = await context2.Users.AsNoTracking().FirstAsync(u => u.Id == recoveredId, CancellationToken);
+            Assert.Null(reloaded.ArchivedAt);
+        }
+
+        [Fact]
+        public async Task UnarchiveUser_UsernameClaimedByAnotherActiveAccount_ReturnsErrorAndDoesNotUnarchive()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int recycledId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var recycled = await TestDataSeeder.CreateUserAsync(context, "recycler", "pw");
+                recycledId = recycled.Id;
+            }
+
+            var archive = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = recycledId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, archive.StatusCode);
+
+            // The freed username is claimed by a brand-new active account before the original is unarchived.
+            var createResponse = await Client.PostAsJsonAsync(
+                "/api/Login/CreateAccount", new { Username = "recycler", Password = "newpass" }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+            var unarchive = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnarchiveUser", new { UserId = recycledId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, unarchive.StatusCode);
+            var result = await unarchive.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal(
+                "Username is now in use by another active account. Rename that account before unarchiving this one.",
+                result?.ErrorMessage);
+
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var reloaded = await context2.Users.AsNoTracking().FirstAsync(u => u.Id == recycledId, CancellationToken);
+            Assert.NotNull(reloaded.ArchivedAt);
+        }
+
+        [Fact]
+        public async Task UnarchiveUser_TargetingSelf_IsRejectedAndDoesNotUnarchive()
+        {
+            var (authClient, adminId) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+
+            // Drive the repository directly to simulate a still-valid session token for an admin who was
+            // archived by someone else — the archive itself isn't reachable via the endpoint (self-target).
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var admin = await context.Users.FirstAsync(u => u.Id == adminId, CancellationToken);
+                admin.ArchivedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/UnarchiveUser", new { UserId = adminId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal("You cannot unarchive your own account.", result?.ErrorMessage);
+
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var reloaded = await context2.Users.AsNoTracking().FirstAsync(u => u.Id == adminId, CancellationToken);
+            Assert.NotNull(reloaded.ArchivedAt);
+        }
+
+        [Fact]
+        public async Task UnarchiveUser_UnknownUser_ReturnsError()
+        {
+            using var authClient = await SetupAdminClientAsync();
+
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnarchiveUser", new { UserId = 999999 }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal("User not found.", result?.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task UnarchiveUser_AlreadyActive_IsANoOpSuccess()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int targetId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var target = await TestDataSeeder.CreateUserAsync(context, "neveraliened", "pw");
+                targetId = target.Id;
+            }
+
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnarchiveUser", new { UserId = targetId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UnbanUser_ClearsBannedState()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int forgivenId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var forgiven = await TestDataSeeder.CreateUserAsync(context, "forgiven", "pw");
+                forgivenId = forgiven.Id;
+            }
+
+            var ban = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/BanUser", new { UserId = forgivenId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, ban.StatusCode);
+
+            var unban = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnbanUser", new { UserId = forgivenId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, unban.StatusCode);
+
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var reloaded = await context2.Users.AsNoTracking().FirstAsync(u => u.Id == forgivenId, CancellationToken);
+            Assert.Null(reloaded.BannedAt);
+        }
+
+        [Fact]
+        public async Task UnbanUser_TargetingSelf_IsRejectedAndDoesNotUnban()
+        {
+            var (authClient, adminId) = await SetupAdminClientWithIdAsync();
+            using var client = authClient;
+
+            // Drive the ban directly, simulating a still-valid session token for an admin banned by someone
+            // else — the ban itself isn't reachable via the endpoint (self-target).
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var admin = await context.Users.FirstAsync(u => u.Id == adminId, CancellationToken);
+                admin.BannedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            var response = await client.PostAsJsonAsync(
+                "/api/AdminTools/UnbanUser", new { UserId = adminId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal("You cannot unban your own account.", result?.ErrorMessage);
+
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var reloaded = await context2.Users.AsNoTracking().FirstAsync(u => u.Id == adminId, CancellationToken);
+            Assert.NotNull(reloaded.BannedAt);
+        }
+
+        [Fact]
+        public async Task UnbanUser_UnknownUser_ReturnsError()
+        {
+            using var authClient = await SetupAdminClientAsync();
+
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnbanUser", new { UserId = 999999 }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.Equal("User not found.", result?.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task UnbanUser_AlreadyUnbanned_IsANoOpSuccess()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            int targetId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var target = await TestDataSeeder.CreateUserAsync(context, "neverbanned", "pw");
+                targetId = target.Id;
+            }
+
+            var response = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/UnbanUser", new { UserId = targetId }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
         public async Task AdminUsers_Unauthenticated_Returns401()
         {
             var response = await Client.GetAsync("/api/AdminTools/GetUsers", CancellationToken);
@@ -750,6 +957,47 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(1, results.Count(r => r == UserActionStatus.Success));
             Assert.Equal(1, results.Count(r => r == UserActionStatus.LastAdmin));
             Assert.Equal(1, await CountUsableAdminsAsync());
+        }
+
+        [Fact]
+        public async Task UnarchiveUser_ConcurrentUnarchiveOfTwoAccountsSharingAnArchivedUsername_LeavesExactlyOneActive()
+        {
+            // The partial unique index only covers active rows, so two archived accounts can share a
+            // username. Unarchiving both concurrently races on which one claims it back as active — the
+            // in-tier commit's unique-violation catch must let exactly one through, not both/neither.
+            int firstId;
+            int secondId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var first = await TestDataSeeder.CreateUserAsync(context, "sharedname", "pw");
+                first.ArchivedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(CancellationToken);
+                firstId = first.Id;
+
+                var second = await TestDataSeeder.CreateUserAsync(context, "sharedname", "pw");
+                second.ArchivedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(CancellationToken);
+                secondId = second.Id;
+            }
+
+            async Task<UserActionStatus> UnarchiveAsync(int targetId)
+            {
+                using var scope = CreateScope();
+                var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+                return await users.UnarchiveUser(0, targetId, CancellationToken);
+            }
+
+            var results = await Task.WhenAll(UnarchiveAsync(firstId), UnarchiveAsync(secondId));
+
+            Assert.Equal(1, results.Count(r => r == UserActionStatus.Success));
+            Assert.Equal(1, results.Count(r => r == UserActionStatus.UsernameTaken));
+
+            using var scope2 = CreateScope();
+            var context2 = scope2.ServiceProvider.GetRequiredService<GameContext>();
+            var activeCount = await context2.Users.CountAsync(
+                u => u.Username == "sharedname" && u.ArchivedAt == null, CancellationToken);
+            Assert.Equal(1, activeCount);
         }
 
         private async Task<(int FirstAdminId, int SecondAdminId, int ActorId)> SeedTwoAdminsAndGhostActorAsync()
