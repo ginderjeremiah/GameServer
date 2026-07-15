@@ -1,7 +1,6 @@
 ﻿using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Game.Api.Filters
 {
@@ -19,7 +18,7 @@ namespace Game.Api.Filters
         public void OnResultExecuting(ResultExecutingContext context)
         {
             if (context.HttpContext.Response.StatusCode == StatusCodes.Status200OK
-                && TryGetError(context.Result, out var response))
+                && ApiResponseErrors.TryGetError(context.Result, out var response))
             {
                 context.HttpContext.Response.StatusCode = StatusForCategory(response.ErrorCategory);
             }
@@ -40,25 +39,6 @@ namespace Game.Api.Filters
                 ApiErrorCategory.TooManyRequests => StatusCodes.Status429TooManyRequests,
                 _ => StatusCodes.Status400BadRequest,
             };
-        }
-
-        /// <summary>
-        /// Determines whether the given <paramref name="result"/> carries an <see cref="IApiResponse"/> with
-        /// a non-empty <see cref="IApiResponse.ErrorMessage"/>, surfacing the response so its category can
-        /// steer the status code.
-        /// </summary>
-        private static bool TryGetError(IActionResult result, [NotNullWhen(true)] out IApiResponse? response)
-        {
-            if (result is ObjectResult objectResult
-                && objectResult.Value is IApiResponse apiResponse
-                && apiResponse.ErrorMessage is not null and not "")
-            {
-                response = apiResponse;
-                return true;
-            }
-
-            response = null;
-            return false;
         }
     }
 }
