@@ -1,4 +1,5 @@
 using Game.Abstractions.DataAccess;
+using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Game.Api.Filters
@@ -10,7 +11,9 @@ namespace Game.Api.Filters
     /// preserving the Workbench's read-your-writes guarantee. A reload failure after a successful write
     /// surfaces as an error on the admin response (the write persisted; the admin can retry). The write is
     /// also broadcast to every other API instance (<see cref="IReferenceDataChangeNotifier"/>), each of which
-    /// reacts with a debounced background reload of its own caches (#359).
+    /// reacts with a debounced background reload of its own caches (#359). A rejected write (an
+    /// <see cref="IApiResponse"/> error result — a retirement-guard or validation rejection that changed
+    /// nothing per the admin repos' documented contract) skips both the broadcast and the reload.
     /// </summary>
     /// <remarks>
     /// Apply via <see cref="ReloadReferenceCachesAttribute"/> rather than a bare
@@ -43,7 +46,8 @@ namespace Game.Api.Filters
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             var executedContext = await next();
-            if (executedContext.Exception is null || executedContext.ExceptionHandled)
+            if ((executedContext.Exception is null || executedContext.ExceptionHandled)
+                && !ApiResponseErrors.TryGetError(executedContext.Result, out _))
             {
                 // Broadcast first: the write is already committed at this point (this filter runs outside
                 // CommitFilter), so other instances can begin their background reloads while this instance
