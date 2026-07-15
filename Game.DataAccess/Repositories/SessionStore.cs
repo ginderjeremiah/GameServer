@@ -2,6 +2,8 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Core.Players;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 
 namespace Game.DataAccess.Repositories
@@ -26,16 +28,33 @@ namespace Game.DataAccess.Repositories
         private static readonly TimeSpan SessionCacheTtl = AuthConstants.RefreshTokenLifetime;
 
         private readonly ICacheService _cache;
+        private readonly ILogger<SessionStore> _logger;
 
-        public SessionStore(ICacheService cache)
+        public SessionStore(ICacheService cache, ILogger<SessionStore> logger)
         {
             _cache = cache;
+            _logger = logger;
         }
 
         public async Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default)
         {
             var sessionKey = SessionKey(userId);
-            var session = await _cache.Get<PlayerState>(sessionKey, cancellationToken);
+            PlayerState? session;
+            try
+            {
+                session = await _cache.Get<PlayerState>(sessionKey, cancellationToken);
+            }
+            catch (JsonException ex)
+            {
+                // A blob that no longer deserializes is corruption, not data: the session is reconstructable
+                // (SessionInitializer rehydrates it in-memory from the token's selected-player claim), so this
+                // self-heals the same way a corrupt player cache entry does - delete it and treat this read as
+                // a miss instead of throwing on every access for the rest of the TTL (#1924).
+                _logger.LogError(ex, "Cached session for user {UserId} at key '{Key}' failed to deserialize; deleting the key.", userId, sessionKey);
+                await _cache.Delete(sessionKey, cancellationToken);
+                return null;
+            }
+
             if (session is not null)
             {
                 // Sliding expiration: a read refreshes the idle TTL so an active session never ages out.
