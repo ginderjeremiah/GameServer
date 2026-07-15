@@ -23,9 +23,12 @@ namespace Game.Abstractions.DataAccess
 
     /// <summary>
     /// Outcome of a single-user lifecycle action (<see cref="IUsers.ArchiveUser"/> /
-    /// <see cref="IUsers.BanUser"/>), so the caller can surface the appropriate message. The data tier
-    /// enforces the admin-lockout rules: an admin cannot target their own account, nor take the last
-    /// usable admin out of circulation.
+    /// <see cref="IUsers.BanUser"/> / <see cref="IUsers.UnarchiveUser"/> / <see cref="IUsers.UnbanUser"/>),
+    /// so the caller can surface the appropriate message. The data tier always rejects an admin targeting
+    /// their own account with this action (self-reversal included — a banned/archived admin's still-valid
+    /// session token would otherwise let them undo the action against themselves before it expires); the
+    /// archive/ban lockout rules additionally guard against taking the last usable admin out of
+    /// circulation, which reinstating can never do.
     /// </summary>
     public enum UserActionStatus
     {
@@ -37,6 +40,11 @@ namespace Game.Abstractions.DataAccess
 
         /// <summary>The action would have taken the last usable admin out of circulation.</summary>
         LastAdmin,
+
+        /// <summary>
+        /// Unarchiving would collide with an active account that has since claimed the freed username.
+        /// </summary>
+        UsernameTaken,
     }
 
     /// <summary>
@@ -166,5 +174,26 @@ namespace Game.Abstractions.DataAccess
         /// <see cref="UserActionStatus.UserNotFound"/> if the user does not exist.
         /// </summary>
         Task<UserActionStatus> BanUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Reverses <see cref="ArchiveUser"/>: clears the target's archived state, restoring their username
+        /// to active-uniqueness enforcement. Rejects the acting admin targeting their own account
+        /// (<see cref="UserActionStatus.SelfTarget"/>) and <see cref="UserActionStatus.UserNotFound"/> if the
+        /// user does not exist. Since archiving frees the username, another active account may have claimed
+        /// it in the meantime; unarchiving then returns <see cref="UserActionStatus.UsernameTaken"/> rather
+        /// than silently renaming either account — the admin must resolve the collision first. Reinstating
+        /// never reduces the usable-admin pool, so unlike <see cref="ArchiveUser"/> there is no last-admin
+        /// guard. A no-op (already active) target returns <see cref="UserActionStatus.Success"/>.
+        /// </summary>
+        Task<UserActionStatus> UnarchiveUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Reverses <see cref="BanUser"/>: clears the target's banned state. Rejects the acting admin
+        /// targeting their own account (<see cref="UserActionStatus.SelfTarget"/>) and returns
+        /// <see cref="UserActionStatus.UserNotFound"/> if the user does not exist. Reinstating never reduces
+        /// the usable-admin pool, so unlike <see cref="BanUser"/> there is no last-admin guard. A no-op
+        /// (already unbanned) target returns <see cref="UserActionStatus.Success"/>.
+        /// </summary>
+        Task<UserActionStatus> UnbanUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default);
     }
 }

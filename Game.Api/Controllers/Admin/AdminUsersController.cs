@@ -10,8 +10,9 @@ namespace Game.Api.Controllers.Admin
 {
     /// <summary>
     /// Admin endpoints for managing user accounts: searching the roster, listing roles, updating a
-    /// user's roles, and archiving (soft-deleting) or banning a user. Like the other admin controllers
-    /// these share the <c>/api/AdminTools/*</c> route prefix and require the <c>Admin</c> role.
+    /// user's roles, and archiving/banning a user (and reversing either via unarchive/unban). Like the
+    /// other admin controllers these share the <c>/api/AdminTools/*</c> route prefix and require the
+    /// <c>Admin</c> role.
     /// </summary>
     /// <remarks>
     /// Unlike the reference-data admin controllers, this one does not carry
@@ -87,6 +88,34 @@ namespace Game.Api.Controllers.Admin
         {
             var status = await _users.BanUser(_session.UserId, data.UserId, HttpContext.RequestAborted);
             return MapUserAction(status, "You cannot ban your own account.", "Cannot ban the last remaining admin.");
+        }
+
+        [HttpPost]
+        public async Task<ApiResponse> UnarchiveUser([FromBody] UserActionData data)
+        {
+            var status = await _users.UnarchiveUser(_session.UserId, data.UserId, HttpContext.RequestAborted);
+            return status switch
+            {
+                UserActionStatus.Success => ApiResponse.Success(),
+                UserActionStatus.UserNotFound => ApiResponse.Error("User not found."),
+                UserActionStatus.SelfTarget => ApiResponse.Error("You cannot unarchive your own account."),
+                UserActionStatus.UsernameTaken => ApiResponse.Error(
+                    "Username is now in use by another active account. Rename that account before unarchiving this one."),
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
+        }
+
+        [HttpPost]
+        public async Task<ApiResponse> UnbanUser([FromBody] UserActionData data)
+        {
+            var status = await _users.UnbanUser(_session.UserId, data.UserId, HttpContext.RequestAborted);
+            return status switch
+            {
+                UserActionStatus.Success => ApiResponse.Success(),
+                UserActionStatus.UserNotFound => ApiResponse.Error("User not found."),
+                UserActionStatus.SelfTarget => ApiResponse.Error("You cannot unban your own account."),
+                _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+            };
         }
 
         private static ApiResponse MapUserAction(UserActionStatus status, string selfTargetMessage, string lastAdminMessage)

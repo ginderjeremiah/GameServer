@@ -372,6 +372,77 @@ namespace Game.DataAccess.Repositories
             return UserActionStatus.Success;
         }
 
+        public async Task<UserActionStatus> UnarchiveUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default)
+        {
+            if (AdminLockoutPolicy.IsSelfTarget(actingUserId, targetUserId))
+            {
+                return UserActionStatus.SelfTarget;
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
+            if (user is null)
+            {
+                return UserActionStatus.UserNotFound;
+            }
+
+            if (user.ArchivedAt is null)
+            {
+                return UserActionStatus.Success;
+            }
+
+            // Archiving frees the username, so another active account may have claimed it since. Check up
+            // front for the common case, then still guard the save itself (below) against the rarer race of
+            // a concurrent claim landing between this check and the commit.
+            var usernameTaken = await _context.Users.AnyAsync(
+                u => u.Id != targetUserId && u.Username == user.Username && u.ArchivedAt == null, cancellationToken);
+            if (usernameTaken)
+            {
+                return UserActionStatus.UsernameTaken;
+            }
+
+            user.ArchivedAt = null;
+
+            try
+            {
+                // Commit here (like CreateAccount) rather than deferring to the per-request unit of work, so
+                // a concurrent claim of this username that slips past the check above still surfaces as
+                // UsernameTaken instead of an unhandled 500 from the deferred commit filter.
+                await _context.SaveChangesAsync(cancellationToken);
+                return UserActionStatus.Success;
+            }
+            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+            {
+                _context.ChangeTracker.Clear();
+                return UserActionStatus.UsernameTaken;
+            }
+        }
+
+        public Task<UserActionStatus> UnbanUser(int actingUserId, int targetUserId, CancellationToken cancellationToken = default)
+        {
+            return ClearUserTimestamp(actingUserId, targetUserId, user => user.BannedAt = null, cancellationToken);
+        }
+
+        private async Task<UserActionStatus> ClearUserTimestamp(int actingUserId, int targetUserId, Action<UserEntity> clearTimestamp, CancellationToken cancellationToken)
+        {
+            // Reinstating never reduces the usable-admin pool, so unlike archive/ban this only needs the
+            // self-target guard — not the last-admin check — but still needs it: without it, a banned/archived
+            // admin's still-valid session token (bans/archives are enforced at login, not re-checked per
+            // request) would let them undo the action against themselves before the token expires.
+            if (AdminLockoutPolicy.IsSelfTarget(actingUserId, targetUserId))
+            {
+                return UserActionStatus.SelfTarget;
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == targetUserId, cancellationToken);
+            if (user is null)
+            {
+                return UserActionStatus.UserNotFound;
+            }
+
+            clearTimestamp(user);
+            return UserActionStatus.Success;
+        }
+
         /// <summary>
         /// Whether any usable admin other than <paramref name="excludingUserId"/> remains. A usable admin
         /// can still log in to recover the instance, so it must be neither archived nor banned. Shared by
