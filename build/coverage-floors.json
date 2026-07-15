@@ -15,6 +15,16 @@
       ],
       "line": 94,
       "branch": 92
+    },
+    "Game.Infrastructure (Redis)": {
+      "assembly": "Game.Infrastructure",
+      "namespaces": [
+        "Game.Infrastructure.Redis",
+        "Game.Infrastructure.PubSub.Redis",
+        "Game.Infrastructure.Cache.Redis"
+      ],
+      "line": 95,
+      "branch": 91
     }
   }
 }
