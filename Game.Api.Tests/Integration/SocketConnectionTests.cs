@@ -91,8 +91,12 @@ namespace Game.Api.Tests.Integration
             // with no cached session is a different, authenticated case; see the rehydration test below.)
             var wsClient = Factory.Server.CreateWebSocketClient();
 
-            await Assert.ThrowsAnyAsync<Exception>(
+            // The TestServer client throws InvalidOperationException with the rejected status code baked
+            // into the message when the handshake doesn't complete with a 101 — tightened from ThrowsAny so
+            // this can't pass on, say, a 500 as readily as the intended 401-rejected upgrade.
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => wsClient.ConnectAsync(new Uri("ws://localhost/socket"), CancellationToken));
+            Assert.Contains("401", ex.Message);
         }
 
         [Fact]

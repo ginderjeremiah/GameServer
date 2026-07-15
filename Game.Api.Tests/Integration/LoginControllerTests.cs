@@ -1210,7 +1210,7 @@ namespace Game.Api.Tests.Integration
         {
             // No bearer token — a pre-authentication request never reaches the creatable-class payload.
             var response = await Client.GetAsync("/api/Login/CharacterCreationData", CancellationToken);
-            Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
     }
 }

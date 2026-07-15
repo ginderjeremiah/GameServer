@@ -9,6 +9,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using System.Net.WebSockets;
 using Xunit;
 
 namespace Game.Api.Tests.Integration
@@ -56,6 +57,15 @@ namespace Game.Api.Tests.Integration
             // SocketReplaced is emitted with no command Id, so it surfaces as a null-Id server push.
             var replaced = await socketA.WaitForResponseAsync(null);
             Assert.Equal(nameof(SocketReplaced), replaced.Name);
+
+            // ...the superseded connection is actually closed, not just notified (#1959): dropping or
+            // reordering the Close() call inside SocketReplaced.ExecuteAsync would leave two live sockets
+            // for one player — the exact condition the single-connection model exists to prevent — with
+            // every assertion above this one still passing.
+            var (closeStatus, closeDescription) = await socketA.WaitForCloseAsync();
+            Assert.Equal(WebSocketState.Closed, socketA.State);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, closeStatus);
+            Assert.Equal(ESocketCloseReason.SocketReplaced.GetDescription(), closeDescription);
 
             // ...and the presence key now points at the new socket rather than the old one.
             await socketB.SendCommandAsync<object>("GetStatisticTypes");
