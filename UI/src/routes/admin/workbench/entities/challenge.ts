@@ -2,7 +2,7 @@ import { ApiRequest, EChallengeType, EEntityType, fetchSocketData, type IChallen
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { persistEntity } from '../save-helpers';
-import { challengeSentence, deriveFromType, fmtNum } from './challenge-helpers';
+import { challengeSentence, deriveFromType, fmtNum, typeBossOnly } from './challenge-helpers';
 import type { EntityConfig } from './types';
 
 // Challenges load over the socket; the admin filter invalidates this cache on every
@@ -95,6 +95,12 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 				}
 				if (c.entityType === EEntityType.DamageType && c.targetEntityId == null) {
 					return 'Must target a damage type — this statistic has no global total';
+				}
+				// The target picker keeps a boss target visible even if it's since lost the
+				// boss flag (reference.entityOptions' `keep` exception); flag that drift here.
+				const target = c.targetEntityId != null ? staticData.enemies?.[c.targetEntityId] : undefined;
+				if (target && typeBossOnly(reference.challengeTypes, c.challengeTypeId) && !target.isBoss) {
+					return 'Target enemy is no longer flagged as a boss';
 				}
 				return null;
 			}

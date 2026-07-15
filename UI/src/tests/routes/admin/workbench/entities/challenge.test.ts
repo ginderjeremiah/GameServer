@@ -137,5 +137,55 @@ describe('challengeEntity', () => {
 			const c = { ...challengeEntity.newItem(1), entityType: EEntityType.Enemy, targetEntityId: undefined };
 			expect(conditionWarn?.(c)).toBeNull();
 		});
+
+		it('flags a boss-only target enemy that has since lost its boss flag (#1996)', () => {
+			const bossOnlyType: IChallengeType = {
+				id: EChallengeType.BossesDefeated,
+				name: 'Bosses Defeated',
+				goalComparison: EChallengeGoalComparison.AtLeast,
+				statisticType: {
+					id: EStatisticType.EnemiesKilled,
+					entityType: EEntityType.Enemy,
+					bossOnly: true,
+					name: 'Bosses Defeated'
+				}
+			};
+			reference.challengeTypes = [...TYPES, bossOnlyType];
+			const enemies: unknown[] = [];
+			enemies[7] = { id: 7, name: 'Warden', isBoss: false };
+			staticData.enemies = enemies;
+			const c = {
+				...challengeEntity.newItem(1),
+				challengeTypeId: bossOnlyType.id,
+				entityType: EEntityType.Enemy,
+				targetEntityId: 7
+			};
+			expect(conditionWarn?.(c)).toBe('Target enemy is no longer flagged as a boss');
+		});
+
+		it('passes a boss-only target that still has the boss flag', () => {
+			const bossOnlyType: IChallengeType = {
+				id: EChallengeType.BossesDefeated,
+				name: 'Bosses Defeated',
+				goalComparison: EChallengeGoalComparison.AtLeast,
+				statisticType: {
+					id: EStatisticType.EnemiesKilled,
+					entityType: EEntityType.Enemy,
+					bossOnly: true,
+					name: 'Bosses Defeated'
+				}
+			};
+			reference.challengeTypes = [...TYPES, bossOnlyType];
+			const enemies: unknown[] = [];
+			enemies[7] = { id: 7, name: 'Warden', isBoss: true };
+			staticData.enemies = enemies;
+			const c = {
+				...challengeEntity.newItem(1),
+				challengeTypeId: bossOnlyType.id,
+				entityType: EEntityType.Enemy,
+				targetEntityId: 7
+			};
+			expect(conditionWarn?.(c)).toBeNull();
+		});
 	});
 });
