@@ -17,9 +17,6 @@ export type WorkbenchProficiency = IProficiency;
 /** The "no skill" sentinel for the milestone reward-skill select (-1 ⇒ no skill chosen / cleared). */
 export const NO_SKILL = -1;
 
-/** The two record kinds the progression editor authors. */
-export type ProgressionKind = 'path' | 'tier';
-
 /** A detail-pane tab descriptor (shared header chrome). */
 export interface ProgressionTab {
 	key: string;
