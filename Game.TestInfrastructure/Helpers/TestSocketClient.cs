@@ -102,6 +102,25 @@ namespace Game.TestInfrastructure.Helpers
             return ReadUntilAsync(m => m.Deserialize<ApiSocketResponse>(), r => r.Id == commandId);
         }
 
+        /// <summary>
+        /// Reads the next frame — expected to be a server-initiated close (e.g. right after a push like
+        /// <c>SocketReplaced</c> that closes the connection) — and completes the closing handshake so
+        /// <see cref="State"/> settles at <see cref="WebSocketState.Closed"/> rather than lingering in
+        /// <see cref="WebSocketState.CloseReceived"/>. Returns the status/description the server sent.
+        /// </summary>
+        public async Task<(WebSocketCloseStatus? Status, string? Description)> WaitForCloseAsync()
+        {
+            var buffer = new byte[4096];
+            await _socket.ReceiveAsync(buffer, _cts.Token);
+
+            if (_socket.State == WebSocketState.CloseReceived)
+            {
+                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, _cts.Token);
+            }
+
+            return (_socket.CloseStatus, _socket.CloseStatusDescription);
+        }
+
         public async Task CloseAsync()
         {
             if (_socket.State == WebSocketState.Open)
