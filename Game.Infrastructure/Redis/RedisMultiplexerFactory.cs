@@ -1,5 +1,7 @@
 ﻿using Game.Infrastructure.Cache;
 using Game.Infrastructure.PubSub;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using StackExchange.Redis;
 
 namespace Game.Infrastructure.Redis
@@ -49,18 +51,19 @@ namespace Game.Infrastructure.Redis
         /// lifetime connections are torn down cleanly on stop rather than left to be force-killed (#954). Each
         /// connection is closed independently so one faulting close still lets the rest tear down.
         /// </summary>
-        public static Task DisposeAllAsync()
+        public static Task DisposeAllAsync(ILogger logger)
         {
-            return DisposeAllAsync(_multiplexers, _lock);
+            return DisposeAllAsync(_multiplexers, _lock, logger);
         }
 
         /// <summary>
         /// Locked drain-and-dispose of a multiplexer cache: snapshots the values under <paramref name="syncRoot"/>,
         /// clears the cache, then disposes each entry. Generic and seam-extracted so the dispose/clear semantics
         /// are unit-testable with a fake disposable, mirroring how <see cref="GetOrAdd{T}"/> is tested without a
-        /// live connection (#954).
+        /// live connection (#954). Each entry's dispose is wrapped independently so a faulting close is logged and
+        /// skipped rather than aborting the rest of the drain.
         /// </summary>
-        internal static async Task DisposeAllAsync<T>(Dictionary<string, T> cache, object syncRoot)
+        internal static async Task DisposeAllAsync<T>(Dictionary<string, T> cache, object syncRoot, ILogger logger)
             where T : IAsyncDisposable
         {
             List<T> toDispose;
@@ -72,7 +75,14 @@ namespace Game.Infrastructure.Redis
 
             foreach (var disposable in toDispose)
             {
-                await disposable.DisposeAsync();
+                try
+                {
+                    await disposable.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to close a cached Redis multiplexer during shutdown; continuing to close the rest.");
+                }
             }
         }
 
@@ -103,7 +113,7 @@ namespace Game.Infrastructure.Redis
         // duplicated the logic with synchronous Dispose() where the production seam uses DisposeAsync()).
         internal static Task ResetForTesting()
         {
-            return DisposeAllAsync();
+            return DisposeAllAsync(NullLogger.Instance);
         }
 
         /// <summary>

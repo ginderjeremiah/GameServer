@@ -132,42 +132,5 @@ namespace Game.Infrastructure.Tests
             Assert.Equal(42, result);
             Assert.Empty(logger.Entries);
         }
-
-        // A minimal capturing logger: the fault continuation's only observable effect is the error log, so the
-        // level and whether an exception was carried are recorded. ExecuteSynchronously means a fault drives the
-        // continuation inline on the SetException call, so the captured entry is visible without extra waiting.
-        private sealed class CapturingLogger : ILogger
-        {
-            private readonly object _gate = new();
-            private readonly List<(LogLevel Level, Exception? Exception)> _entries = [];
-
-            public IReadOnlyList<(LogLevel Level, Exception? Exception)> Entries
-            {
-                get
-                {
-                    lock (_gate)
-                    {
-                        return _entries.ToList();
-                    }
-                }
-            }
-
-            public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
-            public bool IsEnabled(LogLevel logLevel) => true;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            {
-                lock (_gate)
-                {
-                    _entries.Add((logLevel, exception));
-                }
-            }
-
-            private sealed class NullScope : IDisposable
-            {
-                public static readonly NullScope Instance = new();
-                public void Dispose() { }
-            }
-        }
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Game.Infrastructure.Redis
 {
@@ -13,7 +14,8 @@ namespace Game.Infrastructure.Redis
     {
         private readonly Func<Task> _disposeConnections;
 
-        public RedisConnectionLifetime() : this(RedisMultiplexerFactory.DisposeAllAsync) { }
+        public RedisConnectionLifetime(ILogger<RedisConnectionLifetime> logger)
+            : this(() => RedisMultiplexerFactory.DisposeAllAsync(logger)) { }
 
         // The disposal action is injectable so the stop hook can be unit-tested without opening real connections.
         internal RedisConnectionLifetime(Func<Task> disposeConnections)
