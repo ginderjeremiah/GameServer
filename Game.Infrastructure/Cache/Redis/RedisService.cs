@@ -73,6 +73,19 @@ namespace Game.Infrastructure.Cache.Redis
             await Set(key, value?.Serialize(), expiry, cancellationToken);
         }
 
+        public async Task<string?> GetAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+        {
+            // GETEX in one round trip rather than an awaited GET followed by a fire-and-forget EXPIRE, halving
+            // command volume on a sliding-expiration cache hit. A no-op on a missing key, same as ExpireAndForget.
+            return await ObserveWrite(Redis.StringGetSetExpiryAsync(key, expiry), cancellationToken);
+        }
+
+        public async Task<T?> GetAndRefreshExpiry<T>(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+        {
+            var val = await GetAndRefreshExpiry(key, expiry, cancellationToken);
+            return val.Deserialize<T>();
+        }
+
         public void ExpireAndForget(string key, TimeSpan expiry)
         {
             Redis.KeyExpire(key, expiry, CommandFlags.FireAndForget);

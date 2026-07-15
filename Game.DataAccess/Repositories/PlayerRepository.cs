@@ -70,7 +70,9 @@ namespace Game.DataAccess.Repositories
             PlayerCacheModel? model;
             try
             {
-                model = await _cache.Get<PlayerCacheModel>(playerKey, cancellationToken);
+                // A hit's sliding TTL is refreshed in the same round trip as the read (GETEX), rather than a
+                // separate awaited get followed by a fire-and-forget expire.
+                model = await _cache.GetAndRefreshExpiry<PlayerCacheModel>(playerKey, PlayerCacheTtl, cancellationToken);
             }
             catch (JsonException ex)
             {
@@ -92,11 +94,6 @@ namespace Game.DataAccess.Repositories
                 }
 
                 _cache.SetAndForget(playerKey, model, PlayerCacheTtl);
-            }
-            else
-            {
-                // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
-                _cache.ExpireAndForget(playerKey, PlayerCacheTtl);
             }
 
             return PlayerCacheMapper.ToCore(model, _items, _itemMods, _skills);

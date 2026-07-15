@@ -42,7 +42,9 @@ namespace Game.DataAccess.Repositories
             PlayerState? session;
             try
             {
-                session = await _cache.Get<PlayerState>(sessionKey, cancellationToken);
+                // A hit's sliding TTL is refreshed in the same round trip as the read (GETEX), rather than a
+                // separate awaited get followed by a fire-and-forget expire.
+                session = await _cache.GetAndRefreshExpiry<PlayerState>(sessionKey, SessionCacheTtl, cancellationToken);
             }
             catch (JsonException ex)
             {
@@ -53,12 +55,6 @@ namespace Game.DataAccess.Repositories
                 _logger.LogError(ex, "Cached session for user {UserId} at key '{Key}' failed to deserialize; deleting the key.", userId, sessionKey);
                 await _cache.Delete(sessionKey, cancellationToken);
                 return null;
-            }
-
-            if (session is not null)
-            {
-                // Sliding expiration: a read refreshes the idle TTL so an active session never ages out.
-                _cache.ExpireAndForget(sessionKey, SessionCacheTtl);
             }
 
             return session;
