@@ -35,10 +35,7 @@
 	</div>
 
 	{#if store.error}
-		<div class="prog-error" role="alert" data-testid="progression-error">
-			<p>{store.error}</p>
-			<button type="button" class="btn" onclick={() => store.load()}>Refresh</button>
-		</div>
+		<AdminLoadError testid="progression-error" message={store.error} onRetry={() => store.load()} />
 	{:else if !store.loaded}
 		<div class="prog-loading"><Loading loading={true} delay={120} /></div>
 	{:else}
@@ -112,6 +109,7 @@ import { onDestroy, onMount } from 'svelte';
 import Loading from '$components/Loading.svelte';
 import { workbenchDirty } from '../dirty.svelte';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
+import AdminLoadError from '../../AdminLoadError.svelte';
 import { ProgressionStore } from './progression-store.svelte';
 import ProgressionList from './ProgressionList.svelte';
 import ProgressionMap from './ProgressionMap.svelte';
@@ -214,23 +212,6 @@ $effect(() => {
 .prog-loading {
 	flex: 1;
 	min-height: 0;
-}
-.prog-error {
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: 14px;
-	padding: 20px;
-	text-align: center;
-
-	p {
-		max-width: 480px;
-		color: var(--error);
-		font-size: 13px;
-	}
 }
 .prog-body {
 	display: flex;
