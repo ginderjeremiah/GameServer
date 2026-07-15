@@ -11,6 +11,7 @@ import {
 import {
 	attributeChanges,
 	canonicalEqual,
+	childChanged,
 	modSlotChanges,
 	persistEntity,
 	PersistFailedError,
@@ -39,6 +40,24 @@ describe('canonicalEqual', () => {
 	it('compares nested arrays and objects structurally', () => {
 		expect(canonicalEqual({ xs: [{ a: 1, b: 2 }] }, { xs: [{ b: 2, a: 1 }] })).toBe(true);
 		expect(canonicalEqual([1, 2], [2, 1])).toBe(false);
+	});
+});
+
+describe('childChanged', () => {
+	it('treats a newly-added record with an empty current collection as unchanged (#1895)', () => {
+		expect(childChanged([], undefined)).toBe(false);
+	});
+
+	it('still reports a newly-added record with a non-empty current collection as changed', () => {
+		expect(childChanged([{ id: 1 }], undefined)).toBe(true);
+	});
+
+	it('still reports changed when baseline is defined and differs, even if now empty', () => {
+		expect(childChanged([], [{ id: 1 }])).toBe(true);
+	});
+
+	it('reports unchanged when current equals a defined baseline', () => {
+		expect(childChanged([{ id: 1 }], [{ id: 1 }])).toBe(false);
 	});
 });
 
