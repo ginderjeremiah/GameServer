@@ -531,7 +531,7 @@ describe('EnemyManager boss mode', () => {
 
 		await fireStage(h.BattleStage.Defeated);
 
-		expect(send).toHaveBeenCalledWith('BattleLost');
+		expect(send).toHaveBeenCalledWith('BattleLost', { clientTotalMs: h.battleEngine.timeElapsed });
 		expect(manager.mode).toBe('idle');
 		expect(manager.autoFight).toBe(false);
 		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(5000);
@@ -619,7 +619,7 @@ describe('EnemyManager boss mode', () => {
 		// A draw is not a death, so no loss is recorded and the zone is not cleared; the player drops back
 		// to the idle farm (boss available) rather than re-spawning the boss, with auto-fight turned off.
 		// The unresolved boss battle is recorded as abandoned by the backend when the next enemy starts.
-		expect(send).not.toHaveBeenCalledWith('BattleLost');
+		expect(send).not.toHaveBeenCalledWith('BattleLost', expect.anything());
 		expect(send).not.toHaveBeenCalledWith('DefeatEnemy', expect.anything());
 		expect(manager.mode).toBe('idle');
 		expect(manager.autoFight).toBe(false);
@@ -993,7 +993,7 @@ describe('EnemyManager boss mode', () => {
 		await fireStage(h.BattleStage.Drawn);
 
 		expect(send).not.toHaveBeenCalledWith('DefeatEnemy', expect.anything());
-		expect(send).not.toHaveBeenCalledWith('BattleLost');
+		expect(send).not.toHaveBeenCalledWith('BattleLost', expect.anything());
 		// The drawn battle was fought to the cap, so the fetch reports the elapsed time the client simulated
 		// (battleEngine.timeElapsed) — the backend abandon re-simulates that window and records the draw.
 		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 8880, forceAbandon: false });
@@ -1127,7 +1127,7 @@ describe('EnemyManager boss mode', () => {
 
 		await fireStage(h.BattleStage.Defeated);
 
-		expect(send).toHaveBeenCalledWith('BattleLost');
+		expect(send).toHaveBeenCalledWith('BattleLost', { clientTotalMs: h.battleEngine.timeElapsed });
 		expect(h.battleEngine.startLoading).toHaveBeenCalledWith(5000);
 		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
 		expect(manager.currentEnemy).toEqual(preparedInstance);

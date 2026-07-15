@@ -368,7 +368,7 @@ namespace Game.Application.Services
             };
         }
 
-        public async Task<bool> EndBattleLoss(Player player, PlayerState state, CancellationToken cancellationToken = default)
+        public async Task<bool> EndBattleLoss(Player player, PlayerState state, int? clientTotalMs = null, CancellationToken cancellationToken = default)
         {
             // Idempotency backstop (#1874/#1993): mirrors EndBattleVictory's guard — see BattleAlreadyCredited.
             if (BattleAlreadyCredited(state, player))
@@ -383,11 +383,38 @@ namespace Game.Application.Services
 
             if (!TryResolveActiveBattle(state, out var enemy, out var result, out _))
             {
+                // No battle to resolve. After the caller's HasActiveBattle gate this means a torn state
+                // (an enemy id set without its snapshot), which the set/clear invariant should prevent.
+                _logger.LogWarning(
+                    "EndBattleLoss rejected for player {PlayerId}: no resolvable active battle "
+                    + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}).",
+                    player.Id, state.ActiveEnemyId, state.Snapshot is not null);
                 return false;
+            }
+
+            // Diagnostic only (not anti-cheat): mirrors EndBattleVictory's divergence log so a front/back
+            // battle-logic drift is visible on the loss path too. Logged regardless of the outcome below.
+            if (clientTotalMs is int reportedMs && reportedMs != result.TotalMs)
+            {
+                _logger.LogWarning(
+                    "EndBattleLoss battle-duration divergence for player {PlayerId}: client reported "
+                    + "{ClientTotalMs}ms but server replay was {ServerTotalMs}ms (delta: {DeltaMs}, "
+                    + "enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}).",
+                    player.Id, reportedMs, result.TotalMs, reportedMs - result.TotalMs,
+                    enemy.Id, enemy.Level, state.BattleSeed);
             }
 
             if (result.Victory)
             {
+                // The server's parity replay of the exact reported battle ended in a win despite a loss
+                // claim — precisely the client/server battle-logic divergence the parity invariant says must
+                // be surfaced. Seed + enemy + level reproduce it.
+                _logger.LogWarning(
+                    "EndBattleLoss rejected for player {PlayerId}: server replay was a victory, not a loss "
+                    + "(enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}, replayMs: {ReplayMs}, "
+                    + "isBoss: {IsBoss}, zoneId: {ZoneId}).",
+                    player.Id, enemy.Id, enemy.Level, state.BattleSeed, result.TotalMs, state.IsBossBattle,
+                    state.BattleZoneId);
                 return false;
             }
 

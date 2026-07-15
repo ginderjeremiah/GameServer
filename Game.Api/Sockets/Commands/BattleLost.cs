@@ -4,7 +4,7 @@ using Game.Application.Services;
 
 namespace Game.Api.Sockets.Commands
 {
-    public class BattleLost : AbstractSocketCommandWithResponseData<BattleLostResponse>
+    public class BattleLost : AbstractSocketCommand<BattleLostResponse, BattleLostRequest>
     {
         private readonly BattleService _battleService;
         private readonly ILogger<BattleLost> _logger;
@@ -30,7 +30,7 @@ namespace Game.Api.Sockets.Commands
                 });
             }
 
-            var success = await _battleService.EndBattleLoss(player, state, cancellationToken);
+            var success = await _battleService.EndBattleLoss(player, state, Parameters.ClientTotalMs, cancellationToken);
 
             if (success)
             {

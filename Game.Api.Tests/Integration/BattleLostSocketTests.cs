@@ -111,7 +111,7 @@ namespace Game.Api.Tests.Integration
             await socketClient.ConnectAsync(wsClient, userId);
             Assert.Equal(WebSocketState.Open, socketClient.State);
 
-            var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost");
+            var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost", new { });
 
             Assert.NotNull(response.Error);
         }
@@ -147,8 +147,11 @@ namespace Game.Api.Tests.Integration
             await using var socketClient = new TestSocketClient();
             await socketClient.ConnectAsync(wsClient, userId);
 
-            // Report loss
-            var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost");
+            // Report loss, including the client-simulated duration (diagnostic only — the server validates
+            // off its own clock, exercised at the BattleService level in EndBattleLoss_DivergentClientTotalMs_
+            // IsDiagnosticOnly_StillReturnsTrue).
+            var response = await socketClient.SendCommandAsync<BattleLostResponse>(
+                "BattleLost", new { ClientTotalMs = 1234 });
 
             Assert.Null(response.Error);
             Assert.NotNull(response.Data);
@@ -175,7 +178,7 @@ namespace Game.Api.Tests.Integration
 
             // Report the loss immediately: the battle just started, so far less server time has elapsed than
             // its replay duration and the claim could not have finished yet — rejected (#1630).
-            var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost");
+            var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost", new { });
 
             Assert.NotNull(response.Error);
         }

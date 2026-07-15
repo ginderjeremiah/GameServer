@@ -5,6 +5,7 @@ import type {
 	IApplyModRequest,
 	IAttribute,
 	IAttributeUpdate,
+	IBattleLostRequest,
 	IBattleLostResponse,
 	IChallenge,
 	IChallengeBossRequest,
@@ -85,6 +86,7 @@ export type ApiSocketResponseTypes = {
 
 export type ApiSocketRequestTypes = {
 	'ApplyMod': IApplyModRequest;
+	'BattleLost': IBattleLostRequest;
 	'ChallengeBoss': IChallengeBossRequest;
 	'DefeatEnemy': IDefeatEnemyRequest;
 	'EquipItem': IEquipRequest;
