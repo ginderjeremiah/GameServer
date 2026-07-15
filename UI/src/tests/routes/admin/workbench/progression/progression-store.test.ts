@@ -336,6 +336,36 @@ describe('save orchestration', () => {
 		expect(store.totalChanges).toBe(0);
 	});
 
+	it('does not post empty child collections for a brand-new path/tier with no modifiers, rewards, or prerequisites (#1895)', async () => {
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.addPath();
+		const pathLocal = store.selectedPathId as number;
+		store.patchPath(pathLocal, (d) => {
+			d.name = 'Fire';
+			d.activityKey = EActivityKey.Fire;
+		});
+		const tierLocal = store.currentTiers[0].id;
+		store.patchProf(tierLocal, (d) => {
+			d.name = 'Fire T0';
+			d.word = 'fyr';
+			d.pronunciation = 'fyoor';
+			d.translation = 'Fire';
+			d.iconPath = 'fire.png';
+		});
+
+		await store.save();
+
+		// The identity batches still post (path + proficiency), but nothing was ever added to the
+		// new tier's modifiers/rewards/prerequisites, so those child setters must stay untouched.
+		expect(callsTo('AdminTools/AddEditPaths')).toHaveLength(1);
+		expect(callsTo('AdminTools/AddEditProficiencies')).toHaveLength(1);
+		expect(callsTo('AdminTools/SetProficiencyModifiers')).toHaveLength(0);
+		expect(callsTo('AdminTools/SetProficiencyRewards')).toHaveLength(0);
+		expect(callsTo('AdminTools/SetProficiencyPrerequisites')).toHaveLength(0);
+	});
+
 	it('resolves a same-save-new-path proficiency by identity content, not position, when a concurrent add lands at a lower id (#1856)', async () => {
 		const store = new ProgressionStore();
 		await store.load();
@@ -460,8 +490,9 @@ describe('save orchestration', () => {
 
 		const prereqCalls = callsTo('AdminTools/SetProficiencyPrerequisites');
 		expect(prereqCalls).toHaveLength(1);
+		// The new tier (id 2) never has a prerequisite added to it — its prerequisiteIds stay empty
+		// against its (nonexistent) baseline, which is a no-op and must not post (#1895).
 		expect(prereqCalls[0]).toEqual([
-			{ id: 2, prerequisiteIds: [] },
 			{ id: 0, prerequisiteIds: [2] },
 			{ id: 1, prerequisiteIds: [0] }
 		]);

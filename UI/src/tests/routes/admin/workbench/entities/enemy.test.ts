@@ -180,6 +180,28 @@ describe('enemyEntity', () => {
 		expect(postBodyTo('AdminTools/SetEnemySpawns')).toEqual({ enemyId: 7, spawns: [{ zoneId: 1, weight: 8 }] });
 	});
 
+	it('persist Adds a bare new enemy without posting empty child collections (#1895)', async () => {
+		const added: WorkbenchEnemy = {
+			id: -1,
+			name: 'New Enemy',
+			designerNotes: '',
+			isBoss: false,
+			attributeDistribution: [],
+			skillPool: [],
+			spawns: [],
+			bossZones: []
+		};
+		socket.enemies = [{ ...added, id: 7 }];
+
+		await enemyEntity.persist({ added: [added], modified: [], deleted: [], existingIds: [] });
+
+		expect(postBodyTo('AdminTools/AddEditEnemies')[0].changeType).toBe(EChangeType.Add);
+		// Nothing was ever added to any child collection, so none of their setters should post.
+		expect(postBodyTo('AdminTools/SetEnemyAttributeDistributions')).toBeUndefined();
+		expect(postBodyTo('AdminTools/SetEnemySkills')).toBeUndefined();
+		expect(postBodyTo('AdminTools/SetEnemySpawns')).toBeUndefined();
+	});
+
 	it('refresh derives bossZones from the zones whose dedicated boss is this enemy', async () => {
 		socket.enemies = [
 			{ id: 0, name: 'Bat', isBoss: false, attributeDistribution: [], skillPool: [], spawns: [] },

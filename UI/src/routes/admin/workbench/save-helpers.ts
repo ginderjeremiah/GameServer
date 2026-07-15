@@ -33,9 +33,17 @@ export const canonicalEqual = (a: unknown, b: unknown): boolean =>
 
 export const listsEqual = canonicalEqual;
 
-/** True when a child collection differs from its saved baseline (added records have none). */
-export const childChanged = <T>(current: T, baseline: T | undefined): boolean =>
-	baseline === undefined || !listsEqual(current, baseline);
+/**
+ * True when a child collection differs from its saved baseline (added records have none). An
+ * added record with an empty current collection is treated as unchanged — nothing was actually
+ * added to it — so a brand-new record doesn't trigger a no-op write for every empty child section.
+ */
+export const childChanged = <T>(current: T, baseline: T | undefined): boolean => {
+	if (baseline === undefined) {
+		return !(Array.isArray(current) && current.length === 0);
+	}
+	return !listsEqual(current, baseline);
+};
 
 /**
  * Map the local (negative) ids of added records to their persisted ids. Purely positional pairing (the
