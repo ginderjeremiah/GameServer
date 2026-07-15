@@ -87,8 +87,11 @@ vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
 
 import {
 	SkillsView,
+	clampToughness,
+	resolveActivePresetKey,
 	sortMetrics,
 	zoneSpawnLevel,
+	type ComparePreset,
 	type SkillMetrics
 } from '$routes/game/screens/skills/skills-view.svelte';
 import { damagePerSecond } from '$lib/common';
@@ -265,6 +268,19 @@ describe('pure helpers', () => {
 
 	it('takes the midpoint of a zone range as the representative spawn level', () => {
 		expect(zoneSpawnLevel(ZONES[0])).toBe(5); // (2 + 8) / 2
+	});
+
+	it('clamps a stored toughness to the live max, self-healing a stale value above a shrunken ceiling (#1998)', () => {
+		expect(clampToughness(150, 200)).toBe(150); // within range, unchanged
+		expect(clampToughness(250, 200)).toBe(200); // stale value above a ceiling that shrank re-clamps
+		expect(clampToughness(0, 200)).toBe(0);
+	});
+
+	it('resolves the active preset key against the live presets, dropping one whose pill no longer exists (#1998)', () => {
+		const presets: ComparePreset[] = [{ key: 'spawn-0', name: 'Imp', isBoss: false, toughness: 20 }];
+		expect(resolveActivePresetKey('spawn-0', presets)).toBe('spawn-0');
+		expect(resolveActivePresetKey('spawn-9', presets)).toBeNull(); // stale key, preset removed
+		expect(resolveActivePresetKey(null, presets)).toBeNull();
 	});
 
 	it('folds each metric’s own crit multiplier into the effective dps/damage ranking', () => {
@@ -659,6 +675,17 @@ describe('SkillsView — compare-vs enemy presets', () => {
 		view.setToughness(7);
 		expect(view.toughness).toBe(7);
 		expect(view.selectedPresetKey).toBeNull();
+	});
+
+	it('re-clamps the consumed toughness when a stored value ends up stale above the live ceiling (#1998)', () => {
+		// `toughness`/`selectedPresetKey` are only clamped/validated at write time (setToughness/selectPreset).
+		// Assigning past that guard simulates what a shrunken maxToughness (e.g. a zone relocation while the
+		// screen stays mounted) would otherwise leave behind: a stored value above the new range and a pill
+		// key for a preset that no longer exists.
+		view.toughness = 9999;
+		view.selectedPresetKey = 'spawn-9';
+		expect(view.effectiveToughness).toBe(view.maxToughness);
+		expect(view.activePresetKey).toBeNull();
 	});
 
 	it('resorts railList by effective dps when a preset is selected', () => {

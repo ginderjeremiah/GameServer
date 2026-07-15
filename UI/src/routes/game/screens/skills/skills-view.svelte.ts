@@ -121,6 +121,22 @@ export function zoneSpawnLevel(zone: IZone): number {
 	return (zone.levelMin + zone.levelMax) / 2;
 }
 
+/** Clamp a stored Compare-vs Toughness to the live slider ceiling. `toughness` is only clamped at
+ *  the moment it's written (a slider drag or preset pick), so a `maxToughness` that later shrinks
+ *  (e.g. a zone relocation or reference-data refresh while the screen stays mounted) would otherwise
+ *  leave the stored value pinned above the new range — every consumer must read through this instead
+ *  of the raw stored value. */
+export function clampToughness(toughness: number, maxToughness: number): number {
+	return Math.min(toughness, maxToughness);
+}
+
+/** The Compare-vs preset key to treat as active — `selectedPresetKey` unless its preset no longer
+ *  exists among the live presets (e.g. a zone change dropped the pill it pointed at), in which case
+ *  the stale key resolves to no active pill rather than highlighting nothing that's shown. */
+export function resolveActivePresetKey(selectedPresetKey: string | null, presets: ComparePreset[]): string | null {
+	return selectedPresetKey != null && presets.some((p) => p.key === selectedPresetKey) ? selectedPresetKey : null;
+}
+
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 
 export class SkillsView {
@@ -285,6 +301,15 @@ export class SkillsView {
 	 *  1 until zone/enemy reference data loads. */
 	readonly maxToughness = $derived(Math.max(1, ...this.comparePresets.map((p) => p.toughness)));
 
+	/** {@link toughness} re-clamped to the live {@link maxToughness} ceiling — see {@link clampToughness}.
+	 *  Every effective-value read and the slider display go through this instead of the raw stored value,
+	 *  so they can't get stuck on a now-unreachable stale value. */
+	readonly effectiveToughness = $derived(clampToughness(this.toughness, this.maxToughness));
+
+	/** {@link selectedPresetKey}, self-healed against {@link comparePresets} — see {@link resolveActivePresetKey}.
+	 *  Derived rather than mutating `selectedPresetKey` itself out from under a caller. */
+	readonly activePresetKey = $derived(resolveActivePresetKey(this.selectedPresetKey, this.comparePresets));
+
 	/** Core attributes any catalogue skill scales on (the offered filter chips). */
 	readonly usedAttributes = $derived(
 		FILTERABLE_ATTRIBUTES.filter((attr) =>
@@ -313,7 +338,7 @@ export class SkillsView {
 				}
 				return true;
 			});
-		return list.sort(sortMetrics(this.sort, this.toughness));
+		return list.sort(sortMetrics(this.sort, this.effectiveToughness));
 	});
 
 	/** Equipped rail rows, ordered by loadout slot (not by the active sort). Built from
@@ -401,7 +426,7 @@ export class SkillsView {
 	 *  applies before mitigation, so it scales first), then run through the Compare-vs Toughness curve. */
 	effective(id: number): number {
 		const critMultiplier = this.metricsById[id]?.critMultiplier ?? 1;
-		return toughnessMitigatedDamage(this.rawDamage(id) * critMultiplier, this.toughness);
+		return toughnessMitigatedDamage(this.rawDamage(id) * critMultiplier, this.effectiveToughness);
 	}
 
 	effectiveDps(id: number): number {

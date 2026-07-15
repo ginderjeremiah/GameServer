@@ -6,7 +6,7 @@
 				<button
 					type="button"
 					class="epill"
-					class:on={view.selectedPresetKey === preset.key}
+					class:on={view.activePresetKey === preset.key}
 					class:boss={preset.isBoss}
 					onclick={() => view.selectPreset(preset)}
 				>
@@ -24,11 +24,11 @@
 			type="range"
 			min="0"
 			max={view.maxToughness}
-			value={view.toughness}
+			value={view.effectiveToughness}
 			aria-label="Compare-vs enemy toughness"
 			oninput={(e) => view.setToughness(+e.currentTarget.value)}
 		/>
-		<span class="vs-defval">TGH <b>{Math.round(view.toughness)}</b></span>
+		<span class="vs-defval">TGH <b>{Math.round(view.effectiveToughness)}</b></span>
 	</div>
 </div>
 

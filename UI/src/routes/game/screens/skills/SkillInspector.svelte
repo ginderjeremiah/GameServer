@@ -138,7 +138,7 @@ const rawNote = $derived.by(() => {
 	// Critical row and the crit-inclusive effective hit; omitted when no crit can occur.
 	const critBonus = view.critBonus(id);
 	const critPart = critBonus > 0 ? ` · +${fmt(critBonus)} crit` : '';
-	if (view.toughness <= 0) {
+	if (view.effectiveToughness <= 0) {
 		return `${raw} raw damage${critPart} · target has no toughness`;
 	}
 	const mitigated = fmt(view.mitigatedAmount(id));
