@@ -171,41 +171,5 @@ namespace Game.Infrastructure.Tests
                 return ValueTask.CompletedTask;
             }
         }
-
-        // A minimal capturing logger mirroring RedisCommandBudgetTests' CapturingLogger: the dispose-loop's only
-        // observable effect on a faulting entry is the error log, so the level and exception presence are recorded.
-        private sealed class CapturingLogger : ILogger
-        {
-            private readonly object _gate = new();
-            private readonly List<(LogLevel Level, Exception? Exception)> _entries = [];
-
-            public IReadOnlyList<(LogLevel Level, Exception? Exception)> Entries
-            {
-                get
-                {
-                    lock (_gate)
-                    {
-                        return _entries.ToList();
-                    }
-                }
-            }
-
-            public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
-            public bool IsEnabled(LogLevel logLevel) => true;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            {
-                lock (_gate)
-                {
-                    _entries.Add((logLevel, exception));
-                }
-            }
-
-            private sealed class NullScope : IDisposable
-            {
-                public static readonly NullScope Instance = new();
-                public void Dispose() { }
-            }
-        }
     }
 }
