@@ -283,7 +283,7 @@ namespace Game.Application.Services
 
         public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, int? clientTotalMs = null, CancellationToken cancellationToken = default)
         {
-            if (!TryResolveActiveBattle(state, out var enemy, out var result))
+            if (!TryResolveActiveBattle(state, out var enemy, out var result, out var playerMaterials))
             {
                 // No battle to resolve. After the caller's HasActiveBattle gate this means a torn state
                 // (an enemy id set without its snapshot), which the set/clear invariant should prevent.
@@ -333,7 +333,7 @@ namespace Game.Application.Services
                 return null;
             }
 
-            var rewards = RecordVictory(player, enemy, result, state, now);
+            var rewards = RecordVictory(player, enemy, result, state, now, playerMaterials: playerMaterials);
 
             // Anchor the post-battle cooldown to the battle's server-computed completion, not to now: the gap
             // between completion and now is the post-victory network latency, so subtracting it keeps the idle
@@ -356,7 +356,7 @@ namespace Game.Application.Services
 
         public async Task<bool> EndBattleLoss(Player player, PlayerState state, CancellationToken cancellationToken = default)
         {
-            if (!TryResolveActiveBattle(state, out var enemy, out var result))
+            if (!TryResolveActiveBattle(state, out var enemy, out var result, out _))
             {
                 return false;
             }
@@ -483,7 +483,7 @@ namespace Game.Application.Services
 
             // No active battle (nothing to resolve) or no elapsed window to re-simulate against — clear
             // and return without recording an outcome or persisting.
-            if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, simulateMs))
+            if (elapsedMs <= 0 || !TryResolveActiveBattle(state, out var enemy, out var result, out var playerMaterials, simulateMs))
             {
                 state.ClearBattle();
                 return new StaleBattleResolution(null, null);
@@ -507,7 +507,7 @@ namespace Game.Application.Services
                 // abandon resolved as a real victory. Pay it out exactly like EndBattleVictory (exp +
                 // win/clear/challenge credit) rather than booking the win while silently withholding the
                 // earned exp (#206).
-                RecordVictory(player, enemy, result, state, now, notify);
+                RecordVictory(player, enemy, result, state, now, notify, playerMaterials);
             }
             else if (!result.PlayerDied && wallClockMs < GameConstants.DefaultMaxBattleMs)
             {
@@ -563,21 +563,35 @@ namespace Game.Application.Services
         // EndBattleVictory returns only a client-facing DefeatResult, and the BattleStats this mutates is
         // carried on the BattleCompletedEvent, which the dispatcher clears after handling — leaving no other
         // seam to observe that result.Stats.PlayerRating is set from the snapshot rather than the live aggregate.
-        internal DefeatRewards RecordVictory(Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp, bool notify = true)
+        internal DefeatRewards RecordVictory(
+            Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp,
+            bool notify = true, BattlerMaterials? playerMaterials = null)
         {
             // Rate the player for the reward from the same frozen snapshot the battle was simulated against, not
             // the live aggregate. Valid mid-battle socket commands (stat reallocation, gear swaps) can shift live
             // power between battle start and the victory claim — which would both diverge from the fought battle
-            // and let a client deflate its power right before claiming to inflate the payout. RecordVictory only
-            // runs after TryResolveActiveBattle has confirmed an active snapshot, so a null here is a broken
-            // invariant rather than a reachable state.
-            if (state.Snapshot is not { } snapshot)
+            // and let a client deflate its power right before claiming to inflate the payout.
+            //
+            // playerMaterials lets a caller that already resolved it (TryResolveActiveBattle, moments earlier in
+            // the same command) skip re-walking the item/mod/skill/proficiency/class resolution a second time
+            // (#1897) — Build() below still constructs a fresh, single-use Battler regardless (a Battler mutates
+            // its health and active effects during simulation, BattleSnapshot.GetBattlerMaterials), so the rating
+            // still reads the pristine battle-start state, never the fought/mutated one. A caller with no
+            // materials on hand (e.g. a direct unit-test call) falls back to resolving them here; RecordVictory
+            // only runs after TryResolveActiveBattle has confirmed an active snapshot, so a null Snapshot on that
+            // fallback path is a broken invariant rather than a reachable state.
+            if (playerMaterials is null)
             {
-                throw new InvalidOperationException("Cannot record a victory without an active battle snapshot.");
+                if (state.Snapshot is not { } snapshot)
+                {
+                    throw new InvalidOperationException("Cannot record a victory without an active battle snapshot.");
+                }
+
+                playerMaterials = snapshot.GetBattlerMaterials(
+                    _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
             }
 
-            var playerBattler = snapshot.ToBattler(
-                _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
+            var playerBattler = playerMaterials.Build();
             var rewards = new DefeatRewards(playerBattler, enemy);
 
             // Snapshot the player's rating onto the battle stats so the proficiency accrual normalizes activity
@@ -667,16 +681,23 @@ namespace Game.Application.Services
         // the snapshotted enemy, and replays the fight once. Returns false (with no outputs) when there is no
         // active battle, so each caller keeps only its outcome-specific branching. Centralising the guard, the
         // ?? 1 / ?? [] fallbacks, and the simulate call here keeps the replay surface from silently drifting.
+        //
+        // Also resolves the player's BattlerMaterials once and outputs it (#1897): the two victory paths
+        // (EndBattleVictory, the won-abandon branch of AbandonBattle) can hand it straight to RecordVictory
+        // instead of re-walking the same snapshot resolution a second time. A caller with no use for it (e.g.
+        // EndBattleLoss) simply discards it.
         private bool TryResolveActiveBattle(
             PlayerState state,
             [MaybeNullWhen(false)] out CoreEnemy enemy,
             [MaybeNullWhen(false)] out BattleResult result,
+            [MaybeNullWhen(false)] out BattlerMaterials playerMaterials,
             int? maxMs = null)
         {
             if (state.ActiveEnemyId is not int enemyId || state.Snapshot is null)
             {
                 enemy = default;
                 result = default;
+                playerMaterials = default;
                 return false;
             }
 
@@ -686,9 +707,12 @@ namespace Game.Application.Services
             enemy = _enemies.GetDomainEnemy(enemyId, level)
                 ?? throw new InvalidOperationException($"Enemy {enemyId} not found");
 
+            playerMaterials = state.Snapshot.GetBattlerMaterials(
+                _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
+
             // The seed is set alongside the snapshot at battle start (and cleared together), so a non-null
             // snapshot here guarantees a non-null seed — the ?? 0 mirrors the defensive fallbacks above.
-            result = SimulateBattle(enemy, enemySkillIds, state.Snapshot, state.BattleSeed ?? 0, maxMs);
+            result = SimulateBattle(enemy, enemySkillIds, playerMaterials, state.BattleSeed ?? 0, maxMs);
             return true;
         }
 
@@ -699,12 +723,11 @@ namespace Game.Application.Services
             _classes.GetClass(classId)
             ?? throw new InvalidOperationException($"Class {classId} could not be resolved from the catalogue.");
 
-        private BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattleSnapshot snapshot, uint seed, int? maxMs = null)
+        private static BattleResult SimulateBattle(CoreEnemy enemy, IReadOnlyList<int> enemySkillIds, BattlerMaterials playerMaterials, uint seed, int? maxMs = null)
         {
             enemy.SetBattleSkills(enemySkillIds);
 
-            var playerBattler = snapshot.ToBattler(
-                _items.GetItem, _itemMods.GetItemMod, _skills.TryGetSkill, _proficiencies.GetProficiency, ResolveClass);
+            var playerBattler = playerMaterials.Build();
 
             // The same seed shipped to the client at battle start, so the server's anti-cheat replay draws
             // the crit/dodge/block rolls from the identical RNG stream the client simulated.
