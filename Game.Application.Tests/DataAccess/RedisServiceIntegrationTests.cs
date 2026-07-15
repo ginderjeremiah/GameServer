@@ -102,6 +102,37 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task GetAndRefreshExpiry_OnAnExistingKey_ReturnsValueAndRefreshesTtl()
+        {
+            var key = $"redis-getex-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            await cache.Set(key, "player-a", TimeSpan.FromSeconds(2));
+
+            var value = await cache.GetAndRefreshExpiry(key, TimeSpan.FromSeconds(30));
+
+            // The value comes back unchanged and the TTL is refreshed past the 2s seed ceiling, in one round
+            // trip rather than a separate awaited get followed by a fire-and-forget expire.
+            Assert.Equal("player-a", value);
+            var ttl = await ReadTtlAsync(key);
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be refreshed past the 2s seed but was {ttl}.");
+        }
+
+        [Fact]
+        public async Task GetAndRefreshExpiry_OnAMissingKey_ReturnsNullAndDoesNotCreateTheKey()
+        {
+            var key = $"redis-getex-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            var value = await cache.GetAndRefreshExpiry(key, TimeSpan.FromSeconds(30));
+
+            Assert.Null(value);
+            Assert.Null(await cache.Get(key));
+        }
+
+        [Fact]
         public async Task ReclaimAndForget_OnAMissingKey_ClaimsItWithTtl()
         {
             // Mirrors a live socket's presence key having lapsed (TTL expiry or a registration rollback) while

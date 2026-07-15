@@ -28,6 +28,13 @@
         public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default);
         public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default);
         /// <summary>
+        /// Reads <paramref name="key"/> and resets its TTL to <paramref name="expiry"/> in a single round trip
+        /// (a no-op on a missing key, like <see cref="ExpireAndForget"/>). Lets a sliding-expiration cache hit
+        /// avoid the separate awaited get followed by a fire-and-forget expire.
+        /// </summary>
+        public Task<string?> GetAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
+        public Task<T?> GetAndRefreshExpiry<T>(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
+        /// <summary>
         /// Resets the time-to-live on an existing key without awaiting the result (fire-and-forget).
         /// A no-op if the key does not exist. Lets a hot read path slide a sliding-expiration TTL
         /// without paying a round-trip.
