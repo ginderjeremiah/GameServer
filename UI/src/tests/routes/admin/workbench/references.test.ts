@@ -4,6 +4,7 @@ import {
 	EChallengeType,
 	EEntityType,
 	EItemCategory,
+	EItemModType,
 	EModifierType,
 	ERarity,
 	ESkillAcquisition,
@@ -11,6 +12,7 @@ import {
 	type IClass,
 	type IEnemy,
 	type IItem,
+	type IItemMod,
 	type IProficiency,
 	type ISkill,
 	type ISkillRecipe,
@@ -69,6 +71,18 @@ const item = (id: number, name: string, opts: Partial<IItem> = {}): IItem => ({
 	modSlots: [],
 	tags: [],
 	requiredProficiencyLevel: 1,
+	designerNotes: '',
+	...opts
+});
+
+const itemMod = (id: number, name: string, opts: Partial<IItemMod> = {}): IItemMod => ({
+	id,
+	name,
+	description: '',
+	itemModTypeId: EItemModType.Prefix,
+	rarityId: ERarity.Common,
+	attributes: [],
+	tags: [],
 	designerNotes: '',
 	...opts
 });
@@ -177,6 +191,7 @@ const sources = (): ReferenceSources => ({
 		challenge(3, 'Skill Spammer', { entityType: EEntityType.Skill, targetEntityId: 1 })
 	],
 	items: [],
+	itemMods: [],
 	classes: [],
 	skillRecipes: [],
 	proficiencies: [],
@@ -395,6 +410,30 @@ describe('computeReferences — paths', () => {
 	});
 });
 
+describe('computeReferences — tags', () => {
+	it('lists the items and mods the tag is applied to, both marked strong', () => {
+		const src = {
+			...sources(),
+			items: [item(0, 'Iron Helm', { tags: [10] }), item(1, 'Dragon Blade', { tags: [10, 20] })],
+			itemMods: [itemMod(0, 'Sharp', { tags: [10] })]
+		};
+		expect(computeReferences('tags', 10, src)).toEqual([
+			{ kind: 'taggedItems', names: ['Iron Helm', 'Dragon Blade'], strong: true },
+			{ kind: 'taggedMods', names: ['Sharp'], strong: true }
+		]);
+	});
+
+	it('reports only the applied mods when no item carries the tag', () => {
+		const src = { ...sources(), itemMods: [itemMod(0, 'Sharp', { tags: [10] })] };
+		expect(computeReferences('tags', 10, src)).toEqual([{ kind: 'taggedMods', names: ['Sharp'], strong: true }]);
+	});
+
+	it('returns nothing for an unused tag', () => {
+		const src = { ...sources(), items: [item(0, 'Iron Helm', { tags: [20] })] };
+		expect(computeReferences('tags', 10, src)).toEqual([]);
+	});
+});
+
 describe('computeReferences — unknown entity', () => {
 	it('returns no references for an unrecognized entity key', () => {
 		expect(computeReferences('widgets', 0, sources())).toEqual([]);
@@ -456,6 +495,15 @@ describe('formatReferenceBody', () => {
 			'out of circulation for new content'
 		);
 		expect(formatReferenceBody('items', 'Iron Helm', normal)).toContain('out of circulation for new content');
+	});
+
+	it('closes a tag reference with the cascade-delete wording instead of the retire framing', () => {
+		const groups: ReferenceGroup[] = [{ kind: 'taggedItems', names: ['Iron Helm'], strong: true }];
+		const body = formatReferenceBody('tags', 'Fire', groups);
+		expect(body).toContain('Fire is applied to 1 item (Iron Helm)');
+		expect(body).toContain('Deleting removes it from every item and mod listed above, and this cannot be undone.');
+		expect(body).not.toContain('still resolve by id');
+		expect(body).not.toContain('out of circulation');
 	});
 
 	it('caps long name lists with a "+N more" tail', () => {

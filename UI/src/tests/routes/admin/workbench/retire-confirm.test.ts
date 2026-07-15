@@ -7,7 +7,11 @@ const { dangerModal, staticData } = vi.hoisted(() => ({
 }));
 vi.mock('$stores', () => ({ dangerModal, staticData }));
 
-import { referenceSourcesFromStatic, retireWithConfirm } from '$routes/admin/workbench/retire-confirm';
+import {
+	deleteWithConfirm,
+	referenceSourcesFromStatic,
+	retireWithConfirm
+} from '$routes/admin/workbench/retire-confirm';
 import type { ReferenceSources } from '$routes/admin/workbench/references';
 
 const emptySources: ReferenceSources = {
@@ -15,6 +19,7 @@ const emptySources: ReferenceSources = {
 	zones: [],
 	challenges: [],
 	items: [],
+	itemMods: [],
 	classes: [],
 	skillRecipes: [],
 	proficiencies: [],
@@ -23,7 +28,17 @@ const emptySources: ReferenceSources = {
 
 beforeEach(() => {
 	dangerModal.mockReset();
-	for (const key of ['enemies', 'zones', 'challenges', 'items', 'classes', 'skillRecipes', 'proficiencies', 'skills']) {
+	for (const key of [
+		'enemies',
+		'zones',
+		'challenges',
+		'items',
+		'itemMods',
+		'classes',
+		'skillRecipes',
+		'proficiencies',
+		'skills'
+	]) {
 		delete staticData[key];
 	}
 });
@@ -163,5 +178,68 @@ describe('retireWithConfirm', () => {
 		const body = dangerModal.mock.calls[0][0].body as string;
 		expect(body).toContain('Warrior');
 		expect(onConfirmed).toHaveBeenCalledOnce();
+	});
+});
+
+describe('deleteWithConfirm', () => {
+	it('deletes immediately, without prompting, when nothing carries the tag', async () => {
+		const onConfirmed = vi.fn();
+		await deleteWithConfirm({
+			entityKey: 'tags',
+			id: 10,
+			name: 'Fire',
+			title: 'Delete Tag?',
+			sources: emptySources,
+			onConfirmed
+		});
+
+		expect(dangerModal).not.toHaveBeenCalled();
+		expect(onConfirmed).toHaveBeenCalledOnce();
+	});
+
+	it('prompts with the applied-to body under a "Delete anyway" label and deletes only when confirmed', async () => {
+		dangerModal.mockResolvedValue(true);
+		const onConfirmed = vi.fn();
+		const sources: ReferenceSources = {
+			...emptySources,
+			items: [{ id: 0, name: 'Iron Helm', tags: [10] }] as unknown as ReferenceSources['items']
+		};
+
+		await deleteWithConfirm({
+			entityKey: 'tags',
+			id: 10,
+			name: 'Fire',
+			title: 'Delete Tag?',
+			sources,
+			onConfirmed
+		});
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		const call = dangerModal.mock.calls[0][0];
+		expect(call.title).toBe('Delete Tag?');
+		expect(call.confirmLabel).toBe('Delete anyway');
+		expect(call.body).toContain('Iron Helm');
+		expect(onConfirmed).toHaveBeenCalledOnce();
+	});
+
+	it('does not delete when the confirm dialog is cancelled', async () => {
+		dangerModal.mockResolvedValue(false);
+		const onConfirmed = vi.fn();
+		const sources: ReferenceSources = {
+			...emptySources,
+			itemMods: [{ id: 0, name: 'Sharp', tags: [10] }] as unknown as ReferenceSources['itemMods']
+		};
+
+		await deleteWithConfirm({
+			entityKey: 'tags',
+			id: 10,
+			name: 'Fire',
+			title: 'Delete Tag?',
+			sources,
+			onConfirmed
+		});
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		expect(onConfirmed).not.toHaveBeenCalled();
 	});
 });

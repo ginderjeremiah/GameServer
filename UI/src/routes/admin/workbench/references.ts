@@ -4,6 +4,7 @@ import {
 	type IClass,
 	type IEnemy,
 	type IItem,
+	type IItemMod,
 	type IProficiency,
 	type ISkill,
 	type ISkillRecipe,
@@ -25,6 +26,7 @@ export interface ReferenceSources {
 	zones: IZone[];
 	challenges: IChallenge[];
 	items: IItem[];
+	itemMods: IItemMod[];
 	classes: IClass[];
 	skillRecipes: ISkillRecipe[];
 	proficiencies: IProficiency[];
@@ -56,7 +58,9 @@ export type ReferenceKind =
 	| 'milestoneReward'
 	| 'gearGate'
 	| 'recipeCondition'
-	| 'prerequisiteOf';
+	| 'prerequisiteOf'
+	| 'taggedItems'
+	| 'taggedMods';
 
 /** Zero-based-id lookup honouring the retirement Id-as-index invariant (a retired record keeps its slot). */
 const nameByIndex = (records: { name: string }[], id: number): string => records[id]?.name ?? `#${id}`;
@@ -157,6 +161,18 @@ const pathReferences = (id: number, { proficiencies }: ReferenceSources): Refere
 	return group('prerequisiteOf', prerequisiteOf, true);
 };
 
+/**
+ * A tag is applied directly to items/mods (not "reference data referencing reference data" like
+ * every other kind here) — deleting it cascades to strip it from every one of them (see
+ * `GameContext` → `ItemTag`/`ItemModTag` `OnDelete(DeleteBehavior.Cascade)`), a real mutation
+ * rather than an advisory retire consequence, so both groups are marked `strong`.
+ */
+const tagReferences = (id: number, { items, itemMods }: ReferenceSources): ReferenceGroup[] => {
+	const taggedItems = items.filter((i) => i.tags.includes(id)).map((i) => i.name);
+	const taggedMods = itemMods.filter((m) => m.tags.includes(id)).map((m) => m.name);
+	return [...group('taggedItems', taggedItems, true), ...group('taggedMods', taggedMods, true)];
+};
+
 /** Every record that references the given retireable record, grouped by relationship (empty when none). */
 export function computeReferences(entityKey: string, id: number, sources: ReferenceSources): ReferenceGroup[] {
 	switch (entityKey) {
@@ -176,6 +192,8 @@ export function computeReferences(entityKey: string, id: number, sources: Refere
 			return proficiencyReferences(id, sources);
 		case 'paths':
 			return pathReferences(id, sources);
+		case 'tags':
+			return tagReferences(id, sources);
 		default:
 			return [];
 	}
@@ -239,6 +257,10 @@ const clauseFor = (entityKey: string, ref: ReferenceGroup): string => {
 			return entityKey === 'paths'
 				? `home to a tier that gates ${count(n, 'proficiency', 'proficiencies')} (${names})`
 				: `a prerequisite for ${count(n, 'proficiency', 'proficiencies')} (${names})`;
+		case 'taggedItems':
+			return `applied to ${count(n, 'item')} (${names})`;
+		case 'taggedMods':
+			return `applied to ${count(n, 'mod')} (${names})`;
 	}
 };
 
@@ -254,15 +276,26 @@ const joinClauses = (clauses: string[]): string => {
 };
 
 /**
- * Prose body for the retire confirm dialog, enumerating the inbound references. Plain text (the
- * modal renders the body as-is), matching the existing confirm-dialog convention.
+ * Prose body for the retire/delete confirm dialog, enumerating the inbound references. Plain text
+ * (the modal renders the body as-is), matching the existing confirm-dialog convention.
  */
 export function formatReferenceBody(entityKey: string, name: string, groups: ReferenceGroup[]): string {
 	const list = joinClauses(groups.map((g) => clauseFor(entityKey, g)));
-	// A strong reference (the gate-lockout case) has a real consequence for new players that
-	// "the id still resolves" doesn't soften, so close by pointing at the fix rather than reassuring.
-	const closing = groups.some((g) => g.strong)
-		? 'Existing references still resolve by id, but re-point the affected records first if that consequence is unintended.'
-		: 'Retiring takes it out of circulation for new content, though existing references still resolve by id.';
-	return `${name} is ${list}. ${closing}`;
+	return `${name} is ${list}. ${closingFor(entityKey, groups)}`;
 }
+
+/**
+ * Tags are hard-deleted (not retired) and the cascade actually strips them off every item/mod
+ * listed above, so the retire framing ("still resolves by id") would be false for them — every
+ * other entity here is retired, where a strong reference has a real consequence for new players
+ * that "the id still resolves" doesn't soften, so it closes by pointing at the fix instead.
+ */
+const closingFor = (entityKey: string, groups: ReferenceGroup[]): string => {
+	if (entityKey === 'tags') {
+		return 'Deleting removes it from every item and mod listed above, and this cannot be undone.';
+	}
+	if (groups.some((g) => g.strong)) {
+		return 'Existing references still resolve by id, but re-point the affected records first if that consequence is unintended.';
+	}
+	return 'Retiring takes it out of circulation for new content, though existing references still resolve by id.';
+};
