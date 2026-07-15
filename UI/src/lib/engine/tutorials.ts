@@ -1,4 +1,4 @@
-import { ELessonTriggerType, EMechanicEvent, type ILesson } from '$lib/api';
+import { ELessonTriggerType, EMechanicEvent, type ILesson, type IPlayerLesson } from '$lib/api';
 import { isFirstCooldownRecharge, isFirstCrit, isFirstDodge } from '$lib/common/content-events';
 import type { SkillActivation } from '$lib/battle/battle-step';
 import { navigation, staticData, tutorialTour } from '$stores';
@@ -80,6 +80,16 @@ const mechanicFired = (
 	}
 };
 
+// Memoized "is there still a locked mechanic-anchored lesson" flag for evaluateMechanicTriggers
+// below, keyed against the two sources it derives from (#1900/#1901). Once every mechanic lesson
+// has unlocked — the common steady state past onboarding — this lets the hot tick loop skip
+// liveLessons()'s filter allocation and isLocked's linear scan entirely. Re-armed whenever either
+// source's reference changes (a reference-data reload, or the player data being re-initialized —
+// e.g. the welcome-back gate's refreshPlayer) rather than trusting the cached verdict to still hold.
+let mechanicLessonsSource: ILesson[] | undefined;
+let mechanicLessonsPlayerSource: IPlayerLesson[] | undefined;
+let anyLockedMechanicLesson = true;
+
 /**
  * Mechanic-anchored trigger (spike #1392, #1587): call with each battle tick's activations (wired
  * into `BattleEngine.logicalUpdate`). A locked mechanic lesson whose event fires this tick is
@@ -89,13 +99,25 @@ const mechanicFired = (
  * can't re-fire it.
  */
 export function evaluateMechanicTriggers(activations: readonly SkillActivation[]) {
+	if (staticData.lessons !== mechanicLessonsSource || playerManager.lessons !== mechanicLessonsPlayerSource) {
+		mechanicLessonsSource = staticData.lessons;
+		mechanicLessonsPlayerSource = playerManager.lessons;
+		anyLockedMechanicLesson = true;
+	}
+	if (!anyLockedMechanicLesson) {
+		return;
+	}
+
+	let stillLocked = false;
 	for (const lesson of liveLessons()) {
-		if (
-			lesson.triggerType === ELessonTriggerType.MechanicEvent &&
-			isLocked(lesson.id) &&
-			mechanicFired(lesson.triggerMechanicEvent, activations)
-		) {
+		if (lesson.triggerType !== ELessonTriggerType.MechanicEvent || !isLocked(lesson.id)) {
+			continue;
+		}
+		if (mechanicFired(lesson.triggerMechanicEvent, activations)) {
 			playerManager.unlockLesson(lesson.id);
+		} else {
+			stillLocked = true;
 		}
 	}
+	anyLockedMechanicLesson = stillLocked;
 }
