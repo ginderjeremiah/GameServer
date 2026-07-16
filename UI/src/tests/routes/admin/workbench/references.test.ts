@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+	EActivityKey,
 	EAttribute,
 	EChallengeType,
 	EEntityType,
@@ -13,6 +14,7 @@ import {
 	type IEnemy,
 	type IItem,
 	type IItemMod,
+	type IPath,
 	type IProficiency,
 	type ISkill,
 	type ISkillRecipe,
@@ -112,6 +114,15 @@ const recipe = (id: number, resultSkillId: number, opts: Partial<ISkillRecipe> =
 	...opts
 });
 
+const path = (id: number, name: string, opts: Partial<IPath> = {}): IPath => ({
+	id,
+	name,
+	description: '',
+	activityKey: EActivityKey.Fire,
+	designerNotes: '',
+	...opts
+});
+
 const proficiency = (id: number, name: string, opts: Partial<IProficiency> = {}): IProficiency => ({
 	id,
 	name,
@@ -195,7 +206,8 @@ const sources = (): ReferenceSources => ({
 	classes: [],
 	skillRecipes: [],
 	proficiencies: [],
-	skills: []
+	skills: [],
+	paths: []
 });
 
 describe('computeReferences — enemies', () => {
@@ -407,6 +419,32 @@ describe('computeReferences — paths', () => {
 	it('returns nothing for a path whose tiers gate nothing', () => {
 		const src = { ...sources(), proficiencies: [proficiency(0, 'Blades', { pathId: 5 })] };
 		expect(computeReferences('paths', 5, src)).toEqual([]);
+	});
+
+	it('excludes a gateway sitting on a path that is itself already retired, matching PathStaysLive (#1983)', () => {
+		const src = {
+			...sources(),
+			proficiencies: [
+				proficiency(0, 'Blades', { pathId: 5 }),
+				proficiency(6, 'Runeforging', { pathId: 9, prerequisiteIds: [0] })
+			],
+			paths: bySlot(path(9, 'Runeforging Path', { retiredAt: '2026-01-01T00:00:00Z' }))
+		};
+		expect(computeReferences('paths', 5, src)).toEqual([]);
+	});
+
+	it('still flags a gateway once its own path is confirmed live in the paths catalogue', () => {
+		const src = {
+			...sources(),
+			proficiencies: [
+				proficiency(0, 'Blades', { pathId: 5 }),
+				proficiency(6, 'Runeforging', { pathId: 9, prerequisiteIds: [0] })
+			],
+			paths: bySlot(path(9, 'Runeforging Path'))
+		};
+		expect(computeReferences('paths', 5, src)).toEqual([
+			{ kind: 'prerequisiteOf', names: ['Runeforging'], strong: true }
+		]);
 	});
 });
 

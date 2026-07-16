@@ -20,6 +20,7 @@ export function referenceSourcesFromStatic(overrides: Partial<ReferenceSources> 
 		skillRecipes: staticData.skillRecipes ?? [],
 		proficiencies: staticData.proficiencies ?? [],
 		skills: staticData.skills ?? [],
+		paths: staticData.paths ?? [],
 		...overrides
 	};
 }

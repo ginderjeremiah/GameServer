@@ -5,6 +5,7 @@ import {
 	type IEnemy,
 	type IItem,
 	type IItemMod,
+	type IPath,
 	type IProficiency,
 	type ISkill,
 	type ISkillRecipe,
@@ -31,6 +32,7 @@ export interface ReferenceSources {
 	skillRecipes: ISkillRecipe[];
 	proficiencies: IProficiency[];
 	skills: ISkill[];
+	paths: IPath[];
 }
 
 /** A category of inbound reference and the names of the records that make it. */
@@ -148,15 +150,20 @@ const proficiencyReferences = (
 };
 
 /**
- * A path is referenced through its tiers: another (still-live) proficiency naming one of this
- * path's tiers as a cross-path prerequisite. Retiring the path freezes those tiers, so such a
- * gateway could then never open — the same soft-lock `AdminPaths.FindRetiredPathGatingLiveGateway`
- * rejects server-side. Marked `strong` since this is a real (not just advisory) save-time block.
+ * A path is referenced through its tiers: another proficiency naming one of this path's tiers as a
+ * cross-path prerequisite. Retiring the path freezes those tiers, so such a gateway could then
+ * never open — the same soft-lock `AdminPaths.FindRetiredPathGatingLiveGateway` rejects
+ * server-side, and only when the gateway's **own** path stays live (`PathStaysLive`) — a gateway
+ * on an already-retired path is already dead content, not a fresh soft-lock. Marked `strong` since
+ * this is a real (not just advisory) save-time block.
  */
-const pathReferences = (id: number, { proficiencies }: ReferenceSources): ReferenceGroup[] => {
+const pathReferences = (id: number, { proficiencies, paths }: ReferenceSources): ReferenceGroup[] => {
 	const tierIds = new Set(proficiencies.filter((p) => p.pathId === id).map((p) => p.id));
 	const prerequisiteOf = proficiencies
-		.filter((p) => p.pathId !== id && p.prerequisiteIds.some((prereqId) => tierIds.has(prereqId)))
+		.filter(
+			(p) =>
+				p.pathId !== id && p.prerequisiteIds.some((prereqId) => tierIds.has(prereqId)) && !paths[p.pathId]?.retiredAt
+		)
 		.map((p) => p.name);
 	return group('prerequisiteOf', prerequisiteOf, true);
 };
