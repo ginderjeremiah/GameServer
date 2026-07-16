@@ -111,6 +111,26 @@ describe('ownCatalogueOverride (#1976)', () => {
 
 		expect(groups.find((g) => g.kind === 'spawnsIn')?.names).toEqual(['Sunken Ruins']);
 	});
+
+	it("reflects this session's renamed skill when naming a referencing recipe (skills self-reference)", () => {
+		staticData.skills = [
+			{ id: 0, name: 'Fire Bolt (last saved)' },
+			{ id: 1, name: 'Ice Shard' }
+		];
+		staticData.skillRecipes = [{ id: 0, resultSkillId: 0, inputSkillIds: [1], conditions: [] }];
+		const liveSkills = [
+			{ id: -1, name: 'New Skill (unsaved)' },
+			// This session renamed the recipe's result skill but hasn't saved — staticData still shows the old name.
+			{ id: 0, name: 'Fire Bolt (renamed this session)' },
+			{ id: 1, name: 'Ice Shard' }
+		];
+
+		const sources = referenceSourcesFromStatic(ownCatalogueOverride('skills', liveSkills));
+		// Retiring Ice Shard (id 1), an input of the recipe named after its live (renamed) result skill.
+		const groups = computeReferences('skills', 1, sources);
+
+		expect(groups.find((g) => g.kind === 'recipeInput')?.names).toEqual(['Fire Bolt (renamed this session)']);
+	});
 });
 
 describe('retireWithConfirm', () => {

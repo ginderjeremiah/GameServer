@@ -61,6 +61,9 @@ function denseByLiveId<T extends { id: number }>(live: T[]): T[] {
  * array index rather than `proficiencies`' always-`.filter()`-based lookups.
  */
 export function ownCatalogueOverride(entityKey: string, items: { id: number }[]): Partial<ReferenceSources> {
+	// The computed key can't narrow past `string`, and `items` is the generic `{ id }[]` shape rather
+	// than `IEnemy[]`/`ISkill[]` — sound here because the guard restricts entityKey to `enemies`/
+	// `skills`, and `items` (an EntityStore's `.items`) are always that entity's live full records.
 	return SELF_REFERENCING_KEYS.has(entityKey)
 		? ({ [entityKey]: denseByLiveId(items) } as unknown as Partial<ReferenceSources>)
 		: {};
