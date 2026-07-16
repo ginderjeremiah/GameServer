@@ -16,24 +16,24 @@ namespace Game.DataAccess
 
     internal sealed class CachedPlayerStatistic
     {
-        public int StatisticTypeId { get; set; }
-        public int? EntityId { get; set; }
-        public decimal Value { get; set; }
+        public required int StatisticTypeId { get; set; }
+        public required int? EntityId { get; set; }
+        public required decimal Value { get; set; }
     }
 
     internal sealed class CachedPlayerChallenge
     {
-        public int ChallengeId { get; set; }
-        public decimal Progress { get; set; }
-        public bool Completed { get; set; }
-        public DateTime? CompletedAt { get; set; }
+        public required int ChallengeId { get; set; }
+        public required decimal Progress { get; set; }
+        public required bool Completed { get; set; }
+        public required DateTime? CompletedAt { get; set; }
     }
 
     internal sealed class CachedPlayerProficiency
     {
-        public int ProficiencyId { get; set; }
-        public int Level { get; set; }
-        public decimal Xp { get; set; }
+        public required int ProficiencyId { get; set; }
+        public required int Level { get; set; }
+        public required decimal Xp { get; set; }
     }
 
     /// <summary>

@@ -7,6 +7,8 @@ using Game.Core.Players;
 using Game.Core.Progress;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using CoreChallenge = Game.Core.Progress.PlayerChallenge;
 using CoreProficiency = Game.Core.Progress.PlayerProficiency;
 using CoreStat = Game.Core.Progress.PlayerStatistic;
@@ -18,13 +20,15 @@ namespace Game.DataAccess.Repositories
         IChallenges challenges,
         ICacheService cache,
         IPubSubService pubsub,
-        PlayerUpdateBatch updateBatch) : IPlayerProgressRepository
+        PlayerUpdateBatch updateBatch,
+        ILogger<PlayerProgressRepository> logger) : IPlayerProgressRepository
     {
         private readonly GameContext _context = context;
         private readonly IChallenges _challenges = challenges;
         private readonly ICacheService _cache = cache;
         private readonly IPubSubService _pubsub = pubsub;
         private readonly PlayerUpdateBatch _updateBatch = updateBatch;
+        private readonly ILogger<PlayerProgressRepository> _logger = logger;
 
         // Sliding idle TTL for the cached progress aggregate, mirroring the player cache (#439): written on
         // every save and load-miss re-cache, refreshed on every hit, so an active player never ages out while
@@ -180,8 +184,30 @@ namespace Game.DataAccess.Repositories
 
             var key = ProgressKey(playerId);
             var raw = await _cache.HashGetAllIfExists(key, cancellationToken);
-            CachedPlayerProgress progress;
-            if (raw is null)
+            CachedPlayerProgress? progress = null;
+            if (raw is not null)
+            {
+                try
+                {
+                    progress = FromHashFields(raw);
+
+                    // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
+                    _cache.ExpireAndForget(key, ProgressCacheTtl);
+                }
+                catch (JsonException ex)
+                {
+                    // A row that no longer deserializes (e.g. a shape change to one of the cached row models'
+                    // required members) is corruption, not data — the row models are all-required specifically so
+                    // this throws instead of silently defaulting a shrunken/zeroed row that Save would then upsert
+                    // to Postgres as an absolute value. Postgres remains the durable copy, so this self-heals the
+                    // same way PlayerRepository.GetPlayer treats a corrupt player blob: delete the key and fall
+                    // through to the DB reload below rather than locking progress reads for the rest of the TTL (#2000).
+                    _logger.LogError(ex, "Cached progress for player {PlayerId} at key '{Key}' failed to deserialize; deleting the key and reloading from the database.", playerId, key);
+                    await _cache.Delete(key, cancellationToken);
+                }
+            }
+
+            if (progress is null)
             {
                 // This reload just read the authoritative full state from the DB, so it's the one place that
                 // may safely *create* the hash — Save's advance (above) only ever holds this save's dirty
@@ -192,12 +218,6 @@ namespace Game.DataAccess.Repositories
                 progress = await LoadFromDb(playerId, cancellationToken);
                 var fields = ToHashFields(progress);
                 _cache.HashSetAndForget(key, fields.Count > 0 ? fields : PresenceMarkerFields, ProgressCacheTtl);
-            }
-            else
-            {
-                // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
-                _cache.ExpireAndForget(key, ProgressCacheTtl);
-                progress = FromHashFields(raw);
             }
 
             _memo = (playerId, progress);
@@ -370,27 +390,22 @@ namespace Game.DataAccess.Repositories
             {
                 if (field.StartsWith("S_", StringComparison.Ordinal))
                 {
-                    var stat = value.Deserialize<CachedPlayerStatistic>();
-                    if (stat is not null)
-                    {
-                        progress.Statistics.Add(stat);
-                    }
+                    // A row that deserializes to null (e.g. a literal "null" blob) is corruption exactly like a
+                    // required-member mismatch — throwing here (rather than silently skipping) routes it through
+                    // the same delete-and-reload self-heal instead of shadowing the row's DB copy behind a
+                    // present-but-incomplete key (#2000).
+                    var stat = value.Deserialize<CachedPlayerStatistic>() ?? throw new JsonException($"Progress field '{field}' deserialized to null.");
+                    progress.Statistics.Add(stat);
                 }
                 else if (field.StartsWith("C_", StringComparison.Ordinal))
                 {
-                    var challenge = value.Deserialize<CachedPlayerChallenge>();
-                    if (challenge is not null)
-                    {
-                        progress.Challenges.Add(challenge);
-                    }
+                    var challenge = value.Deserialize<CachedPlayerChallenge>() ?? throw new JsonException($"Progress field '{field}' deserialized to null.");
+                    progress.Challenges.Add(challenge);
                 }
                 else if (field.StartsWith("P_", StringComparison.Ordinal))
                 {
-                    var proficiency = value.Deserialize<CachedPlayerProficiency>();
-                    if (proficiency is not null)
-                    {
-                        progress.Proficiencies.Add(proficiency);
-                    }
+                    var proficiency = value.Deserialize<CachedPlayerProficiency>() ?? throw new JsonException($"Progress field '{field}' deserialized to null.");
+                    progress.Proficiencies.Add(proficiency);
                 }
             }
 
