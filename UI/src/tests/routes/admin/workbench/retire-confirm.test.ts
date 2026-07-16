@@ -9,9 +9,11 @@ vi.mock('$stores', () => ({ dangerModal, staticData }));
 
 import {
 	deleteWithConfirm,
+	ownCatalogueOverride,
 	referenceSourcesFromStatic,
 	retireWithConfirm
 } from '$routes/admin/workbench/retire-confirm';
+import { computeReferences } from '$routes/admin/workbench/references';
 import type { ReferenceSources } from '$routes/admin/workbench/references';
 
 const emptySources: ReferenceSources = {
@@ -71,6 +73,65 @@ describe('referenceSourcesFromStatic', () => {
 
 		expect(sources.proficiencies).toBe(liveProficiencies);
 		expect(sources.enemies).toBe(staticData.enemies);
+	});
+});
+
+describe('ownCatalogueOverride (#1976)', () => {
+	it('is a no-op for an entity whose reference lookup never reads its own catalogue', () => {
+		const items = [{ id: 0, name: 'Verdant Hollow' }];
+		expect(ownCatalogueOverride('zones', items)).toEqual({});
+	});
+
+	it('rebuilds a dense-by-id enemies array from live store items, ignoring never-saved (negative-id) additions', () => {
+		// EntityStore.addItem prepends new records, so a session that added one enemy before retiring
+		// an original one sees array position 0 hold the new (negative-id) enemy, not id 0.
+		const liveItems = [
+			{ id: -1, name: 'New Enemy (unsaved)', spawns: [{ zoneId: 9, weight: 1 }] },
+			{ id: 0, name: 'Cave Bat', spawns: [{ zoneId: 2, weight: 7 }] },
+			{ id: 1, name: 'Catacomb Lich', spawns: [] }
+		];
+
+		const override = ownCatalogueOverride('enemies', liveItems);
+
+		expect(override.enemies?.[0]).toEqual(liveItems[1]);
+		expect(override.enemies?.[1]).toEqual(liveItems[2]);
+		expect(override.enemies?.[-1]).toBeUndefined();
+	});
+
+	it("reflects this session's edited spawns when computing an enemy's own referenced-by surface", () => {
+		staticData.enemies = [{ id: 0, name: 'Cave Bat (last saved)', spawns: [] }];
+		// staticData is server-dense (zero-based-id invariant), so index 0 must resolve to id 0 too.
+		staticData.zones = [{ id: 0, name: 'Sunken Ruins' }];
+		const liveEnemies = [
+			{ id: -1, name: 'New Enemy (unsaved)', spawns: [] },
+			// This session added a spawn row not yet saved — staticData still shows an empty spawn list.
+			{ id: 0, name: 'Cave Bat', spawns: [{ zoneId: 0, weight: 4 }] }
+		];
+
+		const sources = referenceSourcesFromStatic(ownCatalogueOverride('enemies', liveEnemies));
+		const groups = computeReferences('enemies', 0, sources);
+
+		expect(groups.find((g) => g.kind === 'spawnsIn')?.names).toEqual(['Sunken Ruins']);
+	});
+
+	it("reflects this session's renamed skill when naming a referencing recipe (skills self-reference)", () => {
+		staticData.skills = [
+			{ id: 0, name: 'Fire Bolt (last saved)' },
+			{ id: 1, name: 'Ice Shard' }
+		];
+		staticData.skillRecipes = [{ id: 0, resultSkillId: 0, inputSkillIds: [1], conditions: [] }];
+		const liveSkills = [
+			{ id: -1, name: 'New Skill (unsaved)' },
+			// This session renamed the recipe's result skill but hasn't saved — staticData still shows the old name.
+			{ id: 0, name: 'Fire Bolt (renamed this session)' },
+			{ id: 1, name: 'Ice Shard' }
+		];
+
+		const sources = referenceSourcesFromStatic(ownCatalogueOverride('skills', liveSkills));
+		// Retiring Ice Shard (id 1), an input of the recipe named after its live (renamed) result skill.
+		const groups = computeReferences('skills', 1, sources);
+
+		expect(groups.find((g) => g.kind === 'recipeInput')?.names).toEqual(['Fire Bolt (renamed this session)']);
 	});
 });
 
