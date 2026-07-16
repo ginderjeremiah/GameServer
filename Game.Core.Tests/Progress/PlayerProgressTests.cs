@@ -955,11 +955,10 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
-        public void RecordBattleCompleted_ZeroFirstWriteMinMaxStatistics_StillCreateAndDirtyTheirRows()
+        public void RecordBattleCompleted_ZeroFirstWriteMinStatistic_StillCreatesAndDirtiesItsRow()
         {
-            // The deliberate asymmetry with the zero-delta Sum skip: Min/Max first-write semantics are
-            // untouched — a first recorded 0 (an instant victory, a battle with no player attack) is a
-            // genuine value, so the row is created and persisted.
+            // Min first-write semantics are untouched by the Max fix below: a first recorded 0 (an instant
+            // victory) is a genuine value a Min stat must lock in, so the row is created and persisted.
             var progress = MakeProgress();
 
             var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
@@ -967,12 +966,24 @@ namespace Game.Core.Tests.Progress
 
             Assert.True(progress.TryGetStatisticValue(EStatisticType.FastestVictory, null, out var fastest));
             Assert.Equal(0m, fastest);
-            Assert.True(progress.TryGetStatisticValue(EStatisticType.HighestSingleAttackDamage, null, out var highest));
-            Assert.Equal(0m, highest);
             Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.FastestVictory && s.EntityId == null);
-            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.HighestSingleAttackDamage && s.EntityId == null);
             Assert.Contains((EStatisticType.FastestVictory, (int?)null), touched);
-            Assert.Contains((EStatisticType.HighestSingleAttackDamage, (int?)null), touched);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_ZeroFirstWriteMaxStatistic_LeavesItAbsentAndUntouched()
+        {
+            // Unlike Min, a Max stat has no legitimate 0 to lock in: the true first positive value would
+            // beat a fresh row's 0 anyway. So a first-write 0 (a battle with no player attack) carries no
+            // information and, like the zero-delta Sum skip, must not create a row or enter the touched set.
+            var progress = MakeProgress();
+
+            var touched = progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false,
+                totalMs: 0, new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.HighestSingleAttackDamage, null, out _));
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.HighestSingleAttackDamage);
+            Assert.DoesNotContain((EStatisticType.HighestSingleAttackDamage, (int?)null), touched);
         }
 
         [Fact]
@@ -1033,8 +1044,9 @@ namespace Game.Core.Tests.Progress
         [Fact]
         public void RecordBattleCompleted_ZeroDamageSkill_RecordsItsUsesButNoDamageDealtRow()
         {
-            // A used utility skill that dealt no damage: the per-skill use count is a real delta, while its
-            // per-skill DamageDealt Sum stays absent (its Max twin keeps first-write semantics).
+            // A used utility skill that dealt no damage: the per-skill use count is a real delta, while both
+            // its per-skill DamageDealt Sum and HighestSingleAttackDamage Max twin stay absent — neither has
+            // a legitimate 0 to record.
             var progress = MakeProgress();
             var stats = new BattleStats
             {
@@ -1047,7 +1059,7 @@ namespace Game.Core.Tests.Progress
 
             Assert.Equal(2m, progress.GetStatisticValue(EStatisticType.SkillsUsed, 10));
             Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDealt, 10, out _));
-            Assert.True(progress.TryGetStatisticValue(EStatisticType.HighestSingleAttackDamage, 10, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.HighestSingleAttackDamage, 10, out _));
         }
 
         [Fact]
