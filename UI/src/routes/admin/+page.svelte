@@ -95,10 +95,13 @@ async function loadReference() {
 }
 
 // Guard the route to Admins, then load the shared reference catalogues (used by every entity's
-// select options, tag UI, and derived spawn shares) before rendering any workbench.
+// select options, tag UI, and derived spawn shares) before rendering any workbench. Reloaded on
+// every mount (not gated on reference.loaded, which stays a render gate only) so catalogues
+// changed by another admin session — or since a much earlier visit this app lifetime — aren't
+// left stale in sibling pickers; the socket reads are cheap and already run in parallel.
 onMount(() => {
 	authorized = ensureAdminAccess();
-	if (authorized && !reference.loaded) {
+	if (authorized) {
 		void loadReference();
 	}
 });
