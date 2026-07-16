@@ -11,7 +11,7 @@ namespace Game.DataAccess.Content
     /// <inheritdoc cref="IContentSeeder"/>
     internal sealed class ContentSeeder : IContentSeeder
     {
-        // Arbitrary key for the seed step's session-scoped Postgres advisory lock — the only one this app
+        // Arbitrary key for the seed step's transaction-scoped Postgres advisory lock — the only one this app
         // takes directly, distinct from EF's own migration-history advisory lock key (which is released
         // before seeding runs anyway).
         private const long SeedAdvisoryLockKey = 2042;
