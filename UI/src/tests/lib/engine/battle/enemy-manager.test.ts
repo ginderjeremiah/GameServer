@@ -385,6 +385,27 @@ describe('EnemyManager.getNewEnemy', () => {
 	});
 });
 
+describe('EnemyManager.stop', () => {
+	it('clears the current enemy so it does not briefly render on the next session before the first fetch replaces it', () => {
+		const manager = new EnemyManager();
+		manager.started = true;
+		manager.currentEnemy = makeEnemy(1);
+
+		manager.stop();
+
+		expect(manager.currentEnemy).toBeUndefined();
+	});
+
+	it('is a no-op when the manager was never started', () => {
+		const manager = new EnemyManager();
+		manager.currentEnemy = makeEnemy(1);
+
+		manager.stop();
+
+		expect(manager.currentEnemy).toEqual(makeEnemy(1));
+	});
+});
+
 describe('EnemyManager.start', () => {
 	let manager: EnemyManager;
 	let sendSocketCommand: ReturnType<typeof vi.spyOn>;

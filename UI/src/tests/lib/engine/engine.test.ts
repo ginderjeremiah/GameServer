@@ -19,7 +19,8 @@ const {
 	playerProficienciesStub,
 	resetLogs,
 	toastSuccess,
-	navigation
+	navigation,
+	clearToasts
 } = vi.hoisted(() => ({
 	staticDataStub: { loaded: true } as {
 		loaded: boolean;
@@ -44,7 +45,8 @@ const {
 	},
 	resetLogs: vi.fn(),
 	toastSuccess: vi.fn(),
-	navigation: { requestScreen: vi.fn() }
+	navigation: { requestScreen: vi.fn(), reset: vi.fn() },
+	clearToasts: vi.fn()
 }));
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
@@ -56,7 +58,8 @@ vi.mock('$stores', async () => {
 		playerProficiencies: playerProficienciesStub,
 		resetLogs,
 		toastSuccess,
-		navigation
+		navigation,
+		clearToasts
 	};
 });
 
@@ -158,7 +161,7 @@ import {
 	battleEngine,
 	inventoryManager
 } from '$lib/engine/engine';
-import { activeModal, clearModals, confirmActiveModal } from '$stores/modal.svelte';
+import { activeModal, clearModals, confirmActiveModal, showModal } from '$stores/modal.svelte';
 import { createHook } from '$lib/common/hooks';
 import { onDestroy } from 'svelte';
 import {
@@ -361,6 +364,29 @@ describe('startGame', () => {
 		void handleSocketReplaced();
 
 		expect(disconnect).toHaveBeenCalledTimes(1);
+	});
+
+	it('stopGame clears any active toasts so they cannot leak onto the next session/login screen (#2038)', () => {
+		startGame();
+		void handleSocketReplaced();
+
+		expect(clearToasts).toHaveBeenCalledTimes(1);
+	});
+
+	it('stopGame clears any queued modal rather than leaving it to show ahead of the session-replaced acknowledgement (#2038)', async () => {
+		const priorModal = showModal({ title: 'Old', body: 'A stale confirm dialog' });
+
+		void handleSocketReplaced();
+
+		await expect(priorModal).resolves.toBe(false);
+		expect(activeModal.current?.title).toBe(SESSION_REPLACED_TITLE);
+	});
+
+	it('stopGame resets the navigation intent so a queued screen request cannot leak into the next session (#2038)', () => {
+		startGame();
+		void handleSocketReplaced();
+
+		expect(navigation.reset).toHaveBeenCalledTimes(1);
 	});
 
 	it("unhooks the previous call's listeners before re-registering, so a remount cannot leak them (#1807)", () => {

@@ -147,6 +147,9 @@ export class EnemyManager {
 			// Teardown (screen unmount / session end), not a user intent change, so don't sync the persisted
 			// loop mode — clobbering it to idle here would lose a disconnecting boss-farmer's mode.
 			this.returnToIdle(false);
+			// Otherwise the previous session's enemy would briefly render on the next session's re-entry,
+			// until the first fetch replaces it.
+			this.currentEnemy = undefined;
 		}
 	}
 
