@@ -115,12 +115,20 @@ const reloadToBoot = () => {
 };
 const enterWorld = reloadToBoot;
 
+// Bumped on every invocation so a stale fetch (from an opened-then-cancelled-then-reopened switcher)
+// can detect it's no longer the latest and skip applying its result, mirroring SkillsView.commitSeq.
+let loadSeq = 0;
+
 const loadCharacters = async () => {
+	const seq = ++loadSeq;
 	phase = 'loading';
 	loadError = null;
 	view = null;
 
 	const response = await new ApiRequest('Login/Players').get();
+	if (seq !== loadSeq) {
+		return;
+	}
 	if (response.status !== 200 || !response.data) {
 		loadError = response.error ?? 'Could not load your characters.';
 		phase = 'error';

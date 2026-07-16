@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
 
 // Doubles for the switcher's wiring: ApiRequest is keyed by route (get for the list, post for the
 // switch/create), and the socket teardown, engine stop, token storage, and takeover are mocked so the
@@ -183,6 +184,44 @@ describe('CharacterSwitcher', () => {
 		await fireEvent.keyDown(window, { key: 'Escape' });
 
 		expect(onClose).toHaveBeenCalled();
+	});
+
+	it('ignores a stale character-list response that resolves after a fresher reopen', async () => {
+		// The first (cancelled-then-reopened) load's response resolves *after* the second load's, and must
+		// not clobber it — the exact race #2045 fixes with a generation counter.
+		const reopenedSummaries = [
+			SUMMARIES[0],
+			{ id: 3, name: 'Mage', level: 2, currentZoneId: 0, lastActivity: '2026-06-21T00:00:00Z' }
+		];
+		let resolveStale: (value: unknown) => void = () => {};
+		let playersCalls = 0;
+		getMock.mockImplementation((route: string) => {
+			if (route !== 'Login/Players') {
+				return Promise.resolve({ status: 200, data: [CREATABLE_CLASS] });
+			}
+			playersCalls += 1;
+			if (playersCalls === 1) {
+				return new Promise((resolve) => {
+					resolveStale = resolve;
+				});
+			}
+			return Promise.resolve({ status: 200, data: reopenedSummaries });
+		});
+
+		const { rerender } = render(CharacterSwitcher, { open: true, onClose: vi.fn() });
+		await waitFor(() => expect(playersCalls).toBe(1));
+
+		await rerender({ open: false, onClose: vi.fn() });
+		await rerender({ open: true, onClose: vi.fn() });
+		await waitFor(() => expect(screen.queryByText('Mage')).toBeTruthy());
+
+		// The stale first request resolves last, with the original (Rogue-included) list.
+		resolveStale({ status: 200, data: SUMMARIES });
+		await tick();
+		await tick();
+
+		expect(screen.getByText('Mage')).toBeTruthy();
+		expect(screen.queryByText('Rogue')).toBeNull();
 	});
 
 	it('does not load characters while closed', async () => {
