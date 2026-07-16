@@ -91,6 +91,31 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public async Task SeedAsync_ConcurrentFreshBoots_ExactlyOneSeedsAndTheLoserNoOpsCleanly()
+        {
+            // Simulates two instances booting simultaneously against a fresh database: both would pass the
+            // outside-transaction presence check, so the advisory lock inside the transaction (not the
+            // outer check) is what must keep the loser from racing the insert into a PK violation.
+            using var scopeA = CreateScope();
+            using var scopeB = CreateScope();
+            var import = scopeA.ServiceProvider.GetRequiredService<IContentImportReader>().Read(RepoPaths.ContentDirectory());
+            var seederA = scopeA.ServiceProvider.GetRequiredService<IContentSeeder>();
+            var seederB = scopeB.ServiceProvider.GetRequiredService<IContentSeeder>();
+
+            var results = await Task.WhenAll(
+                seederA.SeedAsync(import, CancellationToken),
+                seederB.SeedAsync(import, CancellationToken));
+
+            Assert.Single(results, result => result);
+            Assert.Single(results, result => !result);
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skillCount = await context.Set<EntitySkill>().CountAsync(CancellationToken);
+            Assert.Equal(import.Skills.Count, skillCount);
+        }
+
+        [Fact]
         public async Task SeedAsync_TaggedItemMod_SeedsTagCatalogueAndResolvesJoin()
         {
             // Tags are not one of the intrinsic (migration-seeded) sets, so a fresh DB has none. Seeding a tagged
