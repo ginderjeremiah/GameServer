@@ -98,15 +98,15 @@ export class InventoryManager {
 
 	public initialize() {
 		this.generation++;
-		this.unlockedItems.clear();
-		this.unlockedMods.clear();
-		this.equippedSlots = new Array(6).fill(undefined);
+		const unlockedItems: Map<number, Item> = new Map();
+		const unlockedMods: Set<number> = new Set();
+		const equippedSlots: (Item | undefined)[] = new Array(6).fill(undefined);
 
 		const data = playerManager.inventoryData;
 
 		// Load unlocked mods
 		for (const modId of data.unlockedMods) {
-			this.unlockedMods.add(modId);
+			unlockedMods.add(modId);
 		}
 
 		// Load unlocked items
@@ -117,13 +117,18 @@ export class InventoryManager {
 				logMessage(ELogType.Debug, `Skipped unlocked item with unknown id ${invItem.itemId}.`);
 				continue;
 			}
-			this.unlockedItems.set(invItem.itemId, item);
+			unlockedItems.set(invItem.itemId, item);
 
 			// Place equipped items into their equipment slots
 			if (invItem.equipped && invItem.equipmentSlotId != null) {
-				this.equippedSlots[invItem.equipmentSlotId] = item;
+				equippedSlots[invItem.equipmentSlotId] = item;
 			}
 		}
+
+		// Reassign (not mutate) so statify/$state tracks the change, mirroring addUnlockedMod.
+		this.unlockedItems = unlockedItems;
+		this.unlockedMods = unlockedMods;
+		this.equippedSlots = equippedSlots;
 
 		this.publish();
 		this.refreshEquipmentStats();
