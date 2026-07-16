@@ -9,7 +9,7 @@ import {
 } from '$lib/api';
 import { PUNCH_SKILL_ID } from '$lib/api/types/game-constants';
 import { playerManager } from '$lib/engine';
-import { BattleAttributes, Item, newItem, newItemMod } from '$lib/battle';
+import { Item, newItem, newItemMod } from '$lib/battle';
 import { logMessage } from '$lib/engine/log';
 import { SerializedQueue } from '$lib/common';
 import { staticData } from '$stores';
@@ -440,8 +440,7 @@ export class InventoryManager {
 
 	/** Rebuilds an item's cached totalAttributes after its applied mods change. */
 	private refreshItemAttributes(item: Item) {
-		const allAttributes = [...item.attributes, ...item.appliedMods.flatMap((mod) => mod.attributes)];
-		item.totalAttributes = new BattleAttributes(allAttributes, false);
+		item.totalAttributes = item.recomputeTotalAttributes();
 	}
 
 	/** Refreshes the memoised equipmentStats only when the changed item is equipped — an unequipped

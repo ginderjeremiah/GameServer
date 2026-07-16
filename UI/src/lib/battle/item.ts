@@ -57,10 +57,12 @@ export class Item implements IItem {
 		this.favorite = invItem.favorite ?? false;
 		// Drop any applied mod whose own definition is missing/retired so one stale mod can't crash the item.
 		this.appliedMods = invItem.appliedMods.map((am) => newItemMod(am)).filter((mod): mod is ItemMod => mod != null);
-		this.totalAttributes = new BattleAttributes(
-			[...this.attributes, ...this.appliedMods.flatMap((mod) => mod.attributes)],
-			false
-		);
+		this.totalAttributes = this.recomputeTotalAttributes();
+	}
+
+	/** Rebuilds the cached totalAttributes from the item's base attributes plus its applied mods. */
+	recomputeTotalAttributes(): BattleAttributes {
+		return new BattleAttributes([...this.attributes, ...this.appliedMods.flatMap((mod) => mod.attributes)], false);
 	}
 }
 
