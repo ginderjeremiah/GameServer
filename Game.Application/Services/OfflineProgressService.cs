@@ -178,9 +178,6 @@ namespace Game.Application.Services
             // retry together rather than progress already being durably committed while the player save fails
             // (#1921) — the same failure atomicity SavePlayer already gives a progress save reached through its
             // own domain-event dispatch on the live battle-completion path.
-            // Ordering matters here: SavePlayer opens its own nested BeginBatch scope internally and that
-            // scope's disposal ends the shared window (PlayerUpdateBatch.PlayerSaveInProgress is a plain bool,
-            // not a refcount), so any progress save sharing this batch must run *before* SavePlayer, not after.
             using (_playerRepo.BeginBatch())
             {
                 rewards = await ApplyOfflineRewards(player, progress, result, awayWindowEnd, cancellationToken);

@@ -28,6 +28,28 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public void PlayerSaveInProgress_StaysTrueAcrossNestedScope_UntilTheOutermostDisposes()
+        {
+            var batch = new PlayerUpdateBatch();
+
+            // Mirrors OfflineProgressService: an outer BeginBatch scope wraps a nested SavePlayer, whose own
+            // internal BeginPlayerSave must not end the outer caller's window when it disposes first (#2001).
+            using (batch.BeginPlayerSave())
+            {
+                Assert.True(batch.PlayerSaveInProgress);
+
+                using (batch.BeginPlayerSave())
+                {
+                    Assert.True(batch.PlayerSaveInProgress);
+                }
+
+                Assert.True(batch.PlayerSaveInProgress);
+            }
+
+            Assert.False(batch.PlayerSaveInProgress);
+        }
+
+        [Fact]
         public void RunFlushedCallbacks_RunsRegisteredActionsInOrder_ThenClearsThem()
         {
             var batch = new PlayerUpdateBatch();

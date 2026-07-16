@@ -25,12 +25,18 @@ namespace Game.DataAccess
         private readonly List<DomainEventEnvelope> _events = [];
         private readonly List<Action> _onFlushed = [];
 
+        private int _playerSaveDepth;
+
         /// <summary>
         /// True while a <see cref="Repositories.PlayerRepository.SavePlayer"/> is mid-flight — between
         /// <see cref="BeginPlayerSave"/> and the returned scope's disposal. A progress save observing this
-        /// joins the in-flight player save's single flush rather than publishing on its own.
+        /// joins the in-flight player save's single flush rather than publishing on its own. Tracked as a
+        /// depth counter rather than a flag so a nested <see cref="BeginPlayerSave"/> — e.g.
+        /// <c>SavePlayer</c>'s own internal scope opened while an outer caller already holds one via
+        /// <see cref="Repositories.PlayerRepository.BeginBatch"/> — doesn't end the outer scope's window when
+        /// the inner one disposes first.
         /// </summary>
-        public bool PlayerSaveInProgress { get; private set; }
+        public bool PlayerSaveInProgress => _playerSaveDepth > 0;
 
         public void Add(DomainEventEnvelope envelope)
         {
@@ -50,11 +56,12 @@ namespace Game.DataAccess
 
         /// <summary>
         /// Marks a player save as in progress until the returned scope is disposed, so a progress save raised
-        /// during its event dispatch joins this batch instead of publishing independently.
+        /// during its event dispatch joins this batch instead of publishing independently. Safe to nest — the
+        /// window stays open until every <see cref="BeginPlayerSave"/> call has had its scope disposed.
         /// </summary>
         public IDisposable BeginPlayerSave()
         {
-            PlayerSaveInProgress = true;
+            _playerSaveDepth++;
             return new PlayerSaveScope(this);
         }
 
@@ -96,7 +103,7 @@ namespace Game.DataAccess
 
         private sealed class PlayerSaveScope(PlayerUpdateBatch batch) : IDisposable
         {
-            public void Dispose() => batch.PlayerSaveInProgress = false;
+            public void Dispose() => batch._playerSaveDepth--;
         }
     }
 }
