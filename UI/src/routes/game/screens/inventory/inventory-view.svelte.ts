@@ -76,8 +76,9 @@ export class InventoryView {
 
 	// Resolve selection/drag through the manager's itemId-keyed Map (its own O(1) access convention)
 	// rather than a linear scan of the list; `items` stays the source for list/count derivations.
-	// NOTE: unlockedItems is a plain (non-reactive) Map, so these re-resolve only on id changes, not on
-	// set changes — fine while items are add-only; if a removal path lands, clear the ids on removal.
+	// NOTE: unlockedItems is a plain (non-reactive) Map, so these re-resolve on a reassignment
+	// (initialize()'s resync) but not on an in-place add — fine while addUnlockedItem is add-only;
+	// if a removal path lands, clear the ids on removal.
 	readonly selected = $derived(
 		this.selectedId != null ? (inventoryManager.unlockedItems.get(this.selectedId) ?? null) : null
 	);
