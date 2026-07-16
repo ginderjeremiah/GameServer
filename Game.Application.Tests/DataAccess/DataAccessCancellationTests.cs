@@ -113,6 +113,19 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task Publish_WhenTokenAlreadyCancelled_ThrowsOperationCanceled()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+
+            // RedisPubSubService.Publish now routes through RedisCommandBudget.Write like every other awaited
+            // write in the tier (#2002), so a pre-cancelled token unwinds it promptly instead of racing the
+            // bare WaitAsync it used to call directly.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => pubsub.Publish($"pubsub-cancel-{Guid.NewGuid()}", "message", AlreadyCancelled()));
+        }
+
+        [Fact]
         public async Task CommitAsync_WithPendingChanges_WhenTokenAlreadyCancelled_ThrowsOperationCanceled()
         {
             using var scope = CreateScope();

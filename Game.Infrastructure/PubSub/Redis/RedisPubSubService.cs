@@ -1,5 +1,6 @@
 ﻿using Game.Abstractions.Infrastructure;
 using Game.Core;
+using Game.Infrastructure.Redis;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System.Collections.Concurrent;
@@ -15,6 +16,10 @@ namespace Game.Infrastructure.PubSub.Redis
         // Records the channel a handle was subscribed on, so UnSubscribe never has to trust a caller-supplied
         // channel that might not match (#1825).
         private static readonly ConcurrentDictionary<string, (string channel, Action<RedisChannel, RedisValue> handler, BackgroundWorker? worker)> _handles = [];
+
+        // Mirrors RedisService/RedisQueue's WriteFaultMessage: an abandoned command that later faults has no other
+        // signal, so it is logged rather than lost.
+        private const string PublishFaultMessage = "A Redis publish faulted after its command budget was cancelled; the broadcast may not have been delivered.";
 
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<RedisPubSubService> _logger;
@@ -36,9 +41,12 @@ namespace Game.Infrastructure.PubSub.Redis
         // them (e.g. the reference-data invalidation channel), so a genuine send failure must propagate to the
         // caller rather than vanish silently the way CommandFlags.FireAndForget would swallow it. Contrast with
         // Wake below, whose fire-and-forget is safe because a durable queue write already backs it.
-        public async Task Publish(string channel, string message, CancellationToken cancellationToken = default)
+        // Routed through RedisCommandBudget.Write like every other awaited write in the tier (#2002), so a
+        // cancellation that races an already-completed publish is honoured rather than silently swallowed, and a
+        // fault on an abandoned publish is logged instead of surfacing via TaskScheduler.UnobservedTaskException.
+        public Task Publish(string channel, string message, CancellationToken cancellationToken = default)
         {
-            await Redis.PublishAsync(RedisChannel.Literal(channel), message).WaitAsync(cancellationToken);
+            return RedisCommandBudget.Write(Redis.PublishAsync(RedisChannel.Literal(channel), message), cancellationToken, _logger, PublishFaultMessage);
         }
 
         // A bare channel wake: a fire-and-forget empty publish that only nudges the consumer to drain its queue.
