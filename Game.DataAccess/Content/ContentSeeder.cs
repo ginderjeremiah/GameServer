@@ -11,6 +11,11 @@ namespace Game.DataAccess.Content
     /// <inheritdoc cref="IContentSeeder"/>
     internal sealed class ContentSeeder : IContentSeeder
     {
+        // Arbitrary key for the seed step's transaction-scoped Postgres advisory lock — the only one this app
+        // takes directly, distinct from EF's own migration-history advisory lock key (which is released
+        // before seeding runs anyway).
+        private const long SeedAdvisoryLockKey = 2042;
+
         private readonly GameContext _context;
 
         public ContentSeeder(GameContext context)
@@ -58,6 +63,20 @@ namespace Game.DataAccess.Content
             var insertedTypes = new HashSet<Type>();
 
             await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+            // The guard above runs outside the transaction (default READ COMMITTED), so two instances booting
+            // concurrently against a fresh database can both pass it. The advisory lock serializes the actual
+            // seed: it blocks until any other in-flight seed transaction commits or rolls back, then the
+            // recheck below sees that transaction's result — so at most one instance ever inserts, and a
+            // loser skips cleanly instead of racing the insert into a PK violation. Xact-scoped, so it
+            // releases automatically on commit/rollback; mirrors the row-lock check-then-act pattern in
+            // Users.cs, just with no natural row to lock here.
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({SeedAdvisoryLockKey})", cancellationToken);
+            if (await _context.Set<EntitySkill>().AnyAsync(cancellationToken))
+            {
+                return false;
+            }
 
             // Insert referenced sets before referencing ones, and parents before their children. Paths and
             // skills have no static-content dependencies; proficiencies reward skills; items gate on
