@@ -23,7 +23,8 @@ const emptySources: ReferenceSources = {
 	classes: [],
 	skillRecipes: [],
 	proficiencies: [],
-	skills: []
+	skills: [],
+	paths: []
 };
 
 beforeEach(() => {
@@ -37,7 +38,8 @@ beforeEach(() => {
 		'classes',
 		'skillRecipes',
 		'proficiencies',
-		'skills'
+		'skills',
+		'paths'
 	]) {
 		delete staticData[key];
 	}
