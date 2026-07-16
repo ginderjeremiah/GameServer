@@ -133,7 +133,12 @@
 import { fieldsOf, type EntityConfig, type Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
 import { recordsEqual } from '../entity-store.svelte';
-import { deleteWithConfirm, referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
+import {
+	deleteWithConfirm,
+	ownCatalogueOverride,
+	referenceSourcesFromStatic,
+	retireWithConfirm
+} from '../retire-confirm';
 import { sectionWarnings } from '../validation';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import SectionRenderer from './SectionRenderer.svelte';
@@ -157,14 +162,15 @@ const { entity, store, record, baseline, tab, onTab, onNew }: Props = $props();
  * retires without an extra prompt. Advisory only — confirming proceeds, and the record stays
  * resolvable by id either way (see references.ts).
  *
- * Sourced from `staticData` (last-saved), not this pane's own live `store.items`: every reference
- * fn here reads a *sibling* catalogue (an enemy is referenced by zones/challenges, an item by
- * challenges/classes, …), never the one this pane edits, and `store.items` isn't dense-by-id once a
- * record's been added this session (`EntityStore.addItem` prepends negative ids) — indexing it by
- * id, as `enemies[id]?.spawns` and `nameByIndex(skills, …)` do, would resolve the wrong record. See
- * the progression editor's `{ proficiencies: store.profs }` override for the shape this pane would
- * need (index-safe access to every referencing catalogue's own live store) to close this gap
- * generically — tracked as a follow-up rather than attempted here.
+ * Every catalogue but this pane's own comes from `staticData` (last-saved): each of their reference
+ * fns reads a *sibling* catalogue (an enemy is referenced by zones/challenges, an item by
+ * challenges/classes, …) this pane holds no live copy of — closing that gap generically would mean
+ * holding every reference-carrying entity's store alive across a tool switch (see
+ * `ownCatalogueOverride`'s comment), tracked as the remaining part of #1976 rather than attempted
+ * here. This pane's own catalogue is overridden with its live `store.items` for the two entity types
+ * whose reference lookup reads it (enemies' own spawns, a recipe named via the skills catalogue
+ * being retired from) — density-safe, since `store.items` isn't dense-by-id once a record's been
+ * added this session (`EntityStore.addItem` prepends negative ids).
  */
 const onRetire = (rec: Identified) =>
 	retireWithConfirm({
@@ -172,7 +178,7 @@ const onRetire = (rec: Identified) =>
 		id: rec.id,
 		name: entity.title?.(rec) || rec.name || entity.blankName,
 		title: `Retire ${entity.singular}?`,
-		sources: referenceSourcesFromStatic(),
+		sources: referenceSourcesFromStatic(ownCatalogueOverride(entity.key, store.items)),
 		onConfirmed: () => store.setRetired(rec.id, true)
 	});
 

@@ -24,6 +24,48 @@ export function referenceSourcesFromStatic(overrides: Partial<ReferenceSources> 
 	};
 }
 
+/**
+ * Reference-source slots that a generic Workbench entity's own reference function reads (`enemies`
+ * reads its own `spawns`; `skills` names a referencing recipe via its own catalogue) — see
+ * `references.ts`'s `enemyReferences`/`skillReferences`. Every other generic-Workbench entity's
+ * reference function only reads *sibling* catalogues it has no live copy of, so overriding those
+ * slots would be a no-op (#1976's remaining, genuinely cross-catalogue gap — closing it generically
+ * would mean holding every reference-carrying entity's store alive across a tool switch, reversing
+ * the documented one-surface-mounted-at-a-time model in `dirty.svelte.ts`).
+ */
+const SELF_REFERENCING_KEYS = new Set(['enemies', 'skills']);
+
+/**
+ * Rebuilds a zero-based-id-indexed array from a store's live `items`, honouring the Id-as-index
+ * invariant `references.ts`'s self-referential lookups rely on (`docs/backend.md` → _Reference
+ * Data_). `EntityStore.addItem` prepends new records with negative ids, shifting every saved
+ * record's array position, so indexing the live array directly would resolve the wrong record. A
+ * never-saved (negative-id) record is dropped: only an already-saved record can be a retire target
+ * or a referencing recipe's result, so none is looked up by id here.
+ */
+function denseByLiveId<T extends { id: number }>(live: T[]): T[] {
+	const dense: T[] = [];
+	for (const record of live) {
+		if (record.id >= 0) {
+			dense[record.id] = record;
+		}
+	}
+	return dense;
+}
+
+/**
+ * Live override for the generic Workbench entity currently open, closing the self-referential half
+ * of #1976 ("this session's unsaved edits" of the entity's *own* catalogue) for the two entity types
+ * whose reference lookup reads it. A no-op for every other entity. Mirrors the progression editor's
+ * `{ proficiencies: store.profs }` override, but density-safe since enemies/skills are looked up by
+ * array index rather than `proficiencies`' always-`.filter()`-based lookups.
+ */
+export function ownCatalogueOverride(entityKey: string, items: { id: number }[]): Partial<ReferenceSources> {
+	return SELF_REFERENCING_KEYS.has(entityKey)
+		? ({ [entityKey]: denseByLiveId(items) } as unknown as Partial<ReferenceSources>)
+		: {};
+}
+
 interface ConfirmMutationOptions {
 	entityKey: string;
 	id: number;
