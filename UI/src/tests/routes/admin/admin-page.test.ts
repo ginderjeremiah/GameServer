@@ -118,3 +118,21 @@ describe('Admin page — reference-data load failure', () => {
 		expect(screen.getByTestId('workbench-stub').textContent).toBe('Enemies');
 	});
 });
+
+describe('Admin page — reference-data reload on every mount (#2046)', () => {
+	it('refetches the reference catalogues on a later mount instead of trusting the already-loaded flag', async () => {
+		mockFetchSocket.mockReset().mockImplementation(async (command: string) => SOCKET_SETS[command] ?? []);
+
+		const first = render(AdminPage);
+		await waitFor(() => expect(screen.getByTestId('workbench-stub')).toBeTruthy());
+		const callsAfterFirstMount = mockFetchSocket.mock.calls.length;
+		expect(callsAfterFirstMount).toBe(Object.keys(SOCKET_SETS).length);
+		first.unmount();
+
+		// A later mount (re-entering /admin) must not be skipped just because `reference.loaded`
+		// is already true from the first mount — it's a render gate only, not a "loaded once" guard.
+		render(AdminPage);
+		await waitFor(() => expect(mockFetchSocket.mock.calls.length).toBe(callsAfterFirstMount * 2));
+		await waitFor(() => expect(screen.getByTestId('workbench-stub')).toBeTruthy());
+	});
+});
