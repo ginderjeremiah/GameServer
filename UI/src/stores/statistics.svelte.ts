@@ -12,15 +12,23 @@ let loaded = $state(false);
 let error = $state(false);
 
 const fetchStats = async () => {
+	const epoch = loader.currentEpoch;
 	try {
 		// fetchSocketData throws on a socket error, preserving this try/catch contract.
-		stats = (await fetchSocketData('GetPlayerStatistics')) ?? [];
+		const result = (await fetchSocketData('GetPlayerStatistics')) ?? [];
+		if (loader.isStale(epoch)) {
+			// reset() ran while this fetch was in flight; this write belongs to a discarded session.
+			return;
+		}
+		stats = result;
 		error = false;
 		loaded = true;
 	} catch {
 		// A failed load is not a genuine empty result; leave the seal hidden and let
 		// the next load retry. The Statistics screen surfaces the error to the user.
-		error = true;
+		if (!loader.isStale(epoch)) {
+			error = true;
+		}
 	}
 };
 

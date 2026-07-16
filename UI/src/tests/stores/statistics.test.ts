@@ -154,4 +154,37 @@ describe('statistics store', () => {
 		await statistics.load();
 		expect(statistics.isZoneCleared(4)).toBe(true);
 	});
+
+	it('drops an in-flight fetch write that resolves after reset() instead of leaking it into the next session', async () => {
+		const stale = Promise.withResolvers<IPlayerStatistic[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = statistics.load();
+		statistics.reset();
+
+		// The new session's own load starts before the discarded fetch settles.
+		mockFetchSocket.mockResolvedValueOnce([zonesCleared(4, 1)]);
+		const fresh = statistics.load();
+
+		// The stale fetch resolves with the previous character's data; its write must not land.
+		stale.resolve([zonesCleared(3, 1)]);
+		await Promise.all([initial, fresh]);
+
+		expect(statistics.stats).toEqual([zonesCleared(4, 1)]);
+		expect(statistics.loaded).toBe(true);
+	});
+
+	it('does not flag an error when an in-flight fetch rejects after reset() ran', async () => {
+		const stale = Promise.withResolvers<IPlayerStatistic[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = statistics.load();
+		statistics.reset();
+
+		// The discarded fetch rejects after the reset; its catch must not flag the new session.
+		stale.reject(new Error('boom'));
+		await initial;
+
+		expect(statistics.error).toBe(false);
+	});
 });
