@@ -30,6 +30,7 @@
 				class="inp num{dirty ? ' dirty' : ''}"
 				value={(row[col.key] as number) ?? 0}
 				allowNegative={col.allowNegative}
+				commitOnBlur={identity}
 				onChange={(n) => onChange(n)}
 			/>
 			{#if dirty}<DirtyDot />{/if}
@@ -73,10 +74,14 @@ interface Props {
 	rows: TableRow[];
 	record: unknown;
 	dirty: boolean;
+	/** True when this column is the section's row identity (`rowKey`). A `number` identity column
+	 *  defers its commit to blur (see NumInput) so an in-progress multi-digit edit can't transiently
+	 *  collide with a sibling row's identity mid-keystroke. */
+	identity?: boolean;
 	onChange: (value: number | string | undefined) => void;
 }
 
-const { col, row, idx, rows, record, dirty, onChange }: Props = $props();
+const { col, row, idx, rows, record, dirty, identity = false, onChange }: Props = $props();
 
 // For unique select/attribute columns, options already chosen in sibling rows are disabled.
 // These columns' values are always numeric ids, unlike a free-form `text` column's.

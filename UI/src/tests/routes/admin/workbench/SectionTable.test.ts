@@ -299,9 +299,12 @@ describe('SectionTable — editable-identity (rowKey) collections', () => {
 		});
 
 		// Editing the first row's ordinal (0) to the second row's ordinal (1) must not leave two
-		// rows sharing ordinal 1 — that duplicate key crashes Svelte's keyed {#each}.
+		// rows sharing ordinal 1 — that duplicate key crashes Svelte's keyed {#each}. An identity
+		// column commits on blur (not per keystroke), so the edit lands once focus leaves the cell.
 		const ordinalInputs = container.querySelectorAll('input.num');
+		await fireEvent.focus(ordinalInputs[0]);
 		await fireEvent.input(ordinalInputs[0], { target: { value: '1' } });
+		await fireEvent.blur(ordinalInputs[0]);
 
 		const ordinals = store.items[0].steps.map((s) => s.ordinal).sort();
 		expect(ordinals).toEqual([0, 1]);
@@ -309,6 +312,44 @@ describe('SectionTable — editable-identity (rowKey) collections', () => {
 		// The edited row took the new ordinal; its former sibling was swapped to the vacated one.
 		expect(store.items[0].steps.find((s) => s.text === 'First')?.ordinal).toBe(1);
 		expect(store.items[0].steps.find((s) => s.text === 'Second')?.ordinal).toBe(0);
+	});
+
+	it('does not commit (or swap sibling rows) per keystroke while typing a multi-digit ordinal', async () => {
+		// Regression for #2039: typing "12" over step 3's ordinal used to commit "1" on the first
+		// keystroke — colliding with the row holding ordinal 1 and silently swapping it to 3.
+		const store = new EntityStore(config(), [
+			{
+				id: 1,
+				steps: [
+					{ ordinal: 0, text: 'First' },
+					{ ordinal: 1, text: 'Second' },
+					{ ordinal: 2, text: 'Third' },
+					{ ordinal: 3, text: 'Fourth' }
+				]
+			}
+		]);
+		const { container } = render(SectionTable, {
+			props: {
+				section: stepSection as unknown as TableSectionConfig<Identified>,
+				record: store.items[0] as Identified,
+				baseline: store.baselineOf(1),
+				store: store as unknown as EntityStore<Identified>
+			}
+		});
+
+		const ordinalInputs = container.querySelectorAll('input.num');
+		// Retype step 3's (Fourth's) ordinal one keystroke at a time: "3" -> "1" -> "12".
+		await fireEvent.focus(ordinalInputs[3]);
+		await fireEvent.input(ordinalInputs[3], { target: { value: '1' } });
+		await fireEvent.input(ordinalInputs[3], { target: { value: '12' } });
+
+		// Nothing commits mid-edit, so every row (including the one holding ordinal 1) is untouched.
+		expect(store.items[0].steps.map((s) => s.ordinal)).toEqual([0, 1, 2, 3]);
+
+		await fireEvent.blur(ordinalInputs[3]);
+
+		// Only on blur does the final value land — no collision, so no swap is needed.
+		expect(store.items[0].steps.map((s) => s.ordinal)).toEqual([0, 1, 2, 12]);
 	});
 
 	it('typing into then erasing an optional cell returns the row to baseline-equal (not dirty)', async () => {

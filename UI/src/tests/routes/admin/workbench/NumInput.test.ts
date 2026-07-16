@@ -106,3 +106,50 @@ describe('NumInput — in-progress text', () => {
 		expect(onChange).not.toHaveBeenCalled();
 	});
 });
+
+describe('NumInput — commitOnBlur', () => {
+	it('does not call onChange on keystrokes while commitOnBlur is set', async () => {
+		const onChange = vi.fn();
+		const { container } = render(NumInput, { props: { value: 0, onChange, commitOnBlur: true } });
+		const input = container.querySelector('input') as HTMLInputElement;
+		// Focus first (as a real keystroke would) so the not-focused resync effect doesn't clobber
+		// the in-progress text between keystrokes.
+		await fireEvent.focus(input);
+		await fireEvent.input(input, { target: { value: '1' } });
+		await fireEvent.input(input, { target: { value: '12' } });
+		expect(onChange).not.toHaveBeenCalled();
+		expect(input.value).toBe('12');
+	});
+
+	it('commits the final typed value once on blur', async () => {
+		const onChange = vi.fn();
+		const { container } = render(NumInput, { props: { value: 0, onChange, commitOnBlur: true } });
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.focus(input);
+		await fireEvent.input(input, { target: { value: '1' } });
+		await fireEvent.input(input, { target: { value: '12' } });
+		await fireEvent.blur(input);
+		expect(onChange).toHaveBeenCalledTimes(1);
+		expect(onChange).toHaveBeenCalledWith(12);
+	});
+
+	it('does not call onChange on blur when the in-progress text is not a parseable number', async () => {
+		const onChange = vi.fn();
+		const { container } = render(NumInput, { props: { value: 5, onChange, commitOnBlur: true } });
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.focus(input);
+		await fireEvent.input(input, { target: { value: '' } });
+		await fireEvent.blur(input);
+		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it('still commits on every keystroke when commitOnBlur is unset (default)', async () => {
+		const onChange = vi.fn();
+		const { container } = render(NumInput, { props: { value: 0, onChange } });
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: '1' } });
+		await fireEvent.input(input, { target: { value: '12' } });
+		expect(onChange).toHaveBeenNthCalledWith(1, 1);
+		expect(onChange).toHaveBeenNthCalledWith(2, 12);
+	});
+});
