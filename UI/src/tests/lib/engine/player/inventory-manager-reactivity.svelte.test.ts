@@ -175,4 +175,36 @@ describe('InventoryManager reactivity under statify (#1957)', () => {
 
 		cleanup();
 	});
+
+	it('observes unlockedItems/unlockedMods changes through a resync (initialize called again)', () => {
+		mockItems[1] = makeItem(1);
+		mockItemMods[10] = makeItemMod(10);
+		mockInventoryData.unlockedItems = [];
+		mockInventoryData.unlockedMods = [];
+		manager.initialize();
+
+		let itemCount: number | undefined;
+		let modUnlocked: boolean | undefined;
+		const cleanup = $effect.root(() => {
+			const derivedItemCount = $derived(manager.unlockedItems.size);
+			const derivedModUnlocked = $derived(manager.unlockedMods.has(10));
+			$effect(() => {
+				itemCount = derivedItemCount;
+				modUnlocked = derivedModUnlocked;
+			});
+		});
+		flushSync();
+		expect(itemCount).toBe(0);
+		expect(modUnlocked).toBe(false);
+
+		// Simulate a resync delivering an item/mod that weren't present at the last initialize.
+		mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+		mockInventoryData.unlockedMods = [10];
+		manager.initialize();
+		flushSync();
+		expect(itemCount).toBe(1);
+		expect(modUnlocked).toBe(true);
+
+		cleanup();
+	});
 });
