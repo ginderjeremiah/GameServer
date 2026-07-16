@@ -353,6 +353,14 @@ namespace Game.Core.Progress
 
         private void SetMax(EStatisticType type, int? entityId, decimal value)
         {
+            // A first-write 0 carries no information (mirrors Increment's zero-delta skip): the true first
+            // positive value would beat a fresh row's 0 anyway, so there's no legitimate 0 a Max stat needs
+            // to lock in the way SetMin's FastestVictory does.
+            if (value == 0m && !_statistics.ContainsKey((type, entityId)))
+            {
+                return;
+            }
+
             var stat = GetOrCreate(type, entityId, out var created);
             // Record on the first write (created) or a strictly greater value, so the first recorded value
             // wins outright instead of racing the 0 a fresh row starts at. An unimproved value carries no
