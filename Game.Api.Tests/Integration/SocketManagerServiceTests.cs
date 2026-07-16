@@ -204,6 +204,133 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task TryClaimForSwitchCredit_KeyUnset_ClaimsAndReturnsTrue()
+        {
+            const int playerId = 765432;
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+
+            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+            var claimed = await ReadPresenceValueAsync(playerId);
+            Assert.NotNull(claimed);
+            // The claim isn't a real socket id: HasActiveSocket still reports it as present (see the doc
+            // comment on TryClaimForSwitchCredit) since the key itself is what a genuine takeover checks.
+            Assert.True(await socketManager.HasActiveSocket(playerId));
+        }
+
+        [Fact]
+        public async Task TryClaimForSwitchCredit_ActiveSocketAlreadyPresent_ReturnsFalseAndLeavesItIntact()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync("switchcreditlive", "switchcreditlivepass");
+
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            var realSocketId = await ReadPresenceValueAsync(playerId);
+            Assert.NotNull(realSocketId);
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+
+            Assert.False(await socketManager.TryClaimForSwitchCredit(playerId));
+            Assert.Equal(realSocketId, await ReadPresenceValueAsync(playerId));
+        }
+
+        [Fact]
+        public async Task ReleaseSwitchCreditClaim_StillOwned_ClearsTheKey()
+        {
+            const int playerId = 654321;
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+
+            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+            await socketManager.ReleaseSwitchCreditClaim(playerId);
+
+            Assert.Null(await ReadPresenceValueAsync(playerId));
+        }
+
+        [Fact]
+        public async Task ReleaseSwitchCreditClaim_KeyTakenOverByARealSocket_DoesNotClearIt()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync("switchcreditkicked", "switchcreditkickedpass");
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+
+            // A real connection lands (and kicks the claim) while the credit that claimed it is still running.
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            var realSocketId = await ReadPresenceValueAsync(playerId);
+            Assert.NotNull(realSocketId);
+
+            // The credit's later release must be a no-op — releasing unconditionally would delete the newer
+            // connection's presence key out from under it.
+            await socketManager.ReleaseSwitchCreditClaim(playerId);
+            Assert.Equal(realSocketId, await ReadPresenceValueAsync(playerId));
+        }
+
+        [Fact]
+        public async Task RegisterSocket_SwitchCreditClaimActive_DefersUntilClaimReleases()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync("switchcreditdefer", "switchcreditdeferpass");
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+
+            // Simulate an in-flight switch-away credit (#2041) holding the presence key before a new
+            // connection for the same player arrives.
+            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+            var claimedValue = await ReadPresenceValueAsync(playerId);
+            Assert.NotNull(claimedValue);
+
+            // The WebSocket handshake itself completes (accepting the socket happens before RegisterSocket
+            // runs), but the server won't start processing commands on it until RegisterSocket completes -
+            // so a command's response only arrives once the defer clears.
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+            var commandTask = socketA.SendCommandAsync<object>("GetStatisticTypes");
+
+            await Task.Delay(300, CancellationToken);
+            Assert.False(commandTask.IsCompleted,
+                "Expected the new connection to defer registration while the switch-credit claim is held.");
+            Assert.Equal(claimedValue, await ReadPresenceValueAsync(playerId));
+
+            await socketManager.ReleaseSwitchCreditClaim(playerId);
+
+            var completed = await Task.WhenAny(commandTask, Task.Delay(5000, CancellationToken));
+            Assert.Same(commandTask, completed);
+            Assert.Null((await commandTask).Error);
+            Assert.NotEqual(claimedValue, await ReadPresenceValueAsync(playerId));
+        }
+
+        [Fact]
+        public async Task EmitSocketCommand_ByPlayerId_SwitchCreditClaimActive_ReportsNoActiveSocketRatherThanPublishingToTheClaim()
+        {
+            // A resolved switch-credit claim isn't a socket to publish to (#2076 review) — reporting it as
+            // one would let a caller like the dead-letter replay believe a push was delivered when it was
+            // actually published into a queue nothing drains.
+            const int playerId = 543210;
+            var startIndex = _capturingProvider.Entries.Count;
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+
+            var delivered = await socketManager.EmitSocketCommand(new SocketCommandInfo("GetStatisticTypes"), playerId);
+
+            Assert.False(delivered);
+            var warning = Assert.Single(
+                _capturingProvider.Entries.Skip(startIndex),
+                e => e.Category == SocketManagerCategory && e.Level == LogLevel.Warning);
+            Assert.Contains("no active socket", warning.Message);
+            Assert.Equal(playerId, warning.Properties.Single(p => p.Key == "PlayerId").Value);
+        }
+
+        [Fact]
         public async Task EmitSocketCommand_NoActiveSocket_LogsWarning()
         {
             // No presence key exists for this player, so EmitSocketCommand has no socket to publish to: it

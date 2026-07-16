@@ -142,7 +142,9 @@ namespace Game.Api.Controllers
         /// the same path as <see cref="SelectPlayer"/> (validating ownership and rotating the token). The client
         /// must tear down its game socket before calling this, since the departed-character credit runs over
         /// HTTP, off that character's battle loop; the credit is skipped server-side if that socket is still
-        /// live, so a misbehaving client cannot race the credit against the live loop's saves.
+        /// live (or claimed by another in-flight credit), and a socket that registers while the credit is
+        /// running defers behind its claim (#2041), so a misbehaving client cannot race the credit against the
+        /// live loop's saves.
         /// </summary>
         [HttpPost]
         public async Task<ApiResponse<SelectPlayerResult>> SwitchPlayer([FromBody] SelectPlayerRequest request)
@@ -186,8 +188,8 @@ namespace Game.Api.Controllers
         /// Credits the character the caller is switching away from (the token's currently-selected player) for
         /// any elapsed idle time, resolving its in-flight battle. A no-op when there is no departed character to
         /// settle — a pre-selection token (no bound player) or a switch to the same character — when that
-        /// character can no longer be loaded, or when it still has a live socket (its battle loop owns its saves,
-        /// so crediting it here would race that loop — see the server-side guard below).
+        /// character can no longer be loaded, or when its presence key is already claimed (a live socket, or
+        /// another switch-away credit already in flight — see the atomic claim below).
         /// </summary>
         private async Task CreditDepartedCharacter(int targetPlayerId, CancellationToken cancellationToken)
         {
@@ -200,26 +202,42 @@ namespace Game.Api.Controllers
             // off its battle loop. If that character still has a live socket, its battle-completion commands are
             // mutating the same cached aggregate under the per-socket command lock — crediting it here would
             // reintroduce the exact lost-update race that lock exists to prevent. The client is expected to tear
-            // its game socket down before switching, so a live socket means a misbehaving/malicious client: skip
-            // the credit (the live loop owns its own saves) and proceed with the switch rather than racing it.
-            if (await _socketManager.HasActiveSocket(departedPlayerId))
+            // its game socket down before switching, so a live socket means a misbehaving/malicious client.
+            //
+            // The check-and-reserve happens atomically (SocketManagerService.TryClaimForSwitchCredit) rather
+            // than a plain presence read followed by the credit: a socket that registers concurrently either
+            // wins outright (the claim below fails and the credit is skipped, exactly as an already-live socket
+            // is) or defers behind this claim (SocketManagerService.RegisterSocket) until it's released below —
+            // closing the gap where a socket opening between a read and the credit that followed it could still
+            // race its own battle loop's saves against this HTTP-thread credit (#2041).
+            if (!await _socketManager.TryClaimForSwitchCredit(departedPlayerId))
             {
                 _logger.LogWarning(
-                    "Skipping the switch-away credit for player {DepartedPlayerId}: it still has a live socket, so its battle loop owns its saves. The client should close its game socket before switching.",
+                    "Skipping the switch-away credit for player {DepartedPlayerId}: it still has a live socket (or another switch-away credit is already claiming it), so its battle loop owns its saves. The client should close its game socket before switching.",
                     departedPlayerId);
                 return;
             }
 
-            // Bind the departed character's in-flight session state (from the token claim) so the simulator can
-            // resolve any stale battle, then load its aggregate to apply the credited rewards to.
-            await _sessionInitializer.EnsureSessionLoaded(cancellationToken);
-            var departed = await _playerService.LoadPlayer(departedPlayerId, cancellationToken);
-            if (departed is null)
+            try
             {
-                return;
-            }
+                // Bind the departed character's in-flight session state (from the token claim) so the simulator
+                // can resolve any stale battle, then load its aggregate to apply the credited rewards to.
+                await _sessionInitializer.EnsureSessionLoaded(cancellationToken);
+                var departed = await _playerService.LoadPlayer(departedPlayerId, cancellationToken);
+                if (departed is null)
+                {
+                    return;
+                }
 
-            await _offlineProgressService.SimulateSwitchProgress(departed, _sessionService.PlayerState, cancellationToken);
+                await _offlineProgressService.SimulateSwitchProgress(departed, _sessionService.PlayerState, cancellationToken);
+            }
+            finally
+            {
+                // Release even on failure/cancellation so a faulted credit doesn't wedge a reconnect for the
+                // full claim TTL — RegisterSocket's own bound would still recover it, but there's no reason to
+                // make a legitimate reconnect wait that long when we can release promptly instead.
+                await _socketManager.ReleaseSwitchCreditClaim(departedPlayerId);
+            }
         }
 
         /// <summary>

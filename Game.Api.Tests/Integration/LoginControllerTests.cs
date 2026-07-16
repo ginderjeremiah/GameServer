@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
+using Game.Api;
 using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
@@ -493,6 +494,43 @@ namespace Game.Api.Tests.Integration
             // But the departed character's credit was skipped: its live battle loop owns its saves under the
             // per-socket command lock, so the off-lock HTTP credit must not run and its level does not advance.
             await AssertPlayerNotCreditedAsync(departed.Id, departedLevelBefore);
+        }
+
+        [Fact]
+        public async Task SwitchPlayer_CreditsDepartedCharacter_ReleasesTheSwitchCreditClaimAfterward()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            // The same winning idle setup the credit test uses, so SimulateSwitchProgress runs its full path
+            // (resolving a viable zone/enemy) rather than an edge case unrelated to what this test checks.
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 4000m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context, "switchclaimrelease", "pass");
+            var departed = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Alpha", zoneId: zone.Id);
+            var target = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Beta", zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, departed.Id, playerSkill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, target.Id, playerSkill.Id);
+            departed.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+            await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
+
+            var login = await LoginAsync("switchclaimrelease", "pass");
+            var select = await SelectPlayerAsync(login.Tokens, departed.Id);
+            await SwitchPlayerAsync(select.Tokens, target.Id);
+
+            // The atomic claim SwitchPlayer takes on the departed character's presence key (#2041) must not
+            // linger after the credit completes — a stuck claim would defer every later reconnect for that
+            // character behind it until the claim's TTL finally expired.
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            var presenceKey = $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{departed.Id}";
+            Assert.Null(await cache.Get(presenceKey, CancellationToken));
         }
 
         [Fact]
