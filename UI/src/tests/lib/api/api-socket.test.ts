@@ -210,6 +210,33 @@ describe('ApiSocket', () => {
 			expect(handleAuthFailure).not.toHaveBeenCalled();
 			expect(webSocketMock).not.toHaveBeenCalled();
 			expect(getTokens()).toEqual({ accessToken: 'expired', refreshToken: 'r' });
+			// The keepalive must still be armed so its next tick retries the connect — otherwise, on the very
+			// first connect of a page session (no interval running yet), nothing would ever call
+			// ensureSocket() again and the queued command would await forever (#2035).
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+		});
+
+		it('retries the connect via the keepalive after a retryable refresh failure with no interval running yet', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'expired', refreshToken: 'r' });
+				// The very first connect attempt (no keepalive running yet) hits a retryable refresh failure;
+				// a later keepalive tick's attempt succeeds. Reproduces the boot-time hang scenario from #2035.
+				vi.mocked(ensureValidAccessToken)
+					.mockResolvedValueOnce({ accessToken: null, rejected: false })
+					.mockResolvedValue({ accessToken: 'expired', rejected: false });
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+
+				expect(webSocketMock).not.toHaveBeenCalled();
+
+				await vi.advanceTimersByTimeAsync(10000);
+
+				expect(webSocketMock).toHaveBeenCalledTimes(1);
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 
