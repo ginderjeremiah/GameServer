@@ -131,6 +131,13 @@ export class ApiSocket {
 	private async openSocket(): Promise<void> {
 		this.socketOpened = false;
 		this.resetPongTracking();
+		// Armed before the refresh await (not after the handshake is built) so a retryable bail below still
+		// leaves the keepalive running to retry the connect — otherwise the very first connect of a page
+		// session (or any connect after the interval was last stopped) could bail with nothing left to ever
+		// call ensureSocket() again, stranding the queue forever.
+		if (this.pingIntervalId === null) {
+			this.pingIntervalId = setInterval(() => this.attemptPing(), PING_INTERVAL_MS);
+		}
 		// Pre-emptively refresh an access token that is missing or about to expire (mirroring the HTTP
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
@@ -171,9 +178,6 @@ export class ApiSocket {
 		socket.onmessage = this.receiveResponse.bind(this);
 		socket.onerror = this.handleError.bind(this);
 		socket.onclose = this.handleClose.bind(this);
-		if (this.pingIntervalId === null) {
-			this.pingIntervalId = setInterval(() => this.attemptPing(), PING_INTERVAL_MS);
-		}
 	}
 
 	public async sendSocketCommand<T extends ApiSocketCommandNoRequest>(commandName: T): Promise<IApiSocketResponse<T>>;
