@@ -39,6 +39,24 @@ namespace Game.Api.Services
         /// </summary>
         private static readonly TimeSpan SocketQueueTtl = TimeSpan.FromHours(1);
 
+        /// <summary>
+        /// Sentinel value <see cref="TryClaimForSwitchCredit"/> writes into a presence key: not a real socket
+        /// id, so <see cref="RegisterSocket"/> must recognize it (rather than notifying it as a replaced
+        /// connection) and <see cref="CurrentSocketId"/>'s callers must never treat it as a live socket.
+        /// </summary>
+        private const string SwitchCreditClaimValue = "switch-credit";
+
+        /// <summary>
+        /// TTL on a switch-away credit's claim (see <see cref="TryClaimForSwitchCredit"/>). Generous relative to
+        /// the credit's actual work (a player load plus an offline-progress simulation bounded well under the
+        /// socket command timeout) so it only bites a crashed credit that never released its claim, bounding how
+        /// long <see cref="RegisterSocket"/> will ever defer behind one.
+        /// </summary>
+        private static readonly TimeSpan SwitchCreditClaimTtl = TimeSpan.FromSeconds(20);
+
+        /// <summary>Poll interval <see cref="RegisterSocket"/> uses while waiting out a switch-credit claim.</summary>
+        private static readonly TimeSpan SwitchCreditWaitPollInterval = TimeSpan.FromMilliseconds(50);
+
         public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory, SocketConnectionRegistry socketRegistry)
         {
             _pubSub = pubSub;
@@ -56,9 +74,22 @@ namespace Game.Api.Services
             var socketContext = new SocketContext(socket, playerId, sessionService, isAdmin, _loggerFactory.CreateLogger<SocketContext>());
             var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId, socketContext.SocketId));
             var presenceKey = CurrentSocketKey(playerId);
+            // Defer behind an in-flight switch-away credit's claim (#2041) rather than blindly overwriting it:
+            // that credit is a read-modify-write against this same player's aggregate run off this player's
+            // battle loop, so registering (and starting the loop) while it's still mid-flight would reintroduce
+            // the lost-update race the presence claim exists to prevent. Bounded by the claim's own TTL, so a
+            // claim that never releases can never wedge this connection past it.
+            await AwaitSwitchCreditClaimClear(presenceKey);
             // Claim the presence key with its TTL atomically so a fault here can never leave the key without an
             // expiry — a TTL-less key would defeat the heartbeat design and report a permanent ghost session.
             var oldSocketId = await _cache.GetSet(presenceKey, socketContext.SocketId, SocketPresenceTtl);
+            if (oldSocketId == SwitchCreditClaimValue)
+            {
+                // Either the wait above timed out or a credit claimed the key in the gap right before this
+                // GetSet — either way there is no real prior connection to notify, just a claim we kicked.
+                oldSocketId = null;
+            }
+
             try
             {
                 await RegisterSocketCommandListener(socketHandler);
@@ -145,11 +176,52 @@ namespace Game.Api.Services
         /// <summary>
         /// Returns whether the player currently has a live socket registered, without opening or
         /// touching one. The login flow uses this to warn the user before a new connection takes over
-        /// an existing session.
+        /// an existing session. Also reports <see langword="true"/> for the brief window a switch-away
+        /// credit holds the key (see <see cref="TryClaimForSwitchCredit"/>) — a harmless false positive for
+        /// this warning-only use, since that window is milliseconds and self-clears.
         /// </summary>
         public async Task<bool> HasActiveSocket(int playerId)
         {
             return await CurrentSocketId(playerId) is not null;
+        }
+
+        /// <summary>
+        /// Atomically claims <paramref name="playerId"/>'s presence key for an in-flight switch-away credit
+        /// (<c>LoginController.CreditDepartedCharacter</c>, #2041), replacing a plain presence read: the read
+        /// and the claim happen in one Redis round trip, so there is no gap between "no socket is here" and
+        /// "reserve this slot" for a concurrent <see cref="RegisterSocket"/> to land in. Returns
+        /// <see langword="false"/> when the key is already held — a genuinely live socket (the credit must be
+        /// skipped, its battle loop owns the saves) or another switch-credit already claiming it.
+        /// </summary>
+        public async Task<bool> TryClaimForSwitchCredit(int playerId)
+        {
+            return await _cache.CompareAndSet(CurrentSocketKey(playerId), null, SwitchCreditClaimValue, SwitchCreditClaimTtl);
+        }
+
+        /// <summary>
+        /// Releases a switch-away credit's claim taken by <see cref="TryClaimForSwitchCredit"/>. Compare-and-
+        /// delete so it only clears the key while the claim is still ours — a concurrent <see cref="RegisterSocket"/>
+        /// may have already kicked it and claimed the key for a real socket, which must be left intact.
+        /// </summary>
+        public async Task ReleaseSwitchCreditClaim(int playerId)
+        {
+            await _cache.CompareAndDelete(CurrentSocketKey(playerId), SwitchCreditClaimValue);
+        }
+
+        /// <summary>
+        /// Bounded wait for an in-flight switch-away credit's claim on <paramref name="presenceKey"/> to clear,
+        /// so <see cref="RegisterSocket"/> defers rather than immediately overwriting it (see the call site).
+        /// Capped at <see cref="SwitchCreditClaimTtl"/> — the claim's own TTL — so a credit that faults without
+        /// releasing can never wedge a registration past that bound; the caller's own subsequent claim proceeds
+        /// (kicking the stale claim) once the cap is hit.
+        /// </summary>
+        private async Task AwaitSwitchCreditClaimClear(string presenceKey)
+        {
+            var deadline = DateTime.UtcNow + SwitchCreditClaimTtl;
+            while (await _cache.Get(presenceKey) == SwitchCreditClaimValue && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(SwitchCreditWaitPollInterval);
+            }
         }
 
         /// <summary>

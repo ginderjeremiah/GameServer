@@ -416,12 +416,13 @@ namespace Game.Api.Tests.Unit
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
-        // RegisterSocket only claims the presence key via the atomic GetSet-with-expiry; everything else is unused here.
+        // RegisterSocket claims the presence key via the atomic GetSet-with-expiry, first peeking it via Get
+        // to defer behind any switch-credit claim (#2041, always absent here); everything else is unused.
         private sealed class NoOpCacheService : ICacheService
         {
             public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
-            public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> Get(string key, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -493,7 +494,9 @@ namespace Game.Api.Tests.Unit
                 Expires.Add((key, expiry));
             }
 
-            public Task<string?> Get(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            // RegisterSocket peeks the presence key (Get) before claiming it, to defer behind a switch-credit
+            // claim (#2041) — always absent in these teardown/queue-refresh tests.
+            public Task<string?> Get(string key, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
