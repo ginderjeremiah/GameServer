@@ -7,7 +7,7 @@
 	value={text}
 	oninput={handleInput}
 	onfocus={() => (focused = true)}
-	onblur={() => (focused = false)}
+	onblur={handleBlur}
 />
 
 <script lang="ts">
@@ -19,6 +19,10 @@ interface Props {
 	allowNegative?: boolean;
 	/** Accessible name for the input — the visible field labels are presentational `<span>`s, not associated `<label>`s. */
 	ariaLabel?: string;
+	/** Defer the commit to blur instead of every keystroke — for identity columns (e.g. a tour step's
+	 *  author-editable `ordinal`), where a per-keystroke commit can transiently collide with (and swap)
+	 *  a sibling row's identity mid-edit. */
+	commitOnBlur?: boolean;
 }
 
 let {
@@ -27,7 +31,8 @@ let {
 	class: className = '',
 	style = undefined,
 	allowNegative = false,
-	ariaLabel = undefined
+	ariaLabel = undefined,
+	commitOnBlur = false
 }: Props = $props();
 
 // Keep the in-progress text locally so typing "1." or "0.5" isn't clobbered by
@@ -50,6 +55,16 @@ $effect(() => {
 
 const pattern = $derived(allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/);
 
+// Only commit a fully-parseable number. An empty or in-progress field ("", "-", ".", "-.") leaves
+// the stored value untouched rather than coercing it to 0 — navigating away mid-edit then restores
+// the prior value (via the blur effect) instead of silently persisting 0.
+const commit = (raw: string) => {
+	const parsed = parseFloat(raw);
+	if (!Number.isNaN(parsed)) {
+		onChange(parsed);
+	}
+};
+
 const handleInput = (event: Event) => {
 	const el = event.currentTarget as HTMLInputElement;
 	const raw = el.value;
@@ -58,12 +73,15 @@ const handleInput = (event: Event) => {
 		return;
 	}
 	inputText = raw;
-	// Only commit a fully-parseable number. An empty or in-progress field ("", "-", ".", "-.")
-	// leaves the stored value untouched rather than coercing it to 0 — navigating away mid-edit
-	// then restores the prior value (via the blur effect) instead of silently persisting 0.
-	const parsed = parseFloat(raw);
-	if (!Number.isNaN(parsed)) {
-		onChange(parsed);
+	if (!commitOnBlur) {
+		commit(raw);
+	}
+};
+
+const handleBlur = () => {
+	focused = false;
+	if (commitOnBlur && inputText !== undefined) {
+		commit(inputText);
 	}
 };
 </script>

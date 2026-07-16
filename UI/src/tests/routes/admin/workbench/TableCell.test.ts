@@ -173,6 +173,46 @@ describe('TableCell — number type', () => {
 		expect(input).toBeTruthy();
 		expect(input.getAttribute('inputmode')).toBe('decimal');
 	});
+
+	it('commits on every keystroke when this is not the identity column', async () => {
+		const onChange = vi.fn();
+		const { container } = render(TableCell, {
+			props: {
+				col: makeNumberCol(),
+				row: { weight: 10 },
+				idx: 0,
+				rows: [{ weight: 10 }],
+				record: {},
+				dirty: false,
+				onChange
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: '5' } });
+		expect(onChange).toHaveBeenCalledWith(5);
+	});
+
+	it('defers commit to blur when this is the section rowKey (identity) column', async () => {
+		const onChange = vi.fn();
+		const { container } = render(TableCell, {
+			props: {
+				col: makeNumberCol({ key: 'ordinal' }),
+				row: { ordinal: 0 },
+				idx: 0,
+				rows: [{ ordinal: 0 }],
+				record: {},
+				dirty: false,
+				identity: true,
+				onChange
+			}
+		});
+		const input = container.querySelector('input') as HTMLInputElement;
+		await fireEvent.focus(input);
+		await fireEvent.input(input, { target: { value: '5' } });
+		expect(onChange).not.toHaveBeenCalled();
+		await fireEvent.blur(input);
+		expect(onChange).toHaveBeenCalledWith(5);
+	});
 });
 
 describe('TableCell — text type', () => {

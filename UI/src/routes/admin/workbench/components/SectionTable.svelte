@@ -45,6 +45,7 @@
 								{rows}
 								{record}
 								dirty={!isNewRow && !recordsEqual(row[col.key], baseRow[col.key])}
+								identity={col.key === rowKey}
 								onChange={(value) => setCell(i, col.key, value)}
 							/>
 						{/each}
@@ -138,6 +139,8 @@ const setCell = (i: number, key: string, value: number | string | undefined) =>
 		// Editing a row's identity column (e.g. a tour step's author-editable `ordinal`) into another
 		// row's value would duplicate the {#each} key — crashing dev builds and mis-reconciling prod
 		// ones. Swap the two rows' identities instead, so the edit still lands and both keys stay unique.
+		// A number-type identity column commits once on blur (TableCell's `identity` prop → NumInput's
+		// `commitOnBlur`), so this only ever runs against the final typed value, not an in-progress digit.
 		if (key === rowKey) {
 			const collision = list.find((r, ri) => ri !== i && r[rowKey] === value);
 			if (collision) {
