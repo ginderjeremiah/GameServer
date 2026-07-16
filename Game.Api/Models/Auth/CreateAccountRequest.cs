@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Game.Core.Identity;
 
 namespace Game.Api.Models.Auth
 {
@@ -9,7 +10,7 @@ namespace Game.Api.Models.Auth
     /// </summary>
     public class CreateAccountRequest : IModel
     {
-        [Length(1, 25)]
+        [Length(UsernamePolicy.MinLength, UsernamePolicy.MaxLength)]
         public required string Username { get; set; }
 
         [Length(1, 256)]

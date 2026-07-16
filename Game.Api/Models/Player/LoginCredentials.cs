@@ -1,10 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Game.Core.Identity;
 
 namespace Game.Api.Models.Player
 {
     public class LoginCredentials : IModel
     {
-        [Length(1, 25)]
+        [Length(UsernamePolicy.MinLength, UsernamePolicy.MaxLength)]
         public required string Username { get; set; }
 
         [Length(1, 256)]

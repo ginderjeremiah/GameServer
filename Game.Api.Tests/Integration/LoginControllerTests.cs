@@ -5,10 +5,12 @@ using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Core;
+using Game.Core.Identity;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
@@ -598,6 +600,37 @@ namespace Game.Api.Tests.Integration
             var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(result);
             Assert.NotNull(result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task CreateAccount_UsernameAtMaxLength_Succeeds()
+        {
+            // Exactly the 20-char column limit (UsernamePolicy.MaxLength) — the boundary that must still fit storage.
+            var creds = new { Username = new string('u', UsernamePolicy.MaxLength), Password = "newpass" };
+
+            var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Null(result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task CreateAccount_UsernameOverMaxLength_ReturnsValidationErrorNotServerError()
+        {
+            // One character past the 20-char column limit — [ApiController]'s automatic model validation must
+            // reject it (as a ValidationProblemDetails 400, its standard shape for a DataAnnotations failure)
+            // before it ever reaches the database, rather than letting a Postgres string-truncation error
+            // escape the self-commit as a 500.
+            var creds = new { Username = new string('u', UsernamePolicy.MaxLength + 1), Password = "newpass" };
+
+            var response = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(CancellationToken);
+            Assert.NotNull(problem);
+            Assert.Contains(nameof(CreateAccountRequest.Username), problem.Errors.Keys);
         }
 
         [Fact]
