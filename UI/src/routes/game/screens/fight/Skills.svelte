@@ -18,10 +18,10 @@
 					class:ready={charge.ready}
 					style:--pulse-color={pulseColor}
 					onmousemove={handleMouseMove}
-					onmouseenter={(ev) => handleEnter(ev, index)}
-					onmouseleave={() => handleLeave(index)}
-					onfocus={(ev) => handleFocus(ev, index)}
-					onblur={() => handleLeave(index)}
+					onmouseenter={(ev) => handleEnter(ev, skill.id)}
+					onmouseleave={() => handleLeave(skill.id)}
+					onfocus={(ev) => handleFocus(ev, skill.id)}
+					onblur={() => handleLeave(skill.id)}
 					use:describedByTooltip={describedById}
 				>
 					<img class="skill-icon" src={skill.iconPath} alt={skill.name} />
@@ -70,9 +70,12 @@ type Props = {
 const { battler, side, accent }: Props = $props();
 
 let tooltip = $state<TooltipComponent>();
-let tooltipSkillIndex = $state(-1);
+// Tracked by skill id, not slot index: a battler's skills array is reassigned on every spawn, and the
+// keyed {#each} above destroys/recreates a slot's button when the id at that index changes, so a stale
+// index would silently re-derive to the new occupant instead of closing (mirrors ActiveEffectChips).
+let tooltipSkillId = $state<number>();
 
-const tooltipSkill = $derived(battler.skills[tooltipSkillIndex]);
+const tooltipSkill = $derived(battler.skills.find((skill) => skill?.id === tooltipSkillId));
 /** The accent the "ready" border/glow/label resolve to (CSS var, theme-overridable). */
 const readyAccent = $derived(accent ?? 'var(--accent)');
 const pulseColor = $derived(tintColor(accent ?? (side === 'player' ? 'var(--accent)' : 'var(--enemy-accent)'), 0.6));
@@ -84,31 +87,40 @@ const handleMouseMove = (ev: MouseEvent) => {
 };
 
 // Reveal the per-skill tooltip, anchoring at the cursor (mouse) or the slot's box (focus).
-const reveal = (index: number, anchor: TooltipAnchor) => {
-	tooltipSkillIndex = index;
+const reveal = (id: number, anchor: TooltipAnchor) => {
+	tooltipSkillId = id;
 	setTooltipPosition(anchorPosition(anchor));
 	showTooltip();
 };
 
-const handleEnter = (ev: MouseEvent, index: number) => {
-	reveal(index, ev);
+const handleEnter = (ev: MouseEvent, id: number) => {
+	reveal(id, ev);
 };
 
 // Keyboard focus anchors off the slot's box; a mouse click is left to the hover handlers so the
 // tooltip keeps tracking the cursor instead of jumping (#880).
-const handleFocus = (ev: FocusEvent, index: number) => {
+const handleFocus = (ev: FocusEvent, id: number) => {
 	const anchor = focusAnchor(ev);
 	if (anchor) {
-		reveal(index, anchor);
+		reveal(id, anchor);
 	}
 };
 
-const handleLeave = (index: number) => {
-	if (tooltipSkillIndex === index) {
-		tooltipSkillIndex = -1;
+const handleLeave = (id: number) => {
+	if (tooltipSkillId === id) {
+		tooltipSkillId = undefined;
 		hideTooltip();
 	}
 };
+
+// Self-heal if the hovered skill vanishes from the loadout without a mouseleave/blur ever firing (e.g.
+// a respawn whose new loadout has no skill at all at the old slot).
+$effect(() => {
+	if (tooltipSkillId != null && !tooltipSkill) {
+		tooltipSkillId = undefined;
+		hideTooltip();
+	}
+});
 </script>
 
 <style lang="scss">

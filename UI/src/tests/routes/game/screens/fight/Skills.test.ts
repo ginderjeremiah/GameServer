@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
 import { EAttribute, EModifierType, ESkillEffectTarget, type IAttribute } from '$lib/api';
 import { getTutorialAnchor } from '$components';
+import { statify } from '$lib/common';
 
 // Skills renders a SkillTooltip child, which resolves the opponent through the battle engine
 // and attribute names through the reference-data store; both are mocked.
@@ -112,6 +114,25 @@ describe('Skills', () => {
 
 		await fireEvent.mouseLeave(slot);
 		expect(queryByText('Damage breakdown')).toBeNull();
+	});
+
+	it('closes the tooltip when the hovered slot is replaced by a respawn with no mouseleave', async () => {
+		// A reactive battler so the wholesale skills reassignment (an enemy respawn) propagates.
+		const live = statify(makeBattler());
+		live.skills = [makeSkill(live, { id: 1, name: 'Slash' })];
+		const { container } = render(Skills, { props: { battler: live, side: 'enemy' } });
+
+		const slot = container.querySelector('.skill-slot') as HTMLElement;
+		await fireEvent.mouseEnter(slot);
+		expect((container.querySelector('.tt-title-name') as HTMLElement).textContent).toBe('Slash');
+
+		// A new enemy spawns: the skills array is reassigned wholesale with a different id at the
+		// same slot, and the keyed {#each} destroys/recreates the button with no mouseleave firing.
+		live.skills = [makeSkill(live, { id: 2, name: 'Bite' })];
+		flushSync();
+
+		// The tooltip must close rather than silently re-deriving to the new occupant's skill.
+		expect(container.querySelector('.tt-title-name')).toBeNull();
 	});
 
 	it('reveals the skill tooltip on keyboard focus and hides it on blur', async () => {
