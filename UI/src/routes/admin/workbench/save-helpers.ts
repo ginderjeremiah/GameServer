@@ -158,12 +158,17 @@ export class PersistFailedError extends Error {
  * Generic per-entity save: persists identity-level Add/Edit/Delete in one call,
  * refetches to resolve the ids of newly-added records (positionally — the backend
  * appends adds in send order), then runs each child-section persister for every
- * added/modified record against its real id. Returns the final saved list.
+ * added/modified record against its real id. Returns the final saved list alongside
+ * the identity-resolved new-id map, so a caller doesn't need to recompute it (and risk
+ * a purely positional recompute disagreeing with the identity-matched ids the child
+ * savers actually wrote against — see #1962).
  *
  * A failure once anything has committed is rethrown as {@link PersistFailedError}; a pre-commit
  * failure propagates raw (see that type's docs).
  */
-export async function persistEntity<T extends Identified, D>(opts: PersistOptions<T, D>): Promise<T[]> {
+export async function persistEntity<T extends Identified, D>(
+	opts: PersistOptions<T, D>
+): Promise<{ records: T[]; idMap: Map<number, number> }> {
 	const { diff, toPrimaryDto, postPrimary, refresh, childSavers = [] } = opts;
 
 	// A record can be "modified" because only a child collection changed (e.g. a skill
@@ -209,10 +214,10 @@ export async function persistEntity<T extends Identified, D>(opts: PersistOption
 					committed ||= wrote;
 				}
 			}
-			return await refresh();
+			return { records: await refresh(), idMap: idFor };
 		}
 
-		return fresh;
+		return { records: fresh, idMap: idFor };
 	} catch (ex) {
 		if (committed) {
 			throw new PersistFailedError(ex);

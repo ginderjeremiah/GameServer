@@ -12,7 +12,13 @@ interface Row extends Identified {
 	value: number;
 }
 
-const makeConfig = (persist: (diff: SaveDiff<Row>) => Promise<Row[]> = async () => []): EntityConfig<Row> => ({
+/** Wraps a mock's records into the {@link EntityConfig.persist} return shape (an empty idMap unless supplied). */
+const persistResult = (records: Row[], idMap = new Map<number, number>()) => ({ records, idMap });
+
+const makeConfig = (
+	persist: (diff: SaveDiff<Row>) => Promise<{ records: Row[]; idMap: Map<number, number> }> = async () =>
+		persistResult([])
+): EntityConfig<Row> => ({
 	key: 'rows',
 	label: 'Rows',
 	singular: 'Row',
@@ -117,7 +123,7 @@ describe('EntityStore', () => {
 		let captured: SaveDiff<Row> | undefined;
 		const persist = vi.fn(async (diff: SaveDiff<Row>) => {
 			captured = diff;
-			return fresh;
+			return persistResult(fresh);
 		});
 		const store = new EntityStore(makeConfig(persist), seed);
 
@@ -142,7 +148,9 @@ describe('EntityStore', () => {
 			{ id: 2, name: 'Gamma', value: 3 }
 		];
 		const store = new EntityStore(
-			makeConfig(async () => fresh),
+			// A real config's persist (via persistEntity) resolves the idMap from its own diff.added;
+			// this mirrors that instead of hardcoding it, so the test still exercises the mapping.
+			makeConfig(async (diff) => persistResult(fresh, new Map(diff.added.map((record) => [record.id, 2])))),
 			seed
 		);
 		const newId = store.addItem();
@@ -154,7 +162,9 @@ describe('EntityStore', () => {
 
 	it('replaces the id map wholesale on a later save with no added records', async () => {
 		const fresh: Row[] = [...seed, { id: 2, name: 'Gamma', value: 3 }];
-		const persist = vi.fn(async () => fresh);
+		const persist = vi.fn(async (diff: SaveDiff<Row>) =>
+			persistResult(fresh, new Map(diff.added.map((record, index) => [record.id, 2 + index])))
+		);
 		const store = new EntityStore(makeConfig(persist), seed);
 
 		store.addItem();
@@ -234,7 +244,7 @@ describe('EntityStore', () => {
 	});
 
 	it('does not call persist when there are no changes', async () => {
-		const persist = vi.fn(async () => seed);
+		const persist = vi.fn(async () => persistResult(seed));
 		const store = new EntityStore(makeConfig(persist), seed);
 		await store.save();
 		expect(persist).not.toHaveBeenCalled();
@@ -245,7 +255,7 @@ describe('EntityStore', () => {
 			vi.useFakeTimers();
 			try {
 				const store = new EntityStore(
-					makeConfig(async () => seed),
+					makeConfig(async () => persistResult(seed)),
 					seed
 				);
 				store.addItem();
@@ -263,7 +273,7 @@ describe('EntityStore', () => {
 			vi.useFakeTimers();
 			try {
 				const store = new EntityStore(
-					makeConfig(async () => seed),
+					makeConfig(async () => persistResult(seed)),
 					seed
 				);
 				store.addItem();
@@ -285,7 +295,7 @@ describe('EntityStore', () => {
 			vi.useFakeTimers();
 			try {
 				const store = new EntityStore(
-					makeConfig(async () => seed),
+					makeConfig(async () => persistResult(seed)),
 					seed
 				);
 				store.addItem();

@@ -1,6 +1,6 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { toastError } from '$stores';
-import { canonicalEqual, PersistFailedError, resolveNewIds } from './save-helpers';
+import { canonicalEqual, PersistFailedError } from './save-helpers';
 import { entityWarnings } from './validation';
 import type { EntityConfig, Identified, SaveDiff } from './entities/types';
 
@@ -219,10 +219,10 @@ export class EntityStore<T extends Identified> {
 		this.saving = true;
 		try {
 			const diff = this.diff();
-			const fresh = await this.config.persist(diff);
-			this.lastIdMap = new SvelteMap(resolveNewIds(fresh, diff.existingIds, diff.added));
-			this.items = fresh.map(clone);
-			this.base = fresh.map(clone);
+			const { records, idMap } = await this.config.persist(diff);
+			this.lastIdMap = new SvelteMap(idMap);
+			this.items = records.map(clone);
+			this.base = records.map(clone);
 			this.deleted.clear();
 			this.flashSaved();
 		} catch (ex) {
