@@ -308,6 +308,29 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task EmitSocketCommand_ByPlayerId_SwitchCreditClaimActive_ReportsNoActiveSocketRatherThanPublishingToTheClaim()
+        {
+            // A resolved switch-credit claim isn't a socket to publish to (#2076 review) — reporting it as
+            // one would let a caller like the dead-letter replay believe a push was delivered when it was
+            // actually published into a queue nothing drains.
+            const int playerId = 543210;
+            var startIndex = _capturingProvider.Entries.Count;
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+
+            var delivered = await socketManager.EmitSocketCommand(new SocketCommandInfo("GetStatisticTypes"), playerId);
+
+            Assert.False(delivered);
+            var warning = Assert.Single(
+                _capturingProvider.Entries.Skip(startIndex),
+                e => e.Category == SocketManagerCategory && e.Level == LogLevel.Warning);
+            Assert.Contains("no active socket", warning.Message);
+            Assert.Equal(playerId, warning.Properties.Single(p => p.Key == "PlayerId").Value);
+        }
+
+        [Fact]
         public async Task EmitSocketCommand_NoActiveSocket_LogsWarning()
         {
             // No presence key exists for this player, so EmitSocketCommand has no socket to publish to: it

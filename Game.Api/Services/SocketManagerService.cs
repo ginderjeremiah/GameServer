@@ -261,12 +261,15 @@ namespace Game.Api.Services
         /// Publishes to whatever socket is currently live for <paramref name="playerId"/>, returning whether
         /// one was found to publish to (not whether the client actually received it — the push itself is
         /// fire-and-forget). The Ops dead-letter replay (#1542) uses this to gate its queue removal on a
-        /// single presence lookup rather than a separate check-then-act pair.
+        /// single presence lookup rather than a separate check-then-act pair, so a resolved switch-credit
+        /// claim (see <see cref="TryClaimForSwitchCredit"/>) must report exactly like "no active socket" — it
+        /// isn't a socket to publish to, and reporting it as one would let the caller believe a push was
+        /// delivered when it was actually published into a queue nothing drains.
         /// </summary>
         public async Task<bool> EmitSocketCommand(SocketCommandInfo commandInfo, int playerId)
         {
             var socketId = await CurrentSocketId(playerId);
-            if (socketId is not null)
+            if (socketId is not null && socketId != SwitchCreditClaimValue)
             {
                 await EmitSocketCommand(commandInfo, socketId);
                 return true;
