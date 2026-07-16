@@ -268,6 +268,10 @@ export interface EntityConfig<T extends Identified> {
 	sections: SectionConfig<T>[];
 	/** Fetch the saved record list (with caches refreshed). */
 	refresh: () => Promise<T[]>;
-	/** Persist a diff against existing/new endpoints and return the fresh saved list. */
-	persist: (diff: SaveDiff<T>) => Promise<T[]>;
+	/**
+	 * Persist a diff against existing/new endpoints. Returns the fresh saved list plus the
+	 * identity-resolved map of each added record's local (negative) id to its persisted id, so a
+	 * caller tracking a selection by id doesn't need to re-derive it (see {@link resolveNewIds}).
+	 */
+	persist: (diff: SaveDiff<T>) => Promise<{ records: T[]; idMap: Map<number, number> }>;
 }

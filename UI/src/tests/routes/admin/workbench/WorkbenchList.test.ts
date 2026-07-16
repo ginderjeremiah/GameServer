@@ -34,7 +34,7 @@ const makeConfig = (retireable = false): EntityConfig<Identified> => ({
 	meta: () => [],
 	sections: [],
 	refresh: async () => [],
-	persist: async () => []
+	persist: async () => ({ records: [], idMap: new Map() })
 });
 
 const seed: Identified[] = [

@@ -45,7 +45,7 @@ const makeConfig = (overrides: Partial<EntityConfig<Identified>> = {}): EntityCo
 		}
 	],
 	refresh: async () => seed,
-	persist: async () => [],
+	persist: async () => ({ records: [], idMap: new Map() }),
 	...overrides
 });
 
@@ -135,10 +135,10 @@ describe('Workbench', () => {
 	});
 
 	it('follows a newly-added record to its persisted id after save, instead of jumping to the first record', async () => {
-		const persist = vi.fn(async (diff: { added: Identified[] }) => [
-			...seed,
-			...diff.added.map((record, i) => ({ ...record, id: 3 + i }))
-		]);
+		const persist = vi.fn(async (diff: { added: Identified[] }) => ({
+			records: [...seed, ...diff.added.map((record, i) => ({ ...record, id: 3 + i }))],
+			idMap: new Map(diff.added.map((record, i) => [record.id, 3 + i]))
+		}));
 		render(Workbench, { props: { entity: makeConfig({ persist }) } });
 		await waitFor(() => expect(screen.getByTestId('workbench-title')).toBeTruthy());
 

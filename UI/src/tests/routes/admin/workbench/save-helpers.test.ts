@@ -294,7 +294,9 @@ describe('persistEntity', () => {
 
 		// refresh runs after the primary save and again after children.
 		expect(refresh).toHaveBeenCalledTimes(2);
-		expect(result).toEqual(fresh);
+		expect(result.records).toEqual(fresh);
+		expect(result.idMap.get(-1)).toBe(2);
+		expect(result.idMap.get(-2)).toBe(3);
 	});
 
 	it('resolves child-saver ids by identity content, not position, so a concurrent add from another admin cannot steal a write (#1856)', async () => {
