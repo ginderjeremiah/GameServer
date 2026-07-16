@@ -30,7 +30,9 @@ import {
 	acknowledgeModal,
 	resetLogs,
 	toastSuccess,
-	navigation
+	navigation,
+	clearToasts,
+	clearModals
 } from '$stores';
 import {
 	apiSocket,
@@ -360,6 +362,12 @@ const stopGame = () => {
 	playerChallenges.reset();
 	playerProficiencies.reset();
 	resetLogs();
+	// Clear the other module-level UI stores stopEngines/the resets above don't touch, so a leftover toast,
+	// queued modal, or pending screen request can't leak into the next session (e.g. a "View" toast action
+	// queuing a navigation.requestScreen the next session's shell would silently consume on mount).
+	clearToasts();
+	clearModals();
+	navigation.reset();
 	// SocketReplaced routes back to login client-side (no reload), so the socket singleton survives. Tear
 	// it down explicitly, otherwise the keepalive ping would silently reconnect and fight the session that
 	// just took over.

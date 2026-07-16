@@ -49,5 +49,14 @@ export const navigation = {
 	 *  target screen to consume on mount). */
 	clear() {
 		requestedScreen = null;
+	},
+
+	/** Clears every piece of navigation intent — the requested screen and any unconsumed payload.
+	 *  Used on game teardown so a request queued just before disconnect (e.g. a toast's "View" action)
+	 *  doesn't get silently consumed by the next session's game shell on mount. */
+	reset() {
+		requestedScreen = null;
+		pendingPayload = undefined;
+		payloadPending = false;
 	}
 };

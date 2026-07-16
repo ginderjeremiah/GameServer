@@ -38,6 +38,14 @@ describe('navigation store', () => {
 		expect(navigation.hasPendingPayload).toBe(true);
 		expect(navigation.consumePayload()).toBeNull();
 	});
+
+	it('reset clears both the requested screen and any unconsumed payload', () => {
+		navigation.requestScreen('codex', { enemyId: 7 });
+		navigation.reset();
+		expect(navigation.requestedScreen).toBeNull();
+		expect(navigation.hasPendingPayload).toBe(false);
+		expect(navigation.consumePayload()).toBeUndefined();
+	});
 });
 
 describe('requiresRemount', () => {
