@@ -15,6 +15,7 @@ using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using Xunit;
 
@@ -195,7 +196,9 @@ namespace Game.Application.Tests.DataAccess
             // Save must wrap it the same way SavePlayer does, so the socket layer can force the connection's
             // in-memory Player to reload afterward rather than letting the caller's already-applied mutations
             // ride along un-persisted (#1819).
-            var throwingRepo = new PlayerProgressRepository(context, challenges, cache, new ThrowingPubSubService(), batch);
+            var throwingRepo = new PlayerProgressRepository(
+                context, challenges, cache, new ThrowingPubSubService(), batch,
+                scope.ServiceProvider.GetRequiredService<ILogger<PlayerProgressRepository>>());
 
             var progress = await throwingRepo.Load(MakeDomainPlayer(playerId));
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
@@ -457,6 +460,79 @@ namespace Game.Application.Tests.DataAccess
             // A subsequent read falls through to the DB (the write-behind synchronizer is disabled in this
             // harness, so the just-enqueued event never applied) and correctly serves the original 5 kills —
             // not a shadowed/regressed value from a resurrected partial hash.
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var stats = await repo.GetStatistics(playerId);
+                var kills = Assert.Single(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
+                Assert.Equal(5m, kills.Value);
+            }
+        }
+
+        [Fact]
+        public async Task GetStatistics_OnUnparsableHashField_DeletesTheKeyAndReloadsFromDb()
+        {
+            var playerId = await SeedPlayerAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.AddPlayerStatisticAsync(context, playerId, EStatisticType.EnemiesKilled, 5m);
+            }
+
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+            var hashKey = $"Progress_{playerId}";
+
+            // Prime the cache from the DB, then corrupt the one field in place with malformed JSON — standing
+            // in for a truncated write.
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                await repo.GetStatistics(playerId);
+            }
+            var fields = await WaitForHashFieldCountAsync(redis, hashKey, minCount: 1);
+            var statField = Assert.Single(fields, f => f.Name.ToString().StartsWith("S_", StringComparison.Ordinal));
+            await redis.HashSetAsync(hashKey, statField.Name, "{not valid json");
+
+            // A row that no longer parses at all must self-heal (delete the whole hash, reload from the DB)
+            // rather than throw and lock progress reads out for the rest of the TTL (#2000).
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var stats = await repo.GetStatistics(playerId);
+                var kills = Assert.Single(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
+                Assert.Equal(5m, kills.Value);
+            }
+        }
+
+        [Fact]
+        public async Task GetStatistics_OnShapeDriftedHashField_SelfHealsInsteadOfZeroingTheAggregate()
+        {
+            var playerId = await SeedPlayerAsync();
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.AddPlayerStatisticAsync(context, playerId, EStatisticType.EnemiesKilled, 5m);
+            }
+
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+            var hashKey = $"Progress_{playerId}";
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                await repo.GetStatistics(playerId);
+            }
+            var fields = await WaitForHashFieldCountAsync(redis, hashKey, minCount: 1);
+            var statField = Assert.Single(fields, f => f.Name.ToString().StartsWith("S_", StringComparison.Ordinal));
+
+            // Stand in for a pre-shape-change row: valid JSON, but missing every one of the row model's
+            // required members — exactly what an old blob looks like after a field is added. Before #2000 this
+            // deserialized successfully with defaulted (zeroed) values instead of throwing, and Save would have
+            // gone on to fold deltas onto that zeroed aggregate and upsert it to Postgres as an absolute value.
+            await redis.HashSetAsync(hashKey, statField.Name, "{}");
+
             using (var scope = CreateScope())
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
