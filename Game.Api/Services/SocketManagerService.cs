@@ -177,13 +177,12 @@ namespace Game.Api.Services
             return TeardownSocketRegistration(context, "tearing down the socket");
         }
 
-        public async Task<bool> EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
+        public async Task EmitSocketCommand(SocketCommandInfo commandInfo, string socketId)
         {
             await _pubSub.Publish(SocketChannel(socketId), SocketQueueName(socketId), commandInfo);
             // Best-effort backstop (see SocketQueueTtl): the queue key normally drains in milliseconds and is
             // deleted outright on graceful teardown, so a missed refresh here just means the next push retries it.
             _cache.ExpireAndForget(SocketQueueName(socketId), SocketQueueTtl);
-            return true;
         }
 
         /// <summary>
