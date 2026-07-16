@@ -151,4 +151,18 @@ describe('challenges store', () => {
 		expect(playerChallenges.all).toEqual([challenge(4, true)]);
 		expect(playerChallenges.loaded).toBe(true);
 	});
+
+	it('does not flag an error when an in-flight fetch rejects after reset() ran', async () => {
+		const stale = Promise.withResolvers<IPlayerChallenge[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = playerChallenges.load();
+		playerChallenges.reset();
+
+		// The discarded fetch rejects after the reset; its catch must not flag the new session.
+		stale.reject(new Error('boom'));
+		await initial;
+
+		expect(playerChallenges.error).toBe(false);
+	});
 });

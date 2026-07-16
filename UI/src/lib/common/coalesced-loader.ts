@@ -61,10 +61,15 @@ export class CoalescedLoader {
 	}
 
 	/** Current reset epoch, bumped by {@link reset}. `fetchFn` should capture this before its first
-	 *  `await` and compare it again before writing to store state: if it moved, a `reset()` ran
-	 *  mid-flight and the pending write belongs to a discarded session, so it must be dropped. */
+	 *  `await` and pass it to {@link isStale} afterward to detect a `reset()` that ran mid-flight. */
 	get currentEpoch(): number {
 		return this.epoch;
+	}
+
+	/** Whether `epoch` (captured from {@link currentEpoch} before an await) no longer matches — a
+	 *  `reset()` ran mid-flight, so a write gated on this epoch belongs to a discarded session. */
+	isStale(epoch: number): boolean {
+		return epoch !== this.epoch;
 	}
 
 	/** Publishes `pipeline` as the awaitable in-flight load, clearing it once it settles unless a

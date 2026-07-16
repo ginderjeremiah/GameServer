@@ -173,4 +173,18 @@ describe('statistics store', () => {
 		expect(statistics.stats).toEqual([zonesCleared(4, 1)]);
 		expect(statistics.loaded).toBe(true);
 	});
+
+	it('does not flag an error when an in-flight fetch rejects after reset() ran', async () => {
+		const stale = Promise.withResolvers<IPlayerStatistic[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = statistics.load();
+		statistics.reset();
+
+		// The discarded fetch rejects after the reset; its catch must not flag the new session.
+		stale.reject(new Error('boom'));
+		await initial;
+
+		expect(statistics.error).toBe(false);
+	});
 });

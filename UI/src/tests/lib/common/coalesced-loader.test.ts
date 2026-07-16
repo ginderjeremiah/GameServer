@@ -204,4 +204,14 @@ describe('CoalescedLoader', () => {
 		h.settle(0);
 		await initial;
 	});
+
+	it('isStale reflects whether reset() has moved the epoch captured before an await', async () => {
+		const h = harness();
+		const epoch = h.loader.currentEpoch;
+		expect(h.loader.isStale(epoch)).toBe(false);
+
+		h.loader.reset();
+		expect(h.loader.isStale(epoch)).toBe(true);
+		expect(h.loader.isStale(h.loader.currentEpoch)).toBe(false);
+	});
 });

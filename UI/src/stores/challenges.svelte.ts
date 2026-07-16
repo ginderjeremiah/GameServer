@@ -16,7 +16,7 @@ const fetchChallenges = async () => {
 	try {
 		// fetchSocketData throws on a socket error, preserving this try/catch contract.
 		const result = (await fetchSocketData('GetPlayerChallenges')) ?? [];
-		if (loader.currentEpoch !== epoch) {
+		if (loader.isStale(epoch)) {
 			// reset() ran while this fetch was in flight; this write belongs to a discarded session.
 			return;
 		}
@@ -26,7 +26,7 @@ const fetchChallenges = async () => {
 	} catch {
 		// A failed load is not a genuine empty result; leave zones gated as-is and let the next
 		// load retry. The Challenges screen surfaces the error to the user.
-		if (loader.currentEpoch === epoch) {
+		if (!loader.isStale(epoch)) {
 			error = true;
 		}
 	}

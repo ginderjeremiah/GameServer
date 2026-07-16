@@ -153,6 +153,20 @@ describe('proficiencies store', () => {
 		expect(playerProficiencies.loaded).toBe(true);
 	});
 
+	it('does not flag an error when an in-flight fetch rejects after reset() ran', async () => {
+		const stale = Promise.withResolvers<IPlayerProficiency[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = playerProficiencies.load();
+		playerProficiencies.reset();
+
+		// The discarded fetch rejects after the reset; its catch must not flag the new session.
+		stale.reject(new Error('boom'));
+		await initial;
+
+		expect(playerProficiencies.error).toBe(false);
+	});
+
 	describe('levelOf', () => {
 		it('returns the stored level for a known proficiency and 0 for an unopened one', async () => {
 			mockFetchSocket.mockResolvedValue([playerProficiency(0, 3)]);
