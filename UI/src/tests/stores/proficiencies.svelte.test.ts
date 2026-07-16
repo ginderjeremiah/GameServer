@@ -134,6 +134,25 @@ describe('proficiencies store', () => {
 		expect(playerProficiencies.all).toEqual([playerProficiency(2, 1)]);
 	});
 
+	it('drops an in-flight fetch write that resolves after reset() instead of leaking it into the next session', async () => {
+		const stale = Promise.withResolvers<IPlayerProficiency[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = playerProficiencies.load();
+		playerProficiencies.reset();
+
+		// The new session's own load starts before the discarded fetch settles.
+		mockFetchSocket.mockResolvedValueOnce([playerProficiency(1, 5)]);
+		const fresh = playerProficiencies.load();
+
+		// The stale fetch resolves with the previous character's data; its write must not land.
+		stale.resolve([playerProficiency(0, 9)]);
+		await Promise.all([initial, fresh]);
+
+		expect(playerProficiencies.all).toEqual([playerProficiency(1, 5)]);
+		expect(playerProficiencies.loaded).toBe(true);
+	});
+
 	describe('levelOf', () => {
 		it('returns the stored level for a known proficiency and 0 for an unopened one', async () => {
 			mockFetchSocket.mockResolvedValue([playerProficiency(0, 3)]);

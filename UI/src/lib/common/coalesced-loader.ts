@@ -60,6 +60,13 @@ export class CoalescedLoader {
 		this.epoch += 1;
 	}
 
+	/** Current reset epoch, bumped by {@link reset}. `fetchFn` should capture this before its first
+	 *  `await` and compare it again before writing to store state: if it moved, a `reset()` ran
+	 *  mid-flight and the pending write belongs to a discarded session, so it must be dropped. */
+	get currentEpoch(): number {
+		return this.epoch;
+	}
+
 	/** Publishes `pipeline` as the awaitable in-flight load, clearing it once it settles unless a
 	 *  chained fetch has replaced it in the meantime. */
 	private track(pipeline: Promise<void>): Promise<void> {

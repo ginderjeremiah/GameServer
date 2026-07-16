@@ -132,4 +132,23 @@ describe('challenges store', () => {
 		await playerChallenges.load();
 		expect(playerChallenges.isChallengeCompleted(4)).toBe(true);
 	});
+
+	it('drops an in-flight fetch write that resolves after reset() instead of leaking it into the next session', async () => {
+		const stale = Promise.withResolvers<IPlayerChallenge[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = playerChallenges.load();
+		playerChallenges.reset();
+
+		// The new session's own load starts before the discarded fetch settles.
+		mockFetchSocket.mockResolvedValueOnce([challenge(4, true)]);
+		const fresh = playerChallenges.load();
+
+		// The stale fetch resolves with the previous character's data; its write must not land.
+		stale.resolve([challenge(3, true)]);
+		await Promise.all([initial, fresh]);
+
+		expect(playerChallenges.all).toEqual([challenge(4, true)]);
+		expect(playerChallenges.loaded).toBe(true);
+	});
 });

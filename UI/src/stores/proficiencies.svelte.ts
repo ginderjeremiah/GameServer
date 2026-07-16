@@ -15,15 +15,23 @@ let loaded = $state(false);
 let error = $state(false);
 
 const fetchProficiencies = async () => {
+	const epoch = loader.currentEpoch;
 	try {
 		// fetchSocketData throws on a socket error, preserving this try/catch contract.
-		proficiencies = (await fetchSocketData('GetPlayerProficiencies')) ?? [];
+		const result = (await fetchSocketData('GetPlayerProficiencies')) ?? [];
+		if (loader.currentEpoch !== epoch) {
+			// reset() ran while this fetch was in flight; this write belongs to a discarded session.
+			return;
+		}
+		proficiencies = result;
 		error = false;
 		loaded = true;
 	} catch {
 		// A failed load is not a genuine empty result; leave the live battler without proficiency
 		// bonuses and let the next load retry. The proficiency screen surfaces the error to the user.
-		error = true;
+		if (loader.currentEpoch === epoch) {
+			error = true;
+		}
 	}
 };
 

@@ -192,4 +192,16 @@ describe('CoalescedLoader', () => {
 		h.settle(2);
 		await forced;
 	});
+
+	it('currentEpoch moves on reset() so an in-flight fetchFn can detect a discarded session', async () => {
+		const h = harness();
+		const before = h.loader.currentEpoch;
+
+		const initial = h.loader.load();
+		h.loader.reset();
+		expect(h.loader.currentEpoch).not.toBe(before);
+
+		h.settle(0);
+		await initial;
+	});
 });
