@@ -9,7 +9,7 @@ import {
 	type IItemMod,
 	type IPlayerChallenge
 } from '$lib/api';
-import { BattleAttributes, type Item } from '$lib/battle';
+import { Item } from '$lib/battle';
 import {
 	challengeTypeColor,
 	challengeTypeName,
@@ -126,14 +126,7 @@ function targetName(ch: IChallenge): string | null {
 
 /** A non-owned preview item (base stats, empty mod slots) for the item tooltip. */
 function buildPreviewItem(itemData: IItem): Item {
-	return {
-		...itemData,
-		itemId: itemData.id,
-		equipped: false,
-		favorite: false,
-		appliedMods: [],
-		totalAttributes: new BattleAttributes(itemData.attributes, false)
-	};
+	return new Item(itemData, { itemId: itemData.id, equipped: false, favorite: false, appliedMods: [] });
 }
 
 /* ─── Reward resolution (+ reveal gating) ────────────────────────────── */
