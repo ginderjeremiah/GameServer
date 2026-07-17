@@ -253,6 +253,22 @@ describe('Codex screen', () => {
 		expect(screen.getByText('Zones Cleared')).toBeTruthy();
 	});
 
+	it('reflects a background zone-clear in the open dossier without remounting', async () => {
+		render(Codex);
+		await fireEvent.click(screen.getByTestId('codex-tab-zones'));
+		// Ashfen Marsh (zone 1) has no recorded clear in the fetched STATS fixture.
+		await fireEvent.click(screen.getByTestId('codex-zone-1'));
+		await screen.findByText('No statistics recorded for this zone yet.');
+		expect(screen.queryByText('Zones Cleared')).toBeNull();
+
+		// The fight screen marks a zone cleared optimistically the moment its boss is defeated,
+		// while the Codex may already be sitting open on that zone's dossier.
+		statistics.markZoneCleared(1);
+
+		expect(await screen.findByTestId('codex-zone-stats')).toBeTruthy();
+		expect(screen.getByText('Zones Cleared')).toBeTruthy();
+	});
+
 	it('cross-links a zone boss card into the enemy dossier', async () => {
 		render(Codex);
 		await fireEvent.click(screen.getByTestId('codex-tab-zones'));

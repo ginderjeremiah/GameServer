@@ -35,9 +35,9 @@ const view = new CodexView(navigation.consumePayload<CodexNavPayload>());
 
 onMount(async () => {
 	// Force-refresh the player's statistics (the dossier's "your record"); challenge progress is
-	// loaded once at boot, so a plain load is enough.
+	// loaded once at boot, so a plain load is enough. view.stats reads the store live, so no
+	// snapshot assignment is needed here.
 	await Promise.all([statistics.load(true), playerChallenges.load()]);
-	view.stats = statistics.stats;
 	view.statsError = statistics.error;
 	view.statsLoading = false;
 	view.challengesError = playerChallenges.error;

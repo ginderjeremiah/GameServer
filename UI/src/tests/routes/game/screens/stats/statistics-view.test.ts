@@ -2,13 +2,25 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EDamageTypeKey, EEntityType, EStatisticType, type IPlayerStatistic } from '$lib/api';
 
 // StatisticsView reads the statistic-type catalogue + entity lists from the in-memory staticData
-// store, and deep-links enemies into the Codex via the navigation store — both mocked here.
-const { staticData, navigation } = vi.hoisted(() => ({
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	staticData: {} as any,
-	navigation: { requestScreen: vi.fn() }
-}));
-vi.mock('$stores', () => ({ staticData, navigation }));
+// store, deep-links enemies into the Codex via the navigation store, and reads the player's
+// statistic values live from the statistics store — all mocked here.
+const { staticData, navigation, statistics } = vi.hoisted(() => {
+	let mockStats: IPlayerStatistic[] = [];
+	return {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		staticData: {} as any,
+		navigation: { requestScreen: vi.fn() },
+		statistics: {
+			get stats() {
+				return mockStats;
+			},
+			set stats(value: IPlayerStatistic[]) {
+				mockStats = value;
+			}
+		}
+	};
+});
+vi.mock('$stores', () => ({ staticData, navigation, statistics }));
 
 import {
 	buildStatTypes,
@@ -61,8 +73,8 @@ function seedStaticData(): void {
 
 /** A view seeded with the standard stats fixture (loading already finished). */
 function seededView(): StatisticsView {
+	statistics.stats = stats;
 	const view = new StatisticsView();
-	view.stats = stats;
 	view.loading = false;
 	return view;
 }
@@ -70,6 +82,7 @@ function seededView(): StatisticsView {
 beforeEach(() => {
 	seedStaticData();
 	navigation.requestScreen.mockClear();
+	statistics.stats = [];
 });
 
 describe('buildStatTypes', () => {
