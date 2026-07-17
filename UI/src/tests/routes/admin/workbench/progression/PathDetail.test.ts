@@ -13,7 +13,8 @@ const { staticData, dangerModal } = vi.hoisted(() => ({
 		classes: [] as unknown[],
 		skillRecipes: [] as unknown[],
 		proficiencies: [] as unknown[],
-		skills: [] as unknown[]
+		skills: [] as unknown[],
+		paths: [] as unknown[]
 	},
 	dangerModal: vi.fn()
 }));
@@ -58,6 +59,7 @@ const makeStore = (selectedPath: WorkbenchPath, overrides: Record<string, unknow
 	({
 		selectedPath,
 		profs: [],
+		paths: [],
 		currentTiers: [],
 		pathTab: 'identity',
 		saving: false,
@@ -82,6 +84,7 @@ beforeEach(() => {
 	staticData.skillRecipes = [];
 	staticData.proficiencies = [];
 	staticData.skills = [];
+	staticData.paths = [];
 });
 afterEach(cleanup);
 
@@ -140,5 +143,58 @@ describe('PathDetail — retire confirm dialog (#1863)', () => {
 		expect(screen.queryByText('Retire')).toBeNull();
 		await fireEvent.click(screen.getByText('Reinstate'));
 		expect(store.retirePath).toHaveBeenCalledWith(5, false);
+	});
+});
+
+describe('PathDetail — retire confirm honours this session’s live paths, not just staticData (#2099)', () => {
+	it('does not warn when the gating tier lives on a path retired only in this session (staticData still shows it live)', async () => {
+		// Path 9 ("Runeforging's" path) is retired live this session but not yet saved — staticData
+		// (last-saved) still shows it live, so a naive staticData-only check would wrongly warn.
+		const gatingTier = tier({ id: 6, name: 'Runeforging', pathId: 9, prerequisiteIds: [0] });
+		staticData.paths = [path({ id: 9, name: 'Elemental Path', activityKey: EActivityKey.Fire })];
+		const liveRetiredGatingPath = path({ id: 9, name: 'Elemental Path', retiredAt: '2026-07-17T00:00:00Z' });
+		const store = makeStore(path(), { profs: [tier(), gatingTier], paths: [liveRetiredGatingPath] });
+		render(PathDetail, { props: { store } });
+
+		await fireEvent.click(screen.getByText('Retire'));
+
+		expect(dangerModal).not.toHaveBeenCalled();
+		expect(store.retirePath).toHaveBeenCalledWith(5, true);
+	});
+
+	it('warns when the gating tier lives on a path reinstated only in this session (staticData still shows it retired)', async () => {
+		// Inverse: staticData (last-saved) shows path 9 retired, but this session reinstated it live —
+		// a naive staticData-only check would wrongly skip the warning the backend guard would still enforce.
+		dangerModal.mockResolvedValue(true);
+		const gatingTier = tier({ id: 6, name: 'Runeforging', pathId: 9, prerequisiteIds: [0] });
+		staticData.paths = [path({ id: 9, name: 'Elemental Path', retiredAt: '2026-07-01T00:00:00Z' })];
+		const liveReinstatedGatingPath = path({ id: 9, name: 'Elemental Path', retiredAt: undefined });
+		const store = makeStore(path(), { profs: [tier(), gatingTier], paths: [liveReinstatedGatingPath] });
+		render(PathDetail, { props: { store } });
+
+		await fireEvent.click(screen.getByText('Retire'));
+
+		expect(dangerModal).toHaveBeenCalledOnce();
+		const body = dangerModal.mock.calls[0][0].body as string;
+		expect(body).toContain('Runeforging');
+		await waitFor(() => expect(store.retirePath).toHaveBeenCalledWith(5, true));
+	});
+
+	it('rebuilds a dense-by-id paths array so an unsaved new path prepended this session does not shift the gating path’s index', async () => {
+		// ProgressionStore.addPath prepends new paths with negative ids (mirroring EntityStore.addItem),
+		// so passing store.paths through unindexed would misalign paths[9] once a new path exists.
+		const gatingTier = tier({ id: 6, name: 'Runeforging', pathId: 9, prerequisiteIds: [0] });
+		const unsavedNewPath = path({ id: -1, name: 'Draft Path' });
+		const liveRetiredGatingPath = path({ id: 9, name: 'Elemental Path', retiredAt: '2026-07-17T00:00:00Z' });
+		const store = makeStore(path(), {
+			profs: [tier(), gatingTier],
+			paths: [unsavedNewPath, liveRetiredGatingPath]
+		});
+		render(PathDetail, { props: { store } });
+
+		await fireEvent.click(screen.getByText('Retire'));
+
+		expect(dangerModal).not.toHaveBeenCalled();
+		expect(store.retirePath).toHaveBeenCalledWith(5, true);
 	});
 });

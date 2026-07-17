@@ -68,7 +68,7 @@
 {/if}
 
 <script lang="ts">
-import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
+import { denseByLiveId, referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
 import { activityKeyGroups, hasTierCollision, pathWarnings } from './progression-helpers';
 import type { WorkbenchPath } from './types';
@@ -87,6 +87,12 @@ const { store }: Props = $props();
  * Retire a path, first surfacing any live gateway one of its tiers would soft-lock — the same
  * check the backend guard (`AdminPaths.FindRetiredPathGatingLiveGateway`) rejects the save on.
  * Previously bypassed the confirm entirely (#1863), unlike every other retire path.
+ *
+ * Overrides both `proficiencies` and `paths` with this session's live (unsaved-edits-included)
+ * copies — `pathReferences` reads `store.paths`' own `retiredAt` to decide whether a gating path
+ * is still live (#2099), not just `store.profs` for the tiers themselves. `paths` needs the
+ * dense-by-id rebuild since `addPath` prepends unsaved paths with negative ids, unlike `profs`
+ * which `pathReferences`/`proficiencyReferences` only ever `.filter()`, never index by id.
  */
 const onRetire = (rec: WorkbenchPath) =>
 	retireWithConfirm({
@@ -94,7 +100,7 @@ const onRetire = (rec: WorkbenchPath) =>
 		id: rec.id,
 		name: rec.name || 'Unnamed path',
 		title: 'Retire path?',
-		sources: referenceSourcesFromStatic({ proficiencies: store.profs }),
+		sources: referenceSourcesFromStatic({ proficiencies: store.profs, paths: denseByLiveId(store.paths) }),
 		onConfirmed: () => store.retirePath(rec.id, true)
 	});
 
