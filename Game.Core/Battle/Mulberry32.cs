@@ -22,10 +22,15 @@
         /// <returns></returns>
         public double Next()
         {
-            _seed += 0x6D2B79F5;
-            var t = (_seed ^ (_seed >> 15)) * (1 | _seed);
-            t = (t + ((t ^ (t >> 7)) * (61 | t))) ^ t;
-            return (t ^ (t >> 14)) / 4294967296.0;
+            // Mulberry32 deliberately relies on uint wraparound; unchecked keeps that intact
+            // regardless of the project's overflow-checking setting.
+            unchecked
+            {
+                _seed += 0x6D2B79F5;
+                var t = (_seed ^ (_seed >> 15)) * (1 | _seed);
+                t = (t + ((t ^ (t >> 7)) * (61 | t))) ^ t;
+                return (t ^ (t >> 14)) / 4294967296.0;
+            }
         }
     }
 }

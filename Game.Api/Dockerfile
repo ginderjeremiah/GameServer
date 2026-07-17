@@ -15,11 +15,14 @@ WORKDIR /src
 
 # Restore from the project manifests *before* copying the rest of the source — the standard .NET
 # multi-stage layering. NuGet restore is the slow part of the build and its inputs are only the
-# .csproj files, so isolating it in its own layer lets Docker reuse the restored packages from its
-# local layer cache on incremental rebuilds (e.g. local dev) whenever the dependency graph is
-# unchanged, even when source files change. The set below is Game.Api's full restore graph (it
-# references Abstractions/Core/DataAccess/Application; DataAccess pulls in Infrastructure). Add a
-# line here if Game.Api gains a new project reference.
+# .csproj files (plus the repo-root Directory.Build.props/Directory.Packages.props that centrally
+# manage the TargetFramework and package versions referenced below), so isolating it in its own
+# layer lets Docker reuse the restored packages from its local layer cache on incremental rebuilds
+# (e.g. local dev) whenever the dependency graph is unchanged, even when source files change. The
+# .csproj set below is Game.Api's full restore graph (it references Abstractions/Core/DataAccess/
+# Application; DataAccess pulls in Infrastructure). Add a line here if Game.Api gains a new project
+# reference.
+COPY Directory.Build.props Directory.Packages.props ./
 COPY Game.Abstractions/Game.Abstractions.csproj Game.Abstractions/
 COPY Game.Core/Game.Core.csproj Game.Core/
 COPY Game.Infrastructure/Game.Infrastructure.csproj Game.Infrastructure/
