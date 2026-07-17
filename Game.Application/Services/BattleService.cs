@@ -353,7 +353,7 @@ namespace Game.Application.Services
             out DateTime now,
             out DateTime battleCompletedAt)
         {
-            now = DateTime.UtcNow;
+            now = default;
             battleCompletedAt = default;
 
             // Idempotency backstop (#1874/#1993): a reconnecting client can re-present an already-durably-
@@ -410,6 +410,10 @@ namespace Game.Application.Services
                     result.TotalMs, state.IsBossBattle, state.BattleZoneId);
                 return false;
             }
+
+            // Captured after the replay above so the elapsed-time comparison reflects the moment the claim is
+            // actually adjudicated (and so `now` is also the timestamp the outcome-specific payout books).
+            now = DateTime.UtcNow;
 
             // Anti-cheat (#1630), server-clock only: a battle-end claim cannot be accepted before enough real
             // server time has elapsed since battle start for the replayed outcome to have actually happened.
