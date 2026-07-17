@@ -22,47 +22,16 @@
    The reactive layer is composed from one class per tab (`EnemiesTabView`, `ZonesTabView`,
    `SkillsTabView`, each in its own `*-tab-view.svelte.ts` file) so every tab's derivations stay
    independently readable/testable. This CodexView is the thin orchestrator: it owns only what's
-   genuinely cross-tab — the active tab, the live player statistics + challenge-error state,
-   the shared statistics query engine, and the cross-links between dossiers — and every other
-   property/method below simply delegates to the owning tab's instance, so consuming components (and
-   the existing tests) keep reading `view.<x>` exactly as before. */
+   genuinely cross-tab — the active tab, the live player statistics + challenge-error state, the
+   shared statistics query engine, and the cross-links between dossiers — and exposes the three tab
+   instances (`enemiesTab`/`zonesTab`/`skillsTab`) directly; consuming components read/call through
+   the owning tab instance (e.g. `view.enemiesTab.selectedEnemy`) rather than a flat pass-through API. */
 
 import { staticData, statistics } from '$stores';
-import {
-	CODEX_TABS,
-	type CodexTab,
-	type EnemyFilter,
-	type EnemySort,
-	type EnemySubTab,
-	type EntityStatVM,
-	tabAccent,
-	tabLabel
-} from './codex-display';
-import {
-	EnemiesTabView,
-	type EnemyChallengeVM,
-	type EnemyRowVM,
-	type EnemySkillVM,
-	type EnemySpawnVM,
-	type SubTabVM
-} from './enemies-tab-view.svelte';
-import {
-	SkillsTabView,
-	type SkillEffectVM,
-	type SkillProvenanceVM,
-	type SkillRarityVM,
-	type SkillRowVM,
-	type SkillScalingVM,
-	type SkillUserVM
-} from './skills-tab-view.svelte';
-import {
-	ZonesTabView,
-	type ZoneBossVM,
-	type ZoneProjectionVM,
-	type ZoneRowVM,
-	type ZoneSpawnVM,
-	type ZoneUnlockVM
-} from './zones-tab-view.svelte';
+import { CODEX_TABS, type CodexTab, type EnemySubTab, type EntityStatVM, tabAccent, tabLabel } from './codex-display';
+import { EnemiesTabView, type EnemyRowVM } from './enemies-tab-view.svelte';
+import { SkillsTabView } from './skills-tab-view.svelte';
+import { ZonesTabView, type ZoneProjectionVM } from './zones-tab-view.svelte';
 import { fmtValue } from '../stats/statistics-display';
 import {
 	StatisticsData,
@@ -108,9 +77,9 @@ export class CodexView {
 	 *  Challenges sub-tab doesn't render zero-progress/sealed as if it were authoritative. */
 	challengesError = $state(false);
 
-	private readonly enemiesTab: EnemiesTabView;
-	private readonly zonesTab: ZonesTabView;
-	private readonly skillsTab: SkillsTabView;
+	readonly enemiesTab: EnemiesTabView;
+	readonly zonesTab: ZonesTabView;
+	readonly skillsTab: SkillsTabView;
 
 	constructor(payload?: CodexNavPayload) {
 		if (payload?.tab) {
@@ -157,193 +126,6 @@ export class CodexView {
 
 	selectTab(tab: CodexTab): void {
 		this.tab = tab;
-	}
-
-	/* ── enemies tab (delegates to EnemiesTabView) ───────────────────────────────── */
-
-	get enemies() {
-		return this.enemiesTab.enemies;
-	}
-	get enemyProjections(): EnemyRowVM[] {
-		return this.enemiesTab.enemyProjections;
-	}
-	get enemyRows(): EnemyRowVM[] {
-		return this.enemiesTab.enemyRows;
-	}
-	get shownCount() {
-		return this.enemiesTab.shownCount;
-	}
-
-	get selectedEnemyId() {
-		return this.enemiesTab.selectedEnemyId;
-	}
-	set selectedEnemyId(id: number) {
-		this.enemiesTab.selectedEnemyId = id;
-	}
-	get selectedEnemy() {
-		return this.enemiesTab.selectedEnemy;
-	}
-	get range() {
-		return this.enemiesTab.range;
-	}
-	get dossierAccent() {
-		return this.enemiesTab.dossierAccent;
-	}
-	get dossierKind() {
-		return this.enemiesTab.dossierKind;
-	}
-	get attributes() {
-		return this.enemiesTab.attributes;
-	}
-	get maxPrimary() {
-		return this.enemiesTab.maxPrimary;
-	}
-	get enemySkillRows(): EnemySkillVM[] {
-		return this.enemiesTab.enemySkillRows;
-	}
-	get spawnHeading() {
-		return this.enemiesTab.spawnHeading;
-	}
-	get spawns(): EnemySpawnVM[] {
-		return this.enemiesTab.spawns;
-	}
-	get statistics(): EntityStatVM[] {
-		return this.enemiesTab.statistics;
-	}
-	get challenges(): EnemyChallengeVM[] {
-		return this.enemiesTab.challenges;
-	}
-	get subTabs(): SubTabVM[] {
-		return this.enemiesTab.subTabs;
-	}
-
-	get sub() {
-		return this.enemiesTab.sub;
-	}
-	get level() {
-		return this.enemiesTab.level;
-	}
-	get scaling() {
-		return this.enemiesTab.scaling;
-	}
-	get filter() {
-		return this.enemiesTab.filter;
-	}
-	get search() {
-		return this.enemiesTab.search;
-	}
-	set search(value: string) {
-		this.enemiesTab.search = value;
-	}
-	get sort() {
-		return this.enemiesTab.sort;
-	}
-	set sort(value: EnemySort) {
-		this.enemiesTab.sort = value;
-	}
-
-	selectEnemy(id: number): void {
-		this.enemiesTab.selectEnemy(id);
-	}
-	selectSub(sub: EnemySubTab): void {
-		this.enemiesTab.selectSub(sub);
-	}
-	setLevel(level: number): void {
-		this.enemiesTab.setLevel(level);
-	}
-	toggleScaling(): void {
-		this.enemiesTab.toggleScaling();
-	}
-	setFilter(filter: EnemyFilter): void {
-		this.enemiesTab.setFilter(filter);
-	}
-
-	/* ── zones tab (delegates to ZonesTabView) ───────────────────────────────────── */
-
-	get zones() {
-		return this.zonesTab.zones;
-	}
-	get zoneProjections(): ZoneProjectionVM[] {
-		return this.zonesTab.zoneProjections;
-	}
-	get zoneRows(): ZoneRowVM[] {
-		return this.zonesTab.zoneRows;
-	}
-
-	get selectedZoneId() {
-		return this.zonesTab.selectedZoneId;
-	}
-	set selectedZoneId(id: number) {
-		this.zonesTab.selectedZoneId = id;
-	}
-	get selectedZone() {
-		return this.zonesTab.selectedZone;
-	}
-	get zoneBand() {
-		return this.zonesTab.zoneBand;
-	}
-	get selectedZoneStatus() {
-		return this.zonesTab.selectedZoneStatus;
-	}
-	get zoneBoss(): ZoneBossVM | null {
-		return this.zonesTab.zoneBoss;
-	}
-	get zoneSpawns(): ZoneSpawnVM[] {
-		return this.zonesTab.zoneSpawns;
-	}
-	get zoneSpawnCount() {
-		return this.zonesTab.zoneSpawnCount;
-	}
-	get zoneUnlock(): ZoneUnlockVM | null {
-		return this.zonesTab.zoneUnlock;
-	}
-	get zoneStatistics(): EntityStatVM[] {
-		return this.zonesTab.zoneStatistics;
-	}
-
-	selectZone(id: number): void {
-		this.zonesTab.selectZone(id);
-	}
-
-	/* ── skills tab (delegates to SkillsTabView) ─────────────────────────────────── */
-
-	get skillsCatalogue() {
-		return this.skillsTab.skillsCatalogue;
-	}
-	get skillRows(): SkillRowVM[] {
-		return this.skillsTab.skillRows;
-	}
-
-	get selectedSkillId() {
-		return this.skillsTab.selectedSkillId;
-	}
-	set selectedSkillId(id: number) {
-		this.skillsTab.selectedSkillId = id;
-	}
-	get selectedSkill() {
-		return this.skillsTab.selectedSkill;
-	}
-	get selectedSkillRarity(): SkillRarityVM | null {
-		return this.skillsTab.selectedSkillRarity;
-	}
-	get skillScaling(): SkillScalingVM[] {
-		return this.skillsTab.skillScaling;
-	}
-	get skillEffects(): SkillEffectVM[] {
-		return this.skillsTab.skillEffects;
-	}
-	get skillUsedBy(): SkillUserVM[] {
-		return this.skillsTab.skillUsedBy;
-	}
-	get skillProvenance(): SkillProvenanceVM {
-		return this.skillsTab.skillProvenance;
-	}
-	get skillStatistics(): EntityStatVM[] {
-		return this.skillsTab.skillStatistics;
-	}
-
-	selectSkill(id: number): void {
-		this.skillsTab.selectSkill(id);
 	}
 
 	/* ── cross-tab links ──────────────────────────────────────────────────────── */

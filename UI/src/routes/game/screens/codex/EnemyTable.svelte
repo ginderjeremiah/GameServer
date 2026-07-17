@@ -10,14 +10,14 @@
 	</div>
 
 	<div class="rows" data-testid="codex-enemy-rows">
-		{#each view.enemyRows as row (row.id)}
+		{#each view.enemiesTab.enemyRows as row (row.id)}
 			<button
 				type="button"
 				class="row"
-				class:selected={row.id === view.selectedEnemyId}
+				class:selected={row.id === view.enemiesTab.selectedEnemyId}
 				class:boss={row.isBoss}
 				data-testid="codex-enemy-{row.id}"
-				onclick={() => view.selectEnemy(row.id)}
+				onclick={() => view.enemiesTab.selectEnemy(row.id)}
 			>
 				<span class="c-name name-cell">
 					<span class="mark"></span>

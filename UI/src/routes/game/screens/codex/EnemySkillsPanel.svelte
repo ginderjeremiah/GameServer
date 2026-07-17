@@ -1,8 +1,8 @@
 <!-- Skills sub-tab: the enemy's skill pool. Each row cross-links into that skill's dossier. -->
 <div class="skills">
-	<div class="label">Skill pool · {view.enemySkillRows.length}</div>
+	<div class="label">Skill pool · {view.enemiesTab.enemySkillRows.length}</div>
 	<div class="list">
-		{#each view.enemySkillRows as skill (skill.id)}
+		{#each view.enemiesTab.enemySkillRows as skill (skill.id)}
 			<button
 				type="button"
 				class="skill"

@@ -332,7 +332,7 @@ describe('challenge-type lookups', () => {
 	});
 });
 
-describe('entityOptions / entityCatalog target-entity picker', () => {
+describe('entityOptions target-entity picker', () => {
 	it('lists every enemy when the statistic is not boss-only', () => {
 		expect(reference.entityOptions(EEntityType.Enemy).map((o) => o.value)).toEqual([0, 1, 2, 3]);
 	});
@@ -351,10 +351,6 @@ describe('entityOptions / entityCatalog target-entity picker', () => {
 		// Cave Bat (id 0) isn't a boss, but it's the challenge's currently-authored target.
 		expect(reference.entityOptions(EEntityType.Enemy, true, 0)).toContainEqual({ value: 0, text: 'Cave Bat' });
 		expect(reference.entityOptions(EEntityType.Enemy, true).map((o) => o.value)).not.toContain(0);
-	});
-
-	it('returns an empty catalogue for the None / unknown dimension', () => {
-		expect(reference.entityCatalog(EEntityType.None)).toEqual([]);
 	});
 
 	it('resolves a target name across all enemies regardless of the boss filter', () => {
@@ -382,17 +378,15 @@ describe('entityOptions / entityCatalog target-entity picker', () => {
 });
 
 describe('reward record lookups', () => {
-	it('exposes the raw item / mod / skill record lists', () => {
+	it('exposes the raw item / mod record lists', () => {
 		expect(reference.itemRecords()).toHaveLength(2);
 		expect(reference.itemModRecords()).toHaveLength(2);
-		expect(reference.skillRecords()).toHaveLength(2);
 	});
 
-	it('resolves item name, rarity and skill name/damage by id', () => {
+	it('resolves item name, rarity and skill name by id', () => {
 		expect(reference.itemRecName(1)).toBe('Dragon Blade');
 		expect(reference.itemRarityId(1)).toBe(ERarity.Legendary);
 		expect(reference.skillName(1)).toBe('Fireball');
-		expect(reference.skillBaseDamage(1)).toBe(25);
 	});
 
 	it('resolves item-mod name and its type name', () => {

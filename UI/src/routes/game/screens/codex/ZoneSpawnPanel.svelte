@@ -1,8 +1,8 @@
 <!-- Zone dossier spawn table: every non-retired enemy that spawns in the zone, with its share of the
      zone's total spawn weight. Each row is a cross-link into that enemy's dossier. -->
 <SpawnRowList
-	heading={`Spawn table · ${view.zoneSpawnCount}`}
-	rows={view.zoneSpawns.map((spawn) => ({
+	heading={`Spawn table · ${view.zonesTab.zoneSpawnCount}`}
+	rows={view.zonesTab.zoneSpawns.map((spawn) => ({
 		id: spawn.enemyId,
 		name: spawn.enemyName,
 		share: spawn.share,
