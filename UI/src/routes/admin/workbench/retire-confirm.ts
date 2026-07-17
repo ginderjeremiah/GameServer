@@ -39,12 +39,13 @@ const SELF_REFERENCING_KEYS = new Set(['enemies', 'skills']);
 /**
  * Rebuilds a zero-based-id-indexed array from a store's live `items`, honouring the Id-as-index
  * invariant `references.ts`'s self-referential lookups rely on (`docs/backend.md` → _Reference
- * Data_). `EntityStore.addItem` prepends new records with negative ids, shifting every saved
- * record's array position, so indexing the live array directly would resolve the wrong record. A
- * never-saved (negative-id) record is dropped: only an already-saved record can be a retire target
- * or a referencing recipe's result, so none is looked up by id here.
+ * Data_). A store that prepends new records with negative ids (`EntityStore.addItem`,
+ * `ProgressionStore.addPath`) shifts every saved record's array position, so indexing the live
+ * array directly would resolve the wrong record. A never-saved (negative-id) record is dropped:
+ * only an already-saved record can be a retire target or a referencing recipe's result, so none
+ * is looked up by id here.
  */
-function denseByLiveId<T extends { id: number }>(live: T[]): T[] {
+export function denseByLiveId<T extends { id: number }>(live: T[]): T[] {
 	const dense: T[] = [];
 	for (const record of live) {
 		if (record.id >= 0) {
