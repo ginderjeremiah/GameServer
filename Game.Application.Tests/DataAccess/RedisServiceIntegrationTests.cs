@@ -302,6 +302,55 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task HashGetAllAndRefreshExpiry_OnAMissingKey_ReturnsNullAndDoesNotCreateTheKey()
+        {
+            var key = $"redis-hash-getex-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            var fields = await cache.HashGetAllAndRefreshExpiry(key, TimeSpan.FromSeconds(30));
+
+            Assert.Null(fields);
+            Assert.Null(await cache.HashGetAllIfExists(key));
+        }
+
+        [Fact]
+        public async Task HashGetAllAndRefreshExpiry_OnAnExistingHash_ReturnsFieldsAndRefreshesTtlInOneRoundTrip()
+        {
+            var key = $"redis-hash-getex-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(2));
+            await WaitForHashFieldCountAsync(cache, key, 2);
+
+            var fields = await cache.HashGetAllAndRefreshExpiry(key, TimeSpan.FromSeconds(30));
+
+            Assert.NotNull(fields);
+            Assert.Equal(2, fields.Count);
+            Assert.Equal("1", fields["a"]);
+            Assert.Equal("2", fields["b"]);
+
+            // The TTL is refreshed well past the 2s seed ceiling, in the same round trip as the read rather
+            // than a separate awaited HGETALL followed by a fire-and-forget expire.
+            var ttl = await ReadTtlAsync(key);
+            Assert.NotNull(ttl);
+            Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be refreshed past the 2s seed but was {ttl}.");
+        }
+
+        [Fact]
+        public async Task HashGetAllAndRefreshExpiry_OnAKeyHoldingANonHashValue_TreatsItAsAMissAndClearsIt()
+        {
+            // Mirrors HashGetAllIfExists's same self-heal for a stale non-hash representation (#1635).
+            var key = $"redis-hash-getex-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            await cache.Set(key, "a-stale-string-blob", TimeSpan.FromSeconds(30));
+
+            Assert.Null(await cache.HashGetAllAndRefreshExpiry(key, TimeSpan.FromSeconds(30)));
+            Assert.Null(await cache.Get(key));
+        }
+
+        [Fact]
         public async Task HashSetIfExistsAndForget_WithNoFields_IsANoOp()
         {
             var key = $"redis-hash-{Guid.NewGuid()}";

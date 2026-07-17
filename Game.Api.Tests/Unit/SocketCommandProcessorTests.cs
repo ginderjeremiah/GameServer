@@ -439,6 +439,7 @@ namespace Game.Api.Tests.Unit
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
             public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
         }
@@ -510,6 +511,7 @@ namespace Game.Api.Tests.Unit
             public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
             public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
         }
