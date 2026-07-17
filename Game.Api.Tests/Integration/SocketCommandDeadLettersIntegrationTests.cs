@@ -42,10 +42,10 @@ namespace Game.Api.Tests.Integration
         public async Task InspectAsync_ClassifiesEachEntry_AndDerivesCommandNameAndPlayerId()
         {
             using var scope = CreateScope();
-            await SeedDeadLettersAsync(scope,
+            await SeedSocketDeadLettersAsync(
                 "this-is-not-json",
-                Envelope(99, new SocketCommandInfo("MysteryCommand")),
-                Envelope(42, ChallengeCompletedEnvelope()));
+                SocketDeadLetterEnvelope(99, new SocketCommandInfo("MysteryCommand")),
+                SocketDeadLetterEnvelope(42, ChallengeCompletedEnvelope()));
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var inspection = await deadLetters.InspectAsync(50);
@@ -80,7 +80,7 @@ namespace Game.Api.Tests.Integration
             // SocketReplaced is server-initiated (a known command) but only ever meaningful at the moment it
             // was originally emitted — closing whatever socket happens to be live for the player later would
             // kick an innocent session, so it must classify distinctly from a genuinely Replayable entry.
-            await SeedDeadLettersAsync(scope, Envelope(42, new SocketReplacedInfo()));
+            await SeedSocketDeadLettersAsync(SocketDeadLetterEnvelope(42, new SocketReplacedInfo()));
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var inspection = await deadLetters.InspectAsync(50);
@@ -95,10 +95,10 @@ namespace Game.Api.Tests.Integration
         public async Task InspectAsync_RespectsMax_WhileStillReportingFullDepth()
         {
             using var scope = CreateScope();
-            await SeedDeadLettersAsync(scope,
-                Envelope(1, ChallengeCompletedEnvelope()),
-                Envelope(2, ChallengeCompletedEnvelope()),
-                Envelope(3, ChallengeCompletedEnvelope()));
+            await SeedSocketDeadLettersAsync(
+                SocketDeadLetterEnvelope(1, ChallengeCompletedEnvelope()),
+                SocketDeadLetterEnvelope(2, ChallengeCompletedEnvelope()),
+                SocketDeadLetterEnvelope(3, ChallengeCompletedEnvelope()));
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var inspection = await deadLetters.InspectAsync(2);
@@ -121,7 +121,9 @@ namespace Game.Api.Tests.Integration
             await cache.Set(PresenceKey(playerA), socketA, TimeSpan.FromMinutes(1));
             await cache.Set(PresenceKey(playerB), socketB, TimeSpan.FromMinutes(1));
 
-            await SeedDeadLettersAsync(scope, Envelope(playerA, ChallengeCompletedEnvelope()), Envelope(playerB, ChallengeCompletedEnvelope()));
+            await SeedSocketDeadLettersAsync(
+                SocketDeadLetterEnvelope(playerA, ChallengeCompletedEnvelope()),
+                SocketDeadLetterEnvelope(playerB, ChallengeCompletedEnvelope()));
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var result = await deadLetters.ReplayAllAsync();
@@ -145,9 +147,9 @@ namespace Game.Api.Tests.Integration
             var socketId = Guid.NewGuid().ToString();
             await cache.Set(PresenceKey(targetPlayer), socketId, TimeSpan.FromMinutes(1));
 
-            var keep = Envelope(202, ChallengeCompletedEnvelope());
-            var replay = Envelope(targetPlayer, ChallengeCompletedEnvelope());
-            await SeedDeadLettersAsync(scope, keep, replay);
+            var keep = SocketDeadLetterEnvelope(202, ChallengeCompletedEnvelope());
+            var replay = SocketDeadLetterEnvelope(targetPlayer, ChallengeCompletedEnvelope());
+            await SeedSocketDeadLettersAsync(keep, replay);
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var result = await deadLetters.ReplaySelectedAsync([replay]);
@@ -164,8 +166,8 @@ namespace Game.Api.Tests.Integration
         public async Task ReplaySelectedAsync_IgnoresPayloadsNotOnTheQueue_NeverInjectingThemOntoALiveSocket()
         {
             using var scope = CreateScope();
-            var real = Envelope(301, ChallengeCompletedEnvelope());
-            await SeedDeadLettersAsync(scope, real);
+            var real = SocketDeadLetterEnvelope(301, ChallengeCompletedEnvelope());
+            await SeedSocketDeadLettersAsync(real);
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             // A fabricated payload that was never dead-lettered must be skipped, so replay can't be used to
@@ -186,8 +188,8 @@ namespace Game.Api.Tests.Integration
             var malformed = "not-json";
             // Well-formed and known, but the player has no live socket (no presence key seeded) — there is
             // nowhere to redeliver it, so it must stay on the dead-letter queue rather than being dropped.
-            var noLiveSocket = Envelope(401, ChallengeCompletedEnvelope());
-            await SeedDeadLettersAsync(scope, malformed, noLiveSocket);
+            var noLiveSocket = SocketDeadLetterEnvelope(401, ChallengeCompletedEnvelope());
+            await SeedSocketDeadLettersAsync(malformed, noLiveSocket);
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var result = await deadLetters.ReplayAllAsync();
@@ -213,8 +215,8 @@ namespace Game.Api.Tests.Integration
             // deploy). Replaying it would ship a command the client can't recognize and, unlike the player
             // write-behind queue, there is no re-processing round-trip that lets it come back — so it must
             // stay queued rather than being delivered and dropped.
-            var unknown = Envelope(playerId, new SocketCommandInfo("RetiredCommand"));
-            await SeedDeadLettersAsync(scope, unknown);
+            var unknown = SocketDeadLetterEnvelope(playerId, new SocketCommandInfo("RetiredCommand"));
+            await SeedSocketDeadLettersAsync(unknown);
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var result = await deadLetters.ReplayAllAsync();
@@ -239,8 +241,8 @@ namespace Game.Api.Tests.Integration
             // A dead-lettered SocketReplaced is only meaningful at the moment it was originally emitted —
             // replaying it later would force-close whatever socket is currently live for the player, which is
             // never correct. It must stay queued even though the player has a live socket right now.
-            var sessionLifecycle = Envelope(playerId, new SocketReplacedInfo());
-            await SeedDeadLettersAsync(scope, sessionLifecycle);
+            var sessionLifecycle = SocketDeadLetterEnvelope(playerId, new SocketReplacedInfo());
+            await SeedSocketDeadLettersAsync(sessionLifecycle);
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var result = await deadLetters.ReplayAllAsync();
@@ -260,7 +262,7 @@ namespace Game.Api.Tests.Integration
             // `required` only guarantees the "command" key is present, not that its value is non-null — a
             // payload like this deserializes without error but must still classify as Malformed rather than
             // NRE-ing out of InspectAsync.
-            await SeedDeadLettersAsync(scope, "{\"playerId\":5,\"command\":null}");
+            await SeedSocketDeadLettersAsync("{\"playerId\":5,\"command\":null}");
 
             var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
             var inspection = await deadLetters.InspectAsync(50);
@@ -271,20 +273,7 @@ namespace Game.Api.Tests.Integration
             Assert.Null(entry.PlayerId);
         }
 
-        private static async Task SeedDeadLettersAsync(IServiceScope scope, params string[] messages)
-        {
-            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
-            await pubsub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE).AddRangeToQueueAsync(messages);
-        }
-
         /// <summary>A stand-in for a genuinely replayable server-initiated push in these tests.</summary>
         private static ChallengeCompletedInfo ChallengeCompletedEnvelope() => new(new ChallengeCompletedModel { ChallengeId = 1 });
-
-        private static string Envelope(int playerId, SocketCommandInfo command)
-            => new SocketCommandDeadLetterEnvelope { PlayerId = playerId, Command = command }.Serialize();
-
-        private static string PresenceKey(int playerId) => $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}";
-
-        private static string SocketQueueName(string socketId) => $"{Constants.PUBSUB_SOCKET_QUEUE_PREFIX}_{socketId}";
     }
 }

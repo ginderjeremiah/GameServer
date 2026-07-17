@@ -1,5 +1,6 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.Infrastructure;
+using Game.Api;
 using Game.Api.Models.Common;
 using Game.Api.Models.Progress;
 using Game.Api.Sockets.Commands;
@@ -122,7 +123,7 @@ namespace Game.Api.Tests.Integration
         {
             await SeedSocketDeadLettersAsync(
                 "not-json",
-                SocketEnvelope(playerId: 42, new ChallengeCompletedInfo(new ChallengeCompletedModel { ChallengeId = 1 })));
+                SocketDeadLetterEnvelope(playerId: 42, new ChallengeCompletedInfo(new ChallengeCompletedModel { ChallengeId = 1 })));
 
             using var client = AdminClient();
             var response = await client.GetAsync("/api/AdminTools/GetSocketCommandDeadLetters", CancellationToken);
@@ -144,7 +145,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task GetSocketCommandDeadLetters_ClassifiesASessionLifecycleCommandAsNotReplayable()
         {
-            await SeedSocketDeadLettersAsync(SocketEnvelope(playerId: 42, new SocketReplacedInfo()));
+            await SeedSocketDeadLettersAsync(SocketDeadLetterEnvelope(playerId: 42, new SocketReplacedInfo()));
 
             using var client = AdminClient();
             var response = await client.GetAsync("/api/AdminTools/GetSocketCommandDeadLetters", CancellationToken);
@@ -164,9 +165,9 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
             var socketId = Guid.NewGuid().ToString();
-            await cache.Set($"{PlayerSocketPresencePrefix}_601", socketId, TimeSpan.FromMinutes(1));
+            await cache.Set(PresenceKey(601), socketId, TimeSpan.FromMinutes(1));
 
-            var entry = SocketEnvelope(601, new ChallengeCompletedInfo(new ChallengeCompletedModel { ChallengeId = 1 }));
+            var entry = SocketDeadLetterEnvelope(601, new ChallengeCompletedInfo(new ChallengeCompletedModel { ChallengeId = 1 }));
             await SeedSocketDeadLettersAsync(entry);
 
             using var client = AdminClient();
@@ -181,7 +182,7 @@ namespace Game.Api.Tests.Integration
 
             Assert.Equal(0, await SocketDeadLetterDepthAsync());
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
-            Assert.Single(await pubsub.GetQueue($"SocketQueue_{socketId}").PeekAsync(10));
+            Assert.Single(await pubsub.GetQueue(SocketQueueName(socketId)).PeekAsync(10));
         }
 
         private HttpClient AdminClient()
@@ -215,24 +216,11 @@ namespace Game.Api.Tests.Integration
         private static string Envelope(string type, string payloadJson)
             => new { type, payload = payloadJson }.Serialize();
 
-        private const string SocketCommandDeadLetterQueue = "SocketCommandDeadLetterQueue";
-        private const string PlayerSocketPresencePrefix = "PlayerSocket";
-
-        private async Task SeedSocketDeadLettersAsync(params string[] messages)
-        {
-            using var scope = CreateScope();
-            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
-            await pubsub.GetQueue(SocketCommandDeadLetterQueue).AddRangeToQueueAsync(messages);
-        }
-
         private async Task<long> SocketDeadLetterDepthAsync()
         {
             using var scope = CreateScope();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
-            return await pubsub.GetQueue(SocketCommandDeadLetterQueue).GetLengthAsync();
+            return await pubsub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE).GetLengthAsync();
         }
-
-        private static string SocketEnvelope(int playerId, SocketCommandInfo command)
-            => new SocketCommandDeadLetterEnvelope { PlayerId = playerId, Command = command }.Serialize();
     }
 }

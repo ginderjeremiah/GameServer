@@ -1,14 +1,11 @@
 using Game.Abstractions.Infrastructure;
-using Game.Api;
 using Game.Api.Services;
 using Game.Api.Sockets.Commands;
-using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
 using System.Net.WebSockets;
 using Xunit;
 
@@ -351,25 +348,6 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(playerId, warning.Properties.Single(p => p.Key == "PlayerId").Value);
         }
 
-        /// <summary>
-        /// Seeds a user with a player and a linked skill, then logs in (creating the Redis session the
-        /// WebSocket handshake authenticates against), returning the ids needed for socket auth.
-        /// </summary>
-        private async Task<(int UserId, int PlayerId)> SeedAndLoginAsync(string username = "socketmgruser", string password = "socketmgrpass")
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, username, password);
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
-
-            await LoginAsync(username, password);
-            return (user.Id, player.Id);
-        }
-
         private async Task<bool> HasActiveSocketAsync(int playerId)
         {
             using var scope = CreateScope();
@@ -384,19 +362,8 @@ namespace Game.Api.Tests.Integration
             return await cache.Get(PresenceKey(playerId));
         }
 
-        private async Task<TimeSpan?> GetPresenceTtlAsync(int playerId)
-        {
-            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
-            return await multiplexer.GetDatabase().KeyTimeToLiveAsync(PresenceKey(playerId));
-        }
-
         /// <summary>Polls the condition until it holds or a short timeout elapses; returns whether it held.</summary>
         private static Task<bool> WaitUntilAsync(Func<Task<bool>> condition, int timeoutMs = 5000) =>
             PollingHelper.PollUntilAsync(condition, held => held, timeoutMs);
-
-        private static string PresenceKey(int playerId)
-        {
-            return $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}";
-        }
     }
 }

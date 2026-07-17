@@ -36,14 +36,7 @@ namespace Game.Api.Tests.Integration
         public async Task Login_ValidCredentials_ReturnsPlayerSummariesAndTokens()
         {
             // Arrange
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "loginuser", "loginpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            var (_, playerId) = await SeedAsync("loginuser", "loginpass");
 
             var creds = new { Username = "loginuser", Password = "loginpass" };
 
@@ -59,8 +52,8 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result.Data);
             // Login lists the account's characters (no player is bound until SelectPlayer).
             var summary = Assert.Single(result.Data.PlayerSummaries);
-            Assert.Equal(player.Id, summary.Id);
-            Assert.Equal(player.Name, summary.Name);
+            Assert.Equal(playerId, summary.Id);
+            Assert.Equal("TestPlayer", summary.Name);
 
             // Both tokens are issued in the response body (no auth cookie).
             Assert.False(response.Headers.Contains("Set-Cookie"));
@@ -72,14 +65,7 @@ namespace Game.Api.Tests.Integration
         public async Task Login_IssuedAccessToken_AuthenticatesProtectedEndpoint()
         {
             // Arrange
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "beareruser", "bearerpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            await SeedAsync("beareruser", "bearerpass");
 
             var (authClient, _) = await LoginAndBuildClientAsync("beareruser", "bearerpass");
 
@@ -90,7 +76,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
             Assert.NotNull(result?.Data);
-            Assert.Equal(player.Name, result.Data.Name);
+            Assert.Equal("TestPlayer", result.Data.Name);
             authClient.Dispose();
         }
 
@@ -113,14 +99,7 @@ namespace Game.Api.Tests.Integration
         public async Task Login_WrongPassword_ReturnsError()
         {
             // Arrange — a real user whose stored hash won't match the supplied password.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "wrongpassuser", "correctpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            await SeedAsync("wrongpassuser", "correctpass");
 
             var creds = new { Username = "wrongpassuser", Password = "wrongpass" };
 
@@ -141,16 +120,16 @@ namespace Game.Api.Tests.Integration
         {
             // A banned account with otherwise-correct credentials is rejected in the auth path: no tokens
             // are issued and no session is established.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "bannedlogin", "bannedpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            await ReloadReferenceCachesAsync();
+            var (userId, _) = await SeedAsync("bannedlogin", "bannedpass");
 
-            user.BannedAt = DateTime.UtcNow;
-            await context.SaveChangesAsync(CancellationToken);
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var user = await context.Users.FindAsync([userId], CancellationToken);
+                Assert.NotNull(user);
+                user.BannedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(CancellationToken);
+            }
 
             var creds = new { Username = "bannedlogin", Password = "bannedpass" };
 
@@ -165,35 +144,31 @@ namespace Game.Api.Tests.Integration
             Assert.Null(result.Data);
 
             // No session is established for the rejected login.
-            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-            Assert.Null(await sessionStore.GetSession(user.Id));
+            using var verifyScope = CreateScope();
+            var sessionStore = verifyScope.ServiceProvider.GetRequiredService<ISessionStore>();
+            Assert.Null(await sessionStore.GetSession(userId));
         }
 
         [Fact]
         public async Task SelectPlayer_OwnedCharacter_BindsSessionAndRotatesTokenIntoGameReadyState()
         {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "selectuser", "selectpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            await ReloadReferenceCachesAsync();
+            var (userId, playerId) = await SeedAsync("selectuser", "selectpass");
 
             var login = await LoginAsync("selectuser", "selectpass");
             var summary = Assert.Single(login.PlayerSummaries);
 
             // Selecting binds the session and returns the loaded player plus a rotated, game-ready token.
             var select = await SelectPlayerAsync(login.Tokens, summary.Id);
-            Assert.Equal(player.Id, select.Player.Id);
-            Assert.Equal(player.Name, select.Player.Name);
+            Assert.Equal(playerId, select.Player.Id);
+            Assert.Equal("TestPlayer", select.Player.Name);
             Assert.NotEqual(login.Tokens.RefreshToken, select.Tokens.RefreshToken);
 
             // The cached session is now established for the selected character.
+            using var scope = CreateScope();
             var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-            var session = await sessionStore.GetSession(user.Id);
+            var session = await sessionStore.GetSession(userId);
             Assert.NotNull(session);
-            Assert.Equal(player.Id, session.PlayerId);
+            Assert.Equal(playerId, session.PlayerId);
 
             // The rotated access token authenticates Status and resolves the selected player from its claim.
             using var authClient = Factory.CreateClient();
@@ -201,7 +176,7 @@ namespace Game.Api.Tests.Integration
             var statusResponse = await authClient.GetAsync("/api/Login/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, statusResponse.StatusCode);
             var status = await statusResponse.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
-            Assert.Equal(player.Id, status?.Data?.Id);
+            Assert.Equal(playerId, status?.Data?.Id);
         }
 
         [Fact]
@@ -927,7 +902,7 @@ namespace Game.Api.Tests.Integration
             // A valid token with no cached session (evicted, aged out under the sliding TTL, or never
             // established on this instance) must not be reported as "not logged in" (#693). The session is
             // rehydrated from the user's player binding instead.
-            var (client, user, player) = await SeedUserWithTokenButNoSessionAsync("evictedstatus");
+            var (client, userId, _) = await SeedUserWithTokenButNoSessionAsync("evictedstatus");
 
             var response = await client.GetAsync("/api/Login/Status", CancellationToken);
 
@@ -935,11 +910,11 @@ namespace Game.Api.Tests.Integration
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
             Assert.NotNull(result?.Data);
             Assert.Null(result.ErrorMessage);
-            Assert.Equal(player.Name, result.Data.Name);
+            Assert.Equal("TestPlayer", result.Data.Name);
 
             // Rehydration is in-memory only: the request resolves the player without ever writing the session
             // cache, since player-state writes belong on the socket, not this concurrent HTTP path (#937).
-            await AssertSessionNotEstablishedAsync(user.Id);
+            await AssertSessionNotEstablishedAsync(userId);
             client.Dispose();
         }
 
@@ -948,7 +923,7 @@ namespace Game.Api.Tests.Integration
         {
             // The pre-game active-session takeover warning is the user-visible breakage from #693: an evicted
             // session must rehydrate and report the (absent) active socket, not "not logged in".
-            var (client, user, _) = await SeedUserWithTokenButNoSessionAsync("evictedactive");
+            var (client, userId, _) = await SeedUserWithTokenButNoSessionAsync("evictedactive");
 
             var response = await client.GetAsync("/api/Login/ActiveSession", CancellationToken);
 
@@ -959,7 +934,7 @@ namespace Game.Api.Tests.Integration
             Assert.False(result.Data.Active);
 
             // Rehydration is in-memory only — the presence check resolves the player without writing the cache (#937).
-            await AssertSessionNotEstablishedAsync(user.Id);
+            await AssertSessionNotEstablishedAsync(userId);
             client.Dispose();
         }
 
@@ -969,7 +944,7 @@ namespace Game.Api.Tests.Integration
             // The redundant per-request session read is gone (#755): an authenticated endpoint that never
             // reads player state (here DeviceInfo) must not load or rehydrate the session cache, even for a
             // user who has a resolvable player. Only the socket handshake and Status/ActiveSession do.
-            var (client, user, _) = await SeedUserWithTokenButNoSessionAsync("nosessionread");
+            var (client, userId, _) = await SeedUserWithTokenButNoSessionAsync("nosessionread");
             client.DefaultRequestHeaders.TryAddWithoutValidation(ClientHints.DeviceFingerprintHeader, "fp-nosession");
 
             var response = await client.PostAsJsonAsync("/api/Login/DeviceInfo",
@@ -978,7 +953,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             // Confirm the session was never established — the cache stays empty for this user.
-            await AssertSessionNotEstablishedAsync(user.Id);
+            await AssertSessionNotEstablishedAsync(userId);
             client.Dispose();
         }
 
@@ -987,25 +962,22 @@ namespace Game.Api.Tests.Integration
         /// carrying a valid bearer token for that user but with no session ever established in the cache —
         /// the "valid token, evicted/absent session" state.
         /// </summary>
-        private async Task<(HttpClient Client, User User, Player Player)>
+        private async Task<(HttpClient Client, int UserId, int PlayerId)>
             SeedUserWithTokenButNoSessionAsync(string username)
         {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, username, "pass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            await ReloadReferenceCachesAsync();
+            var (userId, playerId) = await SeedAsync(username, "pass");
 
-            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
-            Assert.Null(await sessionStore.GetSession(user.Id));
+            using (var scope = CreateScope())
+            {
+                var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+                Assert.Null(await sessionStore.GetSession(userId));
+            }
 
             var client = Factory.CreateClient();
             // A post-selection token (carrying the selected-player claim) with no cached session — the
             // "valid token, evicted/absent session" state that must rehydrate from the claim.
-            TestAuthHelper.AddAuthHeader(client, user.Id, player.Id);
-            return (client, user, player);
+            TestAuthHelper.AddAuthHeader(client, userId, playerId);
+            return (client, userId, playerId);
         }
 
         // Confirms a session was never written to the cache: rehydration (and any non-session endpoint) resolves
@@ -1023,14 +995,7 @@ namespace Game.Api.Tests.Integration
         public async Task ActiveSession_NoOpenSocket_ReturnsFalse()
         {
             // Arrange — a logged-in user who has not opened a game connection.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "nosocketuser", "nosocketpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            await SeedAsync("nosocketuser", "nosocketpass");
 
             var (authClient, _) = await LoginAndBuildClientAsync("nosocketuser", "nosocketpass");
 
@@ -1047,20 +1012,13 @@ namespace Game.Api.Tests.Integration
         public async Task ActiveSession_WithOpenSocket_ReturnsTrue()
         {
             // Arrange — a logged-in user with a live websocket connection registered.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "livesocketuser", "livesocketpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            var (userId, _) = await SeedAsync("livesocketuser", "livesocketpass");
 
             var (authClient, _) = await LoginAndBuildClientAsync("livesocketuser", "livesocketpass");
 
             await using var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();
-            await socketClient.ConnectAsync(wsClient, user.Id);
+            await socketClient.ConnectAsync(wsClient, userId);
             // Round-trip a command so the connection is fully registered (the socket-presence key is set
             // before the command listener, so any response guarantees registration completed).
             await socketClient.SendCommandAsync<object>("GetStatisticTypes");
@@ -1085,18 +1043,11 @@ namespace Game.Api.Tests.Integration
         public async Task Refresh_ValidToken_RotatesAndReturnsNewTokens()
         {
             // Arrange
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "refreshuser", "refreshpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            var (_, playerId) = await SeedAsync("refreshuser", "refreshpass");
 
             // Select a character so the refreshed token carries the selected player (and Status can load it).
             var login = await LoginAsync("refreshuser", "refreshpass");
-            var select = await SelectPlayerAsync(login.Tokens, player.Id);
+            var select = await SelectPlayerAsync(login.Tokens, playerId);
 
             // Act — exchange the refresh token for a new pair.
             var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
@@ -1121,14 +1072,7 @@ namespace Game.Api.Tests.Integration
         public async Task Refresh_SameTokenTwice_IsRejectedSecondTime()
         {
             // Arrange
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "rotateuser", "rotatepass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            await SeedAsync("rotateuser", "rotatepass");
 
             var login = await LoginAsync("rotateuser", "rotatepass");
 
@@ -1163,14 +1107,7 @@ namespace Game.Api.Tests.Integration
         public async Task Logout_Authenticated_RevokesRefreshTokenAndEndsSession()
         {
             // Arrange — a logged-in user carrying a valid access token.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "logoutuser", "logoutpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            var (userId, _) = await SeedAsync("logoutuser", "logoutpass");
 
             var (authClient, tokens) = await LoginAndBuildClientAsync("logoutuser", "logoutpass");
 
@@ -1184,8 +1121,9 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Null(result.ErrorMessage);
 
+            using var scope = CreateScope();
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
-            var session = await cache.Get($"Session_{user.Id}");
+            var session = await cache.Get($"Session_{userId}");
             Assert.Null(session);
 
             // The revoked refresh token can no longer be exchanged for new tokens.
@@ -1201,18 +1139,12 @@ namespace Game.Api.Tests.Integration
             // The common logout path (#906): the 15-minute access token has already expired, so the client
             // logs out anonymously with just its refresh token. No request principal means no recorded
             // UserId, yet the cached session must still be evicted — derived from the consumed refresh token.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "expiredlogout", "logoutpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            await ReloadReferenceCachesAsync();
+            var (userId, playerId) = await SeedAsync("expiredlogout", "logoutpass");
 
             // Selecting a character establishes the cached session; the refresh token outlives the access token.
             var login = await LoginAsync("expiredlogout", "logoutpass");
-            var select = await SelectPlayerAsync(login.Tokens, player.Id);
-            await AssertSessionPresentAsync(user.Id);
+            var select = await SelectPlayerAsync(login.Tokens, playerId);
+            await AssertSessionPresentAsync(userId);
 
             // Act — log out over the unauthenticated client (no bearer token, mimicking the expired access
             // token) carrying only the still-valid refresh token.
@@ -1221,7 +1153,7 @@ namespace Game.Api.Tests.Integration
 
             // Assert — logout succeeds and the session is evicted despite the absent access token.
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            await AssertSessionEvictedAsync(user.Id);
+            await AssertSessionEvictedAsync(userId);
 
             // The consumed refresh token can no longer be exchanged for new tokens.
             var refreshResponse = await Client.PostAsJsonAsync("/api/Login/Refresh",
@@ -1268,15 +1200,12 @@ namespace Game.Api.Tests.Integration
         public async Task Login_AdminUser_InjectsRoleIntoTokenAndGrantsAdminAccess()
         {
             // Arrange — a user granted the seeded Admin role.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "adminlogin", "adminpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
-            await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
+            var (userId, _) = await SeedAsync("adminlogin", "adminpass");
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.AssignRoleToUserAsync(context, userId, ERole.Admin);
+            }
 
             // Act — log in and reuse the issued access token against an admin endpoint.
             var (authClient, _) = await LoginAndBuildClientAsync("adminlogin", "adminpass");
@@ -1292,14 +1221,7 @@ namespace Game.Api.Tests.Integration
         public async Task Login_NonAdminUser_DoesNotGrantAdminAccess()
         {
             // Arrange — a user without any roles.
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, "plainlogin", "plainpass");
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
+            await SeedAsync("plainlogin", "plainpass");
 
             // Act
             var (authClient, _) = await LoginAndBuildClientAsync("plainlogin", "plainpass");

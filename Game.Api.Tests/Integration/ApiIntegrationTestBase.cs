@@ -1,13 +1,18 @@
 using Game.Abstractions.DataAccess;
+using Game.Abstractions.Infrastructure;
+using Game.Api;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
 using Game.Api.Models.Player;
 using Game.Api.Services;
+using Game.Api.Sockets.Commands;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -150,5 +155,61 @@ namespace Game.Api.Tests.Integration
         /// reference rows directly so the caches (which no longer lazily refill) serve the seeded data.
         /// </summary>
         protected Task ReloadReferenceCachesAsync() => ReferenceCacheReloader.ReloadAllAsync(Factory.Services);
+
+        /// <summary>
+        /// Seeds a user with a player (and a linked skill so the aggregate loads), without establishing a
+        /// session in Redis. Returns the userId (for WebSocket/token auth) and playerId.
+        /// </summary>
+        protected async Task<(int UserId, int PlayerId)> SeedAsync(string username = "testuser", string password = "testpass")
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, username, password);
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
+            await ReloadReferenceCachesAsync();
+
+            return (user.Id, player.Id);
+        }
+
+        /// <summary>
+        /// Seeds test data (see <see cref="SeedAsync"/>), logs in via the real HTTP endpoint (creating the
+        /// session in Redis), and returns the userId (for WebSocket/token auth) and playerId.
+        /// </summary>
+        protected async Task<(int UserId, int PlayerId)> SeedAndLoginAsync(string username = "testuser", string password = "testpass")
+        {
+            var seeded = await SeedAsync(username, password);
+            await LoginAsync(username, password);
+            return seeded;
+        }
+
+        /// <summary>The player's socket-presence cache key.</summary>
+        protected static string PresenceKey(int playerId) => $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}";
+
+        /// <summary>Reads the live TTL on the player's socket-presence key directly from Redis.</summary>
+        protected async Task<TimeSpan?> GetPresenceTtlAsync(int playerId)
+        {
+            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            return await multiplexer.GetDatabase().KeyTimeToLiveAsync(PresenceKey(playerId));
+        }
+
+        /// <summary>A live socket's own pub/sub queue name.</summary>
+        protected static string SocketQueueName(string socketId) => $"{Constants.PUBSUB_SOCKET_QUEUE_PREFIX}_{socketId}";
+
+        /// <summary>Wraps a server-initiated command as the socket-command dead-letter envelope shape
+        /// <see cref="Game.Api.Services.Admin.SocketCommandDeadLetters"/> replays, for tests seeding the
+        /// socket dead-letter queue directly.</summary>
+        protected static string SocketDeadLetterEnvelope(int playerId, SocketCommandInfo command) =>
+            new SocketCommandDeadLetterEnvelope { PlayerId = playerId, Command = command }.Serialize();
+
+        /// <summary>Pushes raw messages directly onto the socket-command dead-letter queue.</summary>
+        protected async Task SeedSocketDeadLettersAsync(params string[] messages)
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            await pubsub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE).AddRangeToQueueAsync(messages);
+        }
     }
 }

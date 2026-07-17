@@ -1,4 +1,3 @@
-using Game.Api;
 using Game.Api.Models.Common;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
@@ -6,7 +5,6 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
-using StackExchange.Redis;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
@@ -21,39 +19,6 @@ namespace Game.Api.Tests.Integration
         public SocketConnectionTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 
         /// <summary>
-        /// Seeds a user with a player (and a linked skill so the aggregate loads), without establishing a
-        /// session in Redis. Returns the userId (for WebSocket auth) and playerId.
-        /// </summary>
-        private async Task<(int UserId, int PlayerId)> SeedAsync(string username = "socketuser", string password = "socketpass")
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, username, password);
-            var skill = await TestDataSeeder.CreateSkillAsync(context);
-            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
-            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
-            // The caches no longer lazily refill, so reload them to resolve the player's linked skill on load.
-            await ReloadReferenceCachesAsync();
-
-            return (user.Id, player.Id);
-        }
-
-        /// <summary>
-        /// Seeds test data, logs in via HTTP (creating the session in Redis), and returns the userId (for
-        /// WebSocket auth) and playerId.
-        /// </summary>
-        private async Task<(int UserId, int PlayerId)> SeedAndLoginAsync(string username = "socketuser", string password = "socketpass")
-        {
-            var seeded = await SeedAsync(username, password);
-
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
-                new { Username = username, Password = password });
-            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
-
-            return seeded;
-        }
-
-        /// <summary>
         /// Seeds a user with no player, so an authenticated handshake for it resolves no player to load.
         /// Returns the userId (for WebSocket auth).
         /// </summary>
@@ -63,13 +28,6 @@ namespace Game.Api.Tests.Integration
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var user = await TestDataSeeder.CreateUserAsync(context, username, password);
             return user.Id;
-        }
-
-        /// <summary>Reads the live TTL on the player's socket-presence key directly from Redis.</summary>
-        private async Task<TimeSpan?> GetPresenceTtlAsync(int playerId)
-        {
-            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
-            return await multiplexer.GetDatabase().KeyTimeToLiveAsync($"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}");
         }
 
         [Fact]
