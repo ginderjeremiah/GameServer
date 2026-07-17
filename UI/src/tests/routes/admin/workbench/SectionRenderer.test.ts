@@ -16,8 +16,7 @@ const { mockReference } = vi.hoisted(() => ({
 		entityOptions: vi.fn(() => []),
 		entityName: vi.fn(() => null),
 		itemRecords: vi.fn(() => []),
-		itemModRecords: vi.fn(() => []),
-		skillRecords: vi.fn(() => [])
+		itemModRecords: vi.fn(() => [])
 	}
 }));
 vi.mock('$routes/admin/workbench/reference.svelte', () => ({ reference: mockReference }));
