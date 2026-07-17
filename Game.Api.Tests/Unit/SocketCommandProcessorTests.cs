@@ -168,12 +168,13 @@ namespace Game.Api.Tests.Unit
         public async Task RegisterSocket_SwitchCreditClaimLandsBetweenReadAndWrite_RetriesRatherThanKickingIt()
         {
             // #2094: before the fix, RegisterSocket peeked the presence key once, then wrote it unconditionally
-            // via GetSet — so a switch-credit claim landing in the gap between the peek and the write got
-            // silently overwritten (kicked) even though the peek observed no claim at all. The claim must
-            // instead be a CompareAndSet loop: a write that races a claim into that same gap has to fail (the
-            // stored value no longer matches what was just read) and retry against whatever is actually there,
-            // deferring while it's the claim sentinel rather than ever falling back to an unconditional
-            // overwrite. RacingClaimCacheService scripts exactly that gap on the first attempt.
+            // via a since-removed GetSet primitive — so a switch-credit claim landing in the gap between the
+            // peek and the write got silently overwritten (kicked) even though the peek observed no claim at
+            // all. The claim must instead be a CompareAndSet loop: a write that races a claim into that same
+            // gap has to fail (the stored value no longer matches what was just read) and retry against
+            // whatever is actually there, deferring while it's the claim sentinel rather than ever falling back
+            // to an unconditional overwrite. RacingClaimCacheService scripts exactly that gap on the first
+            // attempt.
             var cache = new RacingClaimCacheService();
             var pubSub = new CapturingPubSubService();
             var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
@@ -191,9 +192,8 @@ namespace Game.Api.Tests.Unit
 
             Assert.NotNull(context);
             // The raced-out first write, the sentinel it then observed, and the retry that finally landed once
-            // the sentinel cleared — three reads and two compare-and-set attempts, never an unconditional GetSet
-            // (RacingClaimCacheService throws NotSupportedException from GetSet, which would have failed this
-            // test outright).
+            // the sentinel cleared — three reads and two compare-and-set attempts, with every write going
+            // through CompareAndSet (RacingClaimCacheService implements no unconditional-write primitive at all).
             Assert.Equal(3, cache.GetCalls);
             Assert.Equal([null, null], cache.CompareAndSetExpectedValues);
             // It genuinely deferred on observing the sentinel (the poll delay actually ran) rather than
@@ -466,7 +466,6 @@ namespace Game.Api.Tests.Unit
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -541,7 +540,6 @@ namespace Game.Api.Tests.Unit
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -557,11 +555,12 @@ namespace Game.Api.Tests.Unit
         }
 
         /// <summary>Scripts a switch-credit claim landing in the exact gap <see cref="SocketManagerService"/>'s
-        /// old wait-then-GetSet claim left open (#2094): the first read sees the key unclaimed, but the first
-        /// write that acts on that read is raced out (as a real Redis CompareAndSet would be, since the stored
-        /// value no longer matches what was read) — the following read then observes the sentinel that landed
-        /// in the gap, and only the write after that (once the sentinel is gone) succeeds. GetSet throws, so a
-        /// caller that ever falls back to it fails the test outright rather than silently passing.</summary>
+        /// old wait-then-unconditional-write claim left open (#2094): the first read sees the key unclaimed,
+        /// but the first write that acts on that read is raced out (as a real Redis CompareAndSet would be,
+        /// since the stored value no longer matches what was read) — the following read then observes the
+        /// sentinel that landed in the gap, and only the write after that (once the sentinel is gone) succeeds.
+        /// Implements no unconditional-write primitive at all, so a caller that ever fell back to one would fail
+        /// to compile against this fake rather than silently passing.</summary>
         private sealed class RacingClaimCacheService : ICacheService
         {
             private const string SwitchCreditClaimValue = "switch-credit";
@@ -588,9 +587,6 @@ namespace Game.Api.Tests.Unit
                 // (once the caller has re-read and deferred behind the sentinel) succeeds.
                 return Task.FromResult(CompareAndSetExpectedValues.Count > 1);
             }
-
-            public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) =>
-                throw new NotSupportedException("The presence claim must go through CompareAndSet, never an unconditional GetSet (#2094).");
 
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();

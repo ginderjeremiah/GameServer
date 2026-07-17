@@ -78,8 +78,8 @@ namespace Game.Api.Services
             // credit is a read-modify-write against this same player's aggregate run off this player's battle
             // loop, so registering (and starting the loop) while it's still mid-flight would reintroduce the
             // lost-update race the presence claim exists to prevent. ClaimPresenceKey's CompareAndSet loop
-            // closes the gap a separate wait-then-GetSet would leave between "the claim looked clear" and
-            // "the key was written" — see its doc comment.
+            // closes the gap a separate wait-then-unconditional-write would leave between "the claim looked
+            // clear" and "the key was written" — see its doc comment.
             var oldSocketId = await ClaimPresenceKey(presenceKey, socketContext.SocketId);
 
             try
@@ -206,12 +206,12 @@ namespace Game.Api.Services
         /// key and writing it can never be kicked: the write only lands if the key's value is still what was
         /// just read, so a claim (or another registration) that lands first makes the CompareAndSet fail, and
         /// the loop re-reads and retries against whatever is there now instead of blindly overwriting it — the
-        /// gap a separate wait-then-<see cref="ICacheService.GetSet"/> leaves open. While the read value is the
-        /// claim sentinel, the loop defers (polling at <see cref="SwitchCreditWaitPollInterval"/>) rather than
-        /// racing it, capped at <see cref="SwitchCreditClaimTtl"/> — the claim's own TTL — so a credit that
-        /// faults without releasing can never wedge a registration past that bound; only once that deadline
-        /// passes does an attempt targeting the (by then stale) sentinel proceed. Returns the previous real
-        /// socket id, or <see langword="null"/> if the key was unset or held only a switch-credit claim.
+        /// gap a separate wait-then-unconditional-write would leave open. While the read value is the claim
+        /// sentinel, the loop defers (polling at <see cref="SwitchCreditWaitPollInterval"/>) rather than racing
+        /// it, capped at <see cref="SwitchCreditClaimTtl"/> — the claim's own TTL — so a credit that faults
+        /// without releasing can never wedge a registration past that bound; only once that deadline passes
+        /// does an attempt targeting the (by then stale) sentinel proceed. Returns the previous real socket id,
+        /// or <see langword="null"/> if the key was unset or held only a switch-credit claim.
         /// </summary>
         private async Task<string?> ClaimPresenceKey(string presenceKey, string newSocketId)
         {
@@ -232,7 +232,10 @@ namespace Game.Api.Services
                 }
 
                 // Another writer (a fresh switch-credit claim, a competing registration) won the race between
-                // our read and this write; re-read whatever landed and retry against that instead.
+                // our read and this write; re-read whatever landed and retry against that instead. Unbounded by
+                // design but self-limiting in practice: each failure here means one more concurrent writer for
+                // this single player's key, a set that's small and finite rather than something that can churn
+                // forever.
                 currentValue = await _cache.Get(presenceKey);
             }
         }
