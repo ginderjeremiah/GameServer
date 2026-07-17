@@ -183,16 +183,15 @@ namespace Game.DataAccess.Repositories
             }
 
             var key = ProgressKey(playerId);
-            var raw = await _cache.HashGetAllIfExists(key, cancellationToken);
+            // Sliding expiration: a hit refreshes the idle TTL so an active player never ages out, folded into
+            // the same round trip as the read (#2019) rather than a separate fire-and-forget expire.
+            var raw = await _cache.HashGetAllAndRefreshExpiry(key, ProgressCacheTtl, cancellationToken);
             CachedPlayerProgress? progress = null;
             if (raw is not null)
             {
                 try
                 {
                     progress = FromHashFields(raw);
-
-                    // Sliding expiration: a cache hit refreshes the idle TTL so an active player never ages out.
-                    _cache.ExpireAndForget(key, ProgressCacheTtl);
                 }
                 catch (JsonException ex)
                 {

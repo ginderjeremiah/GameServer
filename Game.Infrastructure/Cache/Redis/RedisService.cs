@@ -177,6 +177,38 @@ namespace Game.Infrastructure.Cache.Redis
             return fields;
         }
 
+        public async Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+        {
+            // Same TYPE-then-HGETALL script as HashGetAllIfExists, plus a PEXPIRE on the hit path so a
+            // sliding-expiration hash read pays one round trip instead of an awaited HGETALL followed by a
+            // fire-and-forget expire (mirroring GetAndRefreshExpiry's GETEX win for string keys, which GETEX
+            // itself can't serve here since it only applies to strings). The PEXPIRE makes this a write, so it
+            // routes through ObserveWrite like GetAndRefreshExpiry rather than the plain-read path
+            // HashGetAllIfExists uses.
+            var result = await ObserveWrite(Redis.ScriptEvaluateAsync(
+                "local t = redis.call('type', KEYS[1]).ok "
+                + "if t == 'none' then return false end "
+                + "if t ~= 'hash' then redis.call('del', KEYS[1]) return false end "
+                + "local result = redis.call('hgetall', KEYS[1]) "
+                + "redis.call('pexpire', KEYS[1], ARGV[1]) "
+                + "return result",
+                [key], [(RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
+
+            if (result.IsNull)
+            {
+                return null;
+            }
+
+            var flat = (RedisValue[])result!;
+            var fields = new Dictionary<string, string>(flat.Length / 2);
+            for (var i = 0; i < flat.Length; i += 2)
+            {
+                fields[flat[i]!] = flat[i + 1]!;
+            }
+
+            return fields;
+        }
+
         public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry)
         {
             if (fields.Count == 0)

@@ -75,6 +75,12 @@
         /// </summary>
         public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default);
         /// <summary>
+        /// Same as <see cref="HashGetAllIfExists"/>, but also resets the key's TTL to <paramref name="expiry"/>
+        /// in the same round trip on a hit (a no-op on a miss, like <see cref="GetAndRefreshExpiry"/>). Lets a
+        /// sliding-expiration hash read avoid the separate awaited HGETALL followed by a fire-and-forget expire.
+        /// </summary>
+        public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
+        /// <summary>
         /// Atomically writes <paramref name="fields"/> into the Redis hash at <paramref name="key"/> (adding
         /// or overwriting each named field; existing fields not named in <paramref name="fields"/> are left
         /// untouched) and resets the key's TTL to <paramref name="expiry"/>, without awaiting the result
