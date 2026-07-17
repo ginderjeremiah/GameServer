@@ -157,7 +157,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task SavePlayer_DispatchFaultsForANonCancellationReason_StillFlushesBufferedEnvelopes_AndThrowsPlayerPersistenceFlushFailedException()
+        public async Task SavePlayer_DispatchFaultsForANonCancellationReason_StillFlushesBufferedEnvelopesAndWritesTheCacheBlob_AndThrowsPlayerPersistenceFlushFailedException()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -198,11 +198,16 @@ namespace Game.Application.Tests.Services
             // must not discard whatever other handlers already buffered in the same batch.
             Assert.Equal(1, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
 
-            // The cache blob write is skipped after a dispatch fault (same as a flush failure), so a fresh read
-            // still sees the pre-mutation zone, not the ChangeZone(1) this faulted save never durably applied.
+            // The cache blob write must NOT be skipped after a dispatch fault: the isolate-and-collect dispatcher
+            // (DomainEventDispatcher) always finishes buffering every handler's write before surfacing the fault,
+            // so the queue above already matches this mutated aggregate. A fresh read must therefore see the
+            // ChangeZone(1) mutation, not the pre-mutation zone — skipping this write would leave the cache
+            // silently behind what was just durably enqueued, permanently so for insert-only events with no
+            // compensating overwrite (#2098).
             var rereadPlayer = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(rereadPlayer);
-            Assert.Equal(originalZoneId, rereadPlayer.CurrentZoneId);
+            Assert.NotEqual(originalZoneId, rereadPlayer.CurrentZoneId);
+            Assert.Equal(1, rereadPlayer.CurrentZoneId);
         }
 
         // Stands in for a domain event handler faulting partway through a dispatch: buffers an envelope into
