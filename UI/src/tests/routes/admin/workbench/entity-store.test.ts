@@ -436,5 +436,35 @@ describe('EntityStore', () => {
 
 			expect(store.counts).toMatchObject({ added: 1, modified: 1, deleted: 1, total: 3 });
 		});
+
+		it("an unrelated record's state object is reference-stable across a patch (per-record cache hit)", () => {
+			const store = new EntityStore(requiredNameConfig(), seed);
+			const untouched = store.recordStates[0];
+
+			store.patch(1, (draft) => (draft.value = 99));
+
+			expect(store.recordStates[0]).toBe(untouched);
+			expect(store.recordStates[1]).not.toBe(untouched);
+		});
+
+		it('removeItem flips a previously-cached record to deleted (cache invalidation without a reference change)', () => {
+			const store = new EntityStore(requiredNameConfig(), seed);
+			// Populate the memo for record 0 before its deleted-ness changes.
+			expect(store.recordStates[0].status).toBe('clean');
+
+			store.removeItem(0);
+
+			expect(store.recordStates[0].status).toBe('deleted');
+		});
+
+		it('restoreItem flips a previously-cached deleted record back to clean', () => {
+			const store = new EntityStore(requiredNameConfig(), seed);
+			store.removeItem(0);
+			expect(store.recordStates[0].status).toBe('deleted');
+
+			store.restoreItem(0);
+
+			expect(store.recordStates[0].status).toBe('clean');
+		});
 	});
 });
