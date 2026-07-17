@@ -667,6 +667,104 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(0, await CountAsync(c => c.AppliedMods.CountAsync(am => am.PlayerId == playerId && am.ItemId == itemId && am.ItemModSlotId == slotId, CancellationToken)));
         }
 
+        [Fact]
+        public async Task LessonRead_AppliedTwice_ConvergesToReadAtWithoutDuplicating()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+            var unlockedAt = new DateTime(2026, 7, 16, 8, 0, 0, DateTimeKind.Utc);
+            var evt = new LessonReadEvent(playerId, lessonId, unlockedAt, ReadAt: unlockedAt.AddMinutes(5));
+
+            // First apply inserts (no prior row, the screen-anchored straight-to-read case); the second finds
+            // the row and updates it in place rather than duplicating, so a re-delivered read event converges.
+            await ApplyAsync(evt);
+            await ApplyAsync(evt);
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.PlayerLessons.AsNoTracking()
+                .Where(pl => pl.PlayerId == playerId && pl.LessonId == lessonId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(evt.UnlockedAt, row.UnlockedAt);
+            Assert.Equal(evt.ReadAt, row.ReadAt);
+        }
+
+        [Fact]
+        public async Task LessonRead_AppliedConcurrently_InsertsOneRowWithoutThrowing()
+        {
+            // No PlayerLesson row exists yet, so every concurrent apply's absolute-update misses and falls
+            // through to insert; only one insert wins and the rest hit the unique-violation catch, clear their
+            // tracker, and re-run the absolute update against the now-existing row.
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+            var unlockedAt = new DateTime(2026, 7, 16, 8, 0, 0, DateTimeKind.Utc);
+
+            await ApplyConcurrentlyAsync(new LessonReadEvent(playerId, lessonId, unlockedAt, ReadAt: unlockedAt.AddMinutes(1)));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.PlayerLessons.AsNoTracking()
+                .Where(pl => pl.PlayerId == playerId && pl.LessonId == lessonId)
+                .ToListAsync(CancellationToken));
+            Assert.NotNull(row.ReadAt);
+        }
+
+        [Fact]
+        public async Task LessonReadThenUnlockedReordered_ConvergesWithoutDuplicatingOrOverwriting()
+        {
+            // Models a screen-anchored lesson: the read event arrives first with no prior unlock, inserting
+            // both timestamps; the lesson's own LessonUnlockedEvent then arrives reordered behind it. The
+            // unlock handler's plain insert collides with the already-existing row, so its unique-violation
+            // catch absorbs it as a no-op rather than duplicating the row or clobbering the read's timestamps.
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+            var readUnlockedAt = new DateTime(2026, 7, 16, 8, 0, 0, DateTimeKind.Utc);
+            var readAt = readUnlockedAt.AddMinutes(1);
+
+            await ApplyAsync(new LessonReadEvent(playerId, lessonId, readUnlockedAt, readAt));
+            await ApplyAsync(new LessonUnlockedEvent(playerId, lessonId, readUnlockedAt.AddMinutes(10)));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.PlayerLessons.AsNoTracking()
+                .Where(pl => pl.PlayerId == playerId && pl.LessonId == lessonId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(readUnlockedAt, row.UnlockedAt);
+            Assert.Equal(readAt, row.ReadAt);
+        }
+
+        [Fact]
+        public async Task LessonUnlocked_AppliedTwiceSequentially_InsertsOneRow()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+            var evt = new LessonUnlockedEvent(playerId, lessonId, new DateTime(2026, 7, 16, 9, 0, 0, DateTimeKind.Utc));
+
+            // The first apply inserts; the duplicate delivery hits the unique-violation catch and is absorbed
+            // as a no-op rather than duplicating the row.
+            await ApplyAsync(evt);
+            await ApplyAsync(evt);
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = Assert.Single(await context.PlayerLessons.AsNoTracking()
+                .Where(pl => pl.PlayerId == playerId && pl.LessonId == lessonId)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(evt.UnlockedAt, row.UnlockedAt);
+            Assert.Null(row.ReadAt);
+        }
+
+        [Fact]
+        public async Task LessonUnlocked_AppliedConcurrently_InsertsOneRowWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+
+            await ApplyConcurrentlyAsync(new LessonUnlockedEvent(playerId, lessonId, new DateTime(2026, 7, 16, 9, 0, 0, DateTimeKind.Utc)));
+
+            Assert.Equal(1, await CountAsync(c => c.PlayerLessons.CountAsync(pl => pl.PlayerId == playerId && pl.LessonId == lessonId, CancellationToken)));
+        }
+
         private static AttributeAllocationsChangedEvent MakeAttributeEvent(int playerId, double intellect, double strength) => new(
             playerId,
             [
@@ -905,6 +1003,13 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             return (await TestDataSeeder.CreateZoneAsync(context)).Id;
+        }
+
+        private async Task<int> SeedLessonAsync()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return (await TestDataSeeder.CreateLessonAsync(context)).Id;
         }
     }
 }
