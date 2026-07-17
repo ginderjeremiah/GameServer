@@ -162,19 +162,7 @@ namespace Game.Infrastructure.Cache.Redis
                 + "return redis.call('hgetall', KEYS[1])",
                 [key]), cancellationToken);
 
-            if (result.IsNull)
-            {
-                return null;
-            }
-
-            var flat = (RedisValue[])result!;
-            var fields = new Dictionary<string, string>(flat.Length / 2);
-            for (var i = 0; i < flat.Length; i += 2)
-            {
-                fields[flat[i]!] = flat[i + 1]!;
-            }
-
-            return fields;
+            return MapHashResult(result);
         }
 
         public async Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
@@ -194,6 +182,14 @@ namespace Game.Infrastructure.Cache.Redis
                 + "return result",
                 [key], [(RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
 
+            return MapHashResult(result);
+        }
+
+        // Shared by HashGetAllIfExists and HashGetAllAndRefreshExpiry: both scripts return either a Lua false
+        // (told apart from an empty hash by RedisResult.IsNull) or the flat HGETALL reply, so the
+        // flat-array-to-dictionary conversion — and the null-forgiving indexing it requires — lives in one place.
+        private static Dictionary<string, string>? MapHashResult(RedisResult result)
+        {
             if (result.IsNull)
             {
                 return null;
