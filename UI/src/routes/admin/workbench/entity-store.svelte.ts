@@ -65,16 +65,35 @@ export class EntityStore<T extends Identified> {
 		return recordsEqual(record, baseline) ? 'clean' : 'modified';
 	}
 
+	/** Bumped whenever a record's status can change *without* its object reference changing — only
+	 *  {@link removeItem}/{@link restoreItem} toggling a saved record's membership in {@link deleted}.
+	 *  Every other mutator ({@link patch}, {@link addItem}, {@link resetItem}, `save`, `discard`)
+	 *  replaces the affected record(s) with a new object, which already misses the reference cache
+	 *  below on its own. */
+	private statusEpoch = $state(0);
+	private stateCacheEpoch = -1;
+	private stateCache = new WeakMap<T, RecordState>();
+
 	/**
-	 * Per-record status + validation warnings, keyed by id. Memoised here so the consumers (the list
-	 * rows, the page summary, the save-bar counts) read O(1) lookups instead of each re-running the
-	 * structural diff per record. Recomputes only when the records, baseline, or pending deletes
-	 * change — a search keystroke or a selection change (which touch neither) reuses the cached map.
+	 * Per-record status + validation warnings, keyed by id. Memoised **per record object** so an edit
+	 * keystroke — which replaces only the one record {@link patch} touched — re-diffs just that record
+	 * instead of re-canonicalizing the whole catalogue; every other record is a same-reference cache
+	 * hit. The cache is a `WeakMap` keyed on the record itself (not its id) so a superseded record from
+	 * an earlier edit is garbage-collected instead of accumulating for the life of the store.
 	 */
 	recordStates = $derived.by<Record<number, RecordState>>(() => {
+		if (this.statusEpoch !== this.stateCacheEpoch) {
+			this.stateCache = new WeakMap();
+			this.stateCacheEpoch = this.statusEpoch;
+		}
 		const map: Record<number, RecordState> = {};
 		for (const record of this.items) {
-			map[record.id] = { status: this.status(record), warnings: entityWarnings(this.config, record) };
+			let state = this.stateCache.get(record);
+			if (!state) {
+				state = { status: this.status(record), warnings: entityWarnings(this.config, record) };
+				this.stateCache.set(record, state);
+			}
+			map[record.id] = state;
 		}
 		return map;
 	});
@@ -147,7 +166,10 @@ export class EntityStore<T extends Identified> {
 			// Never-saved record: just drop it.
 			this.items = this.items.filter((record) => record.id !== id);
 		} else {
+			// The record's own object reference is untouched, so the status cache must be invalidated
+			// explicitly — nothing else would tell recordStates this record just became 'deleted'.
 			this.deleted.add(id);
+			this.statusEpoch++;
 		}
 		this.saved = false;
 	}
@@ -156,7 +178,9 @@ export class EntityStore<T extends Identified> {
 		if (this.saving) {
 			return;
 		}
+		// Same reasoning as removeItem: the reference is unchanged, so bump the epoch to invalidate.
 		this.deleted.delete(id);
+		this.statusEpoch++;
 		this.saved = false;
 	}
 
