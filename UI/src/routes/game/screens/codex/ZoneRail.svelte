@@ -2,17 +2,17 @@
      with a status node (cleared / unlocked / locked), the zone name + level band, the spawn-pool size
      and a BOSS tag when the zone has a dedicated boss. -->
 <div class="rail">
-	<div class="rail-head">Progression · {view.zoneRows.length}</div>
+	<div class="rail-head">Progression · {view.zonesTab.zoneRows.length}</div>
 
 	<div class="rows" data-testid="codex-zone-rows">
-		{#each view.zoneRows as row (row.id)}
+		{#each view.zonesTab.zoneRows as row (row.id)}
 			<button
 				type="button"
 				class="row"
-				class:selected={row.id === view.selectedZoneId}
+				class:selected={row.id === view.zonesTab.selectedZoneId}
 				style:--status-color={zoneStatusColor(row.status)}
 				data-testid="codex-zone-{row.id}"
-				onclick={() => view.selectZone(row.id)}
+				onclick={() => view.zonesTab.selectZone(row.id)}
 			>
 				<span class="node">
 					<span class="dot" class:cleared={row.status === 'cleared'} class:locked={row.status === 'locked'}></span>

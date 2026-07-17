@@ -8,10 +8,10 @@
 				<input
 					class="search-input"
 					type="search"
-					placeholder="search {view.enemies.length} enemies"
+					placeholder="search {view.enemiesTab.enemies.length} enemies"
 					aria-label="Search enemies"
 					data-testid="codex-search"
-					bind:value={view.search}
+					bind:value={view.enemiesTab.search}
 				/>
 			</label>
 			<div class="chips">
@@ -19,19 +19,24 @@
 					<button
 						type="button"
 						class="chip"
-						class:on={view.filter === chip.key}
+						class:on={view.enemiesTab.filter === chip.key}
 						data-testid="codex-filter-{chip.key}"
-						onclick={() => view.setFilter(chip.key)}
+						onclick={() => view.enemiesTab.setFilter(chip.key)}
 					>
 						{chip.label}
 					</button>
 				{/each}
 			</div>
 			<span class="spacer"></span>
-			<span class="count">{view.shownCount} shown</span>
+			<span class="count">{view.enemiesTab.shownCount} shown</span>
 			<label class="sort">
 				<span class="sort-label">sort:</span>
-				<select class="sort-select" aria-label="Sort enemies" data-testid="codex-sort" bind:value={view.sort}>
+				<select
+					class="sort-select"
+					aria-label="Sort enemies"
+					data-testid="codex-sort"
+					bind:value={view.enemiesTab.sort}
+				>
 					{#each ENEMY_SORTS as option (option.key)}
 						<option value={option.key}>{option.label}</option>
 					{/each}

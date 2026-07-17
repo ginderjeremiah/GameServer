@@ -1,24 +1,24 @@
 <!-- The enemy dossier (right panel): a section-accented header (kind + name), a row of sub-tabs, and
      the active sub-tab's body. Sub-tab content lives in its own small panel component. -->
 <DossierShell
-	selectedItem={view.selectedEnemy}
+	selectedItem={view.enemiesTab.selectedEnemy}
 	testid="codex-dossier"
-	accent={view.dossierAccent}
-	kind={view.dossierKind}
-	name={view.selectedEnemy?.name ?? ''}
+	accent={view.enemiesTab.dossierAccent}
+	kind={view.enemiesTab.dossierKind}
+	name={view.enemiesTab.selectedEnemy?.name ?? ''}
 >
 	<div class="sub-tabs" role="tablist" aria-label="Enemy detail">
-		{#each view.subTabs as tab (tab.key)}
+		{#each view.enemiesTab.subTabs as tab (tab.key)}
 			<button
 				type="button"
 				id="codex-subtab-{tab.key}"
 				role="tab"
-				aria-selected={view.sub === tab.key}
+				aria-selected={view.enemiesTab.sub === tab.key}
 				aria-controls="codex-subpanel"
 				class="sub-tab"
-				class:active={view.sub === tab.key}
+				class:active={view.enemiesTab.sub === tab.key}
 				data-testid="codex-subtab-{tab.key}"
-				onclick={() => view.selectSub(tab.key)}
+				onclick={() => view.enemiesTab.selectSub(tab.key)}
 			>
 				{tab.label}
 				<span class="underline"></span>
@@ -26,22 +26,22 @@
 		{/each}
 	</div>
 
-	<div class="body" id="codex-subpanel" role="tabpanel" aria-labelledby="codex-subtab-{view.sub}">
-		{#if view.sub === 'attributes'}
+	<div class="body" id="codex-subpanel" role="tabpanel" aria-labelledby="codex-subtab-{view.enemiesTab.sub}">
+		{#if view.enemiesTab.sub === 'attributes'}
 			<AttributesPanel {view} />
-		{:else if view.sub === 'statistics'}
+		{:else if view.enemiesTab.sub === 'statistics'}
 			<StatisticsPanel
-				stats={view.statistics}
+				stats={view.enemiesTab.statistics}
 				loading={view.statsLoading}
 				error={view.statsError}
 				emptyMessage="No battles recorded against this enemy yet."
 				testid="codex-enemy-stats"
 			/>
-		{:else if view.sub === 'skills'}
+		{:else if view.enemiesTab.sub === 'skills'}
 			<EnemySkillsPanel {view} />
-		{:else if view.sub === 'spawns'}
+		{:else if view.enemiesTab.sub === 'spawns'}
 			<EnemySpawnsPanel {view} />
-		{:else if view.sub === 'challenges'}
+		{:else if view.enemiesTab.sub === 'challenges'}
 			<EnemyChallengesPanel {view} />
 		{/if}
 	</div>

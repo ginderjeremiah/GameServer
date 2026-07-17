@@ -2,17 +2,20 @@
      level band / spawn-pool meta, the zone boss card, the spawn table and the unlock condition. The
      boss card and spawn rows cross-link into the enemy dossier. -->
 <DossierShell
-	selectedItem={view.selectedZone}
+	selectedItem={view.zonesTab.selectedZone}
 	testid="codex-zone-dossier"
 	accent="var(--accent)"
 	kind="Zone"
-	name={view.selectedZone?.name ?? ''}
-	description={view.selectedZone?.description}
+	name={view.zonesTab.selectedZone?.name ?? ''}
+	description={view.zonesTab.selectedZone?.description}
 >
 	{#snippet headExtra()}
 		<span class="spacer"></span>
-		<span class="seal" data-testid="codex-zone-status" style:--status-color={zoneStatusColor(view.selectedZoneStatus)}
-			>{ZONE_STATUS_LABELS[view.selectedZoneStatus]}</span
+		<span
+			class="seal"
+			data-testid="codex-zone-status"
+			style:--status-color={zoneStatusColor(view.zonesTab.selectedZoneStatus)}
+			>{ZONE_STATUS_LABELS[view.zonesTab.selectedZoneStatus]}</span
 		>
 	{/snippet}
 
@@ -20,16 +23,19 @@
 		<div class="meta">
 			<div class="meta-card">
 				<div class="meta-label">Level Range</div>
-				<div class="meta-val">{view.zoneBand}</div>
+				<div class="meta-val">{view.zonesTab.zoneBand}</div>
 			</div>
 			<div class="meta-card">
 				<div class="meta-label">Spawn Pool</div>
-				<div class="meta-val">{view.zoneSpawnCount} {view.zoneSpawnCount === 1 ? 'enemy' : 'enemies'}</div>
+				<div class="meta-val">
+					{view.zonesTab.zoneSpawnCount}
+					{view.zonesTab.zoneSpawnCount === 1 ? 'enemy' : 'enemies'}
+				</div>
 			</div>
 		</div>
 
-		{#if view.zoneBoss}
-			{@const boss = view.zoneBoss}
+		{#if view.zonesTab.zoneBoss}
+			{@const boss = view.zonesTab.zoneBoss}
 			<div class="section">
 				<div class="section-label">Zone boss</div>
 				<button
@@ -54,8 +60,8 @@
 
 		<div class="section">
 			<div class="section-label">Unlock condition</div>
-			{#if view.zoneUnlock}
-				{@const unlock = view.zoneUnlock}
+			{#if view.zonesTab.zoneUnlock}
+				{@const unlock = view.zonesTab.zoneUnlock}
 				<div class="unlock" class:sealed={unlock.sealed}>
 					<span class="unlock-text">
 						<span class="unlock-lead">Complete challenge</span>
@@ -75,7 +81,7 @@
 
 		<div class="section">
 			<StatisticsPanel
-				stats={view.zoneStatistics}
+				stats={view.zonesTab.zoneStatistics}
 				loading={view.statsLoading}
 				error={view.statsError}
 				emptyMessage="No statistics recorded for this zone yet."

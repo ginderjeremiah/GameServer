@@ -9,13 +9,13 @@
 	</div>
 
 	<div class="rows" data-testid="codex-skill-rows">
-		{#each view.skillRows as row (row.id)}
+		{#each view.skillsTab.skillRows as row (row.id)}
 			<button
 				type="button"
 				class="row"
-				class:selected={row.id === view.selectedSkillId}
+				class:selected={row.id === view.skillsTab.selectedSkillId}
 				data-testid="codex-skill-{row.id}"
-				onclick={() => view.selectSkill(row.id)}
+				onclick={() => view.skillsTab.selectSkill(row.id)}
 			>
 				<span class="c-name name-cell">
 					<span class="mark" style:--mark={row.rarityColor}></span>

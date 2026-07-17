@@ -1,8 +1,8 @@
 <!-- Spawns sub-tab: the zones this enemy spawns in (with its share of each zone's spawn table), or a
      single "Encounter" row for a boss. Each row cross-links into that zone's dossier. -->
 <SpawnRowList
-	heading={view.spawnHeading}
-	rows={view.spawns.map((spawn) => ({
+	heading={view.enemiesTab.spawnHeading}
+	rows={view.enemiesTab.spawns.map((spawn) => ({
 		id: spawn.zoneId,
 		name: spawn.zoneName,
 		share: spawn.share,

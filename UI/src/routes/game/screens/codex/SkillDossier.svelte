@@ -4,9 +4,9 @@
      not-obtainable wording), the attributes the skill scales with, its authored effects (wording
      from the shared skill-effect-display helper), and the enemies that use it. The "used by" pills
      cross-link into the enemy dossier. A reference card only — no equip/loadout, no DPS. -->
-{#if view.selectedSkill}
-	{@const skill = view.selectedSkill}
-	{@const rarity = view.selectedSkillRarity}
+{#if view.skillsTab.selectedSkill}
+	{@const skill = view.skillsTab.selectedSkill}
+	{@const rarity = view.skillsTab.selectedSkillRarity}
 	<DossierShell
 		selectedItem={skill}
 		testid="codex-skill-dossier"
@@ -36,9 +36,9 @@
 
 			<div class="section">
 				<div class="section-label">How to obtain</div>
-				{#if view.skillProvenance.sources.length > 0}
+				{#if view.skillsTab.skillProvenance.sources.length > 0}
 					<div class="sources">
-						{#each view.skillProvenance.sources as source (source.kind + '-' + source.id)}
+						{#each view.skillsTab.skillProvenance.sources as source (source.kind + '-' + source.id)}
 							<div
 								class="source"
 								style:--src={source.accent}
@@ -50,15 +50,15 @@
 						{/each}
 					</div>
 				{:else}
-					<div class="empty">{view.skillProvenance.emptyLabel}</div>
+					<div class="empty">{view.skillsTab.skillProvenance.emptyLabel}</div>
 				{/if}
 			</div>
 
 			<div class="section">
 				<div class="section-label">Scales with</div>
-				{#if view.skillScaling.length > 0}
+				{#if view.skillsTab.skillScaling.length > 0}
 					<div class="chips">
-						{#each view.skillScaling as scale (scale.attributeId)}
+						{#each view.skillsTab.skillScaling as scale (scale.attributeId)}
 							<span class="scale-chip" style:--chip={scale.color}>
 								<span class="mult">{scale.multiplierLabel}</span>
 								<span class="attr">{scale.name}</span>
@@ -70,11 +70,11 @@
 				{/if}
 			</div>
 
-			{#if view.skillEffects.length > 0}
+			{#if view.skillsTab.skillEffects.length > 0}
 				<div class="section">
 					<div class="section-label">Effects</div>
 					<div class="effects">
-						{#each view.skillEffects as effect (effect.id)}
+						{#each view.skillsTab.skillEffects as effect (effect.id)}
 							<div class="effect-row">
 								<span class="emag" style:color={effect.color}>{effect.magnitude}</span>
 								<span class="eattr">{effect.attributeName}</span>
@@ -86,10 +86,10 @@
 			{/if}
 
 			<div class="section">
-				<div class="section-label">Used by · {view.skillUsedBy.length}</div>
-				{#if view.skillUsedBy.length > 0}
+				<div class="section-label">Used by · {view.skillsTab.skillUsedBy.length}</div>
+				{#if view.skillsTab.skillUsedBy.length > 0}
 					<div class="pills">
-						{#each view.skillUsedBy as user (user.enemyId)}
+						{#each view.skillsTab.skillUsedBy as user (user.enemyId)}
 							<button
 								type="button"
 								class="pill"
@@ -109,7 +109,7 @@
 
 			<div class="section">
 				<StatisticsPanel
-					stats={view.skillStatistics}
+					stats={view.skillsTab.skillStatistics}
 					loading={view.statsLoading}
 					error={view.statsError}
 					emptyMessage="No statistics recorded for this skill yet."

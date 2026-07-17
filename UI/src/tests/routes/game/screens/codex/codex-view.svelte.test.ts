@@ -227,21 +227,21 @@ describe('CodexView tabs', () => {
 
 describe('CodexView enemy rows', () => {
 	it('projects zone + skill counts (boss shows a single zone)', () => {
-		const rows = new CodexView().enemyRows;
+		const rows = new CodexView().enemiesTab.enemyRows;
 		expect(rows.find((r) => r.id === 0)).toMatchObject({ zoneCount: 2, skillCount: 2, band: '1–22' });
 		expect(rows.find((r) => r.id === 2)).toMatchObject({ zoneCount: 1, skillCount: 2, band: 'L10', isBoss: true });
 	});
 
 	it('filters by normal / boss', () => {
 		const view = new CodexView();
-		view.setFilter('boss');
-		expect(view.enemyRows.map((r) => r.id)).toEqual([2]);
-		view.setFilter('normal');
-		expect(view.enemyRows.map((r) => r.id)).toEqual([0, 1]);
+		view.enemiesTab.setFilter('boss');
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([2]);
+		view.enemiesTab.setFilter('normal');
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([0, 1]);
 	});
 
 	it('exposes the level sort key + search haystack on each row', () => {
-		const rows = new CodexView().enemyRows;
+		const rows = new CodexView().enemiesTab.enemyRows;
 		// Dust Skitterer spans 1–22 (low end 1); the haystack carries name, kind and spawn zones.
 		const skitterer = rows.find((r) => r.id === 0);
 		expect(skitterer?.level).toBe(1);
@@ -257,18 +257,18 @@ describe('CodexView enemy projections', () => {
 	it('projects every enemy independent of the active filter, search and sort', () => {
 		const view = new CodexView();
 		// The immutable projection ignores the interaction state the thin `enemyRows` layers on top.
-		view.setFilter('boss');
-		view.search = 'griffin';
-		view.sort = 'name';
-		expect(view.enemyProjections.map((p) => p.id)).toEqual([0, 1, 2]);
-		expect(view.enemyProjections.find((p) => p.id === 2)).toMatchObject({
+		view.enemiesTab.setFilter('boss');
+		view.enemiesTab.search = 'griffin';
+		view.enemiesTab.sort = 'name';
+		expect(view.enemiesTab.enemyProjections.map((p) => p.id)).toEqual([0, 1, 2]);
+		expect(view.enemiesTab.enemyProjections.find((p) => p.id === 2)).toMatchObject({
 			band: 'L10',
 			level: 10,
 			isBoss: true,
 			zoneCount: 1,
 			skillCount: 2
 		});
-		expect(view.enemyProjections.find((p) => p.id === 0)?.searchText).toContain('emberreach');
+		expect(view.enemiesTab.enemyProjections.find((p) => p.id === 0)?.searchText).toContain('emberreach');
 	});
 
 	it('memoizes the projection on a single instance: the same reference survives search / sort / filter changes', () => {
@@ -281,10 +281,10 @@ describe('CodexView enemy projections', () => {
 		let rows: EnemyRowVM[] | undefined;
 		const cleanup = $effect.root(() => {
 			$effect(() => {
-				projection = view.enemyProjections;
+				projection = view.enemiesTab.enemyProjections;
 			});
 			$effect(() => {
-				rows = view.enemyRows;
+				rows = view.enemiesTab.enemyRows;
 			});
 		});
 
@@ -293,9 +293,9 @@ describe('CodexView enemy projections', () => {
 		const rowsBefore = rows;
 
 		// Mutate the reactive interaction state (`filter`/`search`/`sort` are `$state`) the row layer reads.
-		view.setFilter('boss');
-		view.search = 'griffin';
-		view.sort = 'name';
+		view.enemiesTab.setFilter('boss');
+		view.enemiesTab.search = 'griffin';
+		view.enemiesTab.sort = 'name';
 		flushSync();
 
 		// The interaction change genuinely moved the reactive graph — the thin row layer recomputed…
@@ -303,7 +303,7 @@ describe('CodexView enemy projections', () => {
 		expect(rows).toEqual([]); // boss filter + a query that matches nothing
 		// …yet the projection was memoized: the same array reference, never rebuilt.
 		expect(projection).toBe(projectionBefore);
-		expect(view.enemyProjections).toBe(projectionBefore);
+		expect(view.enemiesTab.enemyProjections).toBe(projectionBefore);
 
 		cleanup();
 	});
@@ -312,122 +312,122 @@ describe('CodexView enemy projections', () => {
 describe('CodexView enemy search', () => {
 	it('matches by name, case-insensitively', () => {
 		const view = new CodexView();
-		view.search = 'BOG';
-		expect(view.enemyRows.map((r) => r.id)).toEqual([1]);
+		view.enemiesTab.search = 'BOG';
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([1]);
 	});
 
 	it('matches by zone name (spawn zones + a boss encounter zone)', () => {
 		const view = new CodexView();
 		// Dust Skitterer spawns in Emberreach; Cinder Tyrant's boss encounter is in Emberreach too.
-		view.search = 'emberreach';
-		expect(view.enemyRows.map((r) => r.id)).toEqual([0, 2]);
+		view.enemiesTab.search = 'emberreach';
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([0, 2]);
 	});
 
 	it('matches a boss by its encounter-zone name', () => {
 		const view = new CodexView();
-		view.setFilter('boss');
-		view.search = 'emberreach'; // Cinder Tyrant's encounter zone (it has no spawns)
-		expect(view.enemyRows.map((r) => r.id)).toEqual([2]);
+		view.enemiesTab.setFilter('boss');
+		view.enemiesTab.search = 'emberreach'; // Cinder Tyrant's encounter zone (it has no spawns)
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([2]);
 	});
 
 	it('matches the boss kind', () => {
 		const view = new CodexView();
-		view.search = 'boss';
-		expect(view.enemyRows.map((r) => r.id)).toEqual([2]);
+		view.enemiesTab.search = 'boss';
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([2]);
 	});
 
 	it('shows everything for an empty query', () => {
 		const view = new CodexView();
-		view.search = '   ';
-		expect(view.enemyRows).toHaveLength(3);
+		view.enemiesTab.search = '   ';
+		expect(view.enemiesTab.enemyRows).toHaveLength(3);
 	});
 
 	it('shows nothing when the query matches no enemy', () => {
 		const view = new CodexView();
-		view.search = 'griffin';
-		expect(view.enemyRows).toHaveLength(0);
-		expect(view.shownCount).toBe(0);
+		view.enemiesTab.search = 'griffin';
+		expect(view.enemiesTab.enemyRows).toHaveLength(0);
+		expect(view.enemiesTab.shownCount).toBe(0);
 	});
 
 	it('reflects the search in the shown count and combines with the filter', () => {
 		const view = new CodexView();
-		view.setFilter('normal');
-		view.search = 'lurker';
-		expect(view.enemyRows.map((r) => r.id)).toEqual([1]);
-		expect(view.shownCount).toBe(1);
+		view.enemiesTab.setFilter('normal');
+		view.enemiesTab.search = 'lurker';
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([1]);
+		expect(view.enemiesTab.shownCount).toBe(1);
 	});
 
 	it('keeps an explicitly selected enemy in the dossier even when the search excludes it', () => {
 		// Mirrors the filter behavior: a deliberate selection stays resolvable so the dossier
 		// doesn't jump out from under the player when they type a query.
 		const view = new CodexView();
-		view.selectEnemy(0); // explicitly inspecting Dust Skitterer
-		view.search = 'bog'; // the table shows only Bog Lurker…
-		expect(view.enemyRows.map((r) => r.id)).toEqual([1]);
-		expect(view.selectedEnemy?.id).toBe(0); // …but the dossier holds the selection
+		view.enemiesTab.selectEnemy(0); // explicitly inspecting Dust Skitterer
+		view.enemiesTab.search = 'bog'; // the table shows only Bog Lurker…
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([1]);
+		expect(view.enemiesTab.selectedEnemy?.id).toBe(0); // …but the dossier holds the selection
 	});
 
 	it('falls back the dossier to the first visible row when nothing is explicitly selected', () => {
 		const view = new CodexView();
-		view.selectedEnemyId = -1; // no resolvable selection
-		view.search = 'bog'; // only Bog Lurker is visible
-		expect(view.selectedEnemy?.id).toBe(1);
+		view.enemiesTab.selectedEnemyId = -1; // no resolvable selection
+		view.enemiesTab.search = 'bog'; // only Bog Lurker is visible
+		expect(view.enemiesTab.selectedEnemy?.id).toBe(1);
 	});
 });
 
 describe('CodexView enemy sort', () => {
 	it('defaults to ascending level (boss fixed level ranks among normals)', () => {
 		// Dust Skitterer (1) < Cinder Tyrant (boss, 10) < Bog Lurker (11).
-		expect(new CodexView().enemyRows.map((r) => r.id)).toEqual([0, 2, 1]);
+		expect(new CodexView().enemiesTab.enemyRows.map((r) => r.id)).toEqual([0, 2, 1]);
 	});
 
 	it('sorts alphabetically by name', () => {
 		const view = new CodexView();
-		view.sort = 'name';
+		view.enemiesTab.sort = 'name';
 		// Bog Lurker, Cinder Tyrant, Dust Skitterer.
-		expect(view.enemyRows.map((r) => r.id)).toEqual([1, 2, 0]);
+		expect(view.enemiesTab.enemyRows.map((r) => r.id)).toEqual([1, 2, 0]);
 	});
 });
 
 describe('CodexView selection', () => {
 	it('falls back to the head of the list when no enemy is selected', () => {
-		expect(new CodexView().selectedEnemy?.id).toBe(0);
+		expect(new CodexView().enemiesTab.selectedEnemy?.id).toBe(0);
 	});
 
 	it('seeds the level to the band midpoint for a normal enemy', () => {
 		// Dust Skitterer spans 1–22 → midpoint 12.
-		expect(new CodexView().level).toBe(12);
+		expect(new CodexView().enemiesTab.level).toBe(12);
 	});
 
 	it('selectEnemy reseeds the level (fixed for a boss) and resets the sub-tab', () => {
 		const view = new CodexView();
-		view.selectSub('skills');
-		view.selectEnemy(2);
-		expect(view.selectedEnemy?.id).toBe(2);
-		expect(view.level).toBe(10); // boss fixed level
-		expect(view.sub).toBe('attributes');
-		expect(view.range?.fixed).toBe(true);
+		view.enemiesTab.selectSub('skills');
+		view.enemiesTab.selectEnemy(2);
+		expect(view.enemiesTab.selectedEnemy?.id).toBe(2);
+		expect(view.enemiesTab.level).toBe(10); // boss fixed level
+		expect(view.enemiesTab.sub).toBe('attributes');
+		expect(view.enemiesTab.range?.fixed).toBe(true);
 	});
 });
 
 describe('CodexView dossier projections', () => {
 	it('includes the Challenges sub-tab only when the enemy has related challenges', () => {
 		const view = new CodexView();
-		view.selectEnemy(0); // has challenge 0
-		expect(view.subTabs.map((t) => t.key)).toContain('challenges');
-		view.selectEnemy(1); // no challenges
-		expect(view.subTabs.map((t) => t.key)).not.toContain('challenges');
+		view.enemiesTab.selectEnemy(0); // has challenge 0
+		expect(view.enemiesTab.subTabs.map((t) => t.key)).toContain('challenges');
+		view.enemiesTab.selectEnemy(1); // no challenges
+		expect(view.enemiesTab.subTabs.map((t) => t.key)).not.toContain('challenges');
 	});
 
 	it('builds enemy-scoped challenge rows with progress text', () => {
 		const view = new CodexView();
-		view.selectEnemy(0);
-		expect(view.challenges).toEqual([
+		view.enemiesTab.selectEnemy(0);
+		expect(view.enemiesTab.challenges).toEqual([
 			expect.objectContaining({ id: 0, typeLabel: 'Enemies Killed', progressText: '62/100', completed: false })
 		]);
 		// A goal-of-1 boss challenge with no progress reads as "sealed".
-		view.selectEnemy(2);
-		expect(view.challenges[0].progressText).toBe('sealed');
+		view.enemiesTab.selectEnemy(2);
+		expect(view.enemiesTab.challenges[0].progressText).toBe('sealed');
 	});
 
 	it('hides a retired enemy-scoped challenge unless it was already completed', () => {
@@ -444,34 +444,34 @@ describe('CodexView dossier projections', () => {
 			}
 		];
 		const uncompleted = new CodexView();
-		uncompleted.selectEnemy(0);
-		expect(uncompleted.challenges.map((c) => c.id)).toEqual([0]);
+		uncompleted.enemiesTab.selectEnemy(0);
+		expect(uncompleted.enemiesTab.challenges.map((c) => c.id)).toEqual([0]);
 
 		playerChallenges.all = [...playerChallenges.all, { challengeId: 2, progress: 50, completed: true }];
 		const completed = new CodexView();
-		completed.selectEnemy(0);
-		expect(completed.challenges.map((c) => c.id)).toEqual(expect.arrayContaining([0, 2]));
+		completed.enemiesTab.selectEnemy(0);
+		expect(completed.enemiesTab.challenges.map((c) => c.id)).toEqual(expect.arrayContaining([0, 2]));
 	});
 
 	it('sorts spawn shares descending and collapses a boss to a single Encounter', () => {
 		const view = new CodexView();
-		view.selectEnemy(0);
-		expect(view.spawnHeading).toBe('Spawns in 2 zones');
-		expect(view.spawns).toEqual([
+		view.enemiesTab.selectEnemy(0);
+		expect(view.enemiesTab.spawnHeading).toBe('Spawns in 2 zones');
+		expect(view.enemiesTab.spawns).toEqual([
 			expect.objectContaining({ zoneName: 'Emberreach', share: 100 }),
 			expect.objectContaining({ zoneName: 'Ashfen Marsh', share: 33 })
 		]);
-		view.selectEnemy(2);
-		expect(view.spawnHeading).toBe('Encounter');
-		expect(view.spawns).toEqual([
+		view.enemiesTab.selectEnemy(2);
+		expect(view.enemiesTab.spawnHeading).toBe('Encounter');
+		expect(view.enemiesTab.spawns).toEqual([
 			expect.objectContaining({ zoneName: 'Emberreach', share: 100, weightLabel: 'boss fight' })
 		]);
 	});
 
 	it('lists the enemy’s skill pool with base/cooldown meta', () => {
 		const view = new CodexView();
-		view.selectEnemy(0);
-		expect(view.enemySkillRows).toEqual([
+		view.enemiesTab.selectEnemy(0);
+		expect(view.enemiesTab.enemySkillRows).toEqual([
 			{ id: 0, name: 'Cleave', meta: 'base 14 · 1.8s cd' },
 			{ id: 1, name: 'War Cry', meta: 'utility · 6s cd' }
 		]);
@@ -480,23 +480,26 @@ describe('CodexView dossier projections', () => {
 	it('reuses the statistics query for the player’s per-enemy record', () => {
 		statistics.stats = STATS;
 		const view = new CodexView();
-		view.selectEnemy(0);
-		const killed = view.statistics.find((s) => s.label === 'Enemies Killed');
+		view.enemiesTab.selectEnemy(0);
+		const killed = view.enemiesTab.statistics.find((s) => s.label === 'Enemies Killed');
 		expect(killed?.value).toBe('100');
 	});
 
 	it('scales primary attributes to the current level', () => {
 		const view = new CodexView();
-		view.selectEnemy(0); // level → 12
-		const str = view.attributes.primary.find((p) => p.attributeId === EAttribute.Strength);
+		view.enemiesTab.selectEnemy(0); // level → 12
+		const str = view.enemiesTab.attributes.primary.find((p) => p.attributeId === EAttribute.Strength);
 		expect(str?.value).toBe(Math.round(10 + 1 * 12)); // 22
-		expect(view.attributes.secondary.map((s) => s.attributeId)).toEqual([EAttribute.MaxHealth, EAttribute.Toughness]);
+		expect(view.enemiesTab.attributes.secondary.map((s) => s.attributeId)).toEqual([
+			EAttribute.MaxHealth,
+			EAttribute.Toughness
+		]);
 	});
 });
 
 describe('CodexView zone rail', () => {
 	it('projects status / band / spawn-pool / boss per zone in authored order', () => {
-		const rows = new CodexView().zoneRows;
+		const rows = new CodexView().zonesTab.zoneRows;
 		expect(rows.map((r) => r.id)).toEqual([0, 1, 2]);
 		// Zone 0 is cleared; zone 1 is gated on the uncompleted challenge 0; zone 2 is open.
 		expect(rows.find((r) => r.id === 0)).toMatchObject({
@@ -521,24 +524,24 @@ describe('CodexView zone rail', () => {
 
 	it('marks a gated zone unlocked once its challenge is completed', () => {
 		playerChallenges.all = [{ challengeId: 0, progress: 100, completed: true }];
-		expect(new CodexView().zoneRows.find((r) => r.id === 1)?.status).toBe('unlocked');
+		expect(new CodexView().zonesTab.zoneRows.find((r) => r.id === 1)?.status).toBe('unlocked');
 	});
 
 	it('keeps a cleared zone cleared even behind an unmet gate', () => {
 		statistics.isZoneCleared.mockImplementation((id: number) => id === 1);
-		expect(new CodexView().zoneRows.find((r) => r.id === 1)?.status).toBe('cleared');
+		expect(new CodexView().zonesTab.zoneRows.find((r) => r.id === 1)?.status).toBe('cleared');
 	});
 
 	it('orders the rail by authored order, not by id', () => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		staticData.zones = staticData.zones.map((z: any) => ({ ...z, order: 3 - z.order }));
-		expect(new CodexView().zoneRows.map((r) => r.id)).toEqual([2, 1, 0]);
+		expect(new CodexView().zonesTab.zoneRows.map((r) => r.id)).toEqual([2, 1, 0]);
 	});
 });
 
 describe('CodexView zone projections', () => {
 	it('projects the immutable per-zone fields without the live status, in authored order', () => {
-		const rows = new CodexView().zoneProjections;
+		const rows = new CodexView().zonesTab.zoneProjections;
 		expect(rows.map((r) => r.id)).toEqual([0, 1, 2]);
 		expect(rows.find((r) => r.id === 1)).toEqual({
 			id: 1,
@@ -560,7 +563,7 @@ describe('CodexView zone projections', () => {
 		let projection: ZoneProjectionVM[] | undefined;
 		const cleanup = $effect.root(() => {
 			$effect(() => {
-				projection = view.zoneProjections;
+				projection = view.zonesTab.zoneProjections;
 			});
 		});
 
@@ -573,7 +576,7 @@ describe('CodexView zone projections', () => {
 		playerChallenges.all = [{ challengeId: 0, progress: 100, completed: true }];
 		flushSync();
 
-		expect(view.zoneProjections).toBe(before);
+		expect(view.zonesTab.zoneProjections).toBe(before);
 		cleanup();
 	});
 });
@@ -581,54 +584,58 @@ describe('CodexView zone projections', () => {
 describe('CodexView zone dossier', () => {
 	it('falls back to the head of the rail when no zone is selected', () => {
 		const view = new CodexView();
-		view.selectedZoneId = -1;
-		expect(view.selectedZone?.id).toBe(0);
+		view.zonesTab.selectedZoneId = -1;
+		expect(view.zonesTab.selectedZone?.id).toBe(0);
 	});
 
 	it('resolves the zone boss card (enemy + fixed level), null when none is authored', () => {
 		const view = new CodexView();
-		view.selectZone(0);
-		expect(view.zoneBoss).toEqual({ enemyId: 2, name: 'Cinder Tyrant', level: 10 });
-		view.selectZone(1);
-		expect(view.zoneBoss).toBeNull();
+		view.zonesTab.selectZone(0);
+		expect(view.zonesTab.zoneBoss).toEqual({ enemyId: 2, name: 'Cinder Tyrant', level: 10 });
+		view.zonesTab.selectZone(1);
+		expect(view.zonesTab.zoneBoss).toBeNull();
 	});
 
 	it('builds the spawn table ordered by share with weight labels', () => {
 		const view = new CodexView();
-		view.selectZone(1); // Bog Lurker (40) + Dust Skitterer (20) → 67% / 33%
-		expect(view.zoneSpawns).toEqual([
+		view.zonesTab.selectZone(1); // Bog Lurker (40) + Dust Skitterer (20) → 67% / 33%
+		expect(view.zonesTab.zoneSpawns).toEqual([
 			expect.objectContaining({ enemyId: 1, enemyName: 'Bog Lurker', share: 67, weightLabel: 'weight 40' }),
 			expect.objectContaining({ enemyId: 0, enemyName: 'Dust Skitterer', share: 33, weightLabel: 'weight 20' })
 		]);
-		expect(view.zoneSpawnCount).toBe(2);
+		expect(view.zonesTab.zoneSpawnCount).toBe(2);
 	});
 
 	it('reports the unlock condition (sealed when locked), null for an always-open zone', () => {
 		const view = new CodexView();
-		view.selectZone(1);
-		expect(view.selectedZoneStatus).toBe('locked');
-		expect(view.zoneUnlock).toMatchObject({ challengeId: 0, challengeName: 'Cull the Skitterers', sealed: true });
-		view.selectZone(2);
-		expect(view.zoneUnlock).toBeNull();
-		expect(view.zoneSpawns).toEqual([]);
+		view.zonesTab.selectZone(1);
+		expect(view.zonesTab.selectedZoneStatus).toBe('locked');
+		expect(view.zonesTab.zoneUnlock).toMatchObject({
+			challengeId: 0,
+			challengeName: 'Cull the Skitterers',
+			sealed: true
+		});
+		view.zonesTab.selectZone(2);
+		expect(view.zonesTab.zoneUnlock).toBeNull();
+		expect(view.zonesTab.zoneSpawns).toEqual([]);
 	});
 
 	it('unseals the unlock condition once the gating challenge completes', () => {
 		playerChallenges.all = [{ challengeId: 0, progress: 100, completed: true }];
 		const view = new CodexView();
-		view.selectZone(1);
-		expect(view.selectedZoneStatus).toBe('unlocked');
-		expect(view.zoneUnlock?.sealed).toBe(false);
+		view.zonesTab.selectZone(1);
+		expect(view.zonesTab.selectedZoneStatus).toBe('unlocked');
+		expect(view.zonesTab.zoneUnlock?.sealed).toBe(false);
 	});
 
 	it('reuses the statistics query for the player’s per-zone record', () => {
 		statistics.stats = STATS;
 		const view = new CodexView();
-		view.selectZone(1); // Ashfen Marsh — 3 clears recorded
-		expect(view.zoneStatistics.find((s) => s.label === 'Zones Cleared')?.value).toBe('3');
+		view.zonesTab.selectZone(1); // Ashfen Marsh — 3 clears recorded
+		expect(view.zonesTab.zoneStatistics.find((s) => s.label === 'Zones Cleared')?.value).toBe('3');
 		// A zone with no recorded statistics yields an empty record.
-		view.selectZone(2);
-		expect(view.zoneStatistics).toEqual([]);
+		view.zonesTab.selectZone(2);
+		expect(view.zonesTab.zoneStatistics).toEqual([]);
 	});
 });
 
@@ -638,37 +645,37 @@ describe('CodexView zone → enemy cross-link', () => {
 		view.selectTab('zones');
 		view.openEnemy(2);
 		expect(view.tab).toBe('enemies');
-		expect(view.selectedEnemyId).toBe(2);
-		expect(view.sub).toBe('attributes'); // selectEnemy resets the sub-tab
-		expect(view.level).toBe(10); // boss fixed level
+		expect(view.enemiesTab.selectedEnemyId).toBe(2);
+		expect(view.enemiesTab.sub).toBe('attributes'); // selectEnemy resets the sub-tab
+		expect(view.enemiesTab.level).toBe(10); // boss fixed level
 	});
 });
 
 describe('CodexView enemy → zone cross-link', () => {
 	it('openZone switches to the Zones tab and selects the zone', () => {
 		const view = new CodexView();
-		view.selectEnemy(0); // a normal enemy with spawn zones
+		view.enemiesTab.selectEnemy(0); // a normal enemy with spawn zones
 		view.openZone(1);
 		expect(view.tab).toBe('zones');
-		expect(view.selectedZoneId).toBe(1);
-		expect(view.selectedZone?.id).toBe(1);
+		expect(view.zonesTab.selectedZoneId).toBe(1);
+		expect(view.zonesTab.selectedZone?.id).toBe(1);
 	});
 });
 
 describe('CodexView enemy → skill cross-link', () => {
 	it('openSkill switches to the Skills tab and selects the skill', () => {
 		const view = new CodexView();
-		view.selectEnemy(0); // skill pool [0, 1]
+		view.enemiesTab.selectEnemy(0); // skill pool [0, 1]
 		view.openSkill(1);
 		expect(view.tab).toBe('skills');
-		expect(view.selectedSkillId).toBe(1);
-		expect(view.selectedSkill?.id).toBe(1);
+		expect(view.skillsTab.selectedSkillId).toBe(1);
+		expect(view.skillsTab.selectedSkill?.id).toBe(1);
 	});
 });
 
 describe('CodexView skill table', () => {
 	it('lists every skill in catalogue order with base/cooldown/used-by projections', () => {
-		const rows = new CodexView().skillRows;
+		const rows = new CodexView().skillsTab.skillRows;
 		expect(rows.map((r) => r.id)).toEqual([0, 1, 2]);
 		// Cleave is a 14-dmg attack used by Dust Skitterer + the boss; War Cry is utility used by all
 		// three; Focus is player-only (used by none) and still appears.
@@ -684,35 +691,35 @@ describe('CodexView skill table', () => {
 
 	it('tracks the selected skill (the row highlight reads selectedSkillId, kept out of the projection)', () => {
 		const view = new CodexView();
-		view.selectSkill(1);
-		expect(view.selectedSkillId).toBe(1);
-		expect(view.selectedSkill?.id).toBe(1);
+		view.skillsTab.selectSkill(1);
+		expect(view.skillsTab.selectedSkillId).toBe(1);
+		expect(view.skillsTab.selectedSkill?.id).toBe(1);
 	});
 
 	it('tints each row by its rarity tier and exposes the selected skill rarity for the dossier', () => {
 		const view = new CodexView();
 		// Cleave is authored Rare; its row mark and the dossier accent resolve to the rarity hue + label.
-		expect(view.skillRows.find((r) => r.id === 0)?.rarityColor).toContain('--rarity-');
-		view.selectSkill(0);
-		expect(view.selectedSkillRarity).toEqual({ color: expect.stringContaining('--rarity-'), label: 'Rare' });
+		expect(view.skillsTab.skillRows.find((r) => r.id === 0)?.rarityColor).toContain('--rarity-');
+		view.skillsTab.selectSkill(0);
+		expect(view.skillsTab.selectedSkillRarity).toEqual({ color: expect.stringContaining('--rarity-'), label: 'Rare' });
 	});
 });
 
 describe('CodexView skill dossier', () => {
 	it('defaults the selection to the head of the catalogue', () => {
-		expect(new CodexView().selectedSkill?.id).toBe(0);
+		expect(new CodexView().skillsTab.selectedSkill?.id).toBe(0);
 	});
 
 	it('selectSkill changes the inspected skill', () => {
 		const view = new CodexView();
-		view.selectSkill(2);
-		expect(view.selectedSkill?.id).toBe(2);
+		view.skillsTab.selectSkill(2);
+		expect(view.skillsTab.selectedSkill?.id).toBe(2);
 	});
 
 	it('projects the damage-scaling attributes tinted by their accent', () => {
 		const view = new CodexView();
-		view.selectSkill(0); // Cleave scales ×1.5 Strength
-		expect(view.skillScaling).toEqual([
+		view.skillsTab.selectSkill(0); // Cleave scales ×1.5 Strength
+		expect(view.skillsTab.skillScaling).toEqual([
 			{
 				attributeId: EAttribute.Strength,
 				name: 'Strength',
@@ -722,14 +729,14 @@ describe('CodexView skill dossier', () => {
 			}
 		]);
 		// War Cry has no damage scaling.
-		view.selectSkill(1);
-		expect(view.skillScaling).toEqual([]);
+		view.skillsTab.selectSkill(1);
+		expect(view.skillsTab.skillScaling).toEqual([]);
 	});
 
 	it('describes effects via the shared helper, classifying buff vs debuff', () => {
 		const view = new CodexView();
-		view.selectSkill(1); // War Cry: +15 STR (self, buff) and ×0.5 Toughness (enemy, debuff)
-		expect(view.skillEffects).toEqual([
+		view.skillsTab.selectSkill(1); // War Cry: +15 STR (self, buff) and ×0.5 Toughness (enemy, debuff)
+		expect(view.skillsTab.skillEffects).toEqual([
 			{
 				id: 0,
 				magnitude: '+15',
@@ -748,46 +755,46 @@ describe('CodexView skill dossier', () => {
 			}
 		]);
 		// Cleave applies no effects.
-		view.selectSkill(0);
-		expect(view.skillEffects).toEqual([]);
+		view.skillsTab.selectSkill(0);
+		expect(view.skillsTab.skillEffects).toEqual([]);
 	});
 
 	it('lists the enemies that use the skill, flagging bosses, and is empty for a player-only skill', () => {
 		const view = new CodexView();
-		view.selectSkill(0); // Cleave — Dust Skitterer (normal) + Cinder Tyrant (boss)
-		expect(view.skillUsedBy).toEqual([
+		view.skillsTab.selectSkill(0); // Cleave — Dust Skitterer (normal) + Cinder Tyrant (boss)
+		expect(view.skillsTab.skillUsedBy).toEqual([
 			{ enemyId: 0, name: 'Dust Skitterer', isBoss: false, accent: 'var(--enemy-accent)' },
 			{ enemyId: 2, name: 'Cinder Tyrant', isBoss: true, accent: 'var(--boss-accent)' }
 		]);
-		view.selectSkill(2); // Focus — player-only
-		expect(view.skillUsedBy).toEqual([]);
+		view.skillsTab.selectSkill(2); // Focus — player-only
+		expect(view.skillsTab.skillUsedBy).toEqual([]);
 	});
 
 	it('reuses the statistics query for the player’s per-skill record', () => {
 		statistics.stats = STATS;
 		const view = new CodexView();
-		view.selectSkill(0); // Cleave — 4,500 damage dealt recorded
-		expect(view.skillStatistics.find((s) => s.label === 'Damage Dealt')?.value).toBe('4,500');
+		view.skillsTab.selectSkill(0); // Cleave — 4,500 damage dealt recorded
+		expect(view.skillsTab.skillStatistics.find((s) => s.label === 'Damage Dealt')?.value).toBe('4,500');
 		// A skill with no recorded statistics yields an empty record.
-		view.selectSkill(2);
-		expect(view.skillStatistics).toEqual([]);
+		view.skillsTab.selectSkill(2);
+		expect(view.skillsTab.skillStatistics).toEqual([]);
 	});
 
 	it('surfaces an item grant as a "Granted by" source, tinted by the item rarity', () => {
 		const view = new CodexView();
-		view.selectSkill(1); // War Cry — granted by the Rare Ember Staff
-		expect(view.skillProvenance.status).toBe('obtainable');
-		expect(view.skillProvenance.sources).toEqual([
+		view.skillsTab.selectSkill(1); // War Cry — granted by the Rare Ember Staff
+		expect(view.skillsTab.skillProvenance.status).toBe('obtainable');
+		expect(view.skillsTab.skillProvenance.sources).toEqual([
 			{ kind: 'item', id: 0, label: 'Granted by', name: 'Ember Staff', accent: 'var(--rarity-rare)' }
 		]);
 	});
 
 	it('words an enemy-flagged skill with no player source as enemy-only', () => {
 		const view = new CodexView();
-		view.selectSkill(2); // Focus — Enemy-flagged, no reward/grant
-		expect(view.skillProvenance.status).toBe('enemy-only');
-		expect(view.skillProvenance.sources).toEqual([]);
-		expect(view.skillProvenance.emptyLabel).toContain('Enemy-only');
+		view.skillsTab.selectSkill(2); // Focus — Enemy-flagged, no reward/grant
+		expect(view.skillsTab.skillProvenance.status).toBe('enemy-only');
+		expect(view.skillsTab.skillProvenance.sources).toEqual([]);
+		expect(view.skillsTab.skillProvenance.emptyLabel).toContain('Enemy-only');
 	});
 
 	it('words a flagged-but-unreferenced skill as not obtainable (intent ≠ reality)', () => {
@@ -795,10 +802,10 @@ describe('CodexView skill dossier', () => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		staticData.skills[2] = { ...(staticData.skills[2] as any), acquisition: ESkillAcquisition.Item };
 		const view = new CodexView();
-		view.selectSkill(2);
-		expect(view.skillProvenance.status).toBe('unobtainable');
-		expect(view.skillProvenance.sources).toEqual([]);
-		expect(view.skillProvenance.emptyLabel).toBe('Not currently obtainable.');
+		view.skillsTab.selectSkill(2);
+		expect(view.skillsTab.skillProvenance.status).toBe('unobtainable');
+		expect(view.skillsTab.skillProvenance.sources).toEqual([]);
+		expect(view.skillsTab.skillProvenance.emptyLabel).toBe('Not currently obtainable.');
 	});
 
 	it('excludes a retired item grant from the sources', () => {
@@ -806,9 +813,9 @@ describe('CodexView skill dossier', () => {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		staticData.items[0] = { ...(staticData.items[0] as any), retiredAt: '2026-01-01T00:00:00Z' };
 		const view = new CodexView();
-		view.selectSkill(1); // War Cry — Item-flagged, but its granting item is retired
-		expect(view.skillProvenance.sources).toEqual([]);
-		expect(view.skillProvenance.status).toBe('unobtainable');
+		view.skillsTab.selectSkill(1); // War Cry — Item-flagged, but its granting item is retired
+		expect(view.skillsTab.skillProvenance.sources).toEqual([]);
+		expect(view.skillsTab.skillProvenance.status).toBe('unobtainable');
 	});
 });
 
@@ -818,7 +825,7 @@ describe('CodexView skill → enemy cross-link', () => {
 		view.selectTab('skills');
 		view.openEnemy(2);
 		expect(view.tab).toBe('enemies');
-		expect(view.selectedEnemyId).toBe(2);
+		expect(view.enemiesTab.selectedEnemyId).toBe(2);
 	});
 });
 
@@ -829,40 +836,40 @@ describe('CodexView retired-record resolution', () => {
 	it('resolves a deep-linked retired enemy id instead of falling back to the head of the list', () => {
 		staticData.enemies[1] = { ...staticData.enemies[1], retiredAt: '2026-01-01T00:00:00Z' };
 		const view = new CodexView({ tab: 'enemies', enemyId: 1 });
-		expect(view.selectedEnemy?.id).toBe(1);
+		expect(view.enemiesTab.selectedEnemy?.id).toBe(1);
 	});
 
 	it('selectEnemy resolves a retired id (a cross-link into a retired record)', () => {
 		staticData.enemies[1] = { ...staticData.enemies[1], retiredAt: '2026-01-01T00:00:00Z' };
 		const view = new CodexView();
-		view.selectEnemy(1);
-		expect(view.selectedEnemy?.id).toBe(1);
+		view.enemiesTab.selectEnemy(1);
+		expect(view.enemiesTab.selectedEnemy?.id).toBe(1);
 	});
 
 	it('resolves a deep-linked retired zone id', () => {
 		staticData.zones[1] = { ...staticData.zones[1], retiredAt: '2026-01-01T00:00:00Z' };
 		const view = new CodexView({ tab: 'zones', zoneId: 1 });
-		expect(view.selectedZone?.id).toBe(1);
+		expect(view.zonesTab.selectedZone?.id).toBe(1);
 	});
 
 	it('selectZone resolves a retired id', () => {
 		staticData.zones[1] = { ...staticData.zones[1], retiredAt: '2026-01-01T00:00:00Z' };
 		const view = new CodexView();
-		view.selectZone(1);
-		expect(view.selectedZone?.id).toBe(1);
+		view.zonesTab.selectZone(1);
+		expect(view.zonesTab.selectedZone?.id).toBe(1);
 	});
 
 	it('resolves a deep-linked retired skill id', () => {
 		staticData.skills[1] = { ...staticData.skills[1], retiredAt: '2026-01-01T00:00:00Z' };
 		const view = new CodexView({ tab: 'skills', skillId: 1 });
-		expect(view.selectedSkill?.id).toBe(1);
+		expect(view.skillsTab.selectedSkill?.id).toBe(1);
 	});
 
 	it('selectSkill resolves a retired id', () => {
 		staticData.skills[1] = { ...staticData.skills[1], retiredAt: '2026-01-01T00:00:00Z' };
 		const view = new CodexView();
-		view.selectSkill(1);
-		expect(view.selectedSkill?.id).toBe(1);
+		view.skillsTab.selectSkill(1);
+		expect(view.skillsTab.selectedSkill?.id).toBe(1);
 	});
 });
 
@@ -870,20 +877,20 @@ describe('CodexView nav payload', () => {
 	it('seeds tab / enemy / sub-tab / level from a deep-link payload', () => {
 		const view = new CodexView({ tab: 'enemies', enemyId: 2, sub: 'statistics' });
 		expect(view.tab).toBe('enemies');
-		expect(view.selectedEnemyId).toBe(2);
-		expect(view.sub).toBe('statistics');
-		expect(view.level).toBe(10); // boss fixed level
+		expect(view.enemiesTab.selectedEnemyId).toBe(2);
+		expect(view.enemiesTab.sub).toBe('statistics');
+		expect(view.enemiesTab.level).toBe(10); // boss fixed level
 	});
 
 	it('seeds the tab + zone from a deep-link payload', () => {
 		const view = new CodexView({ tab: 'zones', zoneId: 2 });
 		expect(view.tab).toBe('zones');
-		expect(view.selectedZoneId).toBe(2);
+		expect(view.zonesTab.selectedZoneId).toBe(2);
 	});
 
 	it('seeds the tab + skill from a deep-link payload', () => {
 		const view = new CodexView({ tab: 'skills', skillId: 2 });
 		expect(view.tab).toBe('skills');
-		expect(view.selectedSkillId).toBe(2);
+		expect(view.skillsTab.selectedSkillId).toBe(2);
 	});
 });

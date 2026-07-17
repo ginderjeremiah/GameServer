@@ -8,21 +8,21 @@
 		<button
 			type="button"
 			class="scaling-toggle"
-			class:on={view.scaling}
-			aria-pressed={view.scaling}
+			class:on={view.enemiesTab.scaling}
+			aria-pressed={view.enemiesTab.scaling}
 			data-testid="codex-scaling-toggle"
-			onclick={() => view.toggleScaling()}
+			onclick={() => view.enemiesTab.toggleScaling()}
 		>
 			Show scaling
 		</button>
 	</div>
 
-	{#if view.range}
-		{#if view.range.fixed}
+	{#if view.enemiesTab.range}
+		{#if view.enemiesTab.range.fixed}
 			<div class="fixed-level">
 				<span>FIXED ENCOUNTER</span>
 				<span class="rule"></span>
-				<span class="fixed-val">LVL {view.level}</span>
+				<span class="fixed-val">LVL {view.enemiesTab.level}</span>
 			</div>
 		{:else}
 			<div class="level-control">
@@ -30,41 +30,41 @@
 				<input
 					type="range"
 					class="level-range"
-					min={view.range.min}
-					max={view.range.max}
-					value={view.level}
+					min={view.enemiesTab.range.min}
+					max={view.enemiesTab.range.max}
+					value={view.enemiesTab.level}
 					aria-label="Level"
 					data-testid="codex-level-slider"
-					oninput={(e) => view.setLevel(+e.currentTarget.value)}
+					oninput={(e) => view.enemiesTab.setLevel(+e.currentTarget.value)}
 				/>
-				<span class="lvl-val">{view.level}</span>
+				<span class="lvl-val">{view.enemiesTab.level}</span>
 			</div>
 		{/if}
 	{/if}
 
 	<div class="primary">
-		{#each view.attributes.primary as stat (stat.attributeId)}
+		{#each view.enemiesTab.attributes.primary as stat (stat.attributeId)}
 			<div class="stat">
 				<div class="stat-row">
 					<span class="code">{attributeCode(stat.attributeId, staticData.attributes)}</span>
 					<span class="bar-wrap" style:--bar-fill={attributeColor(stat.attributeId)}>
-						<Bar value={stat.value} max={view.maxPrimary} presentational />
+						<Bar value={stat.value} max={view.enemiesTab.maxPrimary} presentational />
 					</span>
 					<span class="val">{stat.value}</span>
 				</div>
-				{#if view.scaling}
-					<div class="scale-line">{stat.base} base + {stat.perLevel}/lvl × {view.level}</div>
+				{#if view.enemiesTab.scaling}
+					<div class="scale-line">{stat.base} base + {stat.perLevel}/lvl × {view.enemiesTab.level}</div>
 				{/if}
 			</div>
 		{/each}
 	</div>
 
 	<div class="secondary">
-		{#each view.attributes.secondary as stat (stat.attributeId)}
+		{#each view.enemiesTab.attributes.secondary as stat (stat.attributeId)}
 			<div class="card">
 				<div class="card-label">{attributeName(stat.attributeId, staticData.attributes)}</div>
 				<div class="card-val" style:color={secondaryColor(stat.attributeId)}>{stat.value}</div>
-				{#if view.scaling}
+				{#if view.enemiesTab.scaling}
 					<div class="card-scale">+{roundDelta(stat.perLevel)}/lvl</div>
 				{/if}
 			</div>

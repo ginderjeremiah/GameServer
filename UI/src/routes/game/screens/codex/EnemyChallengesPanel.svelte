@@ -1,11 +1,11 @@
 <!-- Challenges sub-tab: the challenges scoped to this enemy, with the player's progress. -->
 <div class="challenges">
-	<div class="label">Related challenges · {view.challenges.length}</div>
+	<div class="label">Related challenges · {view.enemiesTab.challenges.length}</div>
 	{#if view.challengesError}
 		<div class="note">Your challenge progress could not be loaded.</div>
 	{:else}
 		<div class="list">
-			{#each view.challenges as challenge (challenge.id)}
+			{#each view.enemiesTab.challenges as challenge (challenge.id)}
 				<div class="challenge" style:--ch-accent={challenge.accent}>
 					<div class="text">
 						<div class="name">{challenge.name}</div>
