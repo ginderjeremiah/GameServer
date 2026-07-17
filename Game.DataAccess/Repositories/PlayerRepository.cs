@@ -152,14 +152,6 @@ namespace Game.DataAccess.Repositories
                 throw new PlayerPersistenceFlushFailedException(ex);
             }
 
-            if (dispatchFault is not null)
-            {
-                // The flush above succeeded (whatever it carried), but the dispatch itself still failed, so the
-                // aggregate's in-memory state may not match what actually got persisted — force the same reload
-                // a flush failure triggers, and skip the cache blob write below (#1819).
-                throw new PlayerPersistenceFlushFailedException(dispatchFault);
-            }
-
             var playerKey = $"{PlayerPrefix}_{player.Id}";
 
             // Serialize the lean model rather than the aggregate, so the cached blob never holds reference data.
@@ -168,7 +160,25 @@ namespace Game.DataAccess.Repositories
             // write is invisible to the live session and self-heals on the next save, while the awaited queue write
             // above still carries the change to Postgres. Awaiting this would put a Redis round-trip on the per-battle
             // hot path for no durability gain. See docs/backend-persistence.md (write-behind player cache).
+            //
+            // Written even when dispatchFault is set below: DomainEventDispatcher isolates each handler and always
+            // completes the full event sweep — buffering every handler's write into this flush — before surfacing
+            // collected failures (docs/backend-persistence.md -> Domain-event dispatch), so by this point the queue
+            // already matches this mutated aggregate regardless of which handler faulted. Skipping this write left
+            // the cache (and the reload a dispatch fault forces below) silently behind what the flush above just
+            // durably enqueued — for insert-only events (item/skill/mod/lesson unlocks) with no compensating
+            // overwrite, that divergence between DB and cache would persist until the cache blob is evicted
+            // and the aggregate falls through to a fresh DB load (#2098).
             _cache.SetAndForget(playerKey, PlayerCacheMapper.ToCacheModel(player), PlayerCacheTtl);
+
+            if (dispatchFault is not null)
+            {
+                // The dispatch fault itself (e.g. a non-persistence handler like a notifier) still needs to
+                // propagate so the caller treats this command as failed and forces the connection's in-memory
+                // Player to reload — which now reads back the cache blob just written above, so the reload
+                // observes this command's own mutations rather than reverting past them (#1819).
+                throw new PlayerPersistenceFlushFailedException(dispatchFault);
+            }
         }
 
         private async Task<PlayerCacheModel?> GetPlayerModelFromDb(int playerId, CancellationToken cancellationToken)
