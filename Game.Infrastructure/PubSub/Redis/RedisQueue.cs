@@ -12,7 +12,9 @@ namespace Game.Infrastructure.PubSub.Redis
         // per-command budget cooperatively via RedisCommandBudget (the same partial-honouring as RedisService): the
         // await unwinds promptly on cancellation while the underlying command settles in the background. Pure reads
         // (length/peek) take the read path; every mutating op (pop/reserve/acknowledge/reclaim/remove/push) takes
-        // the write path, so a post-cancellation fault on an abandoned write is logged rather than lost.
+        // the write path, so a post-cancellation fault on an abandoned write is logged rather than lost — except
+        // AddRangeToQueueAsync, which deliberately does not abandon on cancellation once dispatched (see its own
+        // comment, #2106).
         private const string WriteFaultMessage = "A Redis queue command faulted after its command budget was cancelled; the operation may not have been applied.";
 
         private readonly ILogger<RedisQueue> _logger;
