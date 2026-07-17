@@ -16,20 +16,31 @@ import { SERVER_STAT_TYPES } from '../stats/stat-fixtures';
 // CodexView reads reference data + challenge progress + per-zone clears from the stores, and reuses
 // the Statistics screen's query engine — all mocked here. (The Statistics view-model also imports
 // `navigation`.)
-const { staticData, playerChallenges, navigation, statistics } = vi.hoisted(() => ({
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	staticData: {} as any,
-	playerChallenges: {
+const { staticData, playerChallenges, navigation, statistics } = vi.hoisted(() => {
+	let mockStats: IPlayerStatistic[] = [];
+	return {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		all: [] as any[],
-		isChallengeCompleted(id: number) {
+		staticData: {} as any,
+		playerChallenges: {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			return this.all.some((c: any) => c.challengeId === id && c.completed);
+			all: [] as any[],
+			isChallengeCompleted(id: number) {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				return this.all.some((c: any) => c.challengeId === id && c.completed);
+			}
+		},
+		navigation: { requestScreen: vi.fn(), consumePayload: vi.fn(), clear: vi.fn() },
+		statistics: {
+			isZoneCleared: vi.fn<(id: number) => boolean>(() => false),
+			get stats() {
+				return mockStats;
+			},
+			set stats(value: IPlayerStatistic[]) {
+				mockStats = value;
+			}
 		}
-	},
-	navigation: { requestScreen: vi.fn(), consumePayload: vi.fn(), clear: vi.fn() },
-	statistics: { isZoneCleared: vi.fn<(id: number) => boolean>(() => false) }
-}));
+	};
+});
 vi.mock('$stores', () => ({ staticData, playerChallenges, navigation, statistics }));
 
 import { CodexView, type EnemyRowVM, type ZoneProjectionVM } from '$routes/game/screens/codex/codex-view.svelte';
@@ -200,6 +211,7 @@ beforeEach(() => {
 	// Zone 0 (Emberreach) is cleared by default; individual tests override as needed.
 	statistics.isZoneCleared.mockReset();
 	statistics.isZoneCleared.mockImplementation((id: number) => id === 0);
+	statistics.stats = [];
 });
 
 describe('CodexView tabs', () => {
@@ -466,8 +478,8 @@ describe('CodexView dossier projections', () => {
 	});
 
 	it('reuses the statistics query for the player’s per-enemy record', () => {
+		statistics.stats = STATS;
 		const view = new CodexView();
-		view.stats = STATS;
 		view.selectEnemy(0);
 		const killed = view.statistics.find((s) => s.label === 'Enemies Killed');
 		expect(killed?.value).toBe('100');
@@ -610,8 +622,8 @@ describe('CodexView zone dossier', () => {
 	});
 
 	it('reuses the statistics query for the player’s per-zone record', () => {
+		statistics.stats = STATS;
 		const view = new CodexView();
-		view.stats = STATS;
 		view.selectZone(1); // Ashfen Marsh — 3 clears recorded
 		expect(view.zoneStatistics.find((s) => s.label === 'Zones Cleared')?.value).toBe('3');
 		// A zone with no recorded statistics yields an empty record.
@@ -752,8 +764,8 @@ describe('CodexView skill dossier', () => {
 	});
 
 	it('reuses the statistics query for the player’s per-skill record', () => {
+		statistics.stats = STATS;
 		const view = new CodexView();
-		view.stats = STATS;
 		view.selectSkill(0); // Cleave — 4,500 damage dealt recorded
 		expect(view.skillStatistics.find((s) => s.label === 'Damage Dealt')?.value).toBe('4,500');
 		// A skill with no recorded statistics yields an empty record.

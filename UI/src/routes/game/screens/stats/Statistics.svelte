@@ -44,9 +44,9 @@ const view = new StatisticsView();
 
 onMount(async () => {
 	// Force a fresh fetch so values reflect play since the store was last loaded
-	// (it is loaded once at game boot to back the fight screen's boss seal).
+	// (it is loaded once at game boot to back the fight screen's boss seal). view.stats reads
+	// the store live, so no snapshot assignment is needed here.
 	await statistics.load(true);
-	view.stats = statistics.stats;
 	view.error = statistics.error;
 	if (statistics.error) {
 		// Don't conflate a failed load with a genuine empty result (the

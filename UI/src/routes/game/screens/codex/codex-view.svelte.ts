@@ -22,13 +22,12 @@
    The reactive layer is composed from one class per tab (`EnemiesTabView`, `ZonesTabView`,
    `SkillsTabView`, each in its own `*-tab-view.svelte.ts` file) so every tab's derivations stay
    independently readable/testable. This CodexView is the thin orchestrator: it owns only what's
-   genuinely cross-tab — the active tab, the once-fetched player statistics + challenge-error state,
+   genuinely cross-tab — the active tab, the live player statistics + challenge-error state,
    the shared statistics query engine, and the cross-links between dossiers — and every other
    property/method below simply delegates to the owning tab's instance, so consuming components (and
    the existing tests) keep reading `view.<x>` exactly as before. */
 
-import type { IPlayerStatistic } from '$lib/api';
-import { staticData } from '$stores';
+import { staticData, statistics } from '$stores';
 import {
 	CODEX_TABS,
 	type CodexTab,
@@ -99,8 +98,10 @@ export class CodexView {
 	/** Active top-level tab. */
 	tab = $state<CodexTab>('enemies');
 
-	/** The player's statistic values (fetched on mount via the shared statistics store). */
-	stats = $state<IPlayerStatistic[]>([]);
+	/** The player's statistic values, read live from the shared store (fetched on mount) so a
+	 *  background update — e.g. the fight screen's optimistic zone-clear — is reflected in every
+	 *  dossier's "your record" section without remounting the Codex. */
+	readonly stats = $derived(statistics.stats);
 	statsLoading = $state(true);
 	statsError = $state(false);
 	/** Whether the mount-time challenge-progress fetch failed — surfaced so the enemy dossier's

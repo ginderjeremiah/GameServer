@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
+import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { EDamageTypeKey, EStatisticType, type IPlayerStatistic } from '$lib/api';
 import { SERVER_STAT_TYPES } from './stat-fixtures';
 
@@ -23,7 +23,7 @@ vi.mock('$stores', async (importOriginal) => {
 });
 
 import Statistics from '$routes/game/screens/stats/Statistics.svelte';
-import { navigation } from '$stores';
+import { navigation, statistics } from '$stores';
 
 const STATS: IPlayerStatistic[] = [
 	{ statisticTypeId: EStatisticType.EnemiesKilled, entityId: 0, value: 300 },
@@ -67,6 +67,20 @@ describe('Statistics screen', () => {
 		await fireEvent.click(screen.getByTestId('tab-time'));
 		expect(screen.getByText('Total Battle Time')).toBeTruthy();
 		expect(screen.getByText('Fastest Victory')).toBeTruthy();
+	});
+
+	it('reflects a background zone-clear in the exploration card without remounting', async () => {
+		render(Statistics);
+		await screen.findByText('Enemies Killed');
+		await fireEvent.click(screen.getByTestId('tab-exploration'));
+		const card = await screen.findByTestId(`stat-card-${EStatisticType.ZonesCleared}`);
+		expect(card.querySelector('.value')?.textContent).toBe('0');
+
+		// The fight screen marks a zone cleared optimistically the moment its boss is defeated,
+		// while the Statistics screen may already be sitting open on the Exploration tab.
+		statistics.markZoneCleared(0);
+
+		await waitFor(() => expect(card.querySelector('.value')?.textContent).toBe('1'));
 	});
 
 	it('shows the damage-type breakdown card with a non-interactive per-key row', async () => {

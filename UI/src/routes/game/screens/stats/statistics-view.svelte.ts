@@ -15,7 +15,7 @@
 
 import { EDamageTypeKey, EEntityType, EStatisticType, type IPlayerStatistic, type IStatisticType } from '$lib/api';
 import { damageTypeKeyName } from '$lib/common';
-import { navigation, staticData } from '$stores';
+import { navigation, staticData, statistics } from '$stores';
 import { statCategoryLabel } from './statistics-display';
 import type { CodexNavPayload } from '../codex/codex-view.svelte';
 
@@ -310,8 +310,10 @@ const EMPTY_SUMMARY: StatSummary = { rows: [], maxVal: 1, headline: 0 };
 /* ── reactive view-model ──────────────────────────────────────────────────── */
 
 export class StatisticsView {
-	/** The player's statistic values, fetched via the `GetPlayerStatistics` socket command on mount. */
-	stats = $state<IPlayerStatistic[]>([]);
+	/** The player's statistic values, read live from the shared store (fetched via the
+	 *  `GetPlayerStatistics` socket command on mount) so a background update — e.g. the fight
+	 *  screen's optimistic zone-clear — is reflected without remounting this screen. */
+	readonly stats = $derived(statistics.stats);
 	/** True until the statistic values have been fetched. */
 	loading = $state(true);
 	/** True when the fetch failed (distinct from a genuine empty result). */
