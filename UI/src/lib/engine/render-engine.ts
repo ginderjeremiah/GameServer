@@ -11,6 +11,7 @@ export class RenderEngine {
 	public tickRate = 0;
 
 	private running = false;
+	private rafHandle?: number;
 	private countTick = getEventCounter((t) => (this.tickRate = Math.round(t)));
 
 	public start() {
@@ -25,6 +26,12 @@ export class RenderEngine {
 
 	public stop() {
 		this.running = false;
+		// Cancel the pending frame so a start() within the same frame can't leave the old callback
+		// running alongside the new loop (mirrors LogicalEngine.stop clearing its tickSource handle).
+		if (this.rafHandle !== undefined) {
+			window.cancelAnimationFrame(this.rafHandle);
+			this.rafHandle = undefined;
+		}
 	}
 
 	//use performance.now instead of animation frame timestamp, because frame stamp is before some amount of processing.
@@ -32,7 +39,7 @@ export class RenderEngine {
 	private renderLoop() {
 		if (this.running) {
 			this.update();
-			window.requestAnimationFrame(() => this.renderLoop());
+			this.rafHandle = window.requestAnimationFrame(() => this.renderLoop());
 		}
 	}
 
