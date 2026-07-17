@@ -301,16 +301,15 @@ namespace Game.Api
         private static void ConfigureAuth(WebApplicationBuilder builder)
         {
             var jwtSection = builder.Configuration.GetSection("Jwt");
+            var jwtOptions = new JwtOptions();
+            jwtSection.Bind(jwtOptions);
+
             builder.Services.AddOptions<JwtOptions>()
                 .Bind(jwtSection)
                 // HMAC-SHA256 needs a key of at least its 256-bit output, so fail fast at startup (mirroring
                 // the pepper/CORS validation below) rather than only when the first token is issued.
                 .Validate(options => Encoding.UTF8.GetByteCount(options.SigningKey) >= 32, "Jwt:SigningKey must be at least 32 bytes for HMAC-SHA256")
                 .ValidateOnStart();
-
-            var signingKey = jwtSection["SigningKey"] ?? throw new InvalidOperationException("Jwt:SigningKey not set");
-            var issuer = jwtSection["Issuer"] ?? Constants.SERVER_PRINCIPAL;
-            var audience = jwtSection["Audience"] ?? Constants.SERVER_PRINCIPAL;
 
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
@@ -320,11 +319,11 @@ namespace Game.Api
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
-                        ValidIssuer = issuer,
+                        ValidIssuer = jwtOptions.Issuer,
                         ValidateAudience = true,
-                        ValidAudience = audience,
+                        ValidAudience = jwtOptions.Audience,
                         ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
                         ValidateLifetime = true,
                         ClockSkew = TimeSpan.FromSeconds(30),
                         NameClaimType = JwtRegisteredClaimNames.Sub,
