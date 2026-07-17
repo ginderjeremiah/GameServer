@@ -533,39 +533,43 @@ namespace Game.Core
         Unarmed = 29,
 
         /// <summary>
-        /// Vulnerability damage enabled (the Hex mastery — spike #1398, #1427). The normalized-marginal extra
-        /// damage the player's applied vulnerability (a negative-resistance debuff on the opponent) let through,
-        /// booked as an overlay tally like <see cref="Crit"/>. A combat-event key — type-neutral, routed straight
-        /// to a single activity key by the accrual with no <see cref="Attributes.DamageTypes.Applies"/> routing.
-        /// Appended after the weapon-mastery keys (the enum grows append-only).
+        /// Vulnerability damage enabled (the Hex mastery — spike #1398, #1427; share claim #1481). The uniform
+        /// overlay share claim: each hit landed while the player's applied vulnerability (a negative-resistance
+        /// debuff on the opponent) was active books its health-capped damage × φ(investment). A combat-event
+        /// key — type-neutral, routed straight to a single activity key by the accrual with no
+        /// <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after the weapon-mastery keys (the
+        /// enum grows append-only).
         /// </summary>
         Hex = 30,
 
         /// <summary>
-        /// Ramp damage enabled (the Momentum mastery — spike #1398, #1428). The normalized-marginal extra damage
-        /// a player-applied ramp (a stacking self-buff to a typed amplification attribute) enabled, booked as an
-        /// overlay tally like <see cref="Crit"/> and <see cref="Hex"/>. A combat-event key — type-neutral, routed
-        /// straight to a single activity key with no <see cref="Attributes.DamageTypes.Applies"/> routing.
-        /// Appended after Hex (the enum grows append-only).
+        /// Ramp damage enabled (the Momentum mastery — spike #1398, #1428; share claim #1481). The uniform
+        /// overlay share claim: each hit landed while a player-applied ramp (a stacking self-buff to a typed
+        /// amplification attribute) was active books its health-capped damage × φ(investment), like
+        /// <see cref="Hex"/>. A combat-event key — type-neutral, routed straight to a single activity key with
+        /// no <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after Hex (the enum grows
+        /// append-only).
         /// </summary>
         Momentum = 31,
 
         /// <summary>
-        /// Execute bonus damage enabled (the Cull mastery — spike #1398, #1430). The normalized-marginal extra
-        /// damage an authored <see cref="EAttribute.ExecuteBonus"/> enabled, scaled by the target's
-        /// missing-health fraction at the moment of the hit, booked as an overlay tally like <see cref="Crit"/>,
-        /// <see cref="Hex"/>, and <see cref="Momentum"/>. A combat-event key — type-neutral, routed straight to a
-        /// single activity key with no <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after
-        /// Momentum (the enum grows append-only).
+        /// Execute bonus damage enabled (the Cull mastery — spike #1398, #1430; share claim #1481). The uniform
+        /// overlay share claim: each hit books its health-capped damage × φ(investment), where the investment is
+        /// the authored <see cref="EAttribute.ExecuteBonus"/> scaled by the target's missing-health fraction at
+        /// the moment of the hit — like <see cref="Hex"/> and <see cref="Momentum"/>. A combat-event key —
+        /// type-neutral, routed straight to a single activity key with no
+        /// <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after Momentum (the enum grows
+        /// append-only).
         /// </summary>
         Cull = 32,
 
         /// <summary>
-        /// Mitigation damage enabled (the Sunder mastery — spike #1398, #1429). The normalized-marginal extra
-        /// damage a player-applied Toughness debuff let through the mitigation curve, booked as an overlay tally
-        /// like <see cref="Crit"/>, <see cref="Hex"/>, <see cref="Momentum"/>, and <see cref="Cull"/>. A
-        /// combat-event key — type-neutral, routed straight to a single activity key with no
-        /// <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after Cull (the enum grows append-only).
+        /// Mitigation damage enabled (the Sunder mastery — spike #1398, #1429; share claim #1481). The uniform
+        /// overlay share claim: each hit landed while a player-applied Toughness debuff was active books its
+        /// health-capped damage × φ(investment), like <see cref="Hex"/>, <see cref="Momentum"/>, and
+        /// <see cref="Cull"/>. A combat-event key — type-neutral, routed straight to a single activity key with
+        /// no <see cref="Attributes.DamageTypes.Applies"/> routing. Appended after Cull (the enum grows
+        /// append-only).
         /// </summary>
         Sunder = 33,
 
