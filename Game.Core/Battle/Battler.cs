@@ -413,12 +413,15 @@ namespace Game.Core.Battle
         /// <summary>
         /// The share of a hit's <paramref name="damage"/> that removed live health, given the target's
         /// <paramref name="healthBefore"/> it landed: capped at the positive health remaining, so a killing
-        /// blow's overkill tail books nothing (#1482). A negative amount (an absorption heal) passes through
-        /// unchanged. A booking rule for the proficiency offense book only — the health math is never capped.
+        /// blow's overkill tail books nothing (#1482), and floored at 0, so a portion that instead healed the
+        /// target under authored absorption (resistance &gt; 1) books nothing rather than going negative and
+        /// offsetting a sibling type's genuine offense-book training (#2101). A booking rule for the
+        /// proficiency offense book only — the health math (both direct hits and DoT ticks) is never capped or
+        /// floored.
         /// </summary>
         public static double HealthRemoved(double damage, double healthBefore)
         {
-            return Math.Min(damage, Math.Max(0, healthBefore));
+            return Math.Clamp(damage, 0, Math.Max(0, healthBefore));
         }
 
         /// <summary>
@@ -468,10 +471,11 @@ namespace Game.Core.Battle
         /// <param name="recordDamageDealt">
         /// Optional per-type <b>post-mitigation</b> recorder for the proficiency offense book (spike #1338) —
         /// invoked with each DoT type and the tick damage <em>after</em> this battler's resistance, capped at
-        /// the health the tick actually removes (<see cref="HealthRemoved"/>, #1482) across the fixed
-        /// accumulator order, so a killing tick's overkill tail books nothing while the health math below stays
-        /// uncapped. Supplied when this battler is the victim of the player's DoT (the enemy), so the player's
-        /// DoT damage dealt is typed for the offense binding consistently with a direct hit's booked damage;
+        /// the health the tick actually removes and floored at 0 (<see cref="HealthRemoved"/>, #1482/#2101)
+        /// across the fixed accumulator order, so a killing tick's overkill tail — and a tick that instead
+        /// healed this battler under authored absorption — both book nothing, while the health math below
+        /// stays uncapped. Supplied when this battler is the victim of the player's DoT (the enemy), so the
+        /// player's DoT damage dealt is typed for the offense binding consistently with a direct hit's booked damage;
         /// <c>null</c> leaves the loop unchanged. Like <paramref name="recordExposure"/> it is a backend-only
         /// side channel that adds no parity surface.
         /// </param>

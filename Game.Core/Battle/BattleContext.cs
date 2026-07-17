@@ -165,7 +165,8 @@ namespace Game.Core.Battle
         /// a parry additionally fires the defender's riposte (see <see cref="FireParryCounter"/>).</item>
         /// </list>
         /// The per-portion typed books (<see cref="BattleStats.AddTypedDamageDealt"/> per portion's net capped at
-        /// the health it actually removed — overkill books nothing, #1482 —
+        /// the health it actually removed and floored at 0 — overkill books nothing (#1482), an absorbed portion
+        /// books nothing rather than going negative (#2101) —
         /// <see cref="BattleStats.AddTypedDamageExposure"/> per portion's pre-resist dealt) are the cross-school
         /// proficiency signal; the whole-hit stats (<see cref="BattleStats.HighestPlayerAttack"/>,
         /// <see cref="BattleStats.CriticalDamageDealt"/>, and the per-skill total via the return) use
@@ -338,6 +339,9 @@ namespace Game.Core.Battle
                 // The typed offense book is capped at the health the portion actually removed (#1482): a
                 // killing swing's overkill tail — and every later portion of it — books nothing, while the
                 // whole-hit stats below keep the full net (feedback like HighestPlayerAttack includes overkill).
+                // It's also floored at 0: a portion the target's own resistance instead absorbed into a heal
+                // (resistance > 1) books nothing rather than a negative that would offset a sibling type's
+                // genuine training within the same battle (#2101).
                 var booked = Battler.HealthRemoved(net, healthBefore);
                 Stats.AddTypedDamageDealt(type, booked);
                 totalNet += net;

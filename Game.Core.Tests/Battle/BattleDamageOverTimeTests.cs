@@ -90,7 +90,8 @@ namespace Game.Core.Tests.Battle
             // A +2.0 BleedResistance would heal 80 (2000 × 40/1000 × (1 − 2) = −80), but the battler is already
             // at MaxHealth (no prior damage) so there's no room — capped at zero net effect, consistent with
             // TakeDamage's absorption cap and ApplyHealOverTime (no overheal/shield concept). Per-type booking
-            // still sees the uncapped tick.
+            // floors at 0 too — an absorbed tick removed no real health, so it books nothing (#2101) — even
+            // though the underlying tick is uncapped.
             var battler = MakeBattler(Stat(Strength, 0), Stat(BleedDamagePerSecond, 2000), Stat(BleedResistance, 2.0)); // MaxHealth 50
             var dealtByType = new Dictionary<EDamageType, double>();
 
@@ -98,7 +99,7 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(0, dealt);
             Assert.Equal(50, battler.CurrentHealth);
-            Assert.Equal(-80, dealtByType[EDamageType.Bleed]); // per-type booking stays uncapped
+            Assert.Equal(0, dealtByType[EDamageType.Bleed]); // per-type booking floors the absorbed tick at 0
         }
 
         [Fact]
@@ -456,7 +457,9 @@ namespace Game.Core.Tests.Battle
         {
             // A Bleed absorption (resistance 2) heals 80 (uncapped, per the DoT absorption rule) before Burn
             // resolves in the fixed order, so the Burn tick's 100 comes out of genuinely restored health and
-            // books in full — the #1482 cap tracks the running health through the order, negatives included.
+            // books in full — the #1482 cap tracks the running (uncapped) health through the order. Bleed's own
+            // booking floors at 0 (#2101): it removed no real health, so it trains nothing despite restoring
+            // room for Burn.
             var battler = MakeBattler(
                 Stat(Strength, 0), Stat(BleedDamagePerSecond, 2000), Stat(BleedResistance, 2.0),
                 Stat(BurnDamagePerSecond, 2500));
@@ -464,9 +467,9 @@ namespace Game.Core.Tests.Battle
 
             battler.ApplyDamageOverTime(40, recordDamageDealt: (type, amount) => dealtByType[type] = amount);
 
-            Assert.Equal(-80, dealtByType[EDamageType.Bleed]); // the negative (heal) passes through unchanged
-            Assert.Equal(100, dealtByType[EDamageType.Burn]);  // fully booked — it removed real, restored health
-            Assert.Equal(30, battler.CurrentHealth);           // 50 + 80 − 100
+            Assert.Equal(0, dealtByType[EDamageType.Bleed]);  // the absorbed (healing) tick books nothing
+            Assert.Equal(100, dealtByType[EDamageType.Burn]); // fully booked — it removed real, restored health
+            Assert.Equal(30, battler.CurrentHealth);          // 50 + 80 − 100
         }
 
         [Fact]

@@ -610,10 +610,11 @@ namespace Game.Core.Tests.Battle
         }
 
         [Fact]
-        public void DamageTarget_AbsorbedHit_BooksTheNegativeNetUnchanged()
+        public void DamageTarget_AbsorbedHit_FloorsTheTypedOffenseBookAtZero()
         {
-            // The #1482 cap trims only positive overkill: an absorbed hit's negative net (the capped heal
-            // TakeDamage reports) still books through to the typed book exactly as before.
+            // An absorbed hit's negative net (the capped heal TakeDamage reports) removed no real health, so
+            // the typed offense book floors it at 0 rather than booking a negative that would offset a
+            // sibling type's genuine training within the same battle (#2101).
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // Toughness 0, MaxHealth 50
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -622,7 +623,7 @@ namespace Game.Core.Tests.Battle
             context.DamageTarget(20, Single(EDamageType.Fire), 0); // 20 × (1 − 2) = −20, absorbed
 
             Assert.Equal(30, TypedDealt(context, EDamageType.Physical), 0.001);
-            Assert.Equal(-20, TypedDealt(context, EDamageType.Fire), 0.001);
+            Assert.Equal(0, TypedDealt(context, EDamageType.Fire), 0.001);
         }
 
         [Fact]
@@ -964,6 +965,8 @@ namespace Game.Core.Tests.Battle
             // 100 against an enemy absorbing Fire (resistance 2.0) at full health: the Physical portion deals 20
             // (full 50 → 30, opening 20 room), then the Fire portion's −80 absorption heal is capped at that 20
             // room (back to 50). Net 20 + (−20) = 0 — the fixed Physical-first order is what lets the heal land.
+            // The Fire portion's typed offense-book booking floors at 0 (#2101): it removed no real health, so
+            // it trains nothing despite the health math showing the order-dependent heal.
             var player = MakeBattlerWith((Endurance, 0));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // MaxHealth 50, Toughness 0
             var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
@@ -973,7 +976,7 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, dealt, 0.001);
             Assert.Equal(50, enemy.CurrentHealth, 0.001); // 50 → 30 (Physical) → 50 (Fire heal capped at 20 room)
             Assert.Equal(20, TypedDealt(context, EDamageType.Physical), 0.001);
-            Assert.Equal(-20, TypedDealt(context, EDamageType.Fire), 0.001);
+            Assert.Equal(0, TypedDealt(context, EDamageType.Fire), 0.001);
         }
 
         [Fact]
@@ -1890,6 +1893,8 @@ namespace Game.Core.Tests.Battle
             // CapHealToRoom's room is positive, mirroring DamageTarget_ResistanceAboveOne_HealsTheTarget). An
             // absorbed counter avoided no real damage either, so it floors at 0 rather than going negative
             // (#2091) — the sanity assertion on the enemy's health confirms the absorption genuinely happened.
+            // The riposte fires through the same ResolvePlayerHit pipeline as a normal player fire, so its
+            // typed offense book booking floors at 0 too, for the same absorption reason (#2101).
             var counter = MakeCounterSkill(20, damageType: EDamageType.Fire);
             var player = MakeBattlerWithCounter(counter, (ParryChance, 1));
             var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // MaxHealth 50, Toughness 0
@@ -1901,6 +1906,7 @@ namespace Game.Core.Tests.Battle
 
             Assert.Equal(40, enemy.CurrentHealth, 0.001); // 20 + min(20, 30 room) — absorption genuinely healed it
             Assert.Equal(0, context.Stats.PlayerCounterDamageDealt, 0.001);
+            Assert.Equal(0, TypedDealt(context, EDamageType.Fire), 0.001);
         }
 
         [Fact]

@@ -162,7 +162,7 @@ namespace Game.Core.Battle
         public double PlayerRating { get; set; }
 
         /// <summary>Accumulates a direct hit's or DoT tick's booked <paramref name="amount"/> (already capped at
-        /// the health it removed by the caller — #1482) into the typed offense book.</summary>
+        /// the health it removed and floored at 0 by the caller — #1482/#2101) into the typed offense book.</summary>
         public void AddTypedDamageDealt(EDamageType type, double amount)
         {
             TypedDamageDealt.TryGetValue(type, out var existing);
