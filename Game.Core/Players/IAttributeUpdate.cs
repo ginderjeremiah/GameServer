@@ -11,7 +11,7 @@
         EAttribute Attribute { get; }
 
         /// <summary>
-        /// The amount to update the attribute to.
+        /// The signed delta to apply to the attribute's allocated points (negative to refund).
         /// </summary>
         int Amount { get; }
     }
