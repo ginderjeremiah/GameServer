@@ -8,6 +8,7 @@ using Game.Core.Players;
 using Game.Core.Progress;
 using Game.Core.TestInfrastructure.Builders;
 using Game.DataAccess;
+using Game.DataAccess.Mapping;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
@@ -540,6 +541,35 @@ namespace Game.Application.Tests.DataAccess
                 var kills = Assert.Single(stats, s => s.Type == EStatisticType.EnemiesKilled && s.EntityId == null);
                 Assert.Equal(5m, kills.Value);
             }
+        }
+
+        [Fact]
+        public async Task GetChallenges_OrphanedChallengeReference_ThrowsDiagnosableException()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+            var hashKey = $"Progress_{playerId}";
+
+            // A challenge id with no matching reference-cache entry stands in for a content-data mistake (a
+            // migration/seed that removed a referenced challenge) — the same class of defect the player-load
+            // missing-reference policy (docs/backend.md → Reference Data) guards against for items/mods/skills.
+            // Written straight to the cache hash (the field-name format `ToCoreChallenge` reads) rather than
+            // through Save, since Save can only ever persist a challenge already resolved from the live catalog.
+            var orphaned = new CachedPlayerChallenge { ChallengeId = 999999, Progress = 1m, Completed = false, CompletedAt = null };
+            await redis.HashSetAsync(hashKey, "C_999999", orphaned.Serialize());
+
+            using var scope = CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            var ex = await Assert.ThrowsAsync<OrphanedReferenceException>(() => repo.GetChallenges(playerId));
+
+            // The message names the player, the catalog, and the missing id so the mistake is diagnosable from logs.
+            Assert.Contains($"Player {playerId}", ex.Message);
+            Assert.Contains("challenge", ex.Message);
+            Assert.Contains("999999", ex.Message);
+            Assert.NotNull(ex.InnerException);
         }
 
         [Fact]

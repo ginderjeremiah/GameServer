@@ -5,6 +5,7 @@ using Game.Core;
 using Game.Core.Events;
 using Game.Core.Players;
 using Game.Core.Progress;
+using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -59,7 +60,7 @@ namespace Game.DataAccess.Repositories
             return new PlayerProgress(
                 player,
                 cached.Statistics.Select(ToCoreStatistic),
-                cached.Challenges.Select(ToCoreChallenge),
+                cached.Challenges.Select(c => ToCoreChallenge(c, player.Id)),
                 cached.Proficiencies.Select(ToCoreProficiency));
         }
 
@@ -72,7 +73,7 @@ namespace Game.DataAccess.Repositories
         public async Task<List<CoreChallenge>> GetChallenges(int playerId, CancellationToken cancellationToken = default)
         {
             var cached = await GetCachedProgress(playerId, cancellationToken);
-            return cached.Challenges.Select(ToCoreChallenge).ToList();
+            return cached.Challenges.Select(c => ToCoreChallenge(c, playerId)).ToList();
         }
 
         public async Task<HashSet<int>> GetCompletedChallengeIds(int playerId, CancellationToken cancellationToken = default)
@@ -269,8 +270,12 @@ namespace Game.DataAccess.Repositories
             Value = cached.Value,
         };
 
-        private CoreChallenge ToCoreChallenge(CachedPlayerChallenge cached) =>
-            new(_challenges.GetChallenge(cached.ChallengeId), cached.Progress, cached.Completed, cached.CompletedAt);
+        private CoreChallenge ToCoreChallenge(CachedPlayerChallenge cached, int playerId) =>
+            new(
+                OrphanedReferenceException.ResolveOrThrow(_challenges.GetChallenge, cached.ChallengeId, playerId, "challenge"),
+                cached.Progress,
+                cached.Completed,
+                cached.CompletedAt);
 
         private static CoreProficiency ToCoreProficiency(CachedPlayerProficiency cached) => new()
         {
