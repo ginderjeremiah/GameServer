@@ -144,11 +144,14 @@ namespace Game.DataAccess.Repositories
                 // A cancellation is a cooperative unwind rather than a persistence fault, so it propagates
                 // unwrapped instead of being wrapped in this type — pinned by
                 // PlayerWriteBehindTests.SavePlayer_PublishFails_PreservesTheEventForTheNextFlush, which expects
-                // OperationCanceledException specifically and would fail if this were wrapped instead. A
-                // cancellation reaching here can still leave this save's mutations stranded with no queued
-                // event to match, so SocketHandler forces the same in-memory reload for a command that settles
-                // via cancellation as it does for this exception, just classified by the settled task's status
-                // rather than by catching this type (#1849).
+                // OperationCanceledException specifically and would fail if this were wrapped instead. Once the
+                // batch's LPUSH is actually dispatched it always runs to genuine completion rather than being
+                // abandoned mid-flight (RedisQueue.AddRangeToQueueAsync, #2106), so a cancellation reaching here
+                // means the push was never sent — this save's mutations never reached the queue, so leaving the
+                // batch's events buffered for the next flush (rather than clearing them, which only a
+                // successful FlushAsync does) loses nothing. SocketHandler still forces the same in-memory
+                // reload for a command that settles via cancellation as it does for this exception, just
+                // classified by the settled task's status rather than by catching this type (#1849).
                 throw new PlayerPersistenceFlushFailedException(ex);
             }
 
@@ -169,6 +172,11 @@ namespace Game.DataAccess.Repositories
             // durably enqueued — for insert-only events (item/skill/mod/lesson unlocks) with no compensating
             // overwrite, that divergence between DB and cache would persist until the cache blob is evicted
             // and the aggregate falls through to a fresh DB load (#2098).
+            //
+            // Also reached when the flush above outlived a mid-flight cancellation of this call's own
+            // cancellationToken (the caller's per-command budget expiring while the LPUSH was already in
+            // flight): FlushAsync only returns normally once the push has genuinely landed, so this line is
+            // never reached with the queue and cache out of sync on that path either (#2106).
             _cache.SetAndForget(playerKey, PlayerCacheMapper.ToCacheModel(player), PlayerCacheTtl);
 
             if (dispatchFault is not null)

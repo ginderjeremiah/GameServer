@@ -210,6 +210,44 @@ namespace Game.Application.Tests.Services
             Assert.Equal(1, rereadPlayer.CurrentZoneId);
         }
 
+        [Fact]
+        public async Task SavePlayer_CancelledAfterTheFlushIsDispatched_StillCompletesAndWritesTheCacheBlob()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            using var cts = new CancellationTokenSource();
+
+            // Dispatch (PlayerPersistencePublisher.Buffer) and the flush's up-front cancellation check both
+            // complete synchronously, so the flush's LPUSH is the first genuinely awaited (incomplete) task in
+            // this call — by the time SavePlayer's returned Task is assigned below, that push is already
+            // dispatched. Cancelling immediately afterward deterministically lands in the mid-flight window
+            // #2106 closes: the save must still complete and the cache blob must still reflect the mutation,
+            // rather than the queue and cache silently diverging (the #1849 half of #2098).
+            player.ChangeZone(1);
+            var task = playerRepo.SavePlayer(player, cts.Token);
+            await cts.CancelAsync();
+            await task;
+
+            Assert.Equal(1, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            var rereadPlayer = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(rereadPlayer);
+            Assert.Equal(1, rereadPlayer.CurrentZoneId);
+        }
+
         // Stands in for a domain event handler faulting partway through a dispatch: buffers an envelope into
         // the shared batch (as a sibling handler that already succeeded would have) before throwing, so the
         // test can assert SavePlayer still flushes what was buffered rather than losing it (#1819).
