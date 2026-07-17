@@ -218,7 +218,7 @@ namespace Game.Core.Battle
                 // scaled by the active battler's CriticalChanceMultiplier (base 1, so an uncommitted skill still
                 // crits at its own authored rate and further investment scales it). A single crit multiplies
                 // every portion (× 1.0 when it misses is exact, so a non-crit is unchanged).
-                totalNet = ResolvePlayerHit(rawDamage, portions, totalWeight, baseCriticalChance, _rng.Next());
+                totalNet = ResolvePlayerHit(rawDamage, portions, totalWeight, baseCriticalChance, _rng.Next(), out _);
             }
             else
             {
@@ -236,12 +236,14 @@ namespace Game.Core.Battle
                 {
                     // A parry negates the whole hit exactly like a dodge — the avoided damage is each portion's
                     // net (resistance then the Toughness curve) computed without mutating health, and no exposure
-                    // is recorded — and then ripostes with the defender's counter skill.
+                    // is recorded — and then ripostes with the defender's counter skill. A portion an authored
+                    // absorption (resistance > 1) would have healed avoided no damage, so it is floored at 0
+                    // rather than decrementing the tally (#2091).
                     Stats.AttacksParried++;
                     for (var i = 0; i < portions.Count; i++)
                     {
                         var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
-                        Stats.DamageParried += _targetBattler.ComputeNetDamage(dealt, portions[i].Type);
+                        Stats.DamageParried += Math.Max(0, _targetBattler.ComputeNetDamage(dealt, portions[i].Type));
                     }
 
                     FireParryCounter(counterCritDraw);
@@ -250,12 +252,13 @@ namespace Game.Core.Battle
                 {
                     // A dodge zeroes the whole hit; the avoided damage is the sum of each portion's net (resistance
                     // then the Toughness curve), computed without mutating health. A dodge evaded the hit
-                    // entirely, so no exposure is recorded (it trains evasion instead).
+                    // entirely, so no exposure is recorded (it trains evasion instead). Floored per portion at 0
+                    // for the same absorption reason as the parry tally above (#2091).
                     Stats.AttacksDodged++;
                     for (var i = 0; i < portions.Count; i++)
                     {
                         var dealt = AmplifiedPortion(rawDamage, totalWeight, portions[i]);
-                        Stats.DamageDodged += _targetBattler.ComputeNetDamage(dealt, portions[i].Type);
+                        Stats.DamageDodged += Math.Max(0, _targetBattler.ComputeNetDamage(dealt, portions[i].Type));
                     }
                 }
                 else
@@ -290,9 +293,16 @@ namespace Game.Core.Battle
         /// with its crit draw supplied by the caller (the enemy fire's third unconditional draw) rather than
         /// drawn here. Requires the player to be the active battler.
         /// </summary>
+        /// <param name="totalNetFloored">
+        /// The same per-portion nets as the return value, but each portion floored at 0 before summing (#2091)
+        /// — unlike <paramref name="rawDamage"/>'s uncapped return, an absorbed (healed) portion contributes
+        /// nothing rather than pulling the total negative, while a killing portion's overkill is still kept (it
+        /// deliberately does <b>not</b> apply <see cref="Battler.HealthRemoved"/>'s health cap, unlike the typed
+        /// offense book). Consumed by <see cref="FireParryCounter"/> for <see cref="BattleStats.PlayerCounterDamageDealt"/>.
+        /// </param>
         private double ResolvePlayerHit(
             double rawDamage, IReadOnlyList<SkillDamagePortion> portions, double totalWeight,
-            double baseCriticalChance, double critDraw)
+            double baseCriticalChance, double critDraw, out double totalNetFloored)
         {
             var isCrit = critDraw < baseCriticalChance * _activeBattler.GetAttributeValue(CriticalChanceMultiplier);
             var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
@@ -317,6 +327,7 @@ namespace Game.Core.Battle
 
             var totalNet = 0.0;
             var totalBooked = 0.0;
+            var netFloored = 0.0;
             for (var i = 0; i < portions.Count; i++)
             {
                 var type = portions[i].Type;
@@ -330,6 +341,7 @@ namespace Game.Core.Battle
                 var booked = Battler.HealthRemoved(net, healthBefore);
                 Stats.AddTypedDamageDealt(type, booked);
                 totalNet += net;
+                netFloored += Math.Max(0, net);
 
                 // Every overlay tally books a share claim on the damage this portion actually landed (#1481):
                 // the booked (health-capped) net × φ(its own investment) — one uniform shape with no
@@ -392,6 +404,7 @@ namespace Game.Core.Battle
                 Stats.HighestPlayerAttack = totalNet;
             }
 
+            totalNetFloored = netFloored;
             return totalNet;
         }
 
@@ -407,7 +420,9 @@ namespace Game.Core.Battle
         /// <paramref name="counterCritDraw"/> (the enemy fire's third unconditional draw), so a defender with
         /// no resolvable counter skill (which parries without a riposte) leaves the stream identical. The
         /// counter's net is additionally booked as <see cref="BattleStats.PlayerCounterDamageDealt"/> — the
-        /// Riposte training signal, a direct tally like Retribution's.
+        /// Riposte training signal, a direct tally like Retribution's — with each portion floored at 0 so an
+        /// enemy that absorbs (resistance > 1) one portion of the riposte contributes nothing for it rather
+        /// than pulling the tally negative (#2091).
         /// </summary>
         private void FireParryCounter(double counterCritDraw)
         {
@@ -427,8 +442,9 @@ namespace Game.Core.Battle
             }
 
             var counterNet = ResolvePlayerHit(
-                raw, counterPortions, totalWeight, counterSkill.CriticalChance, counterCritDraw);
-            Stats.PlayerCounterDamageDealt += counterNet;
+                raw, counterPortions, totalWeight, counterSkill.CriticalChance, counterCritDraw,
+                out var counterNetFloored);
+            Stats.PlayerCounterDamageDealt += counterNetFloored;
             // The enemy's deterministic reflection applies to the counter like any direct hit it takes (the
             // counter is a genuine attack, subject to the target's defenses — unlike reflection itself, which
             // never chains: reflected damage is not routed through this pipeline).
