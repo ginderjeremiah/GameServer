@@ -67,6 +67,45 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task AddRangeToQueueAsync_AlreadyCancelled_ThrowsWithoutPushingAnything()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            // Unlike every other write on this queue, this one no longer just abandons an already-dispatched
+            // command on cancellation (#2106) — a budget that is already spent fails fast before the LPUSH is
+            // ever sent, so the caller can rely on nothing having landed.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queue.AddRangeToQueueAsync(["a", "b"], cts.Token));
+            Assert.Null(await queue.GetNextAsync());
+        }
+
+        [Fact]
+        public async Task AddRangeToQueueAsync_CancelledAfterTheCommandIsDispatched_StillCompletesAndPushesTheValues()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            using var cts = new CancellationTokenSource();
+
+            // By the time this call returns a (necessarily incomplete) Task, it has already run synchronously
+            // past the up-front cancellation check and dispatched the LPUSH to Redis — the only genuine await in
+            // the method is on that in-flight network round trip. Cancelling immediately afterward therefore
+            // deterministically lands in the mid-flight window #2106 closes: the push must not be abandoned once
+            // dispatched, so it still completes and lands rather than throwing.
+            var task = queue.AddRangeToQueueAsync(["a", "b"], cts.Token);
+            await cts.CancelAsync();
+            await task;
+
+            Assert.Equal("a", await queue.GetNextAsync());
+            Assert.Equal("b", await queue.GetNextAsync());
+        }
+
+        [Fact]
         public async Task ReserveNextAsync_ParksItemOffTheQueueUntilAcknowledged()
         {
             using var scope = CreateScope();

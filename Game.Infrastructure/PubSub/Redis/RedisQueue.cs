@@ -12,7 +12,9 @@ namespace Game.Infrastructure.PubSub.Redis
         // per-command budget cooperatively via RedisCommandBudget (the same partial-honouring as RedisService): the
         // await unwinds promptly on cancellation while the underlying command settles in the background. Pure reads
         // (length/peek) take the read path; every mutating op (pop/reserve/acknowledge/reclaim/remove/push) takes
-        // the write path, so a post-cancellation fault on an abandoned write is logged rather than lost.
+        // the write path, so a post-cancellation fault on an abandoned write is logged rather than lost — except
+        // AddRangeToQueueAsync, which deliberately does not abandon on cancellation once dispatched (see its own
+        // comment, #2106).
         private const string WriteFaultMessage = "A Redis queue command faulted after its command budget was cancelled; the operation may not have been applied.";
 
         private readonly ILogger<RedisQueue> _logger;
@@ -158,11 +160,20 @@ namespace Game.Infrastructure.PubSub.Redis
             return AddToQueueAsync(value.Serialize(), cancellationToken);
         }
 
-        public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default)
+        // Unlike every other write here, this one is not abandoned on a mid-flight cancellation once dispatched:
+        // it exclusively backs PlayerUpdateBatch's flush of a player save's write-behind batch, whose caller
+        // (PlayerRepository.SavePlayer) needs a deterministic yes/no on whether this multi-value LPUSH actually
+        // reached Redis before it can safely decide whether to write the player cache blob afterward. The
+        // RedisCommandBudget abandon-and-observe-in-the-background pattern every other write in this class uses
+        // would otherwise leave that outcome indeterminate — the command may or may not have landed by the time
+        // the caller moves on (#2106). A budget already exhausted before this push starts still fails fast
+        // without dispatching anything, matching every other write in the tier.
+        public async Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var redisValues = values.Select(value => (RedisValue)value).ToArray();
             _logger.LogTrace("Added {Count} values to RedisQueue: {QueueName}", redisValues.Length, QueueName);
-            return ObserveWrite(_redis.ListRightPushAsync(QueueName, redisValues), cancellationToken);
+            await _redis.ListRightPushAsync(QueueName, redisValues);
         }
 
         // Awaits a mutating command under the cancellation budget, attaching a fault-logging continuation so an
