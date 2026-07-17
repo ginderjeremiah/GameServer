@@ -371,6 +371,23 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0, context.Stats.DamageDodged, 0.001);
         }
 
+        [Fact]
+        public void DamageTarget_PlayerDodge_AbsorptionResistance_FloorsAvoidedDamageAtZero()
+        {
+            // FireResistance 2.0 drives ComputeNetDamage negative (a would-be heal) — an absorbed hit avoided
+            // no real damage, so the dodged tally floors at 0 instead of decrementing the lifetime
+            // DamageDodged statistic (#2091).
+            var player = MakeBattlerWith((DodgeChance, 1), (FireResistance, 2.0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, Single(EDamageType.Fire), 0);
+
+            Assert.Equal(1, context.Stats.AttacksDodged);
+            Assert.Equal(0, context.Stats.DamageDodged, 0.001);
+        }
+
         // ── DamageTarget: RNG draw order ─────────────────────────────────────
 
         [Fact]
@@ -885,6 +902,22 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(1, context.Stats.AttacksDodged);
             Assert.Equal(40, context.Stats.DamageDodged, 0.001);
             Assert.Empty(context.Stats.TypedDamageExposure); // a dodge records no exposure
+        }
+
+        [Fact]
+        public void DamageTarget_MultiPortion_DodgeWithAbsorption_FloorsEachPortionIndividually()
+        {
+            // Physical avoided = 5 (no resistance); Fire avoided would be 95 × (1 − 2) = −95 (absorbed, FireResistance
+            // 2.0). Flooring EACH portion at 0 before summing gives 5 + 0 = 5; flooring only the summed total
+            // would instead give max(0, 5 − 95) = 0 — the two disagree, proving the floor is per portion (#2091).
+            var player = MakeBattlerWith((DodgeChance, 1), (FireResistance, 2.0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(100, Portions((EDamageType.Physical, 5), (EDamageType.Fire, 95)), 0);
+
+            Assert.Equal(5, context.Stats.DamageDodged, 0.001);
         }
 
         [Fact]
@@ -1828,6 +1861,45 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(1, context.Stats.AttacksParried);
             Assert.Equal(15, context.Stats.DamageParried, 0.001);
             Assert.Equal(0, context.Stats.PlayerDamageTaken, 0.001);
+            Assert.Equal(0, context.Stats.PlayerCounterDamageDealt, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_PlayerParry_AbsorptionResistance_FloorsAvoidedDamageAtZero()
+        {
+            // FireResistance 2.0 drives ComputeNetDamage negative (a would-be heal) — an absorbed hit avoided
+            // no real damage, so the parried tally floors at 0 instead of decrementing the lifetime
+            // DamageParried statistic (#2091).
+            var player = MakeBattlerWith((ParryChance, 1), (FireResistance, 2.0));
+            var enemy = MakeBattlerWith((Endurance, 0));
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, Single(EDamageType.Fire), 0);
+
+            Assert.Equal(1, context.Stats.AttacksParried);
+            Assert.Equal(0, context.Stats.DamageParried, 0.001);
+        }
+
+        [Fact]
+        public void DamageTarget_ParryCounter_AbsorbedByTheEnemy_BooksNoNegativeCounterDamage()
+        {
+            // The enemy absorbs (FireResistance 2.0) the riposte, which would otherwise heal it back toward
+            // MaxHealth. A prior physical hit first brings the enemy below MaxHealth so the absorption heal
+            // has room to actually apply (TakeDamage's absorption branch only returns a negative net when
+            // CapHealToRoom's room is positive, mirroring DamageTarget_ResistanceAboveOne_HealsTheTarget). An
+            // absorbed counter avoided no real damage either, so it floors at 0 rather than going negative
+            // (#2091) — the sanity assertion on the enemy's health confirms the absorption genuinely happened.
+            var counter = MakeCounterSkill(20, damageType: EDamageType.Fire);
+            var player = MakeBattlerWithCounter(counter, (ParryChance, 1));
+            var enemy = MakeBattlerWith((Endurance, 0), (FireResistance, 2.0)); // MaxHealth 50, Toughness 0
+            var context = new BattleContext(player, enemy, timeDelta: 0, new Mulberry32(0));
+            context.DamageTarget(30, Single(EDamageType.Physical), 0); // 50 → 20 health, opens 30 of heal room
+            context.SwapActiveAndTargetBattlers();
+
+            context.DamageTarget(20, Single(EDamageType.Physical), 0); // parried; the Fire riposte is absorbed
+
+            Assert.Equal(40, enemy.CurrentHealth, 0.001); // 20 + min(20, 30 room) — absorption genuinely healed it
             Assert.Equal(0, context.Stats.PlayerCounterDamageDealt, 0.001);
         }
 
