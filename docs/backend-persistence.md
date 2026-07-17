@@ -18,7 +18,7 @@ Player data uses a **write-behind cache where Redis is the source of truth** *fo
 
 The TTL is sized so eviction can't bite mid-drain: because the cache is the source of truth, a key disappearing while its events are still draining would let a later read fall through to a lagging DB. The invariant is *TTL ≫ max queue-drain time*, which the hours-scale TTL dwarfs. Now that every player key carries a TTL, a `volatile-*` Redis eviction policy can shed dormant keys gracefully under memory pressure — but the deliberate TTL, not the eviction policy, is the primary control.
 
-**The `ICacheService` setter contract splits into two camps on null.** Every value-accepting setter carries an expiry. `Set`/`SetAndForget` take a **nullable** value where **null deletes the key** — the de-facto null-means-delete behaviour their generic `<T>` overloads rely on. `GetSet` (the atomic set-with-expiry) is **non-null**: writing a TTL implies writing a value (a null would error its server-side Lua `SET`), so it exposes no delete path.
+**The `ICacheService` setter contract splits into two camps on null.** Every value-accepting setter carries an expiry. `Set`/`SetAndForget` take a **nullable** value where **null deletes the key** — the de-facto null-means-delete behaviour their generic `<T>` overloads rely on. `CompareAndSet`'s new value is **non-null**: writing a TTL implies writing a value (a null would error its server-side Lua `SET`), so it exposes no delete path.
 
 ## The write-behind path
 

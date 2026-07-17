@@ -136,9 +136,10 @@ namespace Game.Api.Tests.Unit
         [Fact]
         public async Task RegisterSocket_SubscribeFailsAfterPresenceWrite_RollsBackPresenceClaim()
         {
-            // The presence key write succeeds (GetSet returns null — no prior owner), then Subscribe throws.
-            // Without rollback the key would point at a socket whose drain loops never started — a "registered
-            // but dead" presence that blocks the player forever (#691). Rollback must compare-and-delete it.
+            // The presence key write succeeds (CompareAndSet against the freshly-read null — no prior owner),
+            // then Subscribe throws. Without rollback the key would point at a socket whose drain loops never
+            // started — a "registered but dead" presence that blocks the player forever (#691). Rollback must
+            // compare-and-delete it.
             var cache = new RecordingCacheService();
             var pubSub = new ThrowingSubscribePubSubService(new InvalidOperationException("subscribe boom"));
             var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
@@ -156,11 +157,49 @@ namespace Game.Api.Tests.Unit
             // ...and the partial registration was rolled back: the presence key was released via a
             // compare-and-delete keyed on the exact socket id that was claimed (so a newer owner's key would be
             // left intact), on the player's presence key.
-            var claim = Assert.Single(cache.GetSetWithExpiries);
+            var claim = Assert.Single(cache.CompareAndSets);
             var release = Assert.Single(cache.CompareAndDeletes);
             Assert.Equal(claim.Key, release.Key);
-            Assert.Equal(claim.Value, release.DeleteIfValue);
+            Assert.Equal(claim.NewValue, release.DeleteIfValue);
             Assert.Contains("42", release.Key);
+        }
+
+        [Fact]
+        public async Task RegisterSocket_SwitchCreditClaimLandsBetweenReadAndWrite_RetriesRatherThanKickingIt()
+        {
+            // #2094: before the fix, RegisterSocket peeked the presence key once, then wrote it unconditionally
+            // via a since-removed GetSet primitive — so a switch-credit claim landing in the gap between the
+            // peek and the write got silently overwritten (kicked) even though the peek observed no claim at
+            // all. The claim must instead be a CompareAndSet loop: a write that races a claim into that same
+            // gap has to fail (the stored value no longer matches what was just read) and retry against
+            // whatever is actually there, deferring while it's the claim sentinel rather than ever falling back
+            // to an unconditional overwrite. RacingClaimCacheService scripts exactly that gap on the first
+            // attempt.
+            var cache = new RacingClaimCacheService();
+            var pubSub = new CapturingPubSubService();
+            var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
+            var registry = new SocketConnectionRegistry(new NoOpHostLifetime(), NullLogger<SocketConnectionRegistry>.Instance);
+            var manager = new SocketManagerService(
+                pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry);
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            await session.CreateSession(userId: 1, playerId: 99);
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var context = await manager.RegisterSocket(socket, session, isAdmin: false);
+            stopwatch.Stop();
+
+            Assert.NotNull(context);
+            // The raced-out first write, the sentinel it then observed, and the retry that finally landed once
+            // the sentinel cleared — three reads and two compare-and-set attempts, with every write going
+            // through CompareAndSet (RacingClaimCacheService implements no unconditional-write primitive at all).
+            Assert.Equal(3, cache.GetCalls);
+            Assert.Equal([null, null], cache.CompareAndSetExpectedValues);
+            // It genuinely deferred on observing the sentinel (the poll delay actually ran) rather than
+            // hot-spinning straight through to the second attempt.
+            Assert.True(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(40),
+                $"Expected RegisterSocket to poll-wait behind the observed claim sentinel, but it returned after only {stopwatch.ElapsedMilliseconds}ms.");
         }
 
         [Fact]
@@ -416,13 +455,14 @@ namespace Game.Api.Tests.Unit
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
-        // RegisterSocket claims the presence key via the atomic GetSet-with-expiry, first peeking it via Get
-        // to defer behind any switch-credit claim (#2041, always absent here); everything else is unused.
+        // RegisterSocket claims the presence key via a CompareAndSet loop, first peeking it via Get to learn
+        // what to compare against (always absent here, so the claim always succeeds outright); everything else
+        // is unused.
         private sealed class NoOpCacheService : ICacheService
         {
-            public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
-
             public Task<string?> Get(string key, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+            public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => Task.FromResult(true);
+
             public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -436,7 +476,6 @@ namespace Game.Api.Tests.Unit
             public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
             public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -465,15 +504,15 @@ namespace Game.Api.Tests.Unit
         /// claimed socket id is the one compare-and-deleted.</summary>
         private sealed class RecordingCacheService : ICacheService
         {
-            public List<(string Key, string? Value)> GetSetWithExpiries { get; } = [];
+            public List<(string Key, string? ExpectedValue, string NewValue)> CompareAndSets { get; } = [];
             public List<(string Key, string DeleteIfValue)> CompareAndDeletes { get; } = [];
             public List<string> Deletes { get; } = [];
             public List<(string Key, TimeSpan Expiry)> Expires { get; } = [];
 
-            public Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
+            public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default)
             {
-                GetSetWithExpiries.Add((key, value));
-                return Task.FromResult<string?>(null);
+                CompareAndSets.Add((key, expectedValue, newValue));
+                return Task.FromResult(true);
             }
 
             public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default)
@@ -508,7 +547,60 @@ namespace Game.Api.Tests.Unit
             public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
             public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
             public void DeleteAndForget(string key) => throw new NotSupportedException();
-            public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
+            public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
+            public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
+        }
+
+        /// <summary>Scripts a switch-credit claim landing in the exact gap <see cref="SocketManagerService"/>'s
+        /// old wait-then-unconditional-write claim left open (#2094): the first read sees the key unclaimed,
+        /// but the first write that acts on that read is raced out (as a real Redis CompareAndSet would be,
+        /// since the stored value no longer matches what was read) — the following read then observes the
+        /// sentinel that landed in the gap, and only the write after that (once the sentinel is gone) succeeds.
+        /// Implements no unconditional-write primitive at all, so a caller that ever fell back to one would fail
+        /// to compile against this fake rather than silently passing.</summary>
+        private sealed class RacingClaimCacheService : ICacheService
+        {
+            private const string SwitchCreditClaimValue = "switch-credit";
+
+            public int GetCalls { get; private set; }
+            public List<string?> CompareAndSetExpectedValues { get; } = [];
+
+            public Task<string?> Get(string key, CancellationToken cancellationToken = default)
+            {
+                GetCalls++;
+                string? result = GetCalls switch
+                {
+                    1 => null,                    // The initial peek: looks unclaimed.
+                    2 => SwitchCreditClaimValue,   // Re-read after the raced-out write: the claim landed.
+                    _ => null,                     // Re-read after the poll wait: the claim has cleared.
+                };
+                return Task.FromResult(result);
+            }
+
+            public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default)
+            {
+                CompareAndSetExpectedValues.Add(expectedValue);
+                // The first attempt is the one raced out by the claim landing in the gap; every later attempt
+                // (once the caller has re-read and deferred behind the sentinel) succeeds.
+                return Task.FromResult(CompareAndSetExpectedValues.Count > 1);
+            }
+
+            public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> GetAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetAndRefreshExpiry<T>(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void ExpireAndForget(string key, TimeSpan expiry) => throw new NotSupportedException();
+            public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
+            public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
+            public Task Delete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void DeleteAndForget(string key) => throw new NotSupportedException();
+            public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();

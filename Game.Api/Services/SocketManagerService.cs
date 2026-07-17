@@ -74,21 +74,13 @@ namespace Game.Api.Services
             var socketContext = new SocketContext(socket, playerId, sessionService, isAdmin, _loggerFactory.CreateLogger<SocketContext>());
             var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId, socketContext.SocketId));
             var presenceKey = CurrentSocketKey(playerId);
-            // Defer behind an in-flight switch-away credit's claim (#2041) rather than blindly overwriting it:
-            // that credit is a read-modify-write against this same player's aggregate run off this player's
-            // battle loop, so registering (and starting the loop) while it's still mid-flight would reintroduce
-            // the lost-update race the presence claim exists to prevent. Bounded by the claim's own TTL, so a
-            // claim that never releases can never wedge this connection past it.
-            await AwaitSwitchCreditClaimClear(presenceKey);
-            // Claim the presence key with its TTL atomically so a fault here can never leave the key without an
-            // expiry — a TTL-less key would defeat the heartbeat design and report a permanent ghost session.
-            var oldSocketId = await _cache.GetSet(presenceKey, socketContext.SocketId, SocketPresenceTtl);
-            if (oldSocketId == SwitchCreditClaimValue)
-            {
-                // Either the wait above timed out or a credit claimed the key in the gap right before this
-                // GetSet — either way there is no real prior connection to notify, just a claim we kicked.
-                oldSocketId = null;
-            }
+            // Defer behind an in-flight switch-away credit's claim (#2041) rather than overwriting it: that
+            // credit is a read-modify-write against this same player's aggregate run off this player's battle
+            // loop, so registering (and starting the loop) while it's still mid-flight would reintroduce the
+            // lost-update race the presence claim exists to prevent. ClaimPresenceKey's CompareAndSet loop
+            // closes the gap a separate wait-then-unconditional-write would leave between "the claim looked
+            // clear" and "the key was written" — see its doc comment.
+            var oldSocketId = await ClaimPresenceKey(presenceKey, socketContext.SocketId);
 
             try
             {
@@ -209,18 +201,42 @@ namespace Game.Api.Services
         }
 
         /// <summary>
-        /// Bounded wait for an in-flight switch-away credit's claim on <paramref name="presenceKey"/> to clear,
-        /// so <see cref="RegisterSocket"/> defers rather than immediately overwriting it (see the call site).
-        /// Capped at <see cref="SwitchCreditClaimTtl"/> — the claim's own TTL — so a credit that faults without
-        /// releasing can never wedge a registration past that bound; the caller's own subsequent claim proceeds
-        /// (kicking the stale claim) once the cap is hit.
+        /// Atomically claims <paramref name="presenceKey"/> as <paramref name="newSocketId"/> via a
+        /// CompareAndSet loop, so a switch-away credit's claim (#2041) landing in the gap between reading the
+        /// key and writing it can never be kicked: the write only lands if the key's value is still what was
+        /// just read, so a claim (or another registration) that lands first makes the CompareAndSet fail, and
+        /// the loop re-reads and retries against whatever is there now instead of blindly overwriting it — the
+        /// gap a separate wait-then-unconditional-write would leave open. While the read value is the claim
+        /// sentinel, the loop defers (polling at <see cref="SwitchCreditWaitPollInterval"/>) rather than racing
+        /// it, capped at <see cref="SwitchCreditClaimTtl"/> — the claim's own TTL — so a credit that faults
+        /// without releasing can never wedge a registration past that bound; only once that deadline passes
+        /// does an attempt targeting the (by then stale) sentinel proceed. Returns the previous real socket id,
+        /// or <see langword="null"/> if the key was unset or held only a switch-credit claim.
         /// </summary>
-        private async Task AwaitSwitchCreditClaimClear(string presenceKey)
+        private async Task<string?> ClaimPresenceKey(string presenceKey, string newSocketId)
         {
             var deadline = DateTime.UtcNow + SwitchCreditClaimTtl;
-            while (await _cache.Get(presenceKey) == SwitchCreditClaimValue && DateTime.UtcNow < deadline)
+            var currentValue = await _cache.Get(presenceKey);
+            while (true)
             {
-                await Task.Delay(SwitchCreditWaitPollInterval);
+                if (currentValue == SwitchCreditClaimValue && DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(SwitchCreditWaitPollInterval);
+                    currentValue = await _cache.Get(presenceKey);
+                    continue;
+                }
+
+                if (await _cache.CompareAndSet(presenceKey, currentValue, newSocketId, SocketPresenceTtl))
+                {
+                    return currentValue == SwitchCreditClaimValue ? null : currentValue;
+                }
+
+                // Another writer (a fresh switch-credit claim, a competing registration) won the race between
+                // our read and this write; re-read whatever landed and retry against that instead. Unbounded by
+                // design but self-limiting in practice: each failure here means one more concurrent writer for
+                // this single player's key, a set that's small and finite rather than something that can churn
+                // forever.
+                currentValue = await _cache.Get(presenceKey);
             }
         }
 

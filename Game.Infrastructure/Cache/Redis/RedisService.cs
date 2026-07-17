@@ -22,7 +22,7 @@ namespace Game.Infrastructure.Cache.Redis
 
         // StackExchange.Redis exposes no CancellationToken on its database operations, so each async op honours the
         // per-command budget cooperatively via RedisCommandBudget (#558): pure reads (Get) take the read path,
-        // while every mutating call — including the read-modify-write GetSet/GetDelete — routes through ObserveWrite
+        // while every mutating call — including the read-modify-write GetDelete — routes through ObserveWrite
         // so a post-cancellation fault on the abandoned write is logged rather than silently lost.
         private const string WriteFaultMessage = "A Redis write faulted after its command budget was cancelled; the write may not have been applied.";
 
@@ -47,20 +47,6 @@ namespace Game.Infrastructure.Cache.Redis
         {
             var val = await GetDelete(key, cancellationToken);
             return val.Deserialize<T>();
-        }
-
-        public async Task<string?> GetSet(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
-        {
-            // The value is required (non-null) so the Lua SET below never receives a nil ARGV and errors
-            // server-side: writing a TTL implies writing a value, so unlike the other setters this overload has
-            // no null-means-delete path. The signature now matches ICacheService's non-null contract (#954).
-            // Read-old-then-write in one Lua script (atomic, mirroring CompareAndDelete) so the value and its
-            // TTL land together — a separate StringGetSet + KeyExpire would leave the key without an expiry if
-            // the process faulted between the two calls.
-            var result = await ObserveWrite(Redis.ScriptEvaluateAsync(
-                "local old = redis.call('get', KEYS[1]); redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]); return old",
-                [key], [(RedisValue)value, (RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
-            return (string?)result;
         }
 
         public async Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default)
@@ -212,7 +198,7 @@ namespace Game.Infrastructure.Cache.Redis
                 return;
             }
 
-            // Bundles every field write and the TTL reset into one atomic script (mirroring GetSet/
+            // Bundles every field write and the TTL reset into one atomic script (mirroring CompareAndSet/
             // ReclaimAndForget) so the hash is never left holding freshly-written fields without its expiry
             // refreshed.
             Redis.ScriptEvaluate(

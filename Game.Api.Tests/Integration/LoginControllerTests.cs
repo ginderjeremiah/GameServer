@@ -2,18 +2,24 @@ using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Api;
+using Game.Api.Controllers;
 using Game.Api.Http;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
+using Game.Api.Services;
+using Game.Application.Services;
 using Game.Core;
+using Game.Core.Battle.Offline;
 using Game.Core.Identity;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -531,6 +537,94 @@ namespace Game.Api.Tests.Integration
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
             var presenceKey = $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{departed.Id}";
             Assert.Null(await cache.Get(presenceKey, CancellationToken));
+        }
+
+        [Fact]
+        public async Task SwitchPlayer_CreditFaults_StillReleasesTheSwitchCreditClaim()
+        {
+            // #2094 ride-along: CreditDepartedCharacter's finally releases the switch-credit claim on both the
+            // success path (pinned above) and a faulted/cancelled SimulateSwitchProgress, but only the success
+            // path was previously covered. A stuck claim from a faulted credit would defer every later reconnect
+            // for the departed character behind it until the claim's own TTL finally expired.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var playerSkill = await TestDataSeeder.CreateSkillAsync(context, "Smash", baseDamage: 1000m, cooldownMs: 500);
+            var enemy = await TestDataSeeder.CreateEnemyAsync(context,
+                strengthBase: 50m, strengthPerLevel: 0m, enduranceBase: 50m, endurancePerLevel: 0m);
+            var enemySkill = await TestDataSeeder.CreateSkillAsync(context, "Poke", baseDamage: 4000m, cooldownMs: 2000);
+            await TestDataSeeder.LinkSkillToEnemyAsync(context, enemy.Id, enemySkill.Id);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, levelMin: 1, levelMax: 1);
+            await TestDataSeeder.LinkEnemyToZoneAsync(context, zone.Id, enemy.Id);
+
+            var user = await TestDataSeeder.CreateUserAsync(context, "switchcreditfault", "pass");
+            var departed = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Alpha", zoneId: zone.Id);
+            var target = await TestDataSeeder.CreatePlayerAsync(context, user.Id, name: "Beta", zoneId: zone.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, departed.Id, playerSkill.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, target.Id, playerSkill.Id);
+            departed.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+            await context.SaveChangesAsync(CancellationToken);
+            await ReloadReferenceCachesAsync();
+
+            // A LoginController built by hand, swapping in an OfflineProgressService whose progress save always
+            // faults — a targeted stand-in for a genuine SimulateSwitchProgress failure (a transient Redis/DB
+            // blip) that leaves the claim-release finally block as the only thing standing between this and a
+            // stuck claim.
+            var faultingOfflineService = new OfflineProgressService(
+                scope.ServiceProvider.GetRequiredService<IPlayerRepository>(),
+                new SaveThrowsPlayerProgressRepository(scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>()),
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<IItemMods>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>(),
+                scope.ServiceProvider.GetRequiredService<IProficiencies>(),
+                scope.ServiceProvider.GetRequiredService<IClasses>(),
+                scope.ServiceProvider.GetRequiredService<IEnemies>(),
+                scope.ServiceProvider.GetRequiredService<OfflineProgressSimulator>(),
+                scope.ServiceProvider.GetRequiredService<ChallengeRewardService>(),
+                scope.ServiceProvider.GetRequiredService<ProficiencyRewardService>(),
+                scope.ServiceProvider.GetRequiredService<ZoneResolutionService>(),
+                scope.ServiceProvider.GetRequiredService<BattleService>());
+
+            var faultingSessionService = new SessionService(scope.ServiceProvider.GetRequiredService<ISessionStore>());
+            faultingSessionService.SetAuthenticatedUser(user.Id, departed.Id);
+
+            var controller = new LoginController(
+                faultingSessionService,
+                scope.ServiceProvider.GetRequiredService<SessionInitializer>(),
+                scope.ServiceProvider.GetRequiredService<AccountService>(),
+                scope.ServiceProvider.GetRequiredService<LoginTrackingService>(),
+                scope.ServiceProvider.GetRequiredService<SocketManagerService>(),
+                scope.ServiceProvider.GetRequiredService<PlayerService>(),
+                faultingOfflineService,
+                scope.ServiceProvider.GetRequiredService<BattleService>(),
+                scope.ServiceProvider.GetRequiredService<IClasses>(),
+                scope.ServiceProvider.GetRequiredService<ILogger<LoginController>>())
+            {
+                ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            };
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => controller.SwitchPlayer(new SelectPlayerRequest { PlayerId = target.Id, RefreshToken = "unused" }));
+
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+            var presenceKey = $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{departed.Id}";
+            Assert.Null(await cache.Get(presenceKey, CancellationToken));
+        }
+
+        /// <summary>Decorates a real <see cref="IPlayerProgressRepository"/>, delegating every read but always
+        /// faulting on <see cref="Save"/> — stands in for a transient persistence blip mid-credit without
+        /// reaching into the write-behind internals a genuine one would exercise. Domain types are qualified
+        /// (rather than a <c>using Game.Core.Players</c>/<c>Game.Core.Progress</c>) since this file's
+        /// <see cref="Game.Infrastructure.Entities"/> import already claims <c>Player</c>/<c>PlayerChallenge</c>/
+        /// <c>PlayerStatistic</c>/<c>PlayerProficiency</c> for the EF entities the rest of the suite seeds with.</summary>
+        private sealed class SaveThrowsPlayerProgressRepository(IPlayerProgressRepository inner) : IPlayerProgressRepository
+        {
+            public Task<Game.Core.Progress.PlayerProgress> Load(Game.Core.Players.Player player, CancellationToken cancellationToken = default) => inner.Load(player, cancellationToken);
+            public Task Save(Game.Core.Progress.PlayerProgress progress, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Simulated progress-save fault.");
+            public Task<List<Game.Core.Progress.PlayerStatistic>> GetStatistics(int playerId, CancellationToken cancellationToken = default) => inner.GetStatistics(playerId, cancellationToken);
+            public Task<List<Game.Core.Progress.PlayerChallenge>> GetChallenges(int playerId, CancellationToken cancellationToken = default) => inner.GetChallenges(playerId, cancellationToken);
+            public Task<List<Game.Core.Progress.PlayerProficiency>> GetProficiencies(int playerId, CancellationToken cancellationToken = default) => inner.GetProficiencies(playerId, cancellationToken);
+            public Task<HashSet<int>> GetCompletedChallengeIds(int playerId, CancellationToken cancellationToken = default) => inner.GetCompletedChallengeIds(playerId, cancellationToken);
         }
 
         [Fact]
