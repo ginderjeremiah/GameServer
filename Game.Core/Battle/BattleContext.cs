@@ -236,9 +236,9 @@ namespace Game.Core.Battle
                 {
                     // A parry negates the whole hit exactly like a dodge — the avoided damage is each portion's
                     // net (resistance then the Toughness curve) computed without mutating health, and no exposure
-                    // is recorded — and then ripostes with the defender's counter skill. A portion an authored
-                    // absorption (resistance > 1) would have healed avoided no damage, so it is floored at 0
-                    // rather than decrementing the tally (#2091).
+                    // is recorded — and then ripostes with the defender's counter skill. A portion that an
+                    // authored absorption (resistance > 1) would have healed avoided no real damage, so it is
+                    // floored at 0 rather than decrementing the tally (#2091).
                     Stats.AttacksParried++;
                     for (var i = 0; i < portions.Count; i++)
                     {
@@ -294,11 +294,11 @@ namespace Game.Core.Battle
         /// drawn here. Requires the player to be the active battler.
         /// </summary>
         /// <param name="totalNetFloored">
-        /// The same per-portion nets as the return value, but each portion floored at 0 before summing (#2091)
-        /// — unlike <paramref name="rawDamage"/>'s uncapped return, an absorbed (healed) portion contributes
-        /// nothing rather than pulling the total negative, while a killing portion's overkill is still kept (it
-        /// deliberately does <b>not</b> apply <see cref="Battler.HealthRemoved"/>'s health cap, unlike the typed
-        /// offense book). Consumed by <see cref="FireParryCounter"/> for <see cref="BattleStats.PlayerCounterDamageDealt"/>.
+        /// The same per-portion nets as the (uncapped) return value, but each portion floored at 0 before
+        /// summing (#2091) — an absorbed (healed) portion contributes nothing rather than pulling the total
+        /// negative, while a killing portion's overkill is still kept (it deliberately does <b>not</b> apply
+        /// <see cref="Battler.HealthRemoved"/>'s health cap, unlike the typed offense book). Consumed by
+        /// <see cref="FireParryCounter"/> for <see cref="BattleStats.PlayerCounterDamageDealt"/>.
         /// </param>
         private double ResolvePlayerHit(
             double rawDamage, IReadOnlyList<SkillDamagePortion> portions, double totalWeight,
