@@ -106,7 +106,7 @@ namespace Game.DataAccess.Mapping
             var unlockedItems = new List<UnlockedItemSlot>();
             foreach (var ui in model.UnlockedItems)
             {
-                var coreItem = ResolveOrThrow(items.GetItem, ui.ItemId, model.Id, "item");
+                var coreItem = OrphanedReferenceException.ResolveOrThrow(items.GetItem, ui.ItemId, model.Id, "item");
                 var appliedMods = new List<AppliedModSlot>();
 
                 if (appliedModsByItem.TryGetValue(ui.ItemId, out var mods))
@@ -117,7 +117,7 @@ namespace Game.DataAccess.Mapping
                         {
                             ItemModId = am.ItemModId,
                             ItemModSlotId = am.ItemModSlotId,
-                            ItemMod = ResolveOrThrow(itemMods.GetItemMod, am.ItemModId, model.Id, "item mod"),
+                            ItemMod = OrphanedReferenceException.ResolveOrThrow(itemMods.GetItemMod, am.ItemModId, model.Id, "item mod"),
                         });
                     }
                 }
@@ -150,7 +150,7 @@ namespace Game.DataAccess.Mapping
             // BattleSnapshot.SkillIds and sent to the client, so it must be deterministic to preserve battle
             // parity — including for legacy rows that default to Order = 0 (SkillId is the deterministic tie-break).
             var skillsById = model.Skills
-                .ToDictionary(ps => ps.SkillId, ps => ResolveOrThrow(skills.GetSkill, ps.SkillId, model.Id, "skill"));
+                .ToDictionary(ps => ps.SkillId, ps => OrphanedReferenceException.ResolveOrThrow(skills.GetSkill, ps.SkillId, model.Id, "skill"));
 
             var playerSkills = skillsById.Values.ToList();
 
@@ -184,26 +184,6 @@ namespace Game.DataAccess.Mapping
                 LogPreferences = model.LogPreferences,
                 Lessons = model.Lessons,
             };
-        }
-
-        /// <summary>
-        /// Resolves an owned reference (item / item mod / skill) against its catalog, rethrowing a catalog miss as a
-        /// loud, diagnosable <see cref="OrphanedReferenceException"/> that names the player, catalog, and missing
-        /// id. We never silently drop the player-owned row; instead the aggregate fails loudly so a content-data
-        /// mistake (a removed referenced id) is obvious from logs rather than surfacing as an opaque load failure.
-        /// </summary>
-        private static T ResolveOrThrow<T>(Func<int, T> resolve, int referenceId, int playerId, string catalogName)
-        {
-            try
-            {
-                return resolve(referenceId);
-            }
-            catch (ArgumentOutOfRangeException ex)
-            {
-                // Only a catalog miss (GetById's documented out-of-range contract) is an orphaned reference;
-                // any other failure propagates unwrapped so the orphaned-reference diagnosis stays truthful.
-                throw new OrphanedReferenceException(playerId, catalogName, referenceId, ex);
-            }
         }
     }
 }

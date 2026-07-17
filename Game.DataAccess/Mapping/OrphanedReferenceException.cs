@@ -14,5 +14,24 @@ namespace Game.DataAccess.Mapping
             $"Player {playerId} owns a {catalogName} reference with Id {missingId} that no longer resolves against " +
             $"the {catalogName} catalog (a content-data mistake — a referenced id was removed). Player-owned " +
             "references must stay resolvable: top-level reference records are retired, never deleted.",
-            innerException);
+            innerException)
+    {
+        /// <summary>
+        /// Resolves a player-owned reference against its catalog, rethrowing a catalog miss (a resolver's
+        /// documented <see cref="ArgumentOutOfRangeException"/>) as a loud, diagnosable
+        /// <see cref="OrphanedReferenceException"/> naming the player, catalog, and missing id. Any other
+        /// failure propagates unwrapped so the orphaned-reference diagnosis stays truthful.
+        /// </summary>
+        public static T ResolveOrThrow<T>(Func<int, T> resolve, int referenceId, int playerId, string catalogName)
+        {
+            try
+            {
+                return resolve(referenceId);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                throw new OrphanedReferenceException(playerId, catalogName, referenceId, ex);
+            }
+        }
+    }
 }

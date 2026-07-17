@@ -8,8 +8,8 @@ namespace Game.DataAccess.Repositories
 {
     internal class Zones(ZonesCacheHolder holder) : IZones, IZoneEntityCache
     {
-        // A single volatile read of the current snapshot; capturing it once per call keeps the bounds check
-        // and the index reading the same list, so a build-then-swap mid-call can never tear.
+        // Read the immutable snapshot once per logical operation (docs/backend.md → Reference-data snapshot
+        // read-once idiom) so a build-then-swap between reads can't mix an old and a new snapshot in one call.
         private ZoneSnapshot Snapshot => holder.Current;
 
         // The snapshot instance changes on every build-then-swap, so it doubles as the content-version key.
@@ -25,16 +25,12 @@ namespace Game.DataAccess.Repositories
             // Hands back the snapshot's shared, pre-materialized domain model rather than mapping a fresh
             // CoreZone per call — this is the per-battle setup hot path and the model is immutable, so the
             // shared instance is safe (docs/backend.md → Reference Data).
-            var snapshot = Snapshot;
-            return IsValidZoneId(snapshot.Entities, zoneId)
-                ? snapshot.CoreZones[zoneId]
-                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+            return Snapshot.CoreZones.GetById(zoneId, "zone");
         }
 
         public Zone? LookupZone(int zoneId)
         {
-            var entities = Snapshot.Entities;
-            return IsValidZoneId(entities, zoneId) ? entities[zoneId] : null;
+            return Snapshot.Entities.Lookup(zoneId);
         }
 
         public IReadOnlyList<Zone> AllZones()
@@ -44,18 +40,12 @@ namespace Game.DataAccess.Repositories
 
         public bool IsZoneRetired(int zoneId)
         {
-            var entities = Snapshot.Entities;
-            return IsValidZoneId(entities, zoneId)
-                ? entities[zoneId].RetiredAt is not null
-                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+            return Snapshot.Entities.GetById(zoneId, "zone").RetiredAt is not null;
         }
 
         public bool IsHomeZone(int zoneId)
         {
-            var entities = Snapshot.Entities;
-            return IsValidZoneId(entities, zoneId)
-                ? entities[zoneId].IsHome
-                : throw new ArgumentOutOfRangeException(nameof(zoneId));
+            return Snapshot.Entities.GetById(zoneId, "zone").IsHome;
         }
 
         public bool ValidateZoneId(int zoneId)
