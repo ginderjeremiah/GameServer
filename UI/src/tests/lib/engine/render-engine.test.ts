@@ -9,10 +9,15 @@ const logicEngineStub = vi.hoisted(() => ({ time: 0 }));
 vi.mock('$lib/engine/engine', () => ({ logicEngine: logicEngineStub }));
 
 const rafCallbacks: (() => void)[] = [];
+const cancelledHandles: number[] = [];
+let rafHandleCounter = 0;
 vi.stubGlobal('window', {
 	requestAnimationFrame: vi.fn((cb: () => void) => {
 		rafCallbacks.push(cb);
-		return rafCallbacks.length;
+		return ++rafHandleCounter;
+	}),
+	cancelAnimationFrame: vi.fn((handle: number) => {
+		cancelledHandles.push(handle);
 	})
 });
 
@@ -27,6 +32,8 @@ describe('RenderEngine', () => {
 
 	beforeEach(() => {
 		rafCallbacks.length = 0;
+		cancelledHandles.length = 0;
+		rafHandleCounter = 0;
 		logicEngineStub.time = 0;
 		performanceNow = 0;
 		renderUpdates = [];
@@ -58,6 +65,23 @@ describe('RenderEngine', () => {
 			engine.stop();
 			rafCallbacks.shift()?.(); // renderLoop checks running → false, schedules nothing
 			expect(rafCallbacks.length).toBe(0);
+		});
+
+		it('stop cancels the pending RAF callback (regression: stop→start within one frame doubling the loop)', () => {
+			// Without cancelling, a start() before this stale callback fires would leave it alive
+			// alongside the new loop — running is true again by then, so it would reschedule itself
+			// forever, doubling every onRenderUpdate notification from then on.
+			engine.start();
+			engine.stop();
+			expect(cancelledHandles).toEqual([1]);
+		});
+
+		it('cancels the latest handle, not a stale one, after several frames have run', () => {
+			engine.start(); // handle 1
+			rafCallbacks.shift()?.(); // handle 2
+			rafCallbacks.shift()?.(); // handle 3
+			engine.stop();
+			expect(cancelledHandles).toEqual([3]);
 		});
 
 		it('can be restarted after stop', () => {
