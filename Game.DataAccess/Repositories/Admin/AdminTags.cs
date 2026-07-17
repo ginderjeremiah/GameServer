@@ -27,20 +27,25 @@ namespace Game.DataAccess.Repositories.Admin
             // front as a graceful business failure rather than 500-ing (Add ids are store-generated sentinels,
             // so they are excluded from the guard). An otherwise well-formed tag write never rejects.
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Tag
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    TagCategoryId = item.TagCategoryId,
-                }),
-                edit: item => _entityStore.Update(new Entities.Tag
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    TagCategoryId = item.TagCategoryId,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    _entityStore.Update(entity);
+                },
                 delete: item => _entityStore.DeleteByKey<Entities.Tag>(item.Id),
                 key: item => item.Id,
                 resourceName: "tag");
+        }
+
+        private static Entities.Tag ToEntity(Contracts.Tag item)
+        {
+            return new Entities.Tag
+            {
+                Name = item.Name,
+                TagCategoryId = item.TagCategoryId,
+            };
         }
     }
 }

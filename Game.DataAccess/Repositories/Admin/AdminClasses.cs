@@ -27,35 +27,33 @@ namespace Game.DataAccess.Repositories.Admin
         public AdminSaveResult SaveClasses(IReadOnlyList<Change<Contracts.Class>> changes)
         {
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Class
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    Description = item.Description,
-                    Word = item.Word,
-                    PassiveAttributeId = (int)item.PassiveAttributeId,
-                    PassiveAmount = item.PassiveAmount,
-                    PassiveScalingAttributeId = (int?)item.PassiveScalingAttributeId,
-                    PassiveScalingAmount = item.PassiveScalingAmount,
-                    PassiveModifierType = (int)item.PassiveModifierType,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Class
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    Description = item.Description,
-                    Word = item.Word,
-                    PassiveAttributeId = (int)item.PassiveAttributeId,
-                    PassiveAmount = item.PassiveAmount,
-                    PassiveScalingAttributeId = (int?)item.PassiveScalingAttributeId,
-                    PassiveScalingAmount = item.PassiveScalingAmount,
-                    PassiveModifierType = (int)item.PassiveModifierType,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "class",
                 editExists: item => _classes.LookupClass(item.Id) is not null);
+        }
+
+        private static Entities.Class ToEntity(Contracts.Class item)
+        {
+            return new Entities.Class
+            {
+                Name = item.Name,
+                Description = item.Description,
+                Word = item.Word,
+                PassiveAttributeId = (int)item.PassiveAttributeId,
+                PassiveAmount = item.PassiveAmount,
+                PassiveScalingAttributeId = (int?)item.PassiveScalingAttributeId,
+                PassiveScalingAmount = item.PassiveScalingAmount,
+                PassiveModifierType = (int)item.PassiveModifierType,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         public AdminSaveResult SetStarterSkills(SetClassStarterSkillsData data)

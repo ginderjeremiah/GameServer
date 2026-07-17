@@ -68,41 +68,38 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Item
-                {
-                    Name = item.Name,
-                    Description = item.Description,
-                    ItemCategoryId = (int)item.ItemCategoryId,
-                    RarityId = (int)item.RarityId,
-                    IconPath = item.IconPath,
-                    GrantedSkillId = item.GrantedSkillId,
-                    WeaponType = (int?)item.WeaponType,
-                    RequiredProficiencyId = item.RequiredProficiencyId,
-                    RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
-                    DesignerNotes = item.DesignerNotes,
-                }),
+                add: item => _entityStore.Insert(ToEntity(item)),
                 // Build a fresh, navigation-free entity rather than mutating the cached one, whose loaded
                 // graph would otherwise be dragged into the change tracker.
-                edit: item => _entityStore.Update(new Entities.Item
+                edit: item =>
                 {
-                    Id = item.Id,
-                    Name = item.Name,
-                    Description = item.Description,
-                    ItemCategoryId = (int)item.ItemCategoryId,
-                    RarityId = (int)item.RarityId,
-                    IconPath = item.IconPath,
-                    GrantedSkillId = item.GrantedSkillId,
-                    WeaponType = (int?)item.WeaponType,
-                    RequiredProficiencyId = item.RequiredProficiencyId,
-                    RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "item",
                 // An edit must target an existing item; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _items.LookupItem(item.Id) is not null);
+        }
+
+        private static Entities.Item ToEntity(Contracts.Item item)
+        {
+            return new Entities.Item
+            {
+                Name = item.Name,
+                Description = item.Description,
+                ItemCategoryId = (int)item.ItemCategoryId,
+                RarityId = (int)item.RarityId,
+                IconPath = item.IconPath,
+                GrantedSkillId = item.GrantedSkillId,
+                WeaponType = (int?)item.WeaponType,
+                RequiredProficiencyId = item.RequiredProficiencyId,
+                RequiredProficiencyLevel = item.RequiredProficiencyId is null ? 0 : item.RequiredProficiencyLevel,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         /// <summary>

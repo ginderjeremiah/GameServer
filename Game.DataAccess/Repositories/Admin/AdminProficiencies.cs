@@ -50,41 +50,36 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Proficiency
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    Description = item.Description,
-                    IconPath = item.IconPath,
-                    Word = item.Word,
-                    Pronunciation = item.Pronunciation,
-                    Translation = item.Translation,
-                    PathId = item.PathId,
-                    PathOrdinal = item.PathOrdinal,
-                    MaxLevel = item.MaxLevel,
-                    BaseXp = item.BaseXp,
-                    XpGrowth = item.XpGrowth,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Proficiency
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    Description = item.Description,
-                    IconPath = item.IconPath,
-                    Word = item.Word,
-                    Pronunciation = item.Pronunciation,
-                    Translation = item.Translation,
-                    PathId = item.PathId,
-                    PathOrdinal = item.PathOrdinal,
-                    MaxLevel = item.MaxLevel,
-                    BaseXp = item.BaseXp,
-                    XpGrowth = item.XpGrowth,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "proficiency",
                 editExists: item => _proficiencies.LookupProficiency(item.Id) is not null);
+        }
+
+        private static Entities.Proficiency ToEntity(Contracts.Proficiency item)
+        {
+            return new Entities.Proficiency
+            {
+                Name = item.Name,
+                Description = item.Description,
+                IconPath = item.IconPath,
+                Word = item.Word,
+                Pronunciation = item.Pronunciation,
+                Translation = item.Translation,
+                PathId = item.PathId,
+                PathOrdinal = item.PathOrdinal,
+                MaxLevel = item.MaxLevel,
+                BaseXp = item.BaseXp,
+                XpGrowth = item.XpGrowth,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         public AdminSaveResult SetModifiers(SetProficiencyModifiersData data)
