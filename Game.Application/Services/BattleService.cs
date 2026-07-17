@@ -283,67 +283,10 @@ namespace Game.Application.Services
 
         public async Task<DefeatResult?> EndBattleVictory(Player player, PlayerState state, int? clientTotalMs = null, CancellationToken cancellationToken = default)
         {
-            // Idempotency backstop (#1874/#1993): a reconnecting client can re-present an already-durably-
-            // credited battle directly through this command instead of the natural AbandonBattle reconnect
-            // path (see BattleAlreadyCredited), so the same guard applies here before paying for the replay
-            // below.
-            if (BattleAlreadyCredited(state, player))
+            if (!TryValidateBattleEndClaim(
+                    player, state, expectVictory: true, clientTotalMs, nameof(EndBattleVictory),
+                    out var enemy, out var result, out var playerMaterials, out var now, out var battleCompletedAt))
             {
-                _logger.LogWarning(
-                    "EndBattleVictory rejected for player {PlayerId}: battle seed {Seed} was already "
-                    + "credited (stale session re-presenting a resolved battle).",
-                    player.Id, state.BattleSeed);
-                state.ClearBattle();
-                return null;
-            }
-
-            if (!TryResolveActiveBattle(state, out var enemy, out var result, out var playerMaterials))
-            {
-                // No battle to resolve. After the caller's HasActiveBattle gate this means a torn state
-                // (an enemy id set without its snapshot), which the set/clear invariant should prevent.
-                _logger.LogWarning(
-                    "EndBattleVictory rejected for player {PlayerId}: no resolvable active battle "
-                    + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}).",
-                    player.Id, state.ActiveEnemyId, state.Snapshot is not null);
-                return null;
-            }
-
-            // Diagnostic only (not anti-cheat): the client reports the battle duration it simulated, so a
-            // divergence from the server's parity replay is visible even when the claim still resolves as a
-            // win. Logged regardless of the outcome below; absent (null) when not reported.
-            if (clientTotalMs is int reportedMs && reportedMs != result.TotalMs)
-            {
-                _logger.LogWarning(
-                    "EndBattleVictory battle-duration divergence for player {PlayerId}: client reported "
-                    + "{ClientTotalMs}ms but server replay was {ServerTotalMs}ms (delta: {DeltaMs}, "
-                    + "enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}).",
-                    player.Id, reportedMs, result.TotalMs, reportedMs - result.TotalMs,
-                    enemy.Id, enemy.Level, state.BattleSeed);
-            }
-
-            if (!result.Victory)
-            {
-                // The server's parity replay of the exact reported battle did not end in a win — a
-                // client/server battle-logic divergence or a forged claim. Seed + enemy + level reproduce it.
-                _logger.LogWarning(
-                    "EndBattleVictory rejected for player {PlayerId}: server replay was not a victory "
-                    + "(enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}, playerDied: {PlayerDied}, "
-                    + "replayMs: {ReplayMs}, isBoss: {IsBoss}, zoneId: {ZoneId}).",
-                    player.Id, enemy.Id, enemy.Level, state.BattleSeed, result.PlayerDied,
-                    result.TotalMs, state.IsBossBattle, state.BattleZoneId);
-                return null;
-            }
-
-            var now = DateTime.UtcNow;
-
-            if (ClaimedBeforeBattleCouldFinish(state.BattleStartTime, result.TotalMs, now, out var battleCompletedAt))
-            {
-                _logger.LogWarning(
-                    "EndBattleVictory rejected for player {PlayerId}: claimed before the battle could finish "
-                    + "(battleStart: {BattleStart:O}, replayMs: {ReplayMs}, battleCompletedAt: {BattleCompletedAt:O}, "
-                    + "now: {Now:O}, shortByMs: {ShortByMs}, toleranceMs: {ToleranceMs}).",
-                    player.Id, state.BattleStartTime, result.TotalMs, battleCompletedAt, now,
-                    (battleCompletedAt - now).TotalMilliseconds, ElapsedBattleTimeTolerance.TotalMilliseconds);
                 return null;
             }
 
@@ -370,69 +313,10 @@ namespace Game.Application.Services
 
         public async Task<bool> EndBattleLoss(Player player, PlayerState state, int? clientTotalMs = null, CancellationToken cancellationToken = default)
         {
-            // Idempotency backstop (#1874/#1993): mirrors EndBattleVictory's guard — see BattleAlreadyCredited.
-            if (BattleAlreadyCredited(state, player))
+            if (!TryValidateBattleEndClaim(
+                    player, state, expectVictory: false, clientTotalMs, nameof(EndBattleLoss),
+                    out var enemy, out var result, out _, out var now, out _))
             {
-                _logger.LogWarning(
-                    "EndBattleLoss rejected for player {PlayerId}: battle seed {Seed} was already credited "
-                    + "(stale session re-presenting a resolved battle).",
-                    player.Id, state.BattleSeed);
-                state.ClearBattle();
-                return false;
-            }
-
-            if (!TryResolveActiveBattle(state, out var enemy, out var result, out _))
-            {
-                // No battle to resolve. After the caller's HasActiveBattle gate this means a torn state
-                // (an enemy id set without its snapshot), which the set/clear invariant should prevent.
-                _logger.LogWarning(
-                    "EndBattleLoss rejected for player {PlayerId}: no resolvable active battle "
-                    + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}).",
-                    player.Id, state.ActiveEnemyId, state.Snapshot is not null);
-                return false;
-            }
-
-            // Diagnostic only (not anti-cheat): mirrors EndBattleVictory's divergence log so a front/back
-            // battle-logic drift is visible on the loss path too. Logged regardless of the outcome below.
-            if (clientTotalMs is int reportedMs && reportedMs != result.TotalMs)
-            {
-                _logger.LogWarning(
-                    "EndBattleLoss battle-duration divergence for player {PlayerId}: client reported "
-                    + "{ClientTotalMs}ms but server replay was {ServerTotalMs}ms (delta: {DeltaMs}, "
-                    + "enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}).",
-                    player.Id, reportedMs, result.TotalMs, reportedMs - result.TotalMs,
-                    enemy.Id, enemy.Level, state.BattleSeed);
-            }
-
-            if (result.Victory)
-            {
-                // The server's parity replay of the exact reported battle ended in a win despite a loss
-                // claim — precisely the client/server battle-logic divergence the parity invariant says must
-                // be surfaced. Seed + enemy + level reproduce it.
-                _logger.LogWarning(
-                    "EndBattleLoss rejected for player {PlayerId}: server replay was a victory, not a loss "
-                    + "(enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}, replayMs: {ReplayMs}, "
-                    + "isBoss: {IsBoss}, zoneId: {ZoneId}).",
-                    player.Id, enemy.Id, enemy.Level, state.BattleSeed, result.TotalMs, state.IsBossBattle,
-                    state.BattleZoneId);
-                return false;
-            }
-
-            var now = DateTime.UtcNow;
-
-            // Anti-cheat (#1630): mirrors EndBattleVictory's gate. Without it, a tampered client can claim
-            // BattleLost the instant a battle starts, and the full replayed statistics (damage, crits, kills,
-            // …) still get booked and evaluated against challenges — farming statistic/challenge accrual at an
-            // accelerated rate. TryResolveActiveBattle above already replays to conclusion (capped at
-            // DefaultMaxBattleMs), so result.TotalMs is the real duration the claimed outcome took.
-            if (ClaimedBeforeBattleCouldFinish(state.BattleStartTime, result.TotalMs, now, out var battleCompletedAt))
-            {
-                _logger.LogWarning(
-                    "EndBattleLoss rejected for player {PlayerId}: claimed before the battle could finish "
-                    + "(battleStart: {BattleStart:O}, replayMs: {ReplayMs}, battleCompletedAt: {BattleCompletedAt:O}, "
-                    + "now: {Now:O}, shortByMs: {ShortByMs}, toleranceMs: {ToleranceMs}).",
-                    player.Id, state.BattleStartTime, result.TotalMs, battleCompletedAt, now,
-                    (battleCompletedAt - now).TotalMilliseconds, ElapsedBattleTimeTolerance.TotalMilliseconds);
                 return false;
             }
 
@@ -442,6 +326,103 @@ namespace Game.Application.Services
             state.ClearBattle();
 
             await _playerRepo.SavePlayer(player, cancellationToken);
+
+            return true;
+        }
+
+        // Shared claim-validation pipeline for the two battle-end commands (expectVictory selects
+        // EndBattleVictory's vs EndBattleLoss's expected outcome): the idempotency backstop, active-battle
+        // resolution, the client/server duration divergence diagnostic, the replay-must-match-the-claimed-
+        // outcome rejection, and the elapsed-time anti-cheat gate (#1630). Extracted so the two paths cannot
+        // drift from one another the way #1993 and #2016 each had to be hand-mirrored across both (#2048) —
+        // each caller keeps only its outcome-specific payout. commandName names the caller in the log
+        // messages so a warning is still attributable to EndBattleVictory vs EndBattleLoss.
+        //
+        // `now` and `battleCompletedAt` are both surfaced to the caller: EndBattleVictory anchors its cooldown
+        // to battleCompletedAt (the battle's server-computed completion) while EndBattleLoss anchors to now —
+        // an intentional asymmetry (see PostBattleCooldown) that this extraction preserves rather than unifies.
+        private bool TryValidateBattleEndClaim(
+            Player player,
+            PlayerState state,
+            bool expectVictory,
+            int? clientTotalMs,
+            string commandName,
+            [MaybeNullWhen(false)] out CoreEnemy enemy,
+            [MaybeNullWhen(false)] out BattleResult result,
+            out BattlerMaterials? playerMaterials,
+            out DateTime now,
+            out DateTime battleCompletedAt)
+        {
+            now = DateTime.UtcNow;
+            battleCompletedAt = default;
+
+            // Idempotency backstop (#1874/#1993): a reconnecting client can re-present an already-durably-
+            // credited battle directly through this command instead of the natural AbandonBattle reconnect
+            // path (see BattleAlreadyCredited), so the same guard applies here before paying for the replay
+            // below.
+            if (BattleAlreadyCredited(state, player))
+            {
+                _logger.LogWarning(
+                    "{CommandName} rejected for player {PlayerId}: battle seed {Seed} was already "
+                    + "credited (stale session re-presenting a resolved battle).",
+                    commandName, player.Id, state.BattleSeed);
+                state.ClearBattle();
+                enemy = default;
+                result = default;
+                playerMaterials = default;
+                return false;
+            }
+
+            if (!TryResolveActiveBattle(state, out enemy, out result, out playerMaterials))
+            {
+                // No battle to resolve. After the caller's HasActiveBattle gate this means a torn state
+                // (an enemy id set without its snapshot), which the set/clear invariant should prevent.
+                _logger.LogWarning(
+                    "{CommandName} rejected for player {PlayerId}: no resolvable active battle "
+                    + "(activeEnemyId: {ActiveEnemyId}, hasSnapshot: {HasSnapshot}).",
+                    commandName, player.Id, state.ActiveEnemyId, state.Snapshot is not null);
+                return false;
+            }
+
+            // Diagnostic only (not anti-cheat): the client reports the battle duration it simulated, so a
+            // divergence from the server's parity replay is visible even when the claim still resolves as
+            // expected. Logged regardless of the outcome below; absent (null) when not reported.
+            if (clientTotalMs is int reportedMs && reportedMs != result.TotalMs)
+            {
+                _logger.LogWarning(
+                    "{CommandName} battle-duration divergence for player {PlayerId}: client reported "
+                    + "{ClientTotalMs}ms but server replay was {ServerTotalMs}ms (delta: {DeltaMs}, "
+                    + "enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}).",
+                    commandName, player.Id, reportedMs, result.TotalMs, reportedMs - result.TotalMs,
+                    enemy.Id, enemy.Level, state.BattleSeed);
+            }
+
+            if (result.Victory != expectVictory)
+            {
+                // The server's parity replay of the exact reported battle did not agree with the claimed
+                // outcome — a client/server battle-logic divergence or a forged claim. Seed + enemy + level
+                // reproduce it.
+                _logger.LogWarning(
+                    "{CommandName} rejected for player {PlayerId}: server replay did not match the claimed "
+                    + "outcome (enemyId: {EnemyId}, enemyLevel: {EnemyLevel}, seed: {Seed}, playerDied: "
+                    + "{PlayerDied}, replayMs: {ReplayMs}, isBoss: {IsBoss}, zoneId: {ZoneId}).",
+                    commandName, player.Id, enemy.Id, enemy.Level, state.BattleSeed, result.PlayerDied,
+                    result.TotalMs, state.IsBossBattle, state.BattleZoneId);
+                return false;
+            }
+
+            // Anti-cheat (#1630), server-clock only: a battle-end claim cannot be accepted before enough real
+            // server time has elapsed since battle start for the replayed outcome to have actually happened.
+            if (ClaimedBeforeBattleCouldFinish(state.BattleStartTime, result.TotalMs, now, out battleCompletedAt))
+            {
+                _logger.LogWarning(
+                    "{CommandName} rejected for player {PlayerId}: claimed before the battle could finish "
+                    + "(battleStart: {BattleStart:O}, replayMs: {ReplayMs}, battleCompletedAt: {BattleCompletedAt:O}, "
+                    + "now: {Now:O}, shortByMs: {ShortByMs}, toleranceMs: {ToleranceMs}).",
+                    commandName, player.Id, state.BattleStartTime, result.TotalMs, battleCompletedAt, now,
+                    (battleCompletedAt - now).TotalMilliseconds, ElapsedBattleTimeTolerance.TotalMilliseconds);
+                return false;
+            }
 
             return true;
         }
