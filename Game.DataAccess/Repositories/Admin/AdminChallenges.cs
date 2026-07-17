@@ -52,36 +52,35 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Challenge
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    Description = item.Description,
-                    ChallengeTypeId = (int)item.ChallengeTypeId,
-                    TargetEntityId = item.TargetEntityId,
-                    ProgressGoal = item.ProgressGoal,
-                    RewardItemId = item.RewardItemId,
-                    RewardItemModId = item.RewardItemModId,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Challenge
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    Description = item.Description,
-                    ChallengeTypeId = (int)item.ChallengeTypeId,
-                    TargetEntityId = item.TargetEntityId,
-                    ProgressGoal = item.ProgressGoal,
-                    RewardItemId = item.RewardItemId,
-                    RewardItemModId = item.RewardItemModId,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "challenge",
                 // An edit must target an existing challenge; a missing id is a not-found rejection (matching the
                 // relationship setters), not an EF 0-row update that throws. Challenges are zero-based-id
                 // reference data, so existence is the shared in-range index check.
                 editExists: item => _challenges.ValidateChallengeId(item.Id));
+        }
+
+        private static Entities.Challenge ToEntity(Contracts.Challenge item)
+        {
+            return new Entities.Challenge
+            {
+                Name = item.Name,
+                Description = item.Description,
+                ChallengeTypeId = (int)item.ChallengeTypeId,
+                TargetEntityId = item.TargetEntityId,
+                ProgressGoal = item.ProgressGoal,
+                RewardItemId = item.RewardItemId,
+                RewardItemModId = item.RewardItemModId,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         /// <summary>

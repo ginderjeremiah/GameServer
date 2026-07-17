@@ -52,21 +52,26 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.SkillRecipe
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    ResultSkillId = item.ResultSkillId,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.SkillRecipe
-                {
-                    Id = item.Id,
-                    ResultSkillId = item.ResultSkillId,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "skill recipe",
                 editExists: item => _recipes.LookupSkillRecipe(item.Id) is not null);
+        }
+
+        private static Entities.SkillRecipe ToEntity(Contracts.SkillRecipe item)
+        {
+            return new Entities.SkillRecipe
+            {
+                ResultSkillId = item.ResultSkillId,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         public AdminSaveResult SetInputs(SetSkillRecipeInputsData data)

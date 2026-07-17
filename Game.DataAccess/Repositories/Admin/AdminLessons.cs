@@ -29,31 +29,31 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Lesson
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Key = item.Key,
-                    Name = item.Name,
-                    TriggerType = (int)item.TriggerType,
-                    ScreenKey = item.ScreenKey,
-                    TriggerMechanicEvent = item.TriggerMechanicEvent is EMechanicEvent mechanicEvent ? (int)mechanicEvent : null,
-                    Ordinal = item.Ordinal,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Lesson
-                {
-                    Id = item.Id,
-                    Key = item.Key,
-                    Name = item.Name,
-                    TriggerType = (int)item.TriggerType,
-                    ScreenKey = item.ScreenKey,
-                    TriggerMechanicEvent = item.TriggerMechanicEvent is EMechanicEvent mechanicEvent ? (int)mechanicEvent : null,
-                    Ordinal = item.Ordinal,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "lesson",
                 editExists: item => _lessons.LookupLesson(item.Id) is not null);
+        }
+
+        private static Entities.Lesson ToEntity(Contracts.Lesson item)
+        {
+            return new Entities.Lesson
+            {
+                Key = item.Key,
+                Name = item.Name,
+                TriggerType = (int)item.TriggerType,
+                ScreenKey = item.ScreenKey,
+                TriggerMechanicEvent = item.TriggerMechanicEvent is EMechanicEvent mechanicEvent ? (int)mechanicEvent : null,
+                Ordinal = item.Ordinal,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         public AdminSaveResult SetSteps(SetLessonStepsData data)

@@ -31,31 +31,33 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.ItemMod
-                {
-                    Name = item.Name,
-                    Description = item.Description,
-                    ItemModTypeId = (int)item.ItemModTypeId,
-                    RarityId = (int)item.RarityId,
-                    DesignerNotes = item.DesignerNotes,
-                }),
+                add: item => _entityStore.Insert(ToEntity(item)),
                 // Build a fresh, navigation-free entity rather than mutating the cached one, whose loaded
                 // graph would otherwise be dragged into the change tracker.
-                edit: item => _entityStore.Update(new Entities.ItemMod
+                edit: item =>
                 {
-                    Id = item.Id,
-                    Name = item.Name,
-                    Description = item.Description,
-                    ItemModTypeId = (int)item.ItemModTypeId,
-                    RarityId = (int)item.RarityId,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "item mod",
                 // An edit must target an existing item mod; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _itemMods.LookupItemMod(item.Id) is not null);
+        }
+
+        private static Entities.ItemMod ToEntity(Contracts.ItemMod item)
+        {
+            return new Entities.ItemMod
+            {
+                Name = item.Name,
+                Description = item.Description,
+                ItemModTypeId = (int)item.ItemModTypeId,
+                RarityId = (int)item.RarityId,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         public AdminSaveResult SetAttributes(AddEditAttributesData data)

@@ -33,25 +33,29 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Enemy
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    IsBoss = item.IsBoss,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Enemy
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    IsBoss = item.IsBoss,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "enemy",
                 // An edit must target an existing enemy; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _enemies.GetEnemy(item.Id) is not null);
+        }
+
+        private static Entities.Enemy ToEntity(Contracts.Enemy item)
+        {
+            return new Entities.Enemy
+            {
+                Name = item.Name,
+                IsBoss = item.IsBoss,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         public AdminSaveResult SetAttributeDistributions(SetEnemyAttributeDistributions data)

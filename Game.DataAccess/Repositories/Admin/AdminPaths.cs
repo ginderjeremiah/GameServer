@@ -30,25 +30,28 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Path
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    Description = item.Description,
-                    ActivityKey = (int)item.ActivityKey,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Path
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    Description = item.Description,
-                    ActivityKey = (int)item.ActivityKey,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "path",
                 editExists: item => _proficiencies.LookupPath(item.Id) is not null);
+        }
+
+        private static Entities.Path ToEntity(Contracts.Path item)
+        {
+            return new Entities.Path
+            {
+                Name = item.Name,
+                Description = item.Description,
+                ActivityKey = (int)item.ActivityKey,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         /// <summary>

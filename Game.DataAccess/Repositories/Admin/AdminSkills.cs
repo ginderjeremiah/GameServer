@@ -26,43 +26,38 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Skill
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    BaseDamage = item.BaseDamage,
-                    CriticalChance = item.CriticalChance,
-                    CooldownMs = item.CooldownMs,
-                    Description = item.Description,
-                    IconPath = item.IconPath,
-                    RarityId = (int)item.RarityId,
-                    Word = item.Word,
-                    Pronunciation = item.Pronunciation,
-                    Translation = item.Translation,
-                    Acquisition = (int)item.Acquisition,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Skill
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    BaseDamage = item.BaseDamage,
-                    CriticalChance = item.CriticalChance,
-                    CooldownMs = item.CooldownMs,
-                    Description = item.Description,
-                    IconPath = item.IconPath,
-                    RarityId = (int)item.RarityId,
-                    Word = item.Word,
-                    Pronunciation = item.Pronunciation,
-                    Translation = item.Translation,
-                    Acquisition = (int)item.Acquisition,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "skill",
                 // An edit must target an existing skill; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _skills.LookupSkill(item.Id) is not null);
+        }
+
+        private static Entities.Skill ToEntity(Contracts.Skill item)
+        {
+            return new Entities.Skill
+            {
+                Name = item.Name,
+                BaseDamage = item.BaseDamage,
+                CriticalChance = item.CriticalChance,
+                CooldownMs = item.CooldownMs,
+                Description = item.Description,
+                IconPath = item.IconPath,
+                RarityId = (int)item.RarityId,
+                Word = item.Word,
+                Pronunciation = item.Pronunciation,
+                Translation = item.Translation,
+                Acquisition = (int)item.Acquisition,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         public AdminSaveResult SetMultipliers(AddEditAttributesData data)
@@ -157,35 +152,16 @@ namespace Game.DataAccess.Repositories.Admin
             var existingEffectIds = skill.SkillEffects.Select(se => se.Id).ToHashSet();
 
             return ChangeSetProcessor.Apply(data.Changes,
-                add: effect => _entityStore.Insert(new Entities.SkillEffect
-                {
-                    SkillId = skill.Id,
-                    Target = (int)effect.Target,
-                    AttributeId = (int)effect.AttributeId,
-                    ModifierType = (int)effect.ModifierTypeId,
-                    Amount = effect.Amount,
-                    DurationMs = effect.DurationMs,
-                    ScalingAttributeId = (int)effect.ScalingAttributeId,
-                    ScalingAmount = effect.ScalingAmount,
-                }),
+                add: effect => _entityStore.Insert(ToEffectEntity(skill.Id, effect)),
                 // Build fresh, navigation-free entities so cached back-references don't drag
                 // the whole graph into the change tracker.
                 edit: effect =>
                 {
                     if (existingEffectIds.Contains(effect.Id))
                     {
-                        _entityStore.Update(new Entities.SkillEffect
-                        {
-                            Id = effect.Id,
-                            SkillId = skill.Id,
-                            Target = (int)effect.Target,
-                            AttributeId = (int)effect.AttributeId,
-                            ModifierType = (int)effect.ModifierTypeId,
-                            Amount = effect.Amount,
-                            DurationMs = effect.DurationMs,
-                            ScalingAttributeId = (int)effect.ScalingAttributeId,
-                            ScalingAmount = effect.ScalingAmount,
-                        });
+                        var entity = ToEffectEntity(skill.Id, effect);
+                        entity.Id = effect.Id;
+                        _entityStore.Update(entity);
                     }
                 },
                 delete: effect =>
@@ -200,6 +176,21 @@ namespace Game.DataAccess.Repositories.Admin
                 },
                 key: effect => effect.Id,
                 resourceName: "skill effect");
+        }
+
+        private static Entities.SkillEffect ToEffectEntity(int skillId, Contracts.SkillEffect effect)
+        {
+            return new Entities.SkillEffect
+            {
+                SkillId = skillId,
+                Target = (int)effect.Target,
+                AttributeId = (int)effect.AttributeId,
+                ModifierType = (int)effect.ModifierTypeId,
+                Amount = effect.Amount,
+                DurationMs = effect.DurationMs,
+                ScalingAttributeId = (int)effect.ScalingAttributeId,
+                ScalingAmount = effect.ScalingAmount,
+            };
         }
     }
 }

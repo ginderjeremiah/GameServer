@@ -80,39 +80,36 @@ namespace Game.DataAccess.Repositories.Admin
             }
 
             return ChangeSetProcessor.Apply(changes,
-                add: item => _entityStore.Insert(new Entities.Zone
+                add: item => _entityStore.Insert(ToEntity(item)),
+                edit: item =>
                 {
-                    Name = item.Name,
-                    Description = item.Description,
-                    LevelMin = item.LevelMin,
-                    LevelMax = item.LevelMax,
-                    Order = item.Order,
-                    BossEnemyId = item.BossEnemyId,
-                    BossLevel = item.BossLevel,
-                    UnlockChallengeId = item.UnlockChallengeId,
-                    IsHome = item.IsHome,
-                    DesignerNotes = item.DesignerNotes,
-                }),
-                edit: item => _entityStore.Update(new Entities.Zone
-                {
-                    Id = item.Id,
-                    Name = item.Name,
-                    Description = item.Description,
-                    LevelMin = item.LevelMin,
-                    LevelMax = item.LevelMax,
-                    Order = item.Order,
-                    BossEnemyId = item.BossEnemyId,
-                    BossLevel = item.BossLevel,
-                    UnlockChallengeId = item.UnlockChallengeId,
-                    IsHome = item.IsHome,
-                    DesignerNotes = item.DesignerNotes,
-                    RetiredAt = item.RetiredAt,
-                }),
+                    var entity = ToEntity(item);
+                    entity.Id = item.Id;
+                    entity.RetiredAt = item.RetiredAt;
+                    _entityStore.Update(entity);
+                },
                 key: item => item.Id,
                 resourceName: "zone",
                 // An edit must target an existing zone; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _zones.LookupZone(item.Id) is not null);
+        }
+
+        private static Entities.Zone ToEntity(Contracts.Zone item)
+        {
+            return new Entities.Zone
+            {
+                Name = item.Name,
+                Description = item.Description,
+                LevelMin = item.LevelMin,
+                LevelMax = item.LevelMax,
+                Order = item.Order,
+                BossEnemyId = item.BossEnemyId,
+                BossLevel = item.BossLevel,
+                UnlockChallengeId = item.UnlockChallengeId,
+                IsHome = item.IsHome,
+                DesignerNotes = item.DesignerNotes,
+            };
         }
 
         /// <summary>
