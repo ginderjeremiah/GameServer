@@ -202,8 +202,7 @@ namespace Game.Api
             {
                 // Regenerate the frontend's TypeScript API client from the running API's types. This
                 // writes into the UI source tree, so it is strictly a local-development concern.
-                var rootFolder = (Directory.GetParent(app.Environment.ContentRootPath)
-                    ?? throw new InvalidOperationException($"Could not resolve parent directory of '{app.Environment.ContentRootPath}'.")).FullName;
+                var rootFolder = CodeGenPaths.FindRepositoryRoot(app.Environment.ContentRootPath);
                 var targetDir = CodeGenPaths.ResolveTargetDirectory(rootFolder);
                 var codeGen = app.Services.GetRequiredService<ApiCodeGenerator>();
                 codeGen.GenerateCode(typeof(Startup).Assembly, new CodeGenOptions { TargetDirectory = targetDir, NewLine = "\n" });
