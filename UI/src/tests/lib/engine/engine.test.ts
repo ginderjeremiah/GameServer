@@ -50,8 +50,11 @@ const {
 }));
 vi.mock('$stores', async () => {
 	const modal = await vi.importActual<typeof import('$stores/modal.svelte')>('$stores/modal.svelte');
+	const tutorialTourModule =
+		await vi.importActual<typeof import('$stores/tutorial-tour.svelte')>('$stores/tutorial-tour.svelte');
 	return {
 		...modal,
+		...tutorialTourModule,
 		staticData: staticDataStub,
 		statistics: statisticsStub,
 		playerChallenges: playerChallengesStub,
@@ -162,10 +165,12 @@ import {
 	inventoryManager
 } from '$lib/engine/engine';
 import { activeModal, clearModals, confirmActiveModal, showModal } from '$stores/modal.svelte';
+import { tutorialTour } from '$stores/tutorial-tour.svelte';
 import { createHook } from '$lib/common/hooks';
 import { onDestroy } from 'svelte';
 import {
 	EItemCategory,
+	ELessonTriggerType,
 	ELogType,
 	ERarity,
 	type IApiSocketResponse,
@@ -185,6 +190,7 @@ let hidden = false;
 beforeEach(() => {
 	vi.clearAllMocks();
 	clearModals();
+	tutorialTour.clear();
 	hidden = false;
 	Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
 	staticDataStub.loaded = true;
@@ -224,6 +230,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	clearModals();
+	tutorialTour.clear();
 	// vi.unstubAllGlobals doesn't undo a defineProperty, so drop the own-property override of
 	// document.hidden and let it fall back to the jsdom prototype getter.
 	delete (document as unknown as Record<string, unknown>).hidden;
@@ -387,6 +394,24 @@ describe('startGame', () => {
 		void handleSocketReplaced();
 
 		expect(navigation.reset).toHaveBeenCalledTimes(1);
+	});
+
+	it('stopGame clears an open coach-mark tour so it cannot leak onto the next character (#2092)', () => {
+		startGame();
+		tutorialTour.play({
+			id: 1,
+			key: 'lesson-key',
+			name: 'Lesson Name',
+			triggerType: ELessonTriggerType.ScreenVisit,
+			screenKey: 'fight',
+			ordinal: 0,
+			designerNotes: '',
+			steps: [{ ordinal: 0, text: 'Step text' }]
+		});
+
+		void handleSocketReplaced();
+
+		expect(tutorialTour.activeLesson).toBeNull();
 	});
 
 	it("unhooks the previous call's listeners before re-registering, so a remount cannot leak them (#1807)", () => {
