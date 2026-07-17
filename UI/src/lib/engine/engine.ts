@@ -32,7 +32,8 @@ import {
 	toastSuccess,
 	navigation,
 	clearToasts,
-	clearModals
+	clearModals,
+	tutorialTour
 } from '$stores';
 import {
 	apiSocket,
@@ -368,6 +369,9 @@ const stopGame = () => {
 	clearToasts();
 	clearModals();
 	navigation.reset();
+	// A coach-mark tour left open must not leak into the next character's session and mark its
+	// lesson read on the wrong character (#2092).
+	tutorialTour.clear();
 	// SocketReplaced routes back to login client-side (no reload), so the socket singleton survives. Tear
 	// it down explicitly, otherwise the keepalive ping would silently reconnect and fight the session that
 	// just took over.
