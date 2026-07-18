@@ -11,6 +11,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Xunit;
 
 namespace Game.Application.Tests.DataAccess
@@ -106,6 +107,101 @@ namespace Game.Application.Tests.DataAccess
             // Both events that exhausted their retries are preserved on the dead-letter queue rather than dropped.
             var deadLettered = await DrainDeadLetterQueue(pubsub);
             Assert.Equal(2, deadLettered.Count);
+        }
+
+        public static IEnumerable<object[]> InfrastructureFailures()
+        {
+            // Bare exceptions, hitting the top-level NpgsqlException/TimeoutException arms directly.
+            yield return [() => new NpgsqlException("simulated connection outage")];
+            yield return [() => new TimeoutException("simulated command timeout")];
+
+            // A PostgresException carrying a server-reported "can't do work right now" SQLSTATE is infrastructure-
+            // wide and self-resolving (a graceful failover/restart, or a reconnect-storm capacity limit), not a
+            // rejection of this specific write.
+            yield return [() => new PostgresException("admin shutdown", "FATAL", "FATAL", PostgresErrorCodes.AdminShutdown)];
+            yield return [() => new PostgresException("cannot connect now", "FATAL", "FATAL", PostgresErrorCodes.CannotConnectNow)];
+            yield return [() => new PostgresException("too many connections", "FATAL", "FATAL", PostgresErrorCodes.TooManyConnections)];
+
+            // EF Core's real shape: SaveChanges wraps the Npgsql/Postgres exception in a DbUpdateException (the
+            // same shape DbUpdateExceptionExtensions.IsUniqueViolation reads), exercising the InnerException
+            // recursion arm rather than a bare top-level exception.
+            yield return [() => new DbUpdateException("wrapped", new NpgsqlException("simulated connection outage"))];
+            yield return [() => new DbUpdateException("wrapped", new PostgresException("admin shutdown", "FATAL", "FATAL", PostgresErrorCodes.AdminShutdown))];
+        }
+
+        [Theory]
+        [MemberData(nameof(InfrastructureFailures))]
+        public async Task ProcessQueue_InfrastructureFailureDuringHandling_RetriesThenLeavesItReservedInsteadOfDeadLettering(Func<Exception> makeException)
+        {
+            // A database-infrastructure failure persists across every retry, standing in for a DB outage/failover
+            // lasting longer than the retry budget (#2097).
+            var brokenServices = new AlwaysThrowingServiceProvider(makeException);
+
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
+
+            var queuedEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false, null);
+            var queue = new InMemoryPubSubQueue(Serialize(queuedEvent));
+
+            await synchronizer.ProcessQueue(queue);
+
+            // Retried the full attempt budget just like any other unexpected failure.
+            Assert.Equal(TestRetryPolicy.MaxAttempts - 1, logger.Entries.Count(e => e.Level == LogLevel.Warning && e.Message.Contains("retrying")));
+
+            // The terminal failure is logged as an outage, distinctly from a genuine dead-letter.
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("database outage"));
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("dead-letter"));
+
+            // Nothing was dead-lettered — the item stays reserved on the processing list for the reclaim to
+            // pick back up once the database recovers, rather than requiring a manual replay.
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+            Assert.Equal(1, await queue.GetProcessingCountAsync());
+        }
+
+        public static IEnumerable<object[]> GenuinePerWriteFailures()
+        {
+            // A deadlock is the base case: the server responded, only this write is affected.
+            yield return [() => new PostgresException("deadlock detected", "ERROR", "ERROR", PostgresErrorCodes.DeadlockDetected)];
+
+            // QueryCanceled is class 57 (operator_intervention) like AdminShutdown/CannotConnectNow, but it means
+            // *this* statement was cancelled (a lock/statement timeout, or a manual cancel) — not that the
+            // database is unreachable — so it must not be swept up by a blanket class-57 check.
+            yield return [() => new PostgresException("query canceled", "ERROR", "ERROR", PostgresErrorCodes.QueryCanceled)];
+
+            // DatabaseDropped is also 57Pxx like AdminShutdown/CannotConnectNow, but it isn't self-resolving —
+            // parking it would retry forever instead of surfacing to an operator.
+            yield return [() => new PostgresException("database dropped", "FATAL", "FATAL", PostgresErrorCodes.DatabaseDropped)];
+
+            // EF Core's real shape: SaveChanges wraps the PostgresException in a DbUpdateException, exercising
+            // the same InnerException recursion arm the infrastructure-failure cases above do.
+            yield return [() => new DbUpdateException("wrapped", new PostgresException("unique violation", "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation))];
+        }
+
+        [Theory]
+        [MemberData(nameof(GenuinePerWriteFailures))]
+        public async Task ProcessQueue_GenuinePerWriteFailureAfterRetries_DeadLettersRatherThanLeavingItReserved(Func<Exception> makeException)
+        {
+            // A genuine per-write failure means the server responded — the connection is healthy and this
+            // specific write failed on its own merits, so it must still dead-letter like any other per-write
+            // failure rather than being (mis)classified as an infrastructure outage.
+            var brokenServices = new AlwaysThrowingServiceProvider(makeException);
+
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
+
+            var queuedEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false, null);
+            var queue = new InMemoryPubSubQueue(Serialize(queuedEvent));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("dead-lettering"));
+            var deadLettered = await DrainDeadLetterQueue(pubsub);
+            Assert.Single(deadLettered);
+            Assert.Equal(0, await queue.GetProcessingCountAsync());
         }
 
         [Fact]
@@ -1968,6 +2064,19 @@ namespace Game.Application.Tests.DataAccess
 
                 return inner.GetRequiredService<IServiceScopeFactory>().CreateScope();
             }
+        }
+
+        /// <summary>
+        /// Fails every scope creation with a caller-supplied exception, standing in for a failure that persists
+        /// across every retry attempt (e.g. a database outage lasting longer than the retry budget) rather than
+        /// <see cref="FlakyServiceProvider"/>'s bounded number of failures. A factory (not a shared instance) so
+        /// each attempt throws its own exception object.
+        /// </summary>
+        private sealed class AlwaysThrowingServiceProvider(Func<Exception> exceptionFactory) : IServiceProvider, IServiceScopeFactory
+        {
+            public object? GetService(Type serviceType) => serviceType == typeof(IServiceScopeFactory) ? this : null;
+
+            public IServiceScope CreateScope() => throw exceptionFactory();
         }
 
         /// <summary>

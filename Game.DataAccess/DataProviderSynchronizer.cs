@@ -414,12 +414,13 @@ namespace Game.DataAccess
 
         /// <summary>
         /// Awaits every item task this pass has started, then resets both tracking collections so subsequent
-        /// work starts on fresh lanes. Never throws: an item task only faults when a Redis queue op (the
-        /// acknowledge or a dead-letter enqueue) escapes <see cref="ProcessMessage"/>, or when its predecessor
-        /// on the same lane did — either way the item is still reserved on the processing list, so the
-        /// stranded-processing reclaim (or the next startup) re-applies it rather than losing it. Faults are
-        /// logged here once; cancellations (a stop mid-retry-backoff) are the normal shutdown contract and
-        /// need no logging.
+        /// work starts on fresh lanes. Never throws: an item task faults either when a Redis queue op (the
+        /// acknowledge or a dead-letter enqueue) escapes <see cref="ProcessMessage"/>, when an exhausted-retry
+        /// database-infrastructure failure deliberately propagates out of it instead of dead-lettering (see
+        /// <see cref="InfrastructureFailureClassifier"/>), or when its predecessor on the same lane did —
+        /// either way the item is still reserved on the processing list, so the stranded-processing reclaim (or
+        /// the next startup) re-applies it rather than losing it. Faults are logged here once; cancellations (a
+        /// stop mid-retry-backoff) are the normal shutdown contract and need no logging.
         /// </summary>
         private async Task SettleInFlightItemsAsync(Dictionary<int, Task> playerLanes, List<Task> inFlight)
         {
@@ -544,10 +545,13 @@ namespace Game.DataAccess
         /// <summary>
         /// Processes a single queued message. Malformed payloads (which can never succeed) are dead-lettered
         /// immediately, while a valid event that fails on an unexpected error (e.g. a transient database error)
-        /// is retried with exponential backoff per <see cref="PlayerUpdateRetryPolicy"/> and dead-lettered only
-        /// once the retries are exhausted, so the change is never silently dropped. The apply itself runs
-        /// uncancelled (so a reserved item finishes cleanly); only the dead-time backoff between failed
-        /// attempts honors <paramref name="cancellationToken"/>, so a shutdown isn't stalled waiting one out.
+        /// is retried with exponential backoff per <see cref="PlayerUpdateRetryPolicy"/>. Once retries are
+        /// exhausted, a genuine per-write failure is dead-lettered so the change is never silently dropped —
+        /// but a database-<b>infrastructure</b> failure (<see cref="InfrastructureFailureClassifier"/>) instead
+        /// propagates out of this method, leaving the item reserved rather than dead-lettered (see the catch
+        /// clause below and <see cref="SettleInFlightItemsAsync"/>). The apply itself runs uncancelled (so a
+        /// reserved item finishes cleanly); only the dead-time backoff between failed attempts honors
+        /// <paramref name="cancellationToken"/>, so a shutdown isn't stalled waiting one out.
         /// </summary>
         private async Task ProcessMessage(string message, IPubSubQueue deadLetterQueue, CancellationToken cancellationToken)
         {
@@ -600,6 +604,19 @@ namespace Game.DataAccess
                     // waiting it out against the bounded drain budget — the reserved item is reclaimed next startup.
                     _logger.LogWarning(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' on attempt {Attempt} of {MaxAttempts}; retrying.", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, attempt, _retryPolicy.MaxAttempts);
                     await Task.Delay(_retryPolicy.DelayAfterAttempt(attempt), cancellationToken);
+                }
+                catch (Exception ex) when (InfrastructureFailureClassifier.IsInfrastructureFailure(ex))
+                {
+                    // Retries exhausted, and the failure is the database itself being unreachable rather than
+                    // this specific write. The ~0.6s default retry budget is tuned for blips, not an outage,
+                    // and every other in-flight write is failing the exact same way right now — dead-lettering
+                    // would mass-dead-letter the whole backlog for something that self-resolves. Rethrowing
+                    // instead of dead-lettering leaves the item reserved (not acknowledged): the caller's fault
+                    // handling (see SettleInFlightItemsAsync) already knows to leave a faulted item on the
+                    // processing list, so the opportunistic stranded-processing reclaim (or the next startup)
+                    // picks it back up once the database recovers, with no dedicated re-probe loop needed (#2097).
+                    _logger.LogError(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' after {MaxAttempts} attempts; treating this as a database outage and leaving it queued for automatic retry once it recovers. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, _retryPolicy.MaxAttempts, message);
+                    throw;
                 }
                 catch (Exception ex)
                 {
