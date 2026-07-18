@@ -7,6 +7,7 @@ import {
 	type IProficiency,
 	type ISetProficiencyPrerequisitesData
 } from '$lib/api';
+import { SaveFlash } from '$lib/common';
 import { staticData, toastError } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, canonicalEqual, resolveId, resolveNewIds } from '../save-helpers';
@@ -46,7 +47,7 @@ export class ProgressionStore {
 
 	loaded = $state(false);
 	saving = $state(false);
-	saved = $state(false);
+	#saveFlash = new SaveFlash();
 	error = $state<string | null>(null);
 
 	// Selection / navigation.
@@ -57,7 +58,11 @@ export class ProgressionStore {
 	selectedLevel = $state(1);
 
 	private nextId = -1;
-	#flashTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/** Brief "Changes saved" confirmation flash. */
+	get saved(): boolean {
+		return this.#saveFlash.active;
+	}
 
 	// ── Loading / seeding ──
 
@@ -209,7 +214,7 @@ export class ProgressionStore {
 			mutate(draft);
 			return draft;
 		});
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	patchProf(id: number, mutate: (draft: WorkbenchProficiency) => void) {
@@ -224,7 +229,7 @@ export class ProgressionStore {
 			mutate(draft);
 			return draft;
 		});
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	// ── Add / reorder / retire ──
@@ -240,7 +245,7 @@ export class ProgressionStore {
 		this.selectedPathId = pathId;
 		this.drilledTierId = null;
 		this.pathTab = 'identity';
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	addTier(pathId: number): number {
@@ -251,7 +256,7 @@ export class ProgressionStore {
 		const ordinal = tiers.length ? Math.max(...tiers.map((t) => t.pathOrdinal)) + 1 : 0;
 		const id = this.nextId--;
 		this.profs = [newProficiency(id, pathId, ordinal), ...this.profs];
-		this.saved = false;
+		this.#saveFlash.reset();
 		return id;
 	}
 
@@ -271,7 +276,7 @@ export class ProgressionStore {
 			const match = renumbered.find((t) => t.id === prof.id);
 			return match ? { ...prof, pathOrdinal: match.pathOrdinal } : prof;
 		});
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	retirePath(id: number, retired: boolean) {
@@ -297,7 +302,7 @@ export class ProgressionStore {
 			this.selectedPathId = this.paths[0]?.id ?? null;
 			this.drilledTierId = null;
 		}
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	/** Remove a never-saved tier locally; leave the drill view if it was open. */
@@ -309,7 +314,7 @@ export class ProgressionStore {
 		if (this.drilledTierId === id) {
 			this.drilledTierId = null;
 		}
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	resetPath(id: number) {
@@ -575,7 +580,7 @@ export class ProgressionStore {
 				this.drilledTierId = resolveId(this.drilledTierId, profIdMap);
 			}
 			await this.reseed();
-			this.flashSaved();
+			this.#saveFlash.flash();
 		} catch (ex) {
 			// Once anything has committed, our baseline is behind the server; re-seed so a retry can't
 			// re-Add already-persisted records. A pre-commit failure changed nothing, so keep the edits.
@@ -609,22 +614,10 @@ export class ProgressionStore {
 		this.paths = this.basePaths.map(clone);
 		this.profs = this.baseProfs.map(clone);
 		this.reconcileSelection();
-		this.saved = false;
-	}
-
-	private flashSaved() {
-		this.saved = true;
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
-		this.#flashTimer = setTimeout(() => {
-			this.saved = false;
-		}, 1900);
+		this.#saveFlash.reset();
 	}
 
 	dispose() {
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
+		this.#saveFlash.dispose();
 	}
 }

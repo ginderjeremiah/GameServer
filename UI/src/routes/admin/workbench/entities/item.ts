@@ -2,7 +2,7 @@ import { ApiRequest, EItemCategory, ERarity, fetchSocketData, type IItem } from 
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, childChanged, guardedSave, modSlotChanges, persistEntity } from '../save-helpers';
-import { firstFree } from './helpers';
+import { attributeBonusSection } from './attribute-table-sections';
 import { tagsSection } from './tags-section';
 import type { EntityConfig } from './types';
 
@@ -137,39 +137,10 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 				}
 			]
 		},
-		{
-			key: 'attributes',
-			label: 'Attributes',
-			glyph: 'bars',
-			desc: 'Flat stat bonuses granted',
-			count: (it) => it.attributes.length,
-			warn: (it) => (it.attributes.length ? null : 'No attributes'),
-			kind: 'table',
+		attributeBonusSection<WorkbenchItem>({
 			itemsKey: 'attributes',
-			rowKey: 'attributeId',
-			addLabel: 'Add bonus',
-			emptyIcon: 'bars',
-			emptyTitle: 'No attribute bonuses',
-			emptySub: 'This item grants no stats.',
-			newRow: (it) => ({
-				attributeId: firstFree(
-					it.attributes.map((a) => a.attributeId),
-					reference.attributeOptions()
-				),
-				amount: 1
-			}),
-			columns: [
-				{
-					key: 'attributeId',
-					label: 'Attribute',
-					type: 'attribute',
-					options: reference.attributeOptions,
-					min: 200,
-					unique: true
-				},
-				{ key: 'amount', label: 'Amount', type: 'number', align: 'r', width: 120, allowNegative: true }
-			]
-		},
+			emptySub: 'This item grants no stats.'
+		}),
 		{
 			key: 'modSlots',
 			label: 'Mod Slots',

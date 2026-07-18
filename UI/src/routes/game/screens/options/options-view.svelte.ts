@@ -9,6 +9,7 @@
 import { apiSocket, ELogType, type ILogPreference } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { logColors } from '$components';
+import { SaveFlash } from '$lib/common';
 import { toastError } from '$stores';
 import type { GlyphKind } from '$components';
 
@@ -155,11 +156,14 @@ export class OptionsView {
 	 *  `null` never matches, so overrides read as empty until the first toggle stamps it. */
 	#draftOverridesPrefs = $state<ILogPreference[] | null>(null);
 	/** Brief "Preferences saved" confirmation flash. */
-	saved = $state(false);
+	#saveFlash = new SaveFlash();
 	/** True while a save request is in flight (guards against double-submit). */
 	saving = $state(false);
 
-	#flashTimer: ReturnType<typeof setTimeout> | undefined;
+	/** Brief "Preferences saved" confirmation flash. */
+	get saved(): boolean {
+		return this.#saveFlash.active;
+	}
 
 	/** Last-persisted preferences, read live off the player manager (see the class doc). */
 	readonly baseline = $derived(readPlayerPrefs());
@@ -206,7 +210,7 @@ export class OptionsView {
 	setOne(id: ELogType, enabled: boolean): void {
 		this.#draftOverrides = { ...this.effectiveOverrides(), [id]: enabled };
 		this.#draftOverridesPrefs = playerManager.logPreferences;
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	setMany(ids: ELogType[], enabled: boolean): void {
@@ -216,13 +220,13 @@ export class OptionsView {
 		}
 		this.#draftOverrides = next;
 		this.#draftOverridesPrefs = playerManager.logPreferences;
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	discard(): void {
 		this.#draftOverrides = {};
 		this.#draftOverridesPrefs = playerManager.logPreferences;
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	/** The minimal set of preferences to persist — only the changed ones.
@@ -275,23 +279,11 @@ export class OptionsView {
 			}
 		}
 		this.#draftOverrides = remaining;
-		this.flashSaved();
-	}
-
-	private flashSaved(): void {
-		this.saved = true;
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
-		this.#flashTimer = setTimeout(() => {
-			this.saved = false;
-		}, 1900);
+		this.#saveFlash.flash();
 	}
 
 	dispose(): void {
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
+		this.#saveFlash.dispose();
 	}
 }
 

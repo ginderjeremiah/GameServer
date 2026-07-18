@@ -31,7 +31,7 @@ import {
 	type ISkill
 } from '$lib/api';
 import { BattleAttributes, isSkillDormant } from '$lib/battle';
-import { attributeName } from '$lib/common';
+import { attributeName, SaveFlash } from '$lib/common';
 import { safeLocalStorage } from '$lib/common/local-storage';
 import { inventoryManager, playerManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
@@ -298,17 +298,20 @@ export class AttributesView {
 	 *  never matches, so deltas read as zero until the first edit stamps it. */
 	#pendingDeltasAttrs = $state<IBattlerAttribute[] | null>(null);
 	/** Brief "Attributes saved" confirmation flash. */
-	saved = $state(false);
+	#saveFlash = new SaveFlash();
 	/** True while a save request is in flight (guards against double-submit). */
 	saving = $state(false);
 	/** While a radar drag is active the scale is pinned to the value captured at
 	 *  gesture start (see {@link lockScale}); null when unpinned. */
 	#lockedHexMax = $state<number | null>(null);
 
-	#flashTimer: ReturnType<typeof setTimeout> | undefined;
-
 	constructor() {
 		this.mode = readStoredMode();
+	}
+
+	/** Brief "Attributes saved" confirmation flash. */
+	get saved(): boolean {
+		return this.#saveFlash.active;
 	}
 
 	/** Unspent pool (statPointsGained − statPointsUsed), derived live from the reactive
@@ -381,7 +384,7 @@ export class AttributesView {
 		next[i] += add;
 		this.#pendingDeltas = next;
 		this.#pendingDeltasAttrs = playerManager.attributes;
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	dec(i: number, by = 1): void {
@@ -393,7 +396,7 @@ export class AttributesView {
 		next[i] -= sub;
 		this.#pendingDeltas = next;
 		this.#pendingDeltasAttrs = playerManager.attributes;
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	/** Set the attribute at `i` directly to `target`, clamped to the available
@@ -430,7 +433,7 @@ export class AttributesView {
 	discard(): void {
 		this.#pendingDeltas = CORE_ATTRIBUTES.map(() => 0);
 		this.#pendingDeltasAttrs = playerManager.attributes;
-		this.saved = false;
+		this.#saveFlash.reset();
 	}
 
 	/** The minimal set of per-attribute deltas to persist — only the changed
@@ -495,23 +498,11 @@ export class AttributesView {
 		if (deltasStillValid) {
 			this.#pendingDeltas = this.#pendingDeltas.map((d, i) => d - sentDeltas[i]);
 		}
-		this.flashSaved();
-	}
-
-	private flashSaved(): void {
-		this.saved = true;
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
-		this.#flashTimer = setTimeout(() => {
-			this.saved = false;
-		}, 1900);
+		this.#saveFlash.flash();
 	}
 
 	dispose(): void {
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
+		this.#saveFlash.dispose();
 	}
 }
 

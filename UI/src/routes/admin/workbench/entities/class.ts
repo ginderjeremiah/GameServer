@@ -11,6 +11,7 @@ import { hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, guardedSave, persistEntity } from '../save-helpers';
+import { attributeDistributionSection } from './attribute-table-sections';
 import { firstFree } from './helpers';
 import { chipsSection, type EntityConfig } from './types';
 
@@ -204,41 +205,12 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 				}
 			]
 		},
-		{
+		attributeDistributionSection<WorkbenchClass>({
 			key: 'attributes',
-			label: 'Attributes',
-			glyph: 'bars',
-			desc: 'Locked-base stat distribution per level',
-			count: (c) => c.attributeDistributions.length,
-			warn: (c) => (c.attributeDistributions.length ? null : 'No attribute distribution'),
-			kind: 'table',
 			itemsKey: 'attributeDistributions',
-			rowKey: 'attributeId',
-			addLabel: 'Add attribute',
-			emptyIcon: 'bars',
-			emptyTitle: 'No attributes set',
-			emptySub: 'This class has no stat distribution yet.',
-			newRow: (c) => ({
-				attributeId: firstFree(
-					c.attributeDistributions.map((a) => a.attributeId),
-					reference.attributeOptions()
-				),
-				baseAmount: 0,
-				amountPerLevel: 0
-			}),
-			columns: [
-				{
-					key: 'attributeId',
-					label: 'Attribute',
-					type: 'attribute',
-					options: reference.attributeOptions,
-					min: 190,
-					unique: true
-				},
-				{ key: 'baseAmount', label: 'Base', type: 'number', align: 'r', width: 110, allowNegative: true },
-				{ key: 'amountPerLevel', label: 'Per Level', type: 'number', align: 'r', width: 110, allowNegative: true }
-			]
-		}
+			desc: 'Locked-base stat distribution per level',
+			emptySub: 'This class has no stat distribution yet.'
+		})
 	],
 	refresh,
 	persist: (diff) =>

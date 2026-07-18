@@ -20,3 +20,4 @@ export * from './hooks';
 export * from './event-measuring';
 export * from './serialized-queue';
 export * from './statify.svelte';
+export * from './save-flash.svelte';
