@@ -187,7 +187,7 @@ const handleSubmit = async () => {
 	if (mode === 'signup') {
 		// Signup creates the account only — its first character is created on the select screen, through the
 		// same class picker as any additional one (#1256), so no class rides this request.
-		const created = await new ApiRequest('Login/CreateAccount').post({ username, password });
+		const created = await new ApiRequest('Auth/CreateAccount').post({ username, password });
 		if (created.status !== 200) {
 			submitting = false;
 			serverError = created.error ?? 'Could not create account.';
@@ -195,7 +195,7 @@ const handleSubmit = async () => {
 		}
 	}
 
-	const response = await new ApiRequest('Login').post({ username, password });
+	const response = await new ApiRequest('Auth').post({ username, password });
 	if (response.status === 200) {
 		setTokens(response.data.tokens);
 

@@ -24,7 +24,7 @@ export const collectDeviceInfo = (): IDeviceInfoRequest => {
  */
 export const reportDeviceInfo = async (): Promise<void> => {
 	try {
-		await new ApiRequest('Login/DeviceInfo').post(collectDeviceInfo());
+		await new ApiRequest('Auth/DeviceInfo').post(collectDeviceInfo());
 	} catch {
 		// Tracking is non-essential; ignore failures.
 	}

@@ -32,13 +32,13 @@ namespace Game.Api.Tests.Integration
         {
             var startIndex = _capturingProvider.Entries.Count;
 
-            await Client.GetAsync("/api/Login/Status", CancellationToken);
+            await Client.GetAsync("/api/Auth/Status", CancellationToken);
 
             var entries = GetMiddlewareEntries(startIndex);
             var startEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Start"));
             var scope = Assert.IsType<Dictionary<string, object?>>(startEntry.ScopeStates.Single());
             Assert.Equal("GET", scope["Method"]);
-            Assert.Equal("/api/Login/Status", scope["Path"]);
+            Assert.Equal("/api/Auth/Status", scope["Path"]);
             Assert.Null(scope["UserId"]);
             Assert.NotNull(scope["RequestId"]);
         }
@@ -48,7 +48,7 @@ namespace Game.Api.Tests.Integration
         {
             var startIndex = _capturingProvider.Entries.Count;
 
-            var response = await Client.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await Client.GetAsync("/api/Auth/Status", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
@@ -71,7 +71,7 @@ namespace Game.Api.Tests.Integration
             using var authClient = login.Client;
 
             var startIndex = _capturingProvider.Entries.Count;
-            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await authClient.GetAsync("/api/Auth/Status", CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -89,7 +89,7 @@ namespace Game.Api.Tests.Integration
             using var authClient = login.Client;
 
             var startIndex = _capturingProvider.Entries.Count;
-            await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            await authClient.GetAsync("/api/Auth/Status", CancellationToken);
 
             var entries = GetMiddlewareEntries(startIndex);
             var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended"));

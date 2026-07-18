@@ -282,7 +282,7 @@ jobs:
         # `|| true` keeps `bash -e` from aborting on curl's non-zero exit while it's still starting.
         wait_for_api() {
           for i in $(seq 1 90); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5008/api/Login/Status) || true
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5008/api/Auth/Status) || true
             if [ "${code:-000}" != "000" ]; then
               echo "API ready (HTTP $code) after ${i} attempt(s)"
               return 0

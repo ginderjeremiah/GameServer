@@ -961,7 +961,7 @@ namespace Game.Application.Tests.Services
         /// <summary>
         /// A trivial access-token service for the application-layer tests. The real JWT signing/format is
         /// a presentation-edge concern verified end-to-end by the API integration tests
-        /// (<c>LoginControllerTests</c>); these tests exercise the account orchestration against the real
+        /// (<c>AuthControllerTests</c>/<c>PlayersControllerTests</c>); these tests exercise the account orchestration against the real
         /// Postgres/Redis collaborators, for which the access-token contents are irrelevant.
         /// </summary>
         /// <summary>

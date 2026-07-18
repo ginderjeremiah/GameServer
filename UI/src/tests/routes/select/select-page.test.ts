@@ -70,7 +70,7 @@ const SUMMARIES = [
 beforeEach(() => {
 	postMock.mockReset();
 	getMock.mockReset();
-	// The create form fetches its class options over HTTP (Login/CharacterCreationData).
+	// The create form fetches its class options over HTTP (Players/CharacterCreationData).
 	getMock.mockResolvedValue({ status: 200, data: [CREATABLE_CLASS] });
 	setTokensMock.mockClear();
 	getRefreshTokenMock.mockReturnValue('r');
@@ -130,7 +130,7 @@ describe('Select page', () => {
 		await fireEvent.click(screen.getAllByTestId('player-card')[1]);
 
 		await waitFor(() =>
-			expect(postMock).toHaveBeenCalledWith('Login/SelectPlayer', { playerId: 2, refreshToken: 'r' })
+			expect(postMock).toHaveBeenCalledWith('Players/SelectPlayer', { playerId: 2, refreshToken: 'r' })
 		);
 		expect(setTokensMock).toHaveBeenCalledWith({ accessToken: 'a2', refreshToken: 'r2' });
 		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ id: 2, name: 'Rogue' }));
@@ -152,7 +152,7 @@ describe('Select page', () => {
 		await fireEvent.input(screen.getByTestId('new-name-input'), { target: { value: 'Mage' } });
 		await fireEvent.submit(screen.getByTestId('create-form'));
 
-		await waitFor(() => expect(postMock).toHaveBeenCalledWith('Login/CreatePlayer', { name: 'Mage', classId: 0 }));
+		await waitFor(() => expect(postMock).toHaveBeenCalledWith('Players/CreatePlayer', { name: 'Mage', classId: 0 }));
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(2));
 		expect(screen.getByText('Mage')).toBeTruthy();
 	});

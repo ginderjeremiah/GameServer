@@ -139,21 +139,21 @@ describe('ApiRequest', () => {
 
 	describe('post', () => {
 		it('sends a POST request to /api/{endpoint}', async () => {
-			await new ApiRequest('Login').post({ username: 'u', password: 'p' });
+			await new ApiRequest('Auth').post({ username: 'u', password: 'p' });
 
 			expect(lastCall().method).toBe('POST');
-			expect(lastCall().url).toBe('/api/Login');
+			expect(lastCall().url).toBe('/api/Auth');
 		});
 
 		it('sets content-type to application/json', async () => {
-			await new ApiRequest('Login').post({ username: 'u', password: 'p' });
+			await new ApiRequest('Auth').post({ username: 'u', password: 'p' });
 
 			expect(lastCall().headers['content-type']).toBe('application/json');
 		});
 
 		it('sends JSON-stringified payload', async () => {
 			const payload = { username: 'user', password: 'pass' };
-			await new ApiRequest('Login').post(payload);
+			await new ApiRequest('Auth').post(payload);
 
 			expect(lastCall().body).toBe(JSON.stringify(payload));
 		});
@@ -163,16 +163,16 @@ describe('ApiRequest', () => {
 				throw new Error('Network error');
 			};
 
-			const response = await new ApiRequest('Login').post({ username: 'u', password: 'p' });
+			const response = await new ApiRequest('Auth').post({ username: 'u', password: 'p' });
 			expect(response).toBeDefined();
 			expect(response.status).toBe(0);
 		});
 
 		it('sends an empty body for endpoints with no request payload', async () => {
-			await new ApiRequest('Login/Logout').post();
+			await new ApiRequest('Auth/Logout').post();
 
 			expect(lastCall().method).toBe('POST');
-			expect(lastCall().url).toBe('/api/Login/Logout');
+			expect(lastCall().url).toBe('/api/Auth/Logout');
 			expect(lastCall().body).toBeUndefined();
 		});
 	});
@@ -186,7 +186,7 @@ describe('ApiRequest', () => {
 
 	describe('static post', () => {
 		it('creates a request and returns data directly', async () => {
-			const data: unknown = await ApiRequest.post('Login', { username: 'u', password: 'p' });
+			const data: unknown = await ApiRequest.post('Auth', { username: 'u', password: 'p' });
 			expect(data).toBe('test-result');
 		});
 	});
@@ -197,7 +197,7 @@ describe('ApiRequest', () => {
 
 			let itemsCalls = 0;
 			fetchResponder = (call) => {
-				if (call.url === '/api/Login/Refresh') {
+				if (call.url === '/api/Auth/Refresh') {
 					return {
 						status: 200,
 						body: JSON.stringify({ data: { accessToken: makeAccessToken(900), refreshToken: 'refresh-2' } })
@@ -211,7 +211,7 @@ describe('ApiRequest', () => {
 
 			const response = await new ApiRequest('Tags').get();
 
-			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			expect(callsTo('/api/Auth/Refresh')).toHaveLength(1);
 			const itemsRequests = callsTo('/api/Tags');
 			expect(itemsRequests).toHaveLength(2);
 			expect(response.status).toBe(200);
@@ -225,9 +225,9 @@ describe('ApiRequest', () => {
 
 			fetchResponder = () => ({ status: 401, body: JSON.stringify({ errorMessage: 'nope' }) });
 
-			const response = await new ApiRequest('Login').post({ username: 'u', password: 'p' });
+			const response = await new ApiRequest('Auth').post({ username: 'u', password: 'p' });
 
-			expect(callsTo('/api/Login/Refresh')).toHaveLength(0);
+			expect(callsTo('/api/Auth/Refresh')).toHaveLength(0);
 			expect(fetchCalls).toHaveLength(1);
 			expect(response.status).toBe(401);
 		});
@@ -237,7 +237,7 @@ describe('ApiRequest', () => {
 			window.location.href = '';
 
 			fetchResponder = (call) =>
-				call.url === '/api/Login/Refresh'
+				call.url === '/api/Auth/Refresh'
 					? { status: 400, body: JSON.stringify({ errorMessage: 'Invalid or expired refresh token' }) }
 					: { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) };
 
@@ -246,7 +246,7 @@ describe('ApiRequest', () => {
 			// The original 401 is what the caller sees; only one refresh attempt is made (the isRetry guard
 			// prevents `execute` from recursing into a second 401-triggered refresh on the retried request).
 			expect(response.status).toBe(401);
-			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			expect(callsTo('/api/Auth/Refresh')).toHaveLength(1);
 			expect(callsTo('/api/Tags')).toHaveLength(1);
 			expect(getTokens()).toBeNull();
 			expect(window.location.href).toBe('/');
@@ -258,7 +258,7 @@ describe('ApiRequest', () => {
 			window.location.href = '';
 
 			fetchResponder = (call) =>
-				call.url === '/api/Login/Refresh'
+				call.url === '/api/Auth/Refresh'
 					? { status: 503, body: '' }
 					: { status: 401, body: JSON.stringify({ errorMessage: 'expired' }) };
 
@@ -267,7 +267,7 @@ describe('ApiRequest', () => {
 			// A transient refresh failure just surfaces the original 401 — no forced logout, and the isRetry
 			// guard still caps this at a single refresh attempt rather than looping.
 			expect(response.status).toBe(401);
-			expect(callsTo('/api/Login/Refresh')).toHaveLength(1);
+			expect(callsTo('/api/Auth/Refresh')).toHaveLength(1);
 			expect(callsTo('/api/Tags')).toHaveLength(1);
 			expect(getTokens()).toEqual({ accessToken, refreshToken: 'refresh-1' });
 			expect(window.location.href).toBe('');
@@ -291,7 +291,7 @@ describe('ApiRequest', () => {
 
 			const response = await new ApiRequest('Tags').get();
 
-			expect(callsTo('/api/Login/Refresh')).toHaveLength(0);
+			expect(callsTo('/api/Auth/Refresh')).toHaveLength(0);
 			expect(response.status).toBe(200);
 			expect(response.data as unknown).toBe('retried');
 			// The winner's pair is left intact — never cleared.

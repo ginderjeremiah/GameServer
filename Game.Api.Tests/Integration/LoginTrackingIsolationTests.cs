@@ -44,7 +44,7 @@ namespace Game.Api.Tests.Integration
             using var authClient = await LoginWithDeviceAsync("isouser", "isopass");
 
             // Act — an unrelated, read-only request. Its commit must not inherit the failed tracking inserts.
-            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await authClient.GetAsync("/api/Auth/Status", CancellationToken);
 
             // Assert — the tracking failure was swallowed and isolated to its own scope, so the request still
             // succeeds rather than 500-ing on a re-flushed bad insert.

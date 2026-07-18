@@ -92,7 +92,7 @@ namespace Game.Api.Tests.Integration
         /// </summary>
         protected async Task<LoginResult> LoginAsync(string username, string password)
         {
-            var response = await Client.PostAsJsonAsync("/api/Login", new { Username = username, Password = password }, CancellationToken);
+            var response = await Client.PostAsJsonAsync("/api/Auth", new { Username = username, Password = password }, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResult>>(CancellationToken);
             Assert.NotNull(result);
@@ -107,7 +107,7 @@ namespace Game.Api.Tests.Integration
         /// </summary>
         protected async Task<SelectPlayerResult> SelectPlayerAsync(AuthTokens tokens, int playerId)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Login/SelectPlayer")
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/Players/SelectPlayer")
             {
                 Content = JsonContent.Create(new { PlayerId = playerId, tokens.RefreshToken }),
             };

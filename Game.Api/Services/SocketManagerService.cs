@@ -179,7 +179,7 @@ namespace Game.Api.Services
 
         /// <summary>
         /// Atomically claims <paramref name="playerId"/>'s presence key for an in-flight switch-away credit
-        /// (<c>LoginController.CreditDepartedCharacter</c>, #2041), replacing a plain presence read: the read
+        /// (<c>CharacterSelectionService.CreditDepartedCharacter</c>, #2041), replacing a plain presence read: the read
         /// and the claim happen in one Redis round trip, so there is no gap between "no socket is here" and
         /// "reserve this slot" for a concurrent <see cref="RegisterSocket"/> to land in. Returns
         /// <see langword="false"/> when the key is already held — a genuinely live socket (the credit must be

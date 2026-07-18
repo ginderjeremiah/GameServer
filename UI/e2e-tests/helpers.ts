@@ -7,7 +7,7 @@ import { expect } from '@playwright/test';
  *
  * The root layout sets `data-hydrated="true"` from its onMount, which runs after every child's
  * onMount, so this resolves as soon as the page is actually interactive. (It previously waited on a
- * `/api/Login/Status` response, but that request only fires when a stored token exists — never in a
+ * `/api/Auth/Status` response, but that request only fires when a stored token exists — never in a
  * fresh test context — so the wait always burned its full timeout.)
  */
 export async function waitForLoginReady(page: Page) {

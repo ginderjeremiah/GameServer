@@ -104,7 +104,7 @@ namespace Game.Api.Tests.Integration
 
             await ReloadReferenceCachesAsync();
 
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
+            var loginResponse = await Client.PostAsJsonAsync("/api/Auth",
                 new { Username = "challengeuser", Password = "challengepass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 

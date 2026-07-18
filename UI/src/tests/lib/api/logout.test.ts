@@ -43,7 +43,7 @@ describe('logout', () => {
 	it('revokes the refresh token, clears storage, and redirects to the login screen', async () => {
 		await logout();
 
-		expect(constructorMock).toHaveBeenCalledWith('Login/Logout');
+		expect(constructorMock).toHaveBeenCalledWith('Auth/Logout');
 		expect(postMock).toHaveBeenCalledTimes(1);
 		expect(postMock).toHaveBeenCalledWith({ refreshToken: 'refresh' });
 		expect(getTokens()).toBeNull();

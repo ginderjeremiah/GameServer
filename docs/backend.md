@@ -116,7 +116,7 @@ Tutorial content (spike #1392) is an authored **`Lesson` reference set** like an
 
 ## Socket connection lifecycle
 
-A player may only be connected to one instance at a time (a TTL'd Redis presence key + a takeover signal to the replaced socket, with the `Login/ActiveSession` HTTP endpoint letting the client warn *before* triggering a takeover), and a stopping instance drains its live sockets cleanly so rolling deploys just reconnect clients to a healthy instance. Both `SocketContext.Close` and `SendData` self-bound and fall back to `WebSocket.Abort()` so a wedged peer can never pin the send lock, the handler, or the in-memory `Player`. The presence/takeover, shutdown-drain, and wedged-peer mechanics live in [backend-sockets.md](./backend-sockets.md).
+A player may only be connected to one instance at a time (a TTL'd Redis presence key + a takeover signal to the replaced socket, with the `Auth/ActiveSession` HTTP endpoint letting the client warn *before* triggering a takeover), and a stopping instance drains its live sockets cleanly so rolling deploys just reconnect clients to a healthy instance. Both `SocketContext.Close` and `SendData` self-bound and fall back to `WebSocket.Abort()` so a wedged peer can never pin the send lock, the handler, or the in-memory `Player`. The presence/takeover, shutdown-drain, and wedged-peer mechanics live in [backend-sockets.md](./backend-sockets.md).
 
 ## Reference-data caching and versioning
 

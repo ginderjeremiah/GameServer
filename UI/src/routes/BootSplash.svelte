@@ -1,5 +1,5 @@
 <!-- Lightweight splash shown by the root layout while a session is being restored on boot (a
-	Login/Status + a reference-version check, sub-second when the cache is warm). It deliberately
+	Auth/Status + a reference-version check, sub-second when the cache is warm). It deliberately
 	carries no manifest or "Enter" affordance — the point of the resume path is that the player drops
 	straight back into the game without the loading screen. The pulsing diamond mirrors the
 	login/loading chrome; `pulse-glow` is the shared keyframe in styles/common.scss (and is collapsed

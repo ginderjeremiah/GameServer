@@ -52,7 +52,7 @@ namespace Game.Api.Tests.Integration
             // Reload the caches so the boss battle resolves the seeded boss/zone (the caches no longer lazily refill).
             await ReloadReferenceCachesAsync();
 
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
+            var loginResponse = await Client.PostAsJsonAsync("/api/Auth",
                 new { Username = "bossuser", Password = "bosspass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
