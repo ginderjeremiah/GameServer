@@ -27,5 +27,44 @@ namespace Game.Application.Tests.Services
             Assert.True(seeds.Distinct().Count() > 1,
                 "Expected the seed generator to produce varied values from a non-time entropy source.");
         }
+
+        // #2112: a fresh seed equal to the player's LastCreditedBattleSeed must never be handed out, since
+        // BattleAlreadyCredited would then treat the brand-new battle as a stale re-presentation of the
+        // already-credited one. The real CSPRNG can't be made to collide on demand (2^-32), so this pins the
+        // public entry point's exclude plumbing statistically, and DrawSeed below pins the redraw loop itself
+        // deterministically via a stubbed generator.
+        [Fact]
+        public void CreateBattleSeed_NeverEqualsProvidedExclude()
+        {
+            var exclude = BattleService.CreateBattleSeed();
+
+            var seeds = Enumerable.Range(0, 1000)
+                .Select(_ => BattleService.CreateBattleSeed(exclude))
+                .ToList();
+
+            Assert.DoesNotContain(exclude, seeds);
+        }
+
+        [Fact]
+        public void DrawSeed_RedrawsUntilPastTheExcludedValue()
+        {
+            var draws = new Queue<uint>([5u, 5u, 5u, 7u]);
+
+            var result = BattleService.DrawSeed(draws.Dequeue, exclude: 5u);
+
+            Assert.Equal(7u, result);
+            Assert.Empty(draws);
+        }
+
+        [Fact]
+        public void DrawSeed_NullExclude_ReturnsFirstDrawUnconditionally()
+        {
+            var draws = new Queue<uint>([5u, 7u]);
+
+            var result = BattleService.DrawSeed(draws.Dequeue, exclude: null);
+
+            Assert.Equal(5u, result);
+            Assert.Equal(7u, draws.Peek());
+        }
     }
 }

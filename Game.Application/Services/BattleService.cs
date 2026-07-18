@@ -119,7 +119,7 @@ namespace Game.Application.Services
             // (see PrepareNextIdleBattle) — and, for the abandon case, is what makes the cooldown just applied
             // actually pace the replacement battle instead of being immediately bypassed (#1851).
             var battleStartTime = scheduledStartTime ?? abandonedOutcomeCooldown ?? DateTime.UtcNow;
-            var seed = CreateBattleSeed();
+            var seed = CreateBattleSeed(player.LastCreditedBattleSeed);
 
             var enemy = _battleFactory.CreateBattleEnemy(
                 zone,
@@ -233,7 +233,7 @@ namespace Game.Application.Services
             // only battle duration per kill instead of duration + cooldown (#1920).
             var utcNow = DateTime.UtcNow;
             var battleStartTime = state.IsOnCooldown(utcNow) ? state.EnemyCooldown : utcNow;
-            var seed = CreateBattleSeed();
+            var seed = CreateBattleSeed(player.LastCreditedBattleSeed);
 
             var enemy = _battleFactory.CreateBossEnemy(zone, _zoneResolution.BossEnemyResolver(zone));
 
@@ -653,8 +653,27 @@ namespace Game.Application.Services
         // (DateTime.Ticks) is monotonic and low-entropy in its low 32 bits — correlated and predictable between
         // battles — which makes it unsuitable as the shared starting point for the parity-identical crit/dodge
         // RNG (#178). The seed is server-generated and transmitted to the client as-is, so changing the source
-        // does not affect how it is consumed. Shared by both start paths.
-        internal static uint CreateBattleSeed() => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(sizeof(uint)));
+        // does not affect how it is consumed. Shared by both start paths (and the offline simulator's
+        // SeedSource, threaded from OfflineProgressService).
+        //
+        // exclude redraws away from the player's own LastCreditedBattleSeed (#2112): BattleAlreadyCredited
+        // matches on seed alone, so a freshly drawn seed that happens to equal the last-credited one would make
+        // this brand-new battle indistinguishable from a stale re-presentation of the already-credited one and
+        // wrongly reject its eventual claim. null for a caller with no player context (none today).
+        internal static uint CreateBattleSeed(uint? exclude = null) =>
+            DrawSeed(() => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(sizeof(uint))), exclude);
+
+        // Extracted so the redraw-on-collision loop can be pinned by a unit test with a stubbed draw — the
+        // real 2^-32 collision this guards against cannot be triggered through the actual CSPRNG.
+        internal static uint DrawSeed(Func<uint> draw, uint? exclude)
+        {
+            uint seed;
+            do
+            {
+                seed = draw();
+            } while (seed == exclude);
+            return seed;
+        }
 
         /// <summary>
         /// Rates the player's current live capability (<see cref="CombatRating.Rate"/>, spike #1526 Decision 7)
