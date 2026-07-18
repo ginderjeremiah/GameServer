@@ -8,7 +8,10 @@ interface HookTracker<T extends unknown[]> {
 }
 
 export const createHook = <T extends unknown[] = []>() => {
-	let dispatching = false;
+	// A depth counter (not a boolean) so a callback that synchronously re-notifies this same
+	// hook doesn't reset the in-progress-dispatch flag early: the outer walk's tombstone
+	// compaction must wait until every nested dispatch has also finished.
+	let dispatchDepth = 0;
 	let hasPendingRemovals = false;
 	const trackers: HookTracker<T>[] = [];
 
@@ -18,18 +21,21 @@ export const createHook = <T extends unknown[] = []>() => {
 		// the index walk isn't disturbed: an unhook only tombstones (`removed`) instead
 		// of splicing, and the snapshotted `count` excludes any subscriber a callback
 		// appends mid-dispatch — keeping it from firing on an event that predates it.
-		// Tombstones are compacted out once after dispatch; appends survive it.
-		dispatching = true;
-		const count = trackers.length;
-		for (let i = 0; i < count; i++) {
-			const tracker = trackers[i];
-			if (!tracker.removed) {
-				tracker.callback(...data, tracker.unhook);
+		// Tombstones are compacted out once after the outermost dispatch; appends survive it.
+		dispatchDepth++;
+		try {
+			const count = trackers.length;
+			for (let i = 0; i < count; i++) {
+				const tracker = trackers[i];
+				if (!tracker.removed) {
+					tracker.callback(...data, tracker.unhook);
+				}
 			}
+		} finally {
+			dispatchDepth--;
 		}
-		dispatching = false;
 
-		if (hasPendingRemovals) {
+		if (dispatchDepth === 0 && hasPendingRemovals) {
 			for (let i = trackers.length - 1; i >= 0; i--) {
 				if (trackers[i].removed) {
 					trackers.splice(i, 1);
@@ -57,7 +63,7 @@ export const createHook = <T extends unknown[] = []>() => {
 			}
 			tracker.removed = true;
 			// Defer the splice during dispatch so the in-progress index walk isn't disturbed.
-			if (dispatching) {
+			if (dispatchDepth > 0) {
 				hasPendingRemovals = true;
 			} else {
 				const index = trackers.indexOf(tracker);
