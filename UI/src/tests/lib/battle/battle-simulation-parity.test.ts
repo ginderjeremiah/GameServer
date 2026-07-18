@@ -798,8 +798,8 @@ const scenarios: ParityScenario[] = [
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
 	},
 
-	// Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two enemy
-	// skills (two dodge draws, one each now that Block's second draw is gone) fire on the same ticks.
+	// Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two enemy skills
+	// (three draws each — parry, dodge, counter-crit, per #1457 — six total) fire on the same ticks.
 	// CriticalDamage folds in the #799 base (1.5 + 0.5 = 2 multiplier). Neither side has Toughness. The player
 	// crits both hits (10×2=20, 15×2=30 → 50/tick); the enemy's two hits land in full (12 + 14 = 26/tick — no
 	// Block). The 100-HP enemy dies on the player's tick-20 volley → 800ms (before its own tick-20 attack), so
@@ -1701,6 +1701,35 @@ describe('Battle simulation parity with backend', () => {
 
 		expect(enemy.attributes.getValue(EAttribute.MaxHealth)).toBe(400);
 		expect(enemy.attributes.getValue(EAttribute.Toughness)).toBe(30); // 2·Endurance(15)
+	});
+
+	// Pins the production replayToOffset boundary (#1595/#1596/#1597 — battle-engine.ts:229-244) against this
+	// simulator's own tick loop: simulating to a mid-battle offset, then continuing on the same (already-mutated)
+	// battlers for the remainder, must land on the exact same outcome and total elapsed time as one uninterrupted
+	// `simulate()` call. Guards the loop's boundary arithmetic (`totalMs <= maxMs`, the `totalMs - tickSize` exit)
+	// against a future refactor silently shifting where a resumed replay picks up. Mirrors the backend
+	// `Parity_RunToOffsetThenContinue_MatchesUninterruptedRun` expectation.
+	it('replays to an offset then continues to the same conclusion as an uninterrupted run', () => {
+		const offset = 2400; // mid-battle: cooldownRecovery concludes at 5760ms.
+		const scenario = scenarios.find((s) => s.name === 'cooldownRecovery');
+		if (!scenario) {
+			throw new Error('cooldownRecovery scenario is missing from the matrix');
+		}
+
+		const splitSim = new BattleSimulator(scenario.player(), scenario.enemy(), PARITY_SEED);
+		const partial = splitSim.simulate(offset);
+		expect(partial.victory).toBe(false);
+		expect(partial.playerDied).toBe(false);
+		expect(partial.totalMs).toBe(offset);
+
+		// Continuing on the SAME (already-mutated) battlers, unbounded, must reach the identical conclusion a
+		// straight, uninterrupted run reaches from a fresh pair.
+		const continuation = splitSim.simulate();
+		const straight = new BattleSimulator(scenario.player(), scenario.enemy(), PARITY_SEED).simulate();
+
+		expect(continuation.victory).toBe(straight.victory);
+		expect(continuation.playerDied).toBe(straight.playerDied);
+		expect(offset + continuation.totalMs).toBe(straight.totalMs);
 	});
 
 	it('composes the equippedItemWithMods stat + item + mod attributes to the expected values', () => {
