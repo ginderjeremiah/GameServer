@@ -5,13 +5,14 @@ using Xunit;
 namespace Game.Infrastructure.Tests
 {
     /// <summary>
-    /// Unit tests for <see cref="PreparedScript"/>, the helper that lets <c>RedisService</c>/<c>RedisQueue</c>
-    /// send a Lua script's hash instead of its full text on every call after the first (#2056). The behaviour
-    /// that matters and is otherwise only exercised indirectly through a live Redis: a cold call that fails
-    /// before it reaches the server must not mark the script warmed, or every later call would jump straight to
-    /// an <c>EVALSHA</c> the server has genuinely never cached — pinned for both <see cref="PreparedScript.EvaluateAsync"/>
-    /// and <see cref="PreparedScript.Evaluate"/>, since the latter blocks its own cold call rather than sharing
-    /// the former's fallback logic.
+    /// Unit tests for <see cref="PreparedScript"/>, the helper that lets an awaited caller send a Lua script's
+    /// hash instead of its full text on every call after the first (#2056). The behaviour that matters and is
+    /// otherwise only exercised indirectly through a live Redis: a cold call that fails before it reaches the
+    /// server must not mark the script warmed, or every later call would jump straight to an <c>EVALSHA</c> the
+    /// server has genuinely never cached. <see cref="PreparedScript.Evaluate"/> (the fire-and-forget-capable sync
+    /// path) has no such state to pin — it always sends the full script text (#2126) — so it isn't covered here;
+    /// its NOSCRIPT-survival behaviour is covered by the integration suite instead
+    /// (RedisServiceIntegrationTests.HashSetAndForget_AfterScriptCacheIsFlushed_StillTakesEffect).
     /// <para>
     /// Uses the same dead-endpoint technique as the sibling <see cref="RedisPubSubPublishFailureTests"/>: a
     /// multiplexer pointed at an unreachable endpoint (<c>abortConnect=false</c>) connects lazily and then throws
@@ -36,21 +37,6 @@ namespace Game.Infrastructure.Tests
 
             // A failed cold call means Redis never actually cached this script; if it had wrongly been marked
             // warmed anyway, every later call would send only the hash and get NOSCRIPT forever.
-            Assert.False(script.IsWarmedForTesting);
-        }
-
-        [Fact]
-        public async Task Evaluate_WhenTheColdCallFails_LeavesTheScriptUnwarmed()
-        {
-            // Evaluate's cold branch strips a caller's FireAndForget flag and blocks for a confirmed reply, so
-            // this is pinned separately from EvaluateAsync's version of the same invariant: a dropped cold send
-            // must not wedge the script into the hash-only path.
-            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(DeadEndpoint);
-            var db = multiplexer.GetDatabase();
-            var script = new PreparedScript("return 1");
-
-            Assert.Throws<RedisConnectionException>(() => script.Evaluate(db, [], [], CommandFlags.FireAndForget));
-
             Assert.False(script.IsWarmedForTesting);
         }
 

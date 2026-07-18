@@ -224,6 +224,32 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task HashSetAndForget_AfterScriptCacheIsFlushedMidRun_StillTakesEffect()
+        {
+            // Mirrors a Redis restart, failover, or manual SCRIPT FLUSH clearing the server-side script cache
+            // mid-process (#2126). HashSetAndForget is fire-and-forget, so it gets no reply to inspect for
+            // NOSCRIPT — this only survives the flush if it never trusted an assumed-cached script in the first
+            // place, which is exactly the fix: it always sends the full script text.
+            var key = $"redis-hash-{Guid.NewGuid()}";
+            using var scope = CreateScope();
+            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+            // Exercise the script at least once first, matching a long-lived process that already warmed it
+            // before its Redis connection loses the script cache.
+            cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1" }, TimeSpan.FromSeconds(30));
+            await WaitForHashFieldCountAsync(cache, key, 1);
+
+            await FlushScriptCacheAsync();
+
+            cache.HashSetAndForget(key, new Dictionary<string, string> { ["b"] = "2" }, TimeSpan.FromSeconds(30));
+
+            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.ContainsKey("b") == true);
+
+            Assert.NotNull(fields);
+            Assert.Equal("2", fields["b"]);
+        }
+
+        [Fact]
         public async Task HashSetIfExistsAndForget_OnAMissingKey_DoesNotCreateIt()
         {
             var key = $"redis-hash-{Guid.NewGuid()}";
@@ -340,6 +366,14 @@ namespace Game.Application.Tests.DataAccess
         {
             await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
             return await multiplexer.GetDatabase().KeyTimeToLiveAsync(key);
+        }
+
+        private async Task FlushScriptCacheAsync()
+        {
+            var options = ConfigurationOptions.Parse(Containers.CacheConnectionString);
+            options.AllowAdmin = true;
+            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            await multiplexer.GetServers().First().ScriptFlushAsync();
         }
     }
 }
