@@ -188,7 +188,7 @@ namespace Game.DataAccess.Repositories.Admin
                     return ChangeSetProcessor.DuplicateFailure<SetProficiencyPrerequisitesData>("proficiency prerequisite");
                 }
 
-                if (ValidatePrerequisiteIds(proficiency.Id, change.PrerequisiteIds) is { } idRejection)
+                if (ValidatePrerequisiteIds(proficiency, change.PrerequisiteIds) is { } idRejection)
                 {
                     return idRejection;
                 }
@@ -230,19 +230,28 @@ namespace Game.DataAccess.Repositories.Admin
         }
 
         /// <summary>Returns a rejection if any id in <paramref name="prerequisiteIds"/> is
-        /// <paramref name="proficiencyId"/> itself or does not exist, else null.</summary>
-        private AdminSaveResult? ValidatePrerequisiteIds(int proficiencyId, IReadOnlyList<int> prerequisiteIds)
+        /// <paramref name="proficiency"/> itself, does not exist, or is on <paramref name="proficiency"/>'s own
+        /// path — gateways are cross-path only (a same-path prerequisite deadlocks the path against its own
+        /// implicit tier ordering, where tier N+1 requires tier N maxed) — else null.</summary>
+        private AdminSaveResult? ValidatePrerequisiteIds(Entities.Proficiency proficiency, IReadOnlyList<int> prerequisiteIds)
         {
             foreach (var prerequisiteId in prerequisiteIds)
             {
-                if (prerequisiteId == proficiencyId)
+                if (prerequisiteId == proficiency.Id)
                 {
                     return AdminSaveResult.Failure("A proficiency cannot be its own prerequisite.");
                 }
 
-                if (_proficiencies.LookupProficiency(prerequisiteId) is null)
+                var prerequisite = _proficiencies.LookupProficiency(prerequisiteId);
+                if (prerequisite is null)
                 {
                     return AdminSaveResult.Failure($"Prerequisite proficiency {prerequisiteId} does not exist.");
+                }
+
+                if (prerequisite.PathId == proficiency.PathId)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Prerequisite proficiency {prerequisiteId} is on the same path as proficiency {proficiency.Id} — gateways must be cross-path.");
                 }
             }
 

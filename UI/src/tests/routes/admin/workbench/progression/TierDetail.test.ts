@@ -244,8 +244,10 @@ describe('TierDetail — tab bodies', () => {
 	});
 
 	it('lists an existing prerequisite chip, removes it, and adds a new one', async () => {
-		const basics = tier({ id: 3, name: 'Basics', prerequisiteIds: [] });
-		const advanced = tier({ id: 7, name: 'Advanced', prerequisiteIds: [] });
+		// Gateways are cross-path only (#2128), so the prerequisite candidates live on a different
+		// path than the gated tier's own (pathId 0, the tier() default).
+		const basics = tier({ id: 3, pathId: 1, name: 'Basics', prerequisiteIds: [] });
+		const advanced = tier({ id: 7, pathId: 1, name: 'Advanced', prerequisiteIds: [] });
 		const gatedTier = tier({ prerequisiteIds: [3] });
 		const store = makeStore(gatedTier, { profs: [gatedTier, basics, advanced], tierTab: 'gateways' });
 		render(TierDetail, { props: { store } });
@@ -261,7 +263,8 @@ describe('TierDetail — tab bodies', () => {
 	it('offers an unsaved tier (negative id, never in staticData) as a prerequisite option (#1997)', async () => {
 		// id -1 is the first id ProgressionStore.nextId hands out to a brand-new tier — deliberately
 		// chosen here to also pin that it doesn't collide with the picker's own placeholder value.
-		const draftTier = tier({ id: -1, name: 'Brand New Tier', prerequisiteIds: [] });
+		// Cross-path (#2128) so it isn't excluded as a same-path candidate.
+		const draftTier = tier({ id: -1, pathId: 1, name: 'Brand New Tier', prerequisiteIds: [] });
 		const gatedTier = tier({ prerequisiteIds: [] });
 		const store = makeStore(gatedTier, { profs: [gatedTier, draftTier], tierTab: 'gateways' });
 		render(TierDetail, { props: { store } });
