@@ -101,8 +101,9 @@ export class BattleEngine {
 	public running = false;
 
 	/** The seeded battle RNG, re-created from each enemy's seed in {@link reset} so the live battle draws the
-	 *  crit/parry/dodge rolls from the same stream the backend replays. Seeded to 0 until the first reset. */
-	private rng = new Mulberry32(0);
+	 *  crit/parry/dodge rolls from the same stream the backend replays. Seeded to 0 until the first reset.
+	 *  `#`-private so `statify` leaves it non-reactive — it's a hot-path internal read only imperatively. */
+	#rng = new Mulberry32(0);
 
 	private logicalUnhook?: Action;
 	private renderUnhook?: Action;
@@ -112,8 +113,10 @@ export class BattleEngine {
 	private finishLoading?: Action;
 
 	/** Reused per-tick sink the shared battleStep populates with this tick's newly-applied effects and
-	 *  DoT/HoT amounts, so the engine can turn them into combat-log lines (frontend-only). */
-	private readonly stepLog: BattleStepLog = {
+	 *  DoT/HoT amounts, so the engine can turn them into combat-log lines (frontend-only). `#`-private so
+	 *  `statify` leaves it non-reactive — it's a reused sink written on every 40ms tick, and deep-proxying
+	 *  it would re-add the per-tick allocation cost it exists to avoid. */
+	readonly #stepLog: BattleStepLog = {
 		appliedEffects: [],
 		enemyDotDamage: 0,
 		playerDotDamage: 0,
@@ -123,22 +126,24 @@ export class BattleEngine {
 
 	/** Over-time damage/heal accumulated since the last flush. DoT/HoT applies every 40ms tick (25/s),
 	 *  so per-tick logging would flood the feed — instead each channel is summed and emitted as a single
-	 *  line per ~1s window (and once more at battle end for the final partial second). */
-	private readonly effectDamage = { enemyDot: 0, playerDot: 0, enemyHot: 0, playerHot: 0 };
-	private effectDamageElapsedMs = 0;
+	 *  line per ~1s window (and once more at battle end for the final partial second). `#`-private for the
+	 *  same reason as {@link #stepLog} above — a per-tick-written internal, never read reactively. */
+	readonly #effectDamage = { enemyDot: 0, playerDot: 0, enemyHot: 0, playerHot: 0 };
+	#effectDamageElapsedMs = 0;
 
 	/** The inputs of the last *full* player attribute derive — the equipment stats, attribute
 	 *  distribution, loadout, and level. An idle farm re-spawns with all four unchanged, so the
 	 *  per-enemy reset can re-arm the existing player battler instead of rebuilding the whole attribute
 	 *  graph (and every Skill) from scratch on each cooldown (#811). The arrays are compared by
 	 *  reference — every producer reassigns rather than mutates in place, so a reference match means the
-	 *  inputs are unchanged. */
-	private lastEquipmentStats?: IBattlerAttribute[];
-	private lastPlayerAttributes?: IBattlerAttribute[];
-	private lastSelectedSkills?: number[];
-	private lastPlayerLevel?: number;
-	private lastLockedBaseModifiers?: AttributeModifier[];
-	private lastProficiencyModifiers?: AttributeModifier[];
+	 *  inputs are unchanged. `#`-private so `statify` leaves them non-reactive — they're read only
+	 *  imperatively inside {@link resetPlayer}. */
+	#lastEquipmentStats?: IBattlerAttribute[];
+	#lastPlayerAttributes?: IBattlerAttribute[];
+	#lastSelectedSkills?: number[];
+	#lastPlayerLevel?: number;
+	#lastLockedBaseModifiers?: AttributeModifier[];
+	#lastProficiencyModifiers?: AttributeModifier[];
 
 	public start() {
 		if (!this.running) {
@@ -201,7 +206,7 @@ export class BattleEngine {
 		this.timeElapsed = 0;
 		// Seed the battle RNG from the enemy instance's seed (the same value the backend simulates against),
 		// so the crit/dodge/block draws stay in lockstep with the anti-cheat replay.
-		this.rng = new Mulberry32(enemyInstance.seed);
+		this.#rng = new Mulberry32(enemyInstance.seed);
 		this.flushEffectDamage();
 		this.resetPlayer();
 		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });
@@ -230,7 +235,7 @@ export class BattleEngine {
 		const cappedOffsetMs = Math.min(offsetMs, DEFAULT_MAX_BATTLE_MS);
 		let totalMs = tickSize;
 		for (; totalMs <= cappedOffsetMs; totalMs += tickSize) {
-			battleStep(this.player, this.enemy, tickSize, this.rng);
+			battleStep(this.player, this.enemy, tickSize, this.#rng);
 			if (this.enemy.isDead || this.player.isDead) {
 				break;
 			}
@@ -260,12 +265,12 @@ export class BattleEngine {
 		// farm re-arms the existing battler instead of rebuilding it (#811).
 		const lockedBaseModifiers = playerManager.battleLockedBaseModifiers;
 		if (
-			equipmentStats === this.lastEquipmentStats &&
-			attributes === this.lastPlayerAttributes &&
-			selectedSkills === this.lastSelectedSkills &&
-			level === this.lastPlayerLevel &&
-			lockedBaseModifiers === this.lastLockedBaseModifiers &&
-			proficiencyModifiers === this.lastProficiencyModifiers
+			equipmentStats === this.#lastEquipmentStats &&
+			attributes === this.#lastPlayerAttributes &&
+			selectedSkills === this.#lastSelectedSkills &&
+			level === this.#lastPlayerLevel &&
+			lockedBaseModifiers === this.#lastLockedBaseModifiers &&
+			proficiencyModifiers === this.#lastProficiencyModifiers
 		) {
 			this.player.reset();
 			return;
@@ -294,12 +299,12 @@ export class BattleEngine {
 		// (#1933) — re-snapshot now so a passive that raises MaxHealth doesn't leave the battler under-full,
 		// matching the backend's Battler ctor which snapshots CurrentHealth after the passive is composed in.
 		this.player.currentHealth = this.player.attributes.getValue(EAttribute.MaxHealth);
-		this.lastEquipmentStats = equipmentStats;
-		this.lastPlayerAttributes = attributes;
-		this.lastSelectedSkills = selectedSkills;
-		this.lastPlayerLevel = level;
-		this.lastLockedBaseModifiers = lockedBaseModifiers;
-		this.lastProficiencyModifiers = proficiencyModifiers;
+		this.#lastEquipmentStats = equipmentStats;
+		this.#lastPlayerAttributes = attributes;
+		this.#lastSelectedSkills = selectedSkills;
+		this.#lastPlayerLevel = level;
+		this.#lastLockedBaseModifiers = lockedBaseModifiers;
+		this.#lastProficiencyModifiers = proficiencyModifiers;
 	}
 
 	public getOpponent(battler: Battler) {
@@ -369,7 +374,7 @@ export class BattleEngine {
 		// loop must declare the draw on the same tick the headless BattleSimulator caps at (battle parity).
 		if (this.stage === Active) {
 			this.timeElapsed += timeDelta;
-			const activations = battleStep(this.player, this.enemy, timeDelta, this.rng, this.stepLog);
+			const activations = battleStep(this.player, this.enemy, timeDelta, this.#rng, this.#stepLog);
 			const damageLogEnabled = playerManager.logTypeEnabled(ELogType.Damage);
 			for (const { skill, damage, byPlayer, crit, dodged, parried, counter, reflected } of activations) {
 				const outcome = damageLogOutcome(byPlayer, crit, dodged, parried, counter);
@@ -451,7 +456,7 @@ export class BattleEngine {
 		if (!playerManager.logTypeEnabled(ELogType.SkillEffect)) {
 			return;
 		}
-		for (const { effect, onPlayer, amount } of this.stepLog.appliedEffects) {
+		for (const { effect, onPlayer, amount } of this.#stepLog.appliedEffects) {
 			const name = attributeName(effect.attributeId, staticData.attributes);
 			const isHarmful = attributeIsHarmful(effect.attributeId, staticData.attributes);
 			logMessage(ELogType.SkillEffect, effectLogMessage(effect, name, isHarmful, onPlayer, this.enemy.name, amount));
@@ -461,12 +466,12 @@ export class BattleEngine {
 	/** Adds this tick's DoT/HoT to the running per-channel totals, flushing a summary line once the
 	 *  accumulation window reaches a second. */
 	private accumulateEffectDamage(timeDelta: number) {
-		this.effectDamage.enemyDot += this.stepLog.enemyDotDamage;
-		this.effectDamage.playerDot += this.stepLog.playerDotDamage;
-		this.effectDamage.enemyHot += this.stepLog.enemyHotHeal;
-		this.effectDamage.playerHot += this.stepLog.playerHotHeal;
-		this.effectDamageElapsedMs += timeDelta;
-		if (this.effectDamageElapsedMs >= 1000) {
+		this.#effectDamage.enemyDot += this.#stepLog.enemyDotDamage;
+		this.#effectDamage.playerDot += this.#stepLog.playerDotDamage;
+		this.#effectDamage.enemyHot += this.#stepLog.enemyHotHeal;
+		this.#effectDamage.playerHot += this.#stepLog.playerHotHeal;
+		this.#effectDamageElapsedMs += timeDelta;
+		if (this.#effectDamageElapsedMs >= 1000) {
 			this.flushEffectDamage();
 		}
 	}
@@ -474,7 +479,7 @@ export class BattleEngine {
 	/** Emits one combat-log line per non-zero over-time channel accumulated since the last flush, then
 	 *  resets the window — so the player sees DoT/HoT totals without a line every 40ms tick. */
 	private flushEffectDamage() {
-		const { enemyDot, playerDot, enemyHot, playerHot } = this.effectDamage;
+		const { enemyDot, playerDot, enemyHot, playerHot } = this.#effectDamage;
 		if (enemyDot > 0) {
 			logMessage(ELogType.SkillEffect, `${this.enemy.name} took ${formatNum(enemyDot)} damage over time.`);
 		}
@@ -491,11 +496,11 @@ export class BattleEngine {
 	}
 
 	private resetEffectDamage() {
-		this.effectDamage.enemyDot = 0;
-		this.effectDamage.playerDot = 0;
-		this.effectDamage.enemyHot = 0;
-		this.effectDamage.playerHot = 0;
-		this.effectDamageElapsedMs = 0;
+		this.#effectDamage.enemyDot = 0;
+		this.#effectDamage.playerDot = 0;
+		this.#effectDamage.enemyHot = 0;
+		this.#effectDamage.playerHot = 0;
+		this.#effectDamageElapsedMs = 0;
 	}
 
 	private renderUpdate(renderDelta: number) {
