@@ -21,7 +21,7 @@ export const ACTIVE_SESSION_BODY =
  * blip) proceeds rather than blocking a legitimate login behind a best-effort warning.
  */
 export const confirmSessionTakeover = async (): Promise<boolean> => {
-	const response = await new ApiRequest('Login/ActiveSession').get();
+	const response = await new ApiRequest('Auth/ActiveSession').get();
 	if (response.status !== 200 || !response.data?.active) {
 		return true;
 	}

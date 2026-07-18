@@ -153,6 +153,8 @@ namespace Game.Api
                 .AddApplication()
                 .AddScoped<SessionService>()
                 .AddScoped<SessionInitializer>()
+                .AddScoped<PlayerDataAssembler>()
+                .AddScoped<CharacterSelectionService>()
                 .AddSingleton<IAccessTokenService, JwtTokenService>()
                 .AddSingleton<SocketConnectionRegistry>()
                 .AddTransient<SocketManagerService>()

@@ -28,7 +28,7 @@ export interface PlayerSelectDeps {
 	confirmTakeover: () => Promise<boolean>;
 	/** Initializes the player manager from the loaded character and navigates into the game. */
 	enterWorld: (player: IPlayerData) => void;
-	/** Loads the create-character class options (the bespoke `Login/CharacterCreationData` payload,
+	/** Loads the create-character class options (the bespoke `Players/CharacterCreationData` payload,
 	 *  reachable pre-player-selection over HTTP). Resolves [] on failure so the picker stays hidden. */
 	loadCreationData: () => Promise<ICreatableClass[]>;
 }

@@ -37,12 +37,12 @@ namespace Game.Api.Tests.Integration
             // The first PermitLimit attempts run the endpoint (rejected as bad credentials, not throttled).
             for (var i = 0; i < PermitLimit; i++)
             {
-                var allowed = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
+                var allowed = await Client.PostAsJsonAsync("/api/Auth", creds, CancellationToken);
                 Assert.NotEqual(HttpStatusCode.TooManyRequests, allowed.StatusCode);
             }
 
             // The next attempt is throttled before the endpoint runs.
-            var throttled = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
+            var throttled = await Client.PostAsJsonAsync("/api/Auth", creds, CancellationToken);
             Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
             Assert.True(throttled.Headers.Contains("Retry-After"));
 
@@ -59,11 +59,11 @@ namespace Game.Api.Tests.Integration
             // Exhaust the budget via Login.
             for (var i = 0; i < PermitLimit; i++)
             {
-                await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
+                await Client.PostAsJsonAsync("/api/Auth", creds, CancellationToken);
             }
 
             // A sibling auth endpoint draws from the same per-IP partition, so it is already throttled.
-            var createAccount = await Client.PostAsJsonAsync("/api/Login/CreateAccount", creds, CancellationToken);
+            var createAccount = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
             Assert.Equal(HttpStatusCode.TooManyRequests, createAccount.StatusCode);
         }
 
@@ -74,13 +74,13 @@ namespace Game.Api.Tests.Integration
             for (var i = 0; i < PermitLimit; i++)
             {
                 await Client.PostAsJsonAsync(
-                    "/api/Login", new { Username = "nobody", Password = "wrong" }, CancellationToken);
+                    "/api/Auth", new { Username = "nobody", Password = "wrong" }, CancellationToken);
             }
 
             // Logout is anonymous like its siblings, so it must also be throttled once the shared budget is
             // spent — closing the gap where it could be spammed unthrottled as a token-revocation surface.
             var loggedOut = await Client.PostAsJsonAsync(
-                "/api/Login/Logout", new { RefreshToken = "any-token" }, CancellationToken);
+                "/api/Auth/Logout", new { RefreshToken = "any-token" }, CancellationToken);
             Assert.Equal(HttpStatusCode.TooManyRequests, loggedOut.StatusCode);
         }
 
@@ -88,7 +88,7 @@ namespace Game.Api.Tests.Integration
         public async Task SingleRequest_UnderLimit_IsNotThrottled()
         {
             var response = await Client.PostAsJsonAsync(
-                "/api/Login", new { Username = "nobody", Password = "wrong" }, CancellationToken);
+                "/api/Auth", new { Username = "nobody", Password = "wrong" }, CancellationToken);
 
             Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode);
         }

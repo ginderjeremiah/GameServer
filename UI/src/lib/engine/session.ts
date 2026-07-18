@@ -2,7 +2,7 @@
    whatever it can from the persisted session and the reference-data cache along the way.
 
    The token pair (token-store) and the reference-data cache (reference-cache) both survive a refresh,
-   so a warm return trip needs no more than a Login/Status check and a single reference-version check
+   so a warm return trip needs no more than a Auth/Status check and a single reference-version check
    before dropping the player straight back into the game — no loading screen. The root layout drives
    this on boot; see docs/frontend.md. */
 
@@ -32,7 +32,7 @@ export async function resumeSession(): Promise<ResumeDestination> {
 }
 
 /**
- * Fetches the authoritative player aggregate via Login/Status and (re)initializes the player manager.
+ * Fetches the authoritative player aggregate via Auth/Status and (re)initializes the player manager.
  * Returns true when a usable session was loaded, false on no/expired session (non-200) or a failed/
  * unparseable request. The shared core of the boot-time {@link restorePlayer} and the mid-session
  * {@link refreshPlayer}. The request layer silently refreshes the access token and, on an unrecoverable
@@ -40,7 +40,7 @@ export async function resumeSession(): Promise<ResumeDestination> {
  */
 async function loadPlayer(): Promise<boolean> {
 	try {
-		const response = await new ApiRequest('Login/Status').get();
+		const response = await new ApiRequest('Auth/Status').get();
 		if (response.status !== 200) {
 			return false;
 		}
@@ -67,7 +67,7 @@ async function restorePlayer(): Promise<boolean> {
 }
 
 /**
- * Re-pulls the authoritative player aggregate (Login/Status) and re-initializes the player manager.
+ * Re-pulls the authoritative player aggregate (Auth/Status) and re-initializes the player manager.
  * Used by the welcome-back gate to refresh the offline-reward-updated state — level, exp, stat points,
  * unlocked skills, raw inventory data — before the game engine builds the live battler from it. Best-effort:
  * a failed refresh leaves the existing in-memory player intact rather than stranding the player at the gate.

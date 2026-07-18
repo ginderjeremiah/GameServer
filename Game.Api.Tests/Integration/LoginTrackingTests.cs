@@ -27,7 +27,7 @@ namespace Game.Api.Tests.Integration
             using var authClient = await LoginWithDeviceAsync("trackuser", "trackpass");
 
             // Act
-            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await authClient.GetAsync("/api/Auth/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             // Assert — a UserLogin, its Device, and the device's BrowserInfo were recorded for this user.
@@ -54,7 +54,7 @@ namespace Game.Api.Tests.Integration
             using var _client = authClient;
 
             // Act
-            var response = await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await authClient.GetAsync("/api/Auth/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             // Assert — without a fingerprint there is no device to key on, so nothing is recorded.
@@ -71,10 +71,10 @@ namespace Game.Api.Tests.Integration
             using var authClient = await LoginWithDeviceAsync("repeatuser", "repeatpass");
 
             // Act — two authenticated requests from the same user/IP/device.
-            await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            await authClient.GetAsync("/api/Auth/Status", CancellationToken);
             var firstConnection = await ReadLastConnectionAsync(userId);
 
-            await authClient.GetAsync("/api/Login/Status", CancellationToken);
+            await authClient.GetAsync("/api/Auth/Status", CancellationToken);
 
             // Assert — still a single row (the combination is unique), with a non-decreasing timestamp.
             using var scope = CreateScope();
@@ -98,7 +98,7 @@ namespace Game.Api.Tests.Integration
             var body = new { DeviceMemory = 16.0, HardwareConcurrency = 8 };
 
             // Act
-            var response = await authClient.PostAsJsonAsync("/api/Login/DeviceInfo", body, CancellationToken);
+            var response = await authClient.PostAsJsonAsync("/api/Auth/DeviceInfo", body, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             // Assert — the capabilities were applied to the Device for this request's fingerprint.
@@ -118,7 +118,7 @@ namespace Game.Api.Tests.Integration
             using var _client = authClient;
 
             // Act
-            var response = await authClient.PostAsJsonAsync("/api/Login/DeviceInfo",
+            var response = await authClient.PostAsJsonAsync("/api/Auth/DeviceInfo",
                 new { DeviceMemory = 8.0, HardwareConcurrency = 4 }, CancellationToken);
 
             // Assert
@@ -129,7 +129,7 @@ namespace Game.Api.Tests.Integration
         public async Task UnauthenticatedRequest_RecordsNothing()
         {
             // Act — an anonymous request never reaches the authenticated tracking path.
-            var response = await Client.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await Client.GetAsync("/api/Auth/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
             // Assert

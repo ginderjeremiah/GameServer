@@ -35,7 +35,7 @@ namespace Game.Api.Tests.Integration
             // Reload the caches so battle setup resolves the seeded enemy/zone (the caches no longer lazily refill).
             await ReloadReferenceCachesAsync();
 
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
+            var loginResponse = await Client.PostAsJsonAsync("/api/Auth",
                 new { Username = "defeatuser", Password = "defeatpass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 

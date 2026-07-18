@@ -403,7 +403,7 @@ namespace Game.Api.Tests.Integration
 
             // The freed username can now be claimed by a brand-new account.
             var createResponse = await Client.PostAsJsonAsync(
-                "/api/Login/CreateAccount", new { Username = "recycler", Password = "newpass" }, CancellationToken);
+                "/api/Auth/CreateAccount", new { Username = "recycler", Password = "newpass" }, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
             var createResult = await createResponse.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.Null(createResult?.ErrorMessage);
@@ -434,7 +434,7 @@ namespace Game.Api.Tests.Integration
 
             // A banned user keeps their username reserved, so it cannot be reused.
             var createResponse = await Client.PostAsJsonAsync(
-                "/api/Login/CreateAccount", new { Username = "outlaw", Password = "newpass" }, CancellationToken);
+                "/api/Auth/CreateAccount", new { Username = "outlaw", Password = "newpass" }, CancellationToken);
             Assert.Equal(HttpStatusCode.BadRequest, createResponse.StatusCode);
         }
 
@@ -482,7 +482,7 @@ namespace Game.Api.Tests.Integration
 
             // The freed username is claimed by a brand-new active account before the original is unarchived.
             var createResponse = await Client.PostAsJsonAsync(
-                "/api/Login/CreateAccount", new { Username = "recycler", Password = "newpass" }, CancellationToken);
+                "/api/Auth/CreateAccount", new { Username = "recycler", Password = "newpass" }, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
 
             var unarchive = await authClient.PostAsJsonAsync(

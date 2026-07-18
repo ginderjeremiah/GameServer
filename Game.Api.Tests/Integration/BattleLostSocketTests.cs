@@ -69,7 +69,7 @@ namespace Game.Api.Tests.Integration
             // Reload the caches so battle setup resolves the seeded enemy/zone (the caches no longer lazily refill).
             await ReloadReferenceCachesAsync();
 
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
+            var loginResponse = await Client.PostAsJsonAsync("/api/Auth",
                 new { Username = "weakplayer", Password = "weakpass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
@@ -94,7 +94,7 @@ namespace Game.Api.Tests.Integration
             // Reload the caches so battle setup resolves the seeded enemy/zone (the caches no longer lazily refill).
             await ReloadReferenceCachesAsync();
 
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
+            var loginResponse = await Client.PostAsJsonAsync("/api/Auth",
                 new { Username = "lossuser", Password = "losspass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 

@@ -145,7 +145,7 @@ namespace Game.Api.Tests.Integration
             var userId = await SeedUserAsync("fwduntrusted", "fwdpass");
             using var client = await LoginWithDeviceAsync("fwduntrusted", "fwdpass");
 
-            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await client.GetAsync("/api/Auth/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             var recordedIp = await ReadRecordedIpAsync(userId);
@@ -169,7 +169,7 @@ namespace Game.Api.Tests.Integration
             var userId = await SeedUserAsync("fwdtrusted", "fwdpass");
             using var client = await LoginWithDeviceAsync("fwdtrusted", "fwdpass");
 
-            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await client.GetAsync("/api/Auth/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             var recordedIp = await ReadRecordedIpAsync(userId);
@@ -195,7 +195,7 @@ namespace Game.Api.Tests.Integration
             var userId = await SeedUserAsync("fwdmultihop", "fwdpass");
             using var client = await LoginWithDeviceAsync("fwdmultihop", "fwdpass");
 
-            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await client.GetAsync("/api/Auth/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             var recordedIp = await ReadRecordedIpAsync(userId);
@@ -221,7 +221,7 @@ namespace Game.Api.Tests.Integration
             var userId = await SeedUserAsync("fwddefaultlimit", "fwdpass");
             using var client = await LoginWithDeviceAsync("fwddefaultlimit", "fwdpass");
 
-            var response = await client.GetAsync("/api/Login/Status", CancellationToken);
+            var response = await client.GetAsync("/api/Auth/Status", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             var recordedIp = await ReadRecordedIpAsync(userId);

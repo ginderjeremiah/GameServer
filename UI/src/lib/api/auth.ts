@@ -31,7 +31,7 @@ const EXPIRY_LEEWAY_SECONDS = 30;
  *
  *  - `success` — a fresh token pair was minted (or another tab's rotated pair was adopted).
  *  - `rejected` — either there is no stored refresh token to present, or the backend affirmatively
- *    rejected the one presented (`Login/Refresh` returns 400 for "Invalid or expired refresh token" —
+ *    rejected the one presented (`Auth/Refresh` returns 400 for "Invalid or expired refresh token" —
  *    its only failure path). Both are a definitively dead session, not something a retry can fix.
  *  - `retryable` — the attempt didn't complete (network error, a non-400 non-2xx status such as a 5xx or
  *    a 429 from rate limiting, or a malformed body). The stored refresh token may still be good; this is
@@ -51,7 +51,7 @@ let inFlightRefresh: Promise<RefreshOutcome> | null = null;
 const performRefresh = async (refreshToken: string): Promise<RefreshOutcome> => {
 	let response: Response;
 	try {
-		response = await fetch('/api/Login/Refresh', {
+		response = await fetch('/api/Auth/Refresh', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ refreshToken })

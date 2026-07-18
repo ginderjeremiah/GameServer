@@ -1,7 +1,7 @@
 <!-- In-game character switcher (#1072). An overlay that lets the player switch to another of the
 	account's characters without re-logging in. It reuses the login-flow player-select UI (the shared
 	`PlayerSelectPanel` driven by `PlayerSelectView`) with switch-flavoured behaviour injected: picking a
-	character tears down the live game, credits the departed character server-side via `Login/SwitchPlayer`
+	character tears down the live game, credits the departed character server-side via `Players/SwitchPlayer`
 	(the lossless-switch backend, #1071), then reloads so the boot gate resumes as the entered character —
 	whose catch-up summary the existing welcome-back gate surfaces on re-entry.
 
@@ -78,7 +78,7 @@ const switchPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 	stopEngines();
 	apiSocket.disconnect();
 
-	const response = await new ApiRequest('Login/SwitchPlayer').post({ playerId, refreshToken });
+	const response = await new ApiRequest('Players/SwitchPlayer').post({ playerId, refreshToken });
 	if (response.status !== 200) {
 		// The game is already torn down, so there is nothing to fall back to inline — recover by reloading,
 		// which the boot gate resolves into either the still-valid current session or the login screen.
@@ -92,7 +92,7 @@ const switchPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 
 const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
 	// classId is the picker's choice; the view-model guarantees one is selected before calling here.
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId });
+	const response = await new ApiRequest('Players/CreatePlayer').post({ name, classId });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}
@@ -101,7 +101,7 @@ const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => 
 
 // The create form's class options, fetched over HTTP (the same endpoint the login→select screen uses).
 const loadCreationData: PlayerSelectDeps['loadCreationData'] = async () => {
-	const response = await new ApiRequest('Login/CharacterCreationData').get();
+	const response = await new ApiRequest('Players/CharacterCreationData').get();
 	return response.status === 200 ? response.data : [];
 };
 
@@ -125,7 +125,7 @@ const loadCharacters = async () => {
 	loadError = null;
 	view = null;
 
-	const response = await new ApiRequest('Login/Players').get();
+	const response = await new ApiRequest('Players').get();
 	if (seq !== loadSeq) {
 		return;
 	}

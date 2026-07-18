@@ -1,3 +1,5 @@
+using Game.Application.Services;
+
 namespace Game.Api.Models.Auth
 {
     /// <summary>
@@ -9,5 +11,14 @@ namespace Game.Api.Models.Auth
     {
         public required string AccessToken { get; set; }
         public required string RefreshToken { get; set; }
+
+        public static AuthTokens From(AuthTokenPair tokens)
+        {
+            return new AuthTokens
+            {
+                AccessToken = tokens.AccessToken,
+                RefreshToken = tokens.RefreshToken,
+            };
+        }
     }
 }

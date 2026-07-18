@@ -1,7 +1,7 @@
 <!-- Class picker for the create-character flow: a radiogroup of the creatable classes plus a preview of
      the chosen class's kit (attribute fingerprint, signature passive, starter skills, weapon-first
      equipment) and its decorative word of power. The class data — with starter skill/item names already
-     resolved — is supplied by the host from the bespoke `Login/CharacterCreationData` payload, so this
+     resolved — is supplied by the host from the bespoke `Players/CharacterCreationData` payload, so this
      component is presentational and needs no reference data of its own (only attribute display metadata,
      which degrades to enum names before the reference sets load). -->
 <!-- Hide-on-empty lives here so the picker is self-contained: the host always renders it and it draws

@@ -1,5 +1,5 @@
 /* Pure display derivation for the create-character class picker. The class data itself (with starter
-   skill/item names already resolved) comes from the bespoke `Login/CharacterCreationData` payload, so
+   skill/item names already resolved) comes from the bespoke `Players/CharacterCreationData` payload, so
    this only orders equipment and formats the signature passive. Kept store-free (attribute reference
    data is passed in) so it unit tests without the static-data store, mirroring the param-passing
    `$lib/common` display helpers. */

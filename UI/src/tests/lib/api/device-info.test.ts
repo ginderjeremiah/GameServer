@@ -35,7 +35,7 @@ describe('device-info', () => {
 		it('posts the collected capabilities to the DeviceInfo endpoint', async () => {
 			await reportDeviceInfo();
 
-			expect(constructorMock).toHaveBeenCalledWith('Login/DeviceInfo');
+			expect(constructorMock).toHaveBeenCalledWith('Auth/DeviceInfo');
 			expect(postMock).toHaveBeenCalledTimes(1);
 			const payload = postMock.mock.calls[0][0];
 			expect(payload.hardwareConcurrency).toBe(8);

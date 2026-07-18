@@ -52,7 +52,7 @@ namespace Game.Api.Tests.Integration
             await ReloadReferenceCachesAsync();
 
             // Login to create the session in Redis that the socket handshake requires.
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
+            var loginResponse = await Client.PostAsJsonAsync("/api/Auth",
                 new { Username = "refdatauser", Password = "refdatapass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 

@@ -20,12 +20,7 @@ const DEVICE_FINGERPRINT_HEADER = 'X-Device-Fingerprint';
  * token / 401-refresh machinery must be skipped for them — otherwise a logout would try to refresh a
  * token it is about to revoke, and the refresh call could recurse.
  */
-const ANONYMOUS_ENDPOINTS: ReadonlySet<string> = new Set([
-	'Login',
-	'Login/CreateAccount',
-	'Login/Refresh',
-	'Login/Logout'
-]);
+const ANONYMOUS_ENDPOINTS: ReadonlySet<string> = new Set(['Auth', 'Auth/CreateAccount', 'Auth/Refresh', 'Auth/Logout']);
 
 export class ApiRequest<U extends ApiEndpoint> {
 	endpoint: U;

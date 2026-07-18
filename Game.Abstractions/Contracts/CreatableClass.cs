@@ -4,7 +4,7 @@ namespace Game.Abstractions.Contracts
 {
     /// <summary>A class as a character-creation option: the data the create-character class picker needs
     /// to preview the kit and let the player choose. Purpose-built and kept distinct from the reference
-    /// <see cref="Class"/> catalogue — it is delivered over HTTP (<c>Login/CharacterCreationData</c>) so it
+    /// <see cref="Class"/> catalogue — it is delivered over HTTP (<c>Players/CharacterCreationData</c>) so it
     /// is reachable on the pre-selection create-character screens, where the socket (and the reference data
     /// it serves) is not, and it carries resolved skill/item names so the preview needs no other reference
     /// sets. Retired classes are excluded.</summary>

@@ -48,7 +48,7 @@ namespace Game.Api.Tests.Integration
             await ReloadReferenceCachesAsync();
 
             // Login to create session
-            var loginResponse = await Client.PostAsJsonAsync("/api/Login",
+            var loginResponse = await Client.PostAsJsonAsync("/api/Auth",
                 new { Username = "battleuser", Password = "battlepass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 

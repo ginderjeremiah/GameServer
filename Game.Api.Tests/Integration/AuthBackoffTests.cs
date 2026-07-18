@@ -33,14 +33,14 @@ namespace Game.Api.Tests.Integration
             var creds = new { Username = "backofftarget", Password = "wrong" };
 
             // The first failure runs the credential check — a plain 400 invalid-credentials rejection.
-            var firstAttempt = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
+            var firstAttempt = await Client.PostAsJsonAsync("/api/Auth", creds, CancellationToken);
             Assert.Equal(HttpStatusCode.BadRequest, firstAttempt.StatusCode);
             var firstBody = await firstAttempt.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
             Assert.NotNull(firstBody);
 
             // The next attempt is within the backoff window: a 429 with a Retry-After hint and a message
             // distinct from the invalid-credentials one above.
-            var backedOff = await Client.PostAsJsonAsync("/api/Login", creds, CancellationToken);
+            var backedOff = await Client.PostAsJsonAsync("/api/Auth", creds, CancellationToken);
             Assert.Equal(HttpStatusCode.TooManyRequests, backedOff.StatusCode);
             Assert.True(backedOff.Headers.Contains("Retry-After"));
 

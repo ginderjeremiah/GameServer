@@ -28,7 +28,7 @@ namespace Game.Api.Tests.Unit
 
             var context = new DefaultHttpContext();
             context.Request.Method = "GET";
-            context.Request.Path = "/api/Login/Status";
+            context.Request.Path = "/api/Auth/Status";
             context.Response.StatusCode = 500;
             var sessionService = new SessionService(new NoOpSessionStore());
 

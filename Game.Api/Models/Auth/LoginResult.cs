@@ -6,7 +6,7 @@ namespace Game.Api.Models.Auth
     /// The result of a successful login: the issued (pre-selection) auth tokens plus a summary of each
     /// character on the account, so the client can authenticate subsequent requests and present the
     /// player-selection step. The selected character is loaded and bound by the follow-up
-    /// <c>Login/SelectPlayer</c> call, which rotates the tokens to carry the chosen player.
+    /// <c>Players/SelectPlayer</c> call, which rotates the tokens to carry the chosen player.
     /// </summary>
     public class LoginResult : IModel
     {

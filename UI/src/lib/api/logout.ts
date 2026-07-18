@@ -14,7 +14,7 @@ export const logout = async () => {
 	const refreshToken = getRefreshToken();
 	try {
 		if (refreshToken) {
-			await new ApiRequest('Login/Logout').post({ refreshToken });
+			await new ApiRequest('Auth/Logout').post({ refreshToken });
 		}
 	} finally {
 		clearTokens();

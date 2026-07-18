@@ -47,7 +47,7 @@ describe('auth', () => {
 			});
 			expect(getTokens()).toEqual({ accessToken: 'new-access', refreshToken: 'new-refresh' });
 			expect(fetchMock).toHaveBeenCalledWith(
-				'/api/Login/Refresh',
+				'/api/Auth/Refresh',
 				expect.objectContaining({ method: 'POST', body: JSON.stringify({ refreshToken: 'old-refresh' }) })
 			);
 		});

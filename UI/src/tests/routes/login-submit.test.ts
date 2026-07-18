@@ -41,7 +41,7 @@ const LOGIN_OK = {
 };
 
 const happyRoute = (route: string) =>
-	route === 'Login/CreateAccount' ? Promise.resolve({ status: 200 }) : Promise.resolve(LOGIN_OK);
+	route === 'Auth/CreateAccount' ? Promise.resolve({ status: 200 }) : Promise.resolve(LOGIN_OK);
 
 const fillCredentials = async (username = 'testuser', password = 'secret1') => {
 	await fireEvent.input(screen.getByTestId('username-input'), { target: { value: username } });
@@ -79,7 +79,7 @@ describe('Login page — submit flow', () => {
 		expect(handoffSetMock).toHaveBeenCalledWith(SUMMARIES);
 		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/select'));
 		// No character is auto-selected here any more.
-		expect(postMock).not.toHaveBeenCalledWith('Login/SelectPlayer', expect.anything());
+		expect(postMock).not.toHaveBeenCalledWith('Players/SelectPlayer', expect.anything());
 	});
 
 	it('hands off an empty character list and navigates to select (a freshly signed-up account)', async () => {
@@ -123,11 +123,11 @@ describe('Login page — submit flow', () => {
 
 		await waitFor(() => expect(gotoMock).toHaveBeenCalledWith('/select'));
 		// Signup creates the account only (no class) — the first character is created on the select screen.
-		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', {
+		expect(postMock).toHaveBeenCalledWith('Auth/CreateAccount', {
 			username: 'newhero',
 			password: 'Test1234'
 		});
-		expect(postMock).toHaveBeenCalledWith('Login', { username: 'newhero', password: 'Test1234' });
+		expect(postMock).toHaveBeenCalledWith('Auth', { username: 'newhero', password: 'Test1234' });
 	});
 
 	it('stops at account creation when CreateAccount fails', async () => {
@@ -142,7 +142,7 @@ describe('Login page — submit flow', () => {
 		await waitFor(() => expect(screen.getByTestId('status-line').textContent).toContain('Username already taken.'));
 		// The login request is never attempted once creation fails.
 		expect(postMock).toHaveBeenCalledTimes(1);
-		expect(postMock).toHaveBeenCalledWith('Login/CreateAccount', expect.anything());
+		expect(postMock).toHaveBeenCalledWith('Auth/CreateAccount', expect.anything());
 		expect(gotoMock).not.toHaveBeenCalled();
 	});
 });

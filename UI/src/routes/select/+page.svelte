@@ -38,7 +38,7 @@ const selectPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 		return { ok: false, error: 'Your session is no longer valid. Please log in again.' };
 	}
 
-	const response = await new ApiRequest('Login/SelectPlayer').post({ playerId, refreshToken });
+	const response = await new ApiRequest('Players/SelectPlayer').post({ playerId, refreshToken });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not enter the game.' };
 	}
@@ -49,7 +49,7 @@ const selectPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
 
 const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => {
 	// classId is the picker's choice; the view-model guarantees one is selected before calling here.
-	const response = await new ApiRequest('Login/CreatePlayer').post({ name, classId });
+	const response = await new ApiRequest('Players/CreatePlayer').post({ name, classId });
 	if (response.status !== 200) {
 		return { ok: false, error: response.error ?? 'Could not create the character.' };
 	}
@@ -60,7 +60,7 @@ const createPlayer: PlayerSelectDeps['createPlayer'] = async (name, classId) => 
 // (the socket — and the reference data it serves — requires a selected player). Resolve [] on failure
 // so the picker simply stays hidden.
 const loadCreationData: PlayerSelectDeps['loadCreationData'] = async () => {
-	const response = await new ApiRequest('Login/CharacterCreationData').get();
+	const response = await new ApiRequest('Players/CharacterCreationData').get();
 	return response.status === 200 ? response.data : [];
 };
 

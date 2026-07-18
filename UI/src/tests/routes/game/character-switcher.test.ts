@@ -53,7 +53,7 @@ const SUMMARIES = [
 	{ id: 2, name: 'Rogue', level: 7, currentZoneId: 1, lastActivity: '2026-06-19T00:00:00Z' }
 ];
 
-// The create form's class options come from Login/CharacterCreationData; one active class (id 0) so
+// The create form's class options come from Players/CharacterCreationData; one active class (id 0) so
 // creating a character defaults to and sends it.
 const CREATABLE_CLASS = {
 	id: 0,
@@ -71,7 +71,7 @@ const CREATABLE_CLASS = {
 
 // The switcher issues two GETs — the character list and the class options — so route the doubles.
 const getByRoute = (route: string) =>
-	route === 'Login/CharacterCreationData'
+	route === 'Players/CharacterCreationData'
 		? Promise.resolve({ status: 200, data: [CREATABLE_CLASS] })
 		: Promise.resolve({ status: 200, data: SUMMARIES });
 
@@ -106,7 +106,7 @@ describe('CharacterSwitcher', () => {
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		expect(screen.getByText('Rogue')).toBeTruthy();
 		expect(screen.queryByText('Hero')).toBeNull();
-		expect(getMock).toHaveBeenCalledWith('Login/Players');
+		expect(getMock).toHaveBeenCalledWith('Players');
 	});
 
 	it('switches: tears down the game, credits via SwitchPlayer, confirms takeover, and reloads', async () => {
@@ -120,7 +120,7 @@ describe('CharacterSwitcher', () => {
 		await fireEvent.click(screen.getAllByTestId('player-card')[0]);
 
 		await waitFor(() =>
-			expect(postMock).toHaveBeenCalledWith('Login/SwitchPlayer', { playerId: 2, refreshToken: 'r' })
+			expect(postMock).toHaveBeenCalledWith('Players/SwitchPlayer', { playerId: 2, refreshToken: 'r' })
 		);
 		// The socket/engines are torn down before the credit runs.
 		expect(stopEnginesMock).toHaveBeenCalled();
@@ -147,7 +147,7 @@ describe('CharacterSwitcher', () => {
 		await fireEvent.click(screen.getAllByTestId('player-card')[0]);
 
 		await waitFor(() =>
-			expect(postMock).toHaveBeenCalledWith('Login/SwitchPlayer', { playerId: 2, refreshToken: 'rotated' })
+			expect(postMock).toHaveBeenCalledWith('Players/SwitchPlayer', { playerId: 2, refreshToken: 'rotated' })
 		);
 	});
 
@@ -196,7 +196,7 @@ describe('CharacterSwitcher', () => {
 		let resolveStale: (value: unknown) => void = () => {};
 		let playersCalls = 0;
 		getMock.mockImplementation((route: string) => {
-			if (route !== 'Login/Players') {
+			if (route !== 'Players') {
 				return Promise.resolve({ status: 200, data: [CREATABLE_CLASS] });
 			}
 			playersCalls += 1;
@@ -253,7 +253,7 @@ describe('CharacterSwitcher', () => {
 		await fireEvent.input(screen.getByTestId('new-name-input'), { target: { value: 'Mage' } });
 		await fireEvent.submit(screen.getByTestId('create-form'));
 
-		await waitFor(() => expect(postMock).toHaveBeenCalledWith('Login/CreatePlayer', { name: 'Mage', classId: 0 }));
+		await waitFor(() => expect(postMock).toHaveBeenCalledWith('Players/CreatePlayer', { name: 'Mage', classId: 0 }));
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(2));
 		expect(screen.getByText('Mage')).toBeTruthy();
 	});
