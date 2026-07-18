@@ -111,16 +111,30 @@ namespace Game.Application.Tests.DataAccess
 
         public static IEnumerable<object[]> InfrastructureFailures()
         {
+            // Bare exceptions, hitting the top-level NpgsqlException/TimeoutException arms directly.
             yield return [() => new NpgsqlException("simulated connection outage")];
             yield return [() => new TimeoutException("simulated command timeout")];
+
+            // A PostgresException carrying a server-reported "can't do work right now" SQLSTATE is infrastructure-
+            // wide and self-resolving (a graceful failover/restart, or a reconnect-storm capacity limit), not a
+            // rejection of this specific write.
+            yield return [() => new PostgresException("admin shutdown", "FATAL", "FATAL", PostgresErrorCodes.AdminShutdown)];
+            yield return [() => new PostgresException("cannot connect now", "FATAL", "FATAL", PostgresErrorCodes.CannotConnectNow)];
+            yield return [() => new PostgresException("too many connections", "FATAL", "FATAL", PostgresErrorCodes.TooManyConnections)];
+
+            // EF Core's real shape: SaveChanges wraps the Npgsql/Postgres exception in a DbUpdateException (the
+            // same shape DbUpdateExceptionExtensions.IsUniqueViolation reads), exercising the InnerException
+            // recursion arm rather than a bare top-level exception.
+            yield return [() => new DbUpdateException("wrapped", new NpgsqlException("simulated connection outage"))];
+            yield return [() => new DbUpdateException("wrapped", new PostgresException("admin shutdown", "FATAL", "FATAL", PostgresErrorCodes.AdminShutdown))];
         }
 
         [Theory]
         [MemberData(nameof(InfrastructureFailures))]
         public async Task ProcessQueue_InfrastructureFailureDuringHandling_RetriesThenLeavesItReservedInsteadOfDeadLettering(Func<Exception> makeException)
         {
-            // A database-infrastructure failure (unreachable connection / command timeout) persists across every
-            // retry, standing in for a DB outage lasting longer than the retry budget (#2097).
+            // A database-infrastructure failure persists across every retry, standing in for a DB outage/failover
+            // lasting longer than the retry budget (#2097).
             var brokenServices = new AlwaysThrowingServiceProvider(makeException);
 
             using var scope = CreateScope();
@@ -146,14 +160,33 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(1, await queue.GetProcessingCountAsync());
         }
 
-        [Fact]
-        public async Task ProcessQueue_GenuinePostgresErrorAfterRetries_DeadLettersRatherThanLeavingItReserved()
+        public static IEnumerable<object[]> GenuinePerWriteFailures()
         {
-            // A PostgresException means the server responded — the connection is healthy and this specific write
-            // failed on its own merits, so it must still dead-letter like any other per-write failure rather than
-            // being (mis)classified as an infrastructure outage.
-            var brokenServices = new AlwaysThrowingServiceProvider(() =>
-                new PostgresException("deadlock detected", "ERROR", "ERROR", PostgresErrorCodes.DeadlockDetected));
+            // A deadlock is the base case: the server responded, only this write is affected.
+            yield return [() => new PostgresException("deadlock detected", "ERROR", "ERROR", PostgresErrorCodes.DeadlockDetected)];
+
+            // QueryCanceled is class 57 (operator_intervention) like AdminShutdown/CannotConnectNow, but it means
+            // *this* statement was cancelled (a lock/statement timeout, or a manual cancel) — not that the
+            // database is unreachable — so it must not be swept up by a blanket class-57 check.
+            yield return [() => new PostgresException("query canceled", "ERROR", "ERROR", PostgresErrorCodes.QueryCanceled)];
+
+            // DatabaseDropped is also 57Pxx like AdminShutdown/CannotConnectNow, but it isn't self-resolving —
+            // parking it would retry forever instead of surfacing to an operator.
+            yield return [() => new PostgresException("database dropped", "FATAL", "FATAL", PostgresErrorCodes.DatabaseDropped)];
+
+            // EF Core's real shape: SaveChanges wraps the PostgresException in a DbUpdateException, exercising
+            // the same InnerException recursion arm the infrastructure-failure cases above do.
+            yield return [() => new DbUpdateException("wrapped", new PostgresException("unique violation", "ERROR", "ERROR", PostgresErrorCodes.UniqueViolation))];
+        }
+
+        [Theory]
+        [MemberData(nameof(GenuinePerWriteFailures))]
+        public async Task ProcessQueue_GenuinePerWriteFailureAfterRetries_DeadLettersRatherThanLeavingItReserved(Func<Exception> makeException)
+        {
+            // A genuine per-write failure means the server responded — the connection is healthy and this
+            // specific write failed on its own merits, so it must still dead-letter like any other per-write
+            // failure rather than being (mis)classified as an infrastructure outage.
+            var brokenServices = new AlwaysThrowingServiceProvider(makeException);
 
             using var scope = CreateScope();
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
