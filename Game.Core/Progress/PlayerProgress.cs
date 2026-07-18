@@ -54,9 +54,14 @@ namespace Game.Core.Progress
         public IReadOnlyCollection<(EStatisticType Type, int? EntityId)> RecordBattleCompleted(
             Enemy enemy, bool victory, bool playerDied, int totalMs, BattleStats stats, bool isBossBattle, int zoneId)
         {
-            Record(EStatisticType.DamageDealt, null, (decimal)Math.Round(stats.PlayerDamageDealt, 3));
+            // PlayerDamageDealt/PlayerDamageTaken stay signed in BattleStats (parity-critical, health
+            // reconciliation) and can go negative under authored absorption (resistance > 1 heals instead of
+            // damaging). Floored here, at the Sum-aggregated lifetime-statistic seam, so an absorption-heavy
+            // battle's net can never regress the monotone lifetime totals or an in-flight challenge's progress
+            // (#2127) — mirroring how the sibling signed channels were floored (#2091, #2101).
+            Record(EStatisticType.DamageDealt, null, (decimal)Math.Round(Math.Max(0, stats.PlayerDamageDealt), 3));
             Record(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
-            Record(EStatisticType.DamageTaken, null, (decimal)Math.Round(stats.PlayerDamageTaken, 3));
+            Record(EStatisticType.DamageTaken, null, (decimal)Math.Round(Math.Max(0, stats.PlayerDamageTaken), 3));
             Record(EStatisticType.DamageHealed, null, (decimal)Math.Round(stats.PlayerDamageHealed, 3));
             Record(EStatisticType.EnemiesEncountered, null, 1);
             Record(EStatisticType.EnemiesEncountered, enemy.Id, 1);
@@ -64,7 +69,7 @@ namespace Game.Core.Progress
             // Player-only crit/dodge/parry tallies — recorded globally only (no per-skill/per-enemy breakdown),
             // alongside the damage statistics they mirror.
             Record(EStatisticType.CriticalHits, null, stats.CriticalHits);
-            Record(EStatisticType.CriticalDamageDealt, null, (decimal)Math.Round(stats.CriticalDamageDealt, 3));
+            Record(EStatisticType.CriticalDamageDealt, null, (decimal)Math.Round(Math.Max(0, stats.CriticalDamageDealt), 3));
             Record(EStatisticType.AttacksDodged, null, stats.AttacksDodged);
             Record(EStatisticType.DamageDodged, null, (decimal)Math.Round(stats.DamageDodged, 3));
             Record(EStatisticType.AttacksParried, null, stats.AttacksParried);
@@ -130,7 +135,7 @@ namespace Game.Core.Progress
             foreach (var (skillId, skillStats) in stats.SkillStats)
             {
                 Record(EStatisticType.SkillsUsed, skillId, skillStats.Uses);
-                Record(EStatisticType.DamageDealt, skillId, (decimal)Math.Round(skillStats.TotalDamage, 3));
+                Record(EStatisticType.DamageDealt, skillId, (decimal)Math.Round(Math.Max(0, skillStats.TotalDamage), 3));
                 Record(EStatisticType.HighestSingleAttackDamage, skillId, (decimal)Math.Round(skillStats.HighestSingleAttack, 3));
             }
 
