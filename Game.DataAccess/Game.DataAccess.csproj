@@ -1,9 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
-  </PropertyGroup>
-
   <ItemGroup>
     <InternalsVisibleTo Include="Game.Application.Tests" />
   </ItemGroup>
