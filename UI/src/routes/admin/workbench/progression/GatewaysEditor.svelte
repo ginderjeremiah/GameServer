@@ -64,7 +64,7 @@ const prereqName = (id: number) => store.profs.find((p) => p.id === id)?.name ||
 const addOptions = $derived([
 	{ value: ADD_PLACEHOLDER, text: '+ Add prerequisite…' },
 	...store.profs
-		.filter((p) => p.id !== tier.id && !p.retiredAt && !tier.prerequisiteIds.includes(p.id))
+		.filter((p) => p.pathId !== tier.pathId && !p.retiredAt && !tier.prerequisiteIds.includes(p.id))
 		.map((p) => ({ value: p.id, text: p.name || 'Unnamed tier' }))
 ]);
 

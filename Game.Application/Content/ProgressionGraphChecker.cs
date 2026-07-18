@@ -602,6 +602,13 @@ namespace Game.Application.Content
                         {
                             Error("ProficiencyPrerequisite", "Proficiency", proficiency.Id, $"has prerequisite proficiency {prerequisiteId}, which is retired/frozen, so this tier can never open.");
                         }
+
+                        // Gateways are cross-path only; a same-path prerequisite deadlocks the path against its
+                        // own implicit tier ordering (tier N+1 requires tier N maxed) regardless of ordinal.
+                        if (onLivePath && prerequisite.PathId == proficiency.PathId)
+                        {
+                            Error("ProficiencyPrerequisite", "Proficiency", proficiency.Id, $"has prerequisite proficiency {prerequisiteId}, which is on its own path {proficiency.PathId} — gateways must be cross-path, so this tier can never open.");
+                        }
                     }
                 }
             }

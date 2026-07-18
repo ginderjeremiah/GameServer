@@ -605,6 +605,33 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetPrerequisites_PrerequisiteOnSamePath_ReturnsFailure()
+        {
+            int gatedId, prerequisiteId;
+            using (var seedScope = CreateScope())
+            {
+                var path = await SeedPathAsync(seedScope);
+                gatedId = (await SeedProficiencyAsync(seedScope, path.Id, pathOrdinal: 0)).Id;
+                prerequisiteId = (await SeedProficiencyAsync(seedScope, path.Id, pathOrdinal: 1)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            // Gating tier 0 on tier 1 of the same path would deadlock the path — tier 1 can't accrue until
+            // tier 0 opens, but tier 0 never opens because tier 1 (which needs tier 0) can never be maxed.
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
+            {
+                Id = gatedId,
+                PrerequisiteIds = [prerequisiteId],
+            }]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("same path", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SetPrerequisites_WouldFormACycle_ReturnsFailure()
         {
             int gatedId, prerequisiteId;

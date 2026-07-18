@@ -687,6 +687,22 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Proficiency_PrerequisiteOnOwnPath_IsError()
+        {
+            // Gateways are cross-path only; a same-path prerequisite deadlocks the path against its own
+            // implicit tier ordering (tier N+1 requires tier N maxed), regardless of retirement state.
+            var graph = HealthyGraph() with
+            {
+                Proficiencies =
+                [
+                    Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(5, 5)], prerequisiteIds: [1]),
+                    Proficiency(1, pathId: 0, maxLevel: 10),
+                ],
+            };
+            AssertHasFinding(graph, "ProficiencyPrerequisite", ContentGraphSeverity.Error, "Proficiency", 0);
+        }
+
+        [Fact]
         public void Proficiency_OnMissingPath_IsError()
         {
             var graph = HealthyGraph() with
