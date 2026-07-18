@@ -13,12 +13,15 @@ namespace Game.Infrastructure.Redis
     /// <para>
     /// The very first call this process makes for a given script sends the full text — an <c>EVAL</c>, which as a
     /// side effect caches the script on the server under its hash — so a cold script cache never causes a
-    /// <c>NOSCRIPT</c> failure; every call after that sends the hash. <see cref="EvaluateAsync"/> additionally
-    /// falls back to a full-text resend if the server reports <c>NOSCRIPT</c> after the script was already warmed
-    /// (a manual <c>SCRIPT FLUSH</c> or a Redis restart that lost its script cache), so an awaited caller
-    /// self-heals. <see cref="Evaluate"/> (fire-and-forget) has no response to inspect for that — the same
-    /// no-delivery-guarantee every other <see cref="CommandFlags.FireAndForget"/> call in this tier already
-    /// accepts.
+    /// <c>NOSCRIPT</c> failure; every call after that sends the hash. That cold call is always a confirmed,
+    /// blocking round trip (a caller's <see cref="CommandFlags.FireAndForget"/> is ignored just for it), because
+    /// a dropped fire-and-forget cold send would still flip the warm flag and then wedge every later
+    /// <c>EVALSHA</c> into <c>NOSCRIPT</c> for the rest of the process — a materially worse failure than the
+    /// single lost op a normal fire-and-forget command risks. <see cref="EvaluateAsync"/> additionally falls back
+    /// to a full-text resend if the server reports <c>NOSCRIPT</c> on an already-warmed script (a manual
+    /// <c>SCRIPT FLUSH</c> or a Redis restart that lost its script cache), so an awaited caller also self-heals
+    /// after warm-up; <see cref="Evaluate"/> has no response to inspect for that once warmed, matching the
+    /// no-delivery-guarantee every other fire-and-forget call in this tier already accepts for a single op.
     /// </para>
     /// <para>
     /// <see cref="Cache.Redis.RedisService"/>/<see cref="PubSub.Redis.RedisQueue"/> are resolved transient
@@ -78,7 +81,11 @@ namespace Game.Infrastructure.Redis
         {
             if (!_warmed)
             {
-                var coldResult = db.ScriptEvaluate(_script, keys, values, flags);
+                // The cold call ignores a FireAndForget flag and blocks for a confirmed reply, so _warmed only
+                // flips once the script is genuinely cached server-side — see the class doc for why a dropped
+                // fire-and-forget cold send would be worse than the single-op loss this flag normally risks.
+                // One blocking round trip, once per process, on a path that is otherwise off the hot loop.
+                var coldResult = db.ScriptEvaluate(_script, keys, values, flags & ~CommandFlags.FireAndForget);
                 _warmed = true;
                 return coldResult;
             }

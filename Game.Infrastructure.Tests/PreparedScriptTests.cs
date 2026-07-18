@@ -9,7 +9,9 @@ namespace Game.Infrastructure.Tests
     /// send a Lua script's hash instead of its full text on every call after the first (#2056). The behaviour
     /// that matters and is otherwise only exercised indirectly through a live Redis: a cold call that fails
     /// before it reaches the server must not mark the script warmed, or every later call would jump straight to
-    /// an <c>EVALSHA</c> the server has genuinely never cached.
+    /// an <c>EVALSHA</c> the server has genuinely never cached — pinned for both <see cref="PreparedScript.EvaluateAsync"/>
+    /// and <see cref="PreparedScript.Evaluate"/>, since the latter blocks its own cold call rather than sharing
+    /// the former's fallback logic.
     /// <para>
     /// Uses the same dead-endpoint technique as the sibling <see cref="RedisPubSubPublishFailureTests"/>: a
     /// multiplexer pointed at an unreachable endpoint (<c>abortConnect=false</c>) connects lazily and then throws
@@ -38,15 +40,32 @@ namespace Game.Infrastructure.Tests
         }
 
         [Fact]
-        public async Task EvaluateAsync_WhenAlreadyWarmed_SendsTheHashRatherThanRewarming()
+        public async Task Evaluate_WhenTheColdCallFails_LeavesTheScriptUnwarmed()
+        {
+            // Evaluate's cold branch strips a caller's FireAndForget flag and blocks for a confirmed reply, so
+            // this is pinned separately from EvaluateAsync's version of the same invariant: a dropped cold send
+            // must not wedge the script into the hash-only path.
+            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(DeadEndpoint);
+            var db = multiplexer.GetDatabase();
+            var script = new PreparedScript("return 1");
+
+            Assert.Throws<RedisConnectionException>(() => script.Evaluate(db, [], [], CommandFlags.FireAndForget));
+
+            Assert.False(script.IsWarmedForTesting);
+        }
+
+        [Fact]
+        public async Task EvaluateAsync_WhenAlreadyWarmed_StaysWarmedAfterAFailedCall()
         {
             await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(DeadEndpoint);
             var db = multiplexer.GetDatabase();
             var script = PreparedScript.CreateAlreadyWarmedForTesting("return 1");
 
-            // Still fails against a dead endpoint either way, but this pins that a warmed script never revisits
-            // the cold (full-text) branch — CreateAlreadyWarmedForTesting's contract that the seam actually
-            // starts in the warmed state.
+            // A dead endpoint can't distinguish the hash branch from the full-text one — both throw the same
+            // RedisConnectionException before anything reaches a server — so this doesn't pin which command form
+            // was sent (that needs a genuine NOSCRIPT reply, covered by the Redis integration suites instead).
+            // What it does pin: CreateAlreadyWarmedForTesting actually starts warmed, and a failure afterward
+            // doesn't flip it back to cold.
             Assert.True(script.IsWarmedForTesting);
             await Assert.ThrowsAsync<RedisConnectionException>(() => script.EvaluateAsync(db, [], []));
             Assert.True(script.IsWarmedForTesting);
