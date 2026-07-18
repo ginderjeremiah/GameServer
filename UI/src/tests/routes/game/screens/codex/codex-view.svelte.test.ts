@@ -430,6 +430,13 @@ describe('CodexView dossier projections', () => {
 		expect(view.enemiesTab.challenges[0].progressText).toBe('sealed');
 	});
 
+	it('clamps progress text to the goal when stored progress races ahead of the completion push', () => {
+		playerChallenges.all = [{ challengeId: 0, progress: 112, completed: false }];
+		const view = new CodexView();
+		view.enemiesTab.selectEnemy(0);
+		expect(view.enemiesTab.challenges[0].progressText).toBe('100/100');
+	});
+
 	it('hides a retired enemy-scoped challenge unless it was already completed', () => {
 		staticData.challenges = [
 			...staticData.challenges,

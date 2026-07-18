@@ -36,3 +36,11 @@ export const challengeTypeColor = (id: EChallengeType): string =>
  */
 export const challengeTypeName = (id: EChallengeType, challengeTypes?: IChallengeType[]): string =>
 	challengeTypes?.find((t) => t.id === id)?.name ?? normalizeText(EChallengeType[id] ?? '');
+
+/**
+ * Clamp an accumulating challenge's raw progress to its goal for display. Stored progress can
+ * transiently exceed the goal in the window before a `ChallengeCompleted` push lands; every
+ * progress readout (Challenges screen, Codex dossier) should route through this so they can't
+ * diverge on how they handle it.
+ */
+export const clampChallengeProgress = (progress: number, goal: number): number => Math.min(progress, goal);
