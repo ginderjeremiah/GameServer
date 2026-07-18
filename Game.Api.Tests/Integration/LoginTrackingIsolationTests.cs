@@ -25,7 +25,8 @@ namespace Game.Api.Tests.Integration
     public class LoginTrackingIsolationTests : ApiIntegrationTestBase
     {
         private const string UserAgent = "TestAgent/1.0 (LoginTrackingIsolationTests)";
-        private const string Fingerprint = "fp-isolation";
+        // Well-formed (64 lowercase hex chars) — ClientHints.DeviceFingerprint now rejects anything else (#2064).
+        private const string Fingerprint = "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4";
 
         public LoginTrackingIsolationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
@@ -115,8 +116,8 @@ namespace Game.Api.Tests.Integration
             }
 
             public Task SaveDeviceInfo(
+                int userId,
                 string deviceFingerprintHash,
-                string userAgent,
                 string? secChUa,
                 string? secChUaMobile,
                 string? secChUaPlatform,

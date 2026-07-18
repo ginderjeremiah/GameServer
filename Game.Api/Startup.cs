@@ -33,6 +33,10 @@ namespace Game.Api
     /// </summary>
     public class Startup
     {
+        /// <summary>Caps the login-tracking dedupe memo (see <c>AddMemoryCache</c> below) so an unbounded
+        /// stream of distinct (user, IP, device) keys can't grow it without bound.</summary>
+        private const int MaxTrackingCacheEntries = 100_000;
+
         /// <summary>
         /// The entry point of the application.
         /// </summary>
@@ -146,8 +150,10 @@ namespace Game.Api
                 .AddSwaggerGen()
                 .AddHttpContextAccessor()
                 // Backs LoginTrackingMiddleware's short-lived per-device dedupe memo (instance-local is
-                // fine — a session sticks to one instance, per the single-connection architecture).
-                .AddMemoryCache()
+                // fine — a session sticks to one instance, per the single-connection architecture). Capped
+                // (each entry sized 1) so a burst of distinct (user, IP, device) keys can't grow the cache
+                // without bound (#2064); a full cache just means more memo misses, not a hard failure.
+                .AddMemoryCache(options => options.SizeLimit = MaxTrackingCacheEntries)
                 .AddDataAccess()
                 .AddDomainEventDispatcher()
                 .AddApplication()

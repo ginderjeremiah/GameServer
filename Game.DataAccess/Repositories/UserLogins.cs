@@ -13,6 +13,13 @@ namespace Game.DataAccess.Repositories
         // and browser; a second covers the rare case where the login row itself raced too.
         private const int MaxSaveAttempts = 3;
 
+        // Bounds how many distinct devices a single account can accumulate. Legitimate players use a
+        // handful of devices; without a cap, an authenticated caller cycling a fresh (validly-shaped)
+        // fingerprint on every request would otherwise grow the Devices/UserLogins tables without bound
+        // (#2064). Once reached, connections from a device the user hasn't already been seen on are
+        // simply not tracked rather than erroring — tracking is best-effort telemetry, not a gate on play.
+        private const int MaxTrackedDevicesPerUser = 20;
+
         private readonly GameContext _context;
 
         public UserLogins(GameContext context)
@@ -31,48 +38,61 @@ namespace Game.DataAccess.Repositories
             CancellationToken cancellationToken = default)
         {
             ipAddress = Truncate(ipAddress, UserLogin.MaxIpAddressLength) ?? string.Empty;
+            deviceFingerprintHash = Truncate(deviceFingerprintHash, Device.MaxFingerprintLength) ?? string.Empty;
 
             return SaveWithConflictRetry(async () =>
             {
-                var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
+                var device = await _context.Devices.FirstOrDefaultAsync(
+                    d => d.DeviceFingerprintHash == deviceFingerprintHash, cancellationToken);
 
-                // A brand-new device cannot have an existing login, so skip the lookup and rely on the
-                // navigation to propagate the generated DeviceId onto the new login when saved.
-                if (_context.Entry(device).State == EntityState.Added)
+                var login = device is null
+                    ? null
+                    : await _context.UserLogins.FirstOrDefaultAsync(l =>
+                        l.UserId == userId && l.IpAddress == ipAddress && l.DeviceId == device.Id, cancellationToken);
+
+                if (login is not null)
                 {
-                    _context.UserLogins.Add(new UserLogin
-                    {
-                        UserId = userId,
-                        IpAddress = ipAddress,
-                        Device = device,
-                        LastConnection = DateTime.UtcNow,
-                    });
+                    login.LastConnection = DateTime.UtcNow;
                     return;
                 }
 
-                var login = await _context.UserLogins.FirstOrDefaultAsync(l =>
-                    l.UserId == userId && l.IpAddress == ipAddress && l.DeviceId == device.Id, cancellationToken);
+                // A device (whether its row already exists globally or not) the user has no existing login
+                // for is a *new* device from this user's perspective, so it grows their tracked-device count
+                // and is subject to the cap.
+                var isNewDeviceForUser = device is null ||
+                    !await _context.UserLogins.AnyAsync(l => l.UserId == userId && l.DeviceId == device.Id, cancellationToken);
 
-                if (login is null)
+                if (isNewDeviceForUser)
                 {
-                    _context.UserLogins.Add(new UserLogin
+                    var trackedDeviceCount = await _context.UserLogins
+                        .Where(l => l.UserId == userId)
+                        .Select(l => l.DeviceId)
+                        .Distinct()
+                        .CountAsync(cancellationToken);
+
+                    if (trackedDeviceCount >= MaxTrackedDevicesPerUser)
                     {
-                        UserId = userId,
-                        IpAddress = ipAddress,
-                        DeviceId = device.Id,
-                        LastConnection = DateTime.UtcNow,
-                    });
+                        return;
+                    }
                 }
-                else
+
+                device ??= await CreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
+
+                // Set via the navigation, not DeviceId directly — a just-created device has no generated Id
+                // yet, and EF only fixes that up through the relationship once SaveChanges assigns one.
+                _context.UserLogins.Add(new UserLogin
                 {
-                    login.LastConnection = DateTime.UtcNow;
-                }
+                    UserId = userId,
+                    IpAddress = ipAddress,
+                    Device = device,
+                    LastConnection = DateTime.UtcNow,
+                });
             }, cancellationToken);
         }
 
         public Task SaveDeviceInfo(
+            int userId,
             string deviceFingerprintHash,
-            string userAgent,
             string? secChUa,
             string? secChUaMobile,
             string? secChUaPlatform,
@@ -80,20 +100,35 @@ namespace Game.DataAccess.Repositories
             int? hardwareConcurrency,
             CancellationToken cancellationToken = default)
         {
+            deviceFingerprintHash = Truncate(deviceFingerprintHash, Device.MaxFingerprintLength) ?? string.Empty;
+
             return SaveWithConflictRetry(async () =>
             {
-                var device = await GetOrCreateDevice(deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
+                // Only enrich a device this user actually has a tracked login for — never create or attach
+                // to one here — so a caller can't touch another account's device by guessing/replaying its
+                // fingerprint (#2064). RecordConnection (which runs earlier in the same request, via
+                // LoginTrackingMiddleware) is solely responsible for establishing that link.
+                var device = await _context.Devices
+                    .Include(d => d.BrowserInfo)
+                    .FirstOrDefaultAsync(d => d.DeviceFingerprintHash == deviceFingerprintHash &&
+                        _context.UserLogins.Any(l => l.UserId == userId && l.DeviceId == d.Id),
+                        cancellationToken);
 
+                if (device is null)
+                {
+                    return;
+                }
+
+                device.BrowserInfo.SecChUa ??= Truncate(secChUa, BrowserInfo.MaxClientHintLength);
+                device.BrowserInfo.SecChUaMobile ??= Truncate(secChUaMobile, BrowserInfo.MaxClientHintLength);
+                device.BrowserInfo.SecChUaPlatform ??= Truncate(secChUaPlatform, BrowserInfo.MaxClientHintLength);
                 device.DeviceMemory = deviceMemory;
                 device.HardwareConcurrency = hardwareConcurrency;
             }, cancellationToken);
         }
 
-        /// <summary>
-        /// Returns the tracked <see cref="Device"/> for the fingerprint, adding a new one (linked to the
-        /// user-agent's <see cref="BrowserInfo"/>) when none exists yet.
-        /// </summary>
-        private async Task<Device> GetOrCreateDevice(
+        /// <summary>Inserts a new <see cref="Device"/>, linked to the user-agent's <see cref="BrowserInfo"/>.</summary>
+        private async Task<Device> CreateDevice(
             string deviceFingerprintHash,
             string userAgent,
             string? secChUa,
@@ -101,19 +136,13 @@ namespace Game.DataAccess.Repositories
             string? secChUaPlatform,
             CancellationToken cancellationToken)
         {
-            deviceFingerprintHash = Truncate(deviceFingerprintHash, Device.MaxFingerprintLength) ?? string.Empty;
-
-            var device = await _context.Devices.FirstOrDefaultAsync(d => d.DeviceFingerprintHash == deviceFingerprintHash, cancellationToken);
-            if (device is null)
+            var browserInfo = await GetOrCreateBrowserInfo(userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
+            var device = new Device
             {
-                var browserInfo = await GetOrCreateBrowserInfo(userAgent, secChUa, secChUaMobile, secChUaPlatform, cancellationToken);
-                device = new Device
-                {
-                    DeviceFingerprintHash = deviceFingerprintHash,
-                    BrowserInfo = browserInfo,
-                };
-                _context.Devices.Add(device);
-            }
+                DeviceFingerprintHash = deviceFingerprintHash,
+                BrowserInfo = browserInfo,
+            };
+            _context.Devices.Add(device);
 
             return device;
         }

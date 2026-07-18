@@ -109,7 +109,7 @@ namespace Game.Application.Tests.DataAccess
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => userLogins.SaveDeviceInfo(
-                    "fp-cancel", "ua", null, null, null, 8, 4, AlreadyCancelled()));
+                    1, "fp-cancel", null, null, null, 8, 4, AlreadyCancelled()));
         }
 
         [Fact]

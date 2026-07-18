@@ -33,8 +33,8 @@ namespace Game.Application.Services
         }
 
         public Task SaveDeviceInfo(
+            int userId,
             string deviceFingerprintHash,
-            string userAgent,
             string? secChUa,
             string? secChUaMobile,
             string? secChUaPlatform,
@@ -43,7 +43,7 @@ namespace Game.Application.Services
             CancellationToken cancellationToken = default)
         {
             return _userLogins.SaveDeviceInfo(
-                deviceFingerprintHash, userAgent, secChUa, secChUaMobile, secChUaPlatform,
+                userId, deviceFingerprintHash, secChUa, secChUaMobile, secChUaPlatform,
                 deviceMemory, hardwareConcurrency, cancellationToken);
         }
     }
