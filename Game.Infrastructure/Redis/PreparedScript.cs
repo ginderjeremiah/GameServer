@@ -11,17 +11,24 @@ namespace Game.Infrastructure.Redis
     /// fixed named-parameter model can't express), so this talks to <see cref="IDatabase"/> directly rather than
     /// through that helper.
     /// <para>
-    /// The very first call this process makes for a given script sends the full text — an <c>EVAL</c>, which as a
-    /// side effect caches the script on the server under its hash — so a cold script cache never causes a
-    /// <c>NOSCRIPT</c> failure; every call after that sends the hash. That cold call is always a confirmed,
-    /// blocking round trip (a caller's <see cref="CommandFlags.FireAndForget"/> is ignored just for it), because
-    /// a dropped fire-and-forget cold send would still flip the warm flag and then wedge every later
-    /// <c>EVALSHA</c> into <c>NOSCRIPT</c> for the rest of the process — a materially worse failure than the
-    /// single lost op a normal fire-and-forget command risks. <see cref="EvaluateAsync"/> additionally falls back
-    /// to a full-text resend if the server reports <c>NOSCRIPT</c> on an already-warmed script (a manual
-    /// <c>SCRIPT FLUSH</c> or a Redis restart that lost its script cache), so an awaited caller also self-heals
-    /// after warm-up; <see cref="Evaluate"/> has no response to inspect for that once warmed, matching the
-    /// no-delivery-guarantee every other fire-and-forget call in this tier already accepts for a single op.
+    /// <see cref="EvaluateAsync"/> is the only method that trusts the server-side script cache: the first call for
+    /// a given script sends the full text (an <c>EVAL</c>, which as a side effect caches it under its hash), every
+    /// call after that sends just the hash, and a <c>NOSCRIPT</c> reply (a manual <c>SCRIPT FLUSH</c>, or a Redis
+    /// restart/failover that lost its script cache) falls back to a full-text resend — so an awaited caller
+    /// self-heals from a cleared cache no matter the cause.
+    /// </para>
+    /// <para>
+    /// <see cref="Evaluate"/> (the fire-and-forget-capable sync path) passes <see cref="CommandFlags.NoScriptCache"/>
+    /// on every call (#2126). This isn't just skipping our own <c>_hash</c>/<c>_warmed</c> bookkeeping — without
+    /// it, StackExchange.Redis' own <c>ScriptEvalMessage</c> transparently substitutes <c>EVALSHA</c> for any
+    /// script text it has seen succeed before (a *per-connection* cache, independent of this class), and its
+    /// <c>NOSCRIPT</c> self-heal only runs inside the reply processor — which a <see cref="CommandFlags.FireAndForget"/>
+    /// command never reaches, since the reply is discarded before it gets there. So once that library-level cache
+    /// believes the script is known, a fire-and-forget call silently wedges into <c>NOSCRIPT</c> for the rest of
+    /// the process the moment the server-side cache is cleared (restart, failover, <c>SCRIPT FLUSH</c>) — and
+    /// <c>NoScriptCache</c> is the only way to opt a call out of that library behaviour, forcing a literal
+    /// <c>EVAL</c> every time. These scripts are ~100-300 bytes, so the bytes an <c>EVALSHA</c> would save isn't
+    /// worth that failure mode.
     /// </para>
     /// <para>
     /// <see cref="Cache.Redis.RedisService"/>/<see cref="PubSub.Redis.RedisQueue"/> are resolved transient
@@ -79,18 +86,10 @@ namespace Game.Infrastructure.Redis
 
         public RedisResult Evaluate(IDatabase db, RedisKey[] keys, RedisValue[] values, CommandFlags flags = CommandFlags.None)
         {
-            if (!_warmed)
-            {
-                // The cold call ignores a FireAndForget flag and blocks for a confirmed reply, so _warmed only
-                // flips once the script is genuinely cached server-side — see the class doc for why a dropped
-                // fire-and-forget cold send would be worse than the single-op loss this flag normally risks.
-                // One blocking round trip, once per process, on a path that is otherwise off the hot loop.
-                var coldResult = db.ScriptEvaluate(_script, keys, values, flags & ~CommandFlags.FireAndForget);
-                _warmed = true;
-                return coldResult;
-            }
-
-            return db.ScriptEvaluate(_hash, keys, values, flags);
+            // NoScriptCache forces a literal EVAL and opts out of StackExchange.Redis' own transparent
+            // EVALSHA-once-known cache — see the class doc for why this path can't safely trust either that or
+            // our own _warmed the way EvaluateAsync does.
+            return db.ScriptEvaluate(_script, keys, values, flags | CommandFlags.NoScriptCache);
         }
     }
 }
