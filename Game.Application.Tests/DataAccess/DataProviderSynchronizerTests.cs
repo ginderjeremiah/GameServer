@@ -11,6 +11,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Xunit;
 
 namespace Game.Application.Tests.DataAccess
@@ -106,6 +107,68 @@ namespace Game.Application.Tests.DataAccess
             // Both events that exhausted their retries are preserved on the dead-letter queue rather than dropped.
             var deadLettered = await DrainDeadLetterQueue(pubsub);
             Assert.Equal(2, deadLettered.Count);
+        }
+
+        public static IEnumerable<object[]> InfrastructureFailures()
+        {
+            yield return [() => new NpgsqlException("simulated connection outage")];
+            yield return [() => new TimeoutException("simulated command timeout")];
+        }
+
+        [Theory]
+        [MemberData(nameof(InfrastructureFailures))]
+        public async Task ProcessQueue_InfrastructureFailureDuringHandling_RetriesThenLeavesItReservedInsteadOfDeadLettering(Func<Exception> makeException)
+        {
+            // A database-infrastructure failure (unreachable connection / command timeout) persists across every
+            // retry, standing in for a DB outage lasting longer than the retry budget (#2097).
+            var brokenServices = new AlwaysThrowingServiceProvider(makeException);
+
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
+
+            var queuedEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false, null);
+            var queue = new InMemoryPubSubQueue(Serialize(queuedEvent));
+
+            await synchronizer.ProcessQueue(queue);
+
+            // Retried the full attempt budget just like any other unexpected failure.
+            Assert.Equal(TestRetryPolicy.MaxAttempts - 1, logger.Entries.Count(e => e.Level == LogLevel.Warning && e.Message.Contains("retrying")));
+
+            // The terminal failure is logged as an outage, distinctly from a genuine dead-letter.
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("database outage"));
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("dead-letter"));
+
+            // Nothing was dead-lettered — the item stays reserved on the processing list for the reclaim to
+            // pick back up once the database recovers, rather than requiring a manual replay.
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+            Assert.Equal(1, await queue.GetProcessingCountAsync());
+        }
+
+        [Fact]
+        public async Task ProcessQueue_GenuinePostgresErrorAfterRetries_DeadLettersRatherThanLeavingItReserved()
+        {
+            // A PostgresException means the server responded — the connection is healthy and this specific write
+            // failed on its own merits, so it must still dead-letter like any other per-write failure rather than
+            // being (mis)classified as an infrastructure outage.
+            var brokenServices = new AlwaysThrowingServiceProvider(() =>
+                new PostgresException("deadlock detected", "ERROR", "ERROR", PostgresErrorCodes.DeadlockDetected));
+
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
+
+            var queuedEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false, null);
+            var queue = new InMemoryPubSubQueue(Serialize(queuedEvent));
+
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("dead-lettering"));
+            var deadLettered = await DrainDeadLetterQueue(pubsub);
+            Assert.Single(deadLettered);
+            Assert.Equal(0, await queue.GetProcessingCountAsync());
         }
 
         [Fact]
@@ -1968,6 +2031,19 @@ namespace Game.Application.Tests.DataAccess
 
                 return inner.GetRequiredService<IServiceScopeFactory>().CreateScope();
             }
+        }
+
+        /// <summary>
+        /// Fails every scope creation with a caller-supplied exception, standing in for a failure that persists
+        /// across every retry attempt (e.g. a database outage lasting longer than the retry budget) rather than
+        /// <see cref="FlakyServiceProvider"/>'s bounded number of failures. A factory (not a shared instance) so
+        /// each attempt throws its own exception object.
+        /// </summary>
+        private sealed class AlwaysThrowingServiceProvider(Func<Exception> exceptionFactory) : IServiceProvider, IServiceScopeFactory
+        {
+            public object? GetService(Type serviceType) => serviceType == typeof(IServiceScopeFactory) ? this : null;
+
+            public IServiceScope CreateScope() => throw exceptionFactory();
         }
 
         /// <summary>
