@@ -1,6 +1,6 @@
+using Game.Abstractions.Content;
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess;
-using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Application.Content
 {
@@ -54,30 +54,14 @@ namespace Game.Application.Content
         }
 
         /// <summary>Assembles the whole static graph from the in-memory reference caches — the same published
-        /// projection the client and Workbench receive. Mirrors <see cref="ContentExporter"/>'s set list; tags
-        /// are the one set not held in a reference cache, so they're materialized from the DB read stream like
-        /// the exporter does.</summary>
-        private async Task<ContentGraph> BuildGraphAsync(CancellationToken cancellationToken)
+        /// projection the client and Workbench receive. Shares <see cref="LiveContentGraphAssembler"/> with
+        /// <see cref="ContentExporter"/>, which builds the identical graph before canonicalizing and
+        /// serializing it.</summary>
+        private Task<ContentGraph> BuildGraphAsync(CancellationToken cancellationToken)
         {
-            var tags = new List<Contracts.Tag>();
-            await foreach (var tag in _tags.All().WithCancellation(cancellationToken))
-            {
-                tags.Add(tag);
-            }
-
-            return new ContentGraph(
-                Skills: _skills.AllSkills(),
-                Tags: tags,
-                Items: _items.All(),
-                ItemMods: _itemMods.All(),
-                Enemies: _enemies.All(),
-                Zones: _zones.All(),
-                Challenges: _challenges.All().Select(ChallengeContractMapper.ToContract).ToList(),
-                Classes: _classes.All(),
-                Paths: _proficiencies.AllPaths(),
-                Proficiencies: _proficiencies.AllProficiencies(),
-                SkillRecipes: _skillRecipes.AllSkillRecipes(),
-                Lessons: _lessons.AllLessons());
+            return LiveContentGraphAssembler.BuildAsync(
+                _skills, _tags, _items, _itemMods, _enemies, _zones, _challenges, _classes, _proficiencies,
+                _skillRecipes, _lessons, cancellationToken);
         }
 
         /// <summary>Projects the checker's domain findings onto the admin report contract and tallies the

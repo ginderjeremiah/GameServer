@@ -16,6 +16,6 @@ namespace Game.Abstractions.Content
         /// because content was already present. Does <em>not</em> reload the reference caches — the caller
         /// reloads them (at startup the eager cache load that follows migration picks the seed up).
         /// </summary>
-        Task<bool> SeedAsync(ContentImport content, CancellationToken cancellationToken = default);
+        Task<bool> SeedAsync(ContentGraph content, CancellationToken cancellationToken = default);
     }
 }

@@ -166,9 +166,9 @@ namespace Game.Application.Tests.Content
 
         /// <summary>An otherwise-empty content graph, so a test can seed just the sets it exercises via a
         /// <c>with</c> expression.</summary>
-        private static ContentImport EmptyImport()
+        private static ContentGraph EmptyImport()
         {
-            return new ContentImport
+            return new ContentGraph
             {
                 Skills = [],
                 Tags = [],

@@ -11,11 +11,11 @@ namespace Game.Application.Content
         /// published/containerized app without any environment-specific path logic.</summary>
         public static string DefaultDirectory => Path.Combine(AppContext.BaseDirectory, "content");
 
-        public ContentImport ReadDefault() => Read(DefaultDirectory);
+        public ContentGraph ReadDefault() => Read(DefaultDirectory);
 
-        public ContentImport Read(string directory)
+        public ContentGraph Read(string directory)
         {
-            return new ContentImport
+            return new ContentGraph
             {
                 Skills = ReadSet<Contracts.Skill>(directory, "skills.json"),
                 Tags = ReadSet<Contracts.Tag>(directory, "tags.json"),
