@@ -362,6 +362,9 @@ const stopGame = () => {
 	statistics.reset();
 	playerChallenges.reset();
 	playerProficiencies.reset();
+	// Cleared so a subsequent login in the same tab re-checks content versions instead of reusing
+	// whatever reference data was in memory for the prior session (#2067).
+	staticData.reset();
 	resetLogs();
 	// Clear the other module-level UI stores stopEngines/the resets above don't touch, so a leftover toast,
 	// queued modal, or pending screen request can't leak into the next session (e.g. a "View" toast action

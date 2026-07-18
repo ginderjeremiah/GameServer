@@ -22,8 +22,9 @@ const {
 	navigation,
 	clearToasts
 } = vi.hoisted(() => ({
-	staticDataStub: { loaded: true } as {
+	staticDataStub: { loaded: true, reset: vi.fn() } as {
 		loaded: boolean;
+		reset: () => void;
 		challenges?: ({ id: number; name: string; rewardItemId?: number } | undefined)[];
 		items?: ({ id: number; name: string; rarityId: number; itemCategoryId: number } | undefined)[];
 		itemMods?: unknown[];
@@ -394,6 +395,13 @@ describe('startGame', () => {
 		void handleSocketReplaced();
 
 		expect(navigation.reset).toHaveBeenCalledTimes(1);
+	});
+
+	it("stopGame clears the in-memory reference data so a subsequent login re-checks content versions instead of reusing the prior session's copy (#2067)", () => {
+		startGame();
+		void handleSocketReplaced();
+
+		expect(staticDataStub.reset).toHaveBeenCalledTimes(1);
 	});
 
 	it('stopGame clears an open coach-mark tour so it cannot leak onto the next character (#2092)', () => {

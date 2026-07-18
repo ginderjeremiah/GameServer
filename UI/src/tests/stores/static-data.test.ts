@@ -77,4 +77,16 @@ describe('staticData store', () => {
 		staticData.skills = undefined;
 		expect(staticData.loaded).toBe(false);
 	});
+
+	it('reset() clears every slot back to unloaded', () => {
+		populateAll();
+		expect(staticData.loaded).toBe(true);
+
+		staticData.reset();
+
+		for (const slot of SLOTS) {
+			expect(staticData[slot]).toBeUndefined();
+		}
+		expect(staticData.loaded).toBe(false);
+	});
 });
