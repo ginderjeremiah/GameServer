@@ -69,7 +69,7 @@ import { childChanged } from '../save-helpers';
 import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, TierTab } from './progression-store.svelte';
 import { payoutLevels, proficiencyWarnings } from './progression-helpers';
-import DetailHeader from './DetailHeader.svelte';
+import DetailHeader from '../components/DetailHeader.svelte';
 import ConlangIdentity from './ConlangIdentity.svelte';
 import XpCurve from './XpCurve.svelte';
 import MilestonesEditor from './MilestonesEditor.svelte';

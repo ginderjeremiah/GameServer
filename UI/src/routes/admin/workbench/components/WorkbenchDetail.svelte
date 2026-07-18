@@ -14,67 +14,33 @@
 	{@const curSection = entity.sections.find((s) => s.key === tab) ?? entity.sections[0]}
 	{@const title = entity.title?.(record) || record.name}
 	<div class="detail-pane">
-		<div class="detail-head">
-			<div class="head-row">
-				<span class="rec-id" class:is-new={record.id < 0}>{record.id < 0 ? 'new' : `#${record.id}`}</span>
-				<h2 class="rec-name" class:blank={!title}>{title || entity.blankName}</h2>
-				{#if badge}
-					<span class="rare-tag" style:color={entity.badgeColor?.(record) ?? 'var(--text-secondary)'}>{badge}</span>
-				{/if}
-				{#if status === 'added'}<span class="spill added">new</span>{/if}
-				{#if status === 'modified'}<span class="spill modified">edited</span>{/if}
-				{#if status === 'deleted'}<span class="spill deleted">removed</span>{/if}
-				{#if entity.retireable && store.isRetired(record)}<span class="spill retired">retired</span>{/if}
-				<div class="spacer"></div>
-				{#if status === 'deleted'}
-					<button type="button" class="hdr-action accent" onclick={() => store.restoreItem(record.id)}>
-						<WorkbenchIcon kind="check" size={11} sw={1.7} />Restore
-					</button>
-				{:else}
-					{#if status === 'modified'}
-						<button type="button" class="hdr-action reset" onclick={() => store.resetItem(record.id)}>Reset</button>
-					{/if}
-					{#if entity.retireable}
-						{#if record.id < 0}
-							<!-- Never-saved record: drop it locally (it was never persisted, so it's not "retired"). -->
-							<button type="button" class="hdr-action danger" onclick={() => store.removeItem(record.id)}>
-								<WorkbenchIcon kind="x" size={11} />Remove
-							</button>
-						{:else if store.isRetired(record)}
-							<button type="button" class="hdr-action accent" onclick={() => store.setRetired(record.id, false)}>
-								<WorkbenchIcon kind="check" size={11} sw={1.7} />Reinstate
-							</button>
-						{:else}
-							<button type="button" class="hdr-action danger" onclick={() => onRetire(record)}>
-								<WorkbenchIcon kind="archive" size={11} />Retire
-							</button>
-						{/if}
-					{:else}
-						<button type="button" class="hdr-action danger" onclick={() => onDelete(record)}>
-							<WorkbenchIcon kind="x" size={11} />Delete
-						</button>
-					{/if}
-				{/if}
-			</div>
-
-			{#if entity.headline}
-				<div class="detail-headline">{entity.headline(record)}</div>
-			{/if}
-
-			<div class="tabs">
-				{#each entity.sections as section (section.key)}
-					{@const count = section.count?.(record) ?? null}
-					{@const incomplete = sectionWarnings(section, record).length > 0}
-					{@const dirty = sectionDirty(section)}
-					<button type="button" class="tab" class:active={tab === section.key} onclick={() => onTab(section.key)}>
-						{section.label}
-						{#if count !== null}<span class="count-badge">{count}</span>{/if}
-						{#if incomplete}<WarnTriangle size={12} />{/if}
-						{#if dirty}<span class="tab-dot" aria-hidden="true"></span><span class="sr-only">Unsaved changes</span>{/if}
-					</button>
-				{/each}
-			</div>
-		</div>
+		<DetailHeader
+			idLabel={record.id < 0 ? 'new' : `#${record.id}`}
+			isNew={record.id < 0}
+			name={title ?? ''}
+			blank={entity.blankName}
+			{badge}
+			badgeColor={entity.badgeColor?.(record)}
+			{status}
+			retireable={entity.retireable ?? false}
+			retired={(entity.retireable ?? false) && store.isRetired(record)}
+			headline={entity.headline?.(record)}
+			tabs={entity.sections.map((section) => ({
+				key: section.key,
+				label: section.label,
+				count: section.count?.(record) ?? null,
+				dirty: sectionDirty(section),
+				warn: sectionWarnings(section, record).length > 0
+			}))}
+			activeTab={tab}
+			onTab={(key) => onTab(key)}
+			onReset={() => store.resetItem(record.id)}
+			onRetire={() => onRetire(record)}
+			onReinstate={() => store.setRetired(record.id, false)}
+			onRemove={() => store.removeItem(record.id)}
+			onDelete={() => onDelete(record)}
+			onRestore={() => store.restoreItem(record.id)}
+		/>
 
 		<div class="detail-body">
 			<div class="body-inner" class:locked={status === 'deleted' || store.saving}>
@@ -86,46 +52,16 @@
 			</div>
 		</div>
 
-		<div class="save-bar">
-			<div class="save-summary">
-				{#if store.saved}
-					<span class="saved"><WorkbenchIcon kind="check" size={13} sw={1.7} />Changes saved</span>
-				{:else if store.counts.total === 0}
-					<span>No unsaved changes</span>
-				{:else}
-					<span class="pending">{store.counts.total} unsaved {store.counts.total === 1 ? 'change' : 'changes'}</span>
-					<span class="pips">
-						{#if store.counts.added > 0}<span class="pip added"
-								><span class="dot"></span>{store.counts.added} added</span
-							>{/if}
-						{#if store.counts.modified > 0}<span class="pip modified"
-								><span class="dot"></span>{store.counts.modified} edited</span
-							>{/if}
-						{#if store.counts.deleted > 0}<span class="pip deleted"
-								><span class="dot"></span>{store.counts.deleted} removed</span
-							>{/if}
-					</span>
-				{/if}
-			</div>
-			<div class="save-actions">
-				<button
-					type="button"
-					class="btn"
-					disabled={store.counts.total === 0 || store.saving}
-					onclick={() => store.discard()}
-				>
-					Discard
-				</button>
-				<button
-					type="button"
-					class="btn primary"
-					disabled={store.counts.total === 0 || store.saving}
-					onclick={() => store.save()}
-				>
-					Save Changes
-				</button>
-			</div>
-		</div>
+		<SaveBar
+			saved={store.saved}
+			total={store.counts.total}
+			saving={store.saving}
+			added={store.counts.added}
+			modified={store.counts.modified}
+			deleted={store.counts.deleted}
+			onDiscard={() => store.discard()}
+			onSave={() => store.save()}
+		/>
 	</div>
 {/if}
 
@@ -140,9 +76,10 @@ import {
 	retireWithConfirm
 } from '../retire-confirm';
 import { sectionWarnings } from '../validation';
+import SaveBar from '../SaveBar.svelte';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
+import DetailHeader from './DetailHeader.svelte';
 import SectionRenderer from './SectionRenderer.svelte';
-import WarnTriangle from './WarnTriangle.svelte';
 
 interface Props {
 	entity: EntityConfig<Identified>;
@@ -226,49 +163,6 @@ const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): bo
 .empty-fill {
 	height: 100%;
 }
-.detail-head {
-	padding: 18px 32px 0;
-}
-.head-row {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-}
-.spacer {
-	flex: 1;
-}
-.rec-id {
-	font-family: var(--mono);
-	font-size: 11px;
-	color: var(--text-muted);
-
-	&.is-new {
-		color: var(--accent);
-	}
-}
-.rec-name {
-	margin: 0;
-	font-size: 22px;
-	font-weight: 500;
-	color: var(--text-primary);
-
-	&.blank {
-		color: var(--text-muted);
-	}
-}
-.detail-headline {
-	margin-top: 8px;
-	font-size: 14px;
-	color: var(--text-secondary);
-	letter-spacing: -0.1px;
-}
-.tabs {
-	display: flex;
-	gap: 4px;
-	margin-top: 16px;
-	border-bottom: 1px solid var(--border-subtle);
-	flex-wrap: wrap;
-}
 .detail-body {
 	flex: 1;
 	overflow-y: auto;
@@ -281,9 +175,5 @@ const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): bo
 		opacity: 0.5;
 		pointer-events: none;
 	}
-}
-.pips {
-	display: inline-flex;
-	gap: 12px;
 }
 </style>

@@ -72,7 +72,7 @@ import { denseByLiveId, referenceSourcesFromStatic, retireWithConfirm } from '..
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
 import { activityKeyGroups, hasTierCollision, pathWarnings } from './progression-helpers';
 import type { WorkbenchPath } from './types';
-import DetailHeader from './DetailHeader.svelte';
+import DetailHeader from '../components/DetailHeader.svelte';
 import ProgInput from './ProgInput.svelte';
 import ProgSelect from './ProgSelect.svelte';
 import TiersSpine from './TiersSpine.svelte';
