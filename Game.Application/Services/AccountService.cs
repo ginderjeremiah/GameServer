@@ -3,6 +3,7 @@ using Game.Abstractions.Contracts.Identity;
 using Game.Abstractions.DataAccess;
 using Game.Application.Auth;
 using Game.Core.Classes;
+using Game.Core.Identity;
 using Game.Core.Players;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -43,23 +44,29 @@ namespace Game.Application.Services
         private readonly ILogger<AccountService> _logger = logger;
 
         /// <summary>
-        /// Creates a new account: validates the username is available, hashes the password, and hands the
-        /// credential material to the Identity context for persistence. The account is created with
-        /// <b>no</b> character — a freshly signed-up account creates its first character on the select
-        /// screen through the same class picker as any additional one (issue #1256), so signup needs no
-        /// class. The up-front check is a fast path; the data tier's active-username uniqueness guard is
-        /// the authority, so a username claimed concurrently (past the check) is still reported as taken.
+        /// Creates a new account: validates and normalizes the username, checks it is available, hashes the
+        /// password, and hands the credential material to the Identity context for persistence. The account
+        /// is created with <b>no</b> character — a freshly signed-up account creates its first character on
+        /// the select screen through the same class picker as any additional one (issue #1256), so signup
+        /// needs no class. The up-front availability check is a fast path; the data tier's active-username
+        /// uniqueness guard is the authority, so a username claimed concurrently (past the check) is still
+        /// reported as taken.
         /// </summary>
         public async Task<CreateAccountStatus> CreateAccount(string username, string password, CancellationToken cancellationToken = default)
         {
-            if (await _users.CheckIfUsernameExists(username, cancellationToken))
+            if (!UsernamePolicy.TryNormalize(username, out var normalized))
+            {
+                return CreateAccountStatus.InvalidUsername;
+            }
+
+            if (await _users.CheckIfUsernameExists(normalized, cancellationToken))
             {
                 return CreateAccountStatus.UsernameTaken;
             }
 
             var account = new NewAccount
             {
-                Username = username,
+                Username = normalized,
                 PassHash = _passwordHasher.Hash(password),
             };
 

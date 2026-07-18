@@ -208,6 +208,43 @@ namespace Game.Api.Tests.Integration
             Assert.Contains(nameof(CreateAccountRequest.Username), problem.Errors.Keys);
         }
 
+        [Theory]
+        [InlineData(" ")] // whitespace-only
+        [InlineData("bad\tname")] // embedded control character
+        public async Task CreateAccount_InvalidUsername_ReturnsError(string username)
+        {
+            var creds = new { Username = username, Password = "newpass" };
+
+            var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task CreateAccount_SurroundingWhitespace_IsTrimmedAndCollidesWithExistingUsername()
+        {
+            // Arrange — an existing account, then a signup for a whitespace-padded variant of the same name.
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                await TestDataSeeder.CreateUserAsync(context, "padded", "pass");
+            }
+
+            var creds = new { Username = "  padded  ", Password = "newpass" };
+
+            var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
+
+            // Normalizing before the uniqueness check means the padded variant collides with the existing
+            // account rather than creating a visually-confusable duplicate.
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ErrorMessage);
+        }
+
         [Fact]
         public async Task CreateAccount_ConcurrentDuplicate_ReturnsCleanErrorNotServerError()
         {

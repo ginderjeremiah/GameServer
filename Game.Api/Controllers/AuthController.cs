@@ -5,6 +5,7 @@ using Game.Api.Models.Player;
 using Game.Api.Services;
 using Game.Api.RateLimiting;
 using Game.Application.Services;
+using Game.Core.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -88,6 +89,8 @@ namespace Game.Api.Controllers
             {
                 CreateAccountStatus.Success => ApiResponse.Success(),
                 CreateAccountStatus.UsernameTaken => ApiResponse.Error("There is already an account with this username."),
+                CreateAccountStatus.InvalidUsername =>
+                    ApiResponse.Error($"Username must be {UsernamePolicy.MinLength}-{UsernamePolicy.MaxLength} characters and contain no control or zero-width characters."),
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }

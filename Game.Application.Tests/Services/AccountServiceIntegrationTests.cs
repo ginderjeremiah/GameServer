@@ -175,6 +175,57 @@ namespace Game.Application.Tests.Services
             Assert.Equal(starterSkills, battleSkillIds.Where(id => starterSkills.Contains(id)));
         }
 
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData("bad\tname")]
+        [InlineData("waaaaaaaaaaaaaaaaaaaytoolong")]
+        public async Task CreateAccount_InvalidUsername_ReturnsInvalidUsernameAndCreatesNothing(string username)
+        {
+            using var scope = CreateScope();
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var status = await accountService.CreateAccount(username, "pass");
+
+            Assert.Equal(CreateAccountStatus.InvalidUsername, status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(0, await verifyContext.Users.CountAsync(user => user.Username == username, CancellationToken));
+        }
+
+        [Fact]
+        public async Task CreateAccount_SurroundingWhitespace_IsTrimmedBeforePersisting()
+        {
+            using var scope = CreateScope();
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var status = await accountService.CreateAccount("  trimmed  ", "pass");
+            Assert.Equal(CreateAccountStatus.Success, status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var createdUser = await verifyContext.Users
+                .FirstOrDefaultAsync(user => user.Username == "trimmed", CancellationToken);
+            Assert.NotNull(createdUser);
+        }
+
+        [Fact]
+        public async Task CreateAccount_WhitespaceVariantOfExistingUsername_ReturnsUsernameTaken()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            await TestDataSeeder.CreateUserAsync(context, "spoofable", "pass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            // Normalizing before the uniqueness check closes the confusable-account gap: a whitespace-padded
+            // variant of an existing username collides with it rather than creating a distinct, spoofable row.
+            var status = await accountService.CreateAccount("  spoofable  ", "newpass");
+
+            Assert.Equal(CreateAccountStatus.UsernameTaken, status);
+        }
+
         [Fact]
         public async Task CreateAccount_DuplicateUsername_ReturnsUsernameTaken()
         {

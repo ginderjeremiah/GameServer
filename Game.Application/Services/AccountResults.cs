@@ -11,6 +11,9 @@ namespace Game.Application.Services
     {
         Success,
         UsernameTaken,
+
+        /// <summary>The supplied username failed validation (blank, too long, or control/zero-width characters).</summary>
+        InvalidUsername,
     }
 
     /// <summary>
