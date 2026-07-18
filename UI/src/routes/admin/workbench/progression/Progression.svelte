@@ -1,4 +1,4 @@
-<div class="prog" data-testid="progression-editor">
+<div class="prog workbench" data-testid="progression-editor">
 	<div class="prog-head">
 		<div class="eyebrow">Admin Console · Progression</div>
 		<div class="title-row">
@@ -63,44 +63,16 @@
 			</div>
 		{/if}
 
-		<div class="save-bar">
-			<div class="save-summary">
-				{#if store.saved}
-					<span class="saved"><WorkbenchIcon kind="check" size={13} sw={1.7} />Changes saved</span>
-				{:else if store.totalChanges === 0}
-					<span>No unsaved changes</span>
-				{:else}
-					<span class="pending">{store.totalChanges} unsaved {store.totalChanges === 1 ? 'change' : 'changes'}</span>
-					<span class="pips">
-						{#if store.counts.added > 0}<span class="pip added"
-								><span class="dot"></span>{store.counts.added} added</span
-							>{/if}
-						{#if store.counts.modified > 0}<span class="pip modified"
-								><span class="dot"></span>{store.counts.modified} edited</span
-							>{/if}
-					</span>
-				{/if}
-			</div>
-			<div class="save-actions">
-				<button
-					type="button"
-					class="btn"
-					disabled={store.totalChanges === 0 || store.saving}
-					onclick={() => store.discard()}
-				>
-					Discard
-				</button>
-				<button
-					type="button"
-					class="btn primary"
-					data-testid="progression-save"
-					disabled={store.totalChanges === 0 || store.saving}
-					onclick={() => store.save()}
-				>
-					Save Changes
-				</button>
-			</div>
-		</div>
+		<SaveBar
+			saved={store.saved}
+			total={store.totalChanges}
+			saving={store.saving}
+			added={store.counts.added}
+			modified={store.counts.modified}
+			onDiscard={() => store.discard()}
+			onSave={() => store.save()}
+			saveTestId="progression-save"
+		/>
 	{/if}
 </div>
 
@@ -108,7 +80,9 @@
 import { onDestroy, onMount } from 'svelte';
 import Loading from '$components/Loading.svelte';
 import { workbenchDirty } from '../dirty.svelte';
+import SaveBar from '../SaveBar.svelte';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
+import '../workbench.scss';
 import AdminLoadError from '../../AdminLoadError.svelte';
 import { ProgressionStore } from './progression-store.svelte';
 import ProgressionList from './ProgressionList.svelte';
@@ -136,13 +110,6 @@ $effect(() => {
 </script>
 
 <style lang="scss">
-.prog {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	min-height: 0;
-	font-family: var(--sans);
-}
 .prog-head {
 	padding: 20px 32px 18px;
 	border-bottom: 1px solid var(--border-subtle);
@@ -160,9 +127,6 @@ $effect(() => {
 	display: flex;
 	align-items: baseline;
 	gap: 14px;
-}
-.spacer {
-	flex: 1;
 }
 .view-toggle {
 	align-self: center;
@@ -246,99 +210,6 @@ $effect(() => {
 	.et {
 		font-size: 14px;
 		color: var(--text-tertiary);
-	}
-}
-
-.save-bar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 16px;
-	padding: 13px 24px;
-	border-top: 1px solid var(--border-subtle);
-	background: var(--surface);
-	flex-shrink: 0;
-}
-.save-summary {
-	display: flex;
-	align-items: center;
-	gap: 14px;
-	font-family: var(--mono);
-	font-size: 11.5px;
-	color: var(--text-tertiary);
-
-	.pending {
-		color: var(--text-secondary);
-	}
-	.saved {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		color: var(--change-added);
-	}
-}
-.pips {
-	display: inline-flex;
-	gap: 12px;
-}
-.pip {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-
-	.dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: currentColor;
-	}
-	&.added {
-		color: var(--change-added);
-	}
-	&.modified {
-		color: var(--change-modified);
-	}
-}
-.save-actions {
-	display: flex;
-	gap: 10px;
-}
-.btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 7px;
-	background: transparent;
-	border: 1px solid var(--border-light);
-	color: var(--text-secondary);
-	font-family: var(--mono);
-	font-size: 11.5px;
-	letter-spacing: 0.6px;
-	text-transform: uppercase;
-	padding: 8px 15px;
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.14s ease;
-	white-space: nowrap;
-
-	&:hover:not(:disabled) {
-		border-color: color-mix(in srgb, var(--white) 32%, transparent);
-	}
-	&.primary {
-		background: color-mix(in srgb, var(--accent) 12%, transparent);
-		border-color: var(--accent);
-		color: var(--accent-light);
-	}
-	&.primary:hover:not(:disabled) {
-		box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
-	}
-	&.sm {
-		padding: 6px 12px;
-	}
-	&:disabled {
-		color: var(--text-muted);
-		border-color: var(--border-subtle);
-		cursor: not-allowed;
-		box-shadow: none;
 	}
 }
 </style>

@@ -16,8 +16,8 @@
 			{/if}
 		</div>
 		<div class="search">
-			<span class="search-ic"><WorkbenchIcon kind="search" size={13} /></span>
-			<input class="search-inp" placeholder="Search…" bind:value={query} aria-label="Search" />
+			<WorkbenchIcon kind="search" sw={1.4} />
+			<input class="inp" placeholder="Search…" bind:value={query} aria-label="Search" />
 		</div>
 	</div>
 
@@ -119,19 +119,6 @@ const rows = $derived.by<Row[]>(() => {
 </script>
 
 <style lang="scss">
-.list-pane {
-	width: 322px;
-	flex-shrink: 0;
-	border-right: 1px solid var(--border-subtle);
-	display: flex;
-	flex-direction: column;
-	background: var(--surface);
-}
-.list-head {
-	padding: 16px 16px 12px;
-	border-bottom: 1px solid var(--border-subtle);
-	flex-shrink: 0;
-}
 .back {
 	display: inline-flex;
 	align-items: center;
@@ -162,9 +149,6 @@ const rows = $derived.by<Row[]>(() => {
 	font-size: 11.5px;
 	color: var(--text-tertiary);
 }
-.spacer {
-	flex: 1;
-}
 .new-btn {
 	display: inline-flex;
 	align-items: center;
@@ -179,31 +163,6 @@ const rows = $derived.by<Row[]>(() => {
 	padding: 5px 11px;
 	border-radius: 3px;
 	cursor: pointer;
-}
-.search {
-	position: relative;
-}
-.search-ic {
-	position: absolute;
-	left: 10px;
-	top: 50%;
-	transform: translateY(-50%);
-	color: var(--text-muted);
-	display: flex;
-	pointer-events: none;
-}
-.search-inp {
-	width: 100%;
-	background: color-mix(in srgb, var(--white) 3%, transparent);
-	border: 1px solid color-mix(in srgb, var(--white) 10%, transparent);
-	border-radius: 3px;
-	color: var(--text-primary);
-	font-size: 13px;
-	padding: 8px 11px 8px 31px;
-}
-.list-scroll {
-	flex: 1;
-	overflow-y: auto;
 }
 .row {
 	width: 100%;
@@ -290,29 +249,6 @@ const rows = $derived.by<Row[]>(() => {
 	font-family: var(--mono);
 	font-size: 11px;
 	color: var(--text-tertiary);
-}
-.spill {
-	font-family: var(--mono);
-	font-size: 8.5px;
-	letter-spacing: 1px;
-	text-transform: uppercase;
-	padding: 2px 6px;
-	border-radius: 3px;
-
-	&.added {
-		color: var(--change-added);
-		border: 1px solid color-mix(in srgb, var(--change-added) 40%, transparent);
-		background: color-mix(in srgb, var(--change-added) 10%, transparent);
-	}
-	&.modified {
-		color: var(--change-modified);
-		border: 1px solid color-mix(in srgb, var(--change-modified) 40%, transparent);
-		background: color-mix(in srgb, var(--change-modified) 10%, transparent);
-	}
-	&.retired {
-		color: var(--text-muted);
-		border: 1px solid var(--border-light);
-	}
 }
 .list-empty {
 	padding: 24px 16px;

@@ -105,18 +105,6 @@ const liveCount = $derived(store.items.filter((it) => store.stateOf(it).status !
 </script>
 
 <style lang="scss">
-.list-pane {
-	width: 322px;
-	flex-shrink: 0;
-	border-right: 1px solid var(--border-subtle);
-	display: flex;
-	flex-direction: column;
-	background: var(--surface);
-}
-.list-head {
-	padding: 16px 16px 12px;
-	border-bottom: 1px solid var(--border-subtle);
-}
 .list-title {
 	display: flex;
 	align-items: baseline;
@@ -127,14 +115,6 @@ const liveCount = $derived(store.items.filter((it) => store.stateOf(it).status !
 		font-size: 14px;
 		font-weight: 500;
 	}
-}
-.spacer {
-	flex: 1;
-}
-.list-scroll {
-	flex: 1;
-	overflow-y: auto;
-	overflow-x: hidden;
 }
 .list-row {
 	width: 100%;
