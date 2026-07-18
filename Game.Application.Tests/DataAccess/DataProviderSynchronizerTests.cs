@@ -799,6 +799,37 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task StartAsync_SlowDrainInProgress_ReturnsWithoutWaitingForItToFinish()
+        {
+            using var scope = CreateScope();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+
+            // Gated inside its acknowledge so the drain can never finish on its own — standing in for a large
+            // fleet-shared backlog (#2096) a rolling deploy's new instance would otherwise block its own
+            // readiness on while healthy instances are still draining it.
+            var gatedQueue = new GatedDrainQueue("malformed-1");
+            var pubsub = new SingleQueuePubSubService(gatedQueue);
+            var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(5));
+
+            // StartAsync completes promptly even though the drain it dispatched is stuck and will never finish
+            // on its own — it is no longer awaited inline. Bounded so a regression back to an inline await
+            // hangs this assertion out rather than silently passing.
+            await synchronizer.StartAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2));
+
+            // The drain genuinely is still running in the background: it reached the gate and is parked there.
+            await gatedQueue.AcknowledgeReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, gatedQueue.ReservedCount);
+
+            // Let it finish and confirm shutdown still waits for it cleanly, exactly like any other in-flight
+            // drain (the pub/sub-triggered kind StopAsync_DrainInFlight_... already covers).
+            gatedQueue.ReleaseAcknowledge.SetResult();
+            await synchronizer.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("did not complete"));
+        }
+
+        [Fact]
         public async Task StopAsync_WedgedReserveDuringDrain_UnwindsPromptlyViaThreadedToken()
         {
             using var scope = CreateScope();
@@ -811,15 +842,17 @@ namespace Game.Application.Tests.DataAccess
             var pubsub = new SingleQueuePubSubService(wedgedQueue);
             var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy, drainTimeout: TimeSpan.FromSeconds(30));
 
-            // The startup drain reserves once and then parks inside the wedged reserve, holding the drain gate.
+            // The startup drain is dispatched to the background (#2096) and reserves once, then parks inside
+            // the wedged reserve, holding the drain gate; StartAsync itself completes right away regardless,
+            // since it no longer awaits the drain.
             var startTask = synchronizer.StartAsync(CancellationToken.None);
+            await startTask.WaitAsync(TimeSpan.FromSeconds(5));
             await wedgedQueue.ReserveReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.False(startTask.IsCompleted);
 
             // Stopping cancels the token threaded into the reserve, so the wedged round-trip unwinds at once rather
             // than blocking until the drain timeout; the OCE is treated as a clean stop, never surfaced as an error.
             var stopTask = synchronizer.StopAsync(CancellationToken.None);
-            await Task.WhenAll(startTask.WaitAsync(TimeSpan.FromSeconds(5)), stopTask.WaitAsync(TimeSpan.FromSeconds(5)));
+            await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("did not complete"));
@@ -911,7 +944,19 @@ namespace Game.Application.Tests.DataAccess
             var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
             var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
 
+            // StartAsync now dispatches the startup drain to the background rather than awaiting it (#2096),
+            // so it returns before the drain necessarily finishes applying against real Postgres. Calling
+            // StopAsync immediately after would race it — StopAsync cancels the stopping token first, which
+            // is threaded cooperatively into the reserve/reclaim ops, so it could abort the in-flight reserve
+            // before it ever lands rather than waiting for it. Poll for the write to land instead, the same
+            // pattern used elsewhere for a fire-and-forget write that can race an immediate read (#1718).
             await synchronizer.StartAsync(CancellationToken.None);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await PollingHelper.PollUntilAsync(
+                () => verifyContext.Players.AsNoTracking().SingleAsync(p => p.Id == player.Id, CancellationToken),
+                p => p.Level == 15);
 
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
             Assert.Empty(await DrainDeadLetterQueue(realPubSub));
@@ -919,10 +964,6 @@ namespace Game.Application.Tests.DataAccess
             // The startup drain consumed the whole queue.
             Assert.Null(await realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE).GetNextAsync());
 
-            using var verifyScope = CreateScope();
-            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
-            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
-            Assert.NotNull(persisted);
             Assert.Equal(15, persisted.Level);
             Assert.Equal(5678, persisted.Exp);
         }
@@ -1091,8 +1132,14 @@ namespace Game.Application.Tests.DataAccess
             var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
             var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
 
-            // Startup reclaims the orphaned in-flight item back onto the queue and the startup drain applies it.
+            // Startup reclaims the orphaned in-flight item back onto the queue; the startup drain that applies
+            // it now runs in the background rather than being awaited inline (#2096). Poll for the processing
+            // list to drain (the acknowledge that follows a successful apply) instead of asserting immediately
+            // or racing an immediate StopAsync — StopAsync cancels the stopping token first, which is threaded
+            // cooperatively into the reserve/reclaim ops, so it could abort the reclaim/apply before it lands
+            // rather than waiting for it.
             await synchronizer.StartAsync(CancellationToken.None);
+            await PollingHelper.PollUntilAsync(() => queue.GetProcessingCountAsync(), count => count == 0);
 
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
             Assert.Empty(await DrainDeadLetterQueue(realPubSub));

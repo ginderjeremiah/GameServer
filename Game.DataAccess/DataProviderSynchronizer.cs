@@ -118,10 +118,9 @@ namespace Game.DataAccess
 
             var queue = _pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
 
-            // A stop requested mid-boot (host shutdown during a large reclaim/drain) must unwind the startup
-            // work too, so honor both the host's startup token and our own stopping signal. It is threaded into
-            // the reclaim/reserve queue ops (which honor it cooperatively) so a wedged Redis round-trip unwinds
-            // promptly, and is still checked at each boundary between ops.
+            // A stop requested mid-boot (host shutdown during a large reclaim) must unwind the startup work
+            // too, so honor both the host's startup token and our own stopping signal. It is threaded into the
+            // reclaim (which honors it cooperatively) so a wedged Redis round-trip unwinds promptly.
             using var startupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stopping.Token);
             var startupToken = startupCts.Token;
 
@@ -142,26 +141,54 @@ namespace Game.DataAccess
                 {
                     _logger.LogInformation("Reclaimed {Count} in-flight player update(s) orphaned by a previous run on queue '{Queue}'.", reclaimed, Constants.PUBSUB_PLAYER_QUEUE);
                 }
-
-                if (startupToken.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                // Drain whatever is already queued once on startup. Redis pub/sub wakes are at-most-once and
-                // fire-and-forget (#552), so an item enqueued while no subscriber was connected — across an
-                // instance restart, or a wake dropped during a brief subscriber outage — would otherwise wait
-                // for the next publish to trigger a drain, stranding it at the tail when no further save follows.
-                // Subscribing first ensures any item enqueued during the drain still gets a wake, and the drain
-                // gate + coalescing flag in ProcessQueue serialize this with the subscription's own first wake
-                // (the reserve/acknowledge read is idempotent, so a concurrent first wake can never double-apply) (#560).
-                await ProcessQueue(queue, startupToken);
             }
             catch (OperationCanceledException) when (startupToken.IsCancellationRequested)
             {
-                // A stop requested mid-boot unwinds a wedged reclaim/reserve promptly via the now-cancelable queue
-                // ops; a clean unwind, not a startup failure. Anything left is reclaimed and drained on the next
-                // startup, so nothing is lost.
+                // A stop requested mid-boot unwinds a wedged reclaim promptly via the now-cancelable queue op;
+                // a clean unwind, not a startup failure. Anything left is reclaimed on the next startup, so
+                // nothing is lost.
+                return;
+            }
+
+            if (_stopping.IsCancellationRequested)
+            {
+                return;
+            }
+
+            // Drain whatever is already queued, dispatched to the background rather than awaited here. ASP.NET
+            // Core holds Kestrel closed until every hosted service's StartAsync completes, and this queue is
+            // fleet-shared — awaiting the whole backlog inline would block this instance's readiness on work a
+            // rolling deploy's already-healthy instances may already be draining (#2096). The correctness goal
+            // (an item enqueued while no subscriber was connected — Redis pub/sub wakes are at-most-once and
+            // fire-and-forget, #552 — is still applied promptly rather than stranded until the next publish)
+            // only needs subscribe + reclaim to precede the drain, not the drain itself to finish before
+            // startup completes. Subscribing first (above) still ensures any item enqueued during this pass
+            // gets its own wake, and the drain gate + coalescing flag in ProcessQueue still serialize this pass
+            // with the subscription's own first wake (the reserve/acknowledge read is idempotent, so a
+            // concurrent first wake can never double-apply) (#560).
+            _ = RunStartupDrain(queue);
+        }
+
+        // Runs the startup drain off the host-readiness path (see StartAsync). Nothing awaits this task, so a
+        // stop is honored via the instance's own stopping token — the host's startup token is no longer
+        // meaningful once StartAsync has returned — and any exception that escapes ProcessQueue is logged here
+        // rather than being lost as an unobserved task fault. StopAsync still waits on the drain gate that
+        // ProcessQueue acquires, so shutdown continues to wait for this pass (within its bounded timeout)
+        // exactly as it already does for a pub/sub-triggered drain.
+        private async Task RunStartupDrain(IPubSubQueue queue)
+        {
+            try
+            {
+                await ProcessQueue(queue, _stopping.Token);
+            }
+            catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+            {
+                // A stop requested while the background drain was running unwinds cleanly; anything left
+                // queued (or reserved but not yet acknowledged) is reclaimed and re-applied on the next startup.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled exception draining the player update queue on startup.");
             }
         }
 
