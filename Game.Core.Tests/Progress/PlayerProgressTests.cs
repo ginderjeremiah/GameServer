@@ -60,6 +60,71 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_NegativeNetUnderAbsorption_FloorsDamageStatisticsAtZeroInsteadOfRecordingARow()
+        {
+            // An enemy with authored absorption (resistance > 1) can heal the player back more than the
+            // battle's real hits dealt/took, so the in-battle (signed, parity-critical) totals go negative.
+            // The lifetime Sum statistics must never regress from that — a floored-to-zero delta carries no
+            // information, so (like any other zero delta) it records no row at all (#2127).
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                PlayerDamageDealt = -12.0,
+                PlayerDamageTaken = -3.0,
+                CriticalDamageDealt = -6.5,
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDealt, null, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageTaken, null, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.CriticalDamageDealt, null, out _));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_NegativeNetUnderAbsorption_NeverRegressesAnExistingLifetimeTotal()
+        {
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.DamageDealt, null, 100m),
+                Stat(EStatisticType.DamageTaken, null, 50m),
+                Stat(EStatisticType.CriticalDamageDealt, null, 20m),
+            ]);
+            var stats = new BattleStats
+            {
+                PlayerDamageDealt = -8.0,
+                PlayerDamageTaken = -4.0,
+                CriticalDamageDealt = -2.0,
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(100m, progress.GetStatisticValue(EStatisticType.DamageDealt, null));
+            Assert.Equal(50m, progress.GetStatisticValue(EStatisticType.DamageTaken, null));
+            Assert.Equal(20m, progress.GetStatisticValue(EStatisticType.CriticalDamageDealt, null));
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.DamageDealt && s.EntityId == null);
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.DamageTaken && s.EntityId == null);
+            Assert.DoesNotContain(progress.DirtyStatistics, s => s.Type == EStatisticType.CriticalDamageDealt && s.EntityId == null);
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_PerSkillNegativeNetUnderAbsorption_FloorsAtZeroInsteadOfRecordingARow()
+        {
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                SkillStats = { [10] = new SkillStats { Uses = 1, TotalDamage = -9.0 } },
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDealt, 10, out _));
+        }
+
+        [Fact]
         public void RecordBattleCompleted_TracksEncountersGloballyAndPerEnemy()
         {
             var progress = MakeProgress();
