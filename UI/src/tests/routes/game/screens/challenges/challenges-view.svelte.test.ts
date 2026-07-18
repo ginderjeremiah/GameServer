@@ -169,6 +169,11 @@ describe('progressInfo', () => {
 		expect(progressInfo(ch, EChallengeGoalComparison.AtLeast, 80).percent).toBe(100);
 	});
 
+	it('clamps an over-goal value to the goal (transient race before the ChallengeCompleted push lands)', () => {
+		const ch = challenge({ id: 2, name: 'x', challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 });
+		expect(progressInfo(ch, EChallengeGoalComparison.AtLeast, 12)).toMatchObject({ value: 10, goal: 10 });
+	});
+
 	it('treats an atMost goal as best-vs-target proximity, with 0 meaning "no data"', () => {
 		const ch = challenge({ id: 9, name: 'x', challengeTypeId: EChallengeType.TimeTrial, progressGoal: 60 });
 		// no qualifying value yet

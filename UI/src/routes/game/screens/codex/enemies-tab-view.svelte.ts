@@ -4,7 +4,13 @@
    orchestrator and the cross-tab concerns (active tab, stats fetch, cross-links). */
 
 import { EEntityType, type IEnemy } from '$lib/api';
-import { type EnemyAttributes, challengeTypeColor, challengeTypeName, enemyAttributesAtLevel } from '$lib/common';
+import {
+	type EnemyAttributes,
+	challengeTypeColor,
+	challengeTypeName,
+	clampChallengeProgress,
+	enemyAttributesAtLevel
+} from '$lib/common';
 import { playerChallenges, staticData } from '$stores';
 import {
 	type EnemyFilter,
@@ -260,8 +266,9 @@ export class EnemiesTabView {
 					const pc = progressById.get(c.id);
 					const progress = pc?.progress ?? 0;
 					const completed = pc?.completed ?? false;
+					const clampedProgress = clampChallengeProgress(progress, c.progressGoal);
 					const progressText =
-						c.progressGoal === 1 ? (completed ? 'done' : 'sealed') : `${Math.round(progress)}/${c.progressGoal}`;
+						c.progressGoal === 1 ? (completed ? 'done' : 'sealed') : `${Math.round(clampedProgress)}/${c.progressGoal}`;
 					return {
 						id: c.id,
 						name: c.name,

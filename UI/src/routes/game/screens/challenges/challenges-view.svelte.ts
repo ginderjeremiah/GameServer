@@ -13,6 +13,7 @@ import { Item } from '$lib/battle';
 import {
 	challengeTypeColor,
 	challengeTypeName,
+	clampChallengeProgress,
 	damageTypeKeyName,
 	rarityGlow,
 	rarityLevel,
@@ -173,7 +174,15 @@ export function progressInfo(ch: IChallenge, comparison: EChallengeGoalCompariso
 		return { atMost: true, percent, value: 0, goal: ch.progressGoal, best, target: ch.progressGoal, hasData };
 	}
 	const percent = Math.min(100, (progress / Math.max(1, ch.progressGoal)) * 100);
-	return { atMost: false, percent, value: progress, goal: ch.progressGoal, best: 0, target: 0, hasData: true };
+	return {
+		atMost: false,
+		percent,
+		value: clampChallengeProgress(progress, ch.progressGoal),
+		goal: ch.progressGoal,
+		best: 0,
+		target: 0,
+		hasData: true
+	};
 }
 
 /* ─── View-model assembly ────────────────────────────────────────────── */
