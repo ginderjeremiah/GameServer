@@ -43,7 +43,8 @@
 			</section>
 		{/if}
 
-		<button class="enter-btn" type="button" onclick={onEnter} data-testid="welcome-back-enter">
+		<!-- svelte-ignore a11y_autofocus -->
+		<button class="enter-btn" type="button" autofocus onclick={onEnter} data-testid="welcome-back-enter">
 			Enter the realm
 		</button>
 	</div>

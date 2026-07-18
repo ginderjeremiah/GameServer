@@ -28,10 +28,11 @@ export function runLoomLoop(view: CardGameView): () => void {
  *  pointer release/cancel anywhere ends a held Reflex (the button is press-and-hold, so the release can
  *  land off the button). Returns a teardown that removes every listener. */
 export function bindLoomInput(view: CardGameView): () => void {
-	// Hotkeys yield to focused sandbox sliders so they keep working.
+	// Hotkeys yield to focused sandbox sliders and buttons so they keep working (a focused button's own
+	// Space/Enter handling — e.g. the Reflex button's press-and-hold — takes precedence over the global one).
 	const onKeyDown = (e: KeyboardEvent) => {
 		const ae = document.activeElement;
-		if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+		if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'BUTTON')) {
 			return;
 		}
 		if (e.code === 'Space') {

@@ -83,6 +83,25 @@ describe('Popover', () => {
 		outside.remove();
 	});
 
+	it('re-anchors focus onto the new content when the focused element unmounts (async loading -> ready swap)', async () => {
+		const loadingChildren = createRawSnippet(() => ({
+			render: () => '<div><button data-testid="cancel">cancel</button></div>'
+		}));
+		const readyChildren = createRawSnippet(() => ({
+			render: () => '<div><button data-testid="pick">pick</button></div>'
+		}));
+
+		const { getByTestId, rerender } = render(Popover, {
+			props: { open: true, onClose: vi.fn(), label: 'Switcher', children: loadingChildren }
+		});
+		await tick();
+		expect(document.activeElement).toBe(getByTestId('cancel'));
+
+		await rerender({ open: true, onClose: vi.fn(), label: 'Switcher', children: readyChildren });
+		await tick();
+		expect(document.activeElement).toBe(getByTestId('pick'));
+	});
+
 	it('locks body scroll while open and releases it on close', async () => {
 		const { rerender } = setup(true);
 		await tick();

@@ -78,4 +78,10 @@ describe('WelcomeBackGate', () => {
 
 		expect(onEnter).toHaveBeenCalledTimes(1);
 	});
+
+	it('autofocuses the enter button on arrival so Enter dismisses the gate immediately', () => {
+		render(WelcomeBackGate, { props: { summary: summary(), onEnter: vi.fn() } });
+
+		expect(document.activeElement).toBe(screen.getByTestId('welcome-back-enter'));
+	});
 });

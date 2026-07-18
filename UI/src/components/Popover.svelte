@@ -48,10 +48,24 @@ let shell = $state<HTMLElement | null>(null);
 
 // On open, move focus onto the first focusable inside the popover (or the shell itself if it has
 // none) so the trap has somewhere to anchor. Trap/Escape/scroll-lock/restore are owned by focusTrap.
+// Content can also swap while open (e.g. a loading placeholder replaced once an async fetch resolves);
+// if that unmounts the focused element, focus falls back to <body>, so a MutationObserver re-places it
+// onto the (possibly new) first focusable whenever a swap drops focus outside the shell.
 $effect(() => {
 	if (open && shell) {
-		const target = shell.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-		(target ?? shell).focus();
+		const placeFocus = () => {
+			const target = shell?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+			(target ?? shell)?.focus();
+		};
+		placeFocus();
+
+		const observer = new MutationObserver(() => {
+			if (!shell?.contains(document.activeElement)) {
+				placeFocus();
+			}
+		});
+		observer.observe(shell, { childList: true, subtree: true });
+		return () => observer.disconnect();
 	}
 });
 </script>

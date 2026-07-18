@@ -89,6 +89,21 @@ describe('NavSidebar', () => {
 		expect(pinButton.classList.contains('pinned')).toBe(true);
 	});
 
+	it('expands on keyboard focus so a Tab-only user can reach the pin button', async () => {
+		render(NavSidebar, { props: { screens, active: 'fight', onNavigate: vi.fn() } });
+
+		const sidebar = screen.getByTestId('sidebar');
+		expect(sidebar.classList.contains('expanded')).toBe(false);
+		expect(screen.queryByTestId('pin-button')).toBeNull();
+
+		await fireEvent.focusIn(screen.getByTestId('sidebar-item-fight'));
+		expect(sidebar.classList.contains('expanded')).toBe(true);
+		expect(screen.getByTestId('pin-button')).toBeTruthy();
+
+		await fireEvent.focusOut(screen.getByTestId('sidebar-item-fight'));
+		expect(sidebar.classList.contains('expanded')).toBe(false);
+	});
+
 	it('toggles the pinned state when the pin button is clicked', async () => {
 		render(NavSidebar, { props: { screens, active: 'fight', onNavigate: vi.fn(), pinned: true } });
 

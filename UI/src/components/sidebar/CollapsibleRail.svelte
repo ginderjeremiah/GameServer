@@ -7,6 +7,8 @@
 	style:--rail-header-padding="{headerPadding}px"
 	onmouseenter={() => (hovering = true)}
 	onmouseleave={() => (hovering = false)}
+	onfocusin={() => (focused = true)}
+	onfocusout={() => (focused = false)}
 >
 	<!-- Header: brand wordmark + pin toggle -->
 	<div class="sidebar-header">
@@ -106,8 +108,9 @@ let {
 }: Props = $props();
 
 let hovering = $state(false);
+let focused = $state(false);
 
-const expanded = $derived(pinned || hovering);
+const expanded = $derived(pinned || hovering || focused);
 </script>
 
 <style lang="scss">

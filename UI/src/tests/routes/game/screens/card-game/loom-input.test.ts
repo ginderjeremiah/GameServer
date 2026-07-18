@@ -95,6 +95,22 @@ describe('bindLoomInput', () => {
 		unbind();
 	});
 
+	it('yields Space to a focused button so its own click/keydown handling still fires', () => {
+		const button = document.createElement('button');
+		document.body.appendChild(button);
+		button.focus();
+
+		const view = fakeView();
+		const unbind = bindLoomInput(view);
+
+		const event = new KeyboardEvent('keydown', { code: 'Space', cancelable: true });
+		window.dispatchEvent(event);
+		expect(view.setReflex).not.toHaveBeenCalled();
+		expect(event.defaultPrevented).toBe(false);
+
+		unbind();
+	});
+
 	it('does not cast once the duel is over', () => {
 		const view = fakeView(true);
 		const unbind = bindLoomInput(view);
