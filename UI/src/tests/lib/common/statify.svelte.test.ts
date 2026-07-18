@@ -12,6 +12,20 @@ class Outer {
 	items: Inner[] = [new Inner()];
 }
 
+class WithPrivateField {
+	// `for...in` (which `statify` walks) never enumerates `#`-private fields, unlike a TS `private` field
+	// (a plain enumerable property at runtime) — the escape hatch a hot-path internal opts into.
+	#hidden = 0;
+
+	bumpHidden() {
+		this.#hidden++;
+	}
+
+	get hidden() {
+		return this.#hidden;
+	}
+}
+
 // Reads the `__statifyPerformed` idempotency marker the utility stamps on every processed object.
 const wasStatified = (obj: unknown) => (obj as { __statifyPerformed?: boolean }).__statifyPerformed === true;
 
@@ -103,5 +117,29 @@ describe('statify', () => {
 
 		// The setter routes a class-typed assignment back through statify.
 		expect(wasStatified(replacement)).toBe(true);
+	});
+
+	it('leaves `#`-private fields non-reactive, unlike a same-shaped public field', () => {
+		const instance = statify(new WithPrivateField());
+
+		// No `$state` accessor was defined for `#hidden` — a `$derived` reading it through the public
+		// getter never re-runs on a mutation, since statify never saw the field to begin with.
+		let observed = -1;
+		const cleanup = $effect.root(() => {
+			const derivedHidden = $derived(instance.hidden);
+			$effect(() => {
+				observed = derivedHidden;
+			});
+		});
+
+		flushSync();
+		expect(observed).toBe(0);
+
+		instance.bumpHidden();
+		flushSync();
+		expect(observed).toBe(0);
+		expect(instance.hidden).toBe(1);
+
+		cleanup();
 	});
 });
