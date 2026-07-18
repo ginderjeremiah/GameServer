@@ -87,10 +87,16 @@ namespace Game.Infrastructure.Cache.Redis
             SetAndForget(key, value?.Serialize(), expiry);
         }
 
+        private static readonly PreparedScript CompareAndDeleteScript = new(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end");
+
         public async Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default)
         {
-            await ObserveWrite(Redis.ScriptEvaluateAsync("if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]) end", [key], [deleteIfValue]), cancellationToken);
+            await ObserveWrite(CompareAndDeleteScript.EvaluateAsync(Redis, [key], [deleteIfValue]), cancellationToken);
         }
+
+        private static readonly PreparedScript ReclaimAndForgetScript = new(
+            "if redis.call('exists', KEYS[1]) == 0 then redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) else redis.call('pexpire', KEYS[1], ARGV[2]) end");
 
         public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry)
         {
@@ -99,11 +105,15 @@ namespace Game.Infrastructure.Cache.Redis
             // just extend the TTL of whatever is already there, mirroring ExpireAndForget's existing
             // don't-care-who-asked refresh so a stale caller still can't overwrite a newer claim's value.
             // CommandFlags.FireAndForget keeps it off the hot inbound-message path the same way ExpireAndForget is.
-            Redis.ScriptEvaluate(
-                "if redis.call('exists', KEYS[1]) == 0 then redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) else redis.call('pexpire', KEYS[1], ARGV[2]) end",
-                [key], [(RedisValue)ownerValue, (RedisValue)(long)expiry.TotalMilliseconds],
+            ReclaimAndForgetScript.Evaluate(
+                Redis, [key], [(RedisValue)ownerValue, (RedisValue)(long)expiry.TotalMilliseconds],
                 flags: CommandFlags.FireAndForget);
         }
+
+        private static readonly PreparedScript CompareAndSetIfAbsentScript = new(
+            "if redis.call('exists', KEYS[1]) == 1 then return 0 end redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) return 1");
+        private static readonly PreparedScript CompareAndSetScript = new(
+            "if redis.call('get', KEYS[1]) ~= ARGV[3] then return 0 end redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) return 1");
 
         public async Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
@@ -113,12 +123,8 @@ namespace Game.Infrastructure.Cache.Redis
             // value is unchanged. The TTL is written alongside the value so the key never lingers without one.
             var expiryMs = (long)expiry.TotalMilliseconds;
             var result = expectedValue is null
-                ? await ObserveWrite(Redis.ScriptEvaluateAsync(
-                    "if redis.call('exists', KEYS[1]) == 1 then return 0 end redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) return 1",
-                    [key], [(RedisValue)newValue, (RedisValue)expiryMs]), cancellationToken)
-                : await ObserveWrite(Redis.ScriptEvaluateAsync(
-                    "if redis.call('get', KEYS[1]) ~= ARGV[3] then return 0 end redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2]) return 1",
-                    [key], [(RedisValue)newValue, (RedisValue)expiryMs, (RedisValue)expectedValue]), cancellationToken);
+                ? await ObserveWrite(CompareAndSetIfAbsentScript.EvaluateAsync(Redis, [key], [(RedisValue)newValue, (RedisValue)expiryMs]), cancellationToken)
+                : await ObserveWrite(CompareAndSetScript.EvaluateAsync(Redis, [key], [(RedisValue)newValue, (RedisValue)expiryMs, (RedisValue)expectedValue]), cancellationToken);
             return (long)result == 1;
         }
 
@@ -132,6 +138,12 @@ namespace Game.Infrastructure.Cache.Redis
             Redis.KeyDelete(key, CommandFlags.FireAndForget);
         }
 
+        private static readonly PreparedScript HashGetAllIfExistsScript = new(
+            "local t = redis.call('type', KEYS[1]).ok "
+            + "if t == 'none' then return false end "
+            + "if t ~= 'hash' then redis.call('del', KEYS[1]) return false end "
+            + "return redis.call('hgetall', KEYS[1])");
+
         public async Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default)
         {
             // TYPE-then-HGETALL in one script (rather than two round trips) so a hot per-battle read pays only
@@ -141,15 +153,18 @@ namespace Game.Infrastructure.Cache.Redis
             // caller that repurposed a string-valued key into a hash-valued one) is treated the same as a miss
             // and cleared, so a stale value self-heals via the normal miss-then-reload path on next write
             // rather than erroring every future read.
-            var result = await RedisCommandBudget.Read(Redis.ScriptEvaluateAsync(
-                "local t = redis.call('type', KEYS[1]).ok "
-                + "if t == 'none' then return false end "
-                + "if t ~= 'hash' then redis.call('del', KEYS[1]) return false end "
-                + "return redis.call('hgetall', KEYS[1])",
-                [key]), cancellationToken);
+            var result = await RedisCommandBudget.Read(HashGetAllIfExistsScript.EvaluateAsync(Redis, [key], []), cancellationToken);
 
             return MapHashResult(result);
         }
+
+        private static readonly PreparedScript HashGetAllAndRefreshExpiryScript = new(
+            "local t = redis.call('type', KEYS[1]).ok "
+            + "if t == 'none' then return false end "
+            + "if t ~= 'hash' then redis.call('del', KEYS[1]) return false end "
+            + "local result = redis.call('hgetall', KEYS[1]) "
+            + "redis.call('pexpire', KEYS[1], ARGV[1]) "
+            + "return result");
 
         public async Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
@@ -159,14 +174,7 @@ namespace Game.Infrastructure.Cache.Redis
             // itself can't serve here since it only applies to strings). The PEXPIRE makes this a write, so it
             // routes through ObserveWrite like GetAndRefreshExpiry rather than the plain-read path
             // HashGetAllIfExists uses.
-            var result = await ObserveWrite(Redis.ScriptEvaluateAsync(
-                "local t = redis.call('type', KEYS[1]).ok "
-                + "if t == 'none' then return false end "
-                + "if t ~= 'hash' then redis.call('del', KEYS[1]) return false end "
-                + "local result = redis.call('hgetall', KEYS[1]) "
-                + "redis.call('pexpire', KEYS[1], ARGV[1]) "
-                + "return result",
-                [key], [(RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
+            var result = await ObserveWrite(HashGetAllAndRefreshExpiryScript.EvaluateAsync(Redis, [key], [(RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
 
             return MapHashResult(result);
         }
@@ -191,6 +199,9 @@ namespace Game.Infrastructure.Cache.Redis
             return fields;
         }
 
+        private static readonly PreparedScript HashSetAndForgetScript = new(
+            "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end redis.call('pexpire', KEYS[1], ARGV[1])");
+
         public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry)
         {
             if (fields.Count == 0)
@@ -201,10 +212,14 @@ namespace Game.Infrastructure.Cache.Redis
             // Bundles every field write and the TTL reset into one atomic script (mirroring CompareAndSet/
             // ReclaimAndForget) so the hash is never left holding freshly-written fields without its expiry
             // refreshed.
-            Redis.ScriptEvaluate(
-                "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end redis.call('pexpire', KEYS[1], ARGV[1])",
-                [key], BuildHashArgv(fields, expiry), flags: CommandFlags.FireAndForget);
+            HashSetAndForgetScript.Evaluate(Redis, [key], BuildHashArgv(fields, expiry), flags: CommandFlags.FireAndForget);
         }
+
+        private static readonly PreparedScript HashSetIfExistsAndForgetScript = new(
+            "if redis.call('exists', KEYS[1]) == 1 then "
+            + "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end "
+            + "redis.call('pexpire', KEYS[1], ARGV[1]) "
+            + "end");
 
         public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry)
         {
@@ -217,12 +232,7 @@ namespace Game.Infrastructure.Cache.Redis
             // under memory pressure, an operator delete) is never resurrected from a caller's partial field
             // view — resurrecting it would recreate the hash holding only these fields, silently shadowing
             // every other row the caller didn't touch this call.
-            Redis.ScriptEvaluate(
-                "if redis.call('exists', KEYS[1]) == 1 then "
-                + "for i = 2, #ARGV, 2 do redis.call('hset', KEYS[1], ARGV[i], ARGV[i + 1]) end "
-                + "redis.call('pexpire', KEYS[1], ARGV[1]) "
-                + "end",
-                [key], BuildHashArgv(fields, expiry), flags: CommandFlags.FireAndForget);
+            HashSetIfExistsAndForgetScript.Evaluate(Redis, [key], BuildHashArgv(fields, expiry), flags: CommandFlags.FireAndForget);
         }
 
         // Shared argv layout for both hash-set scripts above: [expiry-ms, then field/value pairs].
