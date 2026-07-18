@@ -630,6 +630,116 @@ describe('save orchestration', () => {
 		// Pre-commit failure: the working edit is preserved for a clean retry.
 		expect(store.paths[0].name).toBe('Inferno');
 	});
+
+	it('re-seeds from server truth when the refetch after a committed path Add then fails, so a retry cannot re-Add it', async () => {
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.addPath();
+		const pathLocal = store.selectedPathId as number;
+		store.patchPath(pathLocal, (d) => {
+			d.name = 'Fire';
+			d.activityKey = EActivityKey.Fire;
+		});
+
+		// The path Add commits server-side (step 3), but the very next refetch that resolves its
+		// persisted id (step 4) then fails — a partial, already-committed failure.
+		fetchMock.mockImplementationOnce(async () => {
+			throw new Error('replica timeout');
+		});
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		expect(serverPaths).toHaveLength(1);
+		// Recovery re-seeded from server truth: no phantom negative-id path survives to re-Add on retry.
+		expect(store.paths.some((p) => p.id < 0)).toBe(false);
+		expect(store.paths).toHaveLength(1);
+		expect(store.paths[0].name).toBe('Fire');
+		expect(store.totalChanges).toBe(0);
+	});
+
+	it('re-seeds after a modifier write commits but the reward write in the same save then fails', async () => {
+		seedServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.addModifier(0, 3);
+		store.setReward(0, 3, 5);
+
+		postMock.mockImplementation(async (endpoint: string, body: Rec) => {
+			if (endpoint === 'AdminTools/SetProficiencyRewards') {
+				throw new Error('rewards write failed');
+			}
+			applyPost(endpoint, body);
+			return {};
+		});
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		// The modifier write landed server-side before the reward write in the same batch failed.
+		expect(serverProfs[0].levelModifiers).toHaveLength(1);
+		// Recovery re-seeded from that partial server truth rather than leaving the pre-fail edits stale.
+		expect(store.profs[0].levelModifiers).toHaveLength(1);
+		expect(store.profs[0].levelRewards).toHaveLength(0);
+		expect(store.totalChanges).toBe(0);
+	});
+
+	it('leaves local state (now behind server truth) untouched when the committed-failure recovery refresh itself fails', async () => {
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.addPath();
+		const pathLocal = store.selectedPathId as number;
+		store.patchPath(pathLocal, (d) => {
+			d.name = 'Fire';
+			d.activityKey = EActivityKey.Fire;
+		});
+
+		// The path Add commits, then every subsequent refetch — both the post-add resolve and the
+		// failure-recovery reseed — fails.
+		fetchMock.mockImplementation(async () => {
+			throw new Error('refresh down');
+		});
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		expect(serverPaths).toHaveLength(1); // it did persist
+		// The swallowed reseed().catch(() => {}) means local state was never told — the phantom
+		// negative-id path is still sitting in `paths`, unresolved.
+		expect(store.paths.some((p) => p.id === pathLocal)).toBe(true);
+		expect(store.totalChanges).toBe(2);
+	});
+
+	it('recovers when the step-9 selection remap hits an unmapped negative id (stale post-add refetch)', async () => {
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.addPath();
+		const pathLocal = store.selectedPathId as number;
+		store.patchPath(pathLocal, (d) => {
+			d.name = 'Fire';
+			d.activityKey = EActivityKey.Fire;
+		});
+		// Drop the auto-created tier so no proficiency identity depends on the new path's id — the
+		// selection remap in step 9 is the first place an unmapped local id would surface.
+		store.removeTier(store.currentTiers[0].id);
+
+		// The path Add commits, but this one refetch is stale and doesn't show it yet, so
+		// resolveNewIds has nothing to map the local id to.
+		fetchMock.mockImplementationOnce(async (cmd: string) => (cmd === 'GetPaths' ? [] : clone(serverProfs)));
+
+		await store.save();
+
+		expect(callsTo('AdminTools/AddEditPaths')).toHaveLength(1);
+		expect(serverPaths).toHaveLength(1);
+		expect(toastErrorMock).toHaveBeenCalledWith(expect.stringContaining('No persisted id found'));
+		// Recovery re-seeded from (now accurate) server truth rather than leaving the selection dangling.
+		expect(store.paths.some((p) => p.id < 0)).toBe(false);
+		expect(store.selectedPathId).toBe(0);
+	});
 });
 
 const reqPath = (store: ProgressionStore, id: number) => {
