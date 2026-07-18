@@ -26,8 +26,7 @@ namespace Game.Api.Controllers
         LoginTrackingService loginTrackingService,
         SocketManagerService socketManager,
         PlayerService playerService,
-        PlayerDataAssembler playerDataAssembler,
-        ILogger<AuthController> logger) : ControllerBase
+        PlayerDataAssembler playerDataAssembler) : ControllerBase
     {
         private readonly SessionService _sessionService = sessionService;
         private readonly SessionInitializer _sessionInitializer = sessionInitializer;
@@ -36,7 +35,6 @@ namespace Game.Api.Controllers
         private readonly SocketManagerService _socketManager = socketManager;
         private readonly PlayerService _playerService = playerService;
         private readonly PlayerDataAssembler _playerDataAssembler = playerDataAssembler;
-        private readonly ILogger<AuthController> _logger = logger;
 
         [AllowAnonymous]
         [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
