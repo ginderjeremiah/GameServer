@@ -259,7 +259,12 @@ namespace Game.Application.Services
                 PathsForActivityKey = _proficiencies.PathsForActivityKey,
                 DependentsOf = _proficiencies.DependentsOf,
                 ResolveClass = ResolveClass,
-                SeedSource = BattleService.CreateBattleSeed,
+                // Excludes the player's own LastCreditedBattleSeed (#2112), same as the live start paths: this
+                // value never changes across the offline pass (mid-window credits land on the PlayerProgress
+                // aggregate, not Player), so excluding it once per draw is sufficient — a collision with any
+                // other in-window battle's seed is harmless since only a seed matching the persisted credited
+                // value could ever be misread as already-credited by a later live claim.
+                SeedSource = () => BattleService.CreateBattleSeed(player.LastCreditedBattleSeed),
                 StalemateCutoffBattles = StalemateCutoffBattles,
             };
         }
