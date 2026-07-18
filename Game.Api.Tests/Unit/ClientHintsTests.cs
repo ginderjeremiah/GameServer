@@ -90,6 +90,7 @@ namespace Game.Api.Tests.Unit
         [InlineData("A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1")] // uppercase hex
         [InlineData("a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1")] // 63 chars, one short
         [InlineData("a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1aa")] // 66 chars, too long
+        [InlineData("a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\n")] // 64 valid chars + trailing \n — $ (not \z) would let this through
         public void DeviceFingerprint_IsNull_WhenHeaderIsNotAWellFormedHexDigest(string malformed)
         {
             var headers = new HeaderDictionary

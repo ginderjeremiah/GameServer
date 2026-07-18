@@ -40,8 +40,9 @@ namespace Game.Api.Http
         private static string? NullIfEmpty(string value) => string.IsNullOrEmpty(value) ? null : value;
 
         // A SHA-256 digest rendered as lowercase hex (device-fingerprint.ts's hashFingerprint): exactly 64
-        // characters, so an unbounded or malformed header can never reach the data tier.
-        [GeneratedRegex("^[0-9a-f]{64}$")]
+        // characters, so an unbounded or malformed header can never reach the data tier. \z (not $) anchors
+        // strictly to end-of-string — $ would also accept a trailing "\n" after the 64th hex character.
+        [GeneratedRegex("^[0-9a-f]{64}\\z")]
         private static partial Regex FingerprintShapeRegex();
     }
 }
