@@ -83,10 +83,10 @@ namespace Game.Infrastructure.PubSub.Redis
         // count moved. A single Lua script replaces the previous O(N) sequential ListMove round-trips on the
         // crash-recovery path (#954); it is atomic, so readers never see a half-reclaimed state, and on a bounded
         // in-flight processing list the script stays short.
-        private const string ReclaimScript =
+        private static readonly PreparedScript ReclaimScript = new(
             "local n = 0 " +
             "while redis.call('lmove', KEYS[1], KEYS[2], 'RIGHT', 'LEFT') do n = n + 1 end " +
-            "return n";
+            "return n");
 
         public async Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default)
         {
@@ -95,7 +95,7 @@ namespace Game.Infrastructure.PubSub.Redis
             cancellationToken.ThrowIfCancellationRequested();
 
             var result = await ObserveWrite(
-                _redis.ScriptEvaluateAsync(ReclaimScript, [ProcessingQueueName, QueueName]),
+                ReclaimScript.EvaluateAsync(_redis, [ProcessingQueueName, QueueName], []),
                 cancellationToken);
             var reclaimed = (long)result;
 
