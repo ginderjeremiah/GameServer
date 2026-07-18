@@ -12,7 +12,7 @@ namespace Game.Infrastructure.Tests
     /// server has genuinely never cached. <see cref="PreparedScript.Evaluate"/> (the fire-and-forget-capable sync
     /// path) has no such state to pin — it always sends the full script text (#2126) — so it isn't covered here;
     /// its NOSCRIPT-survival behaviour is covered by the integration suite instead
-    /// (RedisServiceIntegrationTests.HashSetAndForget_AfterScriptCacheIsFlushed_StillTakesEffect).
+    /// (RedisServiceIntegrationTests.HashSetAndForget_AfterScriptCacheIsFlushedMidRun_StillTakesEffect).
     /// <para>
     /// Uses the same dead-endpoint technique as the sibling <see cref="RedisPubSubPublishFailureTests"/>: a
     /// multiplexer pointed at an unreachable endpoint (<c>abortConnect=false</c>) connects lazily and then throws
