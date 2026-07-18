@@ -1723,7 +1723,11 @@ describe('Battle simulation parity with backend', () => {
 		expect(partial.totalMs).toBe(offset);
 
 		// Continuing on the SAME (already-mutated) battlers, unbounded, must reach the identical conclusion a
-		// straight, uninterrupted run reaches from a fresh pair.
+		// straight, uninterrupted run reaches from a fresh pair. simulate() re-seeds its own Mulberry32 every
+		// call rather than resuming the prior stream, so this only holds because cooldownRecovery has no
+		// CriticalChance/DodgeChance/ParryChance on either battler — every draw is outcome-insensitive.
+		// Repointing this test at a scenario with a live crit/dodge/parry chance would make the re-seeded
+		// continuation diverge from a true resume.
 		const continuation = splitSim.simulate();
 		const straight = new BattleSimulator(scenario.player(), scenario.enemy(), PARITY_SEED).simulate();
 

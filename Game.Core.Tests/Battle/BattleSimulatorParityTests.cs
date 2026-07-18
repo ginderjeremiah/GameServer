@@ -1404,7 +1404,11 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(offset, partial.TotalMs);
 
             // Continuing on the SAME (already-mutated) battlers, unbounded, must reach the identical
-            // conclusion a straight, uninterrupted run reaches from a fresh pair.
+            // conclusion a straight, uninterrupted run reaches from a fresh pair. Simulate() re-seeds its own
+            // Mulberry32 every call rather than resuming the prior stream, so this only holds because
+            // cooldownRecovery has no CriticalChance/DodgeChance/ParryChance on either battler — every draw is
+            // outcome-insensitive. Repointing this test at a scenario with a live crit/dodge/parry chance would
+            // make the re-seeded continuation diverge from a true resume.
             var continuation = splitSim.Simulate();
             var straight = new BattleSimulator(
                 Scenarios["cooldownRecovery"].Player(), Scenarios["cooldownRecovery"].Enemy(), ParitySeed).Simulate();
