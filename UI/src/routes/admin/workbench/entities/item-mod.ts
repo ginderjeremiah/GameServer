@@ -2,7 +2,7 @@ import { ApiRequest, EItemModType, ERarity, fetchSocketData, type IItemMod } fro
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, childChanged, guardedSave, persistEntity } from '../save-helpers';
-import { firstFree } from './helpers';
+import { attributeBonusSection } from './attribute-table-sections';
 import { tagsSection } from './tags-section';
 import type { EntityConfig } from './types';
 
@@ -73,39 +73,10 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 				}
 			]
 		},
-		{
-			key: 'attributes',
-			label: 'Attributes',
-			glyph: 'bars',
-			desc: 'Flat stat bonuses granted',
-			count: (m) => m.attributes.length,
-			warn: (m) => (m.attributes.length ? null : 'No attributes'),
-			kind: 'table',
+		attributeBonusSection<IItemMod>({
 			itemsKey: 'attributes',
-			rowKey: 'attributeId',
-			addLabel: 'Add bonus',
-			emptyIcon: 'bars',
-			emptyTitle: 'No attribute bonuses',
-			emptySub: 'This mod grants no stats.',
-			newRow: (m) => ({
-				attributeId: firstFree(
-					m.attributes.map((a) => a.attributeId),
-					reference.attributeOptions()
-				),
-				amount: 1
-			}),
-			columns: [
-				{
-					key: 'attributeId',
-					label: 'Attribute',
-					type: 'attribute',
-					options: reference.attributeOptions,
-					min: 200,
-					unique: true
-				},
-				{ key: 'amount', label: 'Amount', type: 'number', align: 'r', width: 120, allowNegative: true }
-			]
-		},
+			emptySub: 'This mod grants no stats.'
+		}),
 		tagsSection<IItemMod>()
 	],
 	refresh,

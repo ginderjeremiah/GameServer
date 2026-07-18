@@ -3,6 +3,7 @@ import { hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, guardedSave, persistEntity } from '../save-helpers';
+import { attributeDistributionSection } from './attribute-table-sections';
 import { firstFree } from './helpers';
 import { chipsSection, type EntityConfig } from './types';
 
@@ -85,41 +86,12 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 				}
 			]
 		},
-		{
+		attributeDistributionSection<WorkbenchEnemy>({
 			key: 'attrs',
-			label: 'Attributes',
-			glyph: 'bars',
-			desc: 'Stat distribution per level',
-			count: (e) => e.attributeDistribution.length,
-			warn: (e) => (e.attributeDistribution.length ? null : 'No attribute distribution'),
-			kind: 'table',
 			itemsKey: 'attributeDistribution',
-			rowKey: 'attributeId',
-			addLabel: 'Add attribute',
-			emptyIcon: 'bars',
-			emptyTitle: 'No attributes set',
-			emptySub: 'This enemy has no stat distribution yet.',
-			newRow: (e) => ({
-				attributeId: firstFree(
-					e.attributeDistribution.map((a) => a.attributeId),
-					reference.attributeOptions()
-				),
-				baseAmount: 0,
-				amountPerLevel: 0
-			}),
-			columns: [
-				{
-					key: 'attributeId',
-					label: 'Attribute',
-					type: 'attribute',
-					options: reference.attributeOptions,
-					min: 190,
-					unique: true
-				},
-				{ key: 'baseAmount', label: 'Base', type: 'number', align: 'r', width: 110, allowNegative: true },
-				{ key: 'amountPerLevel', label: 'Per Level', type: 'number', align: 'r', width: 110, allowNegative: true }
-			]
-		},
+			desc: 'Stat distribution per level',
+			emptySub: 'This enemy has no stat distribution yet.'
+		}),
 		chipsSection<WorkbenchEnemy>()({
 			key: 'skills',
 			label: 'Skills',

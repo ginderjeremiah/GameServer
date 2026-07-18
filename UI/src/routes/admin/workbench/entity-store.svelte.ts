@@ -1,4 +1,5 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SaveFlash } from '$lib/common';
 import { toastError } from '$stores';
 import { canonicalEqual, PersistFailedError } from './save-helpers';
 import { entityWarnings } from './validation';
@@ -27,19 +28,28 @@ export class EntityStore<T extends Identified> {
 	items = $state<T[]>([]);
 	private base = $state<T[]>([]);
 	private deleted = new SvelteSet<number>();
-	saved = $state(false);
+	#saveFlash = new SaveFlash();
 	saving = $state(false);
 	/** Maps a just-saved record's local (negative) id to its persisted id, so a caller tracking a
 	 *  selection by id (the Workbench detail pane) can follow a newly-added record across a save
 	 *  instead of losing it to the "record no longer found" fallback. Replaced wholesale each save. */
 	lastIdMap = $state<SvelteMap<number, number>>(new SvelteMap());
 	private nextId = -1;
-	#flashTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(config: EntityConfig<T>, seed: T[]) {
 		this.config = config;
 		this.items = seed.map(clone);
 		this.base = seed.map(clone);
+	}
+
+	/** Brief "Changes saved" confirmation flash; writable so a mutator can clear it directly
+	 *  (see {@link patch}/{@link removeItem}/etc.) without going through {@link save}. */
+	get saved(): boolean {
+		return this.#saveFlash.active;
+	}
+
+	set saved(value: boolean) {
+		this.#saveFlash.active = value;
 	}
 
 	private baseMap = $derived.by(() => {
@@ -248,7 +258,7 @@ export class EntityStore<T extends Identified> {
 			this.items = records.map(clone);
 			this.base = records.map(clone);
 			this.deleted.clear();
-			this.flashSaved();
+			this.#saveFlash.flash();
 		} catch (ex) {
 			// A *partial* failure (the identity Add/Edit batch or an earlier child saver committed,
 			// then a later step threw) leaves our baseline behind the server: the persisted adds are
@@ -277,22 +287,7 @@ export class EntityStore<T extends Identified> {
 		this.saved = false;
 	}
 
-	/** Briefly flash the "Changes saved" confirmation. The timer handle is owned so a
-	 *  re-arm clears the prior one and {@link dispose} can cancel a pending flash — a save
-	 *  that lands just before the Workbench unmounts must not write into a dead store. */
-	private flashSaved() {
-		this.saved = true;
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
-		this.#flashTimer = setTimeout(() => {
-			this.saved = false;
-		}, 1900);
-	}
-
 	dispose() {
-		if (this.#flashTimer) {
-			clearTimeout(this.#flashTimer);
-		}
+		this.#saveFlash.dispose();
 	}
 }
