@@ -137,5 +137,24 @@ export const staticData = {
 			skillRecipes,
 			lessons
 		].every((set) => set != null);
+	},
+	/** Clears every slot back to unloaded (e.g. on logout), so a subsequent login re-checks content
+	 *  versions instead of reusing whatever was in memory for the prior session. The local-storage
+	 *  cache (`reference-cache.ts`) makes the re-hydrate on next load nearly free when nothing changed. */
+	reset() {
+		zones = undefined;
+		enemies = undefined;
+		items = undefined;
+		skills = undefined;
+		itemMods = undefined;
+		attributes = undefined;
+		challenges = undefined;
+		challengeTypes = undefined;
+		statisticTypes = undefined;
+		proficiencies = undefined;
+		paths = undefined;
+		classes = undefined;
+		skillRecipes = undefined;
+		lessons = undefined;
 	}
 };
