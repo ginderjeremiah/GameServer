@@ -14,7 +14,8 @@ namespace Game.Api.Tests.Integration
     public class LoginTrackingTests : ApiIntegrationTestBase
     {
         private const string UserAgent = "TestAgent/1.0 (LoginTrackingTests)";
-        private const string Fingerprint = "fp-abc123";
+        // Well-formed (64 lowercase hex chars) — ClientHints.DeviceFingerprint now rejects anything else (#2064).
+        private const string Fingerprint = "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5";
 
         public LoginTrackingTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
 

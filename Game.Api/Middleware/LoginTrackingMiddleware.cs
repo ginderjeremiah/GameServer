@@ -65,7 +65,11 @@ namespace Game.Api.Middleware
                             hints.SecChUaPlatform,
                             context.RequestAborted);
 
-                        cache.Set(cacheKey, true, DedupeWindow);
+                        cache.Set(cacheKey, true, new MemoryCacheEntryOptions
+                        {
+                            AbsoluteExpirationRelativeToNow = DedupeWindow,
+                            Size = 1,
+                        });
                     }
                     catch (Exception ex)
                     {

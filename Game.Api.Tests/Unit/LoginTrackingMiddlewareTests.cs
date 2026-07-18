@@ -20,7 +20,10 @@ namespace Game.Api.Tests.Unit
     /// </summary>
     public class LoginTrackingMiddlewareTests
     {
-        private const string Fingerprint = "fp-abc";
+        // Well-formed fingerprints (64 lowercase hex chars) — a malformed header is now rejected upstream
+        // by ClientHints.DeviceFingerprint (#2064), so these must pass that shape check to reach the memo.
+        private const string Fingerprint = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
+        private const string DifferentFingerprint = "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2";
         private const string UserAgent = "TestAgent/1.0";
         private const string Ip = "203.0.113.7";
 
@@ -80,7 +83,7 @@ namespace Game.Api.Tests.Unit
 
         [Theory]
         [InlineData("203.0.113.8", Fingerprint)]
-        [InlineData(Ip, "fp-different")]
+        [InlineData(Ip, DifferentFingerprint)]
         public async Task Authenticated_DifferentIpOrDevice_RecordsSeparately(string ip, string fingerprint)
         {
             var (middleware, userLogins, _) = CreateMiddleware();
@@ -194,8 +197,8 @@ namespace Game.Api.Tests.Unit
             }
 
             public Task SaveDeviceInfo(
+                int userId,
                 string deviceFingerprintHash,
-                string userAgent,
                 string? secChUa,
                 string? secChUaMobile,
                 string? secChUaPlatform,

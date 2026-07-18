@@ -49,15 +49,33 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task SaveDeviceInfo_ConcurrentFromSameNewDevice_ConvergesToSingleDevice()
+        public async Task SaveDeviceInfo_ConcurrentOnAnAlreadyOwnedDevice_ConvergesWithoutError()
         {
+            // SaveDeviceInfo only enriches a device the caller already has a tracked login for (#2064), so
+            // establish that ownership first — the race under test is concurrent updates to that one row,
+            // not concurrent device creation (which SaveDeviceInfo no longer does at all).
+            int userId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var user = await TestDataSeeder.CreateUserAsync(context);
+                userId = user.Id;
+            }
+
+            using (var seedScope = CreateScope())
+            {
+                var repo = seedScope.ServiceProvider.GetRequiredService<IUserLogins>();
+                await repo.RecordConnection(userId, Ip, Fingerprint, UserAgent, null, null, null, CancellationToken);
+            }
+
             await RunConcurrently(repo =>
-                repo.SaveDeviceInfo(Fingerprint, UserAgent, null, null, null, 8, 4, CancellationToken));
+                repo.SaveDeviceInfo(userId, Fingerprint, null, null, null, 8, 4, CancellationToken));
 
             using var scope = CreateScope();
             var assertContext = scope.ServiceProvider.GetRequiredService<GameContext>();
-            Assert.Single(await assertContext.Devices.Where(d => d.DeviceFingerprintHash == Fingerprint).ToListAsync(CancellationToken));
-            Assert.Single(await assertContext.BrowserInfos.Where(b => b.UserAgent == UserAgent).ToListAsync(CancellationToken));
+            var device = await assertContext.Devices.SingleAsync(d => d.DeviceFingerprintHash == Fingerprint, CancellationToken);
+            Assert.Equal(8, device.DeviceMemory);
+            Assert.Equal(4, device.HardwareConcurrency);
         }
 
         /// <summary>

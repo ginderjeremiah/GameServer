@@ -150,9 +150,11 @@ namespace Game.Api.Controllers
         }
 
         /// <summary>
-        /// Records the device capabilities the frontend reports once after login, enriching the device
-        /// identified by the fingerprint header of this request. Requires authentication so it can only be
-        /// sent by a logged-in client. Returns an error when the request carries no device fingerprint.
+        /// Records the device capabilities the frontend reports once after login, enriching the caller's own
+        /// device identified by the fingerprint header of this request — a no-op if the caller has no tracked
+        /// login for that fingerprint (see <see cref="LoginTrackingService.SaveDeviceInfo"/>). Requires
+        /// authentication so it can only be sent by a logged-in client. Returns an error when the request
+        /// carries no device fingerprint, or one that isn't shaped like the frontend's SHA-256 digest.
         /// </summary>
         [HttpPost]
         public async Task<ApiResponse> DeviceInfo([FromBody] DeviceInfoRequest request)
@@ -165,8 +167,8 @@ namespace Game.Api.Controllers
 
             var hints = ClientHints.FromHeaders(Request.Headers);
             await _loginTrackingService.SaveDeviceInfo(
+                _sessionService.UserId,
                 fingerprint,
-                hints.UserAgent,
                 hints.SecChUa,
                 hints.SecChUaMobile,
                 hints.SecChUaPlatform,

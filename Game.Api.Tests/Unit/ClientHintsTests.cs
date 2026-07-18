@@ -61,15 +61,18 @@ namespace Game.Api.Tests.Unit
             Assert.Null(hints.SecChUaPlatform);
         }
 
+        // A well-formed fingerprint: 64 lowercase hex characters, matching the frontend's SHA-256 digest.
+        private const string ValidFingerprint = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
+
         [Fact]
-        public void DeviceFingerprint_ReturnsHeaderValue_WhenPresent()
+        public void DeviceFingerprint_ReturnsHeaderValue_WhenPresentAndWellFormed()
         {
             var headers = new HeaderDictionary
             {
-                [ClientHints.DeviceFingerprintHeader] = "fp-abc123",
+                [ClientHints.DeviceFingerprintHeader] = ValidFingerprint,
             };
 
-            Assert.Equal("fp-abc123", ClientHints.DeviceFingerprint(headers));
+            Assert.Equal(ValidFingerprint, ClientHints.DeviceFingerprint(headers));
         }
 
         [Fact]
@@ -80,6 +83,22 @@ namespace Game.Api.Tests.Unit
             {
                 [ClientHints.DeviceFingerprintHeader] = "",
             }));
+        }
+
+        [Theory]
+        [InlineData("fp-abc123")] // arbitrary client-supplied text, not a hex digest
+        [InlineData("A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1")] // uppercase hex
+        [InlineData("a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1")] // 63 chars, one short
+        [InlineData("a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1aa")] // 66 chars, too long
+        [InlineData("a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\n")] // 64 valid chars + trailing \n — $ (not \z) would let this through
+        public void DeviceFingerprint_IsNull_WhenHeaderIsNotAWellFormedHexDigest(string malformed)
+        {
+            var headers = new HeaderDictionary
+            {
+                [ClientHints.DeviceFingerprintHeader] = malformed,
+            };
+
+            Assert.Null(ClientHints.DeviceFingerprint(headers));
         }
     }
 }

@@ -20,7 +20,8 @@ namespace Game.Api.Tests.Integration
     /// </summary>
     public abstract class ForwardedHeadersTrustTestsBase : ApiIntegrationTestBase
     {
-        protected const string Fingerprint = "fp-fwd-headers";
+        // Well-formed (64 lowercase hex chars) — ClientHints.DeviceFingerprint now rejects anything else (#2064).
+        protected const string Fingerprint = "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3";
         protected const string SimulatedPeerIp = "203.0.113.9";
         protected const string SpoofedClientIp = "9.9.9.9";
         // A second proxy hop (e.g. a CDN sitting in front of the ingress) for the multi-hop ForwardLimit cases.

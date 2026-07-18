@@ -26,13 +26,16 @@ namespace Game.Abstractions.DataAccess
             CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Enriches (creating when new) the <c>Device</c> for the given fingerprint with the capabilities the
-        /// frontend reports after login (<c>deviceMemory</c>/<c>hardwareConcurrency</c>), which are not present
-        /// on a regular request.
+        /// Enriches the caller's own <c>Device</c> for the given fingerprint with the capabilities the
+        /// frontend reports after login (<c>deviceMemory</c>/<c>hardwareConcurrency</c>), backfilling any
+        /// client-hint the stored <c>BrowserInfo</c> is still missing. A no-op when <paramref name="userId"/>
+        /// has no tracked login for that fingerprint — this path never creates or attaches a <c>Device</c>,
+        /// so a caller can't enrich (or overwrite) a device it hasn't actually connected from, even if it
+        /// knows the fingerprint.
         /// </summary>
         Task SaveDeviceInfo(
+            int userId,
             string deviceFingerprintHash,
-            string userAgent,
             string? secChUa,
             string? secChUaMobile,
             string? secChUaPlatform,

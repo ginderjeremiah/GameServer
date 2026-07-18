@@ -30,7 +30,7 @@ namespace Game.Application.Tests.Services
             var service = new LoginTrackingService(userLogins);
             using var cts = new CancellationTokenSource();
 
-            await service.SaveDeviceInfo("fp", "ua", null, null, null, 8, 4, cts.Token);
+            await service.SaveDeviceInfo(5, "fp", null, null, null, 8, 4, cts.Token);
 
             Assert.Equal(cts.Token, userLogins.LastSaveToken);
         }
@@ -55,8 +55,8 @@ namespace Game.Application.Tests.Services
             }
 
             public Task SaveDeviceInfo(
+                int userId,
                 string deviceFingerprintHash,
-                string userAgent,
                 string? secChUa,
                 string? secChUaMobile,
                 string? secChUaPlatform,

@@ -1,10 +1,12 @@
+using System.Text.RegularExpressions;
+
 namespace Game.Api.Http
 {
     /// <summary>
     /// The user-agent string and low-entropy client-hint headers carried on an HTTP request, used to
     /// identify the requesting browser/device for connection tracking.
     /// </summary>
-    public readonly record struct ClientHints(
+    public readonly partial record struct ClientHints(
         string UserAgent,
         string? SecChUa,
         string? SecChUaMobile,
@@ -23,10 +25,24 @@ namespace Game.Api.Http
             NullIfEmpty(headers["Sec-CH-UA-Mobile"].ToString()),
             NullIfEmpty(headers["Sec-CH-UA-Platform"].ToString()));
 
-        /// <summary>Reads the device fingerprint header, or null when the request did not carry one.</summary>
-        public static string? DeviceFingerprint(IHeaderDictionary headers) =>
-            NullIfEmpty(headers[DeviceFingerprintHeader].ToString());
+        /// <summary>
+        /// Reads the device fingerprint header, or null when the request did not carry one or its value
+        /// doesn't have the shape of the frontend's SHA-256 hex digest (<see cref="FingerprintShapeRegex"/>).
+        /// Rejecting anything else keeps an arbitrary client-supplied string from reaching the tracking
+        /// tables (#2064) — the header is otherwise unauthenticated client input.
+        /// </summary>
+        public static string? DeviceFingerprint(IHeaderDictionary headers)
+        {
+            var value = NullIfEmpty(headers[DeviceFingerprintHeader].ToString());
+            return value is not null && FingerprintShapeRegex().IsMatch(value) ? value : null;
+        }
 
         private static string? NullIfEmpty(string value) => string.IsNullOrEmpty(value) ? null : value;
+
+        // A SHA-256 digest rendered as lowercase hex (device-fingerprint.ts's hashFingerprint): exactly 64
+        // characters, so an unbounded or malformed header can never reach the data tier. \z (not $) anchors
+        // strictly to end-of-string — $ would also accept a trailing "\n" after the 64th hex character.
+        [GeneratedRegex("^[0-9a-f]{64}\\z")]
+        private static partial Regex FingerprintShapeRegex();
     }
 }

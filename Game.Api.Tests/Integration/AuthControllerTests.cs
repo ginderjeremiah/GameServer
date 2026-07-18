@@ -313,7 +313,9 @@ namespace Game.Api.Tests.Integration
             // reads player state (here DeviceInfo) must not load or rehydrate the session cache, even for a
             // user who has a resolvable player. Only the socket handshake and Status/ActiveSession do.
             var (client, userId, _) = await SeedUserWithTokenButNoSessionAsync("nosessionread");
-            client.DefaultRequestHeaders.TryAddWithoutValidation(ClientHints.DeviceFingerprintHeader, "fp-nosession");
+            // Well-formed (64 lowercase hex chars) — ClientHints.DeviceFingerprint now rejects anything else (#2064).
+            client.DefaultRequestHeaders.TryAddWithoutValidation(
+                ClientHints.DeviceFingerprintHeader, "a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9");
 
             var response = await client.PostAsJsonAsync("/api/Auth/DeviceInfo",
                 new { DeviceMemory = 8.0, HardwareConcurrency = 4 }, CancellationToken);
