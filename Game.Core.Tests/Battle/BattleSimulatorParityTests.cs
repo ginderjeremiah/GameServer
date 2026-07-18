@@ -576,8 +576,8 @@ namespace Game.Core.Tests.Battle
                     ExpectedTotalMs: 2000),
 
                 // Draw-order alignment over a multi-skill exchange: two player skills (two crit draws) and two
-                // enemy skills (two dodge draws, one each now that Block's second draw is gone) fire on the same
-                // ticks. CriticalDamage folds in the #799 base (1.5 + 0.5 = 2 multiplier). Neither side has
+                // enemy skills (three draws each — parry, dodge, counter-crit, per #1457 — six total) fire on the
+                // same ticks. CriticalDamage folds in the #799 base (1.5 + 0.5 = 2 multiplier). Neither side has
                 // Toughness. The player crits both hits (10×2=20, 15×2=30 → 50/tick); the enemy's two hits land
                 // in full (12 + 14 = 26/tick — no Block). The 100-HP enemy dies on the player's tick-20 volley →
                 // 800ms (before its own tick-20 attack), so the player only takes the tick-10 volley and ends at 74 HP.
@@ -911,7 +911,7 @@ namespace Game.Core.Tests.Battle
 
                 // A granted skill carrying an EFFECT works exactly as a selected one would: the item grants a
                 // skill whose self +10 Strength buff stacks each fire, ramping its own damage. Str×1.0 raw (no
-                // Toughness) deals 10,20,30,40,50 (Str climbing 10→50); cumulative 10,30,60,100,150 drops the
+                // Toughness) deals 10,20,30,40,50 (Str climbing 10→60); cumulative 10,30,60,100,150 drops the
                 // 150-HP enemy on fire 5 at tick 50 → 2000ms — proving granted skills wrap into a full BattleSkill.
                 ["grantedSkillWithEffects"] = new ParityScenario(
                     Player: () => MakeBattlerWithGrants(
@@ -1355,6 +1355,67 @@ namespace Game.Core.Tests.Battle
             // the enemy's Toughness 30) land at ticks 20..120 → 4800ms.
             Assert.Equal(4800, result.TotalMs);
             Assert.True(result.TotalMs < 5760, "Double-counted stats should end the battle sooner.");
+        }
+
+        /// <summary>
+        /// Pins down the <c>cooldownRecovery</c> scenario's derived stats so a divergence in the
+        /// CDR/CooldownBonus/CooldownBonusMultiplier composition is reported directly rather than only
+        /// surfacing as a different battle outcome. Mirrors the frontend "resolves the cooldownRecovery
+        /// derived stats to the expected values" expectation.
+        /// </summary>
+        [Fact]
+        public void Parity_CooldownRecovery_ResolvesDerivedStats()
+        {
+            var player = Scenarios["cooldownRecovery"].Player();
+            var enemy = Scenarios["cooldownRecovery"].Enemy();
+
+            Assert.Equal(900, player.GetAttributeValue(EAttribute.MaxHealth));
+            Assert.Equal(60, player.GetAttributeValue(EAttribute.Toughness)); // 2·Endurance(30)
+            // CDR is severed from the core attributes (#1426): it stays the base 1, and cadence rides the
+            // committed CooldownBonus (0.25, authored) × CooldownBonusMultiplier (1 + 0.002·Agi20 = 1.04) → cdMult 1.26.
+            Assert.Equal(1.0, player.GetAttributeValue(EAttribute.CooldownRecovery), 10);
+            Assert.Equal(0.25, player.GetAttributeValue(EAttribute.CooldownBonus), 10);
+            Assert.Equal(1.04, player.GetAttributeValue(EAttribute.CooldownBonusMultiplier), 10);
+            Assert.Equal(1.26, player.GetCooldownMultiplier(), 10);
+
+            Assert.Equal(400, enemy.GetAttributeValue(EAttribute.MaxHealth));
+            Assert.Equal(30, enemy.GetAttributeValue(EAttribute.Toughness)); // 2·Endurance(15)
+        }
+
+        /// <summary>
+        /// Pins the frontend's <c>replayToOffset</c> boundary (#1595/#1596/#1597 — battle-engine.ts:229-244)
+        /// against this simulator's own tick loop: simulating the <c>cooldownRecovery</c> scenario to a mid-battle
+        /// offset, then continuing on the same (already-mutated) battlers for the remainder, must land on the
+        /// exact same outcome and total elapsed time as one uninterrupted <see cref="BattleSimulator.Simulate"/>
+        /// call. Guards the loop's boundary arithmetic (<c>totalMs &lt;= limit</c>, the <c>totalMs - msPerTick</c>
+        /// exit) against a future refactor silently shifting where a resumed replay picks up. Mirrors the
+        /// frontend "replays to an offset then continues to the same conclusion" expectation.
+        /// </summary>
+        [Fact]
+        public void Parity_RunToOffsetThenContinue_MatchesUninterruptedRun()
+        {
+            const int offset = 2400; // mid-battle: cooldownRecovery concludes at 5760ms.
+
+            var splitSim = new BattleSimulator(
+                Scenarios["cooldownRecovery"].Player(), Scenarios["cooldownRecovery"].Enemy(), ParitySeed);
+            var partial = splitSim.Simulate(offset);
+            Assert.False(partial.Victory);
+            Assert.False(partial.PlayerDied);
+            Assert.Equal(offset, partial.TotalMs);
+
+            // Continuing on the SAME (already-mutated) battlers, unbounded, must reach the identical
+            // conclusion a straight, uninterrupted run reaches from a fresh pair. Simulate() re-seeds its own
+            // Mulberry32 every call rather than resuming the prior stream, so this only holds because
+            // cooldownRecovery has no CriticalChance/DodgeChance/ParryChance on either battler — every draw is
+            // outcome-insensitive. Repointing this test at a scenario with a live crit/dodge/parry chance would
+            // make the re-seeded continuation diverge from a true resume.
+            var continuation = splitSim.Simulate();
+            var straight = new BattleSimulator(
+                Scenarios["cooldownRecovery"].Player(), Scenarios["cooldownRecovery"].Enemy(), ParitySeed).Simulate();
+
+            Assert.Equal(straight.Victory, continuation.Victory);
+            Assert.Equal(straight.PlayerDied, continuation.PlayerDied);
+            Assert.Equal(straight.TotalMs, offset + continuation.TotalMs);
         }
 
         /// <summary>
