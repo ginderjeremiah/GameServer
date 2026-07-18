@@ -23,7 +23,7 @@ namespace Game.DataAccess.Content
             _context = context;
         }
 
-        public async Task<bool> SeedAsync(ContentImport content, CancellationToken cancellationToken = default)
+        public async Task<bool> SeedAsync(ContentGraph content, CancellationToken cancellationToken = default)
         {
             // Skills are the foundational set (the punch fallback, class kit, enemy/proficiency skills all
             // reference them), so their presence marks an already-populated database. Fresh DB only: never

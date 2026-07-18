@@ -1,5 +1,4 @@
 using Game.Abstractions.DataAccess;
-using Contracts = Game.Abstractions.Contracts;
 
 namespace Game.Application.Content
 {
@@ -46,31 +45,27 @@ namespace Game.Application.Content
 
         public async Task<IReadOnlyList<ContentExportFile>> ExportAllAsync(CancellationToken cancellationToken = default)
         {
-            // Tags are the one set not held in an in-memory reference cache, so materialize them from the
-            // database read stream before assembling the (otherwise synchronous) export.
-            var tags = new List<Contracts.Tag>();
-            await foreach (var tag in _tags.All().WithCancellation(cancellationToken))
-            {
-                tags.Add(tag);
-            }
+            var graph = await LiveContentGraphAssembler.BuildAsync(
+                _skills, _tags, _items, _itemMods, _enemies, _zones, _challenges, _classes, _proficiencies,
+                _skillRecipes, _lessons, cancellationToken);
 
             // One file per static set, in dependency-ish order (referenced sets first). Tags are referenced by
             // items/mods, so they precede them. Path and Proficiency are distinct reference sets with their own
             // ids, so each gets its own file.
             return
             [
-                File("skills.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_skills.AllSkills()))),
-                File("tags.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(tags))),
-                File("item-mods.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_itemMods.All()))),
-                File("items.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_items.All()))),
-                File("enemies.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_enemies.All()))),
-                File("challenges.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_challenges.All().Select(ChallengeContractMapper.ToContract)))),
-                File("zones.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_zones.All()))),
-                File("classes.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_classes.All()))),
-                File("paths.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_proficiencies.AllPaths()))),
-                File("proficiencies.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_proficiencies.AllProficiencies()))),
-                File("skill-recipes.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_skillRecipes.AllSkillRecipes()))),
-                File("lessons.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(_lessons.AllLessons()))),
+                File("skills.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Skills))),
+                File("tags.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Tags))),
+                File("item-mods.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.ItemMods))),
+                File("items.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Items))),
+                File("enemies.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Enemies))),
+                File("challenges.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Challenges))),
+                File("zones.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Zones))),
+                File("classes.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Classes))),
+                File("paths.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Paths))),
+                File("proficiencies.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Proficiencies))),
+                File("skill-recipes.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.SkillRecipes))),
+                File("lessons.json", ContentExportSerializer.Serialize(ContentExportSerializer.Canonicalize(graph.Lessons))),
             ];
         }
 

@@ -1,3 +1,4 @@
+using Game.Abstractions.Content;
 using Game.Abstractions.Contracts.Admin;
 
 namespace Game.Application.Content

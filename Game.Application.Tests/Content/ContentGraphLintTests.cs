@@ -28,9 +28,9 @@ namespace Game.Application.Tests.Content
         private static readonly HashSet<string> AcceptedWarnings = [];
 
         [Fact]
-        public async Task CommittedContent_HasNoReachabilityErrors()
+        public void CommittedContent_HasNoReachabilityErrors()
         {
-            var findings = await CheckCommittedContentAsync();
+            var findings = CheckCommittedContent();
             var errors = findings.Where(f => f.Severity == ContentGraphSeverity.Error).ToList();
 
             Assert.True(
@@ -39,9 +39,9 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
-        public async Task CommittedContent_HasNoUnacceptedWarnings()
+        public void CommittedContent_HasNoUnacceptedWarnings()
         {
-            var findings = await CheckCommittedContentAsync();
+            var findings = CheckCommittedContent();
             var warnings = findings
                 .Where(f => f.Severity == ContentGraphSeverity.Warning && !AcceptedWarnings.Contains(f.ToString()))
                 .ToList();
@@ -52,9 +52,9 @@ namespace Game.Application.Tests.Content
                 + $"the finding to AcceptedWarnings with a note on why the gap is deliberate:\n{string.Join("\n", warnings)}");
         }
 
-        private static async Task<IReadOnlyList<ContentGraphFinding>> CheckCommittedContentAsync()
+        private static IReadOnlyList<ContentGraphFinding> CheckCommittedContent()
         {
-            var graph = await ContentGraphJsonReader.ReadFromDirectoryAsync(RepoPaths.ContentDirectory(), TestContext.Current.CancellationToken);
+            var graph = new ContentImportReader().Read(RepoPaths.ContentDirectory());
             return new ProgressionGraphChecker().Check(graph);
         }
     }

@@ -1,3 +1,4 @@
+using Game.Abstractions.Content;
 using Game.Application.Content;
 using Game.Core;
 using Game.Core.Attributes;
@@ -1220,8 +1221,9 @@ namespace Game.Application.Tests.Content
         /// zone, a boss, an enemy pool skill, an item-granted skill, and a proficiency milestone — no findings.</summary>
         private static ContentGraph HealthyGraph()
         {
-            return new ContentGraph(
-                Skills:
+            return new ContentGraph
+            {
+                Skills =
                 [
                     Skill(0, ESkillAcquisition.Player),  // Punch (exempt)
                     Skill(1, ESkillAcquisition.Player),  // class starter
@@ -1229,21 +1231,22 @@ namespace Game.Application.Tests.Content
                     Skill(3, ESkillAcquisition.Item),    // item grant
                     Skill(5, ESkillAcquisition.Player),  // milestone
                 ],
-                Tags: [],
-                Items: [Item(0, grantedSkillId: 3)],
-                ItemMods: [],
-                Enemies: [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
+                Tags = [],
+                Items = [Item(0, grantedSkillId: 3)],
+                ItemMods = [],
+                Enemies = [Enemy(0, skillPool: [2], spawns: [(0, 1), (1, 1)]), Enemy(1, isBoss: true)],
                 // Zone 0 carries a boss (enemy 1) so the default ZonesCleared challenge below can actually
                 // clear it — a boss-less Zone target is itself a lint finding (ChallengeTarget).
-                Zones: [Zone(0, bossEnemyId: 1), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
-                Challenges: [Challenge(0, entityType: EEntityType.Zone, targetEntityId: 0)],
-                Classes: [Class(0, starterSkills: [1])],
-                Paths: [Path(0)],
-                Proficiencies: [Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(5, 5)])],
-                SkillRecipes: [],
+                Zones = [Zone(0, bossEnemyId: 1), Zone(1, unlockChallengeId: 0), Zone(2, isHome: true)],
+                Challenges = [Challenge(0, entityType: EEntityType.Zone, targetEntityId: 0)],
+                Classes = [Class(0, starterSkills: [1])],
+                Paths = [Path(0)],
+                Proficiencies = [Proficiency(0, pathId: 0, maxLevel: 10, rewards: [(5, 5)])],
+                SkillRecipes = [],
                 // A healthy graph must also cover the taught-by-blurb candidates, or CheckLessons's coverage
                 // warning would fire on every other test's otherwise-clean graph too.
-                Lessons: TaughtByBlurbLessons());
+                Lessons = TaughtByBlurbLessons(),
+            };
         }
 
         private static Contracts.Skill Skill(

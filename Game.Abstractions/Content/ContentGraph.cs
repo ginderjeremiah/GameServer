@@ -3,12 +3,13 @@ using Contracts = Game.Abstractions.Contracts;
 namespace Game.Abstractions.Content
 {
     /// <summary>
-    /// The full static reference-data graph deserialized from the source-controlled content export
-    /// (<c>content/*.json</c>, spike #1390) — one list per static set, in the published read-contract shape. It
-    /// is the input the content seeder reconstructs a fresh database from, the reverse of the content
-    /// exporter's output.
+    /// The whole static reference-data graph — the 12 exported sets, in the published read-contract shape
+    /// (spike #1390). Source-agnostic: the same shape is populated from the committed <c>content/*.json</c>
+    /// export (the content seeder's input, and the CI progression-graph lint's input) or from the live
+    /// reference caches (the admin Content Health view), so one type serves every consumer (spike #1390,
+    /// decision 5).
     /// </summary>
-    public sealed record ContentImport
+    public sealed record ContentGraph
     {
         public required IReadOnlyList<Contracts.Skill> Skills { get; init; }
         public required IReadOnlyList<Contracts.Tag> Tags { get; init; }
