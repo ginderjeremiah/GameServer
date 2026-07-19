@@ -34,11 +34,6 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse<SelectPlayerResult>> SelectPlayer([FromBody] SelectPlayerRequest request)
         {
-            if (!_sessionService.Authenticated)
-            {
-                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
-            }
-
             var outcome = await _characterSelectionService.SelectPlayer(
                 _sessionService.UserId, request.PlayerId, request.RefreshToken, HttpContext.RequestAborted);
             if (!outcome.Success)
@@ -57,11 +52,6 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse<SelectPlayerResult>> SwitchPlayer([FromBody] SelectPlayerRequest request)
         {
-            if (!_sessionService.Authenticated)
-            {
-                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
-            }
-
             var outcome = await _characterSelectionService.SwitchPlayer(
                 _sessionService.UserId, request.PlayerId, request.RefreshToken, HttpContext.RequestAborted);
             if (!outcome.Success)
@@ -81,11 +71,6 @@ namespace Game.Api.Controllers
         [HttpPost]
         public async Task<ApiResponse<PlayerSummary>> CreatePlayer([FromBody] CreatePlayerRequest request)
         {
-            if (!_sessionService.Authenticated)
-            {
-                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
-            }
-
             var result = await _accountService.CreatePlayer(_sessionService.UserId, request.Name, request.ClassId, HttpContext.RequestAborted);
             if (!result.Success)
             {
@@ -104,11 +89,6 @@ namespace Game.Api.Controllers
         [HttpGet("/api/[controller]")]
         public async Task<ApiEnumerableResponse<PlayerSummary>> Players()
         {
-            if (!_sessionService.Authenticated)
-            {
-                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
-            }
-
             var players = await _accountService.GetPlayers(_sessionService.UserId, HttpContext.RequestAborted);
             return ApiResponse.Success(players);
         }
@@ -123,11 +103,6 @@ namespace Game.Api.Controllers
         [HttpGet]
         public ApiEnumerableResponse<CreatableClass> CharacterCreationData()
         {
-            if (!_sessionService.Authenticated)
-            {
-                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
-            }
-
             return ApiResponse.Success(_accountService.GetCreatableClasses());
         }
 
