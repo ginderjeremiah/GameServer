@@ -44,7 +44,19 @@ namespace Game.DataAccess
         {
             await _pubsub.UnSubscribe(InstanceId);
             _stopping.Cancel();
-            await _reloadLoop;
+
+            // Honor the host's shutdown deadline: a wedged reload query (e.g. a stuck Npgsql connection) must not
+            // stall host shutdown past the deadline. If the token trips first, stop awaiting and let the loop
+            // finish (or die with the process) in the background — the same bounded give-up
+            // RedisConnectionLifetime.StopAsync applies to multiplexer disposal.
+            try
+            {
+                await _reloadLoop.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown deadline reached before the reload loop settled; unwinding is the deliberate give-up.
+            }
         }
 
         public async Task NotifyChangedAsync()
