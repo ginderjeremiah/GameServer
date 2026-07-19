@@ -58,6 +58,14 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public void RewritesTo409_WhenErrorCategoryIsNoPlayerSelected()
+        {
+            var result = new ObjectResult(ApiResponse.Error("No character selected.", ApiErrorCategory.NoPlayerSelected));
+
+            Assert.Equal(StatusCodes.Status409Conflict, RunFilter(result));
+        }
+
+        [Fact]
         public void RewritesTo400_WhenErrorCategoryIsBadRequest()
         {
             var result = new ObjectResult(ApiResponse.Error("Invalid input", ApiErrorCategory.BadRequest));

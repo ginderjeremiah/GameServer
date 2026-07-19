@@ -24,6 +24,10 @@
         /// <summary>The requested resource does not exist — maps to 404 Not Found.</summary>
         NotFound = 2,
         /// <summary>The caller is being throttled/backed off — maps to 429 Too Many Requests.</summary>
-        TooManyRequests = 3
+        TooManyRequests = 3,
+        /// <summary>The caller is authenticated but has not yet selected a character (a pre-selection
+        /// token, post-Login/pre-SelectPlayer) — maps to 409 Conflict. Distinct from
+        /// <see cref="NotFound"/> because it is an expected flow state, not a missing-resource failure.</summary>
+        NoPlayerSelected = 4
     }
 }
