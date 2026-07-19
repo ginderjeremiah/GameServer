@@ -712,6 +712,53 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ProficiencyPath", ContentGraphSeverity.Error, "Proficiency", 0);
         }
 
+        // --- Skill effects (DoT-accumulator modifier shape) -------------------------------------------
+
+        [Fact]
+        public void Skill_MultiplicativeEffectOnDotAccumulator_IsError()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Player, effects:
+                [
+                    new Contracts.SkillEffect
+                    {
+                        Target = ESkillEffectTarget.Opponent,
+                        AttributeId = EAttribute.PoisonDamagePerSecond,
+                        ModifierTypeId = EModifierType.Multiplicative,
+                        Amount = 2m,
+                        DurationMs = 3000,
+                        ScalingAttributeId = EAttribute.Strength,
+                        ScalingAmount = 0,
+                    },
+                ])).ToList(),
+            };
+            AssertHasFinding(graph, "SkillEffectDotModifier", ContentGraphSeverity.Error, "Skill", 6);
+        }
+
+        [Fact]
+        public void Skill_AdditiveEffectOnDotAccumulator_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Player, effects:
+                [
+                    new Contracts.SkillEffect
+                    {
+                        Target = ESkillEffectTarget.Opponent,
+                        AttributeId = EAttribute.PoisonDamagePerSecond,
+                        ModifierTypeId = EModifierType.Additive,
+                        Amount = 2m,
+                        DurationMs = 3000,
+                        ScalingAttributeId = EAttribute.Strength,
+                        ScalingAmount = 0,
+                    },
+                ])).ToList(),
+            };
+            var findings = _checker.Check(graph);
+            Assert.DoesNotContain(findings, f => f.Check == "SkillEffectDotModifier");
+        }
+
         // --- Skill recipes ----------------------------------------------------------------------------
 
         [Fact]
@@ -1271,7 +1318,8 @@ namespace Game.Application.Tests.Content
             DateTime? retiredAt = null,
             EDamageType primaryType = EDamageType.Physical,
             (EAttribute attributeId, decimal multiplier)[]? damageMultipliers = null,
-            (EAttribute attributeId, decimal scalingAmount)[]? effectScaling = null) => new()
+            (EAttribute attributeId, decimal scalingAmount)[]? effectScaling = null,
+            IReadOnlyList<Contracts.SkillEffect>? effects = null) => new()
             {
                 Id = id,
                 Name = $"Skill {id}",
@@ -1279,7 +1327,7 @@ namespace Game.Application.Tests.Content
                 DamageMultipliers = (damageMultipliers ?? [])
                 .Select(m => new Contracts.AttributeMultiplier { AttributeId = m.attributeId, Multiplier = m.multiplier })
                 .ToList(),
-                Effects = (effectScaling ?? [])
+                Effects = effects ?? (effectScaling ?? [])
                 .Select(e => new Contracts.SkillEffect
                 {
                     Target = ESkillEffectTarget.Self,
