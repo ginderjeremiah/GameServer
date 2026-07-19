@@ -699,6 +699,49 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetPrerequisites_CrossPathCycleComposedWithImplicitTierOrdering_ReturnsFailure()
+        {
+            // The #2144 scenario: Path A tier 0 already gates on Path B tier 2 (a cross-path edge, allowed on
+            // its own). Path B tier 0 -> Path A tier 0 is also cross-path on its own — but Path B's implicit
+            // within-path chain (tier 2 needs tier 1 needs tier 0) composes the two authored edges into
+            // A0 -> B2 -> B1 -> B0 -> A0, a cycle invisible to a check over the authored edges alone.
+            int a0Id, b0Id;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var pathA = await SeedPathAsync(seedScope);
+                var a0 = await SeedProficiencyAsync(seedScope, pathA.Id, pathOrdinal: 0, name: "A0");
+                a0Id = a0.Id;
+
+                var pathB = await SeedPathAsync(seedScope);
+                var b0 = await SeedProficiencyAsync(seedScope, pathB.Id, pathOrdinal: 0, name: "B0");
+                await SeedProficiencyAsync(seedScope, pathB.Id, pathOrdinal: 1, name: "B1");
+                var b2 = await SeedProficiencyAsync(seedScope, pathB.Id, pathOrdinal: 2, name: "B2");
+                b0Id = b0.Id;
+
+                context.Set<Entities.ProficiencyPrerequisite>().Add(new Entities.ProficiencyPrerequisite
+                {
+                    ProficiencyId = a0Id,
+                    PrerequisiteProficiencyId = b2.Id,
+                });
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
+            {
+                Id = b0Id,
+                PrerequisiteIds = [a0Id],
+            }]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("cycle", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SetPrerequisites_BatchNamesTheSameProficiencyTwice_ReturnsFailure()
         {
             int proficiencyId, otherId;

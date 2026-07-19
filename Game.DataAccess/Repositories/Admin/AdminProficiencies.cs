@@ -409,17 +409,23 @@ namespace Game.DataAccess.Repositories.Admin
         /// <summary>Returns a rejection if overriding each proficiency named in
         /// <paramref name="desiredByProficiencyId"/> with its desired prerequisite set would introduce a cycle
         /// in the prerequisite graph, else null. The prospective graph keeps every other proficiency's
-        /// existing edges and overrides only the named nodes'.</summary>
+        /// existing edges and overrides only the named nodes', and is checked together with the implicit
+        /// within-path tier ordering (see <see cref="ProficiencyPrerequisiteGraph"/>) so a cross-path edge
+        /// composed with that ordering is caught too, not just a cycle made entirely of authored edges.</summary>
         private AdminSaveResult? FindPrerequisiteCycle(IReadOnlyDictionary<int, IReadOnlyList<int>> desiredByProficiencyId)
         {
-            var graph = _proficiencies.AllProficiencyEntities().ToDictionary(
+            var allProficiencies = _proficiencies.AllProficiencyEntities();
+
+            var prerequisites = allProficiencies.ToDictionary(
                 p => p.Id,
                 p => (IReadOnlyList<int>)p.Prerequisites.Select(pr => pr.PrerequisiteProficiencyId).ToList());
             foreach (var (proficiencyId, desiredPrerequisiteIds) in desiredByProficiencyId)
             {
-                graph[proficiencyId] = desiredPrerequisiteIds;
+                prerequisites[proficiencyId] = desiredPrerequisiteIds;
             }
 
+            var tiers = allProficiencies.Select(p => (p.Id, p.PathId, p.PathOrdinal)).ToList();
+            var graph = ProficiencyPrerequisiteGraph.BuildGraph(tiers, prerequisites);
             if (ProficiencyPrerequisiteGraph.TryFindCycle(graph, out var cycle))
             {
                 return AdminSaveResult.Failure(
