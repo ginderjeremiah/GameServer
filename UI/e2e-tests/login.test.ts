@@ -36,7 +36,19 @@ test.describe('Login page', () => {
 
 		await expect(page.getByTestId('submit-button')).toBeDisabled();
 
-		await page.waitForTimeout(500);
+		const authRequests: string[] = [];
+		page.on('request', (request) => {
+			if (request.url().includes('/api/Auth')) {
+				authRequests.push(request.url());
+			}
+		});
+
+		// A disabled submit button alone doesn't prove the form can't be submitted — attempt the
+		// implicit Enter-key submission and confirm it's actually blocked, not just untried.
+		await page.getByTestId('password-input').press('Enter');
+		await page.waitForLoadState('networkidle');
+
+		expect(authRequests).toHaveLength(0);
 		await expect(page).toHaveURL('/');
 	});
 });
