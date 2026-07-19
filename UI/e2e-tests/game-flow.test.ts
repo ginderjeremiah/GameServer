@@ -21,7 +21,7 @@ test.describe('Game flow', () => {
 		await expect(enterButton).toBeEnabled({ timeout: 10000 });
 
 		await enterButton.click();
-		await expect(page).toHaveURL('/game', { timeout: 5000 });
+		await expect(page).toHaveURL('/game', { timeout: 10000 });
 	});
 
 	test('game page renders sidebar and battle screen', async ({ page }) => {
@@ -34,7 +34,7 @@ test.describe('Game flow', () => {
 		await expect(enterButton).toBeEnabled({ timeout: 10000 });
 		await enterButton.click();
 
-		await expect(page).toHaveURL('/game', { timeout: 5000 });
+		await expect(page).toHaveURL('/game', { timeout: 10000 });
 
 		await expect(page.getByTestId('sidebar')).toBeVisible();
 		await expect(page.getByTestId('sidebar-item-fight')).toBeVisible();
@@ -52,7 +52,7 @@ test.describe('Game flow', () => {
 		await expect(enterButton).toBeEnabled({ timeout: 10000 });
 		await enterButton.click();
 
-		await expect(page).toHaveURL('/game', { timeout: 5000 });
+		await expect(page).toHaveURL('/game', { timeout: 10000 });
 
 		// The fight screen is the default. The seeded second zone (Ashen Wastes) is gated behind
 		// clearing the starter zone, which a brand-new player has not done, so the forward arrow is

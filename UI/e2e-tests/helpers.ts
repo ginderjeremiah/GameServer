@@ -81,7 +81,12 @@ export async function createFirstCharacter(page: Page, name = 'Hero') {
 	await expect(page.getByTestId('player-card')).toHaveCount(1, { timeout: 10000 });
 }
 
-export async function createAccountAndLogin(page: Page, prefix = 'e') {
+/**
+ * Sign up a new account from the login screen and submit, landing on the (empty) character-select
+ * screen. Split out from {@link createAccountAndLogin} so tests that need to stop at that screen
+ * (rather than create a character and enter the game) don't duplicate the signup block.
+ */
+export async function signUp(page: Page, prefix = 'e') {
 	await page.goto('/');
 	await waitForLoginReady(page);
 
@@ -93,6 +98,12 @@ export async function createAccountAndLogin(page: Page, prefix = 'e') {
 	await page.getByTestId('password-input').fill(TEST_PASSWORD);
 	await page.getByTestId('confirm-input').fill(TEST_PASSWORD);
 	await page.getByTestId('submit-button').click();
+
+	return username;
+}
+
+export async function createAccountAndLogin(page: Page, prefix = 'e') {
+	const username = await signUp(page, prefix);
 
 	// Signup lands on the select screen with no characters; create the first one, then enter as it.
 	await createFirstCharacter(page);
