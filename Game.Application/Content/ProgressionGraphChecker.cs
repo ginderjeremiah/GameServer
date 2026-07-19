@@ -614,8 +614,6 @@ namespace Game.Application.Content
                 }
             }
 
-            // --- Skill recipes ----------------------------------------------------------------------------
-
             // --- Skill effects (DoT-accumulator modifier shape) -------------------------------------------
 
             /// <summary>
@@ -641,6 +639,8 @@ namespace Game.Application.Content
                     }
                 }
             }
+
+            // --- Skill recipes ----------------------------------------------------------------------------
 
             private void CheckSkillRecipes()
             {
