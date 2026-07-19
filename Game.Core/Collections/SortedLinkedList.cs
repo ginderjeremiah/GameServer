@@ -96,6 +96,9 @@ namespace Game.Core.Collections
                 _head = head;
             }
 
+            // Undefined before the first MoveNext or after it returns false, matching the BCL
+            // enumerator contract (e.g. List<T>.Enumerator) — the ! here is deliberate, not an
+            // oversight, for the same reason the BCL's own enumerators use it.
             public readonly T Current => _current!.Value;
 
             readonly object IEnumerator.Current => Current!;

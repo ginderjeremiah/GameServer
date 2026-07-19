@@ -109,8 +109,9 @@ namespace Game.Core.Proficiencies
         /// is exactly the bonus-only set.
         /// </summary>
         public IReadOnlyList<int> RewardSkillsCrossed(int fromLevel, int toLevel) =>
-            [.. Levels.Where(l => l.Level > fromLevel && l.Level <= toLevel && l.RewardSkillId is not null)
-                .Select(l => l.RewardSkillId!.Value)];
+            [.. Levels.Where(l => l.Level > fromLevel && l.Level <= toLevel)
+                .Select(l => l.RewardSkillId)
+                .OfType<int>()];
 
         /// <summary>True once a player has reached this proficiency's <see cref="MaxLevel"/>.</summary>
         public bool IsMaxed(int level) => level >= MaxLevel;
