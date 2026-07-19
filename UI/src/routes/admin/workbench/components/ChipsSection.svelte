@@ -27,6 +27,7 @@
 		<div class="fld add-select">
 			<select
 				class="sel"
+				aria-label={section.addLabel}
 				value=""
 				onchange={(e) => {
 					const { value } = e.currentTarget;

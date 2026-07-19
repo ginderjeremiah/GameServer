@@ -11,6 +11,7 @@
 				<select
 					class="sel"
 					class:dirty={typeDirty}
+					aria-label="Objective Type"
 					value={challenge.challengeTypeId}
 					onchange={(e) =>
 						store.patch(challenge.id, (d) =>

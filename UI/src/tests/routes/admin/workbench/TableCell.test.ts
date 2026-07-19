@@ -137,6 +137,21 @@ describe('TableCell — select type', () => {
 		expect(container.querySelector('select')!.classList.contains('dirty')).toBe(true);
 	});
 
+	it('carries the column label as an accessible name (the visible label is a presentational span)', () => {
+		const { container } = render(TableCell, {
+			props: {
+				col: makeSelectCol(),
+				row: { zoneId: 1 },
+				idx: 0,
+				rows: [{ zoneId: 1 }],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		expect(container.querySelector('select')!.getAttribute('aria-label')).toBe('Zone');
+	});
+
 	it('calls onChange with the numeric value when the selection changes', async () => {
 		const onChange = vi.fn();
 		const { container } = render(TableCell, {
@@ -172,6 +187,21 @@ describe('TableCell — number type', () => {
 		const input = container.querySelector('input') as HTMLInputElement;
 		expect(input).toBeTruthy();
 		expect(input.getAttribute('inputmode')).toBe('decimal');
+	});
+
+	it('carries the column label as an accessible name (the visible label is a presentational span)', () => {
+		const { container } = render(TableCell, {
+			props: {
+				col: makeNumberCol(),
+				row: { weight: 10 },
+				idx: 0,
+				rows: [{ weight: 10 }],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		expect(container.querySelector('input')!.getAttribute('aria-label')).toBe('Weight');
 	});
 
 	it('commits on every keystroke when this is not the identity column', async () => {
