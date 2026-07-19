@@ -80,6 +80,11 @@ namespace Game.Core.Battle.Offline
             // in Idle mode, where each battle's random encounter genuinely differs.
             double? bossEnemyRating = null;
 
+            // Idle mode's per-(template, level) rating memo (#2130): a zone's random encounters are drawn from
+            // a small, bounded-level spawn table, so the same enemy id/level pair recurs across many victories
+            // in one run. Populated and consulted by RateIdleEnemy below.
+            var idleEnemyRatingMemo = new Dictionary<(int Id, int Level), double>();
+
             // Tracks whether any battle has produced progress (a win or a loss). A run that is nothing but
             // draws is a stalemate the player can neither win nor lose; the cutoff below stops it early.
             var madeProgress = false;
@@ -112,9 +117,9 @@ namespace Game.Core.Battle.Offline
                 if (result.Victory)
                 {
                     // The enemy rating reuses the memoized boss rating in Boss mode (populating it on the first
-                    // victory) and is re-derived per victory in Idle mode, where each random encounter genuinely
-                    // differs. Kept as an explicit local — not folded into the DefeatRewards call — so the
-                    // bossEnemyRating cache write-back stays visible rather than buried in a ternary argument.
+                    // victory) and RateIdleEnemy's per-(id, level) memo in Idle mode (#2130). Kept as an
+                    // explicit local — not folded into the DefeatRewards call — so the bossEnemyRating cache
+                    // write-back stays visible rather than buried in a ternary argument.
                     double enemyRating;
                     if (parameters.Mode == OfflineLoopMode.Boss)
                     {
@@ -122,7 +127,7 @@ namespace Game.Core.Battle.Offline
                     }
                     else
                     {
-                        enemyRating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+                        enemyRating = RateIdleEnemy(enemy, idleEnemyRatingMemo);
                     }
 
                     rewards = new DefeatRewards(playerRating, enemyRating);
@@ -269,6 +274,37 @@ namespace Game.Core.Battle.Offline
                 _ => throw new ArgumentOutOfRangeException(
                     nameof(parameters), parameters.Mode, $"Unhandled offline loop mode {parameters.Mode}."),
             };
+        }
+
+        /// <summary>
+        /// Idle mode's per-victory enemy rating (#2130), memoized by (template id, level): a zone's random
+        /// encounters are drawn from a small, bounded-level spawn table, so the same pair recurs across many
+        /// victories in one run, and <see cref="CombatRating.Rate"/> is a pure function of the assembled
+        /// battler — which for a given template and level depends only on which skills got fielded.
+        /// <para>
+        /// That is safe to key on (id, level) alone only when <see cref="Enemy.AvailableSkills"/> fits within
+        /// <see cref="GameConstants.MaxSelectedSkills"/>: <see cref="Enemy.SelectBattleSkills"/> then always
+        /// fields the whole pool (shuffled, but <see cref="CombatRating.Rate"/> sums over skills order-
+        /// independently) and the rating is genuinely stationary. A larger pool draws a genuinely random
+        /// subset per encounter, so the rating is <b>not</b> pure in (id, level) alone — that case falls back
+        /// to a fresh computation every time, matching pre-#2130 behavior.
+        /// </para>
+        /// </summary>
+        private static double RateIdleEnemy(Enemy enemy, Dictionary<(int Id, int Level), double> ratingMemo)
+        {
+            if (enemy.AvailableSkills.Count > GameConstants.MaxSelectedSkills)
+            {
+                return CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+            }
+
+            var key = (enemy.Id, enemy.Level);
+            if (!ratingMemo.TryGetValue(key, out var rating))
+            {
+                rating = CombatRating.Rate(enemy.ToBattler(), isPlayer: false);
+                ratingMemo[key] = rating;
+            }
+
+            return rating;
         }
 
         /// <summary>

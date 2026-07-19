@@ -495,6 +495,57 @@ namespace Game.Core.Tests.Battle.Offline
             Assert.All(result.Battles, battle => Assert.Equal(0, battle.Result.Stats.PlayerRating));
         }
 
+        // ── Idle enemy rating memo (#2130) ───────────────────────────────────
+
+        [Fact]
+        public void Simulate_IdleMode_MemoizedEnemyRatingMatchesAFreshComputation_AcrossRepeatedEncounters()
+        {
+            // WeakEnemy's one-skill pool is well within GameConstants.MaxSelectedSkills, so
+            // Enemy.SelectBattleSkills always fields its whole (stationary) pool and RateIdleEnemy's memo
+            // applies. Pin that every victory against the same (id, level) still reports exactly the rating a
+            // fresh CombatRating.Rate computation would, whether served from the memo or not.
+            var scenario = StrongPlayerWinScenario();
+            var freshEnemy = WeakEnemy(level: 1);
+            var expectedRating = CombatRating.Rate(
+                new Battler(new AttributeCollection(freshEnemy.GetAttributeModifiers()), freshEnemy.AvailableSkills, freshEnemy.Level),
+                isPlayer: false);
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
+
+            var wins = result.Battles.Where(b => b.Result.Victory).ToList();
+            Assert.True(wins.Count > 1);
+            Assert.All(wins, battle => Assert.Equal(expectedRating, battle.EnemyRating, precision: 9));
+        }
+
+        [Fact]
+        public void Simulate_IdleMode_OversizedSkillPoolEnemy_PricesEachVictoryByItsOwnActuallySelectedLoadout()
+        {
+            // A pool larger than GameConstants.MaxSelectedSkills makes Enemy.SelectBattleSkills draw a
+            // genuinely random subset per encounter, so the enemy's rating is not pure in (id, level) alone —
+            // RateIdleEnemy must not memo-serve a stale rating from an earlier encounter's different draw.
+            // VariedSkillPoolEnemy's 8 skills carry distinct damage, so a different draw genuinely re-prices
+            // the enemy; pin that every victory's EnemyRating matches a fresh rating of that battle's own
+            // recorded loadout rather than the first one seen.
+            var scenario = new Scenario
+            {
+                Zone = MakeZone(levelMin: 1, levelMax: 1),
+                Snapshot = PlayerSnapshot(strength: 100, endurance: 100),
+                ResolveEnemy = VariedSkillPoolEnemy,
+            };
+
+            var result = _simulator.Simulate(IdleParameters(ManyStepsBudget(), scenario));
+
+            var wins = result.Battles.Where(b => b.Result.Victory).ToList();
+            Assert.True(wins.Count > 1);
+            var distinctRatings = wins.Select(b => b.EnemyRating).Distinct().Count();
+            Assert.True(distinctRatings > 1, "The random per-encounter loadout never varied the enemy rating — the fixture doesn't exercise the case.");
+            Assert.All(wins, battle =>
+            {
+                var expected = CombatRating.Rate(battle.Enemy.ToBattler(), isPlayer: false);
+                Assert.Equal(expected, battle.EnemyRating, precision: 9);
+            });
+        }
+
         // ── Cancellation ─────────────────────────────────────────────────────
 
         [Fact]
@@ -1239,6 +1290,27 @@ namespace Game.Core.Tests.Battle.Offline
 
         private static Enemy WeakEnemy(int level, int skillCount = 1) =>
             MakeEnemy(level, strength: 5, endurance: 5, skillCount: skillCount);
+
+        /// <summary>
+        /// An enemy whose 8-skill pool exceeds <see cref="GameConstants.MaxSelectedSkills"/>, each skill
+        /// carrying distinct damage — so <see cref="Enemy.SelectBattleSkills"/>'s random per-encounter subset
+        /// genuinely changes the fielded loadout's combat rating, not just its skill ids.
+        /// </summary>
+        private static Enemy VariedSkillPoolEnemy(int level) => new()
+        {
+            Id = EnemyId,
+            Name = "Varied Pool Enemy",
+            IsBoss = false,
+            Level = level,
+            AttributeDistributions =
+            [
+                new AttributeDistribution { AttributeId = Strength, BaseAmount = 5, AmountPerLevel = 0 },
+                new AttributeDistribution { AttributeId = Endurance, BaseAmount = 5, AmountPerLevel = 0 },
+            ],
+            AvailableSkills = Enumerable.Range(0, 8)
+                .Select(id => EnemyAttackSkill(id, baseDamage: 5 + id * 40, cooldownMs: 1500))
+                .ToList(),
+        };
 
         private static Enemy StrongEnemy(int level, int skillCount = 1) =>
             MakeEnemy(level, strength: 200, endurance: 200, skillCount: skillCount);
