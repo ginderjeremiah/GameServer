@@ -1,7 +1,13 @@
 {#if col.type === 'select'}
 	<td style:min-width="{col.min ?? 160}px">
 		<div class="fld">
-			<select class="sel" class:dirty value={row[col.key] as number} onchange={(e) => onChange(+e.currentTarget.value)}>
+			<select
+				class="sel"
+				class:dirty
+				aria-label={col.label}
+				value={row[col.key] as number}
+				onchange={(e) => onChange(+e.currentTarget.value)}
+			>
 				{#each col.options?.(row[col.key] as number, row) ?? [] as option (option.value)}
 					<option value={option.value} disabled={taken.has(option.value) && option.value !== row[col.key]}>
 						{option.text}
@@ -31,6 +37,7 @@
 				value={(row[col.key] as number) ?? 0}
 				allowNegative={col.allowNegative}
 				commitOnBlur={identity}
+				ariaLabel={col.label}
 				onChange={(n) => onChange(n)}
 			/>
 			{#if dirty}<DirtyDot />{/if}

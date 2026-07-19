@@ -97,6 +97,13 @@ describe('ChipsSection', () => {
 		expect(addSelect.querySelectorAll('option')).toHaveLength(3);
 	});
 
+	it('carries the add-label as an accessible name for the add select', () => {
+		const { store, record, baseline } = setup([1]);
+		const { container } = renderChips(store, record, baseline);
+		const addSelect = container.querySelector('.add-select select') as HTMLSelectElement;
+		expect(addSelect.getAttribute('aria-label')).toBe('Add skill…');
+	});
+
 	it('adds a chip when an option is chosen', async () => {
 		const { store, record, baseline } = setup([1]);
 		const { container } = renderChips(store, record, baseline);

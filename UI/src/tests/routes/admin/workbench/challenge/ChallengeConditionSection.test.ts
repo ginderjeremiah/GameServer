@@ -78,6 +78,13 @@ describe('ChallengeConditionSection', () => {
 		expect(select.value).toBe(String(EChallengeType.EnemiesKilled));
 	});
 
+	it('carries an accessible name for the objective-type select (the visible label is a bare span)', () => {
+		const { store, record, baseline } = setup();
+		const { container } = render(ChallengeConditionSection, { props: { record, baseline, store } });
+		const select = container.querySelector('.type-select select') as HTMLSelectElement;
+		expect(select.getAttribute('aria-label')).toBe('Objective Type');
+	});
+
 	it('renders the plain-language objective preview', () => {
 		const { store, record, baseline } = setup();
 		render(ChallengeConditionSection, { props: { record, baseline, store } });
