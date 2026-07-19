@@ -377,6 +377,7 @@ namespace Game.Api.Tests.Unit
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>An in-memory queue whose every dequeue throws, to drive the processor's consecutive-
@@ -403,6 +404,7 @@ namespace Game.Api.Tests.Unit
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         private sealed class CapturingPubSubService : IPubSubService
@@ -453,6 +455,7 @@ namespace Game.Api.Tests.Unit
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         // RegisterSocket claims the presence key via a CompareAndSet loop, first peeking it via Get to learn

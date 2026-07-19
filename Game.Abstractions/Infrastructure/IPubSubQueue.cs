@@ -62,6 +62,17 @@
         /// </summary>
         public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Removes one occurrence of each value in <paramref name="values"/> from this queue in a single
+        /// round trip — the batched counterpart to calling <see cref="RemoveAsync"/> once per value, for a
+        /// caller acknowledging many entries at once (e.g. a bulk dead-letter replay) that would otherwise pay
+        /// one sequential network round trip per entry. A value repeated in <paramref name="values"/> removes
+        /// that many occurrences; a value no longer present is silently skipped, same as
+        /// <see cref="RemoveAsync"/>'s no-op semantics. Returns the number of values actually removed. The
+        /// caller is responsible for not passing an empty sequence.
+        /// </summary>
+        public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default);
+
         public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default);
         public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default);
 

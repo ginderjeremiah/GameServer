@@ -1823,6 +1823,7 @@ namespace Game.Application.Tests.DataAccess
             // Not exercised by DataProviderSynchronizer.ProcessQueue.
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>
@@ -1927,6 +1928,7 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>
@@ -2032,6 +2034,7 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>
@@ -2184,6 +2187,7 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>
@@ -2216,6 +2220,7 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => inner.AddRangeToQueueAsync(values, cancellationToken);
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => inner.RemoveRangeAsync(values, cancellationToken);
         }
 
         /// <summary>
@@ -2317,6 +2322,7 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>
@@ -2349,6 +2355,7 @@ namespace Game.Application.Tests.DataAccess
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
         /// <summary>A controllable <see cref="TimeProvider"/> so the opportunistic-reclaim grace period can be

@@ -149,6 +149,29 @@ namespace Game.Infrastructure.PubSub.Redis
             return await ObserveWrite(_redis.ListRemoveAsync(QueueName, value, 1), cancellationToken) > 0;
         }
 
+        // One LREM count-1 call per requested value, fired without awaiting between them so
+        // StackExchange.Redis pipelines them onto the wire in a single flight — the round-trip win a bulk
+        // dead-letter replay needs (#2129) without ReclaimScript's atomic-Lua approach: an unbounded replay
+        // count (exactly the mass-outage backlog #2129 targets) would turn one non-yielding script into a
+        // multi-second stall blocking every other client on the instance. Pipelined commands still land on
+        // Redis one at a time, in the order sent on this connection (preserving per-value LREM correctness
+        // for duplicates), but other clients' commands can interleave between them.
+        public async Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var tasks = values.Select(value => _redis.ListRemoveAsync(QueueName, value, 1)).ToArray();
+            var results = await ObserveWrite(Task.WhenAll(tasks), cancellationToken);
+            var removed = results.Count(count => count > 0);
+
+            if (removed > 0)
+            {
+                _logger.LogTrace("Removed {Count} value(s) from RedisQueue: {QueueName}", removed, QueueName);
+            }
+
+            return removed;
+        }
+
         public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default)
         {
             _logger.LogTrace("Added value to RedisQueue: {QueueName}, value: {Value}", QueueName, value);
