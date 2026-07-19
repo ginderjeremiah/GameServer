@@ -8,6 +8,7 @@ using Game.Api.Events;
 using Game.Api.Filters;
 using Game.Api.Forwarding;
 using Game.Api.Middleware;
+using Game.Api.Models.Common;
 using Game.Api.RateLimiting;
 using Game.Api.Services;
 using Game.Api.Services.Admin;
@@ -353,6 +354,17 @@ namespace Game.Api
                             }
 
                             return Task.CompletedTask;
+                        },
+                        // A missing/invalid/expired token otherwise gets the bearer handler's default empty-body
+                        // 401, unlike every other failure response's { errorMessage } ApiResponse envelope
+                        // (mirrors the auth rate limiter's OnRejected, which fixes the same gap for 429s).
+                        OnChallenge = async context =>
+                        {
+                            context.HandleResponse();
+                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                            await context.Response.WriteAsJsonAsync(
+                                ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized),
+                                context.HttpContext.RequestAborted);
                         }
                     };
                 });

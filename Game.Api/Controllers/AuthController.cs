@@ -111,11 +111,6 @@ namespace Game.Api.Controllers
         [HttpGet]
         public async Task<ApiResponse<PlayerData>> Status()
         {
-            if (!_sessionService.Authenticated)
-            {
-                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
-            }
-
             // Load (or rehydrate) the session so the selected player id resolves; the HTTP pipeline no
             // longer reads the session cache per request.
             await _sessionInitializer.EnsureSessionLoaded(HttpContext.RequestAborted);
@@ -139,11 +134,6 @@ namespace Game.Api.Controllers
         [HttpGet]
         public async Task<ApiResponse<ActiveSessionResult>> ActiveSession()
         {
-            if (!_sessionService.Authenticated)
-            {
-                return ApiResponse.Error("Not logged in", ApiErrorCategory.Unauthorized);
-            }
-
             // Load (or rehydrate) the session so the selected player id resolves for the presence check;
             // the HTTP pipeline no longer reads the session cache per request.
             await _sessionInitializer.EnsureSessionLoaded(HttpContext.RequestAborted);

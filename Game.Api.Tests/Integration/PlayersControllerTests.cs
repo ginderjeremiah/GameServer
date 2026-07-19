@@ -197,6 +197,10 @@ namespace Game.Api.Tests.Integration
                 new { PlayerId = 1, RefreshToken = "irrelevant" }, CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            // The bearer challenge writes the project's standard ApiResponse envelope rather than the
+            // JWT bearer handler's default empty body.
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
         }
 
         [Fact]
@@ -206,6 +210,8 @@ namespace Game.Api.Tests.Integration
                 new { PlayerId = 1, RefreshToken = "irrelevant" }, CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
         }
 
         [Fact]
@@ -506,6 +512,8 @@ namespace Game.Api.Tests.Integration
         {
             var response = await Client.GetAsync("/api/Players", CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
         }
 
         // Switches the bound character through the real SwitchPlayer endpoint and returns the deserialized
@@ -592,6 +600,8 @@ namespace Game.Api.Tests.Integration
             var response = await Client.PostAsJsonAsync("/api/Players/CreatePlayer", new { Name = "Nobody" }, CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
         }
 
         [Fact]
@@ -713,6 +723,8 @@ namespace Game.Api.Tests.Integration
             // No bearer token — a pre-authentication request never reaches the creatable-class payload.
             var response = await Client.GetAsync("/api/Players/CharacterCreationData", CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
         }
     }
 }

@@ -268,6 +268,10 @@ namespace Game.Api.Tests.Integration
             var response = await Client.GetAsync("/api/Auth/Status", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            // The bearer challenge writes the project's standard ApiResponse envelope rather than the
+            // JWT bearer handler's default empty body.
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
         }
 
         [Fact]
@@ -299,6 +303,8 @@ namespace Game.Api.Tests.Integration
             var response = await Client.GetAsync("/api/Auth/ActiveSession", CancellationToken);
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result?.ErrorMessage);
         }
 
         [Fact]
