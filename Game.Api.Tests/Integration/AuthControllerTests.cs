@@ -275,18 +275,39 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task Status_AuthenticatedButPlayerNotLoadable_Returns404WithError()
+        public async Task Status_PreSelectionToken_ReturnsNoPlayerSelectedNotOpaque404()
         {
-            // A still-valid token whose player can't be loaded (archived/deleted between requests; here a user
-            // with no player at all) must return a structured error, not a 500 — mirroring how Login surfaces a
-            // missing player. Rehydration finds no player, so the session's selected id stays unresolved and the
-            // player load comes back null. The missing-resource semantics surface as 404, not a blanket 400.
+            // A pre-selection token (post-Login, pre-SelectPlayer) is a normal, documented flow state
+            // (docs/backend-auth.md) — every character-select screen refresh carries one. Status must
+            // surface it as its own distinguishable category, not the same 404 a genuinely unloadable
+            // player gets (see the test below).
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var user = await TestDataSeeder.CreateUserAsync(context, "playerlessstatus", "pass");
 
             var client = Factory.CreateClient();
             TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            var response = await client.GetAsync("/api/Auth/Status", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<Models.Player.PlayerData>>(CancellationToken);
+            Assert.Null(result?.Data);
+            Assert.NotNull(result?.ErrorMessage);
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task Status_PostSelectionTokenButPlayerGone_Returns404WithError()
+        {
+            // A post-selection token naming a player that can't be loaded (archived/deleted between
+            // requests) is a genuine missing-resource failure, distinct from the pre-selection state
+            // above — it must still surface as 404, not a 500. A token minted for a player id that was
+            // never persisted stands in for "since deleted" without tearing down FK-linked rows.
+            var (userId, _) = await SeedAsync("playergonestatus", "pass");
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, userId, playerId: 999_999_999);
 
             var response = await client.GetAsync("/api/Auth/Status", CancellationToken);
 

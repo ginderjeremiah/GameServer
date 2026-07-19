@@ -37,6 +37,7 @@ namespace Game.Api.Filters
                 ApiErrorCategory.Unauthorized => StatusCodes.Status401Unauthorized,
                 ApiErrorCategory.NotFound => StatusCodes.Status404NotFound,
                 ApiErrorCategory.TooManyRequests => StatusCodes.Status429TooManyRequests,
+                ApiErrorCategory.NoPlayerSelected => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status400BadRequest,
             };
         }

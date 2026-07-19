@@ -30,7 +30,10 @@ namespace Game.Api.Services
         {
             if (_sessionService.TokenSelectedPlayerId is not int selectedPlayerId)
             {
-                _logger.LogWarning(
+                // A pre-selection token (post-Login, pre-SelectPlayer) is a normal, documented flow state
+                // (docs/backend-auth.md), not a warning-worthy condition — every character-select screen
+                // refresh would otherwise log a warning for expected behavior.
+                _logger.LogDebug(
                     "Authenticated user {UserId} has a valid token with no selected player; session not established.",
                     _sessionService.UserId);
                 return;

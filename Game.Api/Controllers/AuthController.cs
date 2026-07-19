@@ -115,6 +115,14 @@ namespace Game.Api.Controllers
             // longer reads the session cache per request.
             await _sessionInitializer.EnsureSessionLoaded(HttpContext.RequestAborted);
 
+            // A pre-selection token (post-Login, pre-SelectPlayer) is a normal, expected flow state, not a
+            // missing-resource failure — distinguish it from a genuinely unloadable player so callers don't
+            // have to infer "no character chosen yet" from an opaque 404.
+            if (_sessionService.TokenSelectedPlayerId is null)
+            {
+                return ApiResponse.Error("No character selected.", ApiErrorCategory.NoPlayerSelected);
+            }
+
             // A still-valid token whose player can't be loaded (deleted/archived between requests) is a
             // graceful error, not a 500 — mirroring the structured ApiResponse.Error its sibling endpoints use.
             var player = await _playerService.LoadPlayer(_sessionService.SelectedPlayerId, HttpContext.RequestAborted);
