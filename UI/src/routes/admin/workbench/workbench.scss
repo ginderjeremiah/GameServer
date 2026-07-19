@@ -395,6 +395,11 @@
 			color: var(--text-secondary);
 			font-weight: 500;
 		}
+		// A label-less meta value (WorkbenchList's `[label, value]` pairs with an empty label)
+		// stays muted rather than picking up the labelled-value emphasis above.
+		.bare {
+			color: var(--text-tertiary);
+		}
 	}
 	.count-badge {
 		font-family: var(--mono);

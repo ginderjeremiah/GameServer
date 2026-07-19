@@ -23,31 +23,25 @@
 
 	<div class="list-scroll">
 		{#each rows as row (row.id)}
-			<button
-				type="button"
-				class="row"
-				class:selected={row.id === selectedId}
-				onclick={() => (drilled ? store.drillTier(row.id) : store.selectPath(row.id))}
+			<ListRow
+				testId="progression-row"
+				selected={row.id === selectedId}
+				status={row.status}
+				retired={row.retired}
+				name={row.name}
+				blank={row.blank}
+				warnings={row.warnings}
+				onSelect={() => (drilled ? store.drillTier(row.id) : store.selectPath(row.id))}
 			>
-				<span class="edge" class:added={row.status === 'added'} class:modified={row.status === 'modified'}></span>
-				{#if drilled}
-					<span class="ord" class:sel={row.id === selectedId}>{row.ordinal}</span>
-				{/if}
-				<span class="row-main">
-					<span class="row-name-line">
-						<span class="row-name" class:blank={!row.name}>{row.name || row.blank}</span>
-						{#if row.status === 'added'}<span class="spill added">new</span>{/if}
-						{#if row.status === 'modified'}<span class="spill modified">edited</span>{/if}
-						{#if row.retired}<span class="spill retired">retired</span>{/if}
-						{#if row.warn}<span class="spacer"></span><WorkbenchIcon
-								kind="warn"
-								size={11}
-								stroke="var(--warning)"
-							/>{/if}
-					</span>
-					<span class="row-meta">{row.meta}</span>
-				</span>
-			</button>
+				{#snippet leading()}
+					{#if drilled}
+						<span class="ord" class:sel={row.id === selectedId}>{row.ordinal}</span>
+					{/if}
+				{/snippet}
+				{#snippet meta()}
+					{row.meta}
+				{/snippet}
+			</ListRow>
 		{/each}
 		{#if rows.length === 0}
 			<div class="list-empty">{query ? 'No matches' : drilled ? 'No tiers yet' : 'No paths yet'}</div>
@@ -60,6 +54,7 @@ import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import { activityKeyLabel } from '$lib/common';
 import type { ProgressionStore } from './progression-store.svelte';
 import { hasTierCollision, pathWarnings, proficiencyWarnings, tiersOfPath } from './progression-helpers';
+import ListRow, { type ListRowStatus } from '../components/ListRow.svelte';
 
 interface Props {
 	store: ProgressionStore;
@@ -77,9 +72,9 @@ interface Row {
 	name: string;
 	blank: string;
 	meta: string;
-	status: 'added' | 'modified' | 'clean';
+	status: ListRowStatus;
 	retired: boolean;
-	warn: boolean;
+	warnings: string[];
 	ordinal: number;
 }
 
@@ -96,7 +91,7 @@ const rows = $derived.by<Row[]>(() => {
 				meta: `cap ${t.maxLevel} · ${t.levelRewards.length} ${t.levelRewards.length === 1 ? 'milestone' : 'milestones'}`,
 				status: store.profStatus(t),
 				retired: store.isRetired(t),
-				warn: proficiencyWarnings(t).length > 0,
+				warnings: proficiencyWarnings(t),
 				ordinal: t.pathOrdinal
 			}));
 	}
@@ -104,6 +99,7 @@ const rows = $derived.by<Row[]>(() => {
 		.filter((p) => matches(p.name))
 		.map((p) => {
 			const tiers = tiersOfPath(store.profs, p.id);
+			const warnings = pathWarnings(p);
 			return {
 				id: p.id,
 				name: p.name,
@@ -111,7 +107,7 @@ const rows = $derived.by<Row[]>(() => {
 				meta: `${tiers.length} ${tiers.length === 1 ? 'tier' : 'tiers'} · ${activityKeyLabel(p.activityKey)}`,
 				status: store.pathStatus(p),
 				retired: store.isRetired(p),
-				warn: pathWarnings(p).length > 0 || hasTierCollision(tiers),
+				warnings: hasTierCollision(tiers) ? [...warnings, 'Tiers have colliding order'] : warnings,
 				ordinal: 0
 			};
 		});
@@ -164,40 +160,6 @@ const rows = $derived.by<Row[]>(() => {
 	border-radius: 3px;
 	cursor: pointer;
 }
-.row {
-	width: 100%;
-	text-align: left;
-	background: transparent;
-	border: none;
-	border-bottom: 1px solid var(--border-subtle);
-	padding: 10px 14px 10px 0;
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	gap: 10px;
-
-	&:hover {
-		background: color-mix(in srgb, var(--white) 4%, transparent);
-	}
-	&.selected {
-		background: color-mix(in srgb, var(--accent) 8%, transparent);
-	}
-}
-.edge {
-	width: 3px;
-	height: 34px;
-	flex-shrink: 0;
-	background: transparent;
-
-	&.added {
-		background: var(--change-added);
-		box-shadow: 0 0 7px var(--change-added);
-	}
-	&.modified {
-		background: var(--change-modified);
-		box-shadow: 0 0 7px var(--change-modified);
-	}
-}
 .ord {
 	width: 24px;
 	height: 24px;
@@ -217,38 +179,6 @@ const rows = $derived.by<Row[]>(() => {
 		border-color: var(--accent);
 		color: var(--accent-light);
 	}
-}
-.row-main {
-	flex: 1;
-	min-width: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-.row-name-line {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-.row-name {
-	font-size: 13.5px;
-	color: var(--text-secondary);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-
-	&.blank {
-		color: var(--text-muted);
-	}
-}
-.row.selected .row-name {
-	color: var(--text-primary);
-	font-weight: 500;
-}
-.row-meta {
-	font-family: var(--mono);
-	font-size: 11px;
-	color: var(--text-tertiary);
 }
 .list-empty {
 	padding: 24px 16px;
