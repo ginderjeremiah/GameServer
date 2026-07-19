@@ -118,5 +118,15 @@ namespace Game.Core
         /// (<c>min(duration, RefFightDuration / 2)</c>). ~30s per the spike (#1526).
         /// </summary>
         public const double RefFightDuration = 30.0;
+
+        /// <summary>
+        /// Upper clamp on the avoidance (parry+dodge) and resistance credit <see cref="Battle.CombatRating"/>'s
+        /// survivability term prices — both are authored-only, uncapped enablers that the shared-expiry effect
+        /// ramp can push toward 1, and <c>(1 - credit)</c> sits in survivability's denominator, so an uncapped
+        /// credit near 1 diverges the rating (#2171) even though the battle engine itself degrades gracefully at
+        /// chance ≥ 1. The engine's real counter to a near-100%-avoidance build is DoT, which this survivability
+        /// model doesn't price, so an uncapped credit would overstate what avoidance/resistance is actually worth.
+        /// </summary>
+        public const double MaxMitigationCredit = 0.95;
     }
 }

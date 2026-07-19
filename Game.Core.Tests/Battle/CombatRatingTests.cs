@@ -55,6 +55,70 @@ namespace Game.Core.Tests.Battle
             Assert.True(CombatRating.Rate(tough, isPlayer: true) > CombatRating.Rate(weak, isPlayer: true));
         }
 
+        // ── Rate: survivability avoidance/resistance pole (#2171) ───────────────
+
+        [Fact]
+        public void Rate_ParryAtCertainty_DoesNotExplodeRating()
+        {
+            // ParryChance × ParryChanceMultiplier(base 1) = 1.0 drives raw `avoid` to exactly 1, the pole where
+            // the uncapped mitigation fraction hits its Epsilon floor. The capped credit must keep the rating
+            // finite and in the same order of magnitude as a merely-strong (not fully-certain) avoidance build.
+            var certainParry = MakeBattlerWithSkills([(ParryChance, 1.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+            var strongParry = MakeBattlerWithSkills([(ParryChance, 0.5)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+
+            var certainRate = CombatRating.Rate(certainParry, isPlayer: true);
+            var strongRate = CombatRating.Rate(strongParry, isPlayer: true);
+
+            Assert.False(double.IsNaN(certainRate));
+            Assert.False(double.IsInfinity(certainRate));
+            Assert.True(certainRate > strongRate);
+            Assert.True(certainRate < strongRate * 100);
+        }
+
+        [Fact]
+        public void Rate_DodgeBeyondCertainty_DoesNotExplodeRating()
+        {
+            // DodgeChance authored beyond what a chance can mean in-fight (2.0 × base-1 multiplier = 2.0) still
+            // must not push the capped avoidance credit above ServerGameConstants.MaxMitigationCredit.
+            var overCertainDodge = MakeBattlerWithSkills([(DodgeChance, 2.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+
+            var rate = CombatRating.Rate(overCertainDodge, isPlayer: true);
+
+            Assert.False(double.IsNaN(rate));
+            Assert.False(double.IsInfinity(rate));
+        }
+
+        [Fact]
+        public void Rate_ParryBeyondCertainty_RatesTheSameAsExactlyAtTheCap()
+        {
+            // Once avoid clears MaxMitigationCredit, further ParryChance must not move the rating at all —
+            // pins that the credit is truly capped (not just softened) past the pole.
+            var atCap = MakeBattlerWithSkills([(ParryChance, 1.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+            var wayPastCap = MakeBattlerWithSkills([(ParryChance, 50.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+
+            Assert.Equal(
+                CombatRating.Rate(atCap, isPlayer: true),
+                CombatRating.Rate(wayPastCap, isPlayer: true), 6);
+        }
+
+        [Fact]
+        public void Rate_ResistanceBeyondCertainty_DoesNotExplodeRating()
+        {
+            // Stacking every resistance attribute that feeds RefIncomingTypeMix well past 100% average must not
+            // push the capped resist credit above MaxMitigationCredit either.
+            var battler = MakeBattlerWithSkills(
+                [
+                    (PhysicalResistance, 5.0), (FireResistance, 5.0), (WaterResistance, 5.0), (EarthResistance, 5.0),
+                    (WindResistance, 5.0), (BleedResistance, 5.0), (PoisonResistance, 5.0), (BurnResistance, 5.0),
+                ],
+                [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+
+            var rate = CombatRating.Rate(battler, isPlayer: true);
+
+            Assert.False(double.IsNaN(rate));
+            Assert.False(double.IsInfinity(rate));
+        }
+
         // ── Rate: offense ─────────────────────────────────────────────────────
 
         [Fact]
