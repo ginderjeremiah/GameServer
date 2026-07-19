@@ -202,9 +202,11 @@ namespace Game.Api.Sockets
                     // mid read-modify-write of the shared cached Player, and releasing would let the next
                     // command race it (the lost-update class the per-socket command lock prevents — see
                     // docs/backend.md). Hand the lock to a continuation that releases it once the abandoned
-                    // task finally settles. The abandoned command still commits its write (so it isn't lost),
-                    // but its now-late response is dropped: RunCommand never sends — this method owns the single
-                    // send — so the client never receives a second response for the same id.
+                    // task finally settles. The abandoned task's own commit runs under this same (already
+                    // cancelled) token, so a flush that is itself the wedge point unwinds promptly rather than
+                    // riding out Npgsql's own command timeout; its now-late response is dropped regardless:
+                    // RunCommand never sends — this method owns the single send — so the client never receives
+                    // a second response for the same id.
                     _logger.LogWarning("Socket command timed out after {Timeout} and was abandoned: {CommandInfo} on socket: {Id}", _commandTimeout, commandInfo, Id);
                     await SendErrorAsync(commandInfo, "Command timed out.");
                     ReleaseCommandLockWhenSettled(commandTask, cts, commandInfo);
@@ -269,11 +271,13 @@ namespace Game.Api.Sockets
             }
         }
 
-        // Executes the command and commits its unit of work, returning the response (and whether the command
-        // already delivered it itself — ISelfDeliveringCommand) for the caller to send. It deliberately does
-        // not send when not self-delivering: RunCommandUnderLock owns the single send so that a command
-        // abandoned on timeout (whose task runs on here in the background) commits its write but never emits a
-        // second, late response for an id the client already saw time out.
+        // Executes the command and commits its unit of work — under the same per-command token as
+        // ExecuteAsync, so a flush that wedges past the budget unwinds instead of riding out Npgsql's own
+        // command timeout — returning the response (and whether the command already delivered it itself —
+        // ISelfDeliveringCommand) for the caller to send. It deliberately does not send when not
+        // self-delivering: RunCommandUnderLock owns the single send so that a command abandoned on timeout
+        // (whose task runs on here in the background) never emits a second, late response for an id the
+        // client already saw time out.
         private async Task<(ApiSocketResponse Response, bool SelfDelivered)> RunCommand(SocketCommandInfo commandInfo, CancellationToken cancellationToken)
         {
             using var scope = _scopeFactory.CreateScope();
@@ -301,7 +305,7 @@ namespace Game.Api.Sockets
             // JsonException/ArgumentNullException a command's DI construction happened to throw.
             var command = _commandFactory.CreateCommand(commandInfo, scope);
             var response = await command.ExecuteAsync(_context, cancellationToken);
-            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync(cancellationToken);
             return (response, command is ISelfDeliveringCommand);
         }
 

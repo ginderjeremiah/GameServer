@@ -379,6 +379,32 @@ namespace Game.Api.Tests.Unit
             Assert.False(session.PlayerNeedsReload);
         }
 
+        [Fact]
+        public async Task ExecuteCommand_Succeeds_CommitsUnderThePerCommandCancellationToken()
+        {
+            // #2174: the unit-of-work commit must observe the same per-command budget as ExecuteAsync — a
+            // flush that itself wedges past the timeout must be cancellable rather than riding out Npgsql's
+            // own command timeout, mirroring CommitFilter's HTTP-side behavior (which passes RequestAborted).
+            var unitOfWork = new CapturingUnitOfWork();
+            using var provider = new ServiceCollection()
+                .AddScoped<IUnitOfWork>(_ => unitOfWork)
+                .BuildServiceProvider();
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            await session.CreateSession(userId: 1, playerId: 1);
+            var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
+            var handler = new SocketHandler(context, new StubCommandFactory(_ => null), provider.GetRequiredService<IServiceScopeFactory>(),
+                _loggerFactory.CreateLogger<SocketHandler>(), () => { });
+
+            await handler.ExecuteCommand(new SocketCommandInfo("Ok") { Id = "c1" });
+
+            // A token backed by a real CancellationTokenSource reports CanBeCanceled; the prior default-token
+            // call (CancellationToken.None) would not, so this fails without the fix.
+            Assert.NotNull(unitOfWork.ReceivedToken);
+            Assert.True(unitOfWork.ReceivedToken!.Value.CanBeCanceled);
+        }
+
         private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
@@ -489,6 +515,17 @@ namespace Game.Api.Tests.Unit
         private sealed class NoOpUnitOfWork : IUnitOfWork
         {
             public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        }
+
+        private sealed class CapturingUnitOfWork : IUnitOfWork
+        {
+            public CancellationToken? ReceivedToken { get; private set; }
+
+            public Task CommitAsync(CancellationToken cancellationToken = default)
+            {
+                ReceivedToken = cancellationToken;
+                return Task.CompletedTask;
+            }
         }
 
         /// <summary>Returns each of <paramref name="responses"/> in order on successive <see cref="GetPlayer"/>
