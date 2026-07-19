@@ -274,7 +274,9 @@ namespace Game.Core.Battle
             var toughness = effectiveCaster.GetAttributeValue(Toughness);
             var toughnessReduction = toughness / (toughness + GameConstants.ToughnessMitigationConstant);
 
-            var mitigationFraction = (1 - avoid) * (1 - resist) * (1 - toughnessReduction);
+            var cappedAvoid = Math.Min(avoid, ServerGameConstants.MaxMitigationCredit);
+            var cappedResist = Math.Min(resist, ServerGameConstants.MaxMitigationCredit);
+            var mitigationFraction = (1 - cappedAvoid) * (1 - cappedResist) * (1 - toughnessReduction);
             return effectiveHealth / Math.Max(mitigationFraction, Epsilon);
         }
 
