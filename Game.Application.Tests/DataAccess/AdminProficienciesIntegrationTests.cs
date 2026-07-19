@@ -632,6 +632,38 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetPrerequisites_PrerequisiteOnRetiredPath_ReturnsFailure()
+        {
+            int gatedId, prerequisiteId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var gatedPath = await SeedPathAsync(seedScope);
+                gatedId = (await SeedProficiencyAsync(seedScope, gatedPath.Id, name: "Fire I")).Id;
+
+                var frozenPath = await SeedPathAsync(seedScope);
+                prerequisiteId = (await SeedProficiencyAsync(seedScope, frozenPath.Id, name: "Frost I")).Id;
+                frozenPath.RetiredAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(CancellationToken);
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            // A tier on a retired path is frozen — it never accrues, so a gateway prerequisiting it can
+            // never open. Reject at save time as anti-tamper, mirroring the frontend picker exclusion.
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
+            {
+                Id = gatedId,
+                PrerequisiteIds = [prerequisiteId],
+            }]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("retired path", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SetPrerequisites_WouldFormACycle_ReturnsFailure()
         {
             int gatedId, prerequisiteId;

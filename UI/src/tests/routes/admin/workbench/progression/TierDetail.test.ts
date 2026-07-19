@@ -51,6 +51,7 @@ const makeStore = (drilledTier: WorkbenchProficiency, overrides: Record<string, 
 	({
 		drilledTier,
 		profs: [drilledTier],
+		paths: [],
 		tierTab: 'identity',
 		selectedPath: { name: 'Fire Path' },
 		selectedLevel: 1,

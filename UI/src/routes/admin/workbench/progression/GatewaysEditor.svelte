@@ -61,10 +61,17 @@ let addPick = $state(ADD_PLACEHOLDER);
  */
 const prereqName = (id: number) => store.profs.find((p) => p.id === id)?.name || `#${id}`;
 
+// A tier on a retired path is frozen (never accrues, can never max), so picking it as a prerequisite
+// would author a gateway that can never open — excluded the same as a directly-retired tier (#2176).
+const isPathRetired = (pathId: number) => store.paths.find((path) => path.id === pathId)?.retiredAt != null;
+
 const addOptions = $derived([
 	{ value: ADD_PLACEHOLDER, text: '+ Add prerequisite…' },
 	...store.profs
-		.filter((p) => p.pathId !== tier.pathId && !p.retiredAt && !tier.prerequisiteIds.includes(p.id))
+		.filter(
+			(p) =>
+				p.pathId !== tier.pathId && !p.retiredAt && !isPathRetired(p.pathId) && !tier.prerequisiteIds.includes(p.id)
+		)
 		.map((p) => ({ value: p.id, text: p.name || 'Unnamed tier' }))
 ]);
 

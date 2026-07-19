@@ -253,6 +253,12 @@ namespace Game.DataAccess.Repositories.Admin
                     return AdminSaveResult.Failure(
                         $"Prerequisite proficiency {prerequisiteId} is on the same path as proficiency {proficiency.Id} — gateways must be cross-path.");
                 }
+
+                if (_proficiencies.LookupPath(prerequisite.PathId) is { RetiredAt: not null })
+                {
+                    return AdminSaveResult.Failure(
+                        $"Prerequisite proficiency {prerequisiteId} is on a retired path — its tiers can never accrue, so this gateway can never open.");
+                }
             }
 
             return null;
