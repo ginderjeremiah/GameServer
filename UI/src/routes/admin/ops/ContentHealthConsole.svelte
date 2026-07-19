@@ -1,5 +1,5 @@
-<div class="ch-console" data-testid="content-health-console">
-	<div class="ch-head">
+<div class="ops-console" data-testid="content-health-console">
+	<div class="head">
 		<div class="eyebrow">Admin Console · Ops</div>
 		<div class="title-row">
 			<h1 class="title" data-testid="ch-title">Content Health</h1>
@@ -30,21 +30,21 @@
 		</p>
 	</div>
 
-	<div class="ch-toolbar">
+	<div class="toolbar">
 		<button type="button" class="btn" data-testid="ch-refresh" disabled={health.loading} onclick={refresh}>
 			Refresh
 		</button>
 	</div>
 
 	{#if health.error}
-		<div class="ch-error" role="alert" data-testid="ch-error">{health.error}</div>
+		<div class="error-panel" role="alert" data-testid="ch-error">{health.error}</div>
 	{/if}
 
-	<div class="ch-body">
+	<div class="body">
 		{#if !health.loaded && health.loading}
 			<Loading loading={true} delay={150} />
 		{:else if health.isHealthy}
-			<div class="ch-empty" data-testid="ch-healthy">
+			<div class="empty-state" data-testid="ch-healthy">
 				<div class="glyph">
 					<svg
 						width="26"
@@ -97,6 +97,7 @@ import { onMount } from 'svelte';
 import Loading from '$components/Loading.svelte';
 import { toastError } from '$stores';
 import { staticData } from '$stores';
+import './ops-console.scss';
 import { ContentHealthState, entityDisplayName, severityMeta, type EntityNameSources } from './content-health.svelte';
 
 const health = new ContentHealthState();
@@ -124,48 +125,7 @@ const refresh = async () => {
 </script>
 
 <style lang="scss">
-.ch-console {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	min-height: 0;
-	font-family: var(--sans);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-}
-
-.ch-head {
-	padding: 20px 32px 16px;
-	border-bottom: 1px solid var(--border-subtle);
-}
-.eyebrow {
-	font-family: var(--mono);
-	font-size: 10px;
-	letter-spacing: 2px;
-	text-transform: uppercase;
-	color: color-mix(in srgb, var(--accent) 70%, transparent);
-	margin-bottom: 6px;
-}
-.title-row {
-	display: flex;
-	align-items: baseline;
-	gap: 14px;
-	flex-wrap: wrap;
-}
-.title {
-	margin: 0;
-	font-size: 22px;
-	font-weight: 500;
-	letter-spacing: -0.2px;
-}
 .summary {
-	display: inline-flex;
-	align-items: center;
-	gap: 14px;
-	font-family: var(--mono);
-	font-size: 11.5px;
-	color: var(--text-tertiary);
-
 	.err {
 		color: var(--error);
 	}
@@ -177,69 +137,7 @@ const refresh = async () => {
 	}
 }
 .blurb {
-	margin: 12px 0 0;
 	max-width: 820px;
-	font-size: 12.5px;
-	line-height: 1.55;
-	color: var(--text-tertiary);
-
-	em {
-		font-style: normal;
-		color: var(--text-secondary);
-	}
-}
-
-.ch-toolbar {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 14px 32px;
-	border-bottom: 1px solid var(--border-subtle);
-}
-.btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 7px;
-	background: transparent;
-	border: 1px solid var(--border-light);
-	color: var(--text-secondary);
-	font-family: var(--mono);
-	font-size: 11.5px;
-	letter-spacing: 0.6px;
-	text-transform: uppercase;
-	padding: 8px 15px;
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.14s ease;
-	white-space: nowrap;
-
-	&:hover:not(:disabled) {
-		border-color: color-mix(in srgb, var(--white) 32%, transparent);
-		box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
-	}
-	&:disabled {
-		color: var(--text-muted);
-		border-color: var(--border-subtle);
-		cursor: not-allowed;
-		box-shadow: none;
-	}
-}
-
-.ch-error {
-	margin: 14px 32px 0;
-	padding: 11px 14px;
-	border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
-	background: color-mix(in srgb, var(--error) 10%, transparent);
-	border-radius: 4px;
-	color: var(--error);
-	font-size: 12.5px;
-}
-
-.ch-body {
-	flex: 1;
-	min-height: 0;
-	overflow: auto;
-	padding: 12px 32px 28px;
 }
 
 .ch-groups {
@@ -334,32 +232,9 @@ const refresh = async () => {
 	line-height: 1.5;
 }
 
-.ch-empty {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	text-align: center;
-	padding: 60px 20px;
-	color: var(--text-muted);
-	gap: 12px;
-
-	.glyph {
-		width: 56px;
-		height: 56px;
-		border-radius: 10px;
-		border: 1px dashed var(--border-light);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--accent);
-	}
-	.et {
-		font-size: 14px;
-		color: var(--text-tertiary);
-	}
-	.es {
-		font-size: 12px;
-	}
+// The healthy-graph checkmark reads as a positive confirmation, not a neutral empty state,
+// so its glyph keeps the accent color instead of the shared .empty-state's muted default.
+.empty-state .glyph {
+	color: var(--accent);
 }
 </style>
