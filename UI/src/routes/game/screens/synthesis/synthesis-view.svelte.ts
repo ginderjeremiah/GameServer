@@ -37,9 +37,27 @@ export class SynthesisView {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	readonly ownedSkillIds = $derived(new Set(playerManager.unlockedSkills.map((s) => s.skillId)));
 
-	/** The player's current level per proficiency (a missing proficiency counts as level 0 in gating). */
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	readonly proficiencyLevels = $derived(new Map(playerProficiencies.all.map((p) => [p.proficiencyId, p.level])));
+	/** Previous {@link proficiencyLevels} value, for the reference-stability check below. Plain (not
+	 *  `$state`) so writing it mid-derivation isn't a reactive mutation. */
+	#previousLevels: Map<number, number> | undefined;
+
+	/** The player's current level per proficiency (a missing proficiency counts as level 0 in gating).
+	 *  Keeps the previous Map's identity when every level is unchanged: `playerProficiencies.all`
+	 *  reassigns its array wholesale on every `ProficiencyXpGained` push (deliberately, for by-reference
+	 *  change detection elsewhere) even when xp moved but no level did, and this is the value {@link
+	 *  recipes} and {@link graph} key their own recomputation on — without this, the whole recipe list
+	 *  and graph layout would re-derive on every battle victory for no visible change. */
+	readonly proficiencyLevels = $derived.by(() => {
+		const all = playerProficiencies.all;
+		const previous = this.#previousLevels;
+		if (previous && previous.size === all.length && all.every((p) => previous.get(p.proficiencyId) === p.level)) {
+			return previous;
+		}
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const next = new Map(all.map((p) => [p.proficiencyId, p.level]));
+		this.#previousLevels = next;
+		return next;
+	});
 
 	/** The discovered recipes with their reveal/gating state — recomputed as owned skills, proficiency
 	 *  levels, and reference data change. */
