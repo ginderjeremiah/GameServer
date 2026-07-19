@@ -60,13 +60,16 @@ namespace Game.DataAccess.Repositories.Caching
                 .Select(path => path.Id)
                 .ToHashSet();
 
-            // Build-time invariant: the authored prerequisite graph must be acyclic, since a cycle would
-            // soft-lock every node on it under the "open once prerequisites are maxed" rule. The admin save
-            // rejects a cycle before it commits; this is the backstop against a seed/migration mistake (it
-            // fails the build-then-swap, keeping the prior good snapshot or surfacing as a boot failure).
-            var prerequisiteGraph = entities.ToDictionary(
+            // Build-time invariant: the authored prerequisite graph, combined with the implicit within-path tier
+            // ordering, must be acyclic, since a cycle would soft-lock every node on it under the "open once
+            // prerequisites are maxed" rule. The admin save rejects a cycle before it commits; this is the
+            // backstop against a seed/migration mistake (it fails the build-then-swap, keeping the prior good
+            // snapshot or surfacing as a boot failure).
+            var prerequisites = entities.ToDictionary(
                 p => p.Id,
                 p => (IReadOnlyList<int>)p.Prerequisites.Select(pr => pr.PrerequisiteProficiencyId).ToList());
+            var tiers = entities.Select(p => (p.Id, p.PathId, p.PathOrdinal)).ToList();
+            var prerequisiteGraph = ProficiencyPrerequisiteGraph.BuildGraph(tiers, prerequisites);
             if (ProficiencyPrerequisiteGraph.TryFindCycle(prerequisiteGraph, out var cycle))
             {
                 throw new InvalidOperationException(

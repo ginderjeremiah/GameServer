@@ -6,11 +6,40 @@ namespace Game.DataAccess.Repositories.Caching
     /// would soft-lock every node on it under the "open once prerequisites are maxed" rule, so it is rejected
     /// both at admin-authoring time (a clean failure before the write commits) and as a build-time invariant on
     /// the cache snapshot (the backstop against a seed/migration mistake, mirroring the zero-based contiguity
-    /// assertion). Within-path order is implicit in the tier ordinals and inherently acyclic, so only the
-    /// authored prerequisite edges are checked here.
+    /// assertion). Within-path order is implicit in the tier ordinals (tier N+1 requires tier N maxed) and
+    /// inherently acyclic on its own, but a cross-path authored edge composed with that implicit chain can still
+    /// close a cycle the authored edges alone never show — so <see cref="BuildGraph"/> folds each path's
+    /// consecutive-tier edges into the same graph the authored prerequisites use before it is checked.
     /// </summary>
     internal static class ProficiencyPrerequisiteGraph
     {
+        /// <summary>
+        /// Builds the combined prerequisite graph: <paramref name="prerequisites"/>'s authored edges plus one
+        /// implicit edge per path from each tier to the tier immediately below it (ordered by
+        /// <c>PathOrdinal</c>). <paramref name="tiers"/> must list every proficiency (id, path id, path
+        /// ordinal) the graph should account for, regardless of whether it carries authored prerequisites.
+        /// </summary>
+        public static IReadOnlyDictionary<int, IReadOnlyList<int>> BuildGraph(
+            IReadOnlyList<(int Id, int PathId, int PathOrdinal)> tiers,
+            IReadOnlyDictionary<int, IReadOnlyList<int>> prerequisites)
+        {
+            var graph = prerequisites.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<int>)[.. kv.Value]);
+
+            foreach (var path in tiers.GroupBy(t => t.PathId))
+            {
+                var ordered = path.OrderBy(t => t.PathOrdinal).ToList();
+                for (var i = 1; i < ordered.Count; i++)
+                {
+                    var currentId = ordered[i].Id;
+                    var previousId = ordered[i - 1].Id;
+                    var edges = graph.TryGetValue(currentId, out var existing) ? existing : [];
+                    graph[currentId] = [.. edges, previousId];
+                }
+            }
+
+            return graph;
+        }
+
         /// <summary>
         /// Finds a cycle in the prerequisite graph if one exists. <paramref name="prerequisites"/> maps each
         /// proficiency id to the ids it depends on; an absent node is treated as having no prerequisites.
