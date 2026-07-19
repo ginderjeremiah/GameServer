@@ -22,60 +22,27 @@
 	<div class="list-scroll">
 		{#each filtered as record (record.id)}
 			{@const state = store.stateOf(record)}
-			{@const status = state.status}
-			{@const warns = state.warnings}
-			{@const title = displayName(record)}
-			{@const badge = entity.listBadge?.(record)}
-			{@const edge =
-				status === 'added'
-					? 'var(--change-added)'
-					: status === 'modified'
-						? 'var(--change-modified)'
-						: status === 'deleted'
-							? 'var(--change-removed)'
-							: 'transparent'}
 			{@const retired = (entity.retireable ?? false) && store.isRetired(record)}
-			<button
-				type="button"
-				class="list-row"
-				data-testid="workbench-row"
-				class:selected={record.id === selectedId}
-				class:deleted={status === 'deleted'}
-				class:retired
-				onclick={() => onSelect(record.id)}
+			<ListRow
+				testId="workbench-row"
+				selected={record.id === selectedId}
+				status={state.status}
+				{retired}
+				name={displayName(record)}
+				blank={entity.blankName}
+				badge={entity.listBadge?.(record)}
+				badgeColor={entity.badgeColor?.(record)}
+				warnings={state.warnings}
+				onSelect={() => onSelect(record.id)}
 			>
-				<div
-					class="row-edge"
-					style:width="3px"
-					style:height="34px"
-					style:background={edge}
-					style:box-shadow={edge === 'transparent' ? 'none' : `0 0 7px ${edge}`}
-				></div>
-				<div class="row-body">
-					<div class="row-top">
-						<span class="row-name" class:selected={record.id === selectedId} class:struck={status === 'deleted'}>
-							{#if title}{title}{:else}<span class="blank">{entity.blankName}</span>{/if}
-						</span>
-						{#if badge}
-							<span class="rare-tag" style:color={entity.badgeColor?.(record) ?? 'var(--text-secondary)'}>{badge}</span>
-						{/if}
-						{#if status === 'added'}<span class="spill added">new</span>{/if}
-						{#if status === 'modified'}<span class="spill modified">edited</span>{/if}
-						{#if retired}<span class="spill retired">retired</span>{/if}
-						<div class="spacer"></div>
-						{#if status !== 'deleted' && warns.length > 0}
-							<WarnTriangle title={warns.join(' · ')} />
-						{/if}
-					</div>
-					<span class="meta">
-						{#each entity.meta(record) as [label, value] (label)}
-							<span
-								>{#if label}<b>{value}</b> {label}{:else}<b class="bare">{value}</b>{/if}</span
-							>
-						{/each}
-					</span>
-				</div>
-			</button>
+				{#snippet meta()}
+					{#each entity.meta(record) as [label, value] (label)}
+						<span
+							>{#if label}<b>{value}</b> {label}{:else}<b class="bare">{value}</b>{/if}</span
+						>
+					{/each}
+				{/snippet}
+			</ListRow>
 		{/each}
 	</div>
 </div>
@@ -84,7 +51,7 @@
 import type { EntityConfig, Identified } from '../entities/types';
 import type { EntityStore } from '../entity-store.svelte';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
-import WarnTriangle from './WarnTriangle.svelte';
+import ListRow from './ListRow.svelte';
 
 interface Props {
 	entity: EntityConfig<Identified>;
@@ -116,63 +83,9 @@ const liveCount = $derived(store.items.filter((it) => store.stateOf(it).status !
 		font-weight: 500;
 	}
 }
-.list-row {
-	width: 100%;
-	text-align: left;
-	background: transparent;
-	border: none;
-	border-bottom: 1px solid var(--border-subtle);
-	padding: 10px 14px 10px 0;
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	gap: 10px;
-
-	&:hover {
-		background: color-mix(in srgb, var(--white) 2%, transparent);
-	}
-	&.selected {
-		background: color-mix(in srgb, var(--accent) 8%, transparent);
-	}
-	&.deleted {
-		opacity: 0.45;
-	}
-	// Retired records stay in the catalogue (still resolvable by id), just dimmed — distinct
-	// from the stronger fade + strikethrough of a pending hard-delete.
-	&.retired:not(.deleted) {
-		opacity: 0.6;
-	}
-}
-.row-body {
-	flex: 1;
-	min-width: 0;
-}
-.row-top {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-bottom: 4px;
-}
-.row-name {
-	font-size: 13.5px;
-	color: var(--text-secondary);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-
-	&.selected {
-		color: var(--text-primary);
-		font-weight: 500;
-	}
-	&.struck {
-		text-decoration: line-through;
-	}
-	.blank {
-		color: var(--text-muted);
-		font-style: italic;
-	}
-}
-.meta .bare {
+// `.meta`'s wrapper is rendered by ListRow, so scope directly off `.bare` rather than an
+// ancestor combinator that Svelte's per-component CSS scoping can't see across.
+.bare {
 	color: var(--text-tertiary);
 }
 </style>
