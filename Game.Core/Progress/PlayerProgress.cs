@@ -295,16 +295,20 @@ namespace Game.Core.Progress
         /// battle-parity surface. Ties break on the lower <see cref="EDamageType"/> ordinal, for determinism.
         /// Rolled up through <see cref="DamageTypes.Applies"/> like proficiency training, so a Burn-majority
         /// kill books Burn, Fire, Elemental, and Dot alike (backing both "kill with fire magic" and "kill with
-        /// a weapon type" challenges — weapon leaves are damage-type leaves).
+        /// a weapon type" challenges — weapon leaves are damage-type leaves). Zero-valued entries (a portion
+        /// booked at 0 for full resistance/immunity) are excluded before the majority pick, so a kill made
+        /// entirely of untyped damage (e.g. reflection) against a type the player merely swung with — and dealt
+        /// no damage of — books no kill rather than crediting that type.
         /// </summary>
         private void RecordKillByDamageType(BattleStats stats)
         {
-            if (stats.TypedDamageDealt.Count == 0)
+            var positiveDamageDealt = stats.TypedDamageDealt.Where(kv => kv.Value > 0).ToList();
+            if (positiveDamageDealt.Count == 0)
             {
                 return;
             }
 
-            var majorityType = stats.TypedDamageDealt
+            var majorityType = positiveDamageDealt
                 .OrderByDescending(kv => kv.Value)
                 .ThenBy(kv => (int)kv.Key)
                 .First().Key;
