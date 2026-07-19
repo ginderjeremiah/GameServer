@@ -16,6 +16,9 @@ namespace Game.DataAccess.Repositories.Admin
     /// the destination BEFORE removing from the dead-letter queue, so a crash mid-replay can only duplicate
     /// an entry (absorbed by the idempotent write-behind handlers) and never lose it — the same
     /// at-least-once contract the main queue read has, and why a destructive LPOP-then-push is ruled out.
+    /// "Replay all" only re-enqueues entries classified as replayable — a malformed or unknown-type entry
+    /// stays queued, mirroring the sibling socket-command DLQ's peek/replay contract — and both push and
+    /// removal are single batched round trips regardless of how many entries replay (#2129).
     /// </summary>
     internal sealed class PlayerUpdateDeadLetters(IPubSubService pubsub) : IPlayerUpdateDeadLetters
     {
@@ -55,23 +58,27 @@ namespace Game.DataAccess.Repositories.Admin
             // Snapshot the dead-letter queue so a selected replay can only re-enqueue entries that are
             // actually on it (never an arbitrary caller-supplied payload), honouring duplicate multiplicity.
             var snapshot = await deadLetterQueue.PeekAsync(await deadLetterQueue.GetLengthAsync());
-            var targets = all ? snapshot : FilterToSnapshot(requested ?? [], snapshot);
+
+            // "Replay all" only targets entries the synchronizer would actually accept — a malformed or
+            // unknown-type payload would just bounce straight back here, matching the sibling socket-command
+            // DLQ contract that a non-replayable entry stays queued through both peek and replay. A selected
+            // replay is a deliberate, classification-visible operator choice (the admin UI warns when the
+            // selection includes poison entries), so it is not filtered the same way.
+            var targets = all
+                ? snapshot.Where(payload => ClassifyPayload(payload).Reason == EDeadLetterReason.Replayable).ToList()
+                : FilterToSnapshot(requested ?? [], snapshot);
 
             var replayed = 0;
-            foreach (var payload in targets)
+            if (targets.Count > 0)
             {
                 // Reserve onto the destination (push to the player update queue) BEFORE acknowledging off
-                // the source (remove from the dead-letter queue). A crash between the two re-queues, never
-                // loses, the entry; the idempotent handlers absorb the rare duplicate (#769).
-                await playerQueue.AddToQueueAsync(payload);
-                if (await deadLetterQueue.RemoveAsync(payload))
-                {
-                    replayed++;
-                }
-            }
+                // the source (remove from the dead-letter queue), each in a single batched round trip rather
+                // than one push+remove pair per entry. A crash between the two batches never loses an entry
+                // — at worst it duplicates one, absorbed by the idempotent handlers (#769) — the same
+                // at-least-once contract as the former per-item loop, without its O(N) sequential round trips.
+                await playerQueue.AddRangeToQueueAsync(targets);
+                replayed = (int)await deadLetterQueue.RemoveRangeAsync(targets);
 
-            if (replayed > 0)
-            {
                 // Wake the synchronizer so it drains the re-enqueued items promptly rather than waiting for
                 // the next player save. Fire-and-forget: the data is already durably enqueued (#552).
                 await _pubsub.Wake(Constants.PUBSUB_PLAYER_CHANNEL);
@@ -109,8 +116,16 @@ namespace Game.DataAccess.Repositories.Admin
 
         private static DeadLetterEntry Classify(int index, string raw)
         {
-            var entry = new DeadLetterEntry { Index = index, RawPayload = raw };
+            var (reason, eventType, playerId) = ClassifyPayload(raw);
+            return new DeadLetterEntry { Index = index, RawPayload = raw, Reason = reason, EventType = eventType, PlayerId = playerId };
+        }
 
+        /// <summary>
+        /// The classification core shared by <see cref="Classify"/> (full inspection entries) and the
+        /// "replay all" filter, which only needs the <see cref="EDeadLetterReason"/> half.
+        /// </summary>
+        private static (EDeadLetterReason Reason, string? EventType, int? PlayerId) ClassifyPayload(string raw)
+        {
             DomainEventEnvelope? envelope;
             try
             {
@@ -118,22 +133,19 @@ namespace Game.DataAccess.Repositories.Admin
             }
             catch (JsonException)
             {
-                entry.Reason = EDeadLetterReason.Malformed;
-                return entry;
+                return (EDeadLetterReason.Malformed, null, null);
             }
 
             if (envelope is null || string.IsNullOrEmpty(envelope.Type))
             {
-                entry.Reason = EDeadLetterReason.Malformed;
-                return entry;
+                return (EDeadLetterReason.Malformed, null, null);
             }
 
-            entry.EventType = envelope.Type;
-            entry.PlayerId = PlayerUpdateEnvelopeReader.TryReadPlayerIdFromPayload(envelope.Payload);
-            entry.Reason = _knownEventTypes.Contains(envelope.Type)
+            var playerId = PlayerUpdateEnvelopeReader.TryReadPlayerIdFromPayload(envelope.Payload);
+            var reason = _knownEventTypes.Contains(envelope.Type)
                 ? EDeadLetterReason.Replayable
                 : EDeadLetterReason.UnknownEventType;
-            return entry;
+            return (reason, envelope.Type, playerId);
         }
 
         private static IReadOnlySet<string> BuildKnownEventTypes()

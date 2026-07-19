@@ -319,6 +319,40 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(["keep"], await queue.PeekAsync(10));
         }
 
+        [Fact]
+        public async Task RemoveRangeAsync_RemovesEachRequestedOccurrenceInOneCall_RespectingDuplicateMultiplicity()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            // Two copies of "dup", one "solo", one "keep" — requesting "dup" twice must remove both copies
+            // and requesting "solo" once must leave "keep" (never requested) untouched.
+            await queue.AddRangeToQueueAsync(["dup", "solo", "keep", "dup"]);
+
+            var removed = await queue.RemoveRangeAsync(["dup", "solo", "dup"]);
+
+            Assert.Equal(3, removed);
+            Assert.Equal(["keep"], await queue.PeekAsync(10));
+        }
+
+        [Fact]
+        public async Task RemoveRangeAsync_SkipsValuesNoLongerPresent_CountingOnlyThoseActuallyRemoved()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = pubsub.GetQueue($"redis-queue-test-{Guid.NewGuid()}");
+
+            await queue.AddRangeToQueueAsync(["real"]);
+
+            // "missing" was never on the queue and "real" is only requested for removal; the queue is not
+            // mutated by a value that isn't actually present.
+            var removed = await queue.RemoveRangeAsync(["real", "missing"]);
+
+            Assert.Equal(1, removed);
+            Assert.Empty(await queue.PeekAsync(10));
+        }
+
         private sealed record SamplePayload(int Id, string Name);
     }
 }

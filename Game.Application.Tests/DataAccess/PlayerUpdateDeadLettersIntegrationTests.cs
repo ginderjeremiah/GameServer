@@ -110,6 +110,83 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ReplayAllAsync_SkipsMalformedAndUnknownTypeEntries_LeavingThemQueued()
+        {
+            using var scope = CreateScope();
+            var malformed = "this-is-not-json";
+            var unknown = Envelope("MysteryEvent", "{\"playerId\":99}");
+            var replayable = EnvelopeFor(new ItemUnlockedEvent(PlayerId: 1, ItemId: 10));
+            await SeedDeadLettersAsync(scope, malformed, unknown, replayable);
+
+            var deadLetters = scope.ServiceProvider.GetRequiredService<IPlayerUpdateDeadLetters>();
+            var result = await deadLetters.ReplayAllAsync();
+
+            // Only the genuinely replayable entry moves; a malformed or unknown-type entry would just
+            // bounce straight back onto this same queue, so it stays put (matching the sibling
+            // socket-command DLQ contract: a non-replayable entry stays queued through both peek and replay).
+            Assert.Equal(1, result.ReplayedCount);
+            Assert.Equal(2, result.RemainingCount);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            Assert.Equal([malformed, unknown], await pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE).PeekAsync(10));
+            Assert.Equal([replayable], await pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE).PeekAsync(10));
+        }
+
+        [Fact]
+        public async Task ReplaySelectedAsync_StillReplaysAnExplicitlySelectedPoisonEntry()
+        {
+            using var scope = CreateScope();
+            var unknown = Envelope("MysteryEvent", "{\"playerId\":99}");
+            await SeedDeadLettersAsync(scope, unknown);
+
+            var deadLetters = scope.ServiceProvider.GetRequiredService<IPlayerUpdateDeadLetters>();
+            // Unlike ReplayAllAsync, a caller-selected replay honours the operator's explicit choice even
+            // for a non-replayable entry (the admin UI surfaces a warning for this rather than blocking it).
+            var result = await deadLetters.ReplaySelectedAsync([unknown]);
+
+            Assert.Equal(1, result.ReplayedCount);
+            Assert.Equal(0, result.RemainingCount);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            Assert.Equal([unknown], await pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE).PeekAsync(10));
+        }
+
+        [Fact]
+        public async Task ReplayAllAsync_MovesDuplicatePayloads_RespectingMultiplicity()
+        {
+            using var scope = CreateScope();
+            var evt = EnvelopeFor(new ItemUnlockedEvent(PlayerId: 1, ItemId: 10));
+            await SeedDeadLettersAsync(scope, evt, evt);
+
+            var deadLetters = scope.ServiceProvider.GetRequiredService<IPlayerUpdateDeadLetters>();
+            var result = await deadLetters.ReplayAllAsync();
+
+            Assert.Equal(2, result.ReplayedCount);
+            Assert.Equal(0, result.RemainingCount);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            Assert.Equal([evt, evt], await pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE).PeekAsync(10));
+        }
+
+        [Fact]
+        public async Task ReplayAllAsync_AllEntriesPoison_ReplaysNothing_AndLeavesTheQueueUntouched()
+        {
+            using var scope = CreateScope();
+            var malformed = "this-is-not-json";
+            await SeedDeadLettersAsync(scope, malformed);
+
+            var deadLetters = scope.ServiceProvider.GetRequiredService<IPlayerUpdateDeadLetters>();
+            var result = await deadLetters.ReplayAllAsync();
+
+            Assert.Equal(0, result.ReplayedCount);
+            Assert.Equal(1, result.RemainingCount);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            Assert.Equal(0, await pubsub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE).GetLengthAsync());
+            Assert.Equal([malformed], await pubsub.GetQueue(Constants.PUBSUB_PLAYER_DEAD_LETTER_QUEUE).PeekAsync(10));
+        }
+
+        [Fact]
         public async Task ReplaySelectedAsync_MovesOnlyTheChosenEntries_LeavingTheRest()
         {
             using var scope = CreateScope();
