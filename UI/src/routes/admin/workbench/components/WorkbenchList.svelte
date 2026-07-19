@@ -83,9 +83,4 @@ const liveCount = $derived(store.items.filter((it) => store.stateOf(it).status !
 		font-weight: 500;
 	}
 }
-// `.meta`'s wrapper is rendered by ListRow, so scope directly off `.bare` rather than an
-// ancestor combinator that Svelte's per-component CSS scoping can't see across.
-.bare {
-	color: var(--text-tertiary);
-}
 </style>
