@@ -37,7 +37,7 @@ namespace Game.Core.Attributes
         public void AddModifier(AttributeModifier modifier)
         {
             AddModifierWithoutCacheInvalidation(modifier);
-            GetOrCreateNode((int)modifier.Attribute).SetCachedValue(null);
+            GetOrCreateNode((int)modifier.Attribute).Invalidate();
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace Game.Core.Attributes
                 UnhookDerivedLink(node, modifier.DerivedSource);
             }
 
-            node.SetCachedValue(null);
+            node.Invalidate();
             return true;
         }
 

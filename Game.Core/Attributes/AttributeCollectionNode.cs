@@ -39,9 +39,19 @@ namespace Game.Core.Attributes
             return DerivedNodes ??= [];
         }
 
-        public void SetCachedValue(double? value)
+        // Caches a freshly computed value without cascading invalidation — every dependent is
+        // already invalid at this point (a cached dependent always implies cached sources), so
+        // walking DerivedNodes here would be a redundant no-op.
+        public void SetCachedValue(double value)
         {
             CachedValue = value;
+        }
+
+        // Clears this node's cached value and cascades to every derived node whose cache
+        // depended on it. Call this whenever a modifier is added or removed.
+        public void Invalidate()
+        {
+            CachedValue = null;
             if (DerivedNodes is null)
             {
                 return;
@@ -51,7 +61,7 @@ namespace Game.Core.Attributes
             {
                 if (derivedNode.CachedValue is not null)
                 {
-                    derivedNode.SetCachedValue(null);
+                    derivedNode.Invalidate();
                 }
             }
         }
