@@ -142,21 +142,28 @@ namespace Game.Core.Tests.Battle
         [Fact]
         public void Rate_DoTEffect_ContributesOffenseEvenWithZeroBaseDamage()
         {
-            var dotEffect = new SkillEffect
-            {
-                Id = 1,
-                Target = ESkillEffectTarget.Opponent,
-                AttributeId = BleedDamagePerSecond,
-                ModifierType = EModifierType.Additive,
-                Amount = 10,
-                DurationMs = 5000,
-                ScalingAttributeId = Strength,
-                ScalingAmount = 0,
-            };
+            var dotEffect = MakeDotEffect(amount: 10, durationMs: 5000);
             var noDot = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 0)]);
             var withDot = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 0, effects: [dotEffect])]);
 
             Assert.True(CombatRating.Rate(withDot, isPlayer: true) > CombatRating.Rate(noDot, isPlayer: true));
+        }
+
+        [Fact]
+        public void Rate_DoTEffectDurationBeyondRampHorizon_RatesTheSameAsExactlyAtTheHorizon()
+        {
+            // A DoT accumulator rides the same shared-expiry stacking machinery as a Self-targeted effect
+            // (Battler.ApplyEffect), so once duration clears FoldedEffectMagnitude's RefFightDuration/2 ramp
+            // horizon, further duration must not move the rating at all — pins that the DoT term's duration is
+            // truly capped rather than left to grow unboundedly for a duration exceeding its skill's cooldown.
+            var atHorizon = MakeSkill(cooldownMs: 1000, baseDamage: 0, effects:
+                [MakeDotEffect(amount: 10, durationMs: (int)(ServerGameConstants.RefFightDuration * 1000 / 2))]);
+            var wayPastHorizon = MakeSkill(cooldownMs: 1000, baseDamage: 0, effects:
+                [MakeDotEffect(amount: 10, durationMs: 1_000_000)]);
+
+            Assert.Equal(
+                CombatRating.Rate(MakeBattlerWithSkills([], [atHorizon]), isPlayer: true),
+                CombatRating.Rate(MakeBattlerWithSkills([], [wayPastHorizon]), isPlayer: true), 6);
         }
 
         [Fact]
@@ -181,17 +188,7 @@ namespace Game.Core.Tests.Battle
             // A DoT effect's ScalingAttributeId is a core attribute in general (mirroring how the live engine
             // scales an effect's magnitude off the caster) — pins that the DoT term reads it correctly rather
             // than zeroing it.
-            var dotEffect = new SkillEffect
-            {
-                Id = 1,
-                Target = ESkillEffectTarget.Opponent,
-                AttributeId = BleedDamagePerSecond,
-                ModifierType = EModifierType.Additive,
-                Amount = 0,
-                DurationMs = 5000,
-                ScalingAttributeId = Strength,
-                ScalingAmount = 1.0,
-            };
+            var dotEffect = MakeDotEffect(amount: 0, durationMs: 5000, scalingAmount: 1.0);
             var skill = MakeSkill(cooldownMs: 1000, baseDamage: 0, effects: [dotEffect]);
             var weak = MakeBattlerWithSkills([], [skill]);
             var strong = MakeBattlerWithSkills([(Strength, 50)], [skill]);
@@ -344,6 +341,19 @@ namespace Game.Core.Tests.Battle
 
             return new Battler(new AttributeCollection(modifiers), skills, 1, counterSkill);
         }
+
+        private static SkillEffect MakeDotEffect(
+            double amount, int durationMs, EAttribute scalingAttribute = Strength, double scalingAmount = 0) => new()
+            {
+                Id = 1,
+                Target = ESkillEffectTarget.Opponent,
+                AttributeId = BleedDamagePerSecond,
+                ModifierType = EModifierType.Additive,
+                Amount = amount,
+                DurationMs = durationMs,
+                ScalingAttributeId = scalingAttribute,
+                ScalingAmount = scalingAmount,
+            };
 
         private static Skill MakeSkill(
             int cooldownMs, double baseDamage, double criticalChance = 0,

@@ -185,14 +185,21 @@ namespace Game.Core.Battle
                         continue;
                     }
 
-                    // The exact DoT steady-state closed form (spike #1526 Decision 1): magnitude × frozen
-                    // amplification × duration ÷ effective cooldown. DoT bypasses the reference Toughness
-                    // (its real property), so no mitigation term applies here. The scaling attribute is read
-                    // off the original battler, not effectiveCaster — mirroring FoldedEffectMagnitude's "the
-                    // caster's ORIGINAL attribute" rule, so the two DoT-adjacent reads agree.
+                    // The DoT steady-state closed form (spike #1526 Decision 1): magnitude × frozen
+                    // amplification × duration ÷ effective cooldown — capped the same way
+                    // FoldedEffectMagnitude caps a Self-targeted effect's uptime, since a DoT accumulator
+                    // rides the same shared-expiry stacking machinery (Battler.ApplyEffect: magnitudes sum,
+                    // expiry resets on every re-application) as any other effect. Duration ≤ cooldown is the
+                    // exact steady state (d/cd); a duration exceeding its skill's cooldown instead ramps for
+                    // as long as the skill cycles, whose average over the reference fight is the same
+                    // RefFightDuration/(2·cd) horizon FoldedEffectMagnitude derives. DoT bypasses the
+                    // reference Toughness (its real property), so no mitigation term applies here. The
+                    // scaling attribute is read off the original battler, not effectiveCaster — mirroring
+                    // FoldedEffectMagnitude's "the caster's ORIGINAL attribute" rule, so the two DoT-adjacent
+                    // reads agree.
                     var magnitude = effect.Amount + battler.GetAttributeValue(effect.ScalingAttributeId) * effect.ScalingAmount;
                     var ampedMagnitude = effectiveCaster.AmplifyDamage(magnitude, dotType);
-                    var durationSec = effect.DurationMs / 1000.0;
+                    var durationSec = Math.Min(effect.DurationMs / 1000.0, ServerGameConstants.RefFightDuration / 2.0);
                     total += ampedMagnitude * durationSec / effectiveCooldownSec;
                 }
             }
