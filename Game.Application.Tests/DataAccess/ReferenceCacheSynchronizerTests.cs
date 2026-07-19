@@ -9,6 +9,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Game.Application.Tests.DataAccess
@@ -108,6 +109,31 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task StopAsync_ReloadLoopWedged_GivesUpWhenTheShutdownDeadlineTrips()
+        {
+            // Models a reload stuck on a wedged Npgsql connection (#2172): it never completes, ignoring the
+            // stopping token entirely, so StopAsync must still honor the host's own shutdown deadline rather
+            // than block on it.
+            var wedgedCache = new WedgedReloadableCache();
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.FromMilliseconds(10), maxAttempts: 1, baseDelay: TimeSpan.Zero);
+            var reloader = new CoalescingReferenceCacheReloader([wedgedCache], policy, NullLogger<CoalescingReferenceCacheReloader>.Instance);
+            var synchronizer = new ReferenceCacheSynchronizer(new NoOpPubSubService(), reloader);
+
+            await synchronizer.StartAsync(CancellationToken);
+            reloader.NotifyChanged();
+
+            // Wait for the reload to actually be in flight so StopAsync races a real wedged awaiter, not an idle loop.
+            await wedgedCache.ReloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            // Returns (does not throw, does not hang) once the deadline has tripped, even though the reload
+            // loop is still stuck awaiting a reload that will never complete.
+            await synchronizer.StopAsync(cts.Token).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        [Fact]
         public async Task Dispose_WithoutStopAsync_DoesNotThrowAndIsIdempotent()
         {
             using var scope = CreateScope();
@@ -157,6 +183,29 @@ namespace Game.Application.Tests.DataAccess
 
                 await Task.Delay(25, CancellationToken);
             }
+        }
+
+        /// <summary>An <see cref="IReloadableReferenceCache"/> whose reload never completes, ignoring its cancellation
+        /// token entirely — a stand-in for a wedged Npgsql connection during a background sweep.</summary>
+        private sealed class WedgedReloadableCache : IReloadableReferenceCache
+        {
+            public TaskCompletionSource ReloadStarted { get; } = new();
+
+            private readonly TaskCompletionSource _neverCompletes = new();
+
+            public Task ReloadAsync(CancellationToken cancellationToken = default)
+            {
+                ReloadStarted.TrySetResult();
+                return _neverCompletes.Task;
+            }
+        }
+
+        /// <summary>An <see cref="IPubSubService"/> stub whose subscribe/unsubscribe are no-ops, for tests that never
+        /// need a live channel subscription.</summary>
+        private sealed class NoOpPubSubService : NotSupportedPubSubService
+        {
+            public override Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => Task.CompletedTask;
+            public override Task UnSubscribe(string id) => Task.CompletedTask;
         }
     }
 }
