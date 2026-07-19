@@ -9,6 +9,12 @@ src/lib/api/types
 # Images
 **/*.png
 
+# Generated test/coverage outputs
+coverage
+playwright-report
+test-results
+unit-test-results.json
+
 # Other
 .gitignore
 .npmrc
