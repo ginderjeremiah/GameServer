@@ -356,6 +356,79 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetEffects_MultiplicativeOnDotAccumulator_ReturnsFailureWithoutPersisting()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await TestDataSeeder.CreateSkillAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // A Multiplicative effect on a DoT-accumulator attribute would double-apply the caster's
+            // amplification (#2169) — rejected regardless of any other otherwise-valid changes in the batch.
+            var data = new SetSkillEffectsData
+            {
+                Id = skillId,
+                Changes =
+                [
+                    new Change<Contracts.SkillEffect>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewEffect(EAttribute.PoisonDamagePerSecond, amount: 2m,
+                            modifierType: EModifierType.Multiplicative),
+                    },
+                ],
+            };
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                var result = admin.SetEffects(data);
+                Assert.False(result.Succeeded);
+                Assert.Equal("A skill effect targeting a DoT-accumulator attribute must be Additive.", result.ErrorMessage);
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.Empty(await context.SkillEffects.Where(e => e.SkillId == skillId).ToListAsync(CancellationToken));
+            }
+        }
+
+        [Fact]
+        public async Task SetEffects_AdditiveOnDotAccumulator_Succeeds()
+        {
+            int skillId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await TestDataSeeder.CreateSkillAsync(context)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            // The Additive shape is the documented amp-freeze rule (spike #1320 Area C) — the guard must not
+            // over-reject it.
+            var data = new SetSkillEffectsData
+            {
+                Id = skillId,
+                Changes =
+                [
+                    new Change<Contracts.SkillEffect>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewEffect(EAttribute.PoisonDamagePerSecond, amount: 30m),
+                    },
+                ],
+            };
+
+            using var writeScope = CreateScope();
+            var admin = writeScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+            Assert.True(admin.SetEffects(data).Succeeded);
+        }
+
+        [Fact]
         public async Task SetMultipliers_AddOfAlreadyPresentMultiplier_Upserts()
         {
             int skillId;
@@ -521,14 +594,15 @@ namespace Game.Application.Tests.DataAccess
 
         private static Contracts.SkillEffect NewEffect(
             EAttribute attribute, decimal amount, int id = 0,
-            EAttribute scalingAttribute = EAttribute.Strength, decimal scalingAmount = 0m)
+            EAttribute scalingAttribute = EAttribute.Strength, decimal scalingAmount = 0m,
+            EModifierType modifierType = EModifierType.Additive)
         {
             return new Contracts.SkillEffect
             {
                 Id = id,
                 Target = ESkillEffectTarget.Self,
                 AttributeId = attribute,
-                ModifierTypeId = EModifierType.Additive,
+                ModifierTypeId = modifierType,
                 Amount = amount,
                 DurationMs = 1000,
                 ScalingAttributeId = scalingAttribute,

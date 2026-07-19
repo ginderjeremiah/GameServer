@@ -85,6 +85,7 @@ namespace Game.Application.Content
                 CheckItems();
                 CheckItemMods();
                 CheckProficiencies();
+                CheckSkillEffects();
                 CheckSkillRecipes();
                 CheckOrphanSkills();
                 CheckRecipeInputOwnability();
@@ -614,6 +615,32 @@ namespace Game.Application.Content
             }
 
             // --- Skill recipes ----------------------------------------------------------------------------
+
+            // --- Skill effects (DoT-accumulator modifier shape) -------------------------------------------
+
+            /// <summary>
+            /// A DoT-accumulator effect's magnitude is frozen with the caster's typed amplification at apply
+            /// time (spike #1320 Area C, <see cref="BattleContext.ApplySkillEffect"/>). That's correct for an
+            /// Additive effect, but a Multiplicative one would compound the amplification a second time when
+            /// it folds into the stack (#2169). The admin save path already rejects this combination
+            /// (<c>AdminSkills.SetEffects</c>), so this is a defense-in-depth backstop rather than a reachable
+            /// gap — matching the same-path-prerequisite pattern.
+            /// </summary>
+            private void CheckSkillEffects()
+            {
+                foreach (var skill in Live(_graph.Skills, s => s.RetiredAt))
+                {
+                    foreach (var effect in skill.Effects)
+                    {
+                        if (effect.ModifierTypeId == EModifierType.Multiplicative
+                            && DamageTypes.DotTypeForAccumulator(effect.AttributeId) is not null)
+                        {
+                            Error("SkillEffectDotModifier", "Skill", skill.Id,
+                                $"has a Multiplicative effect on DoT-accumulator attribute {effect.AttributeId}, which would double-apply the caster's amplification.");
+                        }
+                    }
+                }
+            }
 
             private void CheckSkillRecipes()
             {

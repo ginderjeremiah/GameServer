@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
+using Game.Core.Attributes;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -144,6 +145,19 @@ namespace Game.DataAccess.Repositories.Admin
             if (skill is null)
             {
                 return AdminSaveResult.NotFound("Skill");
+            }
+
+            // Anti-tamper (#2169): a DoT-accumulator effect's magnitude is frozen with the caster's typed
+            // amplification at apply time (spike #1320 Area C). For an Additive effect that's the correct
+            // per-second rate; for a Multiplicative one the amplified value would compound a second time when
+            // it folds into the stack's combined multiplicative modifier. Reject the combination up front
+            // rather than teaching the engine/rating model multiplicative-DoT semantics.
+            if (data.Changes.Any(c => c.ChangeType != EChangeType.Delete
+                && c.Item.ModifierTypeId == EModifierType.Multiplicative
+                && DamageTypes.DotTypeForAccumulator(c.Item.AttributeId) is not null))
+            {
+                return AdminSaveResult.Failure(
+                    "A skill effect targeting a DoT-accumulator attribute must be Additive.");
             }
 
             // Precompute the current effect-id set once so each Edit/Delete membership guard is an O(1)
