@@ -1,5 +1,5 @@
-<div class="dl-console" data-testid="dead-letter-console">
-	<div class="dl-head">
+<div class="ops-console" data-testid="dead-letter-console">
+	<div class="head">
 		<div class="eyebrow">Admin Console · Ops</div>
 		<div class="title-row">
 			<h1 class="title" data-testid="dl-title">{title}</h1>
@@ -27,7 +27,7 @@
 		</p>
 	</div>
 
-	<div class="dl-toolbar">
+	<div class="toolbar">
 		<button
 			type="button"
 			class="btn"
@@ -59,14 +59,14 @@
 	</div>
 
 	{#if queue.error}
-		<div class="dl-error" role="alert" data-testid="dl-error">{queue.error}</div>
+		<div class="error-panel" role="alert" data-testid="dl-error">{queue.error}</div>
 	{/if}
 
-	<div class="dl-body">
+	<div class="body">
 		{#if !queue.loaded && queue.loading}
 			<Loading loading={true} delay={150} />
 		{:else if queue.loaded && queue.entries.length === 0}
-			<div class="dl-empty" data-testid="dl-empty">
+			<div class="empty-state" data-testid="dl-empty">
 				<div class="glyph">
 					<svg
 						width="26"
@@ -135,6 +135,7 @@
 import { onMount, untrack } from 'svelte';
 import Loading from '$components/Loading.svelte';
 import { confirmModal, toastError, toastSuccess } from '$stores';
+import './ops-console.scss';
 import DeadLetterRow from './DeadLetterRow.svelte';
 import { DeadLetterConsoleState, type DeadLetterQueueVariant } from './dead-letters.svelte';
 
@@ -233,131 +234,16 @@ const replayAll = async () => {
 </script>
 
 <style lang="scss">
-.dl-console {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	min-height: 0;
-	font-family: var(--sans);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-}
-
-.dl-head {
-	padding: 20px 32px 16px;
-	border-bottom: 1px solid var(--border-subtle);
-}
-.eyebrow {
-	font-family: var(--mono);
-	font-size: 10px;
-	letter-spacing: 2px;
-	text-transform: uppercase;
-	color: color-mix(in srgb, var(--accent) 70%, transparent);
-	margin-bottom: 6px;
-}
-.title-row {
-	display: flex;
-	align-items: baseline;
-	gap: 14px;
-	flex-wrap: wrap;
-}
-.title {
-	margin: 0;
-	font-size: 22px;
-	font-weight: 500;
-	letter-spacing: -0.2px;
+.blurb {
+	max-width: 760px;
 }
 .summary {
-	display: inline-flex;
-	align-items: center;
-	gap: 14px;
-	font-family: var(--mono);
-	font-size: 11.5px;
-	color: var(--text-tertiary);
-
 	.sel {
 		color: var(--accent);
 	}
 	.more {
 		color: var(--text-muted);
 	}
-}
-.blurb {
-	margin: 12px 0 0;
-	max-width: 760px;
-	font-size: 12.5px;
-	line-height: 1.55;
-	color: var(--text-tertiary);
-
-	em {
-		font-style: normal;
-		color: var(--text-secondary);
-	}
-}
-
-.dl-toolbar {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 14px 32px;
-	border-bottom: 1px solid var(--border-subtle);
-
-	.spacer {
-		flex: 1;
-	}
-}
-.btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 7px;
-	background: transparent;
-	border: 1px solid var(--border-light);
-	color: var(--text-secondary);
-	font-family: var(--mono);
-	font-size: 11.5px;
-	letter-spacing: 0.6px;
-	text-transform: uppercase;
-	padding: 8px 15px;
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.14s ease;
-	white-space: nowrap;
-
-	&:hover:not(:disabled) {
-		border-color: color-mix(in srgb, var(--white) 32%, transparent);
-		box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
-	}
-	&.primary {
-		background: color-mix(in srgb, var(--accent) 12%, transparent);
-		border-color: var(--accent);
-		color: var(--accent-light);
-	}
-	&.primary:hover:not(:disabled) {
-		box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
-	}
-	&:disabled {
-		color: var(--text-muted);
-		border-color: var(--border-subtle);
-		cursor: not-allowed;
-		box-shadow: none;
-	}
-}
-
-.dl-error {
-	margin: 14px 32px 0;
-	padding: 11px 14px;
-	border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
-	background: color-mix(in srgb, var(--error) 10%, transparent);
-	border-radius: 4px;
-	color: var(--error);
-	font-size: 12.5px;
-}
-
-.dl-body {
-	flex: 1;
-	min-height: 0;
-	overflow: auto;
-	padding: 12px 32px 28px;
 }
 
 .dl-table {
@@ -400,35 +286,6 @@ const replayAll = async () => {
 	strong {
 		color: var(--text-secondary);
 		font-weight: 500;
-	}
-}
-
-.dl-empty {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	text-align: center;
-	padding: 60px 20px;
-	color: var(--text-muted);
-	gap: 12px;
-
-	.glyph {
-		width: 56px;
-		height: 56px;
-		border-radius: 10px;
-		border: 1px dashed var(--border-light);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--text-tertiary);
-	}
-	.et {
-		font-size: 14px;
-		color: var(--text-tertiary);
-	}
-	.es {
-		font-size: 12px;
 	}
 }
 </style>

@@ -35,8 +35,8 @@
 		{/snippet}
 	</DetailHeader>
 
-	<div class="detail-body" class:locked={store.isRetired(tier) || store.saving}>
-		<div class="body-inner">
+	<div class="detail-body">
+		<div class="body-inner" class:locked={store.isRetired(tier) || store.saving}>
 			{#if store.tierTab === 'identity'}
 				<div class="sec-title">
 					Identity · Conlang<span class="sub">— name and words of power</span><span class="ln"></span>
@@ -138,42 +138,5 @@ const milestonesDirty = $derived(
 }
 .crumb-sep {
 	color: var(--text-muted);
-}
-.detail-body {
-	flex: 1;
-	overflow-y: auto;
-	padding: 24px 32px;
-
-	&.locked {
-		opacity: 0.55;
-		pointer-events: none;
-	}
-}
-.body-inner {
-	max-width: 1020px;
-}
-.sec-title {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	font-family: var(--mono);
-	font-size: 10px;
-	letter-spacing: 1.8px;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	margin: 0 0 18px;
-
-	.sub {
-		text-transform: none;
-		letter-spacing: 0;
-		font-family: var(--sans);
-		font-size: 12px;
-		white-space: nowrap;
-	}
-	.ln {
-		flex: 1;
-		height: 1px;
-		background: var(--border-subtle);
-	}
 }
 </style>

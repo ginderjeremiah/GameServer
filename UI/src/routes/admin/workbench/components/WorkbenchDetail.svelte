@@ -163,17 +163,4 @@ const sectionDirty = (section: EntityConfig<Identified>['sections'][number]): bo
 .empty-fill {
 	height: 100%;
 }
-.detail-body {
-	flex: 1;
-	overflow-y: auto;
-	padding: 24px 32px;
-}
-.body-inner {
-	max-width: 1020px;
-
-	&.locked {
-		opacity: 0.5;
-		pointer-events: none;
-	}
-}
 </style>
