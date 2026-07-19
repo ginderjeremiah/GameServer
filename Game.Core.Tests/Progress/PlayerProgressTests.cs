@@ -429,6 +429,42 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_Victory_AllZeroTypedDamage_RecordsNoKillByDamageType()
+        {
+            // A fire-immune enemy killed entirely by untyped reflection: every fire portion books 0, so there is
+            // no positive-damage entry to credit a kill to (#2170).
+            var progress = MakeProgress();
+            var stats = new BattleStats { TypedDamageDealt = { [EDamageType.Fire] = 0.0 } };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Fire, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Elemental, out _));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_Victory_ZeroValuedEntryIgnored_CreditsThePositiveMajorityInstead()
+        {
+            // A minority-but-positive type should still win over a larger zero-valued (immune) entry.
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                TypedDamageDealt =
+                {
+                    [EDamageType.Fire] = 0.0,
+                    [EDamageType.Physical] = 5.0,
+                },
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Physical));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.KillsByDamageType, (int)EDamageTypeKey.Fire, out _));
+        }
+
+        [Fact]
         public void RecordBattleCompleted_Victory_NoTypedDamageDealt_RecordsNoKillByDamageType()
         {
             // Defensive branch: a victory with an empty offense book (shouldn't happen in practice, since a
