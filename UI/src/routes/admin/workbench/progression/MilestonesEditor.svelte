@@ -67,17 +67,19 @@
 		{/each}
 		<button type="button" class="link-add" onclick={() => store.addModifier(tier.id, sel)}>+ Add modifier</button>
 
-		<div class="field-label mt">
-			Reward skill <span class="muted">(optional — granted on reaching this level)</span>
-		</div>
-		<div class="reward">
-			<ProgSelect
-				ariaLabel="Reward skill"
-				value={reward?.rewardSkillId ?? NO_SKILL}
-				options={rewardOptions}
-				onChange={(v) => store.setReward(tier.id, sel, v)}
-			/>
-		</div>
+		{#if sel > 0}
+			<div class="field-label mt">
+				Reward skill <span class="muted">(optional — granted on reaching this level)</span>
+			</div>
+			<div class="reward">
+				<ProgSelect
+					ariaLabel="Reward skill"
+					value={reward?.rewardSkillId ?? NO_SKILL}
+					options={rewardOptions}
+					onChange={(v) => store.setReward(tier.id, sel, v)}
+				/>
+			</div>
+		{/if}
 
 		<div class="payout-foot">
 			<button type="button" class="link-danger" onclick={() => store.removePayout(tier.id, sel)}
@@ -86,7 +88,11 @@
 		</div>
 	{:else}
 		<div class="empty-payout">
-			<div class="ep-text">No payout at level {sel} — players just gain the level.</div>
+			<div class="ep-text">
+				{sel === 0
+					? 'No on-open bonus — players start this tier with nothing.'
+					: `No payout at level ${sel} — players just gain the level.`}
+			</div>
 			<button
 				type="button"
 				class="btn-add"
@@ -115,7 +121,7 @@ interface Props {
 const { store, tier }: Props = $props();
 
 const maxLevel = $derived(Math.max(1, Math.floor(tier.maxLevel) || 1));
-const sel = $derived(Math.min(Math.max(1, store.selectedLevel), maxLevel));
+const sel = $derived(Math.min(Math.max(0, store.selectedLevel), maxLevel));
 const reward = $derived(rewardAtLevel(tier, sel));
 const selMods = $derived(modifiersAtLevel(tier, sel));
 const hasPayout = $derived(selMods.length > 0 || reward !== undefined);
@@ -136,7 +142,7 @@ const attrOptionsFor = (current: number) =>
 
 const levelNodes = $derived.by(() => {
 	const nodes: { level: number; kind: 'empty' | 'bonus' | 'milestone' }[] = [];
-	for (let level = 1; level <= maxLevel; level++) {
+	for (let level = 0; level <= maxLevel; level++) {
 		const hasReward = isMilestoneLevel(tier, level);
 		const hasMod = modifiersAtLevel(tier, level).length > 0;
 		nodes.push({ level, kind: hasReward ? 'milestone' : hasMod ? 'bonus' : 'empty' });
