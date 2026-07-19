@@ -1,7 +1,6 @@
 import type { IProficiencyLevelModifier, IProficiencyLevelReward } from '$lib/api';
 import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
 import { activityKeyDisplay, type ActivityKeyKind } from '$lib/common';
-import { canonicalEqual } from '../save-helpers';
 import type { SelectOption } from '../entities/types';
 import type { WorkbenchPath, WorkbenchProficiency } from './types';
 
@@ -220,30 +219,3 @@ export const profIdentityDto = (prof: WorkbenchProficiency) => ({
 	prerequisiteIds: [] as number[],
 	retiredAt: prof.retiredAt
 });
-
-// ── Diffing & new-id resolution (shared shape with the generic save pipeline) ──
-
-export interface CatalogueDiff<T> {
-	added: T[];
-	modified: { record: T; baseline: T }[];
-}
-
-/**
- * Split a catalogue against its baseline into added (no baseline) and modified (differs from baseline
- * in any way — identity or child collection). Retire is an edit, so there is no delete set; never-saved
- * records that are dropped simply never appear in `current`.
- */
-export const diffCatalogue = <T extends { id: number }>(current: T[], baseline: T[]): CatalogueDiff<T> => {
-	const baseMap = new Map(baseline.map((record) => [record.id, record]));
-	const added: T[] = [];
-	const modified: { record: T; baseline: T }[] = [];
-	for (const record of current) {
-		const base = baseMap.get(record.id);
-		if (!base) {
-			added.push(record);
-		} else if (!canonicalEqual(record, base)) {
-			modified.push({ record, baseline: base });
-		}
-	}
-	return { added, modified };
-};

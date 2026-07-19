@@ -14,7 +14,6 @@ import { childChanged, canonicalEqual, resolveId, resolveNewIds } from '../save-
 import { firstFree } from '../entities/helpers';
 import {
 	blankModifier,
-	diffCatalogue,
 	newPath,
 	newProficiency,
 	pathIdentityDto,
@@ -109,8 +108,68 @@ export class ProgressionStore {
 		}
 		return map;
 	});
-	private pathDiff = $derived(diffCatalogue(this.paths, this.basePaths));
-	private profDiff = $derived(diffCatalogue(this.profs, this.baseProfs));
+
+	/**
+	 * Per-record status, memoised per record object (mirroring EntityStore.recordStates): a patch
+	 * replaces only the one record it touched, so every other record is a same-reference cache hit
+	 * instead of a re-canonicalized comparison against its baseline. No epoch invalidation is needed
+	 * here (unlike EntityStore) — this store has no soft-delete side channel that can flip a status
+	 * without also replacing the record's reference.
+	 */
+	private pathStateCache = new WeakMap<WorkbenchPath, RecordStatus>();
+	private profStateCache = new WeakMap<WorkbenchProficiency, RecordStatus>();
+
+	private pathStatuses = $derived.by<Record<number, RecordStatus>>(() => {
+		const map: Record<number, RecordStatus> = {};
+		for (const path of this.paths) {
+			let status = this.pathStateCache.get(path);
+			if (status === undefined) {
+				const baseline = this.basePathMap[path.id];
+				status = !baseline ? 'added' : canonicalEqual(path, baseline) ? 'clean' : 'modified';
+				this.pathStateCache.set(path, status);
+			}
+			map[path.id] = status;
+		}
+		return map;
+	});
+	private profStatuses = $derived.by<Record<number, RecordStatus>>(() => {
+		const map: Record<number, RecordStatus> = {};
+		for (const prof of this.profs) {
+			let status = this.profStateCache.get(prof);
+			if (status === undefined) {
+				const baseline = this.baseProfMap[prof.id];
+				status = !baseline ? 'added' : canonicalEqual(prof, baseline) ? 'clean' : 'modified';
+				this.profStateCache.set(prof, status);
+			}
+			map[prof.id] = status;
+		}
+		return map;
+	});
+
+	private pathDiff = $derived.by(() => {
+		const added: WorkbenchPath[] = [];
+		const modified: { record: WorkbenchPath; baseline: WorkbenchPath }[] = [];
+		for (const path of this.paths) {
+			if (this.pathStatuses[path.id] === 'added') {
+				added.push(path);
+			} else if (this.pathStatuses[path.id] === 'modified') {
+				modified.push({ record: path, baseline: this.basePathMap[path.id] });
+			}
+		}
+		return { added, modified };
+	});
+	private profDiff = $derived.by(() => {
+		const added: WorkbenchProficiency[] = [];
+		const modified: { record: WorkbenchProficiency; baseline: WorkbenchProficiency }[] = [];
+		for (const prof of this.profs) {
+			if (this.profStatuses[prof.id] === 'added') {
+				added.push(prof);
+			} else if (this.profStatuses[prof.id] === 'modified') {
+				modified.push({ record: prof, baseline: this.baseProfMap[prof.id] });
+			}
+		}
+		return { added, modified };
+	});
 
 	counts = $derived({
 		added: this.pathDiff.added.length + this.profDiff.added.length,
@@ -121,20 +180,14 @@ export class ProgressionStore {
 		return this.counts.added + this.counts.modified;
 	}
 
+	/** Always called with a record from {@link paths}, which {@link pathStatuses} covers exhaustively. */
 	pathStatus(path: WorkbenchPath): RecordStatus {
-		const baseline = this.basePathMap[path.id];
-		if (!baseline) {
-			return 'added';
-		}
-		return canonicalEqual(path, baseline) ? 'clean' : 'modified';
+		return this.pathStatuses[path.id];
 	}
 
+	/** Always called with a record from {@link profs}, which {@link profStatuses} covers exhaustively. */
 	profStatus(prof: WorkbenchProficiency): RecordStatus {
-		const baseline = this.baseProfMap[prof.id];
-		if (!baseline) {
-			return 'added';
-		}
-		return canonicalEqual(prof, baseline) ? 'clean' : 'modified';
+		return this.profStatuses[prof.id];
 	}
 
 	isRetired(record: { retiredAt?: string | null }): boolean {
@@ -407,8 +460,8 @@ export class ProgressionStore {
 		let committed = false;
 		try {
 			const baseProfMap = this.baseProfMap;
-			const pathDiff = diffCatalogue(this.paths, this.basePaths);
-			const profDiff = diffCatalogue(this.profs, this.baseProfs);
+			const pathDiff = this.pathDiff;
+			const profDiff = this.profDiff;
 
 			// 1. Cross-path prerequisite changes that touch only already-persisted tiers need no id remap,
 			// so — only when this save is also retiring a path — they're posted immediately, before path

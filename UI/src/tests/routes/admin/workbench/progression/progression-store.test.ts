@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
  * exercised end to end rather than mocked into a tautology.
  */
 
-const { postMock, fetchMock, staticDataMock, toastErrorMock, referenceMock } = vi.hoisted(() => ({
+const { postMock, fetchMock, staticDataMock, toastErrorMock, referenceMock, canonicalEqualMock } = vi.hoisted(() => ({
 	postMock: vi.fn(),
 	fetchMock: vi.fn(),
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,7 +18,8 @@ const { postMock, fetchMock, staticDataMock, toastErrorMock, referenceMock } = v
 			{ value: 0, text: 'a0' },
 			{ value: 1, text: 'a1' }
 		]
-	}
+	},
+	canonicalEqualMock: vi.fn()
 }));
 
 vi.mock('$lib/api', async (importOriginal) => {
@@ -27,6 +28,18 @@ vi.mock('$lib/api', async (importOriginal) => {
 });
 vi.mock('$stores', () => ({ staticData: staticDataMock, toastError: toastErrorMock }));
 vi.mock('$routes/admin/workbench/reference.svelte', () => ({ reference: referenceMock }));
+// Spies through to the real implementation — only observes call counts, so status/diff results are unaffected.
+vi.mock('$routes/admin/workbench/save-helpers', async (importOriginal) => {
+	const actual = (await importOriginal()) as Record<string, unknown>;
+	const real = actual.canonicalEqual as (a: unknown, b: unknown) => boolean;
+	return {
+		...actual,
+		canonicalEqual: (a: unknown, b: unknown) => {
+			canonicalEqualMock(a, b);
+			return real(a, b);
+		}
+	};
+});
 
 import { EActivityKey, EChangeType } from '$lib/api';
 import { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
@@ -245,6 +258,29 @@ describe('local editing', () => {
 		store.patchPath(0, (d) => (d.name = 'Inferno'));
 		expect(store.counts.modified).toBe(1);
 		expect(store.totalChanges).toBe(1);
+	});
+
+	it('patching one path only re-diffs that record, not the whole catalogue (per-record memoization)', async () => {
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'fire path', activityKey: EActivityKey.Physical, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'water path', activityKey: EActivityKey.Physical, retiredAt: null }
+		];
+		serverProfs = [fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0' })];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Reading status once seeds the memo for both paths.
+		expect(store.pathStatus(reqPath(store, 0))).toBe('clean');
+		expect(store.pathStatus(reqPath(store, 1))).toBe('clean');
+		canonicalEqualMock.mockClear();
+
+		store.patchPath(0, (d) => (d.name = 'Inferno'));
+		expect(store.pathStatus(reqPath(store, 0))).toBe('modified');
+		expect(store.pathStatus(reqPath(store, 1))).toBe('clean');
+
+		// Only path 0's (new object reference) status was recomputed; path 1's untouched reference hit the cache.
+		expect(canonicalEqualMock).toHaveBeenCalledTimes(1);
+		expect(canonicalEqualMock).toHaveBeenCalledWith(reqPath(store, 0), store.pathBaseline(0));
 	});
 
 	it('addPath adds a path plus its first tier', async () => {

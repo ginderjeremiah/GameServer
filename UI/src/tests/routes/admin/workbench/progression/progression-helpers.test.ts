@@ -4,7 +4,6 @@ import {
 	activityKeyGroups,
 	cumulativeXp,
 	decipherThresholds,
-	diffCatalogue,
 	hasTierCollision,
 	isMilestoneLevel,
 	modifiersAtLevel,
@@ -149,21 +148,6 @@ describe('validation', () => {
 			levelRewards: [{ level: 9, rewardSkillId: 1 }]
 		});
 		expect(proficiencyWarnings(ranged)).toContain('Reward level 9 out of range');
-	});
-});
-
-describe('diffCatalogue', () => {
-	it('splits into added (no baseline) and modified (differs)', () => {
-		const a = { id: 1, name: 'A' };
-		const b = { id: 2, name: 'B' };
-		const current = [
-			{ id: 1, name: 'A2' }, // modified
-			{ id: -1, name: 'New' }, // added
-			b // unchanged
-		];
-		const diff = diffCatalogue(current, [a, b]);
-		expect(diff.added.map((r) => r.id)).toEqual([-1]);
-		expect(diff.modified.map((m) => m.record.id)).toEqual([1]);
 	});
 });
 
