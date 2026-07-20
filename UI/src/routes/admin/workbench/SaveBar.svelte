@@ -42,8 +42,8 @@ interface Props {
 	modified: number;
 	deleted?: number;
 	/** True when a pending record carries a save-blocking warning — disables Save alongside the
-	 *  existing total/saving gates and surfaces why. Defaults to false for callers with no concept
-	 *  of blocking warnings (e.g. the progression editor's own advisory-only warnings). */
+	 *  existing total/saving gates and surfaces why. Defaults to false for a caller with no concept
+	 *  of blocking warnings at all. */
 	blocked?: boolean;
 	onDiscard: () => void;
 	onSave: () => void;

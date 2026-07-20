@@ -169,6 +169,9 @@ describe('validation', () => {
 		});
 		expect(proficiencyBlockingWarnings(outOfRange)).toEqual(['Modifier level 8 out of range']);
 
+		const rewardOutOfRange = tier({ id: 4, maxLevel: 5, levelRewards: [{ level: 9, rewardSkillId: 1 }] });
+		expect(proficiencyBlockingWarnings(rewardOutOfRange)).toEqual(['Reward level 9 out of range']);
+
 		const inRange = tier({ id: 3, maxLevel: 5 });
 		expect(proficiencyBlockingWarnings(inRange)).toHaveLength(0);
 	});
