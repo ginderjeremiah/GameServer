@@ -338,18 +338,22 @@ namespace Game.Api
                         RoleClaimType = JwtTokenService.RoleClaimType,
                     };
                     // Browsers can't set Authorization headers on the WebSocket handshake, so the socket
-                    // endpoint accepts the access token via the access_token query-string parameter
-                    // (the standard ASP.NET Core pattern for token auth over WebSockets).
+                    // endpoint accepts the access token as a WebSocket subprotocol (Sec-WebSocket-Protocol)
+                    // rather than a query-string parameter — a query string ends up verbatim in any
+                    // downstream access log (e.g. the edge proxy's default format), while a subprotocol is
+                    // a handshake header a default access log format never records (#2211). The client
+                    // sends the token as the sole requested subprotocol; SocketInterceptorMiddleware echoes
+                    // it back to complete the negotiation the WebSocket spec requires.
                     options.Events = new JwtBearerEvents
                     {
                         OnMessageReceived = context =>
                         {
                             if (string.IsNullOrEmpty(context.Token) && context.HttpContext.Request.Path == "/socket")
                             {
-                                var queryToken = context.Request.Query["access_token"];
-                                if (!string.IsNullOrEmpty(queryToken))
+                                var requestedProtocols = context.HttpContext.WebSockets.WebSocketRequestedProtocols;
+                                if (requestedProtocols.Count > 0)
                                 {
-                                    context.Token = queryToken;
+                                    context.Token = requestedProtocols[0];
                                 }
                             }
 

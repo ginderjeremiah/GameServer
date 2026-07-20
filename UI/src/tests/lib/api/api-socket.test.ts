@@ -28,13 +28,15 @@ interface MockWebSocket {
 
 let socketInstances: MockWebSocket[] = [];
 let lastSocketUrl: string | undefined;
+let lastSocketProtocols: string | string[] | undefined;
 // Every mock socket ever created, never reset per-test — unlike socketInstances, which each test clears.
 // Only the module-level `apiSocket` singleton (see the fetchSocketData describe below) needs this: it
 // outlives any one test, so its own leftover socket has to be findable to force it closed.
 const allCreatedSockets: MockWebSocket[] = [];
 
-function createMockWebSocket(url?: string): MockWebSocket {
+function createMockWebSocket(url?: string, protocols?: string | string[]): MockWebSocket {
 	lastSocketUrl = url;
+	lastSocketProtocols = protocols;
 	const ws: MockWebSocket = {
 		readyState: 1,
 		OPEN: 1,
@@ -73,6 +75,7 @@ describe('ApiSocket', () => {
 	beforeEach(() => {
 		socketInstances = [];
 		lastSocketUrl = undefined;
+		lastSocketProtocols = undefined;
 		webSocketMock.mockClear();
 		localStorage.clear();
 		vi.mocked(refreshTokens).mockReset();
@@ -106,20 +109,22 @@ describe('ApiSocket', () => {
 	};
 
 	describe('authentication', () => {
-		it('passes the stored access token as the access_token query parameter', async () => {
+		it('passes the stored access token as the sole WebSocket subprotocol', async () => {
 			setTokens({ accessToken: 'token-123', refreshToken: 'r' });
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
-			expect(lastSocketUrl).toBe('/socket?access_token=token-123');
+			expect(lastSocketUrl).toBe('/socket');
+			expect(lastSocketProtocols).toEqual(['token-123']);
 		});
 
-		it('opens an unauthenticated socket when no token is stored', async () => {
+		it('opens an unauthenticated socket with no subprotocol when no token is stored', async () => {
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(lastSocketUrl).toBe('/socket');
+			expect(lastSocketProtocols).toBeUndefined();
 			// A never-logged-in caller (no prior refresh token) must not be routed to the auth-failure path.
 			expect(handleAuthFailure).not.toHaveBeenCalled();
 		});
@@ -135,7 +140,7 @@ describe('ApiSocket', () => {
 			await flushMicrotasks();
 
 			expect(ensureValidAccessToken).toHaveBeenCalled();
-			expect(lastSocketUrl).toBe('/socket?access_token=fresh-token');
+			expect(lastSocketProtocols).toEqual(['fresh-token']);
 		});
 
 		it('opens only one socket when concurrent callers race the async open', async () => {
@@ -196,7 +201,7 @@ describe('ApiSocket', () => {
 			await flushMicrotasks();
 
 			expect(handleAuthFailure).not.toHaveBeenCalled();
-			expect(lastSocketUrl).toBe('/socket?access_token=winner-access');
+			expect(lastSocketProtocols).toEqual(['winner-access']);
 		});
 
 		it('leaves the session intact (no logout, no handshake) when the pre-emptive refresh is retryable', async () => {

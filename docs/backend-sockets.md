@@ -2,6 +2,10 @@
 
 The deep mechanics of the socket layer. The architectural goal — why every in-game read and player-state mutation goes over the socket — lives in [backend.md → HTTP vs WebSocket Communication](./backend.md#http-vs-websocket-communication); this doc holds the lifecycle detail you need when working on the socket layer itself.
 
+## Handshake auth via WebSocket subprotocol, not a query string
+
+Browsers can't set an `Authorization` header on the WebSocket handshake, so the access token has to travel some other way. It rides as the sole requested WebSocket subprotocol (`Sec-WebSocket-Protocol`) rather than an `access_token` query-string parameter: a query string ends up verbatim in the request line of any downstream access log (the production edge proxy's default nginx format logs `$request`, which includes the full URL), while a subprotocol is a handshake header no default access log format records. `JwtBearerEvents.OnMessageReceived` (`Startup.cs`) reads the token from `HttpContext.WebSockets.WebSocketRequestedProtocols` when the request has none via the normal bearer path; `SocketInterceptorMiddleware` then echoes that same value back via `AcceptWebSocketAsync(subProtocol)` — required because a browser fails the handshake outright if it offered a subprotocol list and the server's response selects none.
+
 ## Per-socket command serialization & timeouts
 
 **The per-player sequential guarantee is enforced by a per-socket command lock**, because server-initiated pushes (challenge-completion, socket-replaced) arrive over the Redis backplane and run *off* the read loop — so two paths could otherwise mutate the same cached player concurrently, the exact lost-update class the serialization exists to prevent. Each command also runs under a per-command timeout, and that cancellation token is plumbed down through the application services and the data tier (EF/Npgsql honour it natively; the Redis client is wrapped to honour it cooperatively) so a wedged command unwinds promptly and releases the lock rather than stalling every later command. A separate per-socket send lock guards WebSocket output, since overlapping sends on one socket are illegal.
