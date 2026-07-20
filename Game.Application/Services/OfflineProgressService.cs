@@ -314,11 +314,10 @@ namespace Game.Application.Services
             var victoryExpRewards = new List<int>();
             var proficiencyGains = new ProficiencyGainAccumulator();
             // Union the statistic rows touched across every battle, so the end-of-window challenge evaluation
-            // sees every moved statistic. RecordBattleCompleted currently returns the progress aggregate's
-            // cumulative dirty set (it is loaded once for the whole window), but unioning each call's result
-            // explicitly keeps this correct even if that method were ever changed to return only the per-battle
-            // delta — a mixed-outcome window can touch a tracked statistic in a non-final battle (e.g. a kill
-            // challenge crossed by early wins before a closing loss), and the union captures it regardless.
+            // sees every moved statistic. RecordBattleCompleted returns only this call's own per-battle delta
+            // (the progress aggregate is loaded once for the whole window), so a mixed-outcome window still
+            // needs the explicit union to keep a statistic touched by a non-final battle (e.g. a kill challenge
+            // crossed by early wins before a closing loss) in scope for the end-of-window evaluation.
             var touchedStatistics = new HashSet<(EStatisticType Type, int? EntityId)>();
             foreach (var battle in result.Battles)
             {

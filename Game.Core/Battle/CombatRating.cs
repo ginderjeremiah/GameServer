@@ -250,7 +250,7 @@ namespace Game.Core.Battle
             // only pipeline that applies the Cull execute multiplier, so an authored enemy ExecuteBonus is never
             // priced as a capability that cannot fire (the same asymmetry as critExpectation above).
             var executeExpectation = isPlayer
-                ? 1.0 + effectiveCaster.GetAttributeValue(ExecuteBonus) * 0.5
+                ? 1.0 + effectiveCaster.GetAttributeValue(ExecuteBonus) * ServerGameConstants.RefMissingHealthFraction
                 : 1.0;
 
             return afterMitigation * critExpectation * executeExpectation;
