@@ -31,27 +31,48 @@ namespace Game.Api.Middleware
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await context.Response.WriteAsJsonAsync(ApiResponse.Error("The /socket endpoint requires a WebSocket upgrade request."), context.RequestAborted);
             }
-            else if (!await TryLoadPlayer(sessionService, sessionInitializer, scopeFactory, context.RequestAborted))
-            {
-                // An authenticated session whose player can't be loaded can't play, so fail before upgrading
-                // the socket rather than erroring on the first command. The socket isn't upgraded yet, so a
-                // body can still be written: return the project's { errorMessage } envelope (a 404 — the
-                // player resource is absent, not a server fault; a genuine load error throws and is shaped by
-                // ExceptionHandlingMiddleware) rather than a bare 500.
-                context.Response.StatusCode = StatusCodes.Status404NotFound;
-                await context.Response.WriteAsJsonAsync(ApiResponse.Error("Player could not be loaded."), context.RequestAborted);
-            }
             else
             {
-                // Read from the handshake's validated ClaimsPrincipal (the same source
-                // AdminRoleAuthorizationFilter reads for HTTP admin endpoints), not the volatile session
-                // cache, so it derives from the token alone.
-                var isAdmin = context.User.IsInRole(nameof(ERole.Admin));
-                using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                var socketContext = await socketManager.RegisterSocket(webSocket, sessionService, isAdmin);
-                await socketContext.WaitSocketClosed();
-                await socketManager.UnRegisterSocket(socketContext);
+                var loadResult = await TryLoadPlayer(sessionService, sessionInitializer, scopeFactory, context.RequestAborted);
+                if (loadResult == PlayerLoadResult.NoPlayerSelected)
+                {
+                    // A pre-selection token (post-Login, pre-SelectPlayer) can never resolve a loadable
+                    // player, so reject on the token's missing selected-player claim with the same category
+                    // AuthController.Status uses, rather than let a well-behaved-client-can't-hit-this state
+                    // fall through to the generic "player not found" 404 below.
+                    context.Response.StatusCode = StatusCodes.Status409Conflict;
+                    await context.Response.WriteAsJsonAsync(ApiResponse.Error("No character selected.", ApiErrorCategory.NoPlayerSelected), context.RequestAborted);
+                }
+                else if (loadResult == PlayerLoadResult.PlayerNotFound)
+                {
+                    // An authenticated session whose player can't be loaded can't play, so fail before upgrading
+                    // the socket rather than erroring on the first command. The socket isn't upgraded yet, so a
+                    // body can still be written: return the project's { errorMessage } envelope (a 404 — the
+                    // player resource is absent, not a server fault; a genuine load error throws and is shaped by
+                    // ExceptionHandlingMiddleware) rather than a bare 500.
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    await context.Response.WriteAsJsonAsync(ApiResponse.Error("Player could not be loaded."), context.RequestAborted);
+                }
+                else
+                {
+                    // Read from the handshake's validated ClaimsPrincipal (the same source
+                    // AdminRoleAuthorizationFilter reads for HTTP admin endpoints), not the volatile session
+                    // cache, so it derives from the token alone.
+                    var isAdmin = context.User.IsInRole(nameof(ERole.Admin));
+                    using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                    var socketContext = await socketManager.RegisterSocket(webSocket, sessionService, isAdmin);
+                    await socketContext.WaitSocketClosed();
+                    await socketManager.UnRegisterSocket(socketContext);
+                }
             }
+        }
+
+        /// <summary>Whether (and why not) the handshake was able to load a player aggregate for the session.</summary>
+        private enum PlayerLoadResult
+        {
+            Loaded,
+            NoPlayerSelected,
+            PlayerNotFound
         }
 
         /// <summary>
@@ -60,22 +81,28 @@ namespace Game.Api.Middleware
         /// it happens — then loads the player aggregate up front so socket commands read it synchronously for
         /// the connection's lifetime (the connection never re-reads the cache per command). The aggregate load
         /// runs in a disposable scope so its <c>GameContext</c> is not held open for the whole connection.
-        /// Returns false when the authenticated player has no loadable aggregate.
+        /// Rejects a pre-selection token before any load I/O, since <see cref="SessionService.SelectedPlayerId"/>
+        /// can never resolve a real player while it's unbound (player identity starts at 1).
         /// </summary>
-        private static async Task<bool> TryLoadPlayer(SessionService sessionService, SessionInitializer sessionInitializer, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
+        private static async Task<PlayerLoadResult> TryLoadPlayer(SessionService sessionService, SessionInitializer sessionInitializer, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
         {
             await sessionInitializer.EnsureSessionLoaded(cancellationToken);
+
+            if (sessionService.TokenSelectedPlayerId is null)
+            {
+                return PlayerLoadResult.NoPlayerSelected;
+            }
 
             using var scope = scopeFactory.CreateScope();
             var player = await scope.ServiceProvider.GetRequiredService<PlayerService>()
                 .LoadPlayer(sessionService.SelectedPlayerId, cancellationToken);
             if (player is null)
             {
-                return false;
+                return PlayerLoadResult.PlayerNotFound;
             }
 
             sessionService.SetPlayer(player);
-            return true;
+            return PlayerLoadResult.Loaded;
         }
     }
 

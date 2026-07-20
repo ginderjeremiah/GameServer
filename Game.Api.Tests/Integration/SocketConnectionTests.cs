@@ -1,10 +1,8 @@
 using Game.Api.Models.Common;
-using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
@@ -17,18 +15,6 @@ namespace Game.Api.Tests.Integration
     public class SocketConnectionTests : ApiIntegrationTestBase
     {
         public SocketConnectionTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
-
-        /// <summary>
-        /// Seeds a user with no player, so an authenticated handshake for it resolves no player to load.
-        /// Returns the userId (for WebSocket auth).
-        /// </summary>
-        private async Task<int> SeedUserWithoutPlayerAsync(string username = "socketnoplayer", string password = "socketpass")
-        {
-            using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var user = await TestDataSeeder.CreateUserAsync(context, username, password);
-            return user.Id;
-        }
 
         [Fact]
         public async Task Connect_Authenticated_Succeeds()
@@ -92,10 +78,12 @@ namespace Game.Api.Tests.Integration
             // The player-load short-circuit sits after the WebSocket-upgrade check, so — unlike the 401/400
             // cases — it can't be reached with a plain GET (that stops at the 400 branch). The request is
             // driven through the pipeline presenting as a WebSocket upgrade (a stubbed feature), but the
-            // socket is never accepted: the authenticated user has no player, so the handshake loads none and
+            // socket is never accepted: a post-selection token naming a player that can't be loaded
+            // (archived/deleted between requests, mirrored here by a token minted for a never-persisted id)
+            // is a genuine missing-resource failure, distinct from the pre-selection case below — it
             // short-circuits to 404 with the { errorMessage } envelope still written to the (un-upgraded) body.
-            var userId = await SeedUserWithoutPlayerAsync();
-            var token = TestAuthHelper.CreateAccessToken(userId);
+            var (userId, _) = await SeedAsync();
+            var token = TestAuthHelper.CreateAccessToken(userId, playerId: 999_999_999);
 
             var context = await Factory.Server.SendAsync(ctx =>
             {
@@ -107,6 +95,33 @@ namespace Game.Api.Tests.Integration
 
             Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
             // The response body stream isn't seekable, so deserialize straight from its start.
+            var body = await JsonSerializer.DeserializeAsync<ApiResponse>(
+                context.Response.Body,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web),
+                CancellationToken);
+            Assert.NotNull(body);
+            Assert.False(string.IsNullOrWhiteSpace(body.ErrorMessage));
+        }
+
+        [Fact]
+        public async Task Socket_AuthenticatedNoPlayerSelected_ReturnsNoPlayerSelectedNotOpaque404()
+        {
+            // A pre-selection token (post-Login, pre-SelectPlayer) is a normal, documented flow state
+            // (docs/backend-auth.md) — a well-behaved client never opens a socket in this state, but the
+            // handshake must still reject it as its own distinguishable category (mirroring
+            // AuthController.Status), not the generic 404 a genuinely unloadable player gets.
+            var (userId, _) = await SeedAsync();
+            var token = TestAuthHelper.CreateAccessToken(userId);
+
+            var context = await Factory.Server.SendAsync(ctx =>
+            {
+                ctx.Request.Method = HttpMethods.Get;
+                ctx.Request.Path = "/socket";
+                ctx.Request.QueryString = new QueryString($"?access_token={token}");
+                ctx.Features.Set<IHttpWebSocketFeature>(new StubWebSocketFeature());
+            }, CancellationToken);
+
+            Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
             var body = await JsonSerializer.DeserializeAsync<ApiResponse>(
                 context.Response.Body,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web),
