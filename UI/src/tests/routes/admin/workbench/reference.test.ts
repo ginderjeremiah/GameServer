@@ -475,4 +475,11 @@ describe('enemySpawnShareTotal', () => {
 		const total = reference.enemySpawnShareTotal({ zoneId: 99, weight: 0 }, [], { id: 2 });
 		expect(total).toBe(1);
 	});
+
+	it('excludes a retired competitor — it never rolls, so its weight is not real competition', () => {
+		// Zone 0 without retirement: Goblin (30) + Cave Bat (5) + Catacomb Lich (15) = 50 (see above).
+		staticData.enemies[0].retiredAt = '2026-01-01T00:00:00Z'; // Cave Bat
+		const total = reference.enemySpawnShareTotal({ zoneId: 0, weight: 30 }, [], { id: 2 });
+		expect(total).toBe(45);
+	});
 });

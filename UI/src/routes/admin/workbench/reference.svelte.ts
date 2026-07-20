@@ -329,14 +329,16 @@ class WorkbenchReference {
 
 	/**
 	 * Total spawn weight competing in a zone: this row's weight plus every OTHER
-	 * enemy's weight in the same zone (so an enemy's share reflects zone competition,
-	 * not its own zone list).
+	 * LIVE enemy's weight in the same zone (so an enemy's share reflects zone competition,
+	 * not its own zone list). A retired competitor is excluded — the runtime spawn table
+	 * (`EnemiesCacheHolder.BuildZoneEnemyTables`) drops it too, so its weight is not real
+	 * competition.
 	 */
 	enemySpawnShareTotal = (row: TableRow, _rows: TableRow[], record: unknown): number => {
 		const enemyId = (record as { id: number }).id;
 		let sum = Number(row.weight) || 0;
 		for (const enemy of staticData.enemies ?? []) {
-			if (enemy.id === enemyId) {
+			if (enemy.id === enemyId || enemy.retiredAt) {
 				continue;
 			}
 			const spawn = enemy.spawns?.find((s) => s.zoneId === row.zoneId);

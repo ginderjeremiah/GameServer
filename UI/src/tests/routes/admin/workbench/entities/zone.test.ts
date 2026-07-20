@@ -173,6 +173,70 @@ describe('zoneEntity', () => {
 		]);
 	});
 
+	describe('zoneEnemies section warn/share (#2206)', () => {
+		const zoneEnemiesSection = zoneEntity.sections.find((s) => s.key === 'zoneEnemies');
+		const enemiesWarn = zoneEnemiesSection?.warn;
+		const shareColumn =
+			zoneEnemiesSection && 'columns' in zoneEnemiesSection
+				? zoneEnemiesSection.columns.find((c) => c.key === '__share')
+				: undefined;
+		const shareTotal = shareColumn?.shareTotal;
+		const shareValue = shareColumn?.shareValue;
+
+		beforeEach(() => {
+			staticData.enemies = [
+				{ id: 0, name: 'Bat', isBoss: false, spawns: [] },
+				{ id: 1, name: 'Warden', isBoss: true, retiredAt: '2026-01-01T00:00:00Z', spawns: [] }
+			];
+		});
+
+		it('flags a zone whose only spawn rows belong to a retired enemy', () => {
+			const z = { ...zoneEntity.newItem(1), zoneEnemies: [{ enemyId: 1, weight: 5 }] };
+			expect(enemiesWarn?.(z)).toBe('No enemies spawn here');
+		});
+
+		it('passes once a live enemy also spawns there', () => {
+			const z = {
+				...zoneEntity.newItem(1),
+				zoneEnemies: [
+					{ enemyId: 1, weight: 5 },
+					{ enemyId: 0, weight: 3 }
+				]
+			};
+			expect(enemiesWarn?.(z)).toBeNull();
+		});
+
+		it("share total excludes a retired sibling's weight from the denominator", () => {
+			const rows = [
+				{ enemyId: 1, weight: 5 },
+				{ enemyId: 0, weight: 3 }
+			];
+			// Only the live row's weight (3) counts — the retired sibling's 5 is dropped.
+			expect(shareTotal?.(rows[1], rows, undefined)).toBe(3);
+		});
+
+		it('share total falls back to 1 when every spawn row is retired', () => {
+			const rows = [{ enemyId: 1, weight: 5 }];
+			expect(shareTotal?.(rows[0], rows, undefined)).toBe(1);
+		});
+
+		it("share value reports 0 for a retired enemy's own row, so it can't render over 100% (#2214 nit)", () => {
+			const rows = [
+				{ enemyId: 1, weight: 5 },
+				{ enemyId: 0, weight: 3 }
+			];
+			expect(shareValue?.(rows[0], rows, undefined)).toBe(0);
+		});
+
+		it("share value passes through a live enemy's own weight unchanged", () => {
+			const rows = [
+				{ enemyId: 1, weight: 5 },
+				{ enemyId: 0, weight: 3 }
+			];
+			expect(shareValue?.(rows[1], rows, undefined)).toBe(3);
+		});
+	});
+
 	describe('identity section warn (#1996)', () => {
 		const identityWarn = zoneEntity.sections.find((s) => s.key === 'identity')?.warn;
 
