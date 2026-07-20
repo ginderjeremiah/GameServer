@@ -140,15 +140,37 @@ interface PersistOptions<T extends Identified, D> {
 }
 
 /**
+ * What {@link persistEntity} knows about its own diff at the moment a post-commit failure hit,
+ * handed to {@link PersistFailedError} so the caller can rebase rather than blanket-reseed (#2207).
+ */
+export interface PersistRecovery<T> {
+	/** The saved list refetched right after the primary Add/Edit/Delete batch committed. */
+	fresh: T[];
+	/** Local (negative) id → persisted id, for records this save's primary batch added. */
+	idMap: Map<number, number>;
+	/**
+	 * Persisted ids whose *entire* diff entry — identity plus every child saver — had finished
+	 * without throwing by the point of failure. Anything else touched by this save (added/modified/
+	 * deleted) may still be missing part of its write and must not be treated as server truth.
+	 */
+	settledIds: Set<number>;
+}
+
+/**
  * Thrown by {@link persistEntity} when the primary Add/Edit/Delete batch (or an earlier child
  * saver) already committed before a later step failed. The server is then ahead of the caller's
- * baseline, so the caller must re-seed from server truth — otherwise a retry would re-Add the
- * already-persisted records. A *pre-commit* failure (e.g. `postPrimary` itself throwing before any
- * write lands) committed nothing and propagates the raw error instead, so the caller can keep the
- * user's unsaved edits for a clean retry.
+ * baseline for the records this save's diff actually touched, so the caller must rebase those
+ * against server truth via {@link recovery} — otherwise a retry could re-Add an already-persisted
+ * record. A *pre-commit* failure (e.g. `postPrimary` itself throwing before any write lands)
+ * committed nothing and propagates the raw error instead, so the caller can keep the user's unsaved
+ * edits for a clean retry. `recovery` is only absent when the failure struck before the post-commit
+ * refetch itself returned (nothing to rebase against, so the caller falls back to a full re-seed).
  */
-export class PersistFailedError extends Error {
-	constructor(cause: unknown) {
+export class PersistFailedError<T = unknown> extends Error {
+	constructor(
+		cause: unknown,
+		readonly recovery?: PersistRecovery<T>
+	) {
 		super(cause instanceof Error ? cause.message : 'Failed to save changes.', { cause });
 		this.name = 'PersistFailedError';
 	}
@@ -187,8 +209,11 @@ export async function persistEntity<T extends Identified, D>(
 	];
 
 	// `committed` flips the moment a write has definitely landed; it gates whether a later failure
-	// is recoverable-by-keeping-edits (pre-commit) or requires the caller to re-seed (post-commit).
+	// is recoverable-by-keeping-edits (pre-commit) or requires the caller to rebase (post-commit).
 	let committed = false;
+	// Populated once the primary batch and the post-commit refetch both succeed, so a later
+	// child-saver failure can report exactly which records are safe to treat as server truth.
+	let recovery: PersistRecovery<T> | undefined;
 	try {
 		if (changes.length) {
 			await postPrimary(changes);
@@ -202,6 +227,11 @@ export async function persistEntity<T extends Identified, D>(
 		// child writes — see resolveNewIds.
 		const idFor = resolveNewIds(fresh, diff.existingIds, diff.added, toPrimaryDto);
 
+		// A delete has no child saver — it's fully settled the instant the primary batch (which is the
+		// only thing that can fail before this point) has committed.
+		const settledIds = new Set<number>(diff.deleted.map((record) => record.id));
+		recovery = { fresh, idMap: idFor, settledIds };
+
 		const childTargets: { id: number; record: T; baseline: T | undefined }[] = [
 			...diff.added.map((record) => ({ id: resolveId(record.id, idFor), record, baseline: undefined })),
 			...diff.modified.map(({ record, baseline }) => ({ id: record.id, record, baseline }))
@@ -213,6 +243,8 @@ export async function persistEntity<T extends Identified, D>(
 					const wrote = await saver(target.id, target.record, target.baseline);
 					committed ||= wrote;
 				}
+				// This target's identity edit and every one of its child savers ran without throwing.
+				settledIds.add(target.id);
 			}
 			return { records: await refresh(), idMap: idFor };
 		}
@@ -220,7 +252,7 @@ export async function persistEntity<T extends Identified, D>(
 		return { records: fresh, idMap: idFor };
 	} catch (ex) {
 		if (committed) {
-			throw new PersistFailedError(ex);
+			throw new PersistFailedError(ex, recovery);
 		}
 		throw ex;
 	}

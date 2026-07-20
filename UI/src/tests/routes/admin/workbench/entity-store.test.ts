@@ -243,6 +243,105 @@ describe('EntityStore', () => {
 		expect(store.counts.added).toBe(1);
 	});
 
+	it("rebases only the unsettled slice of a partial failure, keeping a sibling record's pending edit alive for a clean retry (#2207)", async () => {
+		const baseline: Row[] = [
+			{ id: 0, name: 'Alpha', value: 1 },
+			{ id: 1, name: 'Beta', value: 2 },
+			{ id: 2, name: 'Gamma', value: 3 }
+		];
+		// The identity (name) batch commits for everyone; only record 0's child-managed `value` write
+		// actually lands before record 1's throws and aborts the rest of the batch.
+		const fresh: Row[] = [
+			{ id: 0, name: 'Alpha-edited', value: 101 },
+			{ id: 1, name: 'Beta-edited', value: 2 },
+			{ id: 2, name: 'Gamma-edited', value: 3 }
+		];
+		const config: EntityConfig<Row> = {
+			...makeConfig(async () => {
+				throw new PersistFailedError(new Error('child saver failed'), {
+					fresh,
+					idMap: new Map(),
+					settledIds: new Set([0])
+				});
+			}),
+			refresh: async () => fresh
+		};
+		const store = new EntityStore(config, baseline);
+		store.patch(0, (draft) => {
+			draft.name = 'Alpha-edited';
+			draft.value = 101;
+		});
+		store.patch(1, (draft) => {
+			draft.name = 'Beta-edited';
+			draft.value = 102;
+		});
+		store.patch(2, (draft) => {
+			draft.name = 'Gamma-edited';
+			draft.value = 103;
+		});
+
+		await store.save();
+
+		// Record 0 fully settled — server truth wins (it matches what was actually sent anyway).
+		expect(store.items.find((r) => r.id === 0)).toEqual({ id: 0, name: 'Alpha-edited', value: 101 });
+		// Records 1 and 2 never finished their child write — the pending edit survives instead of
+		// being silently discarded behind the toast, and each still reads as modified for a retry
+		// that now only needs to resend the child-managed part (identity already matches baseline).
+		expect(store.items.find((r) => r.id === 1)).toEqual({ id: 1, name: 'Beta-edited', value: 102 });
+		expect(store.status(store.items.find((r) => r.id === 1)!)).toBe('modified');
+		expect(store.items.find((r) => r.id === 2)).toEqual({ id: 2, name: 'Gamma-edited', value: 103 });
+		expect(store.status(store.items.find((r) => r.id === 2)!)).toBe('modified');
+		expect(store.counts.total).toBe(2);
+	});
+
+	it('remaps a settled newly-added record from its local id to its persisted id', async () => {
+		const fresh: Row[] = [...seed, { id: 2, name: 'Gamma', value: 3 }];
+		const config: EntityConfig<Row> = {
+			...makeConfig(async () => {
+				throw new PersistFailedError(new Error('an unrelated child saver failed'), {
+					fresh,
+					idMap: new Map([[-1, 2]]),
+					settledIds: new Set([2])
+				});
+			}),
+			refresh: async () => fresh
+		};
+		const store = new EntityStore(config, seed);
+		store.addItem();
+
+		await store.save();
+
+		expect(store.items.some((r) => r.id < 0)).toBe(false);
+		expect(store.items.find((r) => r.id === 2)).toEqual({ id: 2, name: 'Gamma', value: 3 });
+		expect(store.counts.total).toBe(0);
+	});
+
+	it('keeps an unsettled newly-added record pending (remapped to its persisted id) instead of discarding its edit', async () => {
+		// The add's identity committed (so its id resolves to 2), but its own child saver hasn't
+		// finished — the record is not yet in settledIds.
+		const fresh: Row[] = [...seed, { id: 2, name: '', value: 0 }];
+		const config: EntityConfig<Row> = {
+			...makeConfig(async () => {
+				throw new PersistFailedError(new Error('this record’s own child saver failed'), {
+					fresh,
+					idMap: new Map([[-1, 2]]),
+					settledIds: new Set()
+				});
+			}),
+			refresh: async () => fresh
+		};
+		const store = new EntityStore(config, seed);
+		const newId = store.addItem();
+		store.patch(newId, (draft) => (draft.value = 999));
+
+		await store.save();
+
+		const record = store.items.find((r) => r.id === 2);
+		expect(record).toEqual({ id: 2, name: '', value: 999 });
+		expect(store.status(record!)).toBe('modified');
+		expect(store.counts.total).toBe(1);
+	});
+
 	it('does not call persist when there are no changes', async () => {
 		const persist = vi.fn(async () => persistResult(seed));
 		const store = new EntityStore(makeConfig(persist), seed);
