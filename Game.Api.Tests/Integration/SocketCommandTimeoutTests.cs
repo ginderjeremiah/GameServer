@@ -22,7 +22,12 @@ namespace Game.Api.Tests.Integration
     [Collection("Integration")]
     public class SocketCommandTimeoutTests : ApiIntegrationTestBase
     {
-        private static readonly TimeSpan ShortTimeout = TimeSpan.FromMilliseconds(200);
+        // Long enough that a cold JIT/connection-pool run (e.g. this class run in isolation, with no prior
+        // test in the process having warmed the EF/Npgsql code paths the `Next`/`Coop` commands' own
+        // scope-creation and SaveChangesAsync round trip through) doesn't spuriously blow the budget itself —
+        // short enough that the deliberately-wedged `Hung`/`Coop` commands above still reliably time out well
+        // within WaitTimeout (#2184).
+        private static readonly TimeSpan ShortTimeout = TimeSpan.FromMilliseconds(750);
         private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(5);
 
         public SocketCommandTimeoutTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
