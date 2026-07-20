@@ -28,7 +28,6 @@ namespace Game.DataAccess.Repositories
         private static readonly Expression<Func<UserEntity, AccountState>> ToAccountState =
             u => new AccountState
             {
-                Id = u.Id,
                 Roles = u.Roles.Select(r => r.Name).ToList(),
                 IsBanned = u.BannedAt != null,
             };

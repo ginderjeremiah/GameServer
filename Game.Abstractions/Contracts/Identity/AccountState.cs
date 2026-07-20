@@ -8,7 +8,6 @@ namespace Game.Abstractions.Contracts.Identity
     /// </summary>
     public class AccountState
     {
-        public int Id { get; set; }
         public required IReadOnlyList<string> Roles { get; set; }
 
         /// <summary>Whether the account is banned, in which case its refresh chain is rejected outright.</summary>

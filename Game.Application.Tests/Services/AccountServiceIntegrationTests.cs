@@ -578,6 +578,31 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SelectPlayer_ArchivedSinceLogin_IsRejectedAsNotOwnedBeforeReachingTheAccountStateCheck()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "archivedselect", "pass");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("archivedselect", "pass");
+            Assert.True(login.Success);
+
+            // Archived after the pre-selection token was issued. GetPlayerIds already excludes archived
+            // accounts, so this is caught by the pre-existing ownership check (NotOwned) before SelectPlayer
+            // ever reaches the new GetAccountState re-check — the "account is null" branch added by #1762 is
+            // only reachable via a narrow archive-mid-call race between the two reads, not exercisable here.
+            user.ArchivedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var result = await accountService.SelectPlayer(user.Id, player.Id, login.Tokens.RefreshToken);
+
+            Assert.False(result.Success);
+            Assert.Equal(SelectPlayerStatus.NotOwned, result.Status);
+        }
+
+        [Fact]
         public async Task SelectPlayer_BannedSinceLogin_IsRejectedAndLeavesTokenIntact()
         {
             using var scope = CreateScope();
@@ -891,6 +916,31 @@ namespace Game.Application.Tests.Services
             var accountService = CreateAccountService(scope.ServiceProvider);
 
             var refreshed = await accountService.Refresh("not-a-real-token");
+
+            Assert.Null(refreshed);
+        }
+
+        [Fact]
+        public async Task Refresh_ArchivedSinceIssue_ReturnsNull()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "archivedrefresh", "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("archivedrefresh", "pass");
+            Assert.True(login.Success);
+
+            // Archived after the refresh token was issued — GetAccountState excludes archived accounts the
+            // same way GetUser does, so this hits the "account is null" branch distinctly from IsBanned.
+            user.ArchivedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var refreshed = await accountService.Refresh(login.Tokens.RefreshToken);
 
             Assert.Null(refreshed);
         }
