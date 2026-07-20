@@ -21,6 +21,10 @@ namespace Game.Core.Players
         /// Validates and normalizes a player-supplied name: trims surrounding whitespace, then accepts it
         /// only when the trimmed value is within [<see cref="MinLength"/>, <see cref="MaxLength"/>] and free
         /// of control characters. Returns the normalized name via <paramref name="normalized"/> when valid.
+        /// Deliberately does <b>not</b> reject zero-width/Unicode "Format"-category characters the way
+        /// <see cref="Game.Core.Identity.UsernamePolicy.TryNormalize"/> does — character names are
+        /// non-unique with no admin/competitive surface, so a visually-confusable duplicate isn't a
+        /// spoofing risk the way it is for logins. Not an oversight; keep in sync only if that changes.
         /// </summary>
         public static bool TryNormalize(string? name, [NotNullWhen(true)] out string? normalized)
         {
