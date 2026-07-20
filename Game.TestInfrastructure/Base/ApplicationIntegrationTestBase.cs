@@ -63,7 +63,7 @@ namespace Game.TestInfrastructure.Base
             await CleanupAsync();
         }
 
-        public async ValueTask DisposeAsync()
+        public virtual async ValueTask DisposeAsync()
         {
             if (_rootProvider is not null)
             {
