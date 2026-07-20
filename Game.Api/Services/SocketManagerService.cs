@@ -96,16 +96,19 @@ namespace Game.Api.Services
             // clear" and "the key was written" — see its doc comment.
             var oldSocketId = await ClaimPresenceKey(presenceKey, socketContext.SocketId);
 
-            // One live character per account (spike #922, decided A++) is enforced here too, not just one
-            // live socket per character: Session_{userId} (SessionStore) is keyed by account, so if a
-            // *different* character on this account still had a live socket, its connection would keep
-            // saving its own in-flight battle into the same cache slot this connection is about to use,
-            // last-writer-wins, with neither side ever told (#1817). Claiming the account-level slot mirrors
-            // ClaimPresenceKey exactly, just keyed by userId instead of playerId.
-            var oldAccountPlayerId = await ClaimAccountPresence(userId, playerId);
-
+            int? oldAccountPlayerId;
             try
             {
+                // One live character per account (spike #922, decided A++) is enforced here too, not just one
+                // live socket per character: Session_{userId} (SessionStore) is keyed by account, so if a
+                // *different* character on this account still had a live socket, its connection would keep
+                // saving its own in-flight battle into the same cache slot this connection is about to use,
+                // last-writer-wins, with neither side ever told (#1817). Claiming the account-level slot
+                // mirrors ClaimPresenceKey exactly, just keyed by userId instead of playerId. Inside the try
+                // (rather than before it) so a fault here rolls the per-player claim back too, instead of
+                // leaving it briefly orphaned until its own TTL.
+                oldAccountPlayerId = await ClaimAccountPresence(userId, playerId);
+
                 await RegisterSocketCommandListener(socketHandler);
                 // Register before starting the loops so the registry tracks the socket — and threads its
                 // shutdown tokens into Listen — for a graceful drain on host shutdown (#526). Awaited because
