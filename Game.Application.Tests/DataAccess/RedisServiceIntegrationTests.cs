@@ -19,7 +19,19 @@ namespace Game.Application.Tests.DataAccess
     [Collection("Integration")]
     public class RedisServiceIntegrationTests : ApplicationIntegrationTestBase
     {
+        private ConnectionMultiplexer? _readMultiplexer;
+
         public RedisServiceIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper) : base(containers, testOutputHelper) { }
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (_readMultiplexer is not null)
+            {
+                await _readMultiplexer.DisposeAsync();
+            }
+
+            await base.DisposeAsync();
+        }
 
         [Fact]
         public async Task SetWithExpiry_WithNullValue_DeletesTheKey()
@@ -341,7 +353,7 @@ namespace Game.Application.Tests.DataAccess
 
         private async Task<TimeSpan?> ReadTtlAsync(string key)
         {
-            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            var multiplexer = await GetReadMultiplexerAsync();
             return await multiplexer.GetDatabase().KeyTimeToLiveAsync(key);
         }
 
@@ -350,7 +362,7 @@ namespace Game.Application.Tests.DataAccess
         // (or mask a bug in) HashGetAllAndRefreshExpiry's own TTL-refreshing side effect.
         private async Task<Dictionary<string, string>?> ReadHashAsync(string key)
         {
-            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            var multiplexer = await GetReadMultiplexerAsync();
             var db = multiplexer.GetDatabase();
             if (!await db.KeyExistsAsync(key))
             {
@@ -359,6 +371,18 @@ namespace Game.Application.Tests.DataAccess
 
             var entries = await db.HashGetAllAsync(key);
             return entries.ToDictionary(e => (string)e.Name!, e => (string)e.Value!);
+        }
+
+        // Shared across ReadTtlAsync/ReadHashAsync (frequently called inside PollUntilAsync loops) so a
+        // slow-settling assertion reuses one connection instead of churning through a fresh one per call.
+        private async Task<ConnectionMultiplexer> GetReadMultiplexerAsync()
+        {
+            if (_readMultiplexer is null)
+            {
+                _readMultiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            }
+
+            return _readMultiplexer;
         }
 
         private async Task FlushScriptCacheAsync()
