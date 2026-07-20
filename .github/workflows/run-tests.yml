@@ -66,6 +66,8 @@ jobs:
             - '.editorconfig'
             - 'global.json'
             - '.config/dotnet-tools.json'
+            - 'Directory.Build.props'
+            - 'Directory.Packages.props'
             - '.github/workflows/**'
             - 'UI/src/lib/api/types/**'
           frontend:
@@ -97,7 +99,7 @@ jobs:
       uses: actions/cache@v5
       with:
         path: ~/.nuget/packages
-        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
         restore-keys: |
           nuget-${{ runner.os }}-
 
@@ -176,7 +178,7 @@ jobs:
       uses: actions/cache@v5
       with:
         path: ~/.nuget/packages
-        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
         restore-keys: |
           nuget-${{ runner.os }}-
 
