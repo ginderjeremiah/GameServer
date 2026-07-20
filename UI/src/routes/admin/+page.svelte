@@ -51,6 +51,7 @@
 import { onMount } from 'svelte';
 import { beforeNavigate, goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { page } from '$app/state';
 import { Loading } from '$components';
 import AdminLoadError from './AdminLoadError.svelte';
 import AdminSidebar from './AdminSidebar.svelte';
@@ -73,7 +74,17 @@ import { ensureAdminAccess } from './admin-access';
 import { confirmDiscard, createPopStateDiscardGuard, guardBeforeUnload } from './discard-guard';
 import { toastError } from '$stores';
 
-let active = $state('enemies');
+/** Nav key for the default landing tool; omitted from the URL to keep a bare `/admin` link canonical. */
+const DEFAULT_TOOL_KEY = 'enemies';
+const knownToolKeys = new Set(adminTools.map((tool) => tool.key));
+
+// The active tool is derived from the `tool` query param rather than held as its own local state, so
+// there's a single source of truth: a refresh or a shared deep link (e.g. `/admin?tool=paths`) lands on
+// the right tool, and switching tools (below) just writes the URL rather than two things to keep in sync.
+const active = $derived.by(() => {
+	const key = page.url.searchParams.get('tool');
+	return key && knownToolKeys.has(key) ? key : DEFAULT_TOOL_KEY;
+});
 let sidebarPinned = $state(false);
 // Gates rendering until the client-side admin-role check passes. Starts false so the server render
 // (no token available) shows nothing, and a non-admin who deep-links here is redirected before the
@@ -111,7 +122,12 @@ const handleNavigate = async (key: string) => {
 		return;
 	}
 	if (await confirmDiscard(workbenchDirty.total)) {
-		active = key;
+		// Reflects the tool switch in the URL (query param, not a new history entry — Back/Forward
+		// still exits /admin entirely, guarded by the popstate handler below) so the tool is
+		// deep-linkable and survives a refresh. The default tool omits the param, keeping a bare
+		// `/admin` link canonical.
+		const href = key === DEFAULT_TOOL_KEY ? resolve('/admin') : resolve(`/admin?tool=${key}`);
+		await goto(href, { replaceState: true, keepFocus: true, noScroll: true });
 	}
 };
 
