@@ -3,6 +3,7 @@ using Game.Core;
 using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
+using Game.Core.Proficiencies;
 using Game.Core.Progress;
 using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
@@ -611,6 +612,43 @@ namespace Game.Application.Content
                             Error("ProficiencyPrerequisite", "Proficiency", proficiency.Id, $"has prerequisite proficiency {prerequisiteId}, which is on its own path {proficiency.PathId} — gateways must be cross-path, so this tier can never open.");
                         }
                     }
+                }
+
+                CheckProficiencyPrerequisiteCycle();
+            }
+
+            /// <summary>
+            /// Defense-in-depth parity with the admin save-time rejection and build-time cache backstop
+            /// (<see cref="ProficiencyPrerequisiteGraph"/>): a cycle over the combined graph — authored
+            /// prerequisite edges plus the implicit within-path tier ordering — would soft-lock every node on
+            /// it. Content Health can never actually observe a live composed cycle today, since the admin save
+            /// path already rejects one before it is persisted, so this is a consistency check rather than a
+            /// reachable-gap fix. Runs over every proficiency (not just live ones), mirroring the build-time
+            /// backstop's scope.
+            /// </summary>
+            private void CheckProficiencyPrerequisiteCycle()
+            {
+                if (_graph.Proficiencies.Count == 0)
+                {
+                    return;
+                }
+
+                var prerequisites = _graph.Proficiencies.ToDictionary(
+                    p => p.Id,
+                    p => (IReadOnlyList<int>)p.PrerequisiteIds.ToList());
+                var tiers = _graph.Proficiencies.Select(p => (p.Id, p.PathId, p.PathOrdinal)).ToList();
+                var graph = ProficiencyPrerequisiteGraph.BuildGraph(tiers, prerequisites);
+
+                if (!ProficiencyPrerequisiteGraph.TryFindCycle(graph, out var cycle))
+                {
+                    return;
+                }
+
+                // The cycle closes back on its starting node; report each distinct proficiency on it once.
+                foreach (var proficiencyId in cycle.Distinct())
+                {
+                    Error("ProficiencyPrerequisiteCycle", "Proficiency", proficiencyId,
+                        $"is on a prerequisite cycle composed with implicit within-path tier ordering: {string.Join(" -> ", cycle)}.");
                 }
             }
 

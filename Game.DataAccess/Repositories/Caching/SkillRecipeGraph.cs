@@ -1,3 +1,5 @@
+using Game.Core.Collections;
+
 namespace Game.DataAccess.Repositories.Caching
 {
     /// <summary>

@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
+using Game.Core.Proficiencies;
 using Game.DataAccess.Repositories.Caching;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
