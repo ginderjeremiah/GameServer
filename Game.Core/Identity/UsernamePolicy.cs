@@ -25,6 +25,10 @@ namespace Game.Core.Identity
         /// it only when the trimmed value is within [<see cref="MinLength"/>, <see cref="MaxLength"/>] and
         /// free of control and zero-width characters (which could otherwise render a username visually
         /// identical to another). Returns the normalized username via <paramref name="normalized"/> when valid.
+        /// Stricter than <see cref="Game.Core.Players.PlayerName.TryNormalize"/> deliberately: usernames
+        /// surface in the admin roster, ban/archive surface, and logs, where a confusable duplicate is a
+        /// real spoofing concern that character names don't share. Not an oversight; keep in sync only if
+        /// that changes.
         /// </summary>
         public static bool TryNormalize(string? username, [NotNullWhen(true)] out string? normalized)
         {
