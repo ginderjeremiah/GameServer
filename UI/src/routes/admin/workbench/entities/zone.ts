@@ -10,6 +10,14 @@ export interface WorkbenchZone extends IZone {
 	zoneEnemies: IZoneEnemy[];
 }
 
+/**
+ * Whether an enemy id resolves to a live (non-retired) enemy — the runtime spawn table
+ * (`EnemiesCacheHolder.BuildZoneEnemyTables`) and the `EmptyCombatZone` lint both drop a
+ * retired enemy's spawns entirely, so anything computing "will this actually spawn" must
+ * agree.
+ */
+const isLiveEnemy = (enemyId: number): boolean => !staticData.enemies?.[enemyId]?.retiredAt;
+
 const refresh = async (): Promise<WorkbenchZone[]> => {
 	const [zones, enemies] = await Promise.all([fetchSocketData('GetZones'), fetchSocketData('GetEnemies')]);
 	staticData.zones = zones;
@@ -20,6 +28,11 @@ const refresh = async (): Promise<WorkbenchZone[]> => {
 		bossEnemyId: zone.bossEnemyId ?? -1,
 		// Likewise normalise the optional unlock-gate FK to the "None" sentinel (-1).
 		unlockChallengeId: zone.unlockChallengeId ?? -1,
+		// Includes a retired enemy's spawn row: it stays visible/editable (its own enemy
+		// picker shows "· retired") and, critically, must round-trip verbatim on save since
+		// SetZoneEnemies fully reconciles the zone's spawn table against whatever is posted —
+		// filtering it out here would delete the row from the database on the next unrelated
+		// save. Consumers that need "will this actually spawn" semantics use isLiveEnemy.
 		zoneEnemies: enemies.flatMap((enemy) => {
 			const spawn = enemy.spawns.find((s) => s.zoneId === zone.id);
 			return spawn ? [{ enemyId: enemy.id, weight: spawn.weight }] : [];
@@ -135,7 +148,9 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			glyph: 'skull',
 			desc: 'Enemies that spawn here & their weights',
 			count: (z) => z.zoneEnemies.length,
-			warn: (z) => (z.isHome || z.zoneEnemies.length ? null : 'No enemies spawn here'),
+			// A retired enemy's row doesn't count toward "does something spawn here" — it never
+			// rolls at runtime (mirrors the backend's EmptyCombatZone lint).
+			warn: (z) => (z.isHome || z.zoneEnemies.some((ze) => isLiveEnemy(ze.enemyId)) ? null : 'No enemies spawn here'),
 			kind: 'table',
 			itemsKey: 'zoneEnemies',
 			rowKey: 'enemyId',
@@ -153,7 +168,17 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			columns: [
 				{ key: 'enemyId', label: 'Enemy', type: 'select', options: reference.enemyOptions, min: 220, unique: true },
 				{ key: 'weight', label: 'Weight', type: 'number', align: 'r', width: 100 },
-				{ key: '__share', label: 'Spawn share', type: 'share', width: 150, weightKey: 'weight' }
+				{
+					key: '__share',
+					label: 'Spawn share',
+					type: 'share',
+					width: 150,
+					weightKey: 'weight',
+					// Excludes a retired sibling's weight from the denominator — it never rolls,
+					// so counting it would understate every live enemy's real share.
+					shareTotal: (_row, rows) =>
+						rows.reduce((sum, r) => (isLiveEnemy(r.enemyId as number) ? sum + (Number(r.weight) || 0) : sum), 0) || 1
+				}
 			]
 		}
 	],
