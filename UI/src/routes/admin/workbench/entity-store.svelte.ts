@@ -270,8 +270,17 @@ export class EntityStore<T extends Identified> {
 			// failed, in which case there's nothing to rebase against and we fall back to a full re-seed.
 			if (ex instanceof PersistFailedError) {
 				const recovery = ex.recovery as PersistRecovery<T> | undefined;
-				if (recovery) {
+				if (recovery && this.diffAddsResolved(recovery.idMap)) {
 					this.rebaseAfterPartialFailure(recovery);
+				} else if (recovery) {
+					// A committed add whose persisted id the refetch never resolved (e.g. a concurrent
+					// delete by another admin skewed the count, #1856) can't be safely rebased — keeping
+					// it pending under its local id would re-Add a duplicate on retry. Fall back to a full
+					// re-seed from the recovery's own refetch (already fresh; no need to hit the network
+					// again), the same as the pre-existing safe behavior for an unrebaseable failure.
+					this.items = recovery.fresh.map(clone);
+					this.base = recovery.fresh.map(clone);
+					this.deleted.clear();
 				} else {
 					try {
 						const fresh = await this.config.refresh();
@@ -290,6 +299,18 @@ export class EntityStore<T extends Identified> {
 	}
 
 	/**
+	 * A rebase remaps every currently-`added` record through `idMap` (its only route from a local
+	 * negative id to a persisted one). If the refetch never resolved one — the add's identity batch
+	 * still committed, so it exists server-side — a rebase would keep it pending under its local id,
+	 * and a retry would re-Add it as a duplicate. Every record with `added` status was necessarily
+	 * part of this save's own diff (mutators no-op while {@link saving} is true), so this check is
+	 * exactly the records a rebase would need to remap.
+	 */
+	private diffAddsResolved(idMap: Map<number, number>): boolean {
+		return this.items.every((record) => this.status(record) !== 'added' || idMap.has(record.id));
+	}
+
+	/**
 	 * Rebases this save's own diff against server truth instead of blanket-reseeding the whole
 	 * catalogue: a record this save fully settled (identity + every child saver) takes the fresh
 	 * server copy, but anything else — an untouched sibling, or a record this save's failure left
@@ -297,7 +318,8 @@ export class EntityStore<T extends Identified> {
 	 * unrelated work. A newly-added record that settled is remapped from its local (negative) id
 	 * onto the persisted id assigned during this save. A delete has no child saver, so it always
 	 * settles atomically with the primary batch — {@link PersistRecovery.settledIds} already
-	 * guarantees this, so no delete can ever survive a rebase as still-pending.
+	 * guarantees this, so no delete can ever survive a rebase as still-pending. Only called once
+	 * {@link diffAddsResolved} has confirmed every added record maps to a persisted id.
 	 */
 	private rebaseAfterPartialFailure({ fresh, idMap, settledIds }: PersistRecovery<T>) {
 		// Throwaway locals scoped to this one synchronous pass, not reactive state.

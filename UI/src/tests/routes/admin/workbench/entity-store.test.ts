@@ -342,6 +342,33 @@ describe('EntityStore', () => {
 		expect(store.counts.total).toBe(1);
 	});
 
+	it('falls back to a full re-seed (not a rebase) when a committed add could not be resolved to a persisted id, so a retry cannot re-Add a duplicate', async () => {
+		// Mirrors persistEntity's `resolveId`-throws path (save-helpers.ts): the add's identity batch
+		// committed server-side, but the post-commit refetch never mapped it (e.g. a concurrent delete
+		// by another admin skewed the count, #1856) — `idMap` has no entry for it. Rebasing would keep
+		// the add pending under its local id and re-Add a duplicate on the next save.
+		const fresh: Row[] = [...seed, { id: 2, name: 'A', value: 0 }];
+		const config: EntityConfig<Row> = {
+			...makeConfig(async () => {
+				throw new PersistFailedError(new Error('no persisted id found for record'), {
+					fresh,
+					idMap: new Map(),
+					settledIds: new Set()
+				});
+			}),
+			refresh: async () => fresh
+		};
+		const store = new EntityStore(config, seed);
+		store.addItem();
+
+		await store.save();
+
+		// The orphaned local add is dropped, not kept pending, so a retry can't duplicate it.
+		expect(store.items.some((r) => r.id < 0)).toBe(false);
+		expect(store.counts.added).toBe(0);
+		expect(store.items).toHaveLength(3);
+	});
+
 	it('does not call persist when there are no changes', async () => {
 		const persist = vi.fn(async () => persistResult(seed));
 		const store = new EntityStore(makeConfig(persist), seed);
