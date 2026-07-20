@@ -1,4 +1,5 @@
 using Game.Abstractions.Contracts.Admin;
+using Game.DataAccess.Repositories;
 using Game.DataAccess.Repositories.Admin;
 using Xunit;
 using Contracts = Game.Abstractions.Contracts;
@@ -13,16 +14,28 @@ namespace Game.Application.Tests.DataAccess
     /// </summary>
     public class AdminTagsTests
     {
+        // Reports back exactly the ids supplied at construction as "existing" — a database-free stand-in for
+        // the existence check SaveTags now performs against Edit/Delete ids (#2210).
+        private sealed class FakeTagAssignmentQueries(params int[] existingIds) : ITagAssignmentQueries
+        {
+            public IAsyncEnumerable<int> GetExistingTagIds(IReadOnlyCollection<int> tagIds) =>
+                tagIds.Where(existingIds.Contains).ToAsyncEnumerable();
+
+            public IAsyncEnumerable<int> GetTagIdsForItem(int itemId) => throw new NotSupportedException();
+
+            public IAsyncEnumerable<int> GetTagIdsForItemMod(int itemModId) => throw new NotSupportedException();
+        }
+
         private static Change<Contracts.Tag> Change(EChangeType type, int id, string name = "Tag", int categoryId = 0) =>
             new() { ChangeType = type, Item = new Contracts.Tag { Id = id, Name = name, TagCategoryId = categoryId } };
 
         [Fact]
-        public void SaveTags_Add_InsertsTagWithNameAndCategory()
+        public async Task SaveTags_Add_InsertsTagWithNameAndCategory()
         {
             var store = new RecordingEntityStore();
-            var adminTags = new AdminTags(store);
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries());
 
-            var result = adminTags.SaveTags([Change(EChangeType.Add, id: 0, name: "Fire", categoryId: 3)]);
+            var result = await adminTags.SaveTags([Change(EChangeType.Add, id: 0, name: "Fire", categoryId: 3)]);
 
             Assert.True(result.Succeeded);
             var inserted = Assert.IsType<Entities.Tag>(Assert.Single(store.Inserted));
@@ -33,12 +46,12 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveTags_Edit_UpdatesTagByIdWithNewValues()
+        public async Task SaveTags_Edit_UpdatesTagByIdWithNewValues()
         {
             var store = new RecordingEntityStore();
-            var adminTags = new AdminTags(store);
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries(7));
 
-            var result = adminTags.SaveTags([Change(EChangeType.Edit, id: 7, name: "Ice", categoryId: 2)]);
+            var result = await adminTags.SaveTags([Change(EChangeType.Edit, id: 7, name: "Ice", categoryId: 2)]);
 
             Assert.True(result.Succeeded);
             var updated = Assert.IsType<Entities.Tag>(Assert.Single(store.Updated));
@@ -50,12 +63,12 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveTags_Delete_DeletesByKeyWithoutFabricatingName()
+        public async Task SaveTags_Delete_DeletesByKeyWithoutFabricatingName()
         {
             var store = new RecordingEntityStore();
-            var adminTags = new AdminTags(store);
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries(42));
 
-            var result = adminTags.SaveTags([Change(EChangeType.Delete, id: 42)]);
+            var result = await adminTags.SaveTags([Change(EChangeType.Delete, id: 42)]);
 
             Assert.True(result.Succeeded);
             var (entityType, keyValues) = Assert.Single(store.DeletedByKey);
@@ -68,14 +81,14 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveTags_AddWithUndefinedCategory_ReturnsFailureWithoutStaging()
+        public async Task SaveTags_AddWithUndefinedCategory_ReturnsFailureWithoutStaging()
         {
             var store = new RecordingEntityStore();
-            var adminTags = new AdminTags(store);
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries());
 
             // TagCategoryId 0 has no backing ETagCategory member (the enum starts at 1); without the up-front
             // guard this would 500 on the FK at commit instead of rejecting gracefully.
-            var result = adminTags.SaveTags([Change(EChangeType.Add, id: 0, name: "Fire", categoryId: 0)]);
+            var result = await adminTags.SaveTags([Change(EChangeType.Add, id: 0, name: "Fire", categoryId: 0)]);
 
             Assert.False(result.Succeeded);
             Assert.Equal("0 is not a valid tag category.", result.ErrorMessage);
@@ -83,12 +96,12 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveTags_EditWithUndefinedCategory_ReturnsFailureWithoutStaging()
+        public async Task SaveTags_EditWithUndefinedCategory_ReturnsFailureWithoutStaging()
         {
             var store = new RecordingEntityStore();
-            var adminTags = new AdminTags(store);
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries(7));
 
-            var result = adminTags.SaveTags([Change(EChangeType.Edit, id: 7, name: "Ice", categoryId: 99)]);
+            var result = await adminTags.SaveTags([Change(EChangeType.Edit, id: 7, name: "Ice", categoryId: 99)]);
 
             Assert.False(result.Succeeded);
             Assert.Equal("99 is not a valid tag category.", result.ErrorMessage);
@@ -96,16 +109,42 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public void SaveTags_DeleteWithUndefinedCategoryPayload_Succeeds()
+        public async Task SaveTags_DeleteWithUndefinedCategoryPayload_Succeeds()
         {
             var store = new RecordingEntityStore();
-            var adminTags = new AdminTags(store);
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries(42));
 
             // Deletes carry no meaningful category payload (the field just defaults to 0), so the reference
             // guard skips them like every other change-type it's applied to.
-            var result = adminTags.SaveTags([Change(EChangeType.Delete, id: 42)]);
+            var result = await adminTags.SaveTags([Change(EChangeType.Delete, id: 42)]);
 
             Assert.True(result.Succeeded);
+        }
+
+        [Fact]
+        public async Task SaveTags_EditMissingId_ReturnsNotFoundWithoutStaging()
+        {
+            var store = new RecordingEntityStore();
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries());
+
+            var result = await adminTags.SaveTags([Change(EChangeType.Edit, id: 7, name: "Ice", categoryId: 2)]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Tag not found.", result.ErrorMessage);
+            Assert.Empty(store.Updated);
+        }
+
+        [Fact]
+        public async Task SaveTags_DeleteMissingId_ReturnsNotFoundWithoutStaging()
+        {
+            var store = new RecordingEntityStore();
+            var adminTags = new AdminTags(store, new FakeTagAssignmentQueries());
+
+            var result = await adminTags.SaveTags([Change(EChangeType.Delete, id: 42)]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Tag not found.", result.ErrorMessage);
+            Assert.Empty(store.DeletedByKey);
         }
     }
 }

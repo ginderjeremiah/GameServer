@@ -1,6 +1,7 @@
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
+using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -48,7 +49,7 @@ namespace Game.Application.Tests.DataAccess
                 using (var writeScope = CreateScope())
                 {
                     var admin = writeScope.ServiceProvider.GetRequiredService<IAdminTags>();
-                    Assert.True(admin.SaveTags([Delete(tag)]).Succeeded);
+                    Assert.True((await admin.SaveTags([Delete(tag)])).Succeeded);
                     await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
                 }
             }
@@ -81,7 +82,7 @@ namespace Game.Application.Tests.DataAccess
                 using (var writeScope = CreateScope())
                 {
                     var admin = writeScope.ServiceProvider.GetRequiredService<IAdminTags>();
-                    Assert.True(admin.SaveTags([Delete(tag)]).Succeeded);
+                    Assert.True((await admin.SaveTags([Delete(tag)])).Succeeded);
                     await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
                 }
             }
@@ -113,7 +114,7 @@ namespace Game.Application.Tests.DataAccess
                 using (var writeScope = CreateScope())
                 {
                     var admin = writeScope.ServiceProvider.GetRequiredService<IAdminTags>();
-                    Assert.True(admin.SaveTags([Delete(doomed)]).Succeeded);
+                    Assert.True((await admin.SaveTags([Delete(doomed)])).Succeeded);
                     await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
                 }
             }
@@ -123,6 +124,66 @@ namespace Game.Application.Tests.DataAccess
                 var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
                 Assert.False(await context.Tags.AnyAsync(t => t.Id == doomedId, CancellationToken));
                 Assert.True(await context.Tags.AnyAsync(t => t.Id == keptId, CancellationToken));
+            }
+        }
+
+        [Fact]
+        public async Task SaveTags_EditMissingId_ReturnsNotFoundAndLeavesRowUntouched()
+        {
+            int missingId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var tag = await TestDataSeeder.CreateTagAsync(context, "Ephemeral");
+                missingId = tag.Id;
+                // Remove it directly (bypassing the admin write) so the id is genuinely absent, mirroring a
+                // stale admin client naming an id a concurrent delete already removed.
+                context.Tags.Remove(tag);
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminTags>();
+                var edit = new Change<Contracts.Tag>
+                {
+                    ChangeType = EChangeType.Edit,
+                    Item = new Contracts.Tag { Id = missingId, Name = "Ghost", TagCategoryId = (int)ETagCategory.Accessory },
+                };
+
+                var result = await admin.SaveTags([edit]);
+
+                Assert.False(result.Succeeded);
+                Assert.Equal("Tag not found.", result.ErrorMessage);
+            }
+        }
+
+        [Fact]
+        public async Task SaveTags_DeleteMissingId_ReturnsNotFound()
+        {
+            int missingId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var tag = await TestDataSeeder.CreateTagAsync(context, "Ephemeral");
+                missingId = tag.Id;
+                context.Tags.Remove(tag);
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminTags>();
+                var delete = new Change<Contracts.Tag>
+                {
+                    ChangeType = EChangeType.Delete,
+                    Item = new Contracts.Tag { Id = missingId, Name = "Ghost", TagCategoryId = (int)ETagCategory.Accessory },
+                };
+
+                var result = await admin.SaveTags([delete]);
+
+                Assert.False(result.Succeeded);
+                Assert.Equal("Tag not found.", result.ErrorMessage);
             }
         }
     }

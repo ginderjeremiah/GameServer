@@ -10,8 +10,8 @@ namespace Game.Abstractions.DataAccess.Admin
     public interface IAdminTags
     {
         /// <summary>Applies an identity-level Add/Edit/Delete change set to the tag catalogue. Tags carry
-        /// their own identity and keep the hard-delete lifecycle, so this never rejects — it succeeds to
-        /// share the unified <see cref="AdminSaveResult"/> contract every admin write reports through.</summary>
-        AdminSaveResult SaveTags(IReadOnlyList<Change<Tag>> changes);
+        /// their own identity and keep the hard-delete lifecycle. An Edit or Delete naming an id that no
+        /// longer exists is rejected as a not-found failure rather than staged.</summary>
+        Task<AdminSaveResult> SaveTags(IReadOnlyList<Change<Tag>> changes, CancellationToken cancellationToken = default);
     }
 }
