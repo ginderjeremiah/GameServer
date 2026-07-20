@@ -12,6 +12,7 @@ import {
 	pathIdentityDto,
 	pathWarnings,
 	payoutLevels,
+	proficiencyBlockingWarnings,
 	profIdentityDto,
 	proficiencyWarnings,
 	renumberTiers,
@@ -148,6 +149,28 @@ describe('validation', () => {
 			levelRewards: [{ level: 9, rewardSkillId: 1 }]
 		});
 		expect(proficiencyWarnings(ranged)).toContain('Reward level 9 out of range');
+	});
+
+	it('proficiencyBlockingWarnings flags only the out-of-range payout, not MaxLevel/XP-curve nags (#2222)', () => {
+		// Neither condition is enforced by AdminProficiencies/Contracts.Proficiency (confirmed against the
+		// backend), so gating Save on them would block a save the backend would actually accept.
+		const invalidCurve = tier({ id: 1, maxLevel: 0, baseXp: -1, xpGrowth: 0 });
+		expect(proficiencyWarnings(invalidCurve)).toEqual(
+			expect.arrayContaining(['Max level must be at least 1', 'XP curve must be positive'])
+		);
+		expect(proficiencyBlockingWarnings(invalidCurve)).toHaveLength(0);
+
+		const outOfRange = tier({
+			id: 2,
+			maxLevel: 5,
+			levelModifiers: [
+				{ level: 8, attributeId: EAttribute.Strength, modifierTypeId: EModifierType.Additive, amount: 1 }
+			]
+		});
+		expect(proficiencyBlockingWarnings(outOfRange)).toEqual(['Modifier level 8 out of range']);
+
+		const inRange = tier({ id: 3, maxLevel: 5 });
+		expect(proficiencyBlockingWarnings(inRange)).toHaveLength(0);
 	});
 });
 

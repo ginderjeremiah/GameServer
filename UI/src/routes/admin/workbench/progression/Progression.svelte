@@ -69,6 +69,7 @@
 			saving={store.saving}
 			added={store.counts.added}
 			modified={store.counts.modified}
+			blocked={store.hasBlockingWarnings}
 			onDiscard={() => store.discard()}
 			onSave={() => store.save()}
 			saveTestId="progression-save"

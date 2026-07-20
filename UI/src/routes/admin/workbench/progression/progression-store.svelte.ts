@@ -17,6 +17,7 @@ import {
 	newPath,
 	newProficiency,
 	pathIdentityDto,
+	proficiencyBlockingWarnings,
 	profIdentityDto,
 	renumberTiers,
 	tiersOfPath
@@ -179,6 +180,16 @@ export class ProgressionStore {
 	get totalChanges(): number {
 		return this.counts.added + this.counts.modified;
 	}
+
+	/** True while any not-yet-saved tier (added/modified) carries an out-of-range modifier/reward
+	 *  level — the one proficiency condition the backend genuinely hard-rejects (mirrors
+	 *  EntityStore.hasBlockingWarnings, #2217/#2222). Gates {@link save}. */
+	hasBlockingWarnings = $derived.by(() => {
+		return this.profs.some((prof) => {
+			const status = this.profStatuses[prof.id];
+			return (status === 'added' || status === 'modified') && proficiencyBlockingWarnings(prof).length > 0;
+		});
+	});
 
 	/** Always called with a record from {@link paths}, which {@link pathStatuses} covers exhaustively. */
 	pathStatus(path: WorkbenchPath): RecordStatus {
@@ -453,7 +464,7 @@ export class ProgressionStore {
 	// ── Save / discard ──
 
 	async save() {
-		if (this.totalChanges === 0 || this.saving) {
+		if (this.totalChanges === 0 || this.saving || this.hasBlockingWarnings) {
 			return;
 		}
 		this.saving = true;
