@@ -140,17 +140,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task HashGetAllIfExists_OnAMissingKey_ReturnsNull()
-        {
-            var key = $"redis-hash-{Guid.NewGuid()}";
-            using var scope = CreateScope();
-            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
-
-            Assert.Null(await cache.HashGetAllIfExists(key));
-        }
-
-        [Fact]
-        public async Task HashSetAndForget_ThenHashGetAllIfExists_RoundTripsFieldsAndSetsTtl()
+        public async Task HashSetAndForget_ThenReadBack_RoundTripsFieldsAndSetsTtl()
         {
             var key = $"redis-hash-{Guid.NewGuid()}";
             using var scope = CreateScope();
@@ -158,7 +148,7 @@ namespace Game.Application.Tests.DataAccess
 
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(30));
 
-            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f is not null);
+            var fields = await PollingHelper.PollUntilAsync(() => ReadHashAsync(key), f => f is not null);
 
             Assert.NotNull(fields);
             Assert.Equal(2, fields.Count);
@@ -178,13 +168,13 @@ namespace Game.Application.Tests.DataAccess
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
 
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(2));
-            await WaitForHashFieldCountAsync(cache, key, 2);
+            await WaitForHashFieldCountAsync(key, 2);
 
             // Only "a" is named this time — "b" must survive untouched and the TTL must be refreshed well
             // past the 2s seed ceiling.
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "9" }, TimeSpan.FromSeconds(30));
 
-            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.GetValueOrDefault("a") == "9");
+            var fields = await PollingHelper.PollUntilAsync(() => ReadHashAsync(key), f => f?.GetValueOrDefault("a") == "9");
 
             Assert.NotNull(fields);
             Assert.Equal("9", fields["a"]);
@@ -193,21 +183,6 @@ namespace Game.Application.Tests.DataAccess
             var ttl = await ReadTtlAsync(key);
             Assert.NotNull(ttl);
             Assert.True(ttl > TimeSpan.FromSeconds(10), $"Expected the TTL to be refreshed past the 2s seed but was {ttl}.");
-        }
-
-        [Fact]
-        public async Task HashGetAllIfExists_OnAKeyHoldingANonHashValue_TreatsItAsAMissAndClearsIt()
-        {
-            // Mirrors a key still holding a prior string-blob representation after a cache-shape change
-            // (#1635 moved player progress from a serialized string to a Redis hash) — HGETALL would otherwise
-            // error every read forever instead of self-healing on the next write.
-            var key = $"redis-hash-{Guid.NewGuid()}";
-            using var scope = CreateScope();
-            var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
-            await cache.Set(key, "a-stale-string-blob", TimeSpan.FromSeconds(30));
-
-            Assert.Null(await cache.HashGetAllIfExists(key));
-            Assert.Null(await cache.Get(key));
         }
 
         [Fact]
@@ -220,7 +195,7 @@ namespace Game.Application.Tests.DataAccess
             cache.HashSetAndForget(key, new Dictionary<string, string>(), TimeSpan.FromSeconds(30));
 
             await Task.Delay(200);
-            Assert.Null(await cache.HashGetAllIfExists(key));
+            Assert.Null(await ReadHashAsync(key));
         }
 
         [Fact]
@@ -237,13 +212,13 @@ namespace Game.Application.Tests.DataAccess
             // Exercise the script at least once first, matching a long-lived process that already warmed it
             // before its Redis connection loses the script cache.
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1" }, TimeSpan.FromSeconds(30));
-            await WaitForHashFieldCountAsync(cache, key, 1);
+            await WaitForHashFieldCountAsync(key, 1);
 
             await FlushScriptCacheAsync();
 
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["b"] = "2" }, TimeSpan.FromSeconds(30));
 
-            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.ContainsKey("b") == true);
+            var fields = await PollingHelper.PollUntilAsync(() => ReadHashAsync(key), f => f?.ContainsKey("b") == true);
 
             Assert.NotNull(fields);
             Assert.Equal("2", fields["b"]);
@@ -259,7 +234,7 @@ namespace Game.Application.Tests.DataAccess
             cache.HashSetIfExistsAndForget(key, new Dictionary<string, string> { ["a"] = "1" }, TimeSpan.FromSeconds(30));
 
             await Task.Delay(200);
-            Assert.Null(await cache.HashGetAllIfExists(key));
+            Assert.Null(await ReadHashAsync(key));
         }
 
         [Fact]
@@ -270,11 +245,11 @@ namespace Game.Application.Tests.DataAccess
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
 
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(2));
-            await WaitForHashFieldCountAsync(cache, key, 2);
+            await WaitForHashFieldCountAsync(key, 2);
 
             cache.HashSetIfExistsAndForget(key, new Dictionary<string, string> { ["a"] = "9" }, TimeSpan.FromSeconds(30));
 
-            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.GetValueOrDefault("a") == "9");
+            var fields = await PollingHelper.PollUntilAsync(() => ReadHashAsync(key), f => f?.GetValueOrDefault("a") == "9");
 
             Assert.NotNull(fields);
             Assert.Equal("9", fields["a"]);
@@ -295,7 +270,7 @@ namespace Game.Application.Tests.DataAccess
             var fields = await cache.HashGetAllAndRefreshExpiry(key, TimeSpan.FromSeconds(30));
 
             Assert.Null(fields);
-            Assert.Null(await cache.HashGetAllIfExists(key));
+            Assert.Null(await ReadHashAsync(key));
         }
 
         [Fact]
@@ -305,7 +280,7 @@ namespace Game.Application.Tests.DataAccess
             using var scope = CreateScope();
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
             cache.HashSetAndForget(key, new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }, TimeSpan.FromSeconds(2));
-            await WaitForHashFieldCountAsync(cache, key, 2);
+            await WaitForHashFieldCountAsync(key, 2);
 
             var fields = await cache.HashGetAllAndRefreshExpiry(key, TimeSpan.FromSeconds(30));
 
@@ -324,7 +299,9 @@ namespace Game.Application.Tests.DataAccess
         [Fact]
         public async Task HashGetAllAndRefreshExpiry_OnAKeyHoldingANonHashValue_TreatsItAsAMissAndClearsIt()
         {
-            // Mirrors HashGetAllIfExists's same self-heal for a stale non-hash representation (#1635).
+            // Mirrors a key still holding a prior string-blob representation after a cache-shape change
+            // (#1635 moved player progress from a serialized string to a Redis hash) — HGETALL would otherwise
+            // error every read forever instead of self-healing on the next write.
             var key = $"redis-hash-getex-{Guid.NewGuid()}";
             using var scope = CreateScope();
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
@@ -344,12 +321,12 @@ namespace Game.Application.Tests.DataAccess
             cache.HashSetIfExistsAndForget(key, new Dictionary<string, string>(), TimeSpan.FromSeconds(30));
 
             await Task.Delay(200);
-            Assert.Null(await cache.HashGetAllIfExists(key));
+            Assert.Null(await ReadHashAsync(key));
         }
 
-        private static async Task WaitForHashFieldCountAsync(ICacheService cache, string key, int count, int timeoutMs = 5000)
+        private async Task WaitForHashFieldCountAsync(string key, int count, int timeoutMs = 5000)
         {
-            var fields = await PollingHelper.PollUntilAsync(() => cache.HashGetAllIfExists(key), f => f?.Count == count, timeoutMs);
+            var fields = await PollingHelper.PollUntilAsync(() => ReadHashAsync(key), f => f?.Count == count, timeoutMs);
             if (fields?.Count != count)
             {
                 Assert.Fail($"Expected hash '{key}' to have {count} fields within the timeout.");
@@ -366,6 +343,22 @@ namespace Game.Application.Tests.DataAccess
         {
             await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
             return await multiplexer.GetDatabase().KeyTimeToLiveAsync(key);
+        }
+
+        // A side-effect-free raw HGETALL, independent of ICacheService's own hash-read methods, so tests that
+        // merely verify state written by HashSetAndForget/HashSetIfExistsAndForget don't accidentally exercise
+        // (or mask a bug in) HashGetAllAndRefreshExpiry's own TTL-refreshing side effect.
+        private async Task<Dictionary<string, string>?> ReadHashAsync(string key)
+        {
+            await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(Containers.CacheConnectionString);
+            var db = multiplexer.GetDatabase();
+            if (!await db.KeyExistsAsync(key))
+            {
+                return null;
+            }
+
+            var entries = await db.HashGetAllAsync(key);
+            return entries.ToDictionary(e => (string)e.Name!, e => (string)e.Value!);
         }
 
         private async Task FlushScriptCacheAsync()

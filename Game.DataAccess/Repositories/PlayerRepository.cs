@@ -78,7 +78,7 @@ namespace Game.DataAccess.Repositories
             {
                 // A blob that no longer deserializes (e.g. a shape change to PlayerCacheModel's required
                 // members) is corruption, not data - Postgres remains the durable copy, so this self-heals
-                // the same way HashGetAllIfExists treats a wrong-representation key: delete it and fall
+                // the same way HashGetAllAndRefreshExpiry treats a wrong-representation key: delete it and fall
                 // through to the DB reload below instead of locking the player out for the rest of the TTL (#1924).
                 _logger.LogError(ex, "Cached player {PlayerId} at key '{Key}' failed to deserialize; deleting the key and reloading from the database.", playerId, playerKey);
                 await _cache.Delete(playerKey, cancellationToken);

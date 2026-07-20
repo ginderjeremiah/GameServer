@@ -138,26 +138,6 @@ namespace Game.Infrastructure.Cache.Redis
             Redis.KeyDelete(key, CommandFlags.FireAndForget);
         }
 
-        private static readonly PreparedScript HashGetAllIfExistsScript = new(
-            "local t = redis.call('type', KEYS[1]).ok "
-            + "if t == 'none' then return false end "
-            + "if t ~= 'hash' then redis.call('del', KEYS[1]) return false end "
-            + "return redis.call('hgetall', KEYS[1])");
-
-        public async Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default)
-        {
-            // TYPE-then-HGETALL in one script (rather than two round trips) so a hot per-battle read pays only
-            // one — and so the two checks can't race a concurrent expiry/eviction between them. Lua false
-            // comes back over RESP as a null reply, which is how a missing key is told apart from one whose
-            // hash happens to have no fields. A key still holding an older, non-hash representation (e.g. a
-            // caller that repurposed a string-valued key into a hash-valued one) is treated the same as a miss
-            // and cleared, so a stale value self-heals via the normal miss-then-reload path on next write
-            // rather than erroring every future read.
-            var result = await RedisCommandBudget.Read(HashGetAllIfExistsScript.EvaluateAsync(Redis, [key], []), cancellationToken);
-
-            return MapHashResult(result);
-        }
-
         private static readonly PreparedScript HashGetAllAndRefreshExpiryScript = new(
             "local t = redis.call('type', KEYS[1]).ok "
             + "if t == 'none' then return false end "
@@ -168,20 +148,25 @@ namespace Game.Infrastructure.Cache.Redis
 
         public async Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
-            // Same TYPE-then-HGETALL script as HashGetAllIfExists, plus a PEXPIRE on the hit path so a
-            // sliding-expiration hash read pays one round trip instead of an awaited HGETALL followed by a
-            // fire-and-forget expire (mirroring GetAndRefreshExpiry's GETEX win for string keys, which GETEX
-            // itself can't serve here since it only applies to strings). The PEXPIRE makes this a write, so it
-            // routes through ObserveWrite like GetAndRefreshExpiry rather than the plain-read path
-            // HashGetAllIfExists uses.
+            // TYPE-then-HGETALL in one script (rather than two round trips) so a hot per-battle read pays only
+            // one — and so the two checks can't race a concurrent expiry/eviction between them — plus a
+            // PEXPIRE on the hit path so a sliding-expiration hash read pays one round trip instead of a
+            // separate awaited HGETALL followed by a fire-and-forget expire (mirroring GetAndRefreshExpiry's
+            // GETEX win for string keys, which GETEX itself can't serve here since it only applies to strings).
+            // Lua false comes back over RESP as a null reply, which is how a missing key is told apart from one
+            // whose hash happens to have no fields. A key still holding an older, non-hash representation (e.g.
+            // a caller that repurposed a string-valued key into a hash-valued one) is treated the same as a
+            // miss and cleared, so a stale value self-heals via the normal miss-then-reload path on next write
+            // rather than erroring every future read. The PEXPIRE makes this a write, so it routes through
+            // ObserveWrite rather than the plain-read path.
             var result = await ObserveWrite(HashGetAllAndRefreshExpiryScript.EvaluateAsync(Redis, [key], [(RedisValue)(long)expiry.TotalMilliseconds]), cancellationToken);
 
             return MapHashResult(result);
         }
 
-        // Shared by HashGetAllIfExists and HashGetAllAndRefreshExpiry: both scripts return either a Lua false
-        // (told apart from an empty hash by RedisResult.IsNull) or the flat HGETALL reply, so the
-        // flat-array-to-dictionary conversion — and the null-forgiving indexing it requires — lives in one place.
+        // The script above returns either a Lua false (told apart from an empty hash by RedisResult.IsNull)
+        // or the flat HGETALL reply, so the flat-array-to-dictionary conversion — and the null-forgiving
+        // indexing it requires — lives in one place.
         private static Dictionary<string, string>? MapHashResult(RedisResult result)
         {
             if (result.IsNull)
