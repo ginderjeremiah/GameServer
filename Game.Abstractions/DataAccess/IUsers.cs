@@ -119,6 +119,16 @@ namespace Game.Abstractions.DataAccess
         Task<IReadOnlyList<int>> GetPlayerIds(int userId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Loads the active (non-archived) account's live ban state and roles by id. Unlike
+        /// <see cref="GetUser"/> (keyed by username, for the login credential check), this is the re-check a
+        /// refresh or player-selection call runs against an already-authenticated user id — so a ban, or a
+        /// role change, takes effect there instead of only at the account's next login. Returns
+        /// <see langword="null"/> when no active account matches (archived or never existed), which callers
+        /// treat the same as banned: the account is no longer usable.
+        /// </summary>
+        Task<AccountState?> GetAccountState(int userId, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Returns lightweight summaries of the active (non-archived) user's players for the login
         /// player-selection list (name, level, current zone). Empty when the user does not exist, is
         /// archived, or has no players.

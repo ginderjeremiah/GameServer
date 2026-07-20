@@ -578,6 +578,85 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SelectPlayer_ArchivedSinceLogin_IsRejectedAsNotOwnedBeforeReachingTheAccountStateCheck()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "archivedselect", "pass");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("archivedselect", "pass");
+            Assert.True(login.Success);
+
+            // Archived after the pre-selection token was issued. GetPlayerIds already excludes archived
+            // accounts, so this is caught by the pre-existing ownership check (NotOwned) before SelectPlayer
+            // ever reaches the new GetAccountState re-check — the "account is null" branch added by #1762 is
+            // only reachable via a narrow archive-mid-call race between the two reads, not exercisable here.
+            user.ArchivedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var result = await accountService.SelectPlayer(user.Id, player.Id, login.Tokens.RefreshToken);
+
+            Assert.False(result.Success);
+            Assert.Equal(SelectPlayerStatus.NotOwned, result.Status);
+        }
+
+        [Fact]
+        public async Task SelectPlayer_BannedSinceLogin_IsRejectedAndLeavesTokenIntact()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "bannedselect", "pass");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("bannedselect", "pass");
+            Assert.True(login.Success);
+
+            // Banned after the pre-selection token was issued — the live check on SelectPlayer must catch
+            // this rather than trusting the token, which predates the ban.
+            user.BannedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var result = await accountService.SelectPlayer(user.Id, player.Id, login.Tokens.RefreshToken);
+
+            Assert.False(result.Success);
+            Assert.Equal(SelectPlayerStatus.InvalidToken, result.Status);
+
+            // The ban check runs before the token is consumed, so it is still redeemable — asserted directly
+            // against the store, since a Refresh attempt against this now-banned account would reject too.
+            var refreshTokenStore = scope.ServiceProvider.GetRequiredService<IRefreshTokenStore>();
+            var session = await refreshTokenStore.Consume(login.Tokens.RefreshToken, CancellationToken);
+            Assert.NotNull(session);
+            Assert.Equal(user.Id, session.UserId);
+        }
+
+        [Fact]
+        public async Task SelectPlayer_RoleGrantedSinceLogin_ReissuesTokensWithTheNewRole()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "promotedselect", "pass");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var recordingTokens = new RecordingAccessTokenService();
+            var accountService = CreateAccountService(scope.ServiceProvider, accessTokenService: recordingTokens);
+            var login = await accountService.Login("promotedselect", "pass");
+            Assert.True(login.Success);
+            Assert.DoesNotContain(nameof(ERole.Admin), recordingTokens.LastRoles);
+
+            // Granted after the pre-selection token was issued — the selection must carry the account's
+            // current roles, not the (role-less) snapshot the login token was minted with.
+            await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
+
+            var result = await accountService.SelectPlayer(user.Id, player.Id, login.Tokens.RefreshToken);
+
+            Assert.True(result.Success);
+            Assert.Contains(nameof(ERole.Admin), recordingTokens.LastRoles);
+        }
+
+        [Fact]
         public async Task GetPlayers_ReturnsAllOfTheAccountsCharacters()
         {
             using var scope = CreateScope();
@@ -842,6 +921,83 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task Refresh_ArchivedSinceIssue_ReturnsNull()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "archivedrefresh", "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("archivedrefresh", "pass");
+            Assert.True(login.Success);
+
+            // Archived after the refresh token was issued — GetAccountState excludes archived accounts the
+            // same way GetUser does, so this hits the "account is null" branch distinctly from IsBanned.
+            user.ArchivedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var refreshed = await accountService.Refresh(login.Tokens.RefreshToken);
+
+            Assert.Null(refreshed);
+        }
+
+        [Fact]
+        public async Task Refresh_BannedSinceIssue_ReturnsNullAndEndsTheChain()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "bannedrefresh", "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+            var login = await accountService.Login("bannedrefresh", "pass");
+            Assert.True(login.Success);
+
+            // Banned after the refresh token was issued — a stale token must not keep renewing a dead
+            // account's session indefinitely.
+            user.BannedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var refreshed = await accountService.Refresh(login.Tokens.RefreshToken);
+
+            Assert.Null(refreshed);
+        }
+
+        [Fact]
+        public async Task Refresh_RoleGrantedSinceIssue_ReissuesTokensWithTheNewRole()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "promotedrefresh", "pass");
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+
+            var recordingTokens = new RecordingAccessTokenService();
+            var accountService = CreateAccountService(scope.ServiceProvider, accessTokenService: recordingTokens);
+            var login = await accountService.Login("promotedrefresh", "pass");
+            Assert.True(login.Success);
+            Assert.DoesNotContain(nameof(ERole.Admin), recordingTokens.LastRoles);
+
+            // Granted after the refresh token was issued — the reissued pair must carry the account's
+            // current roles, not the (role-less) snapshot the original token was minted with.
+            await TestDataSeeder.AssignRoleToUserAsync(context, user.Id, ERole.Admin);
+
+            var refreshed = await accountService.Refresh(login.Tokens.RefreshToken);
+
+            Assert.NotNull(refreshed);
+            Assert.Contains(nameof(ERole.Admin), recordingTokens.LastRoles);
+        }
+
+        [Fact]
         public async Task Logout_RevokesRefreshToken()
         {
             using var scope = CreateScope();
@@ -974,7 +1130,8 @@ namespace Game.Application.Tests.Services
             LoginBackoffOptions? backoffOptions = null,
             TimeProvider? timeProvider = null,
             int maxPlayersPerAccount = 6,
-            IPasswordHasher? passwordHasher = null)
+            IPasswordHasher? passwordHasher = null,
+            IAccessTokenService? accessTokenService = null)
         {
             // A real PBKDF2 hasher (cheap iteration count) using the same pepper the seeder hashed with,
             // so seeded credentials verify exactly as they would in production. A higher iteration count
@@ -998,7 +1155,7 @@ namespace Game.Application.Tests.Services
                 provider.GetRequiredService<IUsers>(),
                 provider.GetRequiredService<IPlayerRepository>(),
                 provider.GetRequiredService<IRefreshTokenStore>(),
-                new StubAccessTokenService(),
+                accessTokenService ?? new StubAccessTokenService(),
                 hasher,
                 backoffGuard,
                 new NewPlayerFactory(),
@@ -1049,6 +1206,22 @@ namespace Game.Application.Tests.Services
         {
             public string CreateAccessToken(int userId, IReadOnlyList<string> roles, int? playerId = null)
             {
+                return playerId is int selected ? $"access-token-{userId}-{selected}" : $"access-token-{userId}";
+            }
+        }
+
+        /// <summary>
+        /// A stub access-token service that records the roles baked into the most recently created token, so
+        /// a test can assert a reissue carried the account's freshly-derived roles rather than a stale
+        /// snapshot from a previously issued token.
+        /// </summary>
+        private sealed class RecordingAccessTokenService : IAccessTokenService
+        {
+            public IReadOnlyList<string> LastRoles { get; private set; } = [];
+
+            public string CreateAccessToken(int userId, IReadOnlyList<string> roles, int? playerId = null)
+            {
+                LastRoles = roles;
                 return playerId is int selected ? $"access-token-{userId}-{selected}" : $"access-token-{userId}";
             }
         }

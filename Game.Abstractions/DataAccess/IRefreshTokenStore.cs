@@ -13,7 +13,7 @@ namespace Game.Abstractions.DataAccess
         /// before player selection. Returns the raw token value to hand back to the client (only the hash
         /// is stored).
         /// </summary>
-        Task<string> Issue(int userId, IReadOnlyList<string> roles, int? playerId, TimeSpan lifetime, CancellationToken cancellationToken = default);
+        Task<string> Issue(int userId, int? playerId, TimeSpan lifetime, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Atomically validates and invalidates a refresh token (single use). Returns the associated
@@ -24,11 +24,11 @@ namespace Game.Abstractions.DataAccess
     }
 
     /// <summary>
-    /// The session information carried by a refresh token: the user it authenticates, the roles to bake
-    /// into the next access token, and the selected player id (once chosen; <see langword="null"/> before
-    /// selection). Mirrors the "roles are fixed for the session" model used at login (see backend docs) —
-    /// a role change still requires a fresh login to take effect — and likewise carries the selected
-    /// player forward so a refresh keeps the same character bound.
+    /// The session information carried by a refresh token: the user it authenticates and the selected
+    /// player id (once chosen; <see langword="null"/> before selection), so a refresh keeps the same
+    /// character bound. Roles are deliberately not cached here — a refresh re-derives them from the
+    /// account's live state instead, so a role change (or a ban) takes effect on the account's next
+    /// refresh rather than only at its next login (see backend docs).
     /// </summary>
-    public record RefreshTokenData(int UserId, IReadOnlyList<string> Roles, int? PlayerId);
+    public record RefreshTokenData(int UserId, int? PlayerId);
 }
