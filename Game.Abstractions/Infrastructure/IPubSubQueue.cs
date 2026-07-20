@@ -33,13 +33,6 @@
         public Task<long> GetLengthAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// The current number of items reserved via <see cref="ReserveNextAsync"/> but not yet acknowledged —
-        /// the size of the side processing list. Lets a caller detect items stranded there (so they can be
-        /// reclaimed opportunistically) without mutating anything, unlike <see cref="ReclaimProcessingAsync"/>.
-        /// </summary>
-        public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default);
-
-        /// <summary>
         /// Returns up to <paramref name="count"/> items from the head of the queue (oldest first) WITHOUT
         /// removing them — a non-destructive read. Lets a dead-letter queue be inspected without the
         /// at-most-once exposure a destructive pop would reintroduce. A non-positive count returns an empty list.

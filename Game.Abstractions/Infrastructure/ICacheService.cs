@@ -60,15 +60,11 @@
         /// </summary>
         public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry);
         /// <summary>
-        /// Reads every field of the Redis hash at <paramref name="key"/> in one round trip, or
-        /// <see langword="null"/> if the key does not exist — letting a caller distinguish a genuine cache
-        /// miss from a hash that exists but happens to carry no fields.
-        /// </summary>
-        public Task<Dictionary<string, string>?> HashGetAllIfExists(string key, CancellationToken cancellationToken = default);
-        /// <summary>
-        /// Same as <see cref="HashGetAllIfExists"/>, but also resets the key's TTL to <paramref name="expiry"/>
-        /// in the same round trip on a hit (a no-op on a miss, like <see cref="GetAndRefreshExpiry"/>). Lets a
-        /// sliding-expiration hash read avoid the separate awaited HGETALL followed by a fire-and-forget expire.
+        /// Reads every field of the Redis hash at <paramref name="key"/> in one round trip, resetting its TTL
+        /// to <paramref name="expiry"/> in the same round trip on a hit (a no-op on a miss, like
+        /// <see cref="GetAndRefreshExpiry"/>). Returns <see langword="null"/> if the key does not exist —
+        /// letting a caller distinguish a genuine cache miss from a hash that exists but happens to carry no
+        /// fields.
         /// </summary>
         public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
         /// <summary>

@@ -157,7 +157,7 @@ namespace Game.Application.Tests.DataAccess
             // Nothing was dead-lettered — the item stays reserved on the processing list for the reclaim to
             // pick back up once the database recovers, rather than requiring a manual replay.
             Assert.Empty(await DrainDeadLetterQueue(pubsub));
-            Assert.Equal(1, await queue.GetProcessingCountAsync());
+            Assert.Single(await queue.PeekProcessingAsync(10));
         }
 
         public static IEnumerable<object[]> GenuinePerWriteFailures()
@@ -201,7 +201,7 @@ namespace Game.Application.Tests.DataAccess
             Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("dead-lettering"));
             var deadLettered = await DrainDeadLetterQueue(pubsub);
             Assert.Single(deadLettered);
-            Assert.Equal(0, await queue.GetProcessingCountAsync());
+            Assert.Empty(await queue.PeekProcessingAsync(10));
         }
 
         [Fact]
@@ -1125,7 +1125,7 @@ namespace Game.Application.Tests.DataAccess
             // restart against it rather than reclaiming a fresh item.
             await synchronizer.ProcessQueue(queue);
             Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
-            Assert.Equal(1, await queue.GetProcessingCountAsync());
+            Assert.Single(await queue.PeekProcessingAsync(10));
 
             // Only once "stranded-b" has itself dwelled at the head past the grace period does it reclaim.
             timeProvider.Advance(TimeSpan.FromSeconds(31));
@@ -1133,7 +1133,7 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("stranded"));
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
-            Assert.Equal(0, await queue.GetProcessingCountAsync());
+            Assert.Empty(await queue.PeekProcessingAsync(10));
         }
 
         [Fact]
@@ -1235,7 +1235,7 @@ namespace Game.Application.Tests.DataAccess
             // cooperatively into the reserve/reclaim ops, so it could abort the reclaim/apply before it lands
             // rather than waiting for it.
             await synchronizer.StartAsync(CancellationToken.None);
-            await PollingHelper.PollUntilAsync(() => queue.GetProcessingCountAsync(), count => count == 0);
+            await PollingHelper.PollUntilAsync(() => queue.PeekProcessingAsync(1), items => items.Count == 0);
 
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
             Assert.Empty(await DrainDeadLetterQueue(realPubSub));
@@ -1566,7 +1566,7 @@ namespace Game.Application.Tests.DataAccess
 
             // Both of player A's items stay reserved on the processing list for the reclaim: the equip because
             // its acknowledge faulted, the unequip because it chained onto the dead lane and never applied.
-            Assert.Equal(2, await queue.GetProcessingCountAsync());
+            Assert.Equal(2, (await queue.PeekProcessingAsync(10)).Count);
 
             using var verifyScope = CreateScope();
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
@@ -1751,14 +1751,6 @@ namespace Game.Application.Tests.DataAccess
                 }
             }
 
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
-            {
-                lock (_gate)
-                {
-                    return Task.FromResult((long)_processing.Count);
-                }
-            }
-
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default)
             {
                 lock (_gate)
@@ -1894,14 +1886,6 @@ namespace Game.Application.Tests.DataAccess
                 }
             }
 
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
-            {
-                lock (_gate)
-                {
-                    return Task.FromResult((long)_processing.Count);
-                }
-            }
-
             // The drained-queue assertion uses GetNextAsync to confirm nothing is left waiting.
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
@@ -1997,14 +1981,6 @@ namespace Game.Application.Tests.DataAccess
                 lock (_gate)
                 {
                     return Task.FromResult((long)_items.Count);
-                }
-            }
-
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
-            {
-                lock (_gate)
-                {
-                    return Task.FromResult((long)_processing.Count);
                 }
             }
 
@@ -2176,7 +2152,6 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_items.Count);
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult((long)_processing.Count);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(_items.Count > 0 ? _items.Dequeue() : null);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -2211,7 +2186,6 @@ namespace Game.Application.Tests.DataAccess
 
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => inner.ReclaimProcessingAsync(cancellationToken);
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => inner.GetLengthAsync(cancellationToken);
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => inner.GetProcessingCountAsync(cancellationToken);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => inner.GetNextAsync(cancellationToken);
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => inner.PeekAsync(count, cancellationToken);
             public Task<IReadOnlyList<string>> PeekProcessingAsync(long count, CancellationToken cancellationToken = default) => inner.PeekProcessingAsync(count, cancellationToken);
@@ -2292,14 +2266,6 @@ namespace Game.Application.Tests.DataAccess
                 }
             }
 
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default)
-            {
-                lock (_gate)
-                {
-                    return Task.FromResult((long)_processing.Count);
-                }
-            }
-
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
                 lock (_gate)
@@ -2345,7 +2311,6 @@ namespace Game.Application.Tests.DataAccess
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task<long> GetLengthAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
-            public Task<long> GetProcessingCountAsync(CancellationToken cancellationToken = default) => Task.FromResult(0L);
             public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
             public Task<IReadOnlyList<string>> PeekAsync(long count, CancellationToken cancellationToken = default) => throw new NotSupportedException();
