@@ -120,6 +120,15 @@ namespace Game.Core
         public const double RefFightDuration = 30.0;
 
         /// <summary>
+        /// The average missing-health fraction the combat rating assumes over the reference fight when pricing
+        /// <see cref="EAttribute.ExecuteBonus"/> (<c>1 + ExecuteBonus × RefMissingHealthFraction</c>,
+        /// <see cref="Battle.CombatRating"/>) — the same half-horizon logic as <see cref="RefFightDuration"/>/2:
+        /// health depletes from full to empty over the reference fight, so its time-average missing fraction is
+        /// one half. A strawman value, open to future retuning.
+        /// </summary>
+        public const double RefMissingHealthFraction = 0.5;
+
+        /// <summary>
         /// Upper clamp on the avoidance (parry+dodge) and resistance credit <see cref="Battle.CombatRating"/>'s
         /// survivability term prices — both are authored-only, uncapped enablers that the shared-expiry effect
         /// ramp can push toward 1, and <c>(1 - credit)</c> sits in survivability's denominator, so an uncapped

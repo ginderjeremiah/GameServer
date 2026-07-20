@@ -19,6 +19,13 @@ namespace Game.Core.Progress
         private readonly HashSet<int> _dirtyChallenges = [];
         private readonly HashSet<int> _dirtyProficiencies = [];
 
+        // The (statistic type, entity) keys written by the most recent RecordBattleCompleted call — reset at
+        // that call's start and populated alongside _dirtyStatistics by the Increment/SetMax/SetMin write
+        // paths, so it always reflects this battle's real delta rather than _dirtyStatistics' whole
+        // aggregate-lifetime accumulation (which the offline path's single reused aggregate can carry across
+        // many battles between AcceptChanges calls).
+        private readonly HashSet<(EStatisticType Type, int? EntityId)> _touchedThisBattle = [];
+
         public Player Player { get; }
         public IEnumerable<PlayerStatistic> Statistics => _statistics.Values;
         public IEnumerable<PlayerChallenge> ChallengeProgress => _challenges.Values;
@@ -46,14 +53,16 @@ namespace Game.Core.Progress
         }
 
         /// <summary>
-        /// Records the outcome of a completed battle and returns the (statistic type, entity) keys it
-        /// touched. On a freshly loaded aggregate (one is built per battle) those keys are exactly this
-        /// battle's mutated statistics, so the caller can scope challenge evaluation to the challenges that
-        /// track them (see <see cref="ChallengeIndex.RelevantTo"/>) instead of re-scanning the whole catalog.
+        /// Records the outcome of a completed battle and returns the (statistic type, entity) keys this call
+        /// touched — this battle's mutated statistics, so the caller can scope challenge evaluation to the
+        /// challenges that track them (see <see cref="ChallengeIndex.RelevantTo"/>) instead of re-scanning the
+        /// whole catalog.
         /// </summary>
         public IReadOnlyCollection<(EStatisticType Type, int? EntityId)> RecordBattleCompleted(
             Enemy enemy, bool victory, bool playerDied, int totalMs, BattleStats stats, bool isBossBattle, int zoneId)
         {
+            _touchedThisBattle.Clear();
+
             // PlayerDamageDealt/PlayerDamageTaken stay signed in BattleStats (parity-critical, health
             // reconciliation) and can go negative under authored absorption (resistance > 1 heals instead of
             // damaging). Floored here, at the Sum-aggregated lifetime-statistic seam, so an absorption-heavy
@@ -139,9 +148,7 @@ namespace Game.Core.Progress
                 Record(EStatisticType.HighestSingleAttackDamage, skillId, (decimal)Math.Round(skillStats.HighestSingleAttack, 3));
             }
 
-            // The mutated rows are exactly the statistics this battle touched (the aggregate was freshly
-            // loaded), so they double as the relevance scope for challenge evaluation.
-            return [.. _dirtyStatistics];
+            return [.. _touchedThisBattle];
         }
 
         public List<CompletedChallenge> EvaluateChallenges(IEnumerable<Challenge> challenges, DateTime timestamp)
@@ -358,6 +365,7 @@ namespace Game.Core.Progress
             var stat = GetOrCreate(type, entityId, out _);
             stat.Value += amount;
             _dirtyStatistics.Add((type, entityId));
+            _touchedThisBattle.Add((type, entityId));
         }
 
         private void SetMax(EStatisticType type, int? entityId, decimal value)
@@ -378,6 +386,7 @@ namespace Game.Core.Progress
             {
                 stat.Value = value;
                 _dirtyStatistics.Add((type, entityId));
+                _touchedThisBattle.Add((type, entityId));
             }
         }
 
@@ -392,6 +401,7 @@ namespace Game.Core.Progress
             {
                 stat.Value = value;
                 _dirtyStatistics.Add((type, entityId));
+                _touchedThisBattle.Add((type, entityId));
             }
         }
 

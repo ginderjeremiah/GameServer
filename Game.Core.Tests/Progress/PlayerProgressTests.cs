@@ -1184,6 +1184,27 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_SecondCallOnSameAggregate_ReturnsOnlyThatCallsOwnDelta()
+        {
+            // The offline path reuses one aggregate across a whole away window without AcceptChanges between
+            // battles (#2209), so the touched set returned by each call must be that battle's own delta —
+            // not the aggregate's whole dirty set accumulated since load.
+            var progress = MakeProgress();
+            var enemy = MakeEnemy(id: 5);
+
+            var firstTouched = progress.RecordBattleCompleted(enemy, victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats { CriticalHits = 2 }, isBossBattle: false, zoneId: 0);
+            var secondTouched = progress.RecordBattleCompleted(enemy, victory: true, playerDied: false,
+                totalMs: 1000, new BattleStats(), isBossBattle: false, zoneId: 0);
+
+            // CriticalHits was touched by the first, crit-having battle and stays dirty (unsaved) into the
+            // second call, but the second, crit-less battle never touched it and must not re-report it.
+            Assert.Contains((EStatisticType.CriticalHits, (int?)null), firstTouched);
+            Assert.Contains(progress.DirtyStatistics, s => s.Type == EStatisticType.CriticalHits);
+            Assert.DoesNotContain((EStatisticType.CriticalHits, (int?)null), secondTouched);
+        }
+
+        [Fact]
         public void EvaluateChallenges_MarksNewAndChangedChallengesDirty_ButNotSkippedCompletedOnes()
         {
             var progressed = MakeChallenge(id: 0, EChallengeType.EnemiesKilled, goal: 5);
