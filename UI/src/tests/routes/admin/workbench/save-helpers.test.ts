@@ -412,6 +412,81 @@ describe('persistEntity', () => {
 		).rejects.toBeInstanceOf(PersistFailedError);
 	});
 
+	it('reports exactly the records fully settled before a later child-saver failure, for the caller to rebase against (#2207)', async () => {
+		const diff: SaveDiff<Row> = {
+			added: [],
+			modified: [
+				{ record: { id: 0, name: 'A-edited' }, baseline: { id: 0, name: 'A' } },
+				{ record: { id: 1, name: 'B-edited' }, baseline: { id: 1, name: 'B' } },
+				{ record: { id: 2, name: 'C-edited' }, baseline: { id: 2, name: 'C' } }
+			],
+			deleted: [],
+			existingIds: [0, 1, 2]
+		};
+		const fresh: Row[] = [
+			{ id: 0, name: 'A-edited' },
+			{ id: 1, name: 'B-edited' },
+			{ id: 2, name: 'C-edited' }
+		];
+		const attempted: number[] = [];
+
+		try {
+			await persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => ({ id: r.id, name: r.name }),
+				postPrimary: async () => undefined,
+				refresh: async () => fresh,
+				childSavers: [
+					async (id) => {
+						attempted.push(id);
+						if (id === 1) {
+							throw new Error('child saver 500');
+						}
+						return true;
+					}
+				]
+			});
+			expect.unreachable('persistEntity should have thrown');
+		} catch (ex) {
+			expect(ex).toBeInstanceOf(PersistFailedError);
+			const recovery = (ex as PersistFailedError<Row>).recovery;
+			// Record 0's child saver ran to completion before record 1's threw; record 2's was never
+			// attempted at all — neither is safe to treat as server truth.
+			expect(recovery?.settledIds).toEqual(new Set([0]));
+			expect(recovery?.fresh).toEqual(fresh);
+			expect(attempted).toEqual([0, 1]);
+		}
+	});
+
+	it('marks a delete settled the instant the primary batch commits, since no child saver applies to it', async () => {
+		const diff: SaveDiff<Row> = {
+			added: [],
+			modified: [{ record: { id: 1, name: 'B-edited' }, baseline: { id: 1, name: 'B' } }],
+			deleted: [{ id: 0, name: 'A' }],
+			existingIds: [0, 1]
+		};
+		const fresh: Row[] = [{ id: 1, name: 'B-edited' }];
+		try {
+			await persistEntity<Row, Row>({
+				diff,
+				toPrimaryDto: (r) => ({ id: r.id, name: r.name }),
+				postPrimary: async () => undefined,
+				refresh: async () => fresh,
+				childSavers: [
+					async () => {
+						throw new Error('unrelated child saver 500');
+					}
+				]
+			});
+			expect.unreachable('persistEntity should have thrown');
+		} catch (ex) {
+			// Record 1's own child saver is what threw, so it's correctly excluded — but the unrelated
+			// delete for record 0 must not be swept up by that same failure.
+			expect((ex as PersistFailedError<Row>).recovery?.settledIds.has(0)).toBe(true);
+			expect((ex as PersistFailedError<Row>).recovery?.settledIds.has(1)).toBe(false);
+		}
+	});
+
 	it('propagates a child-saver failure raw when every saver ahead of it no-op’d (nothing actually written)', async () => {
 		interface ChildRow extends Identified {
 			id: number;
@@ -483,17 +558,23 @@ describe('persistEntity', () => {
 		expect(childCalls).toEqual([]);
 	});
 
-	it('wraps a post-commit refresh failure as PersistFailedError', async () => {
+	it('wraps a post-commit refresh failure as PersistFailedError with no recovery to rebase against', async () => {
 		const diff: SaveDiff<Row> = { added: [{ id: -1, name: 'A' }], modified: [], deleted: [], existingIds: [] };
-		await expect(
-			persistEntity<Row, Row>({
+		try {
+			await persistEntity<Row, Row>({
 				diff,
 				toPrimaryDto: (r) => r,
 				postPrimary: async () => undefined,
 				refresh: async () => {
 					throw new Error('refresh 500');
 				}
-			})
-		).rejects.toBeInstanceOf(PersistFailedError);
+			});
+			expect.unreachable('persistEntity should have thrown');
+		} catch (ex) {
+			expect(ex).toBeInstanceOf(PersistFailedError);
+			// The failure struck before the post-commit refetch ever returned, so there's nothing to
+			// rebase against — the caller must fall back to a full re-seed.
+			expect((ex as PersistFailedError<Row>).recovery).toBeUndefined();
+		}
 	});
 });

@@ -1,7 +1,7 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { SaveFlash } from '$lib/common';
 import { toastError } from '$stores';
-import { canonicalEqual, PersistFailedError } from './save-helpers';
+import { canonicalEqual, PersistFailedError, type PersistRecovery } from './save-helpers';
 import { entityWarnings } from './validation';
 import type { EntityConfig, Identified, SaveDiff } from './entities/types';
 
@@ -261,24 +261,111 @@ export class EntityStore<T extends Identified> {
 			this.#saveFlash.flash();
 		} catch (ex) {
 			// A *partial* failure (the identity Add/Edit batch or an earlier child saver committed,
-			// then a later step threw) leaves our baseline behind the server: the persisted adds are
-			// still local "added" records, so a naive retry would re-Add duplicates. Only then do we
-			// re-seed from server truth. A *pre-commit* failure committed nothing, so we leave the
-			// edits in place for a clean retry rather than blowing them away behind a toast.
+			// then a later step threw) leaves our baseline behind the server for the records this
+			// save's diff actually touched, so those must be rebased against server truth — a naive
+			// retry could re-Add an already-persisted record. Every *other* pending edit (on a record
+			// this save never touched, or one whose writes hadn't reached yet) is kept for a clean
+			// retry rather than discarded (#2207). A *pre-commit* failure committed nothing, so all
+			// edits are left in place. `recovery` is only absent when the post-commit refetch itself
+			// failed, in which case there's nothing to rebase against and we fall back to a full re-seed.
 			if (ex instanceof PersistFailedError) {
-				try {
-					const fresh = await this.config.refresh();
-					this.items = fresh.map(clone);
-					this.base = fresh.map(clone);
+				const recovery = ex.recovery as PersistRecovery<T> | undefined;
+				if (recovery && this.diffAddsResolved(recovery.idMap)) {
+					this.rebaseAfterPartialFailure(recovery);
+				} else if (recovery) {
+					// A committed add whose persisted id the refetch never resolved (e.g. a concurrent
+					// delete by another admin skewed the count, #1856) can't be safely rebased — keeping
+					// it pending under its local id would re-Add a duplicate on retry. Fall back to a full
+					// re-seed from the recovery's own refetch (already fresh; no need to hit the network
+					// again), the same as the pre-existing safe behavior for an unrebaseable failure.
+					this.items = recovery.fresh.map(clone);
+					this.base = recovery.fresh.map(clone);
 					this.deleted.clear();
-				} catch {
-					// Leave local state intact; surfacing the original save error is what matters.
+				} else {
+					try {
+						const fresh = await this.config.refresh();
+						this.items = fresh.map(clone);
+						this.base = fresh.map(clone);
+						this.deleted.clear();
+					} catch {
+						// Leave local state intact; surfacing the original save error is what matters.
+					}
 				}
 			}
 			toastError(ex instanceof Error ? ex.message : 'Failed to save changes.');
 		} finally {
 			this.saving = false;
 		}
+	}
+
+	/**
+	 * A rebase remaps every currently-`added` record through `idMap` (its only route from a local
+	 * negative id to a persisted one). If the refetch never resolved one — the add's identity batch
+	 * still committed, so it exists server-side — a rebase would keep it pending under its local id,
+	 * and a retry would re-Add it as a duplicate. Every record with `added` status was necessarily
+	 * part of this save's own diff (mutators no-op while {@link saving} is true), so this check is
+	 * exactly the records a rebase would need to remap.
+	 */
+	private diffAddsResolved(idMap: Map<number, number>): boolean {
+		return this.items.every((record) => this.status(record) !== 'added' || idMap.has(record.id));
+	}
+
+	/**
+	 * Rebases this save's own diff against server truth instead of blanket-reseeding the whole
+	 * catalogue: a record this save fully settled (identity + every child saver) takes the fresh
+	 * server copy, but anything else — an untouched sibling, or a record this save's failure left
+	 * only partially written — keeps its current local state so the admin can retry without redoing
+	 * unrelated work. A newly-added record that settled is remapped from its local (negative) id
+	 * onto the persisted id assigned during this save. A delete has no child saver, so it always
+	 * settles atomically with the primary batch — {@link PersistRecovery.settledIds} already
+	 * guarantees this, so no delete can ever survive a rebase as still-pending. Only called once
+	 * {@link diffAddsResolved} has confirmed every added record maps to a persisted id.
+	 */
+	private rebaseAfterPartialFailure({ fresh, idMap, settledIds }: PersistRecovery<T>) {
+		// Throwaway locals scoped to this one synchronous pass, not reactive state.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const freshById = new Map(fresh.map((record) => [record.id, record]));
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const claimedIds = new Set<number>();
+		const rebased: T[] = [];
+
+		for (const record of this.items) {
+			const status = this.status(record);
+			const persistedId = record.id < 0 ? idMap.get(record.id) : record.id;
+			const settled = status === 'clean' || (persistedId !== undefined && settledIds.has(persistedId));
+
+			if (settled) {
+				// Server truth for a settled record — absent from `fresh` only when this save's own
+				// delete for it committed, in which case it's simply dropped.
+				const freshRecord = persistedId !== undefined ? freshById.get(persistedId) : undefined;
+				if (freshRecord) {
+					rebased.push(clone(freshRecord));
+					claimedIds.add(freshRecord.id);
+				}
+				continue;
+			}
+
+			// Added/modified but not yet fully written: keep the local edit, remapped onto its
+			// persisted id if this save's primary batch already assigned it one.
+			const rebasedRecord =
+				persistedId !== undefined && persistedId !== record.id ? { ...clone(record), id: persistedId } : clone(record);
+			rebased.push(rebasedRecord);
+			if (persistedId !== undefined) {
+				claimedIds.add(persistedId);
+			}
+		}
+
+		// A record this save's diff never touched at all but that showed up in the refetch anyway
+		// (a concurrent add from another admin) still needs to appear.
+		for (const record of fresh) {
+			if (!claimedIds.has(record.id)) {
+				rebased.push(clone(record));
+			}
+		}
+
+		this.items = rebased;
+		this.base = fresh.map(clone);
+		this.deleted.clear();
 	}
 
 	discard() {
