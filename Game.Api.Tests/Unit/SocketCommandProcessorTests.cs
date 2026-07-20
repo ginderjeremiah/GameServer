@@ -154,14 +154,23 @@ namespace Game.Api.Tests.Unit
             // The Subscribe failure propagates out of RegisterSocket...
             await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session, isAdmin: false));
 
-            // ...and the partial registration was rolled back: the presence key was released via a
-            // compare-and-delete keyed on the exact socket id that was claimed (so a newer owner's key would be
-            // left intact), on the player's presence key.
-            var claim = Assert.Single(cache.CompareAndSets);
-            var release = Assert.Single(cache.CompareAndDeletes);
-            Assert.Equal(claim.Key, release.Key);
-            Assert.Equal(claim.NewValue, release.DeleteIfValue);
-            Assert.Contains("42", release.Key);
+            // ...and the partial registration was rolled back: both the per-player presence key and the
+            // account-level "current live player" key (#1817) were released via a compare-and-delete keyed on
+            // exactly what was claimed (so a newer owner's key would be left intact).
+            Assert.Equal(2, cache.CompareAndSets.Count);
+            Assert.Equal(2, cache.CompareAndDeletes.Count);
+
+            var presenceClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
+            var presenceRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
+            Assert.Equal(presenceClaim.Key, presenceRelease.Key);
+            Assert.Equal(presenceClaim.NewValue, presenceRelease.DeleteIfValue);
+            Assert.Equal($"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_42", presenceRelease.Key);
+
+            var accountClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX));
+            var accountRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX));
+            Assert.Equal(accountClaim.Key, accountRelease.Key);
+            Assert.Equal(accountClaim.NewValue, accountRelease.DeleteIfValue);
+            Assert.Equal($"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_1", accountRelease.Key);
         }
 
         [Fact]
@@ -192,10 +201,13 @@ namespace Game.Api.Tests.Unit
 
             Assert.NotNull(context);
             // The raced-out first write, the sentinel it then observed, and the retry that finally landed once
-            // the sentinel cleared — three reads and two compare-and-set attempts, with every write going
-            // through CompareAndSet (RacingClaimCacheService implements no unconditional-write primitive at all).
-            Assert.Equal(3, cache.GetCalls);
-            Assert.Equal([null, null], cache.CompareAndSetExpectedValues);
+            // the sentinel cleared — three reads and two compare-and-set attempts for the per-player presence
+            // claim, with every write going through CompareAndSet (RacingClaimCacheService implements no
+            // unconditional-write primitive at all). RegisterSocket then claims the account-level "current
+            // live player" key too (#1817) — a fourth read and third CompareAndSet, unraced (nothing scripts a
+            // race for it, so it succeeds outright on the fake's default null read).
+            Assert.Equal(4, cache.GetCalls);
+            Assert.Equal([null, null, null], cache.CompareAndSetExpectedValues);
             // It genuinely deferred on observing the sentinel (the poll delay actually ran) rather than
             // hot-spinning straight through to the second attempt.
             Assert.True(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(40),
@@ -242,11 +254,17 @@ namespace Game.Api.Tests.Unit
             // The unsubscribe fault during teardown must be swallowed, not propagated...
             await manager.UnRegisterSocket(context);
 
-            // ...and the presence key was still released via a compare-and-delete keyed on the socket's own
-            // id (so a newer owner's key would be left intact), on the player's presence key.
-            var release = Assert.Single(cache.CompareAndDeletes);
-            Assert.Contains("77", release.Key);
-            Assert.Equal(context.SocketId, release.DeleteIfValue);
+            // ...and both the per-player presence key and the account-level "current live player" key
+            // (#1817) were still released via a compare-and-delete keyed on what each was claimed with (so a
+            // newer owner's key would be left intact).
+            Assert.Equal(2, cache.CompareAndDeletes.Count);
+            var presenceRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
+            Assert.Equal($"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_77", presenceRelease.Key);
+            Assert.Equal(context.SocketId, presenceRelease.DeleteIfValue);
+
+            var accountRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX));
+            Assert.Equal($"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_1", accountRelease.Key);
+            Assert.Equal("77", accountRelease.DeleteIfValue);
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("unsubscribe"));
 
             // ...and the socket's own command queue was deleted too, so a graceful disconnect never strands a
