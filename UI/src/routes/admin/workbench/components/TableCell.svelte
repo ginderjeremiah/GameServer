@@ -97,7 +97,9 @@ const taken = $derived(
 );
 
 // Share columns: denominator is the sibling-row sum unless the column overrides it
-// (an enemy's spawn share competes against all enemies in the zone).
+// (an enemy's spawn share competes against all enemies in the zone). The numerator is the
+// row's own weight unless the column overrides it (a row that never actually counts, e.g. a
+// retired enemy's spawn, reports 0 so its displayed share matches runtime truth).
 const pct = $derived.by(() => {
 	if (col.type !== 'share') {
 		return 0;
@@ -106,7 +108,8 @@ const pct = $derived.by(() => {
 	const total = col.shareTotal
 		? col.shareTotal(row, rows, record)
 		: rows.reduce((sum, r) => sum + (Number(r[weightKey]) || 0), 0) || 1;
-	return total > 0 ? Math.round(((Number(row[weightKey]) || 0) / total) * 100) : 0;
+	const value = col.shareValue ? col.shareValue(row, rows, record) : Number(row[weightKey]) || 0;
+	return total > 0 ? Math.round((value / total) * 100) : 0;
 });
 </script>
 

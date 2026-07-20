@@ -408,4 +408,36 @@ describe('TableCell — share type', () => {
 		});
 		expect(container.querySelector('.share-pct')!.textContent).toBe('0%');
 	});
+
+	it("a shareTotal override that already excludes the row's own weight can push the share over 100% (#2214 nit)", () => {
+		// shareTotal alone controls only the denominator; a row whose raw weight (5) exceeds a
+		// denominator that has excluded it (3, from a sibling) divides out to more than 100%.
+		const { container } = render(TableCell, {
+			props: {
+				col: makeShareCol({ shareTotal: () => 3 }),
+				row: { weight: 5 },
+				idx: 0,
+				rows: [{ weight: 5 }, { weight: 3 }],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		expect(container.querySelector('.share-pct')!.textContent).toBe('167%');
+	});
+
+	it('shareValue overrides the numerator so a row that never counts reports 0% regardless of its raw weight', () => {
+		const { container } = render(TableCell, {
+			props: {
+				col: makeShareCol({ shareTotal: () => 3, shareValue: () => 0 }),
+				row: { weight: 5 },
+				idx: 0,
+				rows: [{ weight: 5 }, { weight: 3 }],
+				record: {},
+				dirty: false,
+				onChange: vi.fn()
+			}
+		});
+		expect(container.querySelector('.share-pct')!.textContent).toBe('0%');
+	});
 });

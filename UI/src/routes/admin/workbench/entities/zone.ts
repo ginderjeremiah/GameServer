@@ -177,7 +177,11 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 					// Excludes a retired sibling's weight from the denominator — it never rolls,
 					// so counting it would understate every live enemy's real share.
 					shareTotal: (_row, rows) =>
-						rows.reduce((sum, r) => (isLiveEnemy(r.enemyId as number) ? sum + (Number(r.weight) || 0) : sum), 0) || 1
+						rows.reduce((sum, r) => (isLiveEnemy(r.enemyId as number) ? sum + (Number(r.weight) || 0) : sum), 0) || 1,
+					// A retired enemy's own row never rolls either, so its displayed share is 0 —
+					// otherwise dividing its raw weight into a denominator that already excludes it
+					// could show a share over 100%.
+					shareValue: (row) => (isLiveEnemy(row.enemyId as number) ? Number(row.weight) || 0 : 0)
 				}
 			]
 		}

@@ -101,6 +101,13 @@ export interface ColumnConfig {
 	 * rows; an enemy's spawn share instead competes against all enemies in the zone.
 	 */
 	shareTotal?: (row: TableRow, rows: TableRow[], record: unknown) => number;
+	/**
+	 * Share columns: override the numerator. Defaults to the row's own `weightKey` value;
+	 * a row whose weight never actually counts (e.g. a retired enemy's spawn) can report 0
+	 * here so its displayed share matches runtime truth instead of dividing its raw weight
+	 * into a denominator that has already excluded it.
+	 */
+	shareValue?: (row: TableRow, rows: TableRow[], record: unknown) => number;
 }
 
 interface BaseSection<T> {
