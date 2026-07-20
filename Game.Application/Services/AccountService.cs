@@ -149,9 +149,10 @@ namespace Game.Application.Services
         /// <summary>
         /// Selects which of the account's characters to enter as: validates the player belongs to the
         /// authenticated account (anti-cheat), loads its aggregate, and rotates the token pair to carry the
-        /// chosen player id as the selected-player anchor. Ownership and the player load are checked before
-        /// the refresh token is consumed, so a rejected selection leaves the caller's token intact. Distinct
-        /// failure reasons are reported via the result status so the caller can surface the right message.
+        /// chosen player id as the selected-player anchor. Ownership, the player load, and the account's live
+        /// ban state are all checked before the refresh token is consumed, so a rejected selection leaves the
+        /// caller's token intact. Distinct failure reasons are reported via the result status so the caller
+        /// can surface the right message.
         /// </summary>
         public async Task<AccountSelectPlayerResult> SelectPlayer(int userId, int playerId, string refreshToken, CancellationToken cancellationToken = default)
         {
@@ -167,18 +168,26 @@ namespace Game.Application.Services
                 return AccountSelectPlayerResult.Failed(SelectPlayerStatus.PlayerDataNotFound);
             }
 
+            // Re-check the account's live ban state rather than trusting the refresh token's stored
+            // snapshot, so a ban that lands after the token was issued is rejected here — instead of only at
+            // the account's next login — while a stale (from-before-the-ban) token replay can still occur.
+            var account = await _users.GetAccountState(userId, cancellationToken);
+            if (account is null || account.IsBanned)
+            {
+                return AccountSelectPlayerResult.Failed(SelectPlayerStatus.InvalidToken);
+            }
+
             // Consume the caller's (pre-selection) refresh token and re-issue a rotated pair carrying the
             // chosen player. Consuming only after the validations pass upholds single-use rotation without
-            // burning the token on a rejected selection. The roles come from the consumed token (the "roles
-            // are fixed for the session" model), and the user it resolves to must match the authenticated
-            // caller.
+            // burning the token on a rejected selection. The user it resolves to must match the authenticated
+            // caller; roles come from the account state just loaded, not echoed from the token.
             var session = await _refreshTokenStore.Consume(refreshToken, cancellationToken);
             if (session is null || session.UserId != userId)
             {
                 return AccountSelectPlayerResult.Failed(SelectPlayerStatus.InvalidToken);
             }
 
-            var tokens = await IssueTokens(userId, session.Roles, playerId, cancellationToken);
+            var tokens = await IssueTokens(userId, account.Roles, playerId, cancellationToken);
             return AccountSelectPlayerResult.Succeeded(tokens, player);
         }
 
@@ -297,9 +306,11 @@ namespace Game.Application.Services
         }
 
         /// <summary>
-        /// Validates and rotates a refresh token: consuming it (single use) and, when valid, issuing a
-        /// brand-new token pair carrying the same user, roles, and selected player. Returns
-        /// <see langword="null"/> when the supplied token is missing, expired, or already consumed.
+        /// Validates and rotates a refresh token: consuming it (single use) and, when valid and the account
+        /// is still active and unbanned, issuing a brand-new token pair with freshly-derived roles carrying
+        /// the same selected player. Returns <see langword="null"/> when the supplied token is missing,
+        /// expired, or already consumed — or when the account it resolves to is now banned or archived,
+        /// which ends the refresh chain there rather than letting it renew indefinitely on stale roles.
         /// </summary>
         public async Task<AuthTokenPair?> Refresh(string refreshToken, CancellationToken cancellationToken = default)
         {
@@ -309,7 +320,13 @@ namespace Game.Application.Services
                 return null;
             }
 
-            return await IssueTokens(session.UserId, session.Roles, session.PlayerId, cancellationToken);
+            var account = await _users.GetAccountState(session.UserId, cancellationToken);
+            if (account is null || account.IsBanned)
+            {
+                return null;
+            }
+
+            return await IssueTokens(session.UserId, account.Roles, session.PlayerId, cancellationToken);
         }
 
         /// <summary>
@@ -332,7 +349,7 @@ namespace Game.Application.Services
         private async Task<AuthTokenPair> IssueTokens(int userId, IReadOnlyList<string> roles, int? playerId, CancellationToken cancellationToken = default)
         {
             var accessToken = _accessTokenService.CreateAccessToken(userId, roles, playerId);
-            var refreshToken = await _refreshTokenStore.Issue(userId, roles, playerId, AuthConstants.RefreshTokenLifetime, cancellationToken);
+            var refreshToken = await _refreshTokenStore.Issue(userId, playerId, AuthConstants.RefreshTokenLifetime, cancellationToken);
             return new AuthTokenPair(accessToken, refreshToken);
         }
     }

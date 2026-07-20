@@ -25,6 +25,14 @@ namespace Game.DataAccess.Repositories
                 IsBanned = u.BannedAt != null,
             };
 
+        private static readonly Expression<Func<UserEntity, AccountState>> ToAccountState =
+            u => new AccountState
+            {
+                Id = u.Id,
+                Roles = u.Roles.Select(r => r.Name).ToList(),
+                IsBanned = u.BannedAt != null,
+            };
+
         private static readonly Expression<Func<UserEntity, AdminUser>> ToAdminUser =
             u => new AdminUser
             {
@@ -148,6 +156,14 @@ namespace Game.DataAccess.Repositories
                 .Where(u => u.Id == userId && u.ArchivedAt == null)
                 .SelectMany(u => u.Players.Select(p => p.Id))
                 .ToListAsync(cancellationToken);
+        }
+
+        public Task<AccountState?> GetAccountState(int userId, CancellationToken cancellationToken = default)
+        {
+            return _context.Users
+                .Where(u => u.Id == userId && u.ArchivedAt == null)
+                .Select(ToAccountState)
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         public async Task<IReadOnlyList<PlayerSummary>> GetPlayerSummaries(int userId, CancellationToken cancellationToken = default)

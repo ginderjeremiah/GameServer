@@ -25,10 +25,10 @@ namespace Game.DataAccess.Repositories
             _cache = cache;
         }
 
-        public async Task<string> Issue(int userId, IReadOnlyList<string> roles, int? playerId, TimeSpan lifetime, CancellationToken cancellationToken = default)
+        public async Task<string> Issue(int userId, int? playerId, TimeSpan lifetime, CancellationToken cancellationToken = default)
         {
             var token = GenerateToken();
-            await _cache.Set(Key(token), new RefreshTokenData(userId, roles, playerId), lifetime, cancellationToken);
+            await _cache.Set(Key(token), new RefreshTokenData(userId, playerId), lifetime, cancellationToken);
             return token;
         }
 
