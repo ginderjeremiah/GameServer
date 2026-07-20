@@ -61,9 +61,12 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			desc: 'The skill this recipe produces',
 			kind: 'fields',
 			// `required` only guards an empty value; this section-level check also catches a result that
-			// resolves to a non-Synthesis or retired skill (e.g. an authored result that later lost its flag).
+			// resolves to a non-Synthesis or retired skill (e.g. an authored result that later lost its
+			// flag) — the same condition AdminSkillRecipes hard-rejects on save, so it blocks (#2217).
 			warn: (r) =>
-				reference.isSynthesisResult(r.resultSkillId) ? null : 'Result must be a live Synthesis-flagged skill',
+				reference.isSynthesisResult(r.resultSkillId)
+					? null
+					: { message: 'Result must be a live Synthesis-flagged skill', blocking: true },
 			fields: [
 				{
 					key: 'resultSkillId',
@@ -87,11 +90,12 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			glyph: 'box',
 			desc: 'Owned skills combined into the result',
 			count: (r) => r.inputSkillIds.length,
+			// Both hard-rejected by AdminSkillRecipes.SetInputs, so they block Save (#2217).
 			warn: (r) =>
 				r.inputSkillIds.length === 0
-					? 'No input skills'
+					? { message: 'No input skills', blocking: true }
 					: r.inputSkillIds.includes(r.resultSkillId)
-						? 'An input cannot be the result skill'
+						? { message: 'An input cannot be the result skill', blocking: true }
 						: null,
 			kind: 'chips',
 			itemsKey: 'inputSkillIds',
@@ -111,7 +115,11 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			glyph: 'gauge',
 			desc: 'Proficiency-level gates that must be met',
 			count: (r) => r.conditions.length,
-			warn: (r) => (r.conditions.some((c) => c.minLevel < 1) ? 'Condition level must be at least 1' : null),
+			// Hard-rejected by AdminSkillRecipes.SetConditions, so it blocks Save (#2217).
+			warn: (r) =>
+				r.conditions.some((c) => c.minLevel < 1)
+					? { message: 'Condition level must be at least 1', blocking: true }
+					: null,
 			kind: 'table',
 			itemsKey: 'conditions',
 			rowKey: 'proficiencyId',

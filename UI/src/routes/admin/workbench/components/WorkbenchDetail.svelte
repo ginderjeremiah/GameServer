@@ -59,6 +59,7 @@
 			added={store.counts.added}
 			modified={store.counts.modified}
 			deleted={store.counts.deleted}
+			blocked={store.hasBlockingWarnings}
 			onDiscard={() => store.discard()}
 			onSave={() => store.save()}
 		/>

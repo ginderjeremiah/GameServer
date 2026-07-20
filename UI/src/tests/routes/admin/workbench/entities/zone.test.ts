@@ -240,12 +240,15 @@ describe('zoneEntity', () => {
 	describe('identity section warn (#1996)', () => {
 		const identityWarn = zoneEntity.sections.find((s) => s.key === 'identity')?.warn;
 
-		it('flags a dedicated boss that has since lost its boss flag', () => {
+		it('flags a dedicated boss that has since lost its boss flag, blocking Save (backend-enforced)', () => {
 			const enemies: unknown[] = [];
 			enemies[7] = { id: 7, name: 'Warden', isBoss: false };
 			staticData.enemies = enemies;
 			const z = { ...zoneEntity.newItem(1), bossEnemyId: 7 };
-			expect(identityWarn?.(z)).toBe('Dedicated boss is no longer flagged as a boss');
+			expect(identityWarn?.(z)).toEqual({
+				message: 'Dedicated boss is no longer flagged as a boss',
+				blocking: true
+			});
 		});
 
 		it('passes when the dedicated boss still has the boss flag', () => {

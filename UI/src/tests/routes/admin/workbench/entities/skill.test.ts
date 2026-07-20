@@ -146,7 +146,7 @@ describe('skillEntity', () => {
 		const empty = skillEntity.newItem(1);
 
 		expect(multipliers.count?.(empty)).toBe(0);
-		expect(multipliers.warn?.(empty)).toBe('No damage multipliers');
+		expect(multipliers.warn?.(empty)).toBe('No damage multipliers'); // advisory: not backend-enforced
 		expect(effects.count?.(empty)).toBe(0);
 
 		const filled: ISkill = {
@@ -164,12 +164,15 @@ describe('skillEntity', () => {
 		expect(tableSection('portions').newRow(skillEntity.newItem(1))).toEqual({ type: EDamageType.Fire, weight: 1 });
 	});
 
-	it('portions warn flags an empty set and non-positive weights', () => {
+	it('portions warn flags an empty set and non-positive weights as save-blocking', () => {
 		const portions = tableSection('portions');
-		expect(portions.warn?.({ ...skillEntity.newItem(1), damagePortions: [] })).toBe('No damage portions');
+		expect(portions.warn?.({ ...skillEntity.newItem(1), damagePortions: [] })).toEqual({
+			message: 'No damage portions',
+			blocking: true
+		});
 		expect(
 			portions.warn?.({ ...skillEntity.newItem(1), damagePortions: [{ type: EDamageType.Fire, weight: 0 }] })
-		).toBe('Portion weights must be positive');
+		).toEqual({ message: 'Portion weights must be positive', blocking: true });
 		// A valid single full-weight portion warns nothing.
 		expect(portions.warn?.(skillEntity.newItem(1))).toBeNull();
 	});

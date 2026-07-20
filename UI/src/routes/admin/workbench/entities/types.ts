@@ -110,6 +110,16 @@ export interface ColumnConfig {
 	shareValue?: (row: TableRow, rows: TableRow[], record: unknown) => number;
 }
 
+/**
+ * A validation warning, optionally flagged `blocking` — the backend is known to hard-reject a save
+ * while the condition holds, rather than merely being a data-quality nag. A section's `warn` may
+ * return a plain string (always advisory) or a `Warning` to declare its blocking-ness explicitly.
+ */
+export interface Warning {
+	message: string;
+	blocking?: boolean;
+}
+
 interface BaseSection<T> {
 	key: string;
 	label: string;
@@ -117,8 +127,9 @@ interface BaseSection<T> {
 	desc?: string;
 	/** Tab count badge. */
 	count?: (rec: T) => number;
-	/** Section-level validation warning (e.g. "No skills assigned"). */
-	warn?: (rec: T) => string | null;
+	/** Section-level validation warning (e.g. "No skills assigned"). Return a {@link Warning} instead
+	 *  of a plain string to mark a known backend hard-reject condition as save-blocking. */
+	warn?: (rec: T) => string | Warning | null;
 	/**
 	 * Record keys that constitute a change for this section's tab dirty-dot. Used by
 	 * custom-kind sections (which have no single `fields`/`itemsKey` to diff); the

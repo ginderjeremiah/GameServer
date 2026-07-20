@@ -150,26 +150,36 @@ describe('skillRecipeEntity', () => {
 		});
 	});
 
-	it('warns when the result is not a live Synthesis skill', () => {
+	it('warns when the result is not a live Synthesis skill, blocking Save (backend-enforced)', () => {
 		const warn = fieldsSection('result').warn;
 		expect(warn?.(recipe({ resultSkillId: 3 }))).toBeNull();
-		expect(warn?.(recipe({ resultSkillId: 4 }))).toBe('Result must be a live Synthesis-flagged skill'); // not flagged
-		expect(warn?.(recipe({ resultSkillId: 5 }))).toBe('Result must be a live Synthesis-flagged skill'); // retired
+		expect(warn?.(recipe({ resultSkillId: 4 }))).toEqual({
+			message: 'Result must be a live Synthesis-flagged skill',
+			blocking: true
+		}); // not flagged
+		expect(warn?.(recipe({ resultSkillId: 5 }))).toEqual({
+			message: 'Result must be a live Synthesis-flagged skill',
+			blocking: true
+		}); // retired
 	});
 
-	it('warns on no inputs or an input equal to the result', () => {
+	it('warns on no inputs or an input equal to the result, both blocking Save (backend-enforced)', () => {
 		const warn = chipsSection('inputs').warn;
 		expect(warn?.(recipe({ inputSkillIds: [0, 1] }))).toBeNull();
-		expect(warn?.(recipe({ inputSkillIds: [] }))).toBe('No input skills');
-		expect(warn?.(recipe({ resultSkillId: 3, inputSkillIds: [0, 3] }))).toBe('An input cannot be the result skill');
+		expect(warn?.(recipe({ inputSkillIds: [] }))).toEqual({ message: 'No input skills', blocking: true });
+		expect(warn?.(recipe({ resultSkillId: 3, inputSkillIds: [0, 3] }))).toEqual({
+			message: 'An input cannot be the result skill',
+			blocking: true
+		});
 	});
 
-	it('warns when a condition level is below 1', () => {
+	it('warns when a condition level is below 1, blocking Save (backend-enforced)', () => {
 		const warn = tableSection('conditions').warn;
 		expect(warn?.(recipe({ conditions: [{ proficiencyId: 0, minLevel: 1 }] }))).toBeNull();
-		expect(warn?.(recipe({ conditions: [{ proficiencyId: 0, minLevel: 0 }] }))).toBe(
-			'Condition level must be at least 1'
-		);
+		expect(warn?.(recipe({ conditions: [{ proficiencyId: 0, minLevel: 0 }] }))).toEqual({
+			message: 'Condition level must be at least 1',
+			blocking: true
+		});
 	});
 
 	it('persist saves the inputs when only inputs change, without an identity Edit or a conditions call', async () => {

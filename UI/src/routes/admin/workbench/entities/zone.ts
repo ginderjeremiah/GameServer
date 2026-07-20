@@ -81,13 +81,16 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			kind: 'fields',
 			// The dedicated-boss picker keeps an authored value visible even if it loses its
 			// boss flag (reference.bossEnemyOptions' `keep` exception); flag that drift here
-			// since the zone would otherwise silently point at a non-boss enemy.
+			// since the zone would otherwise silently point at a non-boss enemy. Hard-rejected
+			// by AdminZones.SaveZones, so it blocks Save (#2217).
 			warn: (z) => {
 				if (z.bossEnemyId == null || z.bossEnemyId < 0) {
 					return null;
 				}
 				const boss = staticData.enemies?.[z.bossEnemyId];
-				return boss && !boss.isBoss ? 'Dedicated boss is no longer flagged as a boss' : null;
+				return boss && !boss.isBoss
+					? { message: 'Dedicated boss is no longer flagged as a boss', blocking: true }
+					: null;
 			},
 			fields: [
 				{

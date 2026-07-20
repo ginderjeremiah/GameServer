@@ -118,14 +118,17 @@ describe('challengeEntity', () => {
 	describe('condition section warn (#1781)', () => {
 		const conditionWarn = challengeEntity.sections.find((s) => s.key === 'condition')?.warn;
 
-		it('flags a non-positive goal', () => {
+		it('flags a non-positive goal (advisory — the backend does not range-check it)', () => {
 			const c = { ...challengeEntity.newItem(1), progressGoal: 0 };
 			expect(conditionWarn?.(c)).toBe('Goal must be greater than zero');
 		});
 
-		it('flags a DamageType-scoped statistic left Global — the backend has no global row for it', () => {
+		it('flags a DamageType-scoped statistic left Global, blocking Save (backend-enforced)', () => {
 			const c = { ...challengeEntity.newItem(1), entityType: EEntityType.DamageType, targetEntityId: undefined };
-			expect(conditionWarn?.(c)).toBe('Must target a damage type — this statistic has no global total');
+			expect(conditionWarn?.(c)).toEqual({
+				message: 'Must target a damage type — this statistic has no global total',
+				blocking: true
+			});
 		});
 
 		it('passes once a DamageType-scoped statistic is targeted', () => {
@@ -138,7 +141,7 @@ describe('challengeEntity', () => {
 			expect(conditionWarn?.(c)).toBeNull();
 		});
 
-		it('flags a boss-only target enemy that has since lost its boss flag (#1996)', () => {
+		it('flags a boss-only target enemy that has since lost its boss flag, blocking Save (#1996)', () => {
 			const bossOnlyType: IChallengeType = {
 				id: EChallengeType.BossesDefeated,
 				name: 'Bosses Defeated',
@@ -160,7 +163,7 @@ describe('challengeEntity', () => {
 				entityType: EEntityType.Enemy,
 				targetEntityId: 7
 			};
-			expect(conditionWarn?.(c)).toBe('Target enemy is no longer flagged as a boss');
+			expect(conditionWarn?.(c)).toEqual({ message: 'Target enemy is no longer flagged as a boss', blocking: true });
 		});
 
 		it('passes a boss-only target that still has the boss flag', () => {

@@ -47,12 +47,13 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 			glyph: 'tag',
 			desc: 'Key, trigger & host screen',
 			kind: 'fields',
+			// Both hard-rejected by AdminLessons.SaveLessons, so they block Save (#2217).
 			warn: (l) => {
 				if (l.triggerType === ELessonTriggerType.MechanicEvent && l.triggerMechanicEvent === -1) {
-					return 'Mechanic-event lessons must name a mechanic event';
+					return { message: 'Mechanic-event lessons must name a mechanic event', blocking: true };
 				}
 				if (l.triggerType === ELessonTriggerType.ScreenVisit && l.triggerMechanicEvent !== -1) {
-					return 'Screen-visit lessons cannot also carry a mechanic-event trigger';
+					return { message: 'Screen-visit lessons cannot also carry a mechanic-event trigger', blocking: true };
 				}
 				return null;
 			},
@@ -123,8 +124,10 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					return 'No tour steps';
 				}
 				const ordinals = l.steps.map((s) => s.ordinal);
+				// The backend's ChildCollectionReconciler rejects a duplicate desiredKey, so this blocks
+				// Save (#2217); an empty set or blank callout text both save fine, so those stay advisory.
 				if (new Set(ordinals).size !== ordinals.length) {
-					return 'Two steps share the same ordinal';
+					return { message: 'Two steps share the same ordinal', blocking: true };
 				}
 				if (l.steps.some((s) => !s.text.trim())) {
 					return 'A tour step is missing its callout text';

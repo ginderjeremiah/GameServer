@@ -2,7 +2,7 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { SaveFlash } from '$lib/common';
 import { toastError } from '$stores';
 import { canonicalEqual, PersistFailedError, type PersistRecovery } from './save-helpers';
-import { entityWarnings } from './validation';
+import { entityBlockingWarnings, entityWarnings } from './validation';
 import type { EntityConfig, Identified, SaveDiff } from './entities/types';
 
 export type RecordStatus = 'clean' | 'added' | 'modified' | 'deleted';
@@ -11,6 +11,8 @@ export type RecordStatus = 'clean' | 'added' | 'modified' | 'deleted';
 export interface RecordState {
 	status: RecordStatus;
 	warnings: string[];
+	/** The subset of {@link warnings} the backend is known to hard-reject a save over. */
+	blockingWarnings: string[];
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -100,7 +102,11 @@ export class EntityStore<T extends Identified> {
 		for (const record of this.items) {
 			let state = this.stateCache.get(record);
 			if (!state) {
-				state = { status: this.status(record), warnings: entityWarnings(this.config, record) };
+				state = {
+					status: this.status(record),
+					warnings: entityWarnings(this.config, record),
+					blockingWarnings: entityBlockingWarnings(this.config, record)
+				};
 				this.stateCache.set(record, state);
 			}
 			map[record.id] = state;
@@ -113,10 +119,20 @@ export class EntityStore<T extends Identified> {
 		return (
 			this.recordStates[record.id] ?? {
 				status: this.status(record),
-				warnings: entityWarnings(this.config, record)
+				warnings: entityWarnings(this.config, record),
+				blockingWarnings: entityBlockingWarnings(this.config, record)
 			}
 		);
 	}
+
+	/** True while any not-yet-saved record (added/modified — a delete has nothing left to validate)
+	 *  carries a warning the backend is known to hard-reject a save over. Gates {@link save} so a
+	 *  predictable failure can't trigger the partial-failure rebase path in the first place (#2217). */
+	hasBlockingWarnings = $derived.by(() => {
+		return Object.values(this.recordStates).some(
+			(state) => (state.status === 'added' || state.status === 'modified') && state.blockingWarnings.length > 0
+		);
+	});
 
 	counts = $derived.by(() => {
 		let added = 0;
@@ -247,7 +263,7 @@ export class EntityStore<T extends Identified> {
 	}
 
 	async save() {
-		if (this.counts.total === 0 || this.saving) {
+		if (this.counts.total === 0 || this.saving || this.hasBlockingWarnings) {
 			return;
 		}
 		this.saving = true;
