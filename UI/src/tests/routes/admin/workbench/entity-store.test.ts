@@ -593,4 +593,63 @@ describe('EntityStore', () => {
 			expect(store.recordStates[0].status).toBe('clean');
 		});
 	});
+
+	describe('blocking warnings (#2217)', () => {
+		// A section whose `warn` flags a negative value as save-blocking (mirrors a real entity's
+		// backend-hard-reject condition, e.g. skill.ts's non-positive damage portion weight).
+		const blockingConfig = (persist?: EntityConfig<Row>['persist']): EntityConfig<Row> => ({
+			...makeConfig(persist),
+			sections: [
+				{
+					kind: 'fields',
+					key: 'identity',
+					label: 'Identity',
+					glyph: 'box',
+					fields: [],
+					warn: (r: Row) => (r.value < 0 ? { message: 'Value must not be negative', blocking: true } : null)
+				}
+			]
+		});
+
+		it('surfaces a blocking warning as both a general warning and a blocking warning', () => {
+			const store = new EntityStore(blockingConfig(), seed);
+			store.patch(0, (draft) => (draft.value = -1));
+
+			const state = store.stateOf(store.items.find((r) => r.id === 0)!);
+			expect(state.warnings).toEqual(['Value must not be negative']);
+			expect(state.blockingWarnings).toEqual(['Value must not be negative']);
+		});
+
+		it('hasBlockingWarnings is true only while a pending (added/modified) record carries one', () => {
+			const store = new EntityStore(blockingConfig(), seed);
+			expect(store.hasBlockingWarnings).toBe(false);
+
+			store.patch(0, (draft) => (draft.value = -1));
+			expect(store.hasBlockingWarnings).toBe(true);
+
+			store.patch(0, (draft) => (draft.value = 1));
+			expect(store.hasBlockingWarnings).toBe(false);
+		});
+
+		it('save refuses to persist while any pending record carries a blocking warning', async () => {
+			const persist = vi.fn(async () => persistResult(seed));
+			const store = new EntityStore(blockingConfig(persist), seed);
+			store.patch(0, (draft) => (draft.value = -1));
+
+			await store.save();
+
+			expect(persist).not.toHaveBeenCalled();
+			expect(store.counts.total).toBe(1);
+		});
+
+		it('a deleted record with a stale blocking warning does not gate save — deletes have no child saver to hard-reject', async () => {
+			const persist = vi.fn(async () => persistResult(seed.slice(1)));
+			const store = new EntityStore(blockingConfig(persist), [{ id: 0, name: 'Alpha', value: -1 }, ...seed.slice(1)]);
+			store.removeItem(0);
+
+			await store.save();
+
+			expect(persist).toHaveBeenCalledOnce();
+		});
+	});
 });

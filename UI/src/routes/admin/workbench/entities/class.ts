@@ -164,11 +164,12 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			glyph: 'box',
 			desc: 'Items equipped at character creation',
 			count: (c) => c.starterEquipment.length,
+			// Hard-rejected by AdminClasses.SetStarterEquipment, so it blocks Save (#2217).
 			warn: (c) => {
 				const mismatch = c.starterEquipment.find(
 					(e) => reference.itemCategoryOf(e.itemId) !== reference.equipmentSlotCategory(e.equipmentSlot)
 				);
-				return mismatch ? `Item doesn't match its equipment slot's category` : null;
+				return mismatch ? { message: `Item doesn't match its equipment slot's category`, blocking: true } : null;
 			},
 			kind: 'table',
 			itemsKey: 'starterEquipment',

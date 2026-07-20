@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EChangeType, EDamageType, EItemCategory, ERarity } from '$lib/api';
-import type { FieldsSectionConfig } from '$routes/admin/workbench/entities/types';
+import type { FieldsSectionConfig, Warning } from '$routes/admin/workbench/entities/types';
 
 /* Item config transforms specific to the WeaponType field (#1372, relaxed to any leaf by #1456): the
    `newItem` default, the no-stranding validation warning (a weapon needs both a weapon type and a granted
@@ -36,7 +36,7 @@ import { reference } from '$routes/admin/workbench/reference.svelte';
 const postBodyTo = (endpoint: string) => mockPost.mock.calls.find((c) => c[0] === endpoint)?.[1];
 
 /** Runs the identity section's no-stranding warning against a record. */
-const identityWarn = (rec: WorkbenchItem): string | null => {
+const identityWarn = (rec: WorkbenchItem): string | Warning | null => {
 	const section = itemEntity.sections.find((s) => s.key === 'identity') as FieldsSectionConfig<WorkbenchItem>;
 	return section.warn?.(rec) ?? null;
 };
@@ -58,18 +58,18 @@ describe('itemEntity weapon type', () => {
 		expect(created.grantedSkillId).toBe(-1);
 	});
 
-	it('warns a weapon missing a weapon type', () => {
+	it('warns a weapon missing a weapon type, blocking Save (backend-enforced)', () => {
 		const weapon: WorkbenchItem = { ...itemEntity.newItem(1), itemCategoryId: EItemCategory.Weapon };
-		expect(identityWarn(weapon)).toBe('Weapon needs a weapon type');
+		expect(identityWarn(weapon)).toEqual({ message: 'Weapon needs a weapon type', blocking: true });
 	});
 
-	it('warns a weapon missing a granted skill', () => {
+	it('warns a weapon missing a granted skill, blocking Save (backend-enforced)', () => {
 		const weapon: WorkbenchItem = {
 			...itemEntity.newItem(1),
 			itemCategoryId: EItemCategory.Weapon,
 			weaponType: EDamageType.Sword
 		};
-		expect(identityWarn(weapon)).toBe('Weapon needs a granted skill');
+		expect(identityWarn(weapon)).toEqual({ message: 'Weapon needs a granted skill', blocking: true });
 	});
 
 	it('accepts a weapon that declares both a weapon type and a granted skill', () => {
@@ -82,13 +82,13 @@ describe('itemEntity weapon type', () => {
 		expect(identityWarn(weapon)).toBeNull();
 	});
 
-	it('warns a non-weapon that declares a weapon type', () => {
+	it('warns a non-weapon that declares a weapon type, blocking Save (backend-enforced)', () => {
 		const helm: WorkbenchItem = {
 			...itemEntity.newItem(1),
 			itemCategoryId: EItemCategory.Helm,
 			weaponType: EDamageType.Sword
 		};
-		expect(identityWarn(helm)).toBe('Only weapons have a weapon type');
+		expect(identityWarn(helm)).toEqual({ message: 'Only weapons have a weapon type', blocking: true });
 	});
 
 	it('accepts a clean non-weapon item', () => {

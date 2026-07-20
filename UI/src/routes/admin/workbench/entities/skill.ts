@@ -129,11 +129,12 @@ export const skillEntity: EntityConfig<ISkill> = {
 			desc: 'The weighted leaf-type split this skill’s direct hits deal',
 			count: (s) => s.damagePortions.length,
 			// Validate authoring intent the backend also guards: at least one portion, all weights positive.
+			// Both conditions are hard-rejected by AdminSkills.SetPortions, so they block Save (#2217).
 			warn: (s) =>
 				s.damagePortions.length === 0
-					? 'No damage portions'
+					? { message: 'No damage portions', blocking: true }
 					: s.damagePortions.some((p) => p.weight <= 0)
-						? 'Portion weights must be positive'
+						? { message: 'Portion weights must be positive', blocking: true }
 						: null,
 			kind: 'table',
 			itemsKey: 'damagePortions',

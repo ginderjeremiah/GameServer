@@ -127,8 +127,11 @@ describe('starterEquipment section (#1782)', () => {
 		expect(starterEquipmentSection().warn?.(cls)).toBeNull();
 	});
 
-	it('warn flags a slot/category mismatch as a backstop', () => {
+	it('warn flags a slot/category mismatch as a backstop, blocking Save (backend-enforced)', () => {
 		const cls = blankClass([{ equipmentSlot: EEquipmentSlot.HelmSlot, itemId: 1 }]);
-		expect(starterEquipmentSection().warn?.(cls)).toBe("Item doesn't match its equipment slot's category");
+		expect(starterEquipmentSection().warn?.(cls)).toEqual({
+			message: "Item doesn't match its equipment slot's category",
+			blocking: true
+		});
 	});
 });

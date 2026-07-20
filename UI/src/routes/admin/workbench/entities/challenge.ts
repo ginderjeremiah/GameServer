@@ -86,21 +86,22 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 			desc: 'What the player must do to complete it',
 			kind: 'challenge-condition',
 			// Statistic & entity are fully determined by the type, so they can't be
-			// inconsistent — the remaining condition-level slips are a non-positive goal and a
-			// DamageType-scoped statistic left Global (it has no global row; the backend hard-rejects it).
+			// inconsistent — the remaining condition-level slips are a non-positive goal (advisory only —
+			// the backend doesn't range-check it) and a DamageType-scoped statistic left Global or a
+			// boss-only statistic whose target lost its boss flag (both hard-rejected on save, #2217).
 			dirtyKeys: ['challengeTypeId', 'statisticType', 'entityType', 'targetEntityId', 'progressGoal'],
 			warn: (c) => {
 				if (!c.progressGoal || c.progressGoal <= 0) {
 					return 'Goal must be greater than zero';
 				}
 				if (c.entityType === EEntityType.DamageType && c.targetEntityId == null) {
-					return 'Must target a damage type — this statistic has no global total';
+					return { message: 'Must target a damage type — this statistic has no global total', blocking: true };
 				}
 				// The target picker keeps a boss target visible even if it's since lost the
 				// boss flag (reference.entityOptions' `keep` exception); flag that drift here.
 				const target = c.targetEntityId != null ? staticData.enemies?.[c.targetEntityId] : undefined;
 				if (target && typeBossOnly(reference.challengeTypes, c.challengeTypeId) && !target.isBoss) {
-					return 'Target enemy is no longer flagged as a boss';
+					return { message: 'Target enemy is no longer flagged as a boss', blocking: true };
 				}
 				return null;
 			}

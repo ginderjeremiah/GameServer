@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { entityWarnings, fieldWarn, sectionWarnings } from '../../../../routes/admin/workbench/validation';
+import {
+	entityBlockingWarnings,
+	entityWarnings,
+	fieldWarn,
+	sectionBlockingWarning,
+	sectionWarnings
+} from '../../../../routes/admin/workbench/validation';
 import type { EntityConfig, FieldConfig, Identified } from '../../../../routes/admin/workbench/entities/types';
 
 interface Thing extends Identified {
@@ -88,5 +94,73 @@ describe('entityWarnings', () => {
 
 	it('is empty when the record is complete', () => {
 		expect(entityWarnings(entity, { id: 1, name: 'Goblin', icon: 'g.png', rows: [1] })).toEqual([]);
+	});
+});
+
+describe('sectionBlockingWarning', () => {
+	const blockingSection = {
+		key: 'rows',
+		label: 'Rows',
+		glyph: 'bars',
+		kind: 'table',
+		itemsKey: 'rows',
+		warn: (t: Thing) => (t.rows.length ? null : { message: 'No rows', blocking: true })
+	} as unknown as EntityConfig<Thing>['sections'][number];
+
+	const advisorySection = {
+		key: 'rows',
+		label: 'Rows',
+		glyph: 'bars',
+		kind: 'table',
+		itemsKey: 'rows',
+		warn: (t: Thing) => (t.rows.length ? null : 'No rows')
+	} as unknown as EntityConfig<Thing>['sections'][number];
+
+	it('returns the message when the warn is flagged blocking', () => {
+		expect(sectionBlockingWarning(blockingSection, { id: 1, name: 'x', icon: 'x', rows: [] })).toBe('No rows');
+	});
+
+	it('returns null for a plain-string (advisory) warn', () => {
+		expect(sectionBlockingWarning(advisorySection, { id: 1, name: 'x', icon: 'x', rows: [] })).toBeNull();
+	});
+
+	it('returns null once the condition clears', () => {
+		expect(sectionBlockingWarning(blockingSection, { id: 1, name: 'x', icon: 'x', rows: [1] })).toBeNull();
+	});
+
+	it('a fields section warn can also be flagged blocking, independent of its required-field warnings', () => {
+		const section = {
+			key: 'identity',
+			label: 'Identity',
+			glyph: 'tag',
+			kind: 'fields',
+			fields: [nameField],
+			warn: (t: Thing) => (t.icon ? null : { message: 'No icon set', blocking: true })
+		} as unknown as EntityConfig<Thing>['sections'][number];
+		expect(sectionBlockingWarning(section, { id: 1, name: '', icon: '', rows: [] })).toBe('No icon set');
+	});
+});
+
+describe('entityBlockingWarnings', () => {
+	const mixedEntity = {
+		sections: [
+			{ key: 'identity', label: 'Identity', glyph: 'tag', kind: 'fields', fields: [nameField, iconField] },
+			{
+				key: 'rows',
+				label: 'Rows',
+				glyph: 'bars',
+				kind: 'table',
+				itemsKey: 'rows',
+				warn: (t: Thing) => (t.rows.length ? null : { message: 'No rows', blocking: true })
+			}
+		]
+	} as unknown as EntityConfig<Thing>;
+
+	it('only collects the blocking warnings, skipping required-field (always advisory) warnings', () => {
+		expect(entityBlockingWarnings(mixedEntity, { id: 1, name: '', icon: '', rows: [] })).toEqual(['No rows']);
+	});
+
+	it('is empty once every blocking condition clears, even with unrelated advisory warnings still present', () => {
+		expect(entityBlockingWarnings(mixedEntity, { id: 1, name: '', icon: '', rows: [1] })).toEqual([]);
 	});
 });

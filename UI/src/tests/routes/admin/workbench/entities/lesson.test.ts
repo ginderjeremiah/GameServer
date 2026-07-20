@@ -103,20 +103,22 @@ describe('lessonEntity', () => {
 		expect(lessons[0].triggerMechanicEvent).toBe(EMechanicEvent.FirstCrit);
 	});
 
-	it('warns when a mechanic-event lesson names no mechanic event', () => {
+	it('warns when a mechanic-event lesson names no mechanic event, blocking Save (backend-enforced)', () => {
 		const identity = lessonEntity.sections.find((s) => s.key === 'identity');
 		const l = { ...lessonEntity.newItem(0), triggerType: ELessonTriggerType.MechanicEvent, triggerMechanicEvent: -1 };
-		expect(identity && 'warn' in identity ? identity.warn?.(l) : null).toBe(
-			'Mechanic-event lessons must name a mechanic event'
-		);
+		expect(identity && 'warn' in identity ? identity.warn?.(l) : null).toEqual({
+			message: 'Mechanic-event lessons must name a mechanic event',
+			blocking: true
+		});
 	});
 
-	it('warns when a screen-visit lesson also carries a mechanic-event trigger', () => {
+	it('warns when a screen-visit lesson also carries a mechanic-event trigger, blocking Save (backend-enforced)', () => {
 		const identity = lessonEntity.sections.find((s) => s.key === 'identity');
 		const l = { ...lessonEntity.newItem(0), triggerMechanicEvent: EMechanicEvent.FirstDodge };
-		expect(identity && 'warn' in identity ? identity.warn?.(l) : null).toBe(
-			'Screen-visit lessons cannot also carry a mechanic-event trigger'
-		);
+		expect(identity && 'warn' in identity ? identity.warn?.(l) : null).toEqual({
+			message: 'Screen-visit lessons cannot also carry a mechanic-event trigger',
+			blocking: true
+		});
 	});
 
 	it('does not warn on a consistent trigger', () => {
@@ -180,7 +182,7 @@ describe('lessonEntity', () => {
 			expect(section && 'warn' in section ? section.warn?.(l) : null).toBeNull();
 		});
 
-		it('warns when two steps share the same ordinal', () => {
+		it('warns when two steps share the same ordinal, blocking Save (backend-enforced)', () => {
 			const section = stepsSection();
 			const l = {
 				...lessonEntity.newItem(0),
@@ -189,7 +191,10 @@ describe('lessonEntity', () => {
 					{ ordinal: 0, text: 'Also first' }
 				]
 			};
-			expect(section && 'warn' in section ? section.warn?.(l) : null).toBe('Two steps share the same ordinal');
+			expect(section && 'warn' in section ? section.warn?.(l) : null).toEqual({
+				message: 'Two steps share the same ordinal',
+				blocking: true
+			});
 		});
 
 		it('warns when a step has blank callout text', () => {

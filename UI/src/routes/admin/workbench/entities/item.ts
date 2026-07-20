@@ -64,19 +64,19 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 			glyph: 'tag',
 			desc: 'Name, category & rarity',
 			kind: 'fields',
-			// The no-stranding invariant (enforced authoritatively on the backend): a weapon must declare a
-			// weapon type and a granted signature skill; only a weapon may carry a weapon type.
+			// The no-stranding invariant, hard-rejected by AdminItems on save, so every branch blocks (#2217):
+			// a weapon must declare a weapon type and a granted signature skill; only a weapon may carry one.
 			warn: (it) => {
 				if (it.itemCategoryId === EItemCategory.Weapon) {
 					if (it.weaponType === -1) {
-						return 'Weapon needs a weapon type';
+						return { message: 'Weapon needs a weapon type', blocking: true };
 					}
 					if (it.grantedSkillId === -1) {
-						return 'Weapon needs a granted skill';
+						return { message: 'Weapon needs a granted skill', blocking: true };
 					}
 					return null;
 				}
-				return it.weaponType === -1 ? null : 'Only weapons have a weapon type';
+				return it.weaponType === -1 ? null : { message: 'Only weapons have a weapon type', blocking: true };
 			},
 			fields: [
 				{

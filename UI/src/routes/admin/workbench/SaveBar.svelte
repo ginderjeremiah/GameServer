@@ -11,6 +11,9 @@
 				{#if modified > 0}<span class="pip modified"><span class="dot"></span>{modified} edited</span>{/if}
 				{#if deleted}<span class="pip deleted"><span class="dot"></span>{deleted} removed</span>{/if}
 			</span>
+			{#if blocked}
+				<span class="blocked-note"><WarnTriangle size={13} />Resolve blocking warnings before saving</span>
+			{/if}
 		{/if}
 	</div>
 	<div class="save-actions">
@@ -19,7 +22,7 @@
 			type="button"
 			class="btn primary"
 			data-testid={saveTestId}
-			disabled={total === 0 || saving}
+			disabled={total === 0 || saving || blocked}
 			onclick={onSave}
 		>
 			Save Changes
@@ -28,6 +31,7 @@
 </div>
 
 <script lang="ts">
+import WarnTriangle from './components/WarnTriangle.svelte';
 import WorkbenchIcon from './WorkbenchIcon.svelte';
 
 interface Props {
@@ -37,17 +41,39 @@ interface Props {
 	added: number;
 	modified: number;
 	deleted?: number;
+	/** True when a pending record carries a save-blocking warning — disables Save alongside the
+	 *  existing total/saving gates and surfaces why. Defaults to false for callers with no concept
+	 *  of blocking warnings (e.g. the progression editor's own advisory-only warnings). */
+	blocked?: boolean;
 	onDiscard: () => void;
 	onSave: () => void;
 	saveTestId?: string;
 }
 
-const { saved, total, saving, added, modified, deleted = 0, onDiscard, onSave, saveTestId }: Props = $props();
+const {
+	saved,
+	total,
+	saving,
+	added,
+	modified,
+	deleted = 0,
+	blocked = false,
+	onDiscard,
+	onSave,
+	saveTestId
+}: Props = $props();
 </script>
 
 <style lang="scss">
 .pips {
 	display: inline-flex;
 	gap: 12px;
+}
+.blocked-note {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin-left: 12px;
+	color: var(--warning);
 }
 </style>
