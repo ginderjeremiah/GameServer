@@ -31,7 +31,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task Connect_Unauthenticated_Fails()
         {
-            // A genuinely unauthenticated handshake — no access_token at all — is rejected. (A valid token
+            // A genuinely unauthenticated handshake — no token offered at all — is rejected. (A valid token
             // with no cached session is a different, authenticated case; see the rehydration test below.)
             var wsClient = Factory.Server.CreateWebSocketClient();
 
@@ -89,7 +89,7 @@ namespace Game.Api.Tests.Integration
             {
                 ctx.Request.Method = HttpMethods.Get;
                 ctx.Request.Path = "/socket";
-                ctx.Request.QueryString = new QueryString($"?access_token={token}");
+                ctx.Request.Headers["Sec-WebSocket-Protocol"] = token;
                 ctx.Features.Set<IHttpWebSocketFeature>(new StubWebSocketFeature());
             }, CancellationToken);
 
@@ -117,7 +117,7 @@ namespace Game.Api.Tests.Integration
             {
                 ctx.Request.Method = HttpMethods.Get;
                 ctx.Request.Path = "/socket";
-                ctx.Request.QueryString = new QueryString($"?access_token={token}");
+                ctx.Request.Headers["Sec-WebSocket-Protocol"] = token;
                 ctx.Features.Set<IHttpWebSocketFeature>(new StubWebSocketFeature());
             }, CancellationToken);
 

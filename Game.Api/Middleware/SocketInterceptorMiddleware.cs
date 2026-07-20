@@ -59,7 +59,12 @@ namespace Game.Api.Middleware
                     // AdminRoleAuthorizationFilter reads for HTTP admin endpoints), not the volatile session
                     // cache, so it derives from the token alone.
                     var isAdmin = context.User.IsInRole(nameof(ERole.Admin));
-                    using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                    // The client offers the access token as the sole requested subprotocol (see Startup's
+                    // JwtBearerEvents.OnMessageReceived); the handshake must echo one back or browsers fail
+                    // the connection outright when a subprotocol list was offered but none was selected.
+                    var requestedProtocols = context.WebSockets.WebSocketRequestedProtocols;
+                    var subProtocol = requestedProtocols.Count > 0 ? requestedProtocols[0] : null;
+                    using var webSocket = await context.WebSockets.AcceptWebSocketAsync(subProtocol);
                     var socketContext = await socketManager.RegisterSocket(webSocket, sessionService, isAdmin);
                     await socketContext.WaitSocketClosed();
                     await socketManager.UnRegisterSocket(socketContext);

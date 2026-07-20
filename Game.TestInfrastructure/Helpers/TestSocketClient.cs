@@ -25,9 +25,10 @@ namespace Game.TestInfrastructure.Helpers
             var tokenString = TestAuthHelper.CreateAccessToken(userId, playerId ?? userId);
 
             _ownedSocket = new ClientWebSocket();
+            _ownedSocket.Options.AddSubProtocol(tokenString);
 
             var wsBase = baseUrl.Replace("https://", "wss://").Replace("http://", "ws://");
-            var wsUri = new Uri($"{wsBase}/socket?access_token={Uri.EscapeDataString(tokenString)}");
+            var wsUri = new Uri($"{wsBase}/socket");
             await _ownedSocket.ConnectAsync(wsUri, _cts.Token);
             _socket = _ownedSocket;
         }
@@ -44,7 +45,8 @@ namespace Game.TestInfrastructure.Helpers
         {
             var tokenString = TestAuthHelper.CreateAccessToken(userId, playerId ?? userId, roles);
 
-            var wsUri = new Uri($"ws://localhost/socket?access_token={Uri.EscapeDataString(tokenString)}");
+            wsClient.SubProtocols.Add(tokenString);
+            var wsUri = new Uri("ws://localhost/socket");
             _socket = await wsClient.ConnectAsync(wsUri, _cts.Token);
         }
 

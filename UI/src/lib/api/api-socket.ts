@@ -169,10 +169,11 @@ export class ApiSocket {
 				return;
 			}
 		}
-		// Browsers can't set an Authorization header on the WebSocket handshake, so the access token
-		// is passed as a query-string parameter (the standard ASP.NET Core token-over-WS pattern).
-		const url = accessToken ? `/socket?access_token=${encodeURIComponent(accessToken)}` : '/socket';
-		const socket = new WebSocket(url);
+		// Browsers can't set an Authorization header on the WebSocket handshake, so the access token is
+		// carried as a WebSocket subprotocol instead of a query-string parameter — a query string ends up
+		// verbatim in any downstream access log (e.g. the edge proxy's), while a subprotocol is a
+		// handshake header a default access log format never records (#2211).
+		const socket = accessToken ? new WebSocket('/socket', [accessToken]) : new WebSocket('/socket');
 		this.socket = socket;
 		socket.onopen = this.onStart.bind(this);
 		socket.onmessage = this.receiveResponse.bind(this);
