@@ -157,6 +157,30 @@ export const pathWarnings = (path: WorkbenchPath): string[] => {
 	return warnings;
 };
 
+/**
+ * An out-of-range modifier/reward level, checked against the tier's own (about-to-be-saved) MaxLevel.
+ * This is the one proficiency condition the backend genuinely hard-rejects a save over — via
+ * AdminProficiencies.FindShrunkenMaxLevelViolation (the identity edit, against a still-persisted
+ * payout) or FindLevelOutOfRange (SetModifiers/SetRewards, against the tier's saved MaxLevel) — so it
+ * doubles as {@link proficiencyBlockingWarnings}, unlike the rest of {@link proficiencyWarnings}.
+ */
+const levelRangeWarnings = (prof: WorkbenchProficiency): string[] => {
+	const warnings: string[] = [];
+	for (const modifier of prof.levelModifiers) {
+		if (modifier.level < 0 || modifier.level > prof.maxLevel) {
+			warnings.push(`Modifier level ${modifier.level} out of range`);
+			break;
+		}
+	}
+	for (const reward of prof.levelRewards) {
+		if (reward.level < 1 || reward.level > prof.maxLevel) {
+			warnings.push(`Reward level ${reward.level} out of range`);
+			break;
+		}
+	}
+	return warnings;
+};
+
 export const proficiencyWarnings = (prof: WorkbenchProficiency): string[] => {
 	const warnings: string[] = [];
 	if (!prof.name.trim()) {
@@ -174,20 +198,16 @@ export const proficiencyWarnings = (prof: WorkbenchProficiency): string[] => {
 	if (!(prof.baseXp > 0) || !(prof.xpGrowth > 0)) {
 		warnings.push('XP curve must be positive');
 	}
-	for (const modifier of prof.levelModifiers) {
-		if (modifier.level < 0 || modifier.level > prof.maxLevel) {
-			warnings.push(`Modifier level ${modifier.level} out of range`);
-			break;
-		}
-	}
-	for (const reward of prof.levelRewards) {
-		if (reward.level < 1 || reward.level > prof.maxLevel) {
-			warnings.push(`Reward level ${reward.level} out of range`);
-			break;
-		}
-	}
-	return warnings;
+	return [...warnings, ...levelRangeWarnings(prof)];
 };
+
+/**
+ * The subset of {@link proficiencyWarnings} the backend is known to hard-reject a save over — see
+ * {@link levelRangeWarnings}. `MaxLevel < 1` and a non-positive XP curve stay advisory-only: neither
+ * `Contracts.Proficiency` nor `AdminProficiencies` rejects them, so gating Save on them would block a
+ * save the backend would actually accept.
+ */
+export const proficiencyBlockingWarnings = (prof: WorkbenchProficiency): string[] => levelRangeWarnings(prof);
 
 // ── Persisted DTOs (identity-level Add/Edit; child collections go through their own endpoints) ──
 

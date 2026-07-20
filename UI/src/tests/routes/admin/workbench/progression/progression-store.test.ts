@@ -332,6 +332,47 @@ describe('local editing', () => {
 	});
 });
 
+describe('blocking warnings (#2222)', () => {
+	it('hasBlockingWarnings is true only while a pending tier carries an out-of-range payout', async () => {
+		seedServer();
+		const store = new ProgressionStore();
+		await store.load();
+		expect(store.hasBlockingWarnings).toBe(false);
+
+		store.addModifier(0, 20); // baseline tier's maxLevel is 10 (fullTier default).
+		expect(store.hasBlockingWarnings).toBe(true);
+
+		store.removeModifier(0, store.profs[0].levelModifiers.length - 1);
+		expect(store.hasBlockingWarnings).toBe(false);
+	});
+
+	it('does not block on MaxLevel < 1 or a non-positive XP curve — the backend accepts both as-is', async () => {
+		seedServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.patchProf(0, (d) => {
+			d.maxLevel = 0;
+			d.baseXp = -1;
+			d.xpGrowth = 0;
+		});
+
+		expect(store.hasBlockingWarnings).toBe(false);
+	});
+
+	it('save refuses to persist while any pending tier carries a blocking warning', async () => {
+		seedServer();
+		const store = new ProgressionStore();
+		await store.load();
+
+		store.addModifier(0, 20);
+		await store.save();
+
+		expect(postMock).not.toHaveBeenCalled();
+		expect(store.profs[0].levelModifiers).toHaveLength(1);
+	});
+});
+
 describe('save orchestration', () => {
 	it('creates a path then its tier with the resolved path id, then child collections', async () => {
 		const store = new ProgressionStore();
@@ -626,7 +667,7 @@ describe('save orchestration', () => {
 		expect(identityCallIndex).toBeGreaterThan(rewardsCallIndex);
 	});
 
-	it('lowering MaxLevel without removing the offending payout is still rejected, same as before', async () => {
+	it('lowering MaxLevel without removing the offending payout is now blocked before any network call (#2222)', async () => {
 		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
 		serverProfs = [
 			fullTier({
@@ -642,11 +683,14 @@ describe('save orchestration', () => {
 		await store.load();
 
 		store.patchProf(0, (d) => (d.maxLevel = 5));
+		expect(store.hasBlockingWarnings).toBe(true);
 
 		await store.save();
 
-		expect(toastErrorMock).toHaveBeenCalled();
-		// Rejected pre-commit: nothing wrote, so the local edit is preserved for a clean retry.
+		// Blocked pre-flight — the backend's own FindShrunkenMaxLevelViolation guard (exercised by the
+		// #1827/#1804 case above, where the payout is fixed rather than left offending) is never reached.
+		expect(postMock).not.toHaveBeenCalled();
+		expect(toastErrorMock).not.toHaveBeenCalled();
 		expect(store.profs.find((p) => p.id === 0)?.maxLevel).toBe(5);
 		expect(serverProfs.find((p) => p.id === 0)?.maxLevel).toBe(10);
 	});
