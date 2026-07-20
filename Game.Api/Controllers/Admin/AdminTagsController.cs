@@ -21,9 +21,9 @@ namespace Game.Api.Controllers.Admin
         private readonly IAdminTags _adminTags = adminTags;
 
         [HttpPost]
-        public ApiResponse AddEditTags([FromBody] List<Change<Tag>> changes)
+        public async Task<ApiResponse> AddEditTags([FromBody] List<Change<Tag>> changes)
         {
-            return _adminTags.SaveTags(changes);
+            return await _adminTags.SaveTags(changes, HttpContext.RequestAborted);
         }
     }
 }
