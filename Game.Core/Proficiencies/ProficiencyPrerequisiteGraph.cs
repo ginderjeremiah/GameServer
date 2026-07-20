@@ -1,17 +1,23 @@
-namespace Game.DataAccess.Repositories.Caching
+using Game.Core.Collections;
+
+namespace Game.Core.Proficiencies
 {
     /// <summary>
     /// Cycle detection over the proficiency prerequisite graph (spike #982 area D). A prerequisite edge points
     /// from a proficiency to a proficiency that must be maxed before it opens; a cycle (A needs B needs A)
     /// would soft-lock every node on it under the "open once prerequisites are maxed" rule, so it is rejected
-    /// both at admin-authoring time (a clean failure before the write commits) and as a build-time invariant on
+    /// both at admin-authoring time (a clean failure before the write commits), as a build-time invariant on
     /// the cache snapshot (the backstop against a seed/migration mistake, mirroring the zero-based contiguity
-    /// assertion). Within-path order is implicit in the tier ordinals (tier N+1 requires tier N maxed) and
-    /// inherently acyclic on its own, but a cross-path authored edge composed with that implicit chain can still
-    /// close a cycle the authored edges alone never show — so <see cref="BuildGraph"/> folds each path's
-    /// consecutive-tier edges into the same graph the authored prerequisites use before it is checked.
+    /// assertion), and as a Content Health lint check (defense-in-depth, since the admin save path already
+    /// rejects a live cycle before it is persisted). Within-path order is implicit in the tier ordinals (tier
+    /// N+1 requires tier N maxed) and inherently acyclic on its own, but a cross-path authored edge composed
+    /// with that implicit chain can still close a cycle the authored edges alone never show — so
+    /// <see cref="BuildGraph"/> folds each path's consecutive-tier edges into the same graph the authored
+    /// prerequisites use before it is checked. This is a domain invariant (acyclicity of the prerequisite
+    /// graph), so it lives here rather than in the data tier, reachable by both <c>Game.Application</c> and
+    /// <c>Game.DataAccess</c>.
     /// </summary>
-    internal static class ProficiencyPrerequisiteGraph
+    public static class ProficiencyPrerequisiteGraph
     {
         /// <summary>
         /// Builds the combined prerequisite graph: <paramref name="prerequisites"/>'s authored edges plus one

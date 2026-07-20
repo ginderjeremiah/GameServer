@@ -1,7 +1,7 @@
-using Game.DataAccess.Repositories.Caching;
+using Game.Core.Proficiencies;
 using Xunit;
 
-namespace Game.Application.Tests.DataAccess
+namespace Game.Core.Tests.Proficiencies
 {
     /// <summary>
     /// Cycle detection over the proficiency prerequisite graph (spike #982 area D): a cycle would soft-lock

@@ -712,6 +712,47 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ProficiencyPath", ContentGraphSeverity.Error, "Proficiency", 0);
         }
 
+        [Fact]
+        public void Proficiency_CrossPathPrerequisitesComposedWithImplicitTierOrdering_CycleIsError()
+        {
+            // The #2144 scenario, mirrored from ProficiencyPrerequisiteGraphTests: Path A tier 0 (id 0) gates
+            // on Path B tier 2 (id 3); Path B tier 0 (id 1) gates on Path A tier 0 (id 0). Neither authored
+            // edge revisits its own path, so the per-proficiency same-path/retired checks above see nothing
+            // wrong — only the combined graph (authored edges + Path B's implicit tier-2-needs-tier-1-needs-
+            // tier-0 chain) closes the cycle 0 -> 3 -> 2 -> 1 -> 0.
+            var graph = HealthyGraph() with
+            {
+                Paths = [Path(0), Path(1)],
+                Proficiencies =
+                [
+                    Proficiency(0, pathId: 0, pathOrdinal: 0, maxLevel: 10, prerequisiteIds: [3]),
+                    Proficiency(1, pathId: 1, pathOrdinal: 0, maxLevel: 10, prerequisiteIds: [0]),
+                    Proficiency(2, pathId: 1, pathOrdinal: 1, maxLevel: 10),
+                    Proficiency(3, pathId: 1, pathOrdinal: 2, maxLevel: 10),
+                ],
+            };
+            AssertHasFinding(graph, "ProficiencyPrerequisiteCycle", ContentGraphSeverity.Error, "Proficiency", 0);
+        }
+
+        [Fact]
+        public void Proficiency_CrossPathPrerequisitesWithNoComposedCycle_ProducesNoCycleFinding()
+        {
+            // Same shape as above but Path B tier 0 gates on Path A's *own* tier 0 removed — a lone cross-path
+            // edge with no path composing back to the source is never a cycle.
+            var graph = HealthyGraph() with
+            {
+                Paths = [Path(0), Path(1)],
+                Proficiencies =
+                [
+                    Proficiency(0, pathId: 0, pathOrdinal: 0, maxLevel: 10, prerequisiteIds: [3]),
+                    Proficiency(1, pathId: 1, pathOrdinal: 0, maxLevel: 10),
+                    Proficiency(2, pathId: 1, pathOrdinal: 1, maxLevel: 10),
+                    Proficiency(3, pathId: 1, pathOrdinal: 2, maxLevel: 10),
+                ],
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "ProficiencyPrerequisiteCycle");
+        }
+
         // --- Skill effects (DoT-accumulator modifier shape) -------------------------------------------
 
         [Fact]
@@ -1492,6 +1533,7 @@ namespace Game.Application.Tests.Content
         private static Contracts.Proficiency Proficiency(
             int id,
             int pathId = 0,
+            int pathOrdinal = 0,
             int maxLevel = 10,
             (int level, int rewardSkillId)[]? rewards = null,
             int[]? prerequisiteIds = null,
@@ -1505,7 +1547,7 @@ namespace Game.Application.Tests.Content
                 Pronunciation = "",
                 Translation = "",
                 PathId = pathId,
-                PathOrdinal = 0,
+                PathOrdinal = pathOrdinal,
                 MaxLevel = maxLevel,
                 BaseXp = 1,
                 XpGrowth = 1,

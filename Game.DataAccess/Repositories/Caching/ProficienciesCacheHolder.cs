@@ -8,6 +8,7 @@ using CorePath = Game.Core.Proficiencies.Path;
 using CoreProficiency = Game.Core.Proficiencies.Proficiency;
 using Path = Game.Infrastructure.Entities.Path;
 using PathTier = Game.Core.Proficiencies.PathTier;
+using ProficiencyPrerequisiteGraph = Game.Core.Proficiencies.ProficiencyPrerequisiteGraph;
 
 namespace Game.DataAccess.Repositories.Caching
 {
