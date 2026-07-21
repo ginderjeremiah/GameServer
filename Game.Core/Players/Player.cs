@@ -414,11 +414,19 @@ namespace Game.Core.Players
             return true;
         }
 
-        public void UpdateLogPreference(ELogType logType, bool enabled)
+        // Returns whether the preference's value actually changed, so callers (SaveLogPreferences) can skip
+        // enqueuing a write-behind event and save for an unchanged toggle, matching the "no mutation → no
+        // save" pattern every sibling command follows.
+        public bool UpdateLogPreference(ELogType logType, bool enabled)
         {
             var pref = LogPreferences.FirstOrDefault(p => p.LogType == logType);
             if (pref is not null)
             {
+                if (pref.Enabled == enabled)
+                {
+                    return false;
+                }
+
                 pref.Enabled = enabled;
             }
             else
@@ -427,6 +435,7 @@ namespace Game.Core.Players
             }
 
             RaiseEvent(new LogPreferenceChangedEvent(Id, logType, enabled));
+            return true;
         }
 
         /// <summary>
