@@ -482,4 +482,28 @@ describe('enemySpawnShareTotal', () => {
 		const total = reference.enemySpawnShareTotal({ zoneId: 0, weight: 30 }, [], { id: 2 });
 		expect(total).toBe(45);
 	});
+
+	it("drops the subject's own weight from the total when the subject record itself is retired (#2237)", () => {
+		// Zone 0: only the live competitors count — Cave Bat (5) + Catacomb Lich (15) = 20, not +30.
+		const total = reference.enemySpawnShareTotal({ zoneId: 0, weight: 30 }, [], {
+			id: 2,
+			retiredAt: '2026-01-01T00:00:00Z'
+		});
+		expect(total).toBe(20);
+	});
+});
+
+describe('enemySpawnShareValue (#2237)', () => {
+	it("reports 0 for a retired subject's own row, mirroring the zone editor's shareValue", () => {
+		const value = reference.enemySpawnShareValue({ zoneId: 0, weight: 30 }, [], {
+			id: 2,
+			retiredAt: '2026-01-01T00:00:00Z'
+		});
+		expect(value).toBe(0);
+	});
+
+	it('passes through the row weight unchanged for a live subject', () => {
+		const value = reference.enemySpawnShareValue({ zoneId: 0, weight: 30 }, [], { id: 2 });
+		expect(value).toBe(30);
+	});
 });

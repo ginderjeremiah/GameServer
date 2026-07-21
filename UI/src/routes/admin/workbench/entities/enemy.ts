@@ -144,7 +144,8 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 					type: 'share',
 					width: 150,
 					weightKey: 'weight',
-					shareTotal: reference.enemySpawnShareTotal
+					shareTotal: reference.enemySpawnShareTotal,
+					shareValue: reference.enemySpawnShareValue
 				}
 			]
 		}
