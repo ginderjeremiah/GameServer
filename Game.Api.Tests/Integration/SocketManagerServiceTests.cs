@@ -6,6 +6,7 @@ using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Net.WebSockets;
 using Xunit;
 
@@ -85,7 +86,7 @@ namespace Game.Api.Tests.Integration
             await using var socketA = new TestSocketClient();
             await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId1);
             await socketA.SendCommandAsync<object>("GetStatisticTypes");
-            Assert.Equal(playerId1.ToString(), await ReadAccountPresenceValueAsync(userId));
+            Assert.Equal(playerId1, await ReadAccountPresencePlayerIdAsync(userId));
 
             await using var socketB = new TestSocketClient();
             await socketB.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId2);
@@ -98,7 +99,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(ESocketCloseReason.SocketReplaced.GetDescription(), closeDescription);
 
             await socketB.SendCommandAsync<object>("GetStatisticTypes");
-            Assert.Equal(playerId2.ToString(), await ReadAccountPresenceValueAsync(userId));
+            Assert.Equal(playerId2, await ReadAccountPresencePlayerIdAsync(userId));
         }
 
         [Fact]
@@ -125,6 +126,35 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task RegisterSocket_SameCharacterReconnect_AccountPresenceClaimSurvivesOldSocketsTeardown()
+        {
+            // #2235: the account-level claim's stored value used to be just the player id, which is identical
+            // for the old and new sockets of the same character. The old socket's teardown compare-and-deletes
+            // against that value, so on a same-character reconnect it used to delete the *new* live socket's
+            // claim too — reopening the one-live-character-per-account window #1817 exists to close.
+            var (userId, playerId) = await SeedAndLoginAsync();
+
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            Assert.Equal(playerId, await ReadAccountPresencePlayerIdAsync(userId));
+
+            await using var socketB = new TestSocketClient();
+            await socketB.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+
+            var replaced = await socketA.WaitForResponseAsync(null);
+            Assert.Equal(nameof(SocketReplaced), replaced.Name);
+            await socketA.WaitForCloseAsync();
+
+            // Give the old socket's server-side teardown time to run, then prove the account claim still
+            // names this character (rather than having been deleted by the old socket's stale compare-value).
+            await Task.Delay(1000, CancellationToken);
+            Assert.Equal(playerId, await ReadAccountPresencePlayerIdAsync(userId));
+            var stillAlive = await socketB.SendCommandAsync<object>("GetStatisticTypes");
+            Assert.Null(stillAlive.Error);
+        }
+
+        [Fact]
         public async Task UnRegisterSocket_GracefulClose_ClearsAccountPresenceKey()
         {
             var (userId, playerId) = await SeedAndLoginAsync();
@@ -132,7 +162,7 @@ namespace Game.Api.Tests.Integration
             await using var socketA = new TestSocketClient();
             await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
             await socketA.SendCommandAsync<object>("GetStatisticTypes");
-            Assert.Equal(playerId.ToString(), await ReadAccountPresenceValueAsync(userId));
+            Assert.Equal(playerId, await ReadAccountPresencePlayerIdAsync(userId));
 
             await socketA.CloseAsync();
 
@@ -156,12 +186,12 @@ namespace Game.Api.Tests.Integration
             var replaced = await socketA.WaitForResponseAsync(null);
             Assert.Equal(nameof(SocketReplaced), replaced.Name);
             await socketB.SendCommandAsync<object>("GetStatisticTypes");
-            Assert.Equal(playerId2.ToString(), await ReadAccountPresenceValueAsync(userId));
+            Assert.Equal(playerId2, await ReadAccountPresencePlayerIdAsync(userId));
 
-            // Character 1's own teardown is a compare-and-delete keyed on its own player id, so it must not
-            // clear the account slot character 2 now owns.
+            // Character 1's own teardown is a compare-and-delete keyed on its own player id and socket id, so
+            // it must not clear the account slot character 2 now owns.
             await Task.Delay(1000, CancellationToken);
-            Assert.Equal(playerId2.ToString(), await ReadAccountPresenceValueAsync(userId));
+            Assert.Equal(playerId2, await ReadAccountPresencePlayerIdAsync(userId));
             var stillAlive = await socketB.SendCommandAsync<object>("GetStatisticTypes");
             Assert.Null(stillAlive.Error);
         }
@@ -175,7 +205,7 @@ namespace Game.Api.Tests.Integration
             await using var socketA = new TestSocketClient();
             await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
             await socketA.SendCommandAsync<object>("GetStatisticTypes");
-            Assert.Equal(playerId.ToString(), await ReadAccountPresenceValueAsync(userId));
+            Assert.Equal(playerId, await ReadAccountPresencePlayerIdAsync(userId));
 
             // Simulate the account presence key lapsing out from under a still-live socket, mirroring
             // RefreshSocketPresence_AfterItsKeyLapsesWhileStillLive_ResurrectsItsOwnClaim for the per-player key.
@@ -188,7 +218,7 @@ namespace Game.Api.Tests.Integration
 
             await socketA.SendCommandAsync<object>("GetStatisticTypes");
 
-            Assert.True(await WaitUntilAsync(async () => await ReadAccountPresenceValueAsync(userId) == playerId.ToString()),
+            Assert.True(await WaitUntilAsync(async () => await ReadAccountPresencePlayerIdAsync(userId) == playerId),
                 "Expected the live socket's next heartbeat to resurrect its own account-level claim.");
         }
 
@@ -577,6 +607,16 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
             return await cache.Get(AccountPresenceKey(userId));
+        }
+
+        /// <summary>
+        /// Extracts the player id from an account presence value (<c>"{playerId}:{socketId}"</c>, see
+        /// <c>SocketManagerService.AccountPresenceValue</c>), or <see langword="null"/> if the key is unset.
+        /// </summary>
+        private async Task<int?> ReadAccountPresencePlayerIdAsync(int userId)
+        {
+            var value = await ReadAccountPresenceValueAsync(userId);
+            return value is null ? null : int.Parse(value.Split(':', 2)[0], CultureInfo.InvariantCulture);
         }
 
         /// <summary>Polls the condition until it holds or a short timeout elapses; returns whether it held.</summary>

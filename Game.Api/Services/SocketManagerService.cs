@@ -107,7 +107,7 @@ namespace Game.Api.Services
                 // mirrors ClaimPresenceKey exactly, just keyed by userId instead of playerId. Inside the try
                 // (rather than before it) so a fault here rolls the per-player claim back too, instead of
                 // leaving it briefly orphaned until its own TTL.
-                oldAccountPlayerId = await ClaimAccountPresence(userId, playerId);
+                oldAccountPlayerId = await ClaimAccountPresence(userId, playerId, socketContext.SocketId);
 
                 await RegisterSocketCommandListener(socketHandler);
                 // Register before starting the loops so the registry tracks the socket — and threads its
@@ -212,9 +212,10 @@ namespace Game.Api.Services
             try
             {
                 // Same compare-and-delete guard as the per-player key above, keyed by account instead: a
-                // different character on this account may have already taken the account-level slot over,
-                // and that claim must be left intact.
-                await _cache.CompareAndDelete(AccountSocketKey(context.Session.UserId), PlayerIdValue(context.PlayerId));
+                // different character on this account (or a newer socket for this *same* character, #2235 —
+                // see AccountPresenceValue) may have already taken the account-level slot over, and that
+                // claim must be left intact.
+                await _cache.CompareAndDelete(AccountSocketKey(context.Session.UserId), AccountPresenceValue(context.PlayerId, context.SocketId));
             }
             catch (Exception ex)
             {
@@ -298,27 +299,27 @@ namespace Game.Api.Services
         }
 
         /// <summary>
-        /// Atomically claims <paramref name="userId"/>'s account-level "current live character" slot as
-        /// <paramref name="playerId"/> — the same CompareAndSet-loop shape as <see cref="ClaimPresenceKey"/>,
-        /// just keyed by account instead of by character, and with no switch-credit sentinel to defer behind
-        /// (that claim only ever targets a per-player key). Enforces the decided one-live-character-per-
-        /// account model (spike #922) at the socket layer, alongside the per-player takeover
-        /// <see cref="ClaimPresenceKey"/> already enforces (#1817). Returns the slot's previous player id
-        /// when it names a genuinely different character to kick, or <see langword="null"/> if the slot was
-        /// unset or already held this same player.
+        /// Atomically claims <paramref name="userId"/>'s account-level "current live character" slot for
+        /// <paramref name="playerId"/>'s <paramref name="socketId"/> — the same CompareAndSet-loop shape as
+        /// <see cref="ClaimPresenceKey"/>, just keyed by account instead of by character, and with no
+        /// switch-credit sentinel to defer behind (that claim only ever targets a per-player key). Enforces
+        /// the decided one-live-character-per-account model (spike #922) at the socket layer, alongside the
+        /// per-player takeover <see cref="ClaimPresenceKey"/> already enforces (#1817). Returns the slot's
+        /// previous player id when it names a genuinely different character to kick, or <see langword="null"/>
+        /// if the slot was unset or already held this same player (a same-character reconnect, where the
+        /// stored value's socket id differs but its player id does not — see <see cref="AccountPresenceValue"/>).
         /// </summary>
-        private async Task<int?> ClaimAccountPresence(int userId, int playerId)
+        private async Task<int?> ClaimAccountPresence(int userId, int playerId, string socketId)
         {
             var accountKey = AccountSocketKey(userId);
-            var newValue = PlayerIdValue(playerId);
+            var newValue = AccountPresenceValue(playerId, socketId);
             var currentValue = await _cache.Get(accountKey);
             while (true)
             {
                 if (await _cache.CompareAndSet(accountKey, currentValue, newValue, SocketPresenceTtl))
                 {
-                    return currentValue is not null && currentValue != newValue
-                        ? int.Parse(currentValue, CultureInfo.InvariantCulture)
-                        : null;
+                    var previousPlayerId = currentValue is not null ? ParseAccountPresencePlayerId(currentValue) : (int?)null;
+                    return previousPlayerId is int prev && prev != playerId ? prev : null;
                 }
 
                 // Another writer (a competing registration for this account) won the race; re-read and retry
@@ -341,7 +342,7 @@ namespace Game.Api.Services
         private void RefreshSocketPresence(int userId, int playerId, string socketId)
         {
             _cache.ReclaimAndForget(CurrentSocketKey(playerId), socketId, SocketPresenceTtl);
-            _cache.ReclaimAndForget(AccountSocketKey(userId), PlayerIdValue(playerId), SocketPresenceTtl);
+            _cache.ReclaimAndForget(AccountSocketKey(userId), AccountPresenceValue(playerId, socketId), SocketPresenceTtl);
         }
 
         /// <summary>
@@ -566,5 +567,17 @@ namespace Game.Api.Services
         }
 
         private static string PlayerIdValue(int playerId) => playerId.ToString(CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// The value stored at an account-level presence key (<see cref="AccountSocketKey"/>): the live
+        /// character's player id plus the claiming socket's id, rather than the player id alone. A same-
+        /// character reconnect writes a new socket id for the same player id, so the old socket's teardown
+        /// (a compare-and-delete against its own claim, see <see cref="TeardownSocketRegistration"/>) can no
+        /// longer match — and therefore can no longer delete — the new socket's still-live claim (#2235).
+        /// </summary>
+        private static string AccountPresenceValue(int playerId, string socketId) => $"{PlayerIdValue(playerId)}:{socketId}";
+
+        /// <summary>Extracts the player id embedded in an <see cref="AccountPresenceValue"/>.</summary>
+        private static int ParseAccountPresencePlayerId(string value) => int.Parse(value.Split(':', 2)[0], CultureInfo.InvariantCulture);
     }
 }

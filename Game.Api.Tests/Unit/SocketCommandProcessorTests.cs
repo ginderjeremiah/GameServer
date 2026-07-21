@@ -264,7 +264,7 @@ namespace Game.Api.Tests.Unit
 
             var accountRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX));
             Assert.Equal($"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_1", accountRelease.Key);
-            Assert.Equal("77", accountRelease.DeleteIfValue);
+            Assert.Equal($"77:{context.SocketId}", accountRelease.DeleteIfValue);
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("unsubscribe"));
 
             // ...and the socket's own command queue was deleted too, so a graceful disconnect never strands a
