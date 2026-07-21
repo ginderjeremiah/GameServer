@@ -328,15 +328,17 @@ class WorkbenchReference {
 	};
 
 	/**
-	 * Total spawn weight competing in a zone: this row's weight plus every OTHER
-	 * LIVE enemy's weight in the same zone (so an enemy's share reflects zone competition,
-	 * not its own zone list). A retired competitor is excluded — the runtime spawn table
-	 * (`EnemiesCacheHolder.BuildZoneEnemyTables`) drops it too, so its weight is not real
-	 * competition.
+	 * Total spawn weight competing in a zone: this row's weight (unless the subject enemy
+	 * itself is retired — its own spawns never roll, so it isn't real competition either)
+	 * plus every OTHER LIVE enemy's weight in the same zone (so an enemy's share reflects
+	 * zone competition, not its own zone list). A retired competitor is excluded — the
+	 * runtime spawn table (`EnemiesCacheHolder.BuildZoneEnemyTables`) drops it too, so its
+	 * weight is not real competition.
 	 */
 	enemySpawnShareTotal = (row: TableRow, _rows: TableRow[], record: unknown): number => {
 		const enemyId = (record as { id: number }).id;
-		let sum = Number(row.weight) || 0;
+		const subjectRetired = !!(record as { retiredAt?: string | null }).retiredAt;
+		let sum = subjectRetired ? 0 : Number(row.weight) || 0;
 		for (const enemy of staticData.enemies ?? []) {
 			if (enemy.id === enemyId || enemy.retiredAt) {
 				continue;
@@ -348,6 +350,10 @@ class WorkbenchReference {
 		}
 		return sum || 1;
 	};
+
+	/** A retired enemy's own spawns never roll, so its displayed share is 0 regardless of weight. */
+	enemySpawnShareValue = (row: TableRow, _rows: TableRow[], record: unknown): number =>
+		(record as { retiredAt?: string | null }).retiredAt ? 0 : Number(row.weight) || 0;
 }
 
 export const reference = new WorkbenchReference();
