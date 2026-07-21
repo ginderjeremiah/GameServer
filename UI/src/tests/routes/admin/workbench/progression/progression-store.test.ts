@@ -739,7 +739,7 @@ describe('save orchestration', () => {
 		expect(store.totalChanges).toBe(0);
 	});
 
-	it('re-seeds after a modifier write commits but the reward write in the same save then fails', async () => {
+	it('rebases a tier whose modifier write commits but reward write then fails, keeping the reward pending (#2238)', async () => {
 		seedServer();
 		const store = new ProgressionStore();
 		await store.load();
@@ -760,10 +760,71 @@ describe('save orchestration', () => {
 		expect(toastErrorMock).toHaveBeenCalled();
 		// The modifier write landed server-side before the reward write in the same batch failed.
 		expect(serverProfs[0].levelModifiers).toHaveLength(1);
-		// Recovery re-seeded from that partial server truth rather than leaving the pre-fail edits stale.
+		expect(serverProfs[0].levelRewards).toHaveLength(0);
+		// Rebased against that partial server truth: the committed modifier is now clean (matches the
+		// refreshed baseline), but the still-unsent reward survives as a pending edit for a clean retry
+		// instead of being silently discarded by a blanket reseed.
 		expect(store.profs[0].levelModifiers).toHaveLength(1);
-		expect(store.profs[0].levelRewards).toHaveLength(0);
-		expect(store.totalChanges).toBe(0);
+		expect(store.profs[0].levelRewards).toHaveLength(1);
+		expect(store.profBaseline(0)?.levelModifiers).toHaveLength(1);
+		expect(store.profBaseline(0)?.levelRewards).toHaveLength(0);
+		expect(store.profStatus(store.profs[0])).toBe('modified');
+		expect(store.totalChanges).toBe(1);
+	});
+
+	it('a sibling path rename, an unreached tier edit, and an unreached prerequisite survive a mid-batch tier failure (#2238)', async () => {
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'd', activityKey: EActivityKey.Water, retiredAt: null }
+		];
+		serverProfs = [
+			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0' }),
+			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' }),
+			fullTier({ id: 2, pathId: 1, pathOrdinal: 0, name: 'Water T0' })
+		];
+		const store = new ProgressionStore();
+		await store.load();
+
+		// Path 1 (Water) is renamed — its identity batch commits atomically before the tier loop below.
+		store.patchPath(1, (d) => (d.name = 'Aqua'));
+		// Tier 0 gets a modifier that will fail to save — it's first in save order, so the loop throws here.
+		store.addModifier(0, 3);
+		// Tier 1's own modifier write is next in the same loop; the throw on tier 0 means it's never attempted.
+		store.addModifier(1, 4);
+		// Tier 2's prerequisite change belongs to the very last save step, which never runs at all once the
+		// tier loop above has thrown.
+		store.addPrerequisite(2, 0);
+
+		postMock.mockImplementation(async (endpoint: string, body: Rec) => {
+			if (endpoint === 'AdminTools/SetProficiencyModifiers' && body.id === 0) {
+				throw new Error('modifier write failed');
+			}
+			applyPost(endpoint, body);
+			return {};
+		});
+
+		await store.save();
+
+		expect(toastErrorMock).toHaveBeenCalled();
+		// Path 1's rename committed via the single atomic path-identity batch (it precedes the tier loop).
+		expect(serverPaths.find((p) => p.id === 1)?.name).toBe('Aqua');
+		expect(store.pathBaseline(1)?.name).toBe('Aqua');
+		expect(store.pathStatus(reqPath(store, 1))).toBe('clean');
+		// Tier 0's own failed write survives locally for a retry.
+		expect(serverProfs.find((p) => p.id === 0)?.levelModifiers).toHaveLength(0);
+		expect(store.profs.find((p) => p.id === 0)?.levelModifiers).toHaveLength(1);
+		expect(store.profStatus(reqProf(store, 0))).toBe('modified');
+		// Tier 1's modifier write was never reached by the failing loop — it survives as a pending edit
+		// instead of being discarded by a blanket reseed of the whole catalogue.
+		expect(serverProfs.find((p) => p.id === 1)?.levelModifiers).toHaveLength(0);
+		expect(store.profs.find((p) => p.id === 1)?.levelModifiers).toHaveLength(1);
+		expect(store.profStatus(reqProf(store, 1))).toBe('modified');
+		// Tier 2's prerequisite change belongs to the final combined batch, which never runs once the tier
+		// loop has thrown — it, too, survives as a pending edit rather than being silently dropped.
+		expect(serverProfs.find((p) => p.id === 2)?.prerequisiteIds).toEqual([]);
+		expect(store.profs.find((p) => p.id === 2)?.prerequisiteIds).toEqual([0]);
+		expect(store.profStatus(reqProf(store, 2))).toBe('modified');
+		expect(store.totalChanges).toBe(3);
 	});
 
 	it('leaves local state (now behind server truth) untouched when the committed-failure recovery refresh itself fails', async () => {
