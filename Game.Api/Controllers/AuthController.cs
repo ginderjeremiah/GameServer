@@ -146,6 +146,13 @@ namespace Game.Api.Controllers
             // the HTTP pipeline no longer reads the session cache per request.
             await _sessionInitializer.EnsureSessionLoaded(HttpContext.RequestAborted);
 
+            // A pre-selection token (post-Login, pre-SelectPlayer) has no player to check presence for —
+            // mirrors Status's guard rather than probing player id 0.
+            if (_sessionService.TokenSelectedPlayerId is null)
+            {
+                return ApiResponse.Error("No character selected.", ApiErrorCategory.NoPlayerSelected);
+            }
+
             var active = await _socketManager.HasActiveSocket(_sessionService.SelectedPlayerId);
             return ApiResponse.Success(new ActiveSessionResult { Active = active });
         }

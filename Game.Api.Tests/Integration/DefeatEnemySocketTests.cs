@@ -114,6 +114,52 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task DefeatEnemy_BattleCompletedLongBeforePostBattleCooldownWindow_CooldownClampedToZero()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync();
+
+            var wsClient = Factory.Server.CreateWebSocketClient();
+
+            await using (var socketClient1 = new TestSocketClient())
+            {
+                await socketClient1.ConnectAsync(wsClient, userId);
+
+                var newEnemyResponse = await socketClient1.SendCommandAsync<NewEnemyModel>(
+                    "NewEnemy", new { NewZoneId = (int?)null });
+                Assert.Null(newEnemyResponse.Error);
+
+                await socketClient1.CloseAsync();
+            }
+
+            // Backdate the battle start well past its own replay duration plus the 5s post-battle cooldown, so
+            // the victory's cooldown anchor (battleCompletedAt + cooldown, #2242) is already in the past by the
+            // time the command computes the response — reproducing the unclamped-negative-Cooldown scenario.
+            await SetPlayerState(userId, playerId, state =>
+            {
+                state.SetActiveBattle(
+                    state.ActiveEnemyId!.Value,
+                    state.ActiveEnemyLevel!.Value,
+                    state.ActiveEnemySkillIds!,
+                    state.BattleSeed!.Value,
+                    startTime: DateTime.UtcNow.AddMinutes(-30),
+                    state.Snapshot!,
+                    zoneId: state.BattleZoneId ?? 0,
+                    isBossBattle: state.IsBossBattle
+                );
+            });
+
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            var response = await socketClient.SendCommandAsync<DefeatEnemyResponse>(
+                "DefeatEnemy", new { });
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.Equal(0, response.Data.Cooldown);
+        }
+
+        [Fact]
         public async Task DefeatEnemy_NoActiveBattle_ReturnsError()
         {
             var (userId, _) = await SeedAndLoginAsync();
