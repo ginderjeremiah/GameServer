@@ -469,11 +469,31 @@ export class ProgressionStore {
 		}
 		this.saving = true;
 		let committed = false;
-		try {
-			const baseProfMap = this.baseProfMap;
-			const pathDiff = this.pathDiff;
-			const profDiff = this.profDiff;
+		const baseProfMap = this.baseProfMap;
+		const pathDiff = this.pathDiff;
+		const profDiff = this.profDiff;
 
+		// Recovery tracking for a partial-failure rebase (#2238, porting #2207/#2218's EntityStore
+		// pattern): what this save's pipeline has actually written by the point a later step throws.
+		// A path settles atomically with its one identity batch (it has no child collections); a
+		// proficiency settles once its identity batch *and* every one of its own changed child
+		// collections (modifiers/rewards/prerequisites) has posted — tracked per persisted id since
+		// the child writes run after each catalogue's new ids are resolved. The id maps double as the
+		// "did this save's own pipeline resolve every add's persisted id" check the recovery pass needs.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		let pathIdMap = new Map<number, number>();
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		let profIdMap = new Map<number, number>();
+		let pathIdentityWritten = false;
+		let profIdentityWritten = false;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		const modifiersWritten = new Set<number>();
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		const rewardsWritten = new Set<number>();
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		const prerequisitesWritten = new Set<number>();
+
+		try {
 			// 1. Cross-path prerequisite changes that touch only already-persisted tiers need no id remap,
 			// so — only when this save is also retiring a path — they're posted immediately, before path
 			// identities. This lets a save that both retires a path and removes the now-offending gateway
@@ -501,6 +521,9 @@ export class ProgressionStore {
 				}));
 				await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', changes);
 				committed = true;
+				for (const { prof } of resolvableNow) {
+					prerequisitesWritten.add(prof.id);
+				}
 			}
 
 			// 2. Proficiency child-collection removals that resolve an about-to-shrink MaxLevel are posted
@@ -536,10 +559,12 @@ export class ProgressionStore {
 						modifiers: record.levelModifiers
 					});
 					committed = true;
+					modifiersWritten.add(record.id);
 				}
 				if (childChanged(record.levelRewards, baseline.levelRewards)) {
 					await ApiRequest.post('AdminTools/SetProficiencyRewards', { id: record.id, rewards: record.levelRewards });
 					committed = true;
+					rewardsWritten.add(record.id);
 				}
 			}
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
@@ -556,12 +581,13 @@ export class ProgressionStore {
 				await ApiRequest.post('AdminTools/AddEditPaths', pathChanges);
 				committed = true;
 			}
+			pathIdentityWritten = true;
 
 			// 4. Resolve the persisted ids of newly-added paths before the proficiencies that FK to them.
 			// Identity-content matching (not just position) keeps this correct when another admin's
 			// concurrent add lands in the same refetch (#1856).
 			const freshPaths = await fetchSocketData('GetPaths');
-			const pathIdMap = resolveNewIds(
+			pathIdMap = resolveNewIds(
 				freshPaths,
 				this.basePaths.map((p) => p.id),
 				pathDiff.added,
@@ -583,6 +609,7 @@ export class ProgressionStore {
 				await ApiRequest.post('AdminTools/AddEditProficiencies', profChanges);
 				committed = true;
 			}
+			profIdentityWritten = true;
 
 			// 6. Resolve the persisted ids of newly-added proficiencies (for child savers + gateways).
 			// Identity-content matching keeps this correct under the same concurrent-add race (#1856).
@@ -591,7 +618,7 @@ export class ProgressionStore {
 			// record still carries the path's local negative id, which would otherwise never match the
 			// server's real pathId and silently fall back to positional pairing.
 			const freshProfs = await fetchSocketData('GetProficiencies');
-			const profIdMap = resolveNewIds(
+			profIdMap = resolveNewIds(
 				freshProfs,
 				this.baseProfs.map((p) => p.id),
 				profDiff.added,
@@ -609,10 +636,12 @@ export class ProgressionStore {
 				if (childChanged(prof.levelModifiers, baseline?.levelModifiers)) {
 					await ApiRequest.post('AdminTools/SetProficiencyModifiers', { id, modifiers: prof.levelModifiers });
 					committed = true;
+					modifiersWritten.add(id);
 				}
 				if (childChanged(prof.levelRewards, baseline?.levelRewards)) {
 					await ApiRequest.post('AdminTools/SetProficiencyRewards', { id, rewards: prof.levelRewards });
 					committed = true;
+					rewardsWritten.add(id);
 				}
 			}
 
@@ -625,31 +654,44 @@ export class ProgressionStore {
 			// narrow, retire-only residual of the fuller invariant this batch otherwise preserves.
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
 			const resolvedEarly = new Set(resolvableNow);
-			const prerequisiteChanges: ISetProficiencyPrerequisitesData[] = allPrerequisiteChanges
-				.filter((change) => !resolvedEarly.has(change))
-				.map(({ prof, prerequisiteIds }) => ({
-					id: resolveId(prof.id, profIdMap),
-					prerequisiteIds: prerequisiteIds.map((pid) => resolveId(pid, profIdMap))
-				}));
-			if (prerequisiteChanges.length) {
+			const lateChanges = allPrerequisiteChanges.filter((change) => !resolvedEarly.has(change));
+			if (lateChanges.length) {
+				const prerequisiteChanges: ISetProficiencyPrerequisitesData[] = lateChanges.map(
+					({ prof, prerequisiteIds }) => ({
+						id: resolveId(prof.id, profIdMap),
+						prerequisiteIds: prerequisiteIds.map((pid) => resolveId(pid, profIdMap))
+					})
+				);
 				await ApiRequest.post('AdminTools/SetProficiencyPrerequisites', prerequisiteChanges);
 				committed = true;
+				for (const { prof } of lateChanges) {
+					prerequisitesWritten.add(resolveId(prof.id, profIdMap));
+				}
 			}
 
 			// 9. Follow the selection across any id remap, then re-seed from server truth.
-			if (this.selectedPathId != null) {
-				this.selectedPathId = resolveId(this.selectedPathId, pathIdMap);
-			}
-			if (this.drilledTierId != null) {
-				this.drilledTierId = resolveId(this.drilledTierId, profIdMap);
-			}
+			this.followSelectionRemap(pathIdMap, profIdMap);
 			await this.reseed();
 			this.#saveFlash.flash();
 		} catch (ex) {
-			// Once anything has committed, our baseline is behind the server; re-seed so a retry can't
-			// re-Add already-persisted records. A pre-commit failure changed nothing, so keep the edits.
+			// Once anything has committed, our baseline is behind the server for the records this save's
+			// pipeline actually reached — rebase just those against server truth rather than blanket-
+			// reseeding both catalogues, so a sibling path/tier this save never touched (or hadn't reached
+			// yet) keeps its own pending edit for a clean retry (#2238). A pre-commit failure changed
+			// nothing, so the edits are already exactly as the admin left them.
 			if (committed) {
-				await this.reseed().catch(() => {});
+				await this.rebaseAfterPartialFailure({
+					pathDiff,
+					profDiff,
+					baseProfMap,
+					pathIdMap,
+					profIdMap,
+					pathIdentityWritten,
+					profIdentityWritten,
+					modifiersWritten,
+					rewardsWritten,
+					prerequisitesWritten
+				}).catch(() => {});
 			}
 			toastError(ex instanceof Error ? ex.message : 'Failed to save changes.');
 		} finally {
@@ -672,6 +714,146 @@ export class ProgressionStore {
 		if (!drilled || drilled.pathId !== this.selectedPathId) {
 			this.drilledTierId = null;
 		}
+	}
+
+	/** Follow the selection across this save's id remap (a newly-added record now has a persisted id). */
+	private followSelectionRemap(pathIdMap: Map<number, number>, profIdMap: Map<number, number>) {
+		if (this.selectedPathId != null) {
+			this.selectedPathId = resolveId(this.selectedPathId, pathIdMap);
+		}
+		if (this.drilledTierId != null) {
+			this.drilledTierId = resolveId(this.drilledTierId, profIdMap);
+		}
+	}
+
+	/**
+	 * Rebases one catalogue's diff against its fresh server copy: a record this save fully settled
+	 * (per `isSettled`) — including every record this save's diff never touched, which has nothing
+	 * pending to lose — takes the fresh copy (remapped from a local negative id onto its persisted
+	 * one), while an add/edit the failure struck before finishing keeps its current local edit,
+	 * remapped onto its persisted id if the identity batch already resolved one. A record only in
+	 * `fresh` (a concurrent add from another admin) is appended. Mirrors EntityStore's per-entity
+	 * rebase (`rebaseAfterPartialFailure`), generalized over the two catalogues this store manages.
+	 */
+	private rebaseCatalogue<T extends { id: number }>(
+		current: T[],
+		diff: { added: T[]; modified: { record: T; baseline: T }[] },
+		fresh: T[],
+		idMap: Map<number, number>,
+		isSettled: (record: T, persistedId: number) => boolean
+	): T[] {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		const freshById = new Map(fresh.map((record) => [record.id, record]));
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		const pendingIds = new Set([...diff.added.map((r) => r.id), ...diff.modified.map((m) => m.record.id)]);
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient lookup, not held state
+		const claimedIds = new Set<number>();
+		const rebased: T[] = [];
+
+		for (const record of current) {
+			const pending = pendingIds.has(record.id);
+			const persistedId = record.id < 0 ? idMap.get(record.id) : record.id;
+			const settled = !pending || (persistedId !== undefined && isSettled(record, persistedId));
+
+			if (settled) {
+				const freshRecord = persistedId !== undefined ? freshById.get(persistedId) : undefined;
+				if (freshRecord) {
+					rebased.push(clone(freshRecord));
+					claimedIds.add(freshRecord.id);
+				}
+				continue;
+			}
+
+			const rebasedRecord =
+				persistedId !== undefined && persistedId !== record.id ? { ...clone(record), id: persistedId } : clone(record);
+			rebased.push(rebasedRecord);
+			if (persistedId !== undefined) {
+				claimedIds.add(persistedId);
+			}
+		}
+
+		for (const record of fresh) {
+			if (!claimedIds.has(record.id)) {
+				rebased.push(clone(record));
+			}
+		}
+
+		return rebased;
+	}
+
+	/**
+	 * A partial-failure recovery pass (#2238): rebases each catalogue's own diff against server truth
+	 * instead of blanket-reseeding both, so an edit this save's pipeline never reached survives for a
+	 * clean retry. Always re-fetches both catalogues fresh rather than reusing whatever the pipeline
+	 * itself already read (which may be exactly the stale/failed read that triggered recovery). Falls
+	 * back to a full reseed from that fresh data whenever a rebase can't be trusted — a committed add
+	 * whose persisted id this save's own pipeline never resolved (rebasing would keep it pending under
+	 * its local id, and a retry would re-Add a duplicate) — and to leaving local state untouched if
+	 * even the fresh refetch fails (nothing to rebase against; the original save error is what
+	 * surfaces).
+	 */
+	private async rebaseAfterPartialFailure(recovery: {
+		pathDiff: { added: WorkbenchPath[]; modified: { record: WorkbenchPath; baseline: WorkbenchPath }[] };
+		profDiff: {
+			added: WorkbenchProficiency[];
+			modified: { record: WorkbenchProficiency; baseline: WorkbenchProficiency }[];
+		};
+		baseProfMap: Record<number, WorkbenchProficiency>;
+		pathIdMap: Map<number, number>;
+		profIdMap: Map<number, number>;
+		pathIdentityWritten: boolean;
+		profIdentityWritten: boolean;
+		modifiersWritten: Set<number>;
+		rewardsWritten: Set<number>;
+		prerequisitesWritten: Set<number>;
+	}) {
+		let freshPaths: IPath[];
+		let freshProfs: IProficiency[];
+		try {
+			[freshPaths, freshProfs] = await Promise.all([fetchSocketData('GetPaths'), fetchSocketData('GetProficiencies')]);
+		} catch {
+			// Nothing to rebase against; leave local state as-is so the original save error is what surfaces.
+			return;
+		}
+
+		const { pathDiff, profDiff, baseProfMap, pathIdMap, profIdMap, pathIdentityWritten, profIdentityWritten } =
+			recovery;
+		const { modifiersWritten, rewardsWritten, prerequisitesWritten } = recovery;
+
+		// A rebase remaps every added record through its id map; if the refetch never resolved one, the
+		// add's identity write still committed under a persisted id this save never learned, so rebasing
+		// would keep it pending under its local id and a retry would re-Add a duplicate.
+		const pathAddsResolved = pathDiff.added.every((path) => pathIdMap.has(path.id));
+		const profAddsResolved = profDiff.added.every((prof) => profIdMap.has(prof.id));
+		if (!pathAddsResolved || !profAddsResolved) {
+			this.setData(freshPaths, freshProfs);
+			this.reconcileSelection();
+			return;
+		}
+
+		this.paths = this.rebaseCatalogue(this.paths, pathDiff, freshPaths, pathIdMap, () => pathIdentityWritten);
+		this.profs = this.rebaseCatalogue(this.profs, profDiff, freshProfs, profIdMap, (prof, persistedId) => {
+			if (!profIdentityWritten) {
+				return false;
+			}
+			const baseline = baseProfMap[prof.id];
+			if (childChanged(prof.levelModifiers, baseline?.levelModifiers) && !modifiersWritten.has(persistedId)) {
+				return false;
+			}
+			if (childChanged(prof.levelRewards, baseline?.levelRewards) && !rewardsWritten.has(persistedId)) {
+				return false;
+			}
+			if (childChanged(prof.prerequisiteIds, baseline?.prerequisiteIds) && !prerequisitesWritten.has(persistedId)) {
+				return false;
+			}
+			return true;
+		});
+		this.basePaths = freshPaths.map(clone);
+		this.baseProfs = freshProfs.map(clone);
+		staticData.paths = freshPaths;
+		staticData.proficiencies = freshProfs;
+		this.followSelectionRemap(pathIdMap, profIdMap);
+		this.reconcileSelection();
 	}
 
 	discard() {
