@@ -13,6 +13,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using StackExchange.Redis;
 using Xunit;
 
 namespace Game.Application.Tests.Services
@@ -741,6 +742,40 @@ namespace Game.Application.Tests.Services
 
             Assert.Single(rows, lp => lp.LogTypeId == (int)ELogType.Damage && !lp.Enabled);
             Assert.Single(rows, lp => lp.LogTypeId == (int)ELogType.Exp && lp.Enabled);
+        }
+
+        [Fact]
+        public async Task SaveLogPreferences_NoValuesChanged_DoesNotEnqueueWriteBehindEvents()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var preferences = new List<LogPreference>
+            {
+                new() { LogType = ELogType.Damage, Enabled = false },
+                new() { LogType = ELogType.Exp, Enabled = true },
+            };
+
+            await playerService.SaveLogPreferences(player, preferences);
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            // Re-submitting the same values is a no-op: no LogPreferenceChangedEvent should be raised or saved.
+            await playerService.SaveLogPreferences(player, preferences);
+
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
         private async Task DrainPlayerUpdateQueue(IServiceProvider services)

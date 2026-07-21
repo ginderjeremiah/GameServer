@@ -52,12 +52,14 @@ namespace Game.Application.Services
 
         public async Task SaveLogPreferences(Player player, IEnumerable<LogPreference> preferences, CancellationToken cancellationToken = default)
         {
+            var changed = false;
             foreach (var preference in preferences)
             {
-                player.UpdateLogPreference(preference.LogType, preference.Enabled);
+                // Bitwise OR (not ||) so every preference is applied regardless of earlier ones' outcome.
+                changed |= player.UpdateLogPreference(preference.LogType, preference.Enabled);
             }
 
-            await _playerRepo.SavePlayer(player, cancellationToken);
+            await SaveIf(player, changed, cancellationToken);
         }
 
         public async Task UnlockLesson(Player player, int lessonId, CancellationToken cancellationToken = default)

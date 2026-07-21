@@ -708,28 +708,42 @@ namespace Game.Core.Tests.Players
         // ── UpdateLogPreference ──────────────────────────────────────────────
 
         [Fact]
-        public void UpdateLogPreference_NewType_AddsPreference()
+        public void UpdateLogPreference_NewType_AddsPreferenceAndReturnsTrue()
         {
             var player = MakePlayer();
 
-            player.UpdateLogPreference(ELogType.Damage, false);
+            var result = player.UpdateLogPreference(ELogType.Damage, false);
 
+            Assert.True(result);
             var pref = player.LogPreferences.SingleOrDefault(p => p.LogType == ELogType.Damage);
             Assert.NotNull(pref);
             Assert.False(pref.Enabled);
         }
 
         [Fact]
-        public void UpdateLogPreference_ExistingType_UpdatesInPlace()
+        public void UpdateLogPreference_ExistingTypeChangedValue_UpdatesInPlaceAndReturnsTrue()
         {
             var player = MakePlayer();
             player.LogPreferences.Add(new LogPreference { LogType = ELogType.Damage, Enabled = true });
 
-            player.UpdateLogPreference(ELogType.Damage, false);
+            var result = player.UpdateLogPreference(ELogType.Damage, false);
 
+            Assert.True(result);
             var pref = Assert.Single(player.LogPreferences);
             Assert.Equal(ELogType.Damage, pref.LogType);
             Assert.False(pref.Enabled);
+        }
+
+        [Fact]
+        public void UpdateLogPreference_ExistingTypeUnchangedValue_ReturnsFalseAndDoesNotRaiseEvent()
+        {
+            var player = MakePlayer();
+            player.LogPreferences.Add(new LogPreference { LogType = ELogType.Damage, Enabled = true });
+
+            var result = player.UpdateLogPreference(ELogType.Damage, true);
+
+            Assert.False(result);
+            Assert.Empty(player.DomainEvents.OfType<LogPreferenceChangedEvent>());
         }
 
         [Fact]
