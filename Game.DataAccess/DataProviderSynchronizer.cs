@@ -92,6 +92,15 @@ namespace Game.DataAccess
         // from re-spamming the log on every drain. Touched only under the serialized drain, so it needs no lock.
         private long _lastReportedDeadLetterDepth;
 
+        // Whether a database-infrastructure outage (see InfrastructureFailureClassifier) has already been
+        // logged at Error. Every item a prolonged outage parks re-faults through the same path on each
+        // opportunistic reclaim (roughly every _reclaimGracePeriod), so without this a large backlog would log
+        // one Error per parked item per reclaim cycle. Only the first occurrence (0->1) logs at Error; later
+        // ones log at Debug instead. Reset the moment any event applies successfully, so the next outage is
+        // reported fresh rather than staying silently suppressed by a stale flag. Accessed via Interlocked since
+        // items apply concurrently across distinct players within one drain pass (#1701).
+        private int _infrastructureOutageLogged;
+
         public DataProviderSynchronizer(
             IServiceProvider services,
             IPubSubService pubsub,
@@ -581,6 +590,14 @@ namespace Game.DataAccess
                 try
                 {
                     await HandleEvent(envelope);
+
+                    // The database just responded successfully, so any previously-reported outage is over;
+                    // reset the flag so the next one is logged at Error rather than suppressed as a repeat.
+                    if (Volatile.Read(ref _infrastructureOutageLogged) == 1)
+                    {
+                        Interlocked.Exchange(ref _infrastructureOutageLogged, 0);
+                    }
+
                     return;
                 }
                 catch (JsonException ex)
@@ -615,7 +632,20 @@ namespace Game.DataAccess
                     // handling (see SettleInFlightItemsAsync) already knows to leave a faulted item on the
                     // processing list, so the opportunistic stranded-processing reclaim (or the next startup)
                     // picks it back up once the database recovers, with no dedicated re-probe loop needed (#2097).
-                    _logger.LogError(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' after {MaxAttempts} attempts; treating this as a database outage and leaving it queued for automatic retry once it recovers. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, _retryPolicy.MaxAttempts, message);
+                    //
+                    // Only the outage's first-observed failure logs at Error; every parked item re-faults here
+                    // again on each reclaim cycle for as long as the outage lasts, so logging every one at
+                    // Error would flood the log during exactly the incident an operator most needs clean
+                    // signal from (#2159). Repeats log at Debug instead, until HandleEvent succeeds again.
+                    if (Interlocked.Exchange(ref _infrastructureOutageLogged, 1) == 0)
+                    {
+                        _logger.LogError(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' after {MaxAttempts} attempts; treating this as a database outage and leaving it queued for automatic retry once it recovers. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, _retryPolicy.MaxAttempts, message);
+                    }
+                    else
+                    {
+                        _logger.LogDebug(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' after {MaxAttempts} attempts during an already-reported database outage; leaving it queued for automatic retry once it recovers. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, _retryPolicy.MaxAttempts, message);
+                    }
+
                     throw;
                 }
                 catch (Exception ex)

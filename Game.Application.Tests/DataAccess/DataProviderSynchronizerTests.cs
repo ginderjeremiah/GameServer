@@ -160,6 +160,83 @@ namespace Game.Application.Tests.DataAccess
             Assert.Single(await queue.PeekProcessingAsync(10));
         }
 
+        [Theory]
+        [MemberData(nameof(InfrastructureFailures))]
+        public async Task ProcessQueue_MultipleConcurrentInfrastructureFailuresInOnePass_LogsOnlyOneErrorAndRestAtDebug(Func<Exception> makeException)
+        {
+            // Two distinct players' events both hit a database-infrastructure failure within the same drain
+            // pass — modeling many active players' events all parked by one ongoing outage (#2159). Distinct
+            // players apply concurrently (#1701), so both exhaust their retries at roughly the same time.
+            var brokenServices = new AlwaysThrowingServiceProvider(makeException);
+
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(brokenServices, pubsub, logger, TestRetryPolicy);
+
+            var firstPlayerEvent = new PlayerCoreUpdatedEvent(1, 2, 3, 0, 100, 100, DateTime.UtcNow, false, null);
+            var secondPlayerEvent = new PlayerCoreUpdatedEvent(2, 3, 4, 0, 100, 100, DateTime.UtcNow, false, null);
+            var queue = new InMemoryPubSubQueue(Serialize(firstPlayerEvent), Serialize(secondPlayerEvent));
+
+            await synchronizer.ProcessQueue(queue);
+
+            // Only the first-observed failure is logged at Error; the other logs at Debug instead of flooding
+            // the log with one Error per parked item.
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Debug && e.Message.Contains("database outage")));
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("dead-letter"));
+
+            // Neither was dead-lettered — both stay reserved for the reclaim to pick back up once the database recovers.
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+            Assert.Equal(2, (await queue.PeekProcessingAsync(10)).Count);
+        }
+
+        [Theory]
+        [MemberData(nameof(InfrastructureFailures))]
+        public async Task ProcessQueue_InfrastructureOutageRecoversThenRecurs_LogsErrorAgainOnTheNextOutage(Func<Exception> makeException)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
+
+            var togglingServices = new ToggleableServiceProvider(scope.ServiceProvider, makeException) { ShouldFail = true };
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(togglingServices, pubsub, logger, TestRetryPolicy);
+            var queue = new InMemoryPubSubQueue();
+
+            // First outage: exhausts retries and logs the terminal failure at Error.
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 9, 111, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
+
+            // The database recovers; the next event applies successfully, resetting the outage flag.
+            togglingServices.ShouldFail = false;
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 10, 222, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+
+            using (var verifyScope = CreateScope())
+            {
+                var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+                var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+                Assert.NotNull(persisted);
+                Assert.Equal(10, persisted.Level);
+            }
+
+            // A second, later outage must be reported fresh rather than staying suppressed by the first one's flag.
+            togglingServices.ShouldFail = true;
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 11, 333, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Equal(2, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
+
+            // The recovered event was applied and acknowledged; the two failed ones (from each outage) are
+            // still stranded on the processing list, neither reclaimed nor dead-lettered.
+            Assert.Equal(2, (await queue.PeekProcessingAsync(10)).Count);
+        }
+
         public static IEnumerable<object[]> GenuinePerWriteFailures()
         {
             // A deadlock is the base case: the server responded, only this write is affected.
@@ -2056,6 +2133,21 @@ namespace Game.Application.Tests.DataAccess
             public object? GetService(Type serviceType) => serviceType == typeof(IServiceScopeFactory) ? this : null;
 
             public IServiceScope CreateScope() => throw exceptionFactory();
+        }
+
+        /// <summary>
+        /// Like <see cref="AlwaysThrowingServiceProvider"/>, but the failure is switchable mid-test via
+        /// <see cref="ShouldFail"/> so a test can model a database outage that later recovers: while true,
+        /// <c>CreateScope</c> throws; once flipped false, it delegates to a real scope factory so the event
+        /// actually applies.
+        /// </summary>
+        private sealed class ToggleableServiceProvider(IServiceProvider inner, Func<Exception> exceptionFactory) : IServiceProvider, IServiceScopeFactory
+        {
+            public bool ShouldFail { get; set; }
+
+            public object? GetService(Type serviceType) => serviceType == typeof(IServiceScopeFactory) ? this : null;
+
+            public IServiceScope CreateScope() => ShouldFail ? throw exceptionFactory() : inner.CreateScope();
         }
 
         /// <summary>
