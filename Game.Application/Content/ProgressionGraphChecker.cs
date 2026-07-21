@@ -591,6 +591,15 @@ namespace Game.Application.Content
                         }
                     }
 
+                    // Gateways are root tiers only (#2236): a non-root tier's prerequisites would open (and
+                    // be announced as open) unconditionally once its within-path predecessor maxes, while the
+                    // XP-routing gate still withholds accrual until the prerequisites are actually maxed —
+                    // defense-in-depth parity with the admin save-time rejection.
+                    if (onLivePath && proficiency.PathOrdinal != 0 && proficiency.PrerequisiteIds.Any())
+                    {
+                        Error("ProficiencyPrerequisite", "Proficiency", proficiency.Id, $"is not its path's root tier (ordinal {proficiency.PathOrdinal}) but has authored prerequisites — prerequisites can only be authored on a path's root tier.");
+                    }
+
                     foreach (var prerequisiteId in proficiency.PrerequisiteIds)
                     {
                         if (!_proficiencies.TryGetValue(prerequisiteId, out var prerequisite))

@@ -233,9 +233,22 @@ namespace Game.DataAccess.Repositories.Admin
         /// <summary>Returns a rejection if any id in <paramref name="prerequisiteIds"/> is
         /// <paramref name="proficiency"/> itself, does not exist, or is on <paramref name="proficiency"/>'s own
         /// path — gateways are cross-path only (a same-path prerequisite deadlocks the path against its own
-        /// implicit tier ordering, where tier N+1 requires tier N maxed) — else null.</summary>
+        /// implicit tier ordering, where tier N+1 requires tier N maxed) — or <paramref name="proficiency"/>
+        /// is not its path's root tier, else null.</summary>
         private AdminSaveResult? ValidatePrerequisiteIds(Entities.Proficiency proficiency, IReadOnlyList<int> prerequisiteIds)
         {
+            // Gateways are root tiers only (#2236): OpenSuccessors opens a within-path successor
+            // unconditionally on its predecessor maxing, never checking the successor's own prerequisites, so
+            // a non-root tier carrying prerequisites would open (and get announced as open) before its
+            // prerequisites are actually maxed while the XP-routing gate still withholds its accrual — three
+            // openness answers disagreeing for the same node. Restricting authorship to root tiers (ordinal 0)
+            // removes the shape entirely; every current design-doc gateway example is already a path root.
+            if (prerequisiteIds.Count > 0 && proficiency.PathOrdinal != 0)
+            {
+                return AdminSaveResult.Failure(
+                    $"Proficiency {proficiency.Id} is not its path's root tier (ordinal {proficiency.PathOrdinal}) — prerequisites can only be authored on a path's root tier.");
+            }
+
             foreach (var prerequisiteId in prerequisiteIds)
             {
                 if (prerequisiteId == proficiency.Id)

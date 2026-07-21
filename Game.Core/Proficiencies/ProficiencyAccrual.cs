@@ -110,7 +110,9 @@ namespace Game.Core.Proficiencies
         // Opens the nodes a just-maxed proficiency unlocks: the next tier within its own path (revealed by
         // maxing the tier before it — spike #982 decision 10), and any cross-path gateway it gates whose every
         // prerequisite is now maxed (decision 10's themed gateways). Within-path order is implicit in the
-        // ordinals, so a successor tier needs no authored prerequisite row.
+        // ordinals, so the successor opens unconditionally here — safe only because a non-root tier can never
+        // carry its own authored prerequisites (enforced at admin save time and by the Content Health lint,
+        // #2236), so a within-path successor never has a gateway condition of its own to also satisfy.
         private static void OpenSuccessors(
             ProficiencyCatalog catalog, Proficiency maxed, Func<int, int> levelOf,
             List<ProficiencyOpened> opened, HashSet<int> openedIds)
