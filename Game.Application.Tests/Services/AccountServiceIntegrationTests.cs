@@ -5,6 +5,7 @@ using Game.Application.Auth;
 using Game.Application.Services;
 using Game.Core;
 using Game.Core.Battle;
+using Game.Core.Identity;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
@@ -328,6 +329,23 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task Login_PaddedUsername_NormalizesAndSucceeds()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "paddeduser", "paddedpass");
+
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            // CreateAccount normalizes (trims) before storing, so Login must apply the same normalization —
+            // otherwise a padded variant of a stored username can never match the exact-match lookup.
+            var result = await accountService.Login("  paddeduser  ", "paddedpass");
+
+            Assert.True(result.Success);
+            Assert.Equal(user.Id, result.UserId);
+        }
+
+        [Fact]
         public async Task Login_UserWithMultiplePlayers_ReturnsAllSummaries()
         {
             using var scope = CreateScope();
@@ -425,6 +443,23 @@ namespace Game.Application.Tests.Services
             // The unknown-user branch must spend the dummy derivation work (and never a real verify it has no
             // hash for), so its response time matches a known-user verify and can't be used to enumerate names.
             Assert.Equal(1, hasher.VerifyDummyCalls);
+            Assert.Equal(0, hasher.VerifyCalls);
+        }
+
+        [Fact]
+        public async Task Login_UnNormalizableUsername_FailsFastWithoutPasswordWork()
+        {
+            using var scope = CreateScope();
+            var hasher = new RecordingPasswordHasher(TestPepper);
+            var accountService = CreateAccountService(scope.ServiceProvider, passwordHasher: hasher);
+
+            // A username that can never match a stored (already-normalized) value is rejected before any
+            // backoff/database/PBKDF2 work runs — there is no account this input could possibly resolve to.
+            var result = await accountService.Login(new string('a', UsernamePolicy.MaxLength + 1), "whatever");
+
+            Assert.False(result.Success);
+            Assert.Equal(LoginStatus.InvalidCredentials, result.Status);
+            Assert.Equal(0, hasher.VerifyDummyCalls);
             Assert.Equal(0, hasher.VerifyCalls);
         }
 

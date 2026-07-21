@@ -84,36 +84,45 @@ namespace Game.Application.Services
         /// </summary>
         public async Task<AccountLoginResult> Login(string username, string password, CancellationToken cancellationToken = default)
         {
+            // Normalize the same way CreateAccount does before the account is ever looked up, so a padded
+            // variant of a stored username (e.g. " bob ") resolves to the same account and the same backoff
+            // streak. An un-normalizable input can never match a stored (already-normalized) username, so it
+            // fails fast as invalid credentials without touching the backoff store, the database, or PBKDF2.
+            if (!UsernamePolicy.TryNormalize(username, out var normalized))
+            {
+                return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
+            }
+
             // Defence-in-depth on top of the per-IP rate limiter: if too many consecutive failures have
             // accrued for this account, reject before any database hit or PBKDF2 work. Keyed per account so a
             // slow distributed guess is slowed regardless of source IP; it is a bounded backoff (never a hard
             // lockout), so an attacker who knows a username can only briefly slow the owner, not lock them out.
-            var activeBackoff = await _backoffGuard.GetActiveBackoff(username, cancellationToken);
+            var activeBackoff = await _backoffGuard.GetActiveBackoff(normalized, cancellationToken);
             if (activeBackoff is TimeSpan retryAfter)
             {
                 return AccountLoginResult.BackedOff(retryAfter);
             }
 
-            var account = await _users.GetUser(username, cancellationToken);
+            var account = await _users.GetUser(normalized, cancellationToken);
             if (account is null)
             {
                 // Spend the same PBKDF2 work a real account's verify would, so an unknown username is not
                 // distinguishable by response time (defeating timing-based username enumeration).
                 _passwordHasher.VerifyDummy(password);
-                await _backoffGuard.RegisterFailure(username, cancellationToken);
+                await _backoffGuard.RegisterFailure(normalized, cancellationToken);
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
             var verification = _passwordHasher.Verify(password, account.PassHash);
             if (verification == PasswordVerificationResult.Failed)
             {
-                await _backoffGuard.RegisterFailure(username, cancellationToken);
+                await _backoffGuard.RegisterFailure(normalized, cancellationToken);
                 return AccountLoginResult.Failed(LoginStatus.InvalidCredentials);
             }
 
             // Credentials verified — the attempt is not a brute-force guess, so reset the failure streak
             // before any later (ban / no-player) rejection, which is not a credential failure.
-            await _backoffGuard.Reset(username, cancellationToken);
+            await _backoffGuard.Reset(normalized, cancellationToken);
 
             // Reject a banned account only after its credentials check out, so an anonymous probe can't
             // enumerate ban status — only the account owner learns they are banned. This is also the first
