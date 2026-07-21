@@ -15,6 +15,7 @@ namespace Game.Api
                 ESocketCloseReason.MessageTooBig => "The socket has been closed because a message exceeded the maximum allowed size.",
                 ESocketCloseReason.ServerShuttingDown => "The socket has been closed because the server is shutting down.",
                 ESocketCloseReason.MalformedFrame => "The socket has been closed because a received frame could not be parsed.",
+                ESocketCloseReason.AccessRevoked => "The socket has been closed because the account's access was revoked.",
                 _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unhandled socket close reason.")
             };
         }
@@ -23,8 +24,9 @@ namespace Game.Api
         /// Maps a close reason to the WebSocket status code sent on the close frame, so a client inspecting
         /// the status code alone can tell an error/abnormal closure from a graceful one. Graceful, expected
         /// closures use <see cref="WebSocketCloseStatus.NormalClosure"/>: a finished connection, an intentional
-        /// single-session takeover, and a planned shutdown drain (the client treats that normal closure as a
-        /// cue to reconnect to a healthy instance). Non-graceful closures get a distinct status — an idle
+        /// single-session takeover, an admin-revoked account, and a planned shutdown drain (the client treats
+        /// that normal closure as a cue to reconnect to a healthy instance, or — for a revocation — to route
+        /// back to login instead). Non-graceful closures get a distinct status — an idle
         /// timeout as a policy violation, an oversized message as the matching message-too-big code, an
         /// unparseable frame as invalid payload data.
         /// </summary>
@@ -35,6 +37,7 @@ namespace Game.Api
                 ESocketCloseReason.Finished => WebSocketCloseStatus.NormalClosure,
                 ESocketCloseReason.SocketReplaced => WebSocketCloseStatus.NormalClosure,
                 ESocketCloseReason.ServerShuttingDown => WebSocketCloseStatus.NormalClosure,
+                ESocketCloseReason.AccessRevoked => WebSocketCloseStatus.NormalClosure,
                 ESocketCloseReason.Inactivity => WebSocketCloseStatus.PolicyViolation,
                 ESocketCloseReason.MessageTooBig => WebSocketCloseStatus.MessageTooBig,
                 ESocketCloseReason.MalformedFrame => WebSocketCloseStatus.InvalidPayloadData,

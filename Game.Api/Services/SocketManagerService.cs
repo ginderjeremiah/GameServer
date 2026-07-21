@@ -344,6 +344,29 @@ namespace Game.Api.Services
             _cache.ReclaimAndForget(AccountSocketKey(userId), PlayerIdValue(playerId), SocketPresenceTtl);
         }
 
+        /// <summary>
+        /// Force-closes any currently live socket among <paramref name="playerIds"/> — an account's full
+        /// player list — so an admin ban/archive revokes access immediately rather than only once the
+        /// client's access token expires (up to the 15-minute TTL) or the socket next goes idle. Silent when
+        /// none are connected: unlike a gameplay push (<see cref="EmitSocketCommand(SocketCommandInfo, int)"/>),
+        /// the target of a ban/archive is very often already offline, so that is the common case here, not a
+        /// warning-worthy anomaly — <see cref="HasActiveSocket"/> is checked per player first specifically to
+        /// avoid that log noise. Best-effort like the rest of this service's presence handling: a player who
+        /// connects in the narrow race between the admin action committing and this call reaching their
+        /// socket is not caught, which is acceptable since any subsequent refresh/select for the account is
+        /// already rejected by the live ban/archive check (see docs/backend-auth.md).
+        /// </summary>
+        public async Task RevokeAccess(IReadOnlyList<int> playerIds)
+        {
+            foreach (var playerId in playerIds)
+            {
+                if (await HasActiveSocket(playerId))
+                {
+                    await EmitSocketCommand(new AccessRevokedInfo(), playerId);
+                }
+            }
+        }
+
         public Task UnRegisterSocket(SocketContext context)
         {
             // A clean disconnect shares the same guarded best-effort steps as a registration rollback: if the

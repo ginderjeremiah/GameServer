@@ -154,11 +154,14 @@ import {
 	startGame,
 	stopEngines,
 	handleSocketReplaced,
+	handleAccessRevoked,
 	handleChallengeCompleted,
 	handleProficiencyXpGained,
 	handleServerCommandFailed,
 	SESSION_REPLACED_TITLE,
 	SESSION_REPLACED_BODY,
+	ACCESS_REVOKED_TITLE,
+	ACCESS_REVOKED_BODY,
 	logicEngine,
 	renderEngine,
 	enemyManager,
@@ -268,6 +271,43 @@ describe('handleSocketReplaced', () => {
 
 	it('does not navigate until the modal is acknowledged', async () => {
 		const promise = handleSocketReplaced();
+		expect(goto).not.toHaveBeenCalled();
+
+		confirmActiveModal();
+		await promise;
+
+		expect(goto).toHaveBeenCalledWith('/');
+	});
+});
+
+describe('handleAccessRevoked', () => {
+	it('stops every engine and manager', () => {
+		void handleAccessRevoked();
+
+		expect(logicEngine.stop).toHaveBeenCalledTimes(1);
+		expect(renderEngine.stop).toHaveBeenCalledTimes(1);
+		expect(enemyManager.stop).toHaveBeenCalledTimes(1);
+		expect(battleEngine.stop).toHaveBeenCalledTimes(1);
+	});
+
+	it('resets the combat log so its entries do not leak into the next session', () => {
+		void handleAccessRevoked();
+
+		expect(resetLogs).toHaveBeenCalledTimes(1);
+	});
+
+	it('shows an acknowledgement modal with the access-revoked title and body', () => {
+		void handleAccessRevoked();
+
+		const modal = activeModal.current;
+		expect(modal).not.toBeNull();
+		expect(modal?.kind).toBe('acknowledge');
+		expect(modal?.title).toBe(ACCESS_REVOKED_TITLE);
+		expect(modal?.body).toBe(ACCESS_REVOKED_BODY);
+	});
+
+	it('does not navigate until the modal is acknowledged', async () => {
+		const promise = handleAccessRevoked();
 		expect(goto).not.toHaveBeenCalled();
 
 		confirmActiveModal();

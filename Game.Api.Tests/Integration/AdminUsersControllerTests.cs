@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.Api.Models.Common;
 using Game.Api.Models.Users;
+using Game.Api.Sockets.Commands;
 using Game.Core;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
@@ -9,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.WebSockets;
 using Xunit;
 using ApiRole = Game.Abstractions.Contracts.Identity.Role;
 
@@ -410,6 +412,30 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task ArchiveUser_TargetHasLiveSocket_RevokesAccessImmediately()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            var (targetUserId, _) = await SeedAndLoginAsync("archivedwhilelive", "pw");
+
+            await using var targetSocket = new TestSocketClient();
+            await targetSocket.ConnectAsync(Factory.Server.CreateWebSocketClient(), targetUserId);
+            await targetSocket.SendCommandAsync<object>("GetStatisticTypes");
+
+            var archive = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/ArchiveUser", new { UserId = targetUserId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, archive.StatusCode);
+
+            // Without the socket kick this account would otherwise keep its live session — no re-validation
+            // happens on an already-open socket — until the socket next goes idle (see docs/backend-auth.md).
+            var revoked = await targetSocket.WaitForResponseAsync(null);
+            Assert.Equal(nameof(AccessRevoked), revoked.Name);
+            var (closeStatus, closeDescription) = await targetSocket.WaitForCloseAsync();
+            Assert.Equal(WebSocketState.Closed, targetSocket.State);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, closeStatus);
+            Assert.Equal(ESocketCloseReason.AccessRevoked.GetDescription(), closeDescription);
+        }
+
+        [Fact]
         public async Task BanUser_KeepsUsernameReserved()
         {
             using var authClient = await SetupAdminClientAsync();
@@ -436,6 +462,47 @@ namespace Game.Api.Tests.Integration
             var createResponse = await Client.PostAsJsonAsync(
                 "/api/Auth/CreateAccount", new { Username = "outlaw", Password = "newpass" }, CancellationToken);
             Assert.Equal(HttpStatusCode.BadRequest, createResponse.StatusCode);
+        }
+
+        [Fact]
+        public async Task BanUser_TargetHasLiveSocket_RevokesAccessImmediately()
+        {
+            using var authClient = await SetupAdminClientAsync();
+            var (targetUserId, _) = await SeedAndLoginAsync("bannedwhilelive", "pw");
+
+            await using var targetSocket = new TestSocketClient();
+            await targetSocket.ConnectAsync(Factory.Server.CreateWebSocketClient(), targetUserId);
+            await targetSocket.SendCommandAsync<object>("GetStatisticTypes");
+
+            var ban = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/BanUser", new { UserId = targetUserId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, ban.StatusCode);
+
+            var revoked = await targetSocket.WaitForResponseAsync(null);
+            Assert.Equal(nameof(AccessRevoked), revoked.Name);
+            var (closeStatus, closeDescription) = await targetSocket.WaitForCloseAsync();
+            Assert.Equal(WebSocketState.Closed, targetSocket.State);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, closeStatus);
+            Assert.Equal(ESocketCloseReason.AccessRevoked.GetDescription(), closeDescription);
+        }
+
+        [Fact]
+        public async Task BanUser_TargetNotConnected_SucceedsWithoutError()
+        {
+            // The common case (the target is offline) must not be disrupted by the new revoke-access call —
+            // RevokeAccess is a silent no-op when nothing is live (see SocketManagerServiceTests).
+            using var authClient = await SetupAdminClientAsync();
+            int outlawId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                var outlaw = await TestDataSeeder.CreateUserAsync(context, "offlineoutlaw", "pw");
+                outlawId = outlaw.Id;
+            }
+
+            var ban = await authClient.PostAsJsonAsync(
+                "/api/AdminTools/BanUser", new { UserId = outlawId }, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, ban.StatusCode);
         }
 
         [Fact]

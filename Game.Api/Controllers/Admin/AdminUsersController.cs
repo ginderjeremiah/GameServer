@@ -22,7 +22,7 @@ namespace Game.Api.Controllers.Admin
     [Route("/api/AdminTools/[action]")]
     [ApiController]
     [ServiceFilter(typeof(AdminRoleAuthorizationFilter))]
-    public class AdminUsersController(IUsers users, IRoles roles, SessionService session) : ControllerBase
+    public class AdminUsersController(IUsers users, IRoles roles, SessionService session, SocketManagerService socketManager) : ControllerBase
     {
         private const int MaxPageSize = 100;
         private const int DefaultPageSize = 25;
@@ -31,6 +31,9 @@ namespace Game.Api.Controllers.Admin
         private readonly IRoles _roles = roles;
         // Identifies the acting admin (from the validated token) so destructive actions can self-protect.
         private readonly SessionService _session = session;
+        // Revokes a banned/archived target's live socket immediately rather than leaving it to the
+        // access-token TTL — see ArchiveUser/BanUser.
+        private readonly SocketManagerService _socketManager = socketManager;
 
         [HttpGet]
         public async Task<ApiResponse<AdminUserSearchResults>> GetUsers(
@@ -79,14 +82,28 @@ namespace Game.Api.Controllers.Admin
         [HttpPost]
         public async Task<ApiResponse> ArchiveUser([FromBody] UserActionData data)
         {
+            // Fetched before the action: GetPlayerIds excludes an already-archived account, so reading it
+            // afterward would find nothing to revoke.
+            var playerIds = await _users.GetPlayerIds(data.UserId, HttpContext.RequestAborted);
             var status = await _users.ArchiveUser(_session.UserId, data.UserId, HttpContext.RequestAborted);
+            if (status is UserActionStatus.Success)
+            {
+                await _socketManager.RevokeAccess(playerIds);
+            }
+
             return MapUserAction(status, "You cannot archive your own account.", "Cannot archive the last remaining admin.");
         }
 
         [HttpPost]
         public async Task<ApiResponse> BanUser([FromBody] UserActionData data)
         {
+            var playerIds = await _users.GetPlayerIds(data.UserId, HttpContext.RequestAborted);
             var status = await _users.BanUser(_session.UserId, data.UserId, HttpContext.RequestAborted);
+            if (status is UserActionStatus.Success)
+            {
+                await _socketManager.RevokeAccess(playerIds);
+            }
+
             return MapUserAction(status, "You cannot ban your own account.", "Cannot ban the last remaining admin.");
         }
 

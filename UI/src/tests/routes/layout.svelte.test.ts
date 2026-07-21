@@ -8,23 +8,33 @@ import { SvelteURL } from 'svelte/reactivity';
 // `SvelteURL` (created in beforeEach, mutated in place by `setPath`) makes the `.pathname` read inside
 // the effect track it. The URL is filled in beforeEach because vi.hoisted runs before module imports
 // resolve, so `SvelteURL` isn't available inside the factory.
-const { goto, getTokens, onSocketError, listenCommand, handleSocketReplaced, resumeSession, playerManager, page } =
-	vi.hoisted(() => ({
-		goto: vi.fn(() => Promise.resolve()),
-		getTokens: vi.fn(),
-		onSocketError: vi.fn(),
-		listenCommand: vi.fn(),
-		handleSocketReplaced: vi.fn(),
-		resumeSession: vi.fn(),
-		playerManager: { name: '' },
-		page: { url: new URL('http://localhost/') as URL }
-	}));
+const {
+	goto,
+	getTokens,
+	onSocketError,
+	listenCommand,
+	handleSocketReplaced,
+	handleAccessRevoked,
+	resumeSession,
+	playerManager,
+	page
+} = vi.hoisted(() => ({
+	goto: vi.fn(() => Promise.resolve()),
+	getTokens: vi.fn(),
+	onSocketError: vi.fn(),
+	listenCommand: vi.fn(),
+	handleSocketReplaced: vi.fn(),
+	handleAccessRevoked: vi.fn(),
+	resumeSession: vi.fn(),
+	playerManager: { name: '' },
+	page: { url: new URL('http://localhost/') as URL }
+}));
 
 vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('$app/paths', () => ({ resolve: (p: string) => p }));
 vi.mock('$app/state', () => ({ page }));
 vi.mock('$lib/api', () => ({ getTokens, onSocketError, apiSocket: { listenCommand } }));
-vi.mock('$lib/engine', () => ({ playerManager, handleSocketReplaced }));
+vi.mock('$lib/engine', () => ({ playerManager, handleSocketReplaced, handleAccessRevoked }));
 vi.mock('$lib/engine/session', () => ({ resumeSession }));
 vi.mock('$stores', () => ({ toastError: vi.fn() }));
 vi.mock('$components', () => ({
@@ -66,6 +76,12 @@ describe('root layout socket listeners', () => {
 		renderLayout();
 
 		expect(listenCommand).toHaveBeenCalledWith('SocketReplaced', handleSocketReplaced, true);
+	});
+
+	it('registers an AccessRevoked listener once for the whole app session, independent of the game route', () => {
+		renderLayout();
+
+		expect(listenCommand).toHaveBeenCalledWith('AccessRevoked', handleAccessRevoked, true);
 	});
 });
 

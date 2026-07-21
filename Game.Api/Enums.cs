@@ -7,7 +7,8 @@
         SocketReplaced = 2,
         MessageTooBig = 3,
         ServerShuttingDown = 4,
-        MalformedFrame = 5
+        MalformedFrame = 5,
+        AccessRevoked = 6
     }
 
     /// <summary>
