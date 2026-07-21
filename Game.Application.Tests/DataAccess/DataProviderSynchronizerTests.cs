@@ -204,7 +204,8 @@ namespace Game.Application.Tests.DataAccess
             var togglingServices = new ToggleableServiceProvider(scope.ServiceProvider, makeException) { ShouldFail = true };
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
-            var synchronizer = new DataProviderSynchronizer(togglingServices, pubsub, logger, TestRetryPolicy);
+            // Pinned to 2 consecutive successes so a genuine recovery is deterministic and quick to exercise here.
+            var synchronizer = new DataProviderSynchronizer(togglingServices, pubsub, logger, TestRetryPolicy, successesRequiredToClearOutage: 2);
             var queue = new InMemoryPubSubQueue();
 
             // First outage: exhausts retries and logs the terminal failure at Error.
@@ -212,8 +213,10 @@ namespace Game.Application.Tests.DataAccess
             await synchronizer.ProcessQueue(queue);
             Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
 
-            // The database recovers; the next event applies successfully, resetting the outage flag.
+            // The database recovers; two consecutive events apply successfully, resetting the outage flag.
             togglingServices.ShouldFail = false;
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 10, 222, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
             await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 10, 222, 0, 100, 100, DateTime.UtcNow, false, null)));
             await synchronizer.ProcessQueue(queue);
 
@@ -225,16 +228,69 @@ namespace Game.Application.Tests.DataAccess
                 Assert.Equal(10, persisted.Level);
             }
 
-            // A second, later outage must be reported fresh rather than staying suppressed by the first one's flag.
+            // A third, later outage must be reported fresh rather than staying suppressed by the first one's flag.
             togglingServices.ShouldFail = true;
             await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 11, 333, 0, 100, 100, DateTime.UtcNow, false, null)));
             await synchronizer.ProcessQueue(queue);
 
             Assert.Equal(2, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
 
-            // The recovered event was applied and acknowledged; the two failed ones (from each outage) are
+            // The recovered events were applied and acknowledged; the two failed ones (from each outage) are
             // still stranded on the processing list, neither reclaimed nor dead-lettered.
             Assert.Equal(2, (await queue.PeekProcessingAsync(10)).Count);
+        }
+
+        [Theory]
+        [MemberData(nameof(InfrastructureFailures))]
+        public async Task ProcessQueue_LoneSuccessDuringFlappingStormDoesNotClearOutage_ButEnoughConsecutiveSuccessesDo(Func<Exception> makeException)
+        {
+            // Models a TooManyConnections reconnect storm (#2247): during recovery, some writes intermittently
+            // succeed while others keep failing, so a single success must not be treated as the outage ending.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
+
+            var togglingServices = new ToggleableServiceProvider(scope.ServiceProvider, makeException) { ShouldFail = true };
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var synchronizer = new DataProviderSynchronizer(togglingServices, pubsub, logger, TestRetryPolicy, successesRequiredToClearOutage: 3);
+            var queue = new InMemoryPubSubQueue();
+
+            // Outage begins: first-observed failure logs at Error.
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 9, 111, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
+
+            // One intermittent success (a write that happened to get a connection during the storm) is not
+            // enough on its own to clear the flag.
+            togglingServices.ShouldFail = false;
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 10, 222, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+
+            // So the very next failure is still the same ongoing outage — logged at Debug, not a fresh Error.
+            togglingServices.ShouldFail = true;
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 11, 333, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Debug && e.Message.Contains("database outage")));
+
+            // Once three consecutive applies succeed uninterrupted, the outage is considered genuinely over.
+            togglingServices.ShouldFail = false;
+            for (var i = 0; i < 3; i++)
+            {
+                await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 12 + i, 400 + i, 0, 100, 100, DateTime.UtcNow, false, null)));
+                await synchronizer.ProcessQueue(queue);
+            }
+
+            // A later, genuinely new outage is now reported fresh at Error rather than staying suppressed.
+            togglingServices.ShouldFail = true;
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 99, 999, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Equal(2, logger.Entries.Count(e => e.Level == LogLevel.Error && e.Message.Contains("database outage")));
         }
 
         public static IEnumerable<object[]> GenuinePerWriteFailures()
