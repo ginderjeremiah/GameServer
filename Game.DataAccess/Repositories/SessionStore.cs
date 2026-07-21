@@ -8,8 +8,11 @@ using System.Text.Json;
 
 namespace Game.DataAccess.Repositories
 {
-    // Sessions are keyed by the user/account id (single active session per user).
-    // Note PlayerState.PlayerId is a distinct value and is not used as the key.
+    // Sessions are keyed by the user/account id (single active session per user, spike #922's decided
+    // A++ model). Note PlayerState.PlayerId is a distinct value and is not used as the key: two live
+    // characters on the same account writing here would silently clobber each other, so that invariant is
+    // enforced one layer up, at socket registration (SocketManagerService's account-level presence claim,
+    // see docs/backend-sockets.md -> "Single active connection", #1817).
     internal class SessionStore : ISessionStore
     {
         private static string SessionPrefix => Constants.CACHE_SESSION_PREFIX;

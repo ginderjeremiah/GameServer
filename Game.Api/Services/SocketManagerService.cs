@@ -2,6 +2,7 @@
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Core;
+using System.Globalization;
 using System.Net.WebSockets;
 
 namespace Game.Api.Services
@@ -17,14 +18,26 @@ namespace Game.Api.Services
         private readonly SocketConnectionRegistry _socketRegistry;
 
         /// <summary>
-        /// Time-to-live on the per-player socket-presence key. The client heartbeats every 10s
-        /// (<c>api-socket.ts</c>), and every inbound message refreshes this TTL, so a live connection
-        /// keeps its key fresh while a non-gracefully-closed one (a tab/device that vanished without a
-        /// close frame) lets the key expire within this window instead of lingering until the 60s
-        /// inactivity check. That keeps the <see cref="HasActiveSocket"/> presence signal honest — the
-        /// 30s budget tolerates two missed heartbeats before a live session is mistaken for gone.
+        /// Time-to-live on the per-player socket-presence key (and the account-level "current live player"
+        /// key it shares its shape with, see <see cref="ClaimAccountPresence"/>). The client heartbeats
+        /// every 10s (<c>api-socket.ts</c>), and every inbound message refreshes this TTL, so a live
+        /// connection keeps its key fresh while a non-gracefully-closed one (a tab/device that vanished
+        /// without a close frame) eventually lets the key expire.
         /// </summary>
-        private static readonly TimeSpan SocketPresenceTtl = TimeSpan.FromSeconds(30);
+        /// <remarks>
+        /// Pinned to <em>at least</em> <see cref="SocketHandler.DefaultInactivityTimeout"/> +
+        /// <see cref="SocketHandler.DefaultInactivityPollInterval"/> — the watchdog's own worst-case bound
+        /// on how long a silent socket may still be genuinely alive — rather than a shorter, UI-responsive
+        /// value (#1817). <see cref="TryClaimForSwitchCredit"/> and <see cref="ClaimAccountPresence"/> both
+        /// treat an expired presence key as "safe to claim"; if the TTL were shorter than the watchdog's
+        /// bound, a backgrounded-but-still-open socket (throttled well past 10s between heartbeats — see
+        /// spike #922's background-tab-throttling note) could lose its presence claim to a switch-credit or
+        /// an account-level takeover while the watchdog still considers it live and lets it keep processing
+        /// commands, reintroducing the lost-update race those claims exist to prevent. The trade-off is a
+        /// slower <see cref="HasActiveSocket"/> signal for a socket that vanished uncleanly (no close frame):
+        /// it now takes up to this TTL, not a shorter one, to be reported gone.
+        /// </remarks>
+        internal static readonly TimeSpan SocketPresenceTtl = SocketHandler.DefaultInactivityTimeout + SocketHandler.DefaultInactivityPollInterval;
 
         /// <summary>
         /// Backstop TTL applied to a per-socket command queue (<see cref="SocketQueueName"/>) on every push.
@@ -70,9 +83,10 @@ namespace Game.Api.Services
 
         public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService, bool isAdmin)
         {
+            var userId = sessionService.UserId;
             var playerId = sessionService.SelectedPlayerId;
             var socketContext = new SocketContext(socket, playerId, sessionService, isAdmin, _loggerFactory.CreateLogger<SocketContext>());
-            var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(playerId, socketContext.SocketId));
+            var socketHandler = new SocketHandler(socketContext, _commandFactory, _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(), () => RefreshSocketPresence(userId, playerId, socketContext.SocketId));
             var presenceKey = CurrentSocketKey(playerId);
             // Defer behind an in-flight switch-away credit's claim (#2041) rather than overwriting it: that
             // credit is a read-modify-write against this same player's aggregate run off this player's battle
@@ -82,8 +96,19 @@ namespace Game.Api.Services
             // clear" and "the key was written" — see its doc comment.
             var oldSocketId = await ClaimPresenceKey(presenceKey, socketContext.SocketId);
 
+            int? oldAccountPlayerId;
             try
             {
+                // One live character per account (spike #922, decided A++) is enforced here too, not just one
+                // live socket per character: Session_{userId} (SessionStore) is keyed by account, so if a
+                // *different* character on this account still had a live socket, its connection would keep
+                // saving its own in-flight battle into the same cache slot this connection is about to use,
+                // last-writer-wins, with neither side ever told (#1817). Claiming the account-level slot
+                // mirrors ClaimPresenceKey exactly, just keyed by userId instead of playerId. Inside the try
+                // (rather than before it) so a fault here rolls the per-player claim back too, instead of
+                // leaving it briefly orphaned until its own TTL.
+                oldAccountPlayerId = await ClaimAccountPresence(userId, playerId);
+
                 await RegisterSocketCommandListener(socketHandler);
                 // Register before starting the loops so the registry tracks the socket — and threads its
                 // shutdown tokens into Listen — for a graceful drain on host shutdown (#526). Awaited because
@@ -106,18 +131,38 @@ namespace Game.Api.Services
             // than tearing down the live new connection over a notification the old socket no longer needs.
             if (oldSocketId is not null)
             {
-                try
+                await NotifyReplacedSocket(oldSocketId, playerId);
+            }
+
+            if (oldAccountPlayerId is int otherPlayerId)
+            {
+                // The other character's own presence key (not the account key just claimed above) names its
+                // live socket, if any. A well-behaved switch already closed it — CharacterSelectionService's
+                // switch-away credit runs only after the client tears its game socket down — so this is
+                // normally a no-op and only fires for a client that opened a second character's socket
+                // without doing so (a stale/second tab, or a misbehaving client).
+                var otherSocketId = await CurrentSocketId(otherPlayerId);
+                if (otherSocketId is not null && otherSocketId != SwitchCreditClaimValue)
                 {
-                    await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to notify replaced socket {OldSocketId} for player {PlayerId}; it will be cleaned up by its own inactivity teardown.", oldSocketId, playerId);
+                    await NotifyReplacedSocket(otherSocketId, otherPlayerId);
                 }
             }
 
             _logger.LogDebug("Initiated socket for player: ({Id}), with Id: {SocketId}", playerId, socketContext.SocketId);
             return socketContext;
+        }
+
+        /// <summary>Best-effort push telling a superseded socket it was replaced; see the callers in <see cref="RegisterSocket"/>.</summary>
+        private async Task NotifyReplacedSocket(string oldSocketId, int oldPlayerId)
+        {
+            try
+            {
+                await EmitSocketCommand(new SocketReplacedInfo(), oldSocketId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to notify replaced socket {OldSocketId} for player {PlayerId}; it will be cleaned up by its own inactivity teardown.", oldSocketId, oldPlayerId);
+            }
         }
 
         /// <summary>
@@ -162,6 +207,18 @@ namespace Game.Api.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to release the presence key for socket {SocketId} while {Reason}.", context.SocketId, reason);
+            }
+
+            try
+            {
+                // Same compare-and-delete guard as the per-player key above, keyed by account instead: a
+                // different character on this account may have already taken the account-level slot over,
+                // and that claim must be left intact.
+                await _cache.CompareAndDelete(AccountSocketKey(context.Session.UserId), PlayerIdValue(context.PlayerId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to release the account presence key for socket {SocketId} while {Reason}.", context.SocketId, reason);
             }
         }
 
@@ -241,20 +298,50 @@ namespace Game.Api.Services
         }
 
         /// <summary>
-        /// Extends the player's socket-presence TTL on connection activity, so a live socket keeps its
-        /// presence key from expiring (see <see cref="SocketPresenceTtl"/>). Reclaims the key as this
-        /// socket's own id if it is currently unset, so a live socket can restore a claim that lapsed (a TTL
-        /// lapse from an inbound stall) or was rolled back out from under it (a superseding registration
-        /// that later failed) — a bare expire is a no-op on a missing key and can never resurrect it. If the
-        /// key already holds a different (newer) socket's id, the refresh still just extends that key's TTL
-        /// without touching its value, so it can never clobber a takeover. Fire-and-forget: presence refresh
-        /// is best-effort (a missed refresh simply lets the sliding TTL lapse), so it must neither throw on a
-        /// transient Redis fault — which would tear down the live read loop — nor add a serial round-trip to
-        /// the front of every inbound command.
+        /// Atomically claims <paramref name="userId"/>'s account-level "current live character" slot as
+        /// <paramref name="playerId"/> — the same CompareAndSet-loop shape as <see cref="ClaimPresenceKey"/>,
+        /// just keyed by account instead of by character, and with no switch-credit sentinel to defer behind
+        /// (that claim only ever targets a per-player key). Enforces the decided one-live-character-per-
+        /// account model (spike #922) at the socket layer, alongside the per-player takeover
+        /// <see cref="ClaimPresenceKey"/> already enforces (#1817). Returns the slot's previous player id
+        /// when it names a genuinely different character to kick, or <see langword="null"/> if the slot was
+        /// unset or already held this same player.
         /// </summary>
-        private void RefreshSocketPresence(int playerId, string socketId)
+        private async Task<int?> ClaimAccountPresence(int userId, int playerId)
+        {
+            var accountKey = AccountSocketKey(userId);
+            var newValue = PlayerIdValue(playerId);
+            var currentValue = await _cache.Get(accountKey);
+            while (true)
+            {
+                if (await _cache.CompareAndSet(accountKey, currentValue, newValue, SocketPresenceTtl))
+                {
+                    return currentValue is not null && currentValue != newValue
+                        ? int.Parse(currentValue, CultureInfo.InvariantCulture)
+                        : null;
+                }
+
+                // Another writer (a competing registration for this account) won the race; re-read and retry
+                // against whatever landed, exactly as ClaimPresenceKey does.
+                currentValue = await _cache.Get(accountKey);
+            }
+        }
+
+        /// <summary>
+        /// Extends the player's socket-presence TTL — and the account-level slot claiming it as the
+        /// account's current live character — on connection activity, so a live socket keeps both from
+        /// expiring (see <see cref="SocketPresenceTtl"/>). Both use <see cref="ICacheService.ReclaimAndForget"/>:
+        /// each key is resurrected as this socket's/player's own claim if currently unset (a TTL lapse from
+        /// an inbound stall, or a rolled-back registration), but if a key already holds a different (newer)
+        /// owner's value the refresh only extends that key's TTL without touching it, so it can never clobber
+        /// a takeover. Fire-and-forget: presence refresh is best-effort (a missed refresh simply lets the
+        /// sliding TTL lapse), so it must neither throw on a transient Redis fault — which would tear down the
+        /// live read loop — nor add a serial round-trip to the front of every inbound command.
+        /// </summary>
+        private void RefreshSocketPresence(int userId, int playerId, string socketId)
         {
             _cache.ReclaimAndForget(CurrentSocketKey(playerId), socketId, SocketPresenceTtl);
+            _cache.ReclaimAndForget(AccountSocketKey(userId), PlayerIdValue(playerId), SocketPresenceTtl);
         }
 
         public Task UnRegisterSocket(SocketContext context)
@@ -442,5 +529,13 @@ namespace Game.Api.Services
         {
             return $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}";
         }
+
+        /// <summary>The account-level "current live character" key <see cref="ClaimAccountPresence"/> claims.</summary>
+        private static string AccountSocketKey(int userId)
+        {
+            return $"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_{userId}";
+        }
+
+        private static string PlayerIdValue(int playerId) => playerId.ToString(CultureInfo.InvariantCulture);
     }
 }

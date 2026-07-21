@@ -42,11 +42,21 @@ namespace Game.Api.Sockets
 
         private readonly TimeSpan _commandTimeout;
 
-        /// <summary>How long a socket may go without inbound traffic before the watchdog closes it.</summary>
-        private static readonly TimeSpan DefaultInactivityTimeout = TimeSpan.FromSeconds(60);
+        /// <summary>
+        /// How long a socket may go without inbound traffic before the watchdog closes it. Internal (rather
+        /// than private) so <see cref="Services.SocketManagerService"/> can derive its presence-key TTL from
+        /// it — that TTL must never lapse before this bound, or a socket the watchdog still considers live
+        /// could lose its presence claim to a concurrent takeover/credit check (see
+        /// <see cref="Services.SocketManagerService.SocketPresenceTtl"/>).
+        /// </summary>
+        internal static readonly TimeSpan DefaultInactivityTimeout = TimeSpan.FromSeconds(60);
 
-        /// <summary>How often the inactivity watchdog re-checks the last-activity timestamp.</summary>
-        private static readonly TimeSpan DefaultInactivityPollInterval = TimeSpan.FromSeconds(10);
+        /// <summary>
+        /// How often the inactivity watchdog re-checks the last-activity timestamp — the worst-case extra
+        /// delay past <see cref="DefaultInactivityTimeout"/> before a stale socket actually closes. Internal
+        /// for the same reason as <see cref="DefaultInactivityTimeout"/>.
+        /// </summary>
+        internal static readonly TimeSpan DefaultInactivityPollInterval = TimeSpan.FromSeconds(10);
 
         private readonly TimeSpan _inactivityTimeout;
         private readonly TimeSpan _inactivityPollInterval;

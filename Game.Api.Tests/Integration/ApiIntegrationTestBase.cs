@@ -185,8 +185,29 @@ namespace Game.Api.Tests.Integration
             return seeded;
         }
 
+        /// <summary>
+        /// Seeds an additional character (with a linked skill so the aggregate loads) on an account already
+        /// seeded by <see cref="SeedAsync"/>/<see cref="SeedAndLoginAsync"/>, for tests exercising the
+        /// multiple-characters-per-account model (spike #922) — e.g. the account-level socket takeover
+        /// (#1817). No session/login is established for it; connect a socket directly with
+        /// <see cref="TestSocketClient.ConnectAsync(Microsoft.AspNetCore.TestHost.WebSocketClient, int, int?, string[])"/>.
+        /// </summary>
+        protected async Task<int> SeedSecondPlayerAsync(int userId, string name = "TestPlayer2")
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var skill = await TestDataSeeder.CreateSkillAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, userId, name);
+            await TestDataSeeder.LinkSkillToPlayerAsync(context, player.Id, skill.Id);
+            await ReloadReferenceCachesAsync();
+            return player.Id;
+        }
+
         /// <summary>The player's socket-presence cache key.</summary>
         protected static string PresenceKey(int playerId) => $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}";
+
+        /// <summary>The account's account-level "current live character" socket-presence cache key (#1817).</summary>
+        protected static string AccountPresenceKey(int userId) => $"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_{userId}";
 
         /// <summary>Reads the live TTL on the player's socket-presence key directly from Redis.</summary>
         protected async Task<TimeSpan?> GetPresenceTtlAsync(int playerId)
