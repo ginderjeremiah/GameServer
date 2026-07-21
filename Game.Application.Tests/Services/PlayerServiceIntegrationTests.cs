@@ -765,12 +765,15 @@ namespace Game.Application.Tests.Services
                 new() { LogType = ELogType.Exp, Enabled = true },
             };
 
-            await playerService.SaveLogPreferences(player, preferences);
-            await DrainPlayerUpdateQueue(scope.ServiceProvider);
-
             var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
             using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
             var db = multiplexer.GetDatabase();
+
+            // The first save actually changes both preferences, so it must enqueue both events — proving the
+            // no-op assertion below isn't trivially true (e.g. from a broken queue rather than the no-op guard).
+            await playerService.SaveLogPreferences(player, preferences);
+            Assert.Equal(2, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
 
             // Re-submitting the same values is a no-op: no LogPreferenceChangedEvent should be raised or saved.
             await playerService.SaveLogPreferences(player, preferences);
