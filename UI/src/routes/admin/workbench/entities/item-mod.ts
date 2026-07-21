@@ -70,7 +70,8 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this mod exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},

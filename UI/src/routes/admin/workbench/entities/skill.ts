@@ -90,7 +90,14 @@ export const skillEntity: EntityConfig<ISkill> = {
 				},
 				{ key: 'cooldownMs', label: 'Cooldown', type: 'number', suffix: 'ms', width: 150 },
 				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },
-				{ key: 'iconPath', label: 'Icon Path', type: 'text', placeholder: 'skills/icon.png', grow: true },
+				{
+					key: 'iconPath',
+					label: 'Icon Path',
+					type: 'text',
+					placeholder: 'skills/icon.png',
+					grow: true,
+					maxLength: 50
+				},
 				{ key: 'word', label: 'Word of Power', type: 'text', placeholder: 'sijren', width: 200 },
 				{ key: 'pronunciation', label: 'Pronunciation', type: 'text', placeholder: 'sij·ren', width: 200 },
 				{ key: 'translation', label: 'Translation', type: 'text', placeholder: 'The Riven Frost', grow: true },
@@ -119,7 +126,8 @@ export const skillEntity: EntityConfig<ISkill> = {
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this skill exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},

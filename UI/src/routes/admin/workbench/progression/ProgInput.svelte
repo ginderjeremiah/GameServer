@@ -6,6 +6,7 @@
 			class:invalid={warn}
 			aria-label={label}
 			{placeholder}
+			maxlength={maxLength}
 			{value}
 			oninput={(e) => onChange(e.currentTarget.value)}
 		></textarea>
@@ -16,6 +17,7 @@
 			class:invalid={warn}
 			aria-label={label}
 			{placeholder}
+			maxlength={maxLength}
 			{value}
 			oninput={(e) => onChange(e.currentTarget.value)}
 		/>
@@ -33,6 +35,7 @@ interface Props {
 	fullWidth?: boolean;
 	mono?: boolean;
 	warn?: boolean;
+	maxLength?: number;
 }
 
 const {
@@ -44,7 +47,8 @@ const {
 	grow = false,
 	fullWidth = false,
 	mono = false,
-	warn = false
+	warn = false,
+	maxLength
 }: Props = $props();
 </script>
 

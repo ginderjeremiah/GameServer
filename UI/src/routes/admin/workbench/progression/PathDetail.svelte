@@ -45,6 +45,7 @@
 						value={path.description}
 						textarea
 						fullWidth
+						maxLength={500}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.description = v))}
 					/>
 				</div>

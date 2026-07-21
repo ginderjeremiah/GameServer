@@ -141,7 +141,8 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this item exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},
