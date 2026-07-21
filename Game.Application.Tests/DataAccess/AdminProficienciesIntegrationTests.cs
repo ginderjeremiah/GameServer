@@ -632,6 +632,36 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SetPrerequisites_OnNonRootTier_ReturnsFailure()
+        {
+            int gatedId, prerequisiteId;
+            using (var seedScope = CreateScope())
+            {
+                var path = await SeedPathAsync(seedScope);
+                await SeedProficiencyAsync(seedScope, path.Id, pathOrdinal: 0, name: "Fire I");
+                gatedId = (await SeedProficiencyAsync(seedScope, path.Id, pathOrdinal: 1, name: "Fire II")).Id;
+                prerequisiteId = (await SeedProficiencyAsync(seedScope)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            // A within-path tier's opening depends only on its predecessor maxing (ProficiencyAccrual.
+            // OpenSuccessors opens it unconditionally) — an authored prerequisite here would never actually
+            // gate the open trigger, only the XP-routing check, so the tier could show open/trainable while
+            // silently never accruing (#2236). Gateways are root-tier-only.
+            var result = admin.SetPrerequisites([new SetProficiencyPrerequisitesData
+            {
+                Id = gatedId,
+                PrerequisiteIds = [prerequisiteId],
+            }]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("root tier", result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SetPrerequisites_PrerequisiteOnRetiredPath_ReturnsFailure()
         {
             int gatedId, prerequisiteId;

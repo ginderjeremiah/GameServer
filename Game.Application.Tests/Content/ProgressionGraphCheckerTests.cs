@@ -703,6 +703,25 @@ namespace Game.Application.Tests.Content
         }
 
         [Fact]
+        public void Proficiency_PrerequisiteOnNonRootTier_IsError()
+        {
+            // Gateways are root-tier-only (#2236): a non-root tier's own opening never checks its authored
+            // prerequisites (OpenSuccessors opens the within-path successor unconditionally), so a
+            // prerequisite here would only gate XP routing, not the open trigger the player sees.
+            var graph = HealthyGraph() with
+            {
+                Paths = [Path(0), Path(1)],
+                Proficiencies =
+                [
+                    Proficiency(0, pathId: 0, pathOrdinal: 0, maxLevel: 10),
+                    Proficiency(1, pathId: 0, pathOrdinal: 1, maxLevel: 10, prerequisiteIds: [2]),
+                    Proficiency(2, pathId: 1, pathOrdinal: 0, maxLevel: 10),
+                ],
+            };
+            AssertHasFinding(graph, "ProficiencyPrerequisite", ContentGraphSeverity.Error, "Proficiency", 1);
+        }
+
+        [Fact]
         public void Proficiency_OnMissingPath_IsError()
         {
             var graph = HealthyGraph() with
