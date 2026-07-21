@@ -103,7 +103,8 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 					placeholder: 'items/icon.png',
 					grow: true,
 					required: true,
-					reqMsg: 'No icon path'
+					reqMsg: 'No icon path',
+					maxLength: 50
 				},
 				{
 					key: 'grantedSkillId',
@@ -127,7 +128,14 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 					width: 240
 				},
 				{ key: 'requiredProficiencyLevel', label: 'Required Level', type: 'number', width: 150 },
-				{ key: 'description', label: 'Description', type: 'textarea', placeholder: 'Flavor text…', grow: true },
+				{
+					key: 'description',
+					label: 'Description',
+					type: 'textarea',
+					placeholder: 'Flavor text…',
+					grow: true,
+					maxLength: 500
+				},
 				{
 					key: 'designerNotes',
 					label: 'Designer Notes',

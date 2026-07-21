@@ -45,6 +45,8 @@ export interface FieldConfig<T> {
 	 *  provider as `select` — used for every EAttribute picker now the enum is large (#1327). */
 	type: 'text' | 'number' | 'toggle' | 'textarea' | 'select' | 'attribute' | 'flags';
 	placeholder?: string;
+	/** Enforces the backend column's `HasMaxLength` bound on a text/textarea field. */
+	maxLength?: number;
 	/** Lets a text/textarea field stretch to fill the row. */
 	grow?: boolean;
 	/** Fixed width (px) for number/select fields. */

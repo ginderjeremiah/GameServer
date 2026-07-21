@@ -24,6 +24,7 @@
 			class:invalid={!!warn}
 			aria-label={field.label}
 			placeholder={field.placeholder}
+			maxlength={field.maxLength}
 			value={value as string}
 			oninput={(e) => set(e.currentTarget.value)}
 		></textarea>
@@ -106,6 +107,7 @@
 			class:invalid={!!warn}
 			aria-label={field.label}
 			placeholder={field.placeholder}
+			maxlength={field.maxLength}
 			value={value as string}
 			oninput={(e) => set(e.currentTarget.value)}
 		/>
