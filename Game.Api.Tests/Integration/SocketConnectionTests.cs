@@ -1,4 +1,5 @@
 using Game.Api.Models.Common;
+using Game.Api.Services;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
@@ -158,10 +159,12 @@ namespace Game.Api.Tests.Integration
             var ttl = await GetPresenceTtlAsync(playerId);
 
             // The presence key carries a TTL, so a connection that vanishes without a clean close can't
-            // leave the key lingering forever.
+            // leave the key lingering forever. Bounded by the production TTL (pinned to at least the
+            // inactivity watchdog's own bound, see SocketManagerService.SocketPresenceTtl) rather than a
+            // hardcoded value that would silently drift from it.
             Assert.NotNull(ttl);
             Assert.True(ttl > TimeSpan.Zero, $"Expected a positive TTL but got {ttl}.");
-            Assert.True(ttl <= TimeSpan.FromSeconds(30), $"Expected TTL <= 30s but got {ttl}.");
+            Assert.True(ttl <= SocketManagerService.SocketPresenceTtl, $"Expected TTL <= {SocketManagerService.SocketPresenceTtl} but got {ttl}.");
         }
 
         [Fact]

@@ -5,7 +5,7 @@ import { navigation, staticData, tutorialTour } from '$stores';
 import { playerManager } from './player/player-manager';
 
 /** Live (non-retired) lessons from reference data, or `[]` before it has loaded. */
-const liveLessons = (): ILesson[] => (staticData.lessons ?? []).filter((lesson) => !lesson.retiredAt);
+export const liveLessons = (): ILesson[] => (staticData.lessons ?? []).filter((lesson) => !lesson.retiredAt);
 
 /** A lesson is locked until the player has an entry for it (unlocked or read) — see
  *  {@link PlayerManager.unlockLesson}/{@link PlayerManager.markLessonRead}. */
