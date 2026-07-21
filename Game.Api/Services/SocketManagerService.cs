@@ -350,19 +350,25 @@ namespace Game.Api.Services
         /// client's access token expires (up to the 15-minute TTL) or the socket next goes idle. Silent when
         /// none are connected: unlike a gameplay push (<see cref="EmitSocketCommand(SocketCommandInfo, int)"/>),
         /// the target of a ban/archive is very often already offline, so that is the common case here, not a
-        /// warning-worthy anomaly — <see cref="HasActiveSocket"/> is checked per player first specifically to
-        /// avoid that log noise. Best-effort like the rest of this service's presence handling: a player who
-        /// connects in the narrow race between the admin action committing and this call reaching their
-        /// socket is not caught, which is acceptable since any subsequent refresh/select for the account is
-        /// already rejected by the live ban/archive check (see docs/backend-auth.md).
+        /// warning-worthy anomaly. Reads the presence key directly (mirroring the <c>otherSocketId</c> check
+        /// in <see cref="RegisterSocket"/>) and skips a null or switch-credit-sentinel value, rather than
+        /// gating on <see cref="HasActiveSocket"/> and then calling the int-keyed <see cref="EmitSocketCommand(SocketCommandInfo, int)"/>
+        /// overload — that combination re-reads the key and, during the brief window a switch-credit claim
+        /// holds it (see <see cref="TryClaimForSwitchCredit"/>), finds no real socket and logs the very
+        /// no-active-socket warning this method exists to suppress (#2233). Best-effort like the rest of this
+        /// service's presence handling: a player who connects in the narrow race between the admin action
+        /// committing and this call reaching their socket is not caught, which is acceptable since any
+        /// subsequent refresh/select for the account is already rejected by the live ban/archive check (see
+        /// docs/backend-auth.md).
         /// </summary>
         public async Task RevokeAccess(IReadOnlyList<int> playerIds)
         {
             foreach (var playerId in playerIds)
             {
-                if (await HasActiveSocket(playerId))
+                var socketId = await CurrentSocketId(playerId);
+                if (socketId is not null && socketId != SwitchCreditClaimValue)
                 {
-                    await EmitSocketCommand(new AccessRevokedInfo(), playerId);
+                    await EmitSocketCommand(new AccessRevokedInfo(), socketId);
                 }
             }
         }

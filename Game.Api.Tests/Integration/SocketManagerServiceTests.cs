@@ -535,6 +535,29 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(nameof(AccessRevoked), revoked.Name);
         }
 
+        [Fact]
+        public async Task RevokeAccess_PlayerHeldBySwitchCreditSentinel_IsSilentNoOp()
+        {
+            // A ban/archive landing while the target's presence key holds the switch-credit sentinel (rather
+            // than a real socket id or being unset) is the gap #2233 fixes: HasActiveSocket reports this
+            // player as present (see TryClaimForSwitchCredit's doc comment), but there is no real socket to
+            // push AccessRevoked to, so the old HasActiveSocket-gated check fell through to EmitSocketCommand's
+            // no-active-socket warning branch. RevokeAccess must recognize the sentinel and skip silently.
+            const int playerId = 918273;
+            var startIndex = _capturingProvider.Entries.Count;
+
+            using (var scope = CreateScope())
+            {
+                var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+                Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+
+                await socketManager.RevokeAccess([playerId]);
+            }
+
+            Assert.DoesNotContain(_capturingProvider.Entries.Skip(startIndex),
+                e => e.Category == SocketManagerCategory && e.Level == LogLevel.Warning);
+        }
+
         private async Task<bool> HasActiveSocketAsync(int playerId)
         {
             using var scope = CreateScope();
