@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Game.Infrastructure.Migrations
 {
     [DbContext(typeof(GameContext))]
-    [Migration("20260702231051_AddParryRiposteIntrinsics")]
-    partial class AddParryRiposteIntrinsics
+    [Migration("20260721201453_InitialBaseline")]
+    partial class InitialBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -57,7 +57,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -90,13 +91,13 @@ namespace Game.Infrastructure.Migrations
                         new
                         {
                             Id = 3,
-                            Description = "A measure of one's speed and reflexes. Improves cooldown recovery and the chance to dodge attacks.",
+                            Description = "A measure of one's speed and reflexes. Amplifies your cooldown bonus and dodge chance.",
                             Name = "Agility"
                         },
                         new
                         {
                             Id = 4,
-                            Description = "A measure of one's precision and finesse. Increases the damage of some physical skills and improves cooldown recovery.",
+                            Description = "A measure of one's precision and finesse. Increases the damage of some physical skills.",
                             Name = "Dexterity"
                         },
                         new
@@ -350,6 +351,24 @@ namespace Game.Infrastructure.Migrations
                             Id = 48,
                             Description = "A multiplier applied to your parry chance.",
                             Name = "Parry Chance Multiplier"
+                        },
+                        new
+                        {
+                            Id = 49,
+                            Description = "A multiplier applied to your dodge chance.",
+                            Name = "Dodge Chance Multiplier"
+                        },
+                        new
+                        {
+                            Id = 50,
+                            Description = "Additional cooldown recovery granted by items and skill effects, amplified by your cooldown bonus multiplier.",
+                            Name = "Cooldown Bonus"
+                        },
+                        new
+                        {
+                            Id = 51,
+                            Description = "A multiplier applied to your cooldown bonus.",
+                            Name = "Cooldown Bonus Multiplier"
                         });
                 });
 
@@ -794,7 +813,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("DesignerNotes")
                         .IsRequired()
@@ -806,7 +826,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("IconPath")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("ItemCategoryId")
                         .HasColumnType("integer");
@@ -921,7 +942,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("DesignerNotes")
                         .IsRequired()
@@ -1053,6 +1075,76 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("TagId");
 
                     b.ToTable("ItemTags");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.Lesson", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 0L, null, 0L, null, null, null);
+
+                    b.Property<string>("DesignerNotes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ScreenKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("TriggerMechanicEvent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TriggerType")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("Lessons");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.LessonStep", b =>
+                {
+                    b.Property<int>("LessonId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AnchorKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("LessonId", "Ordinal");
+
+                    b.ToTable("LessonSteps");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.LogPreference", b =>
@@ -1199,6 +1291,9 @@ namespace Game.Infrastructure.Migrations
                     b.Property<DateTime>("LastActivity")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long?>("LastCreditedBattleSeed")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("Level")
                         .HasColumnType("integer");
 
@@ -1217,6 +1312,10 @@ namespace Game.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ClassId");
+
+                    b.HasIndex("CurrentZoneId");
 
                     b.HasIndex("UserId");
 
@@ -1265,6 +1364,27 @@ namespace Game.Infrastructure.Migrations
                     b.HasIndex("ChallengeId");
 
                     b.ToTable("PlayerChallenges");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerLesson", b =>
+                {
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LessonId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UnlockedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("PlayerId", "LessonId");
+
+                    b.HasIndex("LessonId");
+
+                    b.ToTable("PlayerLessons");
                 });
 
             modelBuilder.Entity("Game.Infrastructure.Entities.PlayerProficiency", b =>
@@ -1567,7 +1687,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("DesignerNotes")
                         .IsRequired()
@@ -2002,6 +2123,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.HasKey("PlayerId", "ItemId");
 
+                    b.HasIndex("EquipmentSlotId");
+
                     b.HasIndex("ItemId");
 
                     b.HasIndex("PlayerId", "EquipmentSlotId")
@@ -2113,7 +2236,8 @@ namespace Game.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("DesignerNotes")
                         .IsRequired()
@@ -2204,7 +2328,7 @@ namespace Game.Infrastructure.Migrations
                     b.HasOne("Game.Infrastructure.Entities.ItemModSlot", "ItemModSlot")
                         .WithMany()
                         .HasForeignKey("ItemModSlotId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Game.Infrastructure.Entities.Player", "Player")
@@ -2507,6 +2631,17 @@ namespace Game.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Game.Infrastructure.Entities.LessonStep", b =>
+                {
+                    b.HasOne("Game.Infrastructure.Entities.Lesson", "Lesson")
+                        .WithMany("Steps")
+                        .HasForeignKey("LessonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lesson");
+                });
+
             modelBuilder.Entity("Game.Infrastructure.Entities.LogPreference", b =>
                 {
                     b.HasOne("Game.Infrastructure.Entities.LogType", "LogType")
@@ -2528,6 +2663,18 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("Game.Infrastructure.Entities.Player", b =>
                 {
+                    b.HasOne("Game.Infrastructure.Entities.Class", null)
+                        .WithMany()
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Game.Infrastructure.Entities.Zone", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Game.Infrastructure.Entities.User", "User")
                         .WithMany("Players")
                         .HasForeignKey("UserId")
@@ -2571,6 +2718,25 @@ namespace Game.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Challenge");
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Game.Infrastructure.Entities.PlayerLesson", b =>
+                {
+                    b.HasOne("Game.Infrastructure.Entities.Lesson", "Lesson")
+                        .WithMany()
+                        .HasForeignKey("LessonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Game.Infrastructure.Entities.Player", "Player")
+                        .WithMany("PlayerLessons")
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lesson");
 
                     b.Navigation("Player");
                 });
@@ -2830,6 +2996,11 @@ namespace Game.Infrastructure.Migrations
 
             modelBuilder.Entity("Game.Infrastructure.Entities.UnlockedItem", b =>
                 {
+                    b.HasOne("Game.Infrastructure.Entities.EquipmentSlot", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentSlotId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Game.Infrastructure.Entities.Item", "Item")
                         .WithMany("UnlockedItems")
                         .HasForeignKey("ItemId")
@@ -3003,6 +3174,11 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("ItemMods");
                 });
 
+            modelBuilder.Entity("Game.Infrastructure.Entities.Lesson", b =>
+                {
+                    b.Navigation("Steps");
+                });
+
             modelBuilder.Entity("Game.Infrastructure.Entities.LogType", b =>
                 {
                     b.Navigation("LogPreferences");
@@ -3022,6 +3198,8 @@ namespace Game.Infrastructure.Migrations
                     b.Navigation("PlayerAttributes");
 
                     b.Navigation("PlayerChallenges");
+
+                    b.Navigation("PlayerLessons");
 
                     b.Navigation("PlayerProficiencies");
 
