@@ -43,6 +43,7 @@ import type {
 } from './';
 
 export type ApiSocketResponseTypes = {
+	'AccessRevoked': undefined;
 	'ApplyMod': undefined;
 	'BattleLost': IBattleLostResponse;
 	'ChallengeBoss': INewEnemyModel;

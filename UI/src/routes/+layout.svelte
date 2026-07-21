@@ -16,7 +16,7 @@ import { page } from '$app/state';
 import { onMount } from 'svelte';
 import { TooltipBase, ToastContainer, ModalHost } from '$components';
 import { apiSocket, getTokens, onSocketError } from '$lib/api';
-import { handleSocketReplaced, playerManager } from '$lib/engine';
+import { handleAccessRevoked, handleSocketReplaced, playerManager } from '$lib/engine';
 import { resumeSession } from '$lib/engine/session';
 import { bootRedirect, shouldReturnToLogin } from '$lib/engine/boot-redirect';
 import { bootState } from '$lib/engine/boot-state.svelte';
@@ -44,6 +44,9 @@ onSocketError((message) => toastError(message), true);
 // lifecycle previously owned this listener, so it went unheard while parked outside /game (e.g. /admin,
 // #1836). Registered here instead, once for the whole app session, independent of the game engines.
 apiSocket.listenCommand('SocketReplaced', handleSocketReplaced, true);
+// Same reasoning applies to an admin ban/archive revoking access mid-session (#2226/#2227): the push must
+// reach the client regardless of which route is mounted.
+apiSocket.listenCommand('AccessRevoked', handleAccessRevoked, true);
 
 // Boot gate. On a fresh page load (refresh or deep link) the in-memory game state is gone, so we
 // attempt to restore the session and decide where to land — keeping a fully-restored session on the

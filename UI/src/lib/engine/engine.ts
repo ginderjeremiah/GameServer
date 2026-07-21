@@ -70,6 +70,10 @@ export const SESSION_REPLACED_TITLE = 'Session Replaced';
 export const SESSION_REPLACED_BODY =
 	'Another session has started elsewhere. You have been disconnected. You will be taken to the login screen.';
 
+export const ACCESS_REVOKED_TITLE = 'Access Revoked';
+export const ACCESS_REVOKED_BODY =
+	'Your account access has been revoked. You have been disconnected. You will be taken to the login screen.';
+
 let challengeCompletedUnhook: Action | undefined;
 let proficiencyXpGainedUnhook: Action | undefined;
 let serverCommandFailedUnhook: Action | undefined;
@@ -321,6 +325,18 @@ export const handleSocketReplaced = async () => {
 	await acknowledgeModal({
 		title: SESSION_REPLACED_TITLE,
 		body: SESSION_REPLACED_BODY,
+		confirmLabel: 'Go to Login'
+	});
+	void goto(resolve('/'));
+};
+
+// Pushed when an admin ban/archive revokes the account's access — same client-side shape as
+// handleSocketReplaced (tear down, acknowledge, route to login) with revocation-specific copy.
+export const handleAccessRevoked = async () => {
+	stopGame();
+	await acknowledgeModal({
+		title: ACCESS_REVOKED_TITLE,
+		body: ACCESS_REVOKED_BODY,
 		confirmLabel: 'Go to Login'
 	});
 	void goto(resolve('/'));

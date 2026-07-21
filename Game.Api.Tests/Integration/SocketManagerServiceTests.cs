@@ -348,6 +348,72 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(playerId, warning.Properties.Single(p => p.Key == "PlayerId").Value);
         }
 
+        [Fact]
+        public async Task RevokeAccess_PlayerHasActiveSocket_PushesAccessRevokedAndCloses()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync();
+
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            Assert.True(await HasActiveSocketAsync(playerId));
+
+            using (var scope = CreateScope())
+            {
+                var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+                await socketManager.RevokeAccess([playerId]);
+            }
+
+            // AccessRevoked is emitted with no command Id, so it surfaces as a null-Id server push, mirroring
+            // how RegisterSocket_SecondConnection_ReplacesPresenceKeyAndNotifiesOldSocket observes SocketReplaced.
+            var revoked = await socketA.WaitForResponseAsync(null);
+            Assert.Equal(nameof(AccessRevoked), revoked.Name);
+
+            var (closeStatus, closeDescription) = await socketA.WaitForCloseAsync();
+            Assert.Equal(WebSocketState.Closed, socketA.State);
+            Assert.Equal(WebSocketCloseStatus.NormalClosure, closeStatus);
+            Assert.Equal(ESocketCloseReason.AccessRevoked.GetDescription(), closeDescription);
+        }
+
+        [Fact]
+        public async Task RevokeAccess_PlayerHasNoActiveSocket_IsSilentNoOp()
+        {
+            // Ban/archive targets are very often offline, unlike the gameplay pushes EmitSocketCommand's
+            // no-active-socket branch is meant to warn about — RevokeAccess must not emit that warning for
+            // what is, here, the common case (see the doc comment on RevokeAccess).
+            const int playerId = 192837;
+            var startIndex = _capturingProvider.Entries.Count;
+
+            using (var scope = CreateScope())
+            {
+                var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+                await socketManager.RevokeAccess([playerId]);
+            }
+
+            Assert.DoesNotContain(_capturingProvider.Entries.Skip(startIndex),
+                e => e.Category == SocketManagerCategory && e.Level == LogLevel.Warning);
+        }
+
+        [Fact]
+        public async Task RevokeAccess_MixOfLiveAndOfflinePlayerIds_OnlyClosesTheLiveOne()
+        {
+            var (userId, playerId) = await SeedAndLoginAsync();
+            const int offlinePlayerId = 283746;
+
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+
+            using (var scope = CreateScope())
+            {
+                var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+                await socketManager.RevokeAccess([offlinePlayerId, playerId]);
+            }
+
+            var revoked = await socketA.WaitForResponseAsync(null);
+            Assert.Equal(nameof(AccessRevoked), revoked.Name);
+        }
+
         private async Task<bool> HasActiveSocketAsync(int playerId)
         {
             using var scope = CreateScope();
