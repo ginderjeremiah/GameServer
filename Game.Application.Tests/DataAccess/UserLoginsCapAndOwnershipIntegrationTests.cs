@@ -10,14 +10,15 @@ using Xunit;
 namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
-    /// Integration coverage for the device/login-tracking hardening (#2064): a single account can't grow the
-    /// Devices/UserLogins tables without bound by cycling fresh fingerprints, and <c>SaveDeviceInfo</c> can
-    /// only enrich a device the caller actually has a tracked login for.
+    /// Integration coverage for the device/login-tracking hardening (#2064, #2240): a single account can't
+    /// grow the Devices/UserLogins tables without bound by cycling fresh fingerprints or IPs, and
+    /// <c>SaveDeviceInfo</c> can only enrich a device the caller actually has a tracked login for.
     /// </summary>
     [Collection("Integration")]
     public class UserLoginsCapAndOwnershipIntegrationTests : ApplicationIntegrationTestBase
     {
         private const int MaxTrackedDevicesPerUser = 20;
+        private const int MaxTrackedIpsPerUserDevice = 20;
         private const string UserAgent = "TestAgent/1.0";
         private const string Ip = "203.0.113.10";
 
@@ -74,6 +75,62 @@ namespace Game.Application.Tests.DataAccess
             {
                 var context = scope.ServiceProvider.GetRequiredService<GameContext>();
                 Assert.Equal(MaxTrackedDevicesPerUser + 1, await context.UserLogins.CountAsync(l => l.UserId == userId, CancellationToken));
+            }
+        }
+
+        [Fact]
+        public async Task RecordConnection_PastIpCapForKnownDevice_StopsTrackingNewIpsButStillUpdatesKnownOnes()
+        {
+            int userId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                var user = await TestDataSeeder.CreateUserAsync(context);
+                userId = user.Id;
+            }
+
+            // Reach the cap with distinct IPs against the same, already-tracked device.
+            for (var i = 0; i < MaxTrackedIpsPerUserDevice; i++)
+            {
+                using var scope = CreateScope();
+                var repo = scope.ServiceProvider.GetRequiredService<IUserLogins>();
+                await repo.RecordConnection(userId, IpForIndex(i), Fingerprint(0), UserAgent, null, null, null, CancellationToken);
+            }
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.Equal(MaxTrackedIpsPerUserDevice, await context.UserLogins.CountAsync(l => l.UserId == userId, CancellationToken));
+            }
+
+            // One more, brand-new IP for the same device: silently not tracked rather than growing past the cap.
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IUserLogins>();
+                await repo.RecordConnection(userId, IpForIndex(MaxTrackedIpsPerUserDevice), Fingerprint(0), UserAgent, null, null, null, CancellationToken);
+            }
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.Equal(MaxTrackedIpsPerUserDevice, await context.UserLogins.CountAsync(l => l.UserId == userId, CancellationToken));
+                Assert.Empty(await context.UserLogins
+                    .Where(l => l.UserId == userId && l.IpAddress == IpForIndex(MaxTrackedIpsPerUserDevice))
+                    .ToListAsync(CancellationToken));
+            }
+
+            // An already-tracked (user, IP, device) combination is the fast-path update, not blocked by a
+            // cap that only governs *new* IPs — the row count stays put.
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IUserLogins>();
+                await repo.RecordConnection(userId, IpForIndex(0), Fingerprint(0), UserAgent, null, null, null, CancellationToken);
+            }
+
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.Equal(MaxTrackedIpsPerUserDevice, await context.UserLogins.CountAsync(l => l.UserId == userId, CancellationToken));
             }
         }
 
@@ -159,5 +216,9 @@ namespace Game.Application.Tests.DataAccess
         // the repository itself doesn't enforce that shape (only the HTTP-layer ClientHints does), so a
         // simple distinguishable string is enough here.
         private static string Fingerprint(int index) => $"fp-cap-{index:D3}";
+
+        // A distinct IP per index, drawn from the TEST-NET-2 documentation range (RFC 5737) so it can't
+        // collide with the class-level Ip constant used elsewhere in this file.
+        private static string IpForIndex(int index) => $"198.51.100.{index}";
     }
 }

@@ -20,6 +20,13 @@ namespace Game.DataAccess.Repositories
         // simply not tracked rather than erroring — tracking is best-effort telemetry, not a gate on play.
         private const int MaxTrackedDevicesPerUser = 20;
 
+        // Mirrors MaxTrackedDevicesPerUser for the IP dimension of an already-tracked device: a
+        // mobile/VPN user on carrier-NAT rotation would otherwise grow UserLogins rows for that one
+        // device without bound (#2240, the IP-side gap the device cap above didn't cover). Same
+        // best-effort policy — once reached, connections from an IP the user hasn't already been seen
+        // on for that device are simply not tracked, not evicted.
+        private const int MaxTrackedIpsPerUserDevice = 20;
+
         private readonly GameContext _context;
 
         public UserLogins(GameContext context)
@@ -71,6 +78,21 @@ namespace Game.DataAccess.Repositories
                         .CountAsync(cancellationToken);
 
                     if (trackedDeviceCount >= MaxTrackedDevicesPerUser)
+                    {
+                        return;
+                    }
+                }
+                else if (device is not null)
+                {
+                    // A device the user already has *some* login for, but not from this IP — bound the
+                    // IP dimension the same way the branch above bounds the device dimension.
+                    var trackedIpCount = await _context.UserLogins
+                        .Where(l => l.UserId == userId && l.DeviceId == device.Id)
+                        .Select(l => l.IpAddress)
+                        .Distinct()
+                        .CountAsync(cancellationToken);
+
+                    if (trackedIpCount >= MaxTrackedIpsPerUserDevice)
                     {
                         return;
                     }
