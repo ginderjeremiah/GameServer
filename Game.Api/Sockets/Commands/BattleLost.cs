@@ -49,7 +49,7 @@ namespace Game.Api.Sockets.Commands
                 var now = DateTime.UtcNow;
                 return Success(new BattleLostResponse
                 {
-                    Cooldown = (state.EnemyCooldown - now).TotalMilliseconds,
+                    Cooldown = state.IsOnCooldown(now) ? (state.EnemyCooldown - now).TotalMilliseconds : 0,
                     NextEnemy = next is not null ? EnemyInstance.FromSource(next) : null,
                     NextZoneId = next is not null ? player.CurrentZoneId : null,
                 });

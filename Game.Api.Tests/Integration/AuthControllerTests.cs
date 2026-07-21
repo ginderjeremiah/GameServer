@@ -351,6 +351,28 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task ActiveSession_PreSelectionToken_ReturnsNoPlayerSelectedNotProbingPlayerZero()
+        {
+            // Mirrors Status_PreSelectionToken_ReturnsNoPlayerSelectedNotOpaque404 (#2242): a pre-selection
+            // token must surface the same distinguishable NoPlayerSelected category rather than resolving
+            // SelectedPlayerId to 0 and probing that socket's presence.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var user = await TestDataSeeder.CreateUserAsync(context, "playerlessactive", "pass");
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, user.Id);
+
+            var response = await client.GetAsync("/api/Auth/ActiveSession", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<ActiveSessionResult>>(CancellationToken);
+            Assert.Null(result?.Data);
+            Assert.NotNull(result?.ErrorMessage);
+            client.Dispose();
+        }
+
+        [Fact]
         public async Task ActiveSession_ValidTokenWithNoSessionCache_RehydratesAndReturnsResult()
         {
             // The pre-game active-session takeover warning is the user-visible breakage from #693: an evicted

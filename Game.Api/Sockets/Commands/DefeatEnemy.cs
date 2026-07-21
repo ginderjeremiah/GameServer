@@ -64,7 +64,7 @@ namespace Game.Api.Sockets.Commands
                 var now = DateTime.UtcNow;
                 return Success(new DefeatEnemyResponse
                 {
-                    Cooldown = (state.EnemyCooldown - now).TotalMilliseconds,
+                    Cooldown = state.IsOnCooldown(now) ? (state.EnemyCooldown - now).TotalMilliseconds : 0,
                     Rewards = new DefeatRewards(rewards),
                     NextEnemy = nextEnemy,
                     NextZoneId = nextZoneId,
