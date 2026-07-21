@@ -62,7 +62,8 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 					placeholder: 'Describe this mod…',
 					grow: true,
 					required: true,
-					reqMsg: 'No description'
+					reqMsg: 'No description',
+					maxLength: 500
 				},
 				{
 					key: 'designerNotes',

@@ -111,7 +111,8 @@ export const skillEntity: EntityConfig<ISkill> = {
 					placeholder: 'Describe what this skill does…',
 					grow: true,
 					required: true,
-					reqMsg: 'No description'
+					reqMsg: 'No description',
+					maxLength: 500
 				},
 				{
 					key: 'designerNotes',

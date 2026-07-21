@@ -127,7 +127,8 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 					placeholder: 'Describe this zone…',
 					grow: true,
 					required: true,
-					reqMsg: 'No description'
+					reqMsg: 'No description',
+					maxLength: 500
 				},
 				{
 					key: 'isHome',

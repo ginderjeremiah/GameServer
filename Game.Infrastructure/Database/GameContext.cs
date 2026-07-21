@@ -104,6 +104,9 @@ namespace Game.Infrastructure.Database
                 entity.Property(a => a.Name)
                     .HasMaxLength(50);
 
+                entity.Property(a => a.Description)
+                    .HasMaxLength(500);
+
                 entity.HasData(Core.Attributes.Attribute.GetAllAttributes().Select(a =>
                 {
                     return new Attribute
@@ -276,6 +279,12 @@ namespace Game.Infrastructure.Database
                 entity.Property(i => i.Name)
                     .HasMaxLength(50);
 
+                entity.Property(i => i.Description)
+                    .HasMaxLength(500);
+
+                entity.Property(i => i.IconPath)
+                    .HasMaxLength(50);
+
                 entity.Property(i => i.DesignerNotes)
                     .HasMaxLength(2000);
 
@@ -331,6 +340,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(im => im.Name)
                     .HasMaxLength(50);
+
+                entity.Property(im => im.Description)
+                    .HasMaxLength(500);
 
                 entity.Property(im => im.DesignerNotes)
                     .HasMaxLength(2000);
@@ -502,6 +514,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(s => s.Name)
                     .HasMaxLength(50);
+
+                entity.Property(s => s.Description)
+                    .HasMaxLength(500);
 
                 entity.Property(s => s.IconPath)
                     .HasMaxLength(50);
@@ -900,6 +915,9 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(z => z.Name)
                     .HasMaxLength(50);
+
+                entity.Property(z => z.Description)
+                    .HasMaxLength(500);
 
                 entity.Property(z => z.DesignerNotes)
                     .HasMaxLength(2000);
