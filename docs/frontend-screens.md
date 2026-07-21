@@ -35,6 +35,13 @@ The Options screen (`src/routes/game/screens/options`) reimagines the old loggin
 - **Live preview reuses the real log row.** The preview renders a sample event stream through the actual `LogRow`, filtered by the *draft* preferences, so it looks exactly like the real combat log and reflects each toggle before you save.
 - **All colour flows from the root `--log-*` vars** (the theming rule in frontend.md): one `var(--log-*)` reference map is shared by the real log, the preview, and the per-type rows, with every neutral/alpha shade a `color-mix` over a base token.
 
+## Help screen (the tutorial reading room)
+
+The Help screen (`src/routes/game/screens/help`, #1589) is the reserved `help` slot's implementation: a flat list of every live `Lesson` (spike #1392) in authored `ordinal` order, each showing this player's `locked`/`unread`/`read` state — the destination the sidebar's unread badge leads to.
+
+- **No screen-local open/read logic.** Selecting an unread or read (replayable) row calls straight into the shared `openLesson` flow (`$lib/engine/tutorials`) — navigate to the lesson's host screen and play its tour — the same path a screen/mechanic trigger uses, so replaying from Help behaves identically to a live trigger. A locked row is a disabled, name-only teaser (no step content), matching the "no spoilers" framing the trigger system already uses elsewhere.
+- **State is derived, not stored** — a lesson with no `PlayerLesson` entry is locked; an entry with no `readAt` is unread; otherwise read. No screen-local state beyond the view-model's derived read.
+
 ## Character-select screen (login → game)
 
 The character-select screen (`src/routes/select`) sits between the login page and the loading screen: an account can own multiple characters (see [game-design.md](./game-design.md) and the spike `docs/spikes/922-multiple-players-per-account.md`), so `Login` now returns the account's `playerSummaries` instead of binding the first one, and this screen is where the player picks who to enter as or creates a new character. Selecting one calls `SelectPlayer` — which binds the session and rotates the token to carry the chosen `playerId` — then runs the per-player active-session takeover check before entering the game.

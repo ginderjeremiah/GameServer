@@ -12,6 +12,7 @@ import AttributeBreakdown from './attribute-breakdown/AttributeBreakdown.svelte'
 import Statistics from './stats/Statistics.svelte';
 import Codex from './codex/Codex.svelte';
 import Options from './options/Options.svelte';
+import Help from './help/Help.svelte';
 
 /** A navigable game screen shown in the sidebar. */
 export interface ScreenDef {
@@ -57,7 +58,7 @@ export const GAME_SCREENS: ScreenDef[] = [
 	{ key: 'codex', label: 'Codex', group: 'character', built: true, component: Codex },
 	{ key: 'options', label: 'Options', group: 'settings', built: true, component: Options },
 	{ key: 'switch', label: 'Switch Character', group: 'settings', built: true },
-	{ key: 'help', label: 'Help', group: 'settings', built: false },
+	{ key: 'help', label: 'Help', group: 'settings', built: true, component: Help },
 	{ key: 'quit', label: 'Quit', group: 'settings', built: true },
 	{ key: 'admin', label: 'Admin', group: 'admin', built: true, requiresRole: ERole.Admin }
 ];
