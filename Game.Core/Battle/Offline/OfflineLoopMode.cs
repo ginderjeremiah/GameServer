@@ -13,7 +13,7 @@ namespace Game.Core.Battle.Offline
         Idle,
 
         /// <summary>Auto-challenging the current zone's dedicated boss: the same boss each battle, with a fresh
-        /// seed so the crit/dodge/block RNG can vary the outcome.</summary>
+        /// seed so the crit/dodge/parry/reflection RNG can vary the outcome.</summary>
         Boss,
     }
 }

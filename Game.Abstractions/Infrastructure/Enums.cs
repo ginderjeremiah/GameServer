@@ -2,6 +2,8 @@
 {
     public enum CacheSystem
     {
+        // Deliberately starts at 0, unlike DatabaseSystem: an unset config selects Redis rather than failing
+        // loud. A missing connection string still throws in RedisMultiplexerFactory, so this stays safe.
         Redis = 0
     }
 
@@ -14,6 +16,8 @@
 
     public enum PubSubSystem
     {
+        // Deliberately starts at 0, unlike DatabaseSystem: an unset config selects Redis rather than failing
+        // loud. A missing connection string still throws in RedisMultiplexerFactory, so this stays safe.
         Redis = 0
     }
 }

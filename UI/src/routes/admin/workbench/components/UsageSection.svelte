@@ -7,8 +7,8 @@
 		<span class="usage-note">read-only · derived from item &amp; mod tag lists</span>
 	</div>
 	<div class="usage-groups">
-		{@render group('Items', 'box', usage.itemList, 'items', true)}
-		{@render group('Item Mods', 'rune', usage.modList, 'mods', true)}
+		{@render group('Items', 'box', usage.itemList, 'items')}
+		{@render group('Item Mods', 'rune', usage.modList, 'mods')}
 	</div>
 </div>
 
@@ -16,8 +16,7 @@
 	label: string,
 	glyph: WorkbenchIconKind,
 	list: { id: number; name: string; rarityId?: number }[],
-	noun: string,
-	withRarity: boolean
+	noun: string
 )}
 	<div class="usage-group">
 		<div class="sec-title">
@@ -30,7 +29,7 @@
 			<div class="usage-tags">
 				{#each list.slice(0, 40) as record (record.id)}
 					<span class="ov-tag">
-						{#if withRarity && record.rarityId}
+						{#if record.rarityId}
 							<span class="tdot" style:background={reference.rarityColor(record.rarityId)}></span>
 						{/if}
 						{record.name}

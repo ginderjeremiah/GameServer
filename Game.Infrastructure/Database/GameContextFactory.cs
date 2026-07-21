@@ -6,6 +6,9 @@ namespace Game.Infrastructure.Database
 {
     internal static class GameContextFactory
     {
+        // Production only uses the Configure seam below (via AddGameContext); this wrapper exists so unit tests
+        // can assert the fully-configured DbContextOptions (e.g. the resolved provider) without opening a
+        // connection or standing up DI.
         public static GameContext GetGameContext(IDatabaseOptions config, ILoggerFactory loggerFactory)
         {
             var optionsBuilder = new DbContextOptionsBuilder<GameContext>();

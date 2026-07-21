@@ -11,7 +11,9 @@ namespace Game.Infrastructure
     /// is no longer needed. <see cref="Dispose"/> implies <see cref="Kill"/>.
     /// </para>
     /// </summary>
-    public class BackgroundWorker : IDisposable
+    // No consumer outside Game.Infrastructure; internal rather than public keeps it out of the assembly's public
+    // surface (both test assemblies reach it via InternalsVisibleTo).
+    internal class BackgroundWorker : IDisposable
     {
         private readonly AutoResetEvent _resetEvent = new(false);
         private readonly ILogger<BackgroundWorker> _logger;
