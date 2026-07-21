@@ -36,6 +36,16 @@ namespace Game.DataAccess
         private const int DefaultMaxConcurrentDrainItems = 4;
 
         /// <summary>
+        /// Default number of consecutive successful applies required after an infrastructure failure before the
+        /// outage is considered genuinely over and the next failure logs a fresh Error (see
+        /// <see cref="_consecutiveOutageSuccesses"/> and #2247). A `TooManyConnections` reconnect storm is a
+        /// transient-capacity condition where some writes intermittently succeed while others keep failing
+        /// concurrently, so requiring only one success to clear the flag re-floods the log with one Error per
+        /// failure-following-success. Conservative default; tune via the constructor if needed.
+        /// </summary>
+        private const int DefaultSuccessesRequiredToClearOutage = 3;
+
+        /// <summary>
         /// Lane key for a reserved item whose player id couldn't be determined (a malformed envelope/payload).
         /// Such items are rare and are routed onto one shared serial lane rather than their own concurrent
         /// slot — always order-safe since a genuine player id never collides with it.
@@ -50,6 +60,7 @@ namespace Game.DataAccess
         private readonly TimeSpan _reclaimGracePeriod;
         private readonly TimeProvider _timeProvider;
         private readonly int _maxConcurrentDrainItems;
+        private readonly int _successesRequiredToClearOutage;
 
         // When a drain pass finds the main queue empty but the processing list non-empty, this is the identity
         // and first-observed instant of whichever item currently sits at the processing list's head (its
@@ -96,10 +107,19 @@ namespace Game.DataAccess
         // logged at Error. Every item a prolonged outage parks re-faults through the same path on each
         // opportunistic reclaim (roughly every _reclaimGracePeriod), so without this a large backlog would log
         // one Error per parked item per reclaim cycle. Only the first occurrence (0->1) logs at Error; later
-        // ones log at Debug instead. Reset the moment any event applies successfully, so the next outage is
-        // reported fresh rather than staying silently suppressed by a stale flag. Accessed via Interlocked since
+        // ones log at Debug instead. Reset only once _consecutiveOutageSuccesses (below) reaches
+        // _successesRequiredToClearOutage, so the next genuine outage is reported fresh rather than staying
+        // silently suppressed by a stale flag — while a lone intermittent success amid an ongoing
+        // TooManyConnections storm (#2247) doesn't flip it back prematurely. Accessed via Interlocked since
         // items apply concurrently across distinct players within one drain pass (#1701).
         private int _infrastructureOutageLogged;
+
+        // Consecutive successful HandleEvent applies observed while _infrastructureOutageLogged is set. Reset to
+        // 0 by any infrastructure failure (even one from a different, concurrently-applying event), so only an
+        // uninterrupted run of successes ever reaches _successesRequiredToClearOutage and clears the outage
+        // flag — a single success mid-storm doesn't. Accessed via Interlocked for the same reason as
+        // _infrastructureOutageLogged.
+        private int _consecutiveOutageSuccesses;
 
         public DataProviderSynchronizer(
             IServiceProvider services,
@@ -109,7 +129,8 @@ namespace Game.DataAccess
             TimeSpan? drainTimeout = null,
             TimeSpan? reclaimGracePeriod = null,
             TimeProvider? timeProvider = null,
-            int? maxConcurrentDrainItems = null)
+            int? maxConcurrentDrainItems = null,
+            int? successesRequiredToClearOutage = null)
         {
             _services = services;
             _pubsub = pubsub;
@@ -119,6 +140,7 @@ namespace Game.DataAccess
             _reclaimGracePeriod = reclaimGracePeriod ?? DefaultReclaimGracePeriod;
             _timeProvider = timeProvider ?? TimeProvider.System;
             _maxConcurrentDrainItems = maxConcurrentDrainItems ?? DefaultMaxConcurrentDrainItems;
+            _successesRequiredToClearOutage = successesRequiredToClearOutage ?? DefaultSuccessesRequiredToClearOutage;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -591,11 +613,17 @@ namespace Game.DataAccess
                 {
                     await HandleEvent(envelope);
 
-                    // The database just responded successfully, so any previously-reported outage is over;
-                    // reset the flag so the next one is logged at Error rather than suppressed as a repeat.
-                    if (Volatile.Read(ref _infrastructureOutageLogged) == 1)
+                    // The database just responded successfully. Only clear the outage flag once several
+                    // applies in a row have succeeded (_successesRequiredToClearOutage) rather than on this one
+                    // success alone — during a TooManyConnections reconnect storm (#2247) some writes
+                    // intermittently succeed while others keep failing concurrently, and clearing on any single
+                    // success would let the very next concurrent failure re-log at Error, reintroducing the log
+                    // flood #2159 set out to prevent.
+                    if (Volatile.Read(ref _infrastructureOutageLogged) == 1 &&
+                        Interlocked.Increment(ref _consecutiveOutageSuccesses) >= _successesRequiredToClearOutage)
                     {
                         Interlocked.Exchange(ref _infrastructureOutageLogged, 0);
+                        Interlocked.Exchange(ref _consecutiveOutageSuccesses, 0);
                     }
 
                     return;
@@ -633,10 +661,16 @@ namespace Game.DataAccess
                     // processing list, so the opportunistic stranded-processing reclaim (or the next startup)
                     // picks it back up once the database recovers, with no dedicated re-probe loop needed (#2097).
                     //
+                    // Any failure — including one from a different, concurrently-applying event — interrupts
+                    // the recovery streak, so a partial run counted so far toward
+                    // _successesRequiredToClearOutage doesn't carry over into the next attempt at it (#2247).
+                    Interlocked.Exchange(ref _consecutiveOutageSuccesses, 0);
+
                     // Only the outage's first-observed failure logs at Error; every parked item re-faults here
                     // again on each reclaim cycle for as long as the outage lasts, so logging every one at
                     // Error would flood the log during exactly the incident an operator most needs clean
-                    // signal from (#2159). Repeats log at Debug instead, until HandleEvent succeeds again.
+                    // signal from (#2159). Repeats log at Debug instead, until HandleEvent succeeds enough
+                    // times in a row to clear the flag.
                     if (Interlocked.Exchange(ref _infrastructureOutageLogged, 1) == 0)
                     {
                         _logger.LogError(ex, "Failed to process player data event '{EventType}' from queue '{Queue}' after {MaxAttempts} attempts; treating this as a database outage and leaving it queued for automatic retry once it recovers. Raw message: {Message}", envelope.Type, Constants.PUBSUB_PLAYER_QUEUE, _retryPolicy.MaxAttempts, message);
