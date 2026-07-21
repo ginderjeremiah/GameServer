@@ -142,7 +142,8 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this zone exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},

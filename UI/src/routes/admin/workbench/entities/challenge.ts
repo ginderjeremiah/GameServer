@@ -68,14 +68,16 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 					placeholder: 'Describe the objective shown to players…',
 					grow: true,
 					required: true,
-					reqMsg: 'No description'
+					reqMsg: 'No description',
+					maxLength: 500
 				},
 				{
 					key: 'designerNotes',
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this challenge exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},
