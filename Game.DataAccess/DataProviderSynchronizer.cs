@@ -706,7 +706,9 @@ namespace Game.DataAccess
                     // instead of dead-lettering leaves the item reserved (not acknowledged): the caller's fault
                     // handling (see SettleInFlightItemsAsync) already knows to leave a faulted item on the
                     // processing list, so the opportunistic stranded-processing reclaim (or the next startup)
-                    // picks it back up once the database recovers, with no dedicated re-probe loop needed (#2097).
+                    // picks it back up once the database recovers (#2097) — bounded even on a quiet/single-
+                    // instance deployment by the periodic reconciliation wake (RunReconciliationLoop, #2273),
+                    // which guarantees that later pass happens rather than depending on unrelated traffic.
                     //
                     // Any failure — including one from a different, concurrently-applying event — interrupts
                     // the recovery streak, so a partial run counted so far toward
