@@ -1,4 +1,5 @@
 using Game.Abstractions.Infrastructure;
+using Microsoft.Extensions.Logging;
 
 namespace Game.DataAccess
 {
@@ -24,8 +25,14 @@ namespace Game.DataAccess
     {
         private readonly List<DomainEventEnvelope> _events = [];
         private readonly List<Action> _onFlushed = [];
+        private readonly ILogger<PlayerUpdateBatch> _logger;
 
         private int _playerSaveDepth;
+
+        public PlayerUpdateBatch(ILogger<PlayerUpdateBatch> logger)
+        {
+            _logger = logger;
+        }
 
         /// <summary>
         /// True while a <see cref="Repositories.PlayerRepository.SavePlayer"/> is mid-flight — between
@@ -84,7 +91,10 @@ namespace Game.DataAccess
         /// <summary>
         /// Runs and clears the actions registered via <see cref="OnFlushed"/>. <see cref="FlushAsync"/> calls
         /// this after its flush so a batched progress save's deferred cache advance lands only once its event is
-        /// enqueued (publish-before-cache).
+        /// enqueued (publish-before-cache). Each callback is isolated (logged, not rethrown): the cache advance
+        /// is best-effort by design, and by this point the flush it rides has already durably succeeded, so a
+        /// callback fault (e.g. a dropped Redis connection) must never be mistaken for a flush failure and skip
+        /// the player cache-blob write that follows in <see cref="Repositories.PlayerRepository.SavePlayer"/> (#2271).
         /// </summary>
         public void RunFlushedCallbacks()
         {
@@ -95,7 +105,14 @@ namespace Game.DataAccess
 
             foreach (var action in _onFlushed)
             {
-                action();
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "A deferred OnFlushed callback threw after its batch's flush already succeeded; continuing with the remaining callbacks.");
+                }
             }
 
             _onFlushed.Clear();
