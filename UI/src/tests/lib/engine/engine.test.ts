@@ -31,8 +31,7 @@ const {
 		skills?: ({ id: number; name: string } | undefined)[];
 		skillRecipes?: ISkillRecipe[];
 		proficiencies?: (
-			| { id: number; name: string; levelRewards: { level: number; rewardSkillId: number }[] }
-			| undefined
+			{ id: number; name: string; levelRewards: { level: number; rewardSkillId: number }[] } | undefined
 		)[];
 	},
 	statisticsStub: { load: vi.fn(), reset: vi.fn() },

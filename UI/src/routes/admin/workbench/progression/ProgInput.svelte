@@ -8,8 +8,7 @@
 			{placeholder}
 			maxlength={maxLength}
 			{value}
-			oninput={(e) => onChange(e.currentTarget.value)}
-		></textarea>
+			oninput={(e) => onChange(e.currentTarget.value)}></textarea>
 	{:else}
 		<input
 			class="inp"
