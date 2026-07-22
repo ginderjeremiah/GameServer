@@ -34,6 +34,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      csproj: ${{ steps.filter.outputs.csproj }}
     steps:
     - name: Checkout
       uses: actions/checkout@v7
@@ -74,6 +75,30 @@ jobs:
             - 'UI/**'
             - 'content/**'
             - '.github/workflows/**'
+          csproj:
+            - '**/*.csproj'
+
+  # Guards against a known dependabot-core artifact under Central Package Management: rebasing a
+  # NuGet version-bump PR (because another PR touched Directory.Packages.props first) can make
+  # Dependabot's updater re-add a redundant <PackageReference> to a *.csproj that already gets the
+  # dependency transitively — see #2299. A version bump should only ever touch
+  # Directory.Packages.props, so any .csproj change on a dependabot PR is almost certainly this
+  # artifact rather than an intended edit.
+  guard-dependabot-csproj-scope:
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() &&
+      github.event_name == 'pull_request' &&
+      github.actor == 'dependabot[bot]' &&
+      needs.detect-changes.outputs.csproj == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Fail — dependabot PR modified a .csproj file
+      run: |
+        echo "This dependabot PR modifies one or more .csproj files."
+        echo "Under Central Package Management, a version bump should only touch Directory.Packages.props."
+        echo "This is a known dependabot-core rebase artifact (see issue #2299) — strip the spurious <PackageReference> edit before merging."
+        exit 1
 
   # Non-test backend verifications (codegen drift + formatter), split out of test-backend so that
   # job is left with just build + tests/coverage (its longest path). Both checks need the build, so
@@ -356,7 +381,7 @@ jobs:
     # skipped (path-filtered out); fails if any job failed or was cancelled, including
     # detect-changes itself (a change-detection failure should block the PR, not silently skip tests).
     if: always()
-    needs: [detect-changes, verify-backend, verify-frontend, test-backend, test-frontend, test-e2e]
+    needs: [detect-changes, guard-dependabot-csproj-scope, verify-backend, verify-frontend, test-backend, test-frontend, test-e2e]
     runs-on: ubuntu-latest
     steps:
     - name: Verify all jobs passed or were skipped
