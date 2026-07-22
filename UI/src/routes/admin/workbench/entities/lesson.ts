@@ -166,7 +166,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					type: 'text',
 					width: 200,
 					placeholder: 'Optional — centered if blank',
-					optional: true
+					optional: true,
+					maxLength: 100
 				}
 			]
 		}

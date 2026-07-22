@@ -78,7 +78,8 @@ export const skillEntity: EntityConfig<ISkill> = {
 					placeholder: 'Name this skill…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 50
 				},
 				{ key: 'baseDamage', label: 'Base Damage', type: 'number', suffix: 'dmg', width: 150 },
 				{
