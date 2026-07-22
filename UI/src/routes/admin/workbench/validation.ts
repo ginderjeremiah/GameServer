@@ -16,13 +16,13 @@ export function fieldWarn<T>(field: FieldConfig<T>, rec: T): string | null {
 	return empty ? (field.reqMsg ?? `${field.label} required`) : null;
 }
 
-const resolveWarning = <T>(section: SectionConfig<T>, rec: T): Warning | null => {
-	const result = section.warn?.(rec) ?? null;
+const resolveWarning = <T>(section: SectionConfig<T>, rec: T, baseline?: T): Warning | null => {
+	const result = section.warn?.(rec, baseline) ?? null;
 	return result === null ? null : typeof result === 'string' ? { message: result } : result;
 };
 
-export function sectionWarnings<T>(section: SectionConfig<T>, rec: T): string[] {
-	const warning = resolveWarning(section, rec);
+export function sectionWarnings<T>(section: SectionConfig<T>, rec: T, baseline?: T): string[] {
+	const warning = resolveWarning(section, rec, baseline);
 	if (section.kind === 'fields') {
 		// A fields section warns on each failing required field, plus an optional section-level `warn`
 		// for a cross-field rule the per-field `required` check can't express (e.g. a recipe result that
@@ -35,15 +35,15 @@ export function sectionWarnings<T>(section: SectionConfig<T>, rec: T): string[] 
 
 /** The section's warning message when it's flagged {@link Warning.blocking}, else null — used to gate
  *  Save separately from the advisory triangle/list display, which shows every warning regardless. */
-export function sectionBlockingWarning<T>(section: SectionConfig<T>, rec: T): string | null {
-	const warning = resolveWarning(section, rec);
+export function sectionBlockingWarning<T>(section: SectionConfig<T>, rec: T, baseline?: T): string | null {
+	const warning = resolveWarning(section, rec, baseline);
 	return warning?.blocking ? warning.message : null;
 }
 
-export function entityWarnings<T extends Identified>(entity: EntityConfig<T>, rec: T): string[] {
-	return entity.sections.flatMap((s) => sectionWarnings(s, rec));
+export function entityWarnings<T extends Identified>(entity: EntityConfig<T>, rec: T, baseline?: T): string[] {
+	return entity.sections.flatMap((s) => sectionWarnings(s, rec, baseline));
 }
 
-export function entityBlockingWarnings<T extends Identified>(entity: EntityConfig<T>, rec: T): string[] {
-	return entity.sections.map((s) => sectionBlockingWarning(s, rec)).filter((w): w is string => !!w);
+export function entityBlockingWarnings<T extends Identified>(entity: EntityConfig<T>, rec: T, baseline?: T): string[] {
+	return entity.sections.map((s) => sectionBlockingWarning(s, rec, baseline)).filter((w): w is string => !!w);
 }

@@ -104,8 +104,8 @@ export class EntityStore<T extends Identified> {
 			if (!state) {
 				state = {
 					status: this.status(record),
-					warnings: entityWarnings(this.config, record),
-					blockingWarnings: entityBlockingWarnings(this.config, record)
+					warnings: entityWarnings(this.config, record, this.baselineOf(record.id)),
+					blockingWarnings: entityBlockingWarnings(this.config, record, this.baselineOf(record.id))
 				};
 				this.stateCache.set(record, state);
 			}
@@ -119,8 +119,8 @@ export class EntityStore<T extends Identified> {
 		return (
 			this.recordStates[record.id] ?? {
 				status: this.status(record),
-				warnings: entityWarnings(this.config, record),
-				blockingWarnings: entityBlockingWarnings(this.config, record)
+				warnings: entityWarnings(this.config, record, this.baselineOf(record.id)),
+				blockingWarnings: entityBlockingWarnings(this.config, record, this.baselineOf(record.id))
 			}
 		);
 	}

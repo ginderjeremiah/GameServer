@@ -30,7 +30,7 @@
 				label: section.label,
 				count: section.count?.(record) ?? null,
 				dirty: sectionDirty(section),
-				warn: sectionWarnings(section, record).length > 0
+				warn: sectionWarnings(section, record, baseline).length > 0
 			}))}
 			activeTab={tab}
 			onTab={(key) => onTab(key)}

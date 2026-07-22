@@ -81,6 +81,24 @@ describe('sectionWarnings', () => {
 		// Neither when both pass.
 		expect(sectionWarnings(section, { id: 1, name: 'Ok', icon: 'x', rows: [] })).toEqual([]);
 	});
+
+	it('passes the baseline through to the warn predicate', () => {
+		const section = {
+			key: 'rows',
+			label: 'Rows',
+			glyph: 'bars',
+			kind: 'table',
+			itemsKey: 'rows',
+			// Mirrors zone.ts's isHome gap: the pending record alone can't tell whether this is a
+			// same-save clear, only comparing against the persisted baseline can.
+			warn: (t: Thing, baseline: Thing | undefined) =>
+				!t.rows.length && baseline?.rows.length ? 'Cleared this save' : null
+		} as unknown as EntityConfig<Thing>['sections'][number];
+		const rec = { id: 1, name: 'x', icon: 'x', rows: [] };
+		expect(sectionWarnings(section, rec)).toEqual([]);
+		expect(sectionWarnings(section, rec, { id: 1, name: 'x', icon: 'x', rows: [] })).toEqual([]);
+		expect(sectionWarnings(section, rec, { id: 1, name: 'x', icon: 'x', rows: [1] })).toEqual(['Cleared this save']);
+	});
 });
 
 describe('entityWarnings', () => {
