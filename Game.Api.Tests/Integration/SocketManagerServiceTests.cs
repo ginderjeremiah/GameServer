@@ -1,6 +1,10 @@
+using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.Infrastructure;
+using Game.Api.Models.Common;
 using Game.Api.Services;
+using Game.Api.Services.Admin;
 using Game.Api.Sockets.Commands;
+using Game.Core;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
@@ -586,6 +590,66 @@ namespace Game.Api.Tests.Integration
 
             Assert.DoesNotContain(_capturingProvider.Entries.Skip(startIndex),
                 e => e.Category == SocketManagerCategory && e.Level == LogLevel.Warning);
+        }
+
+        [Fact]
+        public async Task CommandProcessor_EnvelopeFailsToDeserialize_DeadLettersRawPayloadAndNotifiesClient()
+        {
+            // Simulates the envelope-level break #2272 covers (most plausibly wire-shape skew during a
+            // rolling deploy): a payload that never even parses into a SocketCommandInfo, landing directly on
+            // the live socket's own pub/sub queue the way a genuine server push would.
+            var (userId, playerId) = await SeedAndLoginAsync();
+
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            var socketId = await ReadPresenceValueAsync(playerId);
+            Assert.NotNull(socketId);
+
+            await PublishRawToSocketAsync(socketId!, "this-is-not-json");
+
+            // The client still gets the re-sync notice even though the server can no longer name which
+            // command failed, mirroring the player write-behind queue's malformed-envelope handling.
+            var notice = await socketA.WaitForCommandAsync<ServerCommandFailedModel>(nameof(ServerCommandFailed));
+            Assert.Equal("Unknown", notice.Data?.CommandName);
+
+            using var scope = CreateScope();
+            var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
+            var inspection = await deadLetters.InspectAsync(50);
+            var entry = Assert.Single(inspection.Entries);
+            Assert.Equal(EDeadLetterReason.Malformed, entry.Reason);
+            Assert.Equal("this-is-not-json", entry.RawPayload);
+
+            // The processor kept draining afterward rather than abandoning the connection over a poison entry.
+            var stillAlive = await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            Assert.Null(stillAlive.Error);
+        }
+
+        [Fact]
+        public async Task CommandProcessor_EnvelopeDeserializesToNull_DeadLettersRawPayloadAndNotifiesClient()
+        {
+            // A literal JSON "null" deserializes cleanly but carries no command — the same poison-payload
+            // treatment as an outright parse failure applies (mirroring DataProviderSynchronizer.ProcessMessage's
+            // empty-envelope branch for the player write-behind queue).
+            var (userId, playerId) = await SeedAndLoginAsync();
+
+            await using var socketA = new TestSocketClient();
+            await socketA.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+            await socketA.SendCommandAsync<object>("GetStatisticTypes");
+            var socketId = await ReadPresenceValueAsync(playerId);
+            Assert.NotNull(socketId);
+
+            await PublishRawToSocketAsync(socketId!, "null");
+
+            var notice = await socketA.WaitForCommandAsync<ServerCommandFailedModel>(nameof(ServerCommandFailed));
+            Assert.Equal("Unknown", notice.Data?.CommandName);
+
+            using var scope = CreateScope();
+            var deadLetters = scope.ServiceProvider.GetRequiredService<SocketCommandDeadLetters>();
+            var inspection = await deadLetters.InspectAsync(50);
+            var entry = Assert.Single(inspection.Entries);
+            Assert.Equal(EDeadLetterReason.Malformed, entry.Reason);
+            Assert.Equal("null", entry.RawPayload);
         }
 
         private async Task<bool> HasActiveSocketAsync(int playerId)

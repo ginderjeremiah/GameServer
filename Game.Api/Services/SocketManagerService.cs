@@ -4,6 +4,7 @@ using Game.Api.Sockets.Commands;
 using Game.Core;
 using System.Globalization;
 using System.Net.WebSockets;
+using System.Text.Json;
 
 namespace Game.Api.Services
 {
@@ -445,18 +446,20 @@ namespace Game.Api.Services
                 var consecutiveFailures = 0;
                 while (true)
                 {
-                    SocketCommandInfo? nextCommandInfo;
+                    string? rawMessage;
                     try
                     {
-                        nextCommandInfo = await queue.GetNextAsync<SocketCommandInfo>();
+                        // Popped as the raw string (rather than queue.GetNextAsync<SocketCommandInfo>()) so a
+                        // payload that fails to deserialize is still available to dead-letter below — the
+                        // popped-before-deserialized item can't otherwise be recovered once GetNextAsync<T>
+                        // throws (#2272).
+                        rawMessage = await queue.GetNextAsync();
                     }
                     catch (Exception ex)
                     {
-                        // A fault dequeuing the next message (a malformed payload or a Redis blip) must not
-                        // escape the processor and kill the drain loop — that would silently drop every later
-                        // server push for this socket (#691). A malformed payload is already popped by
-                        // GetNextAsync before deserialization throws, so skipping it advances the queue; a
-                        // transient blip is retried on the next pass.
+                        // A fault popping the next message (a Redis blip) must not escape the processor and
+                        // kill the drain loop — that would silently drop every later server push for this
+                        // socket (#691). Retried on the next pass.
                         _logger.LogError(ex, "An error occurred while dequeuing a socket command on socket: {Id}, playerId: {PlayerId}.", socket.Id, socket.PlayerId);
 
                         // Bound a persistent fault: a hot retry loop would hammer Redis and the log for the
@@ -474,9 +477,35 @@ namespace Game.Api.Services
 
                     consecutiveFailures = 0;
 
-                    if (nextCommandInfo is null)
+                    if (rawMessage is null)
                     {
                         break;
+                    }
+
+                    SocketCommandInfo? nextCommandInfo;
+                    try
+                    {
+                        nextCommandInfo = rawMessage.Deserialize<SocketCommandInfo>();
+                    }
+                    catch (JsonException ex)
+                    {
+                        // An envelope-level break (most plausibly wire-shape skew during a rolling deploy) is a
+                        // genuine bug, since the payload is server-authored — escalate it the same as a fault
+                        // (dead-letter + client re-sync notice) rather than only logging it, mirroring the
+                        // player write-behind queue's malformed-envelope handling. The pop above already
+                        // advanced the queue, so this is purely an escalation add.
+                        _logger.LogError(ex, "Dead-lettering a socket command with a malformed envelope on socket: {Id}, playerId: {PlayerId}. Raw message: {RawMessage}", socket.Id, socket.PlayerId, rawMessage);
+                        await EscalateMalformedServerCommand(socket, rawMessage);
+                        continue;
+                    }
+
+                    if (nextCommandInfo is null)
+                    {
+                        // A null payload deserialized cleanly but carries no command; the same poison-payload
+                        // treatment as a JSON parse failure applies.
+                        _logger.LogError("Dead-lettering an empty socket command envelope on socket: {Id}, playerId: {PlayerId}. Raw message: {RawMessage}", socket.Id, socket.PlayerId, rawMessage);
+                        await EscalateMalformedServerCommand(socket, rawMessage);
+                        continue;
                     }
 
                     _logger.LogTrace("Received command on socket: {Id}, playerId: {PlayerId}, command: {CommandInfo}.", socket.Id, socket.PlayerId, nextCommandInfo);
@@ -525,20 +554,65 @@ namespace Game.Api.Services
             // that would risk an escalation loop. The dead-letter above already preserves it.
             if (commandInfo.Name != nameof(ServerCommandFailed))
             {
-                // Dispatched directly (not re-queued over pub/sub) since the failing socket is right here;
-                // ExecuteServerCommand runs it under the same command lock and owns the send to the client.
-                // Capture the outcome: if the notice itself doesn't get through (e.g. the socket just closed),
-                // the client never gets the re-sync cue for a gating command like ChallengeCompleted and would
-                // diverge silently — so surface it for an operator rather than ignoring the result.
-                var noticeOutcome = await socket.ExecuteServerCommand(new ServerCommandFailedInfo(commandInfo.Name));
-                if (noticeOutcome is not SocketCommandOutcome.Succeeded)
-                {
-                    _logger.LogWarning("The re-sync notice for a failed server command did not complete (outcome: {Outcome}); the client may not have received the re-sync cue for {Command} on socket: {Id}.", noticeOutcome, commandInfo.Name, socket.Id);
-                }
+                await SendServerCommandFailedNotice(socket, commandInfo.Name);
             }
 
             _logger.LogWarning("Dead-lettered a failing server-initiated command and notified the client: {CommandInfo} on socket: {Id}. Dead-letter queue depth: {Depth}", commandInfo, socket.Id, deadLetterDepth);
         }
+
+        /// <summary>
+        /// Escalates a server push whose envelope itself failed to deserialize — the payload is already popped
+        /// off the queue by the time <see cref="GetSocketCommandProcessor"/> discovers it's malformed, so
+        /// unlike <see cref="EscalateFailedServerCommand"/> there is no parsed <see cref="SocketCommandInfo"/>
+        /// to wrap in a <see cref="SocketCommandDeadLetterEnvelope"/> (and no failed command name to report).
+        /// The raw string is dead-lettered as-is: the Ops inspector's classifier already treats an entry that
+        /// doesn't parse as a <see cref="SocketCommandDeadLetterEnvelope"/> as malformed, so this needs no
+        /// reader-side change. The client still gets the re-sync notice — with a sentinel command name, since
+        /// which specific push it missed can no longer be recovered — mirroring the player write-behind
+        /// queue's malformed-envelope handling (#2272).
+        /// </summary>
+        private async Task EscalateMalformedServerCommand(SocketHandler socket, string rawMessage)
+        {
+            long? deadLetterDepth = null;
+            try
+            {
+                var deadLetterQueue = _pubSub.GetQueue(Constants.PUBSUB_SOCKET_DEAD_LETTER_QUEUE);
+                await deadLetterQueue.AddToQueueAsync(rawMessage);
+                deadLetterDepth = await deadLetterQueue.GetLengthAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to dead-letter a socket command with a malformed envelope on socket: {Id}. Raw message: {RawMessage}", socket.Id, rawMessage);
+            }
+
+            await SendServerCommandFailedNotice(socket, UnknownServerCommandName);
+
+            _logger.LogWarning("Dead-lettered a socket command with a malformed envelope and notified the client on socket: {Id}. Raw message: {RawMessage}. Dead-letter queue depth: {Depth}", socket.Id, rawMessage, deadLetterDepth);
+        }
+
+        /// <summary>
+        /// Dispatched directly (not re-queued over pub/sub) since the failing socket is right here;
+        /// ExecuteServerCommand runs it under the same command lock and owns the send to the client. Capture
+        /// the outcome: if the notice itself doesn't get through (e.g. the socket just closed), the client
+        /// never gets the re-sync cue for a gating command like ChallengeCompleted and would diverge silently
+        /// — so surface it for an operator rather than ignoring the result.
+        /// </summary>
+        private async Task SendServerCommandFailedNotice(SocketHandler socket, string failedCommandName)
+        {
+            var noticeOutcome = await socket.ExecuteServerCommand(new ServerCommandFailedInfo(failedCommandName));
+            if (noticeOutcome is not SocketCommandOutcome.Succeeded)
+            {
+                _logger.LogWarning("The re-sync notice for a failed server command did not complete (outcome: {Outcome}); the client may not have received the re-sync cue for {Command} on socket: {Id}.", noticeOutcome, failedCommandName, socket.Id);
+            }
+        }
+
+        /// <summary>
+        /// Sentinel <see cref="ServerCommandFailedModel.CommandName"/> for <see cref="EscalateMalformedServerCommand"/>:
+        /// an envelope-level parse failure never resolves a command name, but the model requires one. The
+        /// frontend's <c>handleServerCommandFailed</c> only special-cases known command names and otherwise
+        /// just logs the notice, so a sentinel that matches nothing is a safe, self-describing placeholder.
+        /// </summary>
+        private const string UnknownServerCommandName = "Unknown";
 
         private async Task<string?> CurrentSocketId(int playerId)
         {
