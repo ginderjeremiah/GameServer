@@ -26,8 +26,7 @@
 			placeholder={field.placeholder}
 			maxlength={field.maxLength}
 			value={value as string}
-			oninput={(e) => set(e.currentTarget.value)}
-		></textarea>
+			oninput={(e) => set(e.currentTarget.value)}></textarea>
 		{#if dirty}<DirtyDot />{/if}
 	</div>
 {:else if field.type === 'number'}

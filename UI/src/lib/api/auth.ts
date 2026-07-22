@@ -38,9 +38,7 @@ const EXPIRY_LEEWAY_SECONDS = 30;
  *    not proof the session is dead, so callers must not clear tokens or force a logout on it.
  */
 export type RefreshOutcome =
-	| { status: 'success'; tokens: StoredTokens }
-	| { status: 'rejected' }
-	| { status: 'retryable' };
+	{ status: 'success'; tokens: StoredTokens } | { status: 'rejected' } | { status: 'retryable' };
 
 /** The access token to use (or null when none could be obtained) alongside whether a refresh attempt —
  *  if one was made — was a definitive rejection, so callers can tell a dead session from a transient one. */

@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/UI"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "@emnapi/core"
+      - dependency-name: "@emnapi/runtime"
+
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
