@@ -104,7 +104,8 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 					placeholder: 'Name this zone…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 50
 				},
 				{ key: 'order', label: 'Order', type: 'number', width: 110 },
 				{ key: 'levelMin', label: 'Level Min', type: 'number', suffix: 'lv', width: 130 },

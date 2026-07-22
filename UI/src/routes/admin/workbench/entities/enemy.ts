@@ -74,7 +74,8 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 					placeholder: 'Name this enemy…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 50
 				},
 				{ key: 'isBoss', label: 'Classification', type: 'toggle', onLabel: 'Boss enemy', offLabel: 'Standard enemy' },
 				{
@@ -82,7 +83,8 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this enemy exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},

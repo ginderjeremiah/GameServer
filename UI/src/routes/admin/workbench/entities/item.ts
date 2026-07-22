@@ -86,7 +86,8 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 					placeholder: 'Name this item…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 50
 				},
 				{
 					key: 'itemCategoryId',
