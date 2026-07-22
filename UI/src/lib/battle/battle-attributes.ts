@@ -88,14 +88,12 @@ export class BattleAttributes {
 		additionalModifiers: readonly AttributeModifier[] = []
 	) {
 		this.#calcDerived = calcDerivedStats;
-		const base = attList.map(
-			(att): BaseAttributeModifier => ({
-				attribute: att.attributeId,
-				amount: att.amount,
-				type: EModifierType.Additive,
-				source: EAttributeModifierSource.AttributeDistribution
-			})
-		);
+		const base = attList.map((att): BaseAttributeModifier => ({
+			attribute: att.attributeId,
+			amount: att.amount,
+			type: EModifierType.Additive,
+			source: EAttributeModifierSource.AttributeDistribution
+		}));
 		const modifiers = calcDerivedStats
 			? [...base, ...additionalModifiers, ...STATIC_ATTRIBUTE_MODIFIERS]
 			: [...base, ...additionalModifiers];
