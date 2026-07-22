@@ -12,6 +12,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      dotnet-runtime:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Microsoft.Extensions.*"
+          - "Microsoft.AspNetCore.*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
