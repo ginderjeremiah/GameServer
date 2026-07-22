@@ -14,7 +14,7 @@ on:
     branches: [ "main" ]
 
 # No job needs more than read access to repo contents (checkout); this also caps the third-party
-# dorny/paths-filter@v3 action (flagged above as uncertified) to the same least-privilege default.
+# dorny/paths-filter@v4 action (flagged above as uncertified) to the same least-privilege default.
 permissions:
   contents: read
 
@@ -38,7 +38,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v6
     - name: Detect changed paths
-      uses: dorny/paths-filter@v3
+      uses: dorny/paths-filter@v4
       id: filter
       with:
         filters: |
