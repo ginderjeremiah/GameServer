@@ -128,6 +128,25 @@ describe('ApiSocket', () => {
 			// A never-logged-in caller (no prior refresh token) must not be routed to the auth-failure path.
 			expect(handleAuthFailure).not.toHaveBeenCalled();
 		});
+
+		it('settles the queue and routes to auth failure when the constructor throws on a malformed token', async () => {
+			// The real WebSocket constructor throws synchronously (a SyntaxError) if the subprotocol string
+			// contains a character outside the RFC 6455 token grammar — only reachable with a corrupted or
+			// hand-edited stored access token.
+			setTokens({ accessToken: 'bad token', refreshToken: 'r' });
+			webSocketMock.mockImplementationOnce(() => {
+				throw new SyntaxError("Failed to construct 'WebSocket': invalid subprotocol");
+			});
+
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+
+			// A token that can't even form a handshake is dead: settle the queued command rather than leaving
+			// the caller awaiting a connection that will never open, and route to re-auth.
+			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
+			await expect(promise).resolves.toMatchObject({ error: expect.any(String) });
+		});
 	});
 
 	describe('pre-emptive token refresh on open', () => {

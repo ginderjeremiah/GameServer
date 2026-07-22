@@ -173,7 +173,22 @@ export class ApiSocket {
 		// carried as a WebSocket subprotocol instead of a query-string parameter — a query string ends up
 		// verbatim in any downstream access log (e.g. the edge proxy's), while a subprotocol is a
 		// handshake header a default access log format never records (#2211).
-		const socket = accessToken ? new WebSocket('/socket', [accessToken]) : new WebSocket('/socket');
+		let socket: WebSocket;
+		try {
+			socket = accessToken ? new WebSocket('/socket', [accessToken]) : new WebSocket('/socket');
+		} catch (ex) {
+			// The constructor throws synchronously (rather than failing the handshake asynchronously) if
+			// accessToken contains a character outside the RFC 6455 subprotocol token grammar — only
+			// possible with a corrupted/hand-edited stored token, since a real backend JWT is always valid
+			// base64url. A token that can't even form a handshake is dead, so this is unrecoverable like the
+			// "definitively rejected" branch above: settle the queue and route to re-auth rather than
+			// leaving the caller awaiting a connection that will never open.
+			console.error('WebSocket construction failed, likely due to a malformed access token', ex);
+			this.stopPingInterval();
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
+			handleAuthFailure();
+			return;
+		}
 		this.socket = socket;
 		socket.onopen = this.onStart.bind(this);
 		socket.onmessage = this.receiveResponse.bind(this);
