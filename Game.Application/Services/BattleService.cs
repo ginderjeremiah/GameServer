@@ -256,15 +256,20 @@ namespace Game.Application.Services
         /// always the player's current zone's boss — the loop never targets a separate zone — so enabling
         /// validates <see cref="Player.CurrentZoneId"/> as anti-cheat the same way <see cref="StartBossBattle"/>
         /// does (in circulation, unlocked, has a dedicated boss), rejecting (no mutation) otherwise; disabling
-        /// is always accepted (returning to idle needs no target). The change rides the existing write-behind
-        /// save via the player's core-updated event.
+        /// is always accepted (returning to idle needs no target). A toggle to the already-active mode saves
+        /// nothing (no mutation, no event) but still returns <c>true</c> — accepting is not the same as
+        /// changing. Otherwise the change rides the existing write-behind save via the player's core-updated
+        /// event.
         /// </summary>
         public async Task<bool> SetAutoChallengeBoss(Player player, bool enabled, CancellationToken cancellationToken = default)
         {
             if (!enabled)
             {
-                player.SetAutoChallengeBoss(false);
-                await _playerRepo.SavePlayer(player, cancellationToken);
+                if (player.SetAutoChallengeBoss(false))
+                {
+                    await _playerRepo.SavePlayer(player, cancellationToken);
+                }
+
                 return true;
             }
 
@@ -276,8 +281,11 @@ namespace Game.Application.Services
                 return false;
             }
 
-            player.SetAutoChallengeBoss(true);
-            await _playerRepo.SavePlayer(player, cancellationToken);
+            if (player.SetAutoChallengeBoss(true))
+            {
+                await _playerRepo.SavePlayer(player, cancellationToken);
+            }
+
             return true;
         }
 

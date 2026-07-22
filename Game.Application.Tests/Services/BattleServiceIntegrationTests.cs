@@ -8,11 +8,13 @@ using Game.Core.Battle.Events;
 using Game.Core.Battle.Offline;
 using Game.Core.Players;
 using Game.Core.TestInfrastructure.Builders;
+using Game.DataAccess;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 using Xunit;
 
 namespace Game.Application.Tests.Services
@@ -2773,6 +2775,75 @@ namespace Game.Application.Tests.Services
             var reloaded = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(reloaded);
             Assert.False(reloaded.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_AlreadyActiveMode_SkipsSaveButStillReturnsTrue()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var boss = await TestDataSeeder.CreateEnemyAsync(context, "Zone Boss", isBoss: true);
+            var zone = await TestDataSeeder.CreateZoneAsync(context, "Boss Zone", bossEnemyId: boss.Id, bossLevel: 5);
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            // The first enable actually changes the mode, so it must enqueue a write-behind event — proving
+            // the no-op assertions below aren't trivially true (e.g. from a broken queue).
+            await battleService.SetAutoChallengeBoss(player, enabled: true);
+            Assert.Equal(1, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+            await db.KeyDeleteAsync(Constants.PUBSUB_PLAYER_QUEUE);
+
+            // Re-enabling the already-active mode is accepted (still returns true) but is a no-op: no event,
+            // no write-behind save.
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: true);
+
+            Assert.True(success);
+            Assert.True(player.AutoChallengeBoss);
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+        }
+
+        [Fact]
+        public async Task SetAutoChallengeBoss_AlreadyIdle_DisableIsNoOpButStillReturnsTrue()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var zone = await TestDataSeeder.CreateZoneAsync(context);
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var battleService = scope.ServiceProvider.GetRequiredService<BattleService>();
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            // The player already loads idle (AutoChallengeBoss defaults false), so disabling is a no-op.
+            var success = await battleService.SetAutoChallengeBoss(player, enabled: false);
+
+            Assert.True(success);
+            Assert.False(player.AutoChallengeBoss);
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
         [Fact]

@@ -1024,8 +1024,9 @@ namespace Game.Core.Tests.Players
         {
             var player = MakePlayer();
 
-            player.SetAutoChallengeBoss(true);
+            var changed = player.SetAutoChallengeBoss(true);
 
+            Assert.True(changed);
             Assert.True(player.AutoChallengeBoss);
             var evt = Assert.IsType<PlayerCoreUpdatedEvent>(Assert.Single(player.DomainEvents));
             Assert.True(evt.AutoChallengeBoss);
@@ -1038,11 +1039,38 @@ namespace Game.Core.Tests.Players
             player.SetAutoChallengeBoss(true);
             player.ClearEvents();
 
-            player.SetAutoChallengeBoss(false);
+            var changed = player.SetAutoChallengeBoss(false);
 
+            Assert.True(changed);
             Assert.False(player.AutoChallengeBoss);
             var evt = Assert.IsType<PlayerCoreUpdatedEvent>(Assert.Single(player.DomainEvents));
             Assert.False(evt.AutoChallengeBoss);
+        }
+
+        [Fact]
+        public void SetAutoChallengeBoss_AlreadyEnabled_ReturnsFalseAndDoesNotRaiseEvent()
+        {
+            var player = MakePlayer();
+            player.SetAutoChallengeBoss(true);
+            player.ClearEvents();
+
+            var changed = player.SetAutoChallengeBoss(true);
+
+            Assert.False(changed);
+            Assert.True(player.AutoChallengeBoss);
+            Assert.Empty(player.DomainEvents);
+        }
+
+        [Fact]
+        public void SetAutoChallengeBoss_AlreadyDisabled_ReturnsFalseAndDoesNotRaiseEvent()
+        {
+            var player = MakePlayer();
+
+            var changed = player.SetAutoChallengeBoss(false);
+
+            Assert.False(changed);
+            Assert.False(player.AutoChallengeBoss);
+            Assert.Empty(player.DomainEvents);
         }
 
         // ── RecordBattleCompleted — boss-mode backstop ───────────────────────
