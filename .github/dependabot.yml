@@ -4,6 +4,9 @@ updates:
     directory: "/UI"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "@emnapi/core"
+      - dependency-name: "@emnapi/runtime"
 
   - package-ecosystem: "nuget"
     directory: "/"
