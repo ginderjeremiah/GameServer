@@ -29,6 +29,7 @@
 						value={path.name}
 						grow
 						warn={!path.name.trim()}
+						maxLength={50}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.name = v))}
 					/>
 					<ProgSelect
@@ -55,6 +56,7 @@
 						value={path.designerNotes}
 						textarea
 						fullWidth
+						maxLength={2000}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.designerNotes = v))}
 					/>
 				</div>

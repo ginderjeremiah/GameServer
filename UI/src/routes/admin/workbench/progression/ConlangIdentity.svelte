@@ -4,6 +4,7 @@
 		value={tier.name}
 		grow
 		warn={!tier.name.trim()}
+		maxLength={50}
 		onChange={(v) => store.patchProf(tier.id, (d) => (d.name = v))}
 	/>
 	<ProgInput
@@ -11,6 +12,7 @@
 		value={tier.iconPath}
 		mono
 		warn={!tier.iconPath.trim()}
+		maxLength={50}
 		onChange={(v) => store.patchProf(tier.id, (d) => (d.iconPath = v))}
 	/>
 	<div class="ro">
@@ -35,6 +37,7 @@
 			mono
 			fullWidth
 			warn={!tier.word.trim()}
+			maxLength={50}
 			onChange={(v) => store.patchProf(tier.id, (d) => (d.word = v))}
 		/>
 		<ProgInput
@@ -42,6 +45,7 @@
 			value={tier.pronunciation}
 			fullWidth
 			warn={!tier.pronunciation.trim()}
+			maxLength={50}
 			onChange={(v) => store.patchProf(tier.id, (d) => (d.pronunciation = v))}
 		/>
 		<ProgInput
@@ -49,6 +53,7 @@
 			value={tier.translation}
 			fullWidth
 			warn={!tier.translation.trim()}
+			maxLength={100}
 			onChange={(v) => store.patchProf(tier.id, (d) => (d.translation = v))}
 		/>
 	</div>
@@ -80,6 +85,7 @@
 		value={tier.designerNotes}
 		textarea
 		fullWidth
+		maxLength={2000}
 		onChange={(v) => store.patchProf(tier.id, (d) => (d.designerNotes = v))}
 	/>
 </div>
