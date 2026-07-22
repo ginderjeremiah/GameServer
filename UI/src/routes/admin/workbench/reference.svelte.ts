@@ -156,8 +156,17 @@ class WorkbenchReference {
 	lessonTriggerTypeOptions = (): SelectOption[] => toOptions(enumPairs(ELessonTriggerType));
 	mechanicEventOptions = (): SelectOption[] => toOptions(enumPairs(EMechanicEvent));
 	tagCategoryOptions = (): SelectOption[] => this.tagCategories.map((c) => ({ value: c.id, text: c.name }));
+	/**
+	 * Zone spawn-target picker options: excludes the Home zone the same way a retired zone is
+	 * excluded — it's a no-combat sanctuary the backend categorically rejects a spawn against
+	 * (`AdminEnemies.SetSpawns`) — while keeping the current value visible if it's already Home.
+	 */
 	zoneOptions = (keep?: number): SelectOption[] =>
-		this.retireableOptions(staticData.zones ?? [], keep, (z) => `${z.name} · L${z.levelMin}–${z.levelMax}`);
+		this.retireableOptions(
+			(staticData.zones ?? []).filter((z) => !z.isHome || z.id === keep),
+			keep,
+			(z) => `${z.name} · L${z.levelMin}–${z.levelMax}`
+		);
 	enemyOptions = (keep?: number): SelectOption[] => this.retireableOptions(staticData.enemies ?? [], keep);
 	/**
 	 * Dedicated-boss picker options: a "None" sentinel (-1) plus every active boss enemy. The

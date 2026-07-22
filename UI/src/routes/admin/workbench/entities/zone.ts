@@ -82,10 +82,14 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			// The dedicated-boss picker keeps an authored value visible even if it loses its
 			// boss flag (reference.bossEnemyOptions' `keep` exception); flag that drift here
 			// since the zone would otherwise silently point at a non-boss enemy. Hard-rejected
-			// by AdminZones.SaveZones, so it blocks Save (#2217).
+			// by AdminZones.SaveZones, so it blocks Save (#2217). A boss on a Home zone is
+			// likewise hard-rejected there (Home is a no-combat sanctuary) — flag it too.
 			warn: (z) => {
 				if (z.bossEnemyId == null || z.bossEnemyId < 0) {
 					return null;
+				}
+				if (z.isHome) {
+					return { message: 'The Home zone cannot have a boss', blocking: true };
 				}
 				const boss = staticData.enemies?.[z.bossEnemyId];
 				return boss && !boss.isBoss
@@ -154,8 +158,15 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			desc: 'Enemies that spawn here & their weights',
 			count: (z) => z.zoneEnemies.length,
 			// A retired enemy's row doesn't count toward "does something spawn here" — it never
-			// rolls at runtime (mirrors the backend's EmptyCombatZone lint).
-			warn: (z) => (z.isHome || z.zoneEnemies.some((ze) => isLiveEnemy(ze.enemyId)) ? null : 'No enemies spawn here'),
+			// rolls at runtime (mirrors the backend's EmptyCombatZone lint). A Home zone with any
+			// spawn rows is a harder problem: it's hard-rejected on save (AdminZones.SaveZones'
+			// edit guard, AdminZones.SetEnemies), so it blocks rather than merely warns.
+			warn: (z) => {
+				if (z.isHome) {
+					return z.zoneEnemies.length ? { message: 'The Home zone cannot have enemy spawns', blocking: true } : null;
+				}
+				return z.zoneEnemies.some((ze) => isLiveEnemy(ze.enemyId)) ? null : 'No enemies spawn here';
+			},
 			kind: 'table',
 			itemsKey: 'zoneEnemies',
 			rowKey: 'enemyId',
