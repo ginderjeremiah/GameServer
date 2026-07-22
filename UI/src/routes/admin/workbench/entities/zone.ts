@@ -162,9 +162,19 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			// rolls at runtime (mirrors the backend's EmptyCombatZone lint). A Home zone with any
 			// spawn rows is a harder problem: it's hard-rejected on save (AdminZones.SaveZones'
 			// edit guard, AdminZones.SetEnemies), so it blocks rather than merely warns.
-			warn: (z) => {
+			warn: (z, baseline) => {
 				if (z.isHome) {
-					return z.zoneEnemies.length ? { message: 'The Home zone cannot have enemy spawns', blocking: true } : null;
+					if (z.zoneEnemies.length) {
+						return { message: 'The Home zone cannot have enemy spawns', blocking: true };
+					}
+					// SaveZones' edit guard reads the *persisted* spawn count (AdminZones.cs), evaluated
+					// before this save's own SetZoneEnemies child-saver clears it — so clearing spawns and
+					// flipping isHome on in the same save still hard-rejects even though the pending record
+					// already reads empty. Check the baseline's count instead of the pending one to preempt
+					// it (#2314); an Add has no baseline and can't carry pre-existing spawns either way.
+					return baseline?.zoneEnemies.length
+						? { message: 'Clear spawns in a separate save before making this zone Home', blocking: true }
+						: null;
 				}
 				return z.zoneEnemies.some((ze) => isLiveEnemy(ze.enemyId)) ? null : 'No enemies spawn here';
 			},

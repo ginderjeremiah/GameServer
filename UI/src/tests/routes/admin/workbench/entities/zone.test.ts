@@ -216,6 +216,26 @@ describe('zoneEntity', () => {
 			expect(enemiesWarn?.(z)).toBeNull();
 		});
 
+		it("blocks clearing spawns and flipping isHome in the same save — the backend reads the persisted count before this save's own SetZoneEnemies clears it (#2314)", () => {
+			const baseline = { ...zoneEntity.newItem(1), isHome: false, zoneEnemies: [{ enemyId: 0, weight: 3 }] };
+			const z = { ...baseline, isHome: true, zoneEnemies: [] };
+			expect(enemiesWarn?.(z, baseline)).toEqual({
+				message: 'Clear spawns in a separate save before making this zone Home',
+				blocking: true
+			});
+		});
+
+		it('passes flipping isHome on when the spawn table was already cleared in an earlier save (#2314)', () => {
+			const baseline = { ...zoneEntity.newItem(1), isHome: false, zoneEnemies: [] };
+			const z = { ...baseline, isHome: true };
+			expect(enemiesWarn?.(z, baseline)).toBeNull();
+		});
+
+		it('passes a brand-new Home zone (no baseline) even though it has no spawns to worry about (#2314)', () => {
+			const z = { ...zoneEntity.newItem(-1), isHome: true, zoneEnemies: [] };
+			expect(enemiesWarn?.(z, undefined)).toBeNull();
+		});
+
 		it("share total excludes a retired sibling's weight from the denominator", () => {
 			const rows = [
 				{ enemyId: 1, weight: 5 },

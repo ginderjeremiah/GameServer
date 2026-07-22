@@ -132,8 +132,11 @@ interface BaseSection<T> {
 	/** Tab count badge. */
 	count?: (rec: T) => number;
 	/** Section-level validation warning (e.g. "No skills assigned"). Return a {@link Warning} instead
-	 *  of a plain string to mark a known backend hard-reject condition as save-blocking. */
-	warn?: (rec: T) => string | Warning | null;
+	 *  of a plain string to mark a known backend hard-reject condition as save-blocking. `baseline` is
+	 *  the record's last-saved copy (undefined for a not-yet-saved add) — a predicate whose backend
+	 *  counterpart validates against persisted state rather than the pending record (e.g. a child
+	 *  saver that hasn't run yet) needs it to preempt the same rejection. */
+	warn?: (rec: T, baseline?: T) => string | Warning | null;
 	/**
 	 * Record keys that constitute a change for this section's tab dirty-dot. Used by
 	 * custom-kind sections (which have no single `fields`/`itemsKey` to diff); the
