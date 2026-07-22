@@ -14,6 +14,9 @@ namespace Game.Application.Services
 
         /// <summary>The supplied username failed validation (blank, too long, or control/zero-width characters).</summary>
         InvalidUsername,
+
+        /// <summary>The supplied password failed validation (too short, too long, or missing a letter/digit).</summary>
+        InvalidPassword,
     }
 
     /// <summary>

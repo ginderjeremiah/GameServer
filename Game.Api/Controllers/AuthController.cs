@@ -91,6 +91,8 @@ namespace Game.Api.Controllers
                 CreateAccountStatus.UsernameTaken => ApiResponse.Error("There is already an account with this username."),
                 CreateAccountStatus.InvalidUsername =>
                     ApiResponse.Error($"Username must be {UsernamePolicy.MinLength}-{UsernamePolicy.MaxLength} characters and contain no control or zero-width characters."),
+                CreateAccountStatus.InvalidPassword =>
+                    ApiResponse.Error($"Password must be at least {PasswordPolicy.MinLength} characters and contain a letter and a number."),
                 _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
             };
         }

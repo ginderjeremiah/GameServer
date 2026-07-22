@@ -36,7 +36,7 @@ namespace Game.Application.Tests.Services
 
             // Signup creates the account only — the first character is created later, on the select screen
             // (#1256), so no class is supplied and no player graph is built here.
-            var status = await accountService.CreateAccount("newaccount", "newpass");
+            var status = await accountService.CreateAccount("newaccount", "newpass1");
             Assert.Equal(CreateAccountStatus.Success, status);
 
             // CreateAccount commits its own insert (so the active-username guard can be honoured), so the
@@ -195,13 +195,31 @@ namespace Game.Application.Tests.Services
             Assert.Equal(0, await verifyContext.Users.CountAsync(user => user.Username == username, CancellationToken));
         }
 
+        [Theory]
+        [InlineData("short12")] // one under the 8-char minimum
+        [InlineData("nodigits")] // long enough but no digit
+        [InlineData("12345678")] // long enough but no letter
+        public async Task CreateAccount_InvalidPassword_ReturnsInvalidPasswordAndCreatesNothing(string password)
+        {
+            using var scope = CreateScope();
+            var accountService = CreateAccountService(scope.ServiceProvider);
+
+            var status = await accountService.CreateAccount("weakpassuser", password);
+
+            Assert.Equal(CreateAccountStatus.InvalidPassword, status);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            Assert.Equal(0, await verifyContext.Users.CountAsync(user => user.Username == "weakpassuser", CancellationToken));
+        }
+
         [Fact]
         public async Task CreateAccount_SurroundingWhitespace_IsTrimmedBeforePersisting()
         {
             using var scope = CreateScope();
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var status = await accountService.CreateAccount("  trimmed  ", "pass");
+            var status = await accountService.CreateAccount("  trimmed  ", "pass1234");
             Assert.Equal(CreateAccountStatus.Success, status);
 
             using var verifyScope = CreateScope();
@@ -222,7 +240,7 @@ namespace Game.Application.Tests.Services
 
             // Normalizing before the uniqueness check closes the confusable-account gap: a whitespace-padded
             // variant of an existing username collides with it rather than creating a distinct, spoofable row.
-            var status = await accountService.CreateAccount("  spoofable  ", "newpass");
+            var status = await accountService.CreateAccount("  spoofable  ", "newpass1");
 
             Assert.Equal(CreateAccountStatus.UsernameTaken, status);
         }
@@ -236,7 +254,7 @@ namespace Game.Application.Tests.Services
 
             var accountService = CreateAccountService(scope.ServiceProvider);
 
-            var status = await accountService.CreateAccount("existing", "anotherpass");
+            var status = await accountService.CreateAccount("existing", "anotherpass1");
 
             Assert.Equal(CreateAccountStatus.UsernameTaken, status);
         }
@@ -250,7 +268,7 @@ namespace Game.Application.Tests.Services
             async Task<CreateAccountStatus> Attempt()
             {
                 using var scope = CreateScope();
-                return await CreateAccountService(scope.ServiceProvider).CreateAccount("raceuser", "racepass");
+                return await CreateAccountService(scope.ServiceProvider).CreateAccount("raceuser", "racepass1");
             }
 
             var results = await Task.WhenAll(Attempt(), Attempt());
@@ -276,7 +294,7 @@ namespace Game.Application.Tests.Services
             archived.ArchivedAt = DateTime.UtcNow;
             await context.SaveChangesAsync(CancellationToken);
 
-            var status = await CreateAccountService(scope.ServiceProvider).CreateAccount("reusable", "newpass");
+            var status = await CreateAccountService(scope.ServiceProvider).CreateAccount("reusable", "newpass1");
             Assert.Equal(CreateAccountStatus.Success, status);
 
             using var verifyScope = CreateScope();

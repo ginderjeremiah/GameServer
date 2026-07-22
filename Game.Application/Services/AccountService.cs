@@ -59,6 +59,11 @@ namespace Game.Application.Services
                 return CreateAccountStatus.InvalidUsername;
             }
 
+            if (!PasswordPolicy.IsValid(password))
+            {
+                return CreateAccountStatus.InvalidPassword;
+            }
+
             if (await _users.CheckIfUsernameExists(normalized, cancellationToken))
             {
                 return CreateAccountStatus.UsernameTaken;
