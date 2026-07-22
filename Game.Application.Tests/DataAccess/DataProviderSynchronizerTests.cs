@@ -1325,6 +1325,94 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task StartAsync_ReconciliationInterval_ReclaimsAndAppliesAnItemStrandedWithNoWakeAtAll()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
+
+            var validEvent = new PlayerCoreUpdatedEvent(
+                PlayerId: player.Id,
+                Level: 44,
+                Exp: 4444,
+                CurrentZoneId: 0,
+                StatPointsGained: 100,
+                StatPointsUsed: 100,
+                LastActivity: DateTime.UtcNow,
+                AutoChallengeBoss: false,
+                LastCreditedBattleSeed: null);
+
+            var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
+
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            // Subscribe is suppressed so no pub/sub wake can ever reach this instance; a short reclaim grace
+            // period and reconciliation interval keep the test fast.
+            var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromMilliseconds(10),
+                reconciliationInterval: TimeSpan.FromMilliseconds(50));
+
+            // Nothing is queued yet at startup, so the startup reclaim/drain finds nothing to do.
+            await synchronizer.StartAsync(CancellationToken.None);
+
+            // Only now does an item get stranded on the processing list (#2273's failure scenario: a
+            // DB-infrastructure outage leaves it reserved but unacknowledged) — reserved directly rather than
+            // through the synchronizer, with nothing left on the main queue. No wake is ever published, so the
+            // only thing that can ever pick this up is the periodic reconciliation loop waking itself.
+            await queue.AddToQueueAsync(Serialize(validEvent));
+            Assert.NotNull(await queue.ReserveNextAsync());
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await PollingHelper.PollUntilAsync(
+                () => verifyContext.Players.AsNoTracking().SingleAsync(p => p.Id == player.Id, CancellationToken),
+                p => p.Level == 44);
+
+            Assert.Equal(44, persisted.Level);
+            Assert.Equal(4444, persisted.Exp);
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("stranded"));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+
+            await synchronizer.StopAsync(CancellationToken.None);
+        }
+
+        [Fact]
+        public async Task RunReconciliationLoop_StopRequestedWhileWaiting_UnwindsCleanlyWithoutDrainingAgain()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
+
+            var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
+            // An interval far longer than the test needs, so a stop must be what unwinds the wait rather than
+            // the delay simply elapsing on its own.
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reconciliationInterval: TimeSpan.FromSeconds(30));
+
+            await synchronizer.StartAsync(CancellationToken.None);
+            await synchronizer.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Stopping while the loop was merely waiting for its next tick must not itself trigger a drain or
+            // log anything — it is a clean, silent unwind.
+            Assert.Empty(logger.Entries);
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(5, persisted.Level);
+        }
+
+        [Fact]
         public async Task StartAsync_ReclaimsInFlightItemOrphanedByCrashedRun_AndApplies()
         {
             using var scope = CreateScope();
