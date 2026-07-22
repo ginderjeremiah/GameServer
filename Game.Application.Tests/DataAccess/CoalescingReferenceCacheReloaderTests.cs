@@ -163,6 +163,49 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task RunAsync_NoSignalWithinReconciliationInterval_RunsAPeriodicSweepAnyway()
+        {
+            var cache = new RecordingCache();
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.Zero, maxAttempts: 1, baseDelay: TimeSpan.Zero, reconciliationInterval: TimeSpan.FromMilliseconds(30));
+            await using var harness = new Harness(policy, cache);
+
+            // No NotifyChanged call at all — the sweep can only have come from the reconciliation interval.
+            await WaitUntilAsync(() => cache.CompletedReloads == 1, "the periodic reconciliation sweep to run");
+
+            Assert.Contains(harness.Logs.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("reconciliation", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
+        public async Task RunAsync_NoReconciliationIntervalConfigured_NeverSweepsWithoutASignal()
+        {
+            var cache = new RecordingCache();
+            // reconciliationInterval omitted (null) — periodic sweeping must stay disabled, matching the
+            // signal-only behavior every other test in this suite relies on.
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.FromMilliseconds(10), maxAttempts: 1, baseDelay: TimeSpan.Zero);
+            await using var harness = new Harness(policy, cache);
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+            Assert.Equal(0, cache.CompletedReloads);
+        }
+
+        [Fact]
+        public async Task RunAsync_SignalArrivesBeforeReconciliationInterval_ResetsThePeriodicWait()
+        {
+            var cache = new RecordingCache();
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.Zero, maxAttempts: 1, baseDelay: TimeSpan.Zero, reconciliationInterval: TimeSpan.FromMilliseconds(200));
+            await using var harness = new Harness(policy, cache);
+
+            harness.Reloader.NotifyChanged();
+            await WaitUntilAsync(() => cache.CompletedReloads == 1, "the signal-triggered sweep to complete");
+
+            // The reactive sweep must restart the reconciliation wait from zero rather than leaving it
+            // primed to fire immediately after.
+            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+            Assert.Equal(1, cache.CompletedReloads);
+            Assert.DoesNotContain(harness.Logs.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("reconciliation", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
         public async Task RunAsync_CancelledMidSweep_StopsWithoutCompletingTheSweep()
         {
             var cache = new BlockingCache();

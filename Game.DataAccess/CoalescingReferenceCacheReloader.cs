@@ -12,7 +12,9 @@ namespace Game.DataAccess
     /// at most one follow-up sweep, which (on top of the per-holder single-flight reload gate) keeps the
     /// caches eventually consistent without re-reloading once per notification. A failed sweep is retried
     /// with exponential backoff and never throws out of the loop — readers keep serving the holders'
-    /// previous snapshots until a sweep succeeds.
+    /// previous snapshots until a sweep succeeds. A periodic reconciliation sweep additionally runs after
+    /// <see cref="ReferenceCacheReloadPolicy.ReconciliationInterval"/> of signal silence, self-healing a
+    /// notification this instance never received (Redis pub/sub delivery is at-most-once).
     /// </summary>
     internal sealed class CoalescingReferenceCacheReloader(
         IEnumerable<IReloadableReferenceCache> caches,
@@ -37,16 +39,36 @@ namespace Game.DataAccess
         /// burst lands as one sweep, drains every signal the burst produced, then reloads all caches. The
         /// drain happens before the reload — never after — so a signal that arrives mid-sweep survives to
         /// trigger a follow-up sweep and a change can never slip between the drain and the reload.
+        /// <para>
+        /// If <see cref="ReferenceCacheReloadPolicy.ReconciliationInterval"/> elapses with no signal at all,
+        /// a sweep runs anyway — a reconciliation backstop for Redis pub/sub's at-most-once delivery, which
+        /// otherwise leaves an instance that missed a notification (e.g. mid-reconnect) stale indefinitely.
+        /// </para>
         /// </summary>
         public async Task RunAsync(CancellationToken cancellationToken)
         {
             try
             {
-                while (await _signal.Reader.WaitToReadAsync(cancellationToken))
+                while (true)
                 {
-                    await Task.Delay(policy.DebounceWindow, cancellationToken);
+                    var reconciling = await WaitForNextSweepAsync(cancellationToken);
+                    if (!reconciling)
+                    {
+                        await Task.Delay(policy.DebounceWindow, cancellationToken);
+                    }
+
                     while (_signal.Reader.TryRead(out _))
                     {
+                    }
+
+                    if (reconciling)
+                    {
+                        // Routine idle-steady-state activity (no admin write happened anywhere in the cluster
+                        // in this window) rather than evidence of a missed signal, so this logs at Debug, not
+                        // Information — an operator skimming logs shouldn't read it as a delivery problem.
+                        logger.LogDebug(
+                            "Periodic reference-cache reconciliation sweep running ({Interval} since the last sweep).",
+                            policy.ReconciliationInterval);
                     }
 
                     await ReloadAllAsync(cancellationToken);
@@ -55,6 +77,47 @@ namespace Game.DataAccess
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 // Normal shutdown.
+            }
+        }
+
+        /// <summary>
+        /// Waits for either a change signal or the reconciliation interval, whichever comes first. Returns
+        /// <see langword="true"/> if the interval elapsed with no signal (a reconciliation sweep is due), or
+        /// <see langword="false"/> if a signal arrived first (the ordinary debounce-then-reload path). A
+        /// <see langword="null"/> <see cref="ReferenceCacheReloadPolicy.ReconciliationInterval"/> makes the
+        /// periodic wait never elapse, so this degrades to signal-only waiting.
+        /// </summary>
+        private async Task<bool> WaitForNextSweepAsync(CancellationToken cancellationToken)
+        {
+            using var timerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var signalWait = _signal.Reader.WaitToReadAsync(timerCts.Token).AsTask();
+            var periodicWait = Task.Delay(policy.ReconciliationInterval ?? Timeout.InfiniteTimeSpan, timerCts.Token);
+
+            var reconciling = await Task.WhenAny(signalWait, periodicWait) == periodicWait;
+            // Cancel whichever wait didn't win so it doesn't keep running into the next iteration.
+            timerCts.Cancel();
+
+            // Observe both tasks so cancelling the loser never surfaces as an unobserved task exception. This
+            // also catches the case where cancellationToken itself (not the interval) fired mid-wait — either
+            // task can be the one that happens to have observed it — so re-check it explicitly afterward
+            // rather than trusting which task "won" the race above.
+            await ObserveCancellationAsync(signalWait);
+            await ObserveCancellationAsync(periodicWait);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return reconciling;
+        }
+
+        /// <summary>Awaits a task expected to be cancelled by the losing side of a <see cref="Task.WhenAny(Task[])"/> race, swallowing the resulting cancellation so it never surfaces as an unobserved task exception.</summary>
+        private static async Task ObserveCancellationAsync(Task task)
+        {
+            try
+            {
+                await task;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected: this side lost the race and was cancelled via the shared linked token.
             }
         }
 
