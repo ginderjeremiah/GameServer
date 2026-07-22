@@ -98,9 +98,23 @@ export const skillEntity: EntityConfig<ISkill> = {
 					grow: true,
 					maxLength: 50
 				},
-				{ key: 'word', label: 'Word of Power', type: 'text', placeholder: 'sijren', width: 200 },
-				{ key: 'pronunciation', label: 'Pronunciation', type: 'text', placeholder: 'sij·ren', width: 200 },
-				{ key: 'translation', label: 'Translation', type: 'text', placeholder: 'The Riven Frost', grow: true },
+				{ key: 'word', label: 'Word of Power', type: 'text', placeholder: 'sijren', width: 200, maxLength: 50 },
+				{
+					key: 'pronunciation',
+					label: 'Pronunciation',
+					type: 'text',
+					placeholder: 'sij·ren',
+					width: 200,
+					maxLength: 50
+				},
+				{
+					key: 'translation',
+					label: 'Translation',
+					type: 'text',
+					placeholder: 'The Riven Frost',
+					grow: true,
+					maxLength: 100
+				},
 				{
 					key: 'acquisition',
 					label: 'Acquisition (channels allowed to grant this skill)',

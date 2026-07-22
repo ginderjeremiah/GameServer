@@ -96,6 +96,8 @@ export interface ColumnConfig {
 	/** Text columns: a cleared input stores as `undefined` rather than `''`, so an optional field reads
 	 *  as unmodified against a baseline that omits it (e.g. a tour step's Anchor Key). */
 	optional?: boolean;
+	/** Text columns: enforces the backend column's `HasMaxLength` bound. */
+	maxLength?: number;
 	/** Share columns: which numeric field drives the bar (default "weight"). */
 	weightKey?: string;
 	/**

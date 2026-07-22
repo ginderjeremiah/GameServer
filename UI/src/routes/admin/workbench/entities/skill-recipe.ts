@@ -80,7 +80,8 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this recipe exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},

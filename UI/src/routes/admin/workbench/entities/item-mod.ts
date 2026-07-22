@@ -51,7 +51,8 @@ export const itemModEntity: EntityConfig<IItemMod> = {
 					placeholder: 'Name this mod…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 50
 				},
 				{ key: 'itemModTypeId', label: 'Type', type: 'select', options: reference.modTypeOptions, width: 170 },
 				{ key: 'rarityId', label: 'Rarity', type: 'select', options: reference.rarityOptions, width: 170 },

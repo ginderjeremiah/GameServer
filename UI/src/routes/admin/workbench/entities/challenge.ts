@@ -59,7 +59,8 @@ export const challengeEntity: EntityConfig<IChallenge> = {
 					placeholder: 'Name this challenge…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 100
 				},
 				{
 					key: 'description',

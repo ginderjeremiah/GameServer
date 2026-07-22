@@ -65,7 +65,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					placeholder: 'idle-loop-basics',
 					width: 220,
 					required: true,
-					reqMsg: 'Missing key'
+					reqMsg: 'Missing key',
+					maxLength: 100
 				},
 				{
 					key: 'name',
@@ -74,7 +75,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					placeholder: 'Name this lesson…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 100
 				},
 				{
 					key: 'triggerType',
@@ -90,7 +92,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					placeholder: 'fight',
 					width: 170,
 					required: true,
-					reqMsg: 'Missing host screen'
+					reqMsg: 'Missing host screen',
+					maxLength: 50
 				},
 				{
 					key: 'triggerMechanicEvent',
@@ -105,7 +108,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this lesson exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},
@@ -153,7 +157,8 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 					label: 'Callout Text',
 					type: 'text',
 					min: 260,
-					placeholder: 'What this step teaches the player…'
+					placeholder: 'What this step teaches the player…',
+					maxLength: 500
 				},
 				{
 					key: 'anchorKey',

@@ -748,6 +748,9 @@ namespace Game.Infrastructure.Database
             {
                 entity.HasKey(s => new { s.LessonId, s.Ordinal });
 
+                entity.Property(s => s.Text)
+                    .HasMaxLength(500);
+
                 entity.Property(s => s.AnchorKey)
                     .HasMaxLength(100);
 

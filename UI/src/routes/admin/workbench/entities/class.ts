@@ -77,7 +77,8 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 					placeholder: 'Name this class…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 50
 				},
 				{
 					key: 'word',
@@ -86,7 +87,8 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 					placeholder: 'Conlang label (decorative)…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing word of power'
+					reqMsg: 'Missing word of power',
+					maxLength: 50
 				},
 				{
 					key: 'description',
@@ -95,14 +97,16 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 					placeholder: 'Describe the class shown to players…',
 					grow: true,
 					required: true,
-					reqMsg: 'No description'
+					reqMsg: 'No description',
+					maxLength: 500
 				},
 				{
 					key: 'designerNotes',
 					label: 'Designer Notes',
 					type: 'textarea',
 					placeholder: 'Why this class exists — authoring notes (never shown to players)…',
-					grow: true
+					grow: true,
+					maxLength: 2000
 				}
 			]
 		},

@@ -40,7 +40,8 @@ export const tagEntity: EntityConfig<ITag> = {
 					placeholder: 'Name this tag…',
 					grow: true,
 					required: true,
-					reqMsg: 'Missing name'
+					reqMsg: 'Missing name',
+					maxLength: 50
 				},
 				{ key: 'tagCategoryId', label: 'Category', type: 'select', options: reference.tagCategoryOptions, width: 200 }
 			]

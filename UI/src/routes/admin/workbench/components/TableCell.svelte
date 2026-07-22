@@ -51,6 +51,7 @@
 				class:dirty
 				aria-label={col.label}
 				placeholder={col.placeholder}
+				maxlength={col.maxLength}
 				value={(row[col.key] as string) ?? ''}
 				oninput={(e) => onChange(col.optional ? e.currentTarget.value || undefined : e.currentTarget.value)}
 			/>
