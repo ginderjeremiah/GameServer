@@ -46,6 +46,18 @@ namespace Game.DataAccess
         private const int DefaultSuccessesRequiredToClearOutage = 3;
 
         /// <summary>
+        /// How long the drain can go with no pub/sub wake at all before it wakes itself anyway, mirroring
+        /// <see cref="ReferenceCacheReloadPolicy.ReconciliationInterval"/>. A drain pass only starts on a wake
+        /// or on startup, so on a quiet/single-instance deployment where no other player's save happens to
+        /// trigger one, an item left reserved by a database-infrastructure outage (see <see cref="ProcessMessage"/>)
+        /// or otherwise stranded on the processing list would sit until unrelated traffic or a restart (#2273).
+        /// Comfortably longer than <see cref="DefaultReclaimGracePeriod"/> so a periodic sweep can both observe
+        /// a stranded head item and, on its next firing, reclaim it. Conservative default; tune via the
+        /// constructor for a deployment that wants a tighter recovery bound.
+        /// </summary>
+        private static readonly TimeSpan DefaultReconciliationInterval = TimeSpan.FromMinutes(5);
+
+        /// <summary>
         /// Lane key for a reserved item whose player id couldn't be determined (a malformed envelope/payload).
         /// Such items are rare and are routed onto one shared serial lane rather than their own concurrent
         /// slot — always order-safe since a genuine player id never collides with it.
@@ -61,6 +73,7 @@ namespace Game.DataAccess
         private readonly TimeProvider _timeProvider;
         private readonly int _maxConcurrentDrainItems;
         private readonly int _successesRequiredToClearOutage;
+        private readonly TimeSpan _reconciliationInterval;
 
         // When a drain pass finds the main queue empty but the processing list non-empty, this is the identity
         // and first-observed instant of whichever item currently sits at the processing list's head (its
@@ -130,7 +143,8 @@ namespace Game.DataAccess
             TimeSpan? reclaimGracePeriod = null,
             TimeProvider? timeProvider = null,
             int? maxConcurrentDrainItems = null,
-            int? successesRequiredToClearOutage = null)
+            int? successesRequiredToClearOutage = null,
+            TimeSpan? reconciliationInterval = null)
         {
             _services = services;
             _pubsub = pubsub;
@@ -141,6 +155,7 @@ namespace Game.DataAccess
             _timeProvider = timeProvider ?? TimeProvider.System;
             _maxConcurrentDrainItems = maxConcurrentDrainItems ?? DefaultMaxConcurrentDrainItems;
             _successesRequiredToClearOutage = successesRequiredToClearOutage ?? DefaultSuccessesRequiredToClearOutage;
+            _reconciliationInterval = reconciliationInterval ?? DefaultReconciliationInterval;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -198,6 +213,38 @@ namespace Game.DataAccess
             // with the subscription's own first wake (the reserve/acknowledge read is idempotent, so a
             // concurrent first wake can never double-apply) (#560).
             _ = RunStartupDrain(queue);
+
+            // Bounds how long this instance can go with zero pub/sub wakes before it drains anyway, so an item
+            // stranded by a database-infrastructure outage (or otherwise left on the processing list) still
+            // gets recovered on a quiet deployment where no other player's save ever triggers a follow-up pass
+            // (#2273). Also dispatched rather than awaited, for the same readiness reason as the startup drain.
+            _ = RunReconciliationLoop(queue);
+        }
+
+        // Periodically requests a drain pass with no pub/sub signal at all, mirroring
+        // CoalescingReferenceCacheReloader's reconciliation sweep. ProcessQueue's own gate and coalescing flag
+        // (see below) mean this never runs a drain concurrently with — or duplicates the work of — a
+        // signal-triggered one; it just requests a pass exactly like a wake does, so a quiet period still gets
+        // the "next drain pass" the opportunistic stranded-processing reclaim (TryReclaimStrandedProcessingAsync)
+        // needs to actually recover a stranded item rather than only priming its clock.
+        private async Task RunReconciliationLoop(IPubSubQueue queue)
+        {
+            try
+            {
+                while (!_stopping.IsCancellationRequested)
+                {
+                    await Task.Delay(_reconciliationInterval, _stopping.Token);
+                    await ProcessQueue(queue, _stopping.Token);
+                }
+            }
+            catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+            {
+                // Normal shutdown.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled exception in the periodic player update drain reconciliation loop.");
+            }
         }
 
         // Runs the startup drain off the host-readiness path (see StartAsync). Nothing awaits this task, so a
