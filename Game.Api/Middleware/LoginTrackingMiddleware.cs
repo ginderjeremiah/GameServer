@@ -38,47 +38,73 @@ namespace Game.Api.Middleware
 
         public async Task InvokeAsync(HttpContext context, SessionService sessionService, IServiceScopeFactory scopeFactory, IMemoryCache cache)
         {
-            var fingerprint = ClientHints.DeviceFingerprint(context.Request.Headers);
-            if (sessionService.Authenticated && fingerprint is not null)
+            var cacheKey = ResolvePendingTracking(context, sessionService, cache);
+
+            // Tracking runs after the request handler (in a finally, so it still fires if the handler
+            // throws) rather than before it. It's best-effort telemetry the response never depends on, so
+            // it shouldn't sit on the endpoint's latency path — and during a DB outage, it shouldn't force
+            // every authenticated request through a tracking timeout before the endpoint (which may not
+            // even touch Postgres) gets a chance to run.
+            try
             {
-                var ipAddress = ClientIp.Resolve(context);
-                var cacheKey = new TrackingCacheKey(sessionService.UserId, ipAddress, fingerprint);
-
-                if (!cache.TryGetValue<bool>(cacheKey, out _))
+                await _next(context);
+            }
+            finally
+            {
+                if (cacheKey is not null)
                 {
-                    try
-                    {
-                        var hints = ClientHints.FromHeaders(context.Request.Headers);
-                        // Resolve tracking from a dedicated scope so its GameContext is independent of the
-                        // request's. RecordConnection self-commits; sharing the request context would let a
-                        // non-unique save failure leave queued inserts that the later per-request commit
-                        // re-flushes (or breaks on). The scope is disposed here whatever the outcome.
-                        await using var scope = scopeFactory.CreateAsyncScope();
-                        var trackingService = scope.ServiceProvider.GetRequiredService<LoginTrackingService>();
-                        await trackingService.RecordConnection(
-                            sessionService.UserId,
-                            ipAddress,
-                            fingerprint,
-                            hints.UserAgent,
-                            hints.SecChUa,
-                            hints.SecChUaMobile,
-                            hints.SecChUaPlatform,
-                            context.RequestAborted);
-
-                        cache.Set(cacheKey, true, new MemoryCacheEntryOptions
-                        {
-                            AbsoluteExpirationRelativeToNow = DedupeWindow,
-                            Size = 1,
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to record login tracking for user {UserId}.", sessionService.UserId);
-                    }
+                    await RecordConnectionAsync(context, scopeFactory, cache, cacheKey.Value);
                 }
             }
+        }
 
-            await _next(context);
+        private static TrackingCacheKey? ResolvePendingTracking(HttpContext context, SessionService sessionService, IMemoryCache cache)
+        {
+            var fingerprint = ClientHints.DeviceFingerprint(context.Request.Headers);
+            if (!sessionService.Authenticated || fingerprint is null)
+            {
+                return null;
+            }
+
+            var cacheKey = new TrackingCacheKey(sessionService.UserId, ClientIp.Resolve(context), fingerprint);
+            return cache.TryGetValue<bool>(cacheKey, out _) ? null : cacheKey;
+        }
+
+        private async Task RecordConnectionAsync(
+            HttpContext context,
+            IServiceScopeFactory scopeFactory,
+            IMemoryCache cache,
+            TrackingCacheKey cacheKey)
+        {
+            try
+            {
+                var hints = ClientHints.FromHeaders(context.Request.Headers);
+                // Resolve tracking from a dedicated scope so its GameContext is independent of the
+                // request's. RecordConnection self-commits; sharing the request context would let a
+                // non-unique save failure leave queued inserts that the later per-request commit
+                // re-flushes (or breaks on). The scope is disposed here whatever the outcome.
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var trackingService = scope.ServiceProvider.GetRequiredService<LoginTrackingService>();
+                await trackingService.RecordConnection(
+                    cacheKey.UserId,
+                    cacheKey.IpAddress,
+                    cacheKey.Fingerprint,
+                    hints.UserAgent,
+                    hints.SecChUa,
+                    hints.SecChUaMobile,
+                    hints.SecChUaPlatform,
+                    context.RequestAborted);
+
+                cache.Set(cacheKey, true, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = DedupeWindow,
+                    Size = 1,
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to record login tracking for user {UserId}.", cacheKey.UserId);
+            }
         }
 
         private readonly record struct TrackingCacheKey(int UserId, string IpAddress, string Fingerprint);

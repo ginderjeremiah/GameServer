@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Collections.Generic;
 using System.Net;
 using Xunit;
 
@@ -128,6 +129,48 @@ namespace Game.Api.Tests.Unit
             Assert.True(nextCalled());
         }
 
+        [Fact]
+        public async Task Authenticated_NewDeviceIpUser_RunsTheHandlerBeforeRecordingTheConnection()
+        {
+            // Tracking must not sit in front of the request handler on the latency path (#2274) — the
+            // handler should observe no delay from it, and the DB write should only happen afterward.
+            var order = new List<string>();
+            var userLogins = new FakeUserLogins();
+            RequestDelegate next = _ =>
+            {
+                order.Add("next");
+                return Task.CompletedTask;
+            };
+            userLogins.OnRecordConnection = () => order.Add("recordConnection");
+            var middleware = new LoginTrackingMiddleware(next, NullLogger<LoginTrackingMiddleware>.Instance);
+            var session = AuthenticatedSession(userId: 5);
+            var cache = new MemoryCache(new MemoryCacheOptions());
+            var scopeFactory = ScopeFactory(userLogins);
+
+            await middleware.InvokeAsync(CreateContext(Ip, Fingerprint, UserAgent), session, scopeFactory, cache);
+
+            Assert.Equal(["next", "recordConnection"], order);
+        }
+
+        [Fact]
+        public async Task NextThrows_StillRecordsConnection_AndRethrowsTheOriginalException()
+        {
+            // Tracking runs in a finally so a handler failure doesn't skip recording the connection, and
+            // the original exception must still propagate unchanged rather than being swallowed here.
+            var userLogins = new FakeUserLogins();
+            RequestDelegate next = _ => throw new InvalidOperationException("handler failure");
+            var middleware = new LoginTrackingMiddleware(next, NullLogger<LoginTrackingMiddleware>.Instance);
+            var session = AuthenticatedSession(userId: 5);
+            var cache = new MemoryCache(new MemoryCacheOptions());
+            var scopeFactory = ScopeFactory(userLogins);
+
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                middleware.InvokeAsync(CreateContext(Ip, Fingerprint, UserAgent), session, scopeFactory, cache));
+
+            Assert.Equal("handler failure", ex.Message);
+            Assert.Equal(1, userLogins.RecordConnectionCallCount);
+        }
+
         private static (LoginTrackingMiddleware Middleware, FakeUserLogins UserLogins, Func<bool> NextCalled) CreateMiddleware()
         {
             var nextCalled = false;
@@ -172,10 +215,12 @@ namespace Game.Api.Tests.Unit
 
         // Records how many times RecordConnection was actually invoked, so tests can tell whether the
         // dedupe memo skipped the DB round-trip. ThrowOnRecordConnection lets a test pin the failure path.
+        // OnRecordConnection lets a test observe when the call happened relative to other events.
         private sealed class FakeUserLogins : IUserLogins
         {
             public int RecordConnectionCallCount { get; private set; }
             public bool ThrowOnRecordConnection { get; set; }
+            public Action? OnRecordConnection { get; set; }
 
             public Task RecordConnection(
                 int userId,
@@ -188,6 +233,7 @@ namespace Game.Api.Tests.Unit
                 CancellationToken cancellationToken = default)
             {
                 RecordConnectionCallCount++;
+                OnRecordConnection?.Invoke();
                 if (ThrowOnRecordConnection)
                 {
                     throw new InvalidOperationException("simulated tracking failure");

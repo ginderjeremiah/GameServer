@@ -92,9 +92,13 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task DeviceInfoEndpoint_EnrichesStoredDevice()
         {
-            // Arrange
+            // Arrange — the frontend attaches the fingerprint header to every authenticated request, so in
+            // practice DeviceInfo is always preceded by at least one other authenticated request (e.g.
+            // SelectPlayer) that has already tracked the device. Prime that here with a Status call, since
+            // SaveDeviceInfo enriches an existing tracked device rather than creating one.
             await SeedUserAsync("enrichuser", "enrichpass");
             using var authClient = await LoginWithDeviceAsync("enrichuser", "enrichpass");
+            await authClient.GetAsync("/api/Auth/Status", CancellationToken);
 
             var body = new { DeviceMemory = 16.0, HardwareConcurrency = 8 };
 

@@ -128,7 +128,7 @@ namespace Game.DataAccess.Repositories
             {
                 // Only enrich a device this user actually has a tracked login for — never create or attach
                 // to one here — so a caller can't touch another account's device by guessing/replaying its
-                // fingerprint (#2064). RecordConnection (which runs earlier in the same request, via
+                // fingerprint (#2064). RecordConnection (on a prior authenticated request, via
                 // LoginTrackingMiddleware) is solely responsible for establishing that link.
                 var device = await _context.Devices
                     .Include(d => d.BrowserInfo)
