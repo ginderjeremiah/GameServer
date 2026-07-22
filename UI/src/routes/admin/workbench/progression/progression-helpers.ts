@@ -158,13 +158,23 @@ export const pathWarnings = (path: WorkbenchPath): string[] => {
 };
 
 /**
+ * A tier carrying prerequisites that isn't (or would no longer be) its path's root tier — the same rule
+ * AdminProficiencies.ValidatePrerequisiteIds/FindPrerequisiteRootViolation hard-rejects a save over.
+ * Root-only gating is asserted at authoring time (#2236); a tier reorder can strand an already-gated
+ * root tier off ordinal 0 without ever touching prerequisiteIds, so this must be checked against the
+ * about-to-be-saved pathOrdinal, not just at the point prerequisites are edited.
+ */
+export const prerequisiteRootWarnings = (prof: WorkbenchProficiency): string[] =>
+	prof.pathOrdinal !== 0 && prof.prerequisiteIds.length > 0 ? ['Prerequisites are only allowed on a root tier'] : [];
+
+/**
  * An out-of-range modifier/reward level, checked against the tier's own (about-to-be-saved) MaxLevel.
  * This is the one proficiency condition the backend genuinely hard-rejects a save over — via
  * AdminProficiencies.FindShrunkenMaxLevelViolation (the identity edit, against a still-persisted
  * payout) or FindLevelOutOfRange (SetModifiers/SetRewards, against the tier's saved MaxLevel) — so it
  * doubles as {@link proficiencyBlockingWarnings}, unlike the rest of {@link proficiencyWarnings}.
  */
-const levelRangeWarnings = (prof: WorkbenchProficiency): string[] => {
+export const levelRangeWarnings = (prof: WorkbenchProficiency): string[] => {
 	const warnings: string[] = [];
 	for (const modifier of prof.levelModifiers) {
 		if (modifier.level < 0 || modifier.level > prof.maxLevel) {
@@ -198,16 +208,19 @@ export const proficiencyWarnings = (prof: WorkbenchProficiency): string[] => {
 	if (!(prof.baseXp > 0) || !(prof.xpGrowth > 0)) {
 		warnings.push('XP curve must be positive');
 	}
-	return [...warnings, ...levelRangeWarnings(prof)];
+	return [...warnings, ...levelRangeWarnings(prof), ...prerequisiteRootWarnings(prof)];
 };
 
 /**
  * The subset of {@link proficiencyWarnings} the backend is known to hard-reject a save over — see
- * {@link levelRangeWarnings}. `MaxLevel < 1` and a non-positive XP curve stay advisory-only: neither
- * `Contracts.Proficiency` nor `AdminProficiencies` rejects them, so gating Save on them would block a
- * save the backend would actually accept.
+ * {@link levelRangeWarnings} and {@link prerequisiteRootWarnings}. `MaxLevel < 1` and a non-positive XP
+ * curve stay advisory-only: neither `Contracts.Proficiency` nor `AdminProficiencies` rejects them, so
+ * gating Save on them would block a save the backend would actually accept.
  */
-export const proficiencyBlockingWarnings = (prof: WorkbenchProficiency): string[] => levelRangeWarnings(prof);
+export const proficiencyBlockingWarnings = (prof: WorkbenchProficiency): string[] => [
+	...levelRangeWarnings(prof),
+	...prerequisiteRootWarnings(prof)
+];
 
 // ── Persisted DTOs (identity-level Add/Edit; child collections go through their own endpoints) ──
 

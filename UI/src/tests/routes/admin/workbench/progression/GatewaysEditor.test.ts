@@ -82,6 +82,36 @@ describe('GatewaysEditor — cross-path-only prerequisite picker (#2128)', () =>
 	});
 });
 
+describe('GatewaysEditor — root-tier-only authoring (#2275)', () => {
+	it('hides the "Add prerequisite" picker on a non-root tier', () => {
+		const nonRoot = tier({ id: 0, pathId: 0, pathOrdinal: 1, name: 'Fire II' });
+		const store = makeStore([nonRoot]);
+
+		render(GatewaysEditor, { store, tier: nonRoot });
+
+		expect(screen.queryByRole('combobox', { name: 'Add prerequisite' })).toBeNull();
+	});
+
+	it('still shows the picker on a root tier', () => {
+		const root = tier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire I' });
+		const store = makeStore([root]);
+
+		render(GatewaysEditor, { store, tier: root });
+
+		expect(screen.getByRole('combobox', { name: 'Add prerequisite' })).toBeTruthy();
+	});
+
+	it('warns when an already-gated tier has been reordered off root', () => {
+		const strandedGateway = tier({ id: 0, pathId: 0, pathOrdinal: 1, name: 'Fire II', prerequisiteIds: [2] });
+		const prerequisite = tier({ id: 2, pathId: 1, name: 'Frost I' });
+		const store = makeStore([strandedGateway, prerequisite]);
+
+		render(GatewaysEditor, { store, tier: strandedGateway });
+
+		expect(screen.getByText(/no longer its path's root/)).toBeTruthy();
+	});
+});
+
 describe('GatewaysEditor — excludes tiers of a retired path (#2176)', () => {
 	it('omits a tier whose own record is live but whose owning path is retired', async () => {
 		const gated = tier({ id: 0, pathId: 0, name: 'Fire I' });

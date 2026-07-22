@@ -516,10 +516,15 @@ describe('save orchestration', () => {
 	});
 
 	it('batches cross-path prerequisite changes into one call so a gateway swap posts as a single combined set', async () => {
-		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		// Both tiers are cross-path *root* tiers (#2275: gateways are root-tier-only), so the swap below
+		// stays authorable on both ends throughout.
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'd', activityKey: EActivityKey.Water, retiredAt: null }
+		];
 		serverProfs = [
 			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0', prerequisiteIds: [1] }),
-			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+			fullTier({ id: 1, pathId: 1, pathOrdinal: 0, name: 'Water T0' })
 		];
 		const store = new ProgressionStore();
 		await store.load();
@@ -543,10 +548,14 @@ describe('save orchestration', () => {
 	});
 
 	it('a non-retiring save keeps every prerequisite change in one batch, even spanning a brand-new tier', async () => {
-		serverPaths = [{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null }];
+		// Both tiers are cross-path *root* tiers (#2275: gateways are root-tier-only) throughout.
+		serverPaths = [
+			{ id: 0, name: 'Fire', description: 'd', activityKey: EActivityKey.Fire, retiredAt: null },
+			{ id: 1, name: 'Water', description: 'd', activityKey: EActivityKey.Water, retiredAt: null }
+		];
 		serverProfs = [
 			fullTier({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire T0', prerequisiteIds: [1] }),
-			fullTier({ id: 1, pathId: 0, pathOrdinal: 1, name: 'Fire T1' })
+			fullTier({ id: 1, pathId: 1, pathOrdinal: 0, name: 'Water T0' })
 		];
 		const store = new ProgressionStore();
 		await store.load();

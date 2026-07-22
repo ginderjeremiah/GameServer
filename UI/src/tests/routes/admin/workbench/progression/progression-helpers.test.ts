@@ -12,6 +12,7 @@ import {
 	pathIdentityDto,
 	pathWarnings,
 	payoutLevels,
+	prerequisiteRootWarnings,
 	proficiencyBlockingWarnings,
 	profIdentityDto,
 	proficiencyWarnings,
@@ -174,6 +175,22 @@ describe('validation', () => {
 
 		const inRange = tier({ id: 3, maxLevel: 5 });
 		expect(proficiencyBlockingWarnings(inRange)).toHaveLength(0);
+	});
+
+	it('prerequisiteRootWarnings flags a non-root tier carrying prerequisites (#2275)', () => {
+		// AdminProficiencies rejects this shape whenever it's reachable — either directly (SetPrerequisites'
+		// ValidatePrerequisiteIds) or through an identity-only ordinal edit that strands an already-gated
+		// root tier (FindPrerequisiteRootViolation) — so it must block Save, mirroring the level-range rule.
+		const strandedGateway = tier({ id: 1, pathOrdinal: 1, prerequisiteIds: [7] });
+		expect(prerequisiteRootWarnings(strandedGateway)).toEqual(['Prerequisites are only allowed on a root tier']);
+		expect(proficiencyBlockingWarnings(strandedGateway)).toContain('Prerequisites are only allowed on a root tier');
+		expect(proficiencyWarnings(strandedGateway)).toContain('Prerequisites are only allowed on a root tier');
+
+		const rootGateway = tier({ id: 2, pathOrdinal: 0, prerequisiteIds: [7] });
+		expect(prerequisiteRootWarnings(rootGateway)).toHaveLength(0);
+
+		const nonRootNoPrereqs = tier({ id: 3, pathOrdinal: 1, prerequisiteIds: [] });
+		expect(prerequisiteRootWarnings(nonRootNoPrereqs)).toHaveLength(0);
 	});
 });
 

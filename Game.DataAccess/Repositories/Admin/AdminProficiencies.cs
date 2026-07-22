@@ -50,6 +50,14 @@ namespace Game.DataAccess.Repositories.Admin
                 return maxLevelRejection;
             }
 
+            // ValidatePrerequisiteIds only fires from SetPrerequisites, so an identity-only ordinal edit
+            // (e.g. a reorder that never touches the prerequisite set) can move an already-gated tier off
+            // its path's root without ever being checked against the same rule. Reject that here too.
+            if (FindPrerequisiteRootViolation(changes) is { } prerequisiteRootRejection)
+            {
+                return prerequisiteRootRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(ToEntity(item)),
                 edit: item =>
@@ -363,6 +371,43 @@ namespace Game.DataAccess.Repositories.Admin
                     var pathName = _proficiencies.LookupPath(tier.PathId)?.Name;
                     var pathLabel = pathName is null ? $"{tier.PathId}" : $"'{pathName}'";
                     return AdminSaveResult.Failure($"Path {pathLabel} has two tiers at ordinal {tier.PathOrdinal}.");
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns a rejection if the prospective per-proficiency ordinals would leave a
+        /// prerequisite-carrying tier off its path's root (ordinal 0), else null. Mirrors the rule
+        /// <see cref="ValidatePrerequisiteIds"/> enforces on <c>SetPrerequisites</c>, but that check only
+        /// fires when the prerequisite set itself changes — an identity-only ordinal edit (e.g. the
+        /// progression editor's tier reorder) never calls it, so a tier that already carries persisted
+        /// prerequisites could otherwise be reordered off root through this save alone. Only Edits can move
+        /// an existing tier's ordinal; an Add starts with no prerequisites, so it can't violate this on its
+        /// own.</summary>
+        private AdminSaveResult? FindPrerequisiteRootViolation(IReadOnlyList<Change<Contracts.Proficiency>> changes)
+        {
+            var prospectiveOrdinal = new Dictionary<int, int>();
+            foreach (var change in changes)
+            {
+                if (change.ChangeType == EChangeType.Edit)
+                {
+                    prospectiveOrdinal[change.Item.Id] = change.Item.PathOrdinal;
+                }
+            }
+
+            foreach (var proficiency in _proficiencies.AllProficiencyEntities())
+            {
+                if (proficiency.Prerequisites.Count == 0)
+                {
+                    continue;
+                }
+
+                var ordinal = prospectiveOrdinal.TryGetValue(proficiency.Id, out var edited) ? edited : proficiency.PathOrdinal;
+                if (ordinal != 0)
+                {
+                    return AdminSaveResult.Failure(
+                        $"Proficiency '{proficiency.Name}' carries prerequisites and cannot move off its path's root tier (ordinal {ordinal}).");
                 }
             }
 

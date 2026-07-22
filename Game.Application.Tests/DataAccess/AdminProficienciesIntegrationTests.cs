@@ -136,6 +136,81 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task SaveProficiencies_ReorderStrandsPersistedPrerequisiteOffRoot_ReturnsFailure()
+        {
+            // A root tier already gated by a cross-path prerequisite (via SetPrerequisites) must not be
+            // movable off ordinal 0 through the identity save alone — the progression editor's tier reorder
+            // produces exactly this shape (an ordinal-only Edit that never touches prerequisiteIds), so
+            // ValidatePrerequisiteIds (which only fires from SetPrerequisites) would never see it.
+            int gatedId, prerequisiteId, gatedPathId;
+            using (var seedScope = CreateScope())
+            {
+                var gatedPath = await SeedPathAsync(seedScope);
+                gatedPathId = gatedPath.Id;
+                gatedId = (await SeedProficiencyAsync(seedScope, gatedPath.Id, pathOrdinal: 0, name: "Fire I")).Id;
+                prerequisiteId = (await SeedProficiencyAsync(seedScope, (await SeedPathAsync(seedScope)).Id, pathOrdinal: 0, name: "Frost I")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var setupScope = CreateScope())
+            {
+                var setupAdmin = setupScope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+                Assert.True(setupAdmin.SetPrerequisites([
+                    new SetProficiencyPrerequisitesData { Id = gatedId, PrerequisiteIds = [prerequisiteId] },
+                ]).Succeeded);
+                await setupScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: gatedId, pathId: gatedPathId, pathOrdinal: 1, name: "Fire I") },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("root tier", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveProficiencies_EditsRootTierWithPrerequisitesWithoutMovingOrdinal_IsAccepted()
+        {
+            // The guard must not false-reject an identity edit that leaves an already-gated root tier at
+            // ordinal 0 — only an actual move off root is a violation.
+            int gatedId, prerequisiteId, gatedPathId;
+            using (var seedScope = CreateScope())
+            {
+                var gatedPath = await SeedPathAsync(seedScope);
+                gatedPathId = gatedPath.Id;
+                gatedId = (await SeedProficiencyAsync(seedScope, gatedPath.Id, pathOrdinal: 0, name: "Fire I")).Id;
+                prerequisiteId = (await SeedProficiencyAsync(seedScope, (await SeedPathAsync(seedScope)).Id, pathOrdinal: 0, name: "Frost I")).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var setupScope = CreateScope())
+            {
+                var setupAdmin = setupScope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+                Assert.True(setupAdmin.SetPrerequisites([
+                    new SetProficiencyPrerequisitesData { Id = gatedId, PrerequisiteIds = [prerequisiteId] },
+                ]).Succeeded);
+                await setupScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+            await ReloadReferenceCachesAsync();
+
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminProficiencies>();
+
+            var result = admin.SaveProficiencies(
+            [
+                new Change<Contracts.Proficiency> { ChangeType = EChangeType.Edit, Item = NewProficiency(id: gatedId, pathId: gatedPathId, pathOrdinal: 0, name: "Fire I Renamed") },
+            ]);
+
+            Assert.True(result.Succeeded, result.ErrorMessage);
+        }
+
+        [Fact]
         public async Task SaveProficiencies_TwoAddsSameOrdinalSamePath_IsRejected()
         {
             int pathId;
