@@ -466,10 +466,10 @@ namespace Game.Core.Tests.Battle.Offline
         }
 
         [Fact]
-        public void Simulate_SnapshotsPlayerRatingOntoEachVictoryStats()
+        public void Simulate_SnapshotsPlayerRatingOntoEachVictoryOutcome()
         {
             // The effect-based proficiency accrual normalizes activity by the player's rating, so the simulator
-            // snapshots it onto each won battle's stats — the same stationary CombatRating.Rate DefeatRewards
+            // snapshots it onto each won battle's outcome — the same stationary CombatRating.Rate DefeatRewards
             // measures from the snapshot (the player's power never changes while away, so every victory's
             // snapshot rating is identical).
             var scenario = StrongPlayerWinScenario();
@@ -480,19 +480,19 @@ namespace Game.Core.Tests.Battle.Offline
 
             Assert.True(result.Wins > 1);
             Assert.Equal(result.BattlesSimulated, result.Wins); // the strong player wins every battle
-            Assert.All(result.Battles, battle => Assert.Equal(expectedRating, battle.Result.Stats.PlayerRating, precision: 9));
+            Assert.All(result.Battles, battle => Assert.Equal(expectedRating, battle.PlayerRating, precision: 9));
         }
 
         [Fact]
         public void Simulate_LeavesPlayerRatingAtZeroForLosses()
         {
-            // A loss earns no DefeatRewards, so (like the live path) its stats carry no rating snapshot — the
+            // A loss earns no DefeatRewards, so (like the live path) its outcome carries no rating — the
             // default 0. Accrual is victory-only, so a loss's rating is never read.
             var result = _simulator.Simulate(BossParameters(ManyStepsBudget(), AlwaysLoseBossScenario()));
 
             Assert.True(result.Losses > 1);
             Assert.Equal(result.BattlesSimulated, result.Losses);
-            Assert.All(result.Battles, battle => Assert.Equal(0, battle.Result.Stats.PlayerRating));
+            Assert.All(result.Battles, battle => Assert.Equal(0, battle.PlayerRating));
         }
 
         // ── Idle enemy rating memo (#2130) ───────────────────────────────────

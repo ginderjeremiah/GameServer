@@ -313,7 +313,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task RecordVictory_SnapshotsPlayerRatingOntoStats_FromSnapshotNotLiveAggregate()
+        public async Task RecordVictory_RatesPlayerRewardFromSnapshotNotLiveAggregate()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -339,8 +339,8 @@ namespace Game.Application.Tests.Services
             await battleService.StartBattle(player, state, zoneId: zone.Id);
 
             // Deflate the LIVE player's power to almost nothing after the snapshot is frozen (a valid mid-battle
-            // stat reallocation). The accrual must normalize by the snapshot-era rating, so a regression sourcing
-            // PlayerRating from the live aggregate — or dropping the assignment — would read a far lower value.
+            // stat reallocation). The reward must rate the snapshot-era attributes, so a regression sourcing
+            // PlayerRating from the live aggregate would read a far lower value.
             foreach (var allocation in player.StatPoints.StatAllocations)
             {
                 allocation.Amount = 1;
@@ -361,7 +361,6 @@ namespace Game.Application.Tests.Services
                 new Battler(new AttributeCollection(player.GetAllModifiers()), [], player.Level), isPlayer: true);
             Assert.True(rewards.PlayerRating > deflatedRating,
                 $"Expected the snapshot-era rating ({rewards.PlayerRating}) to exceed the deflated live rating ({deflatedRating}).");
-            Assert.Equal(rewards.PlayerRating, result.Stats.PlayerRating, precision: 9);
         }
 
         [Fact]

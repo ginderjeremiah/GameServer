@@ -598,10 +598,9 @@ namespace Game.Application.Services
         // (AbandonBattle's elapsedMs) — a win only resolves if the enemy died within time the server itself
         // observed, so the server-measured cap is the (stronger) control there and nothing else is needed.
         // Both paths therefore require a server-validated timeline; neither can be claimed early.
-        // internal (not private) so an integration test can assert the live PlayerRating snapshot directly:
-        // EndBattleVictory returns only a client-facing DefeatResult, and the BattleStats this mutates is
-        // carried on the BattleCompletedEvent, which the dispatcher clears after handling — leaving no other
-        // seam to observe that result.Stats.PlayerRating is set from the snapshot rather than the live aggregate.
+        // internal (not private) so integration tests can call it directly — bypassing TryResolveActiveBattle's
+        // SimulateBattle call — to assert on the returned DefeatRewards (e.g. that PlayerRating reflects the
+        // frozen battle snapshot, not the live aggregate) without needing a battle to actually run and be won.
         internal DefeatRewards RecordVictory(
             Player player, CoreEnemy enemy, BattleResult result, PlayerState state, DateTime timestamp,
             bool notify = true, BattlerMaterials? playerMaterials = null)
@@ -632,11 +631,6 @@ namespace Game.Application.Services
 
             var playerBattler = playerMaterials.Build();
             var rewards = new DefeatRewards(playerBattler, enemy);
-
-            // Snapshot the player's rating onto the battle stats so the proficiency accrual normalizes activity
-            // by the identical measure the reward curve uses (spike #1526 Decision 5) — captured here from the
-            // same snapshot-built battler, not the live aggregate.
-            result.Stats.PlayerRating = rewards.PlayerRating;
 
             player.GrantExp(rewards.ExpReward);
             // Thread both combat ratings onto the battle-completed event so the progress handler can normalize

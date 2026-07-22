@@ -154,13 +154,6 @@ namespace Game.Core.Battle
         /// </summary>
         public Dictionary<EDamageType, double> TypedDamageResistanceMitigated { get; set; } = [];
 
-        /// <summary>
-        /// The player's combat rating for this battle (<see cref="Battle.CombatRating.Rate"/>), superseding the
-        /// old core-attribute sum (spike #1526). Populated at battle completion from
-        /// <see cref="DefeatRewards.PlayerRating"/> (victory-only, like the rewards); <c>0</c> until then.
-        /// </summary>
-        public double PlayerRating { get; set; }
-
         /// <summary>Accumulates a direct hit's or DoT tick's booked <paramref name="amount"/> (already capped at
         /// the health it removed and floored at 0 by the caller — #1482/#2101) into the typed offense book.</summary>
         public void AddTypedDamageDealt(EDamageType type, double amount)

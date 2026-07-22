@@ -135,11 +135,6 @@ namespace Game.Core.Battle.Offline
                 var proficiencyGains = ProficiencyAccrualResult.Empty;
                 if (rewards is not null)
                 {
-                    // Snapshot the player's rating onto this battle's stats so the offline accrual normalizes by
-                    // the identical measure the live path does (spike #1526 Decision 5) — victory-only, like the
-                    // rewards.
-                    result.Stats.PlayerRating = rewards.PlayerRating;
-
                     // Accrue proficiency XP in-loop (#1602): the same domain math the live per-battle path
                     // runs, against this run's own working proficiency state, so a milestone attribute payout
                     // crossed here is already baked into the next battle's snapshot below — unlike the pre-#1602
