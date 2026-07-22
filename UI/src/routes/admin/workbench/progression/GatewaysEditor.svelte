@@ -31,11 +31,19 @@
 			<div class="opens-name">{tier.name || 'This tier'} · Tier {tier.pathOrdinal}</div>
 		</div>
 	</div>
+	{#if tier.pathOrdinal !== 0}
+		<div class="non-root-warning">
+			This tier is no longer its path's root — prerequisites are only allowed on a root tier. Remove them or move this
+			tier back to the top.
+		</div>
+	{/if}
 {/if}
 
-<div class="add-prereq">
-	<ProgSelect label="Add prerequisite" width={340} value={addPick} options={addOptions} onChange={onAddPrereq} />
-</div>
+{#if tier.pathOrdinal === 0}
+	<div class="add-prereq">
+		<ProgSelect label="Add prerequisite" width={340} value={addPick} options={addOptions} onChange={onAddPrereq} />
+	</div>
+{/if}
 
 <script lang="ts">
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
@@ -104,6 +112,15 @@ const onAddPrereq = (value: number) => {
 	padding: 16px;
 	font-size: 13px;
 	color: var(--text-tertiary);
+}
+.non-root-warning {
+	margin-top: 12px;
+	background: color-mix(in srgb, var(--warning) 10%, transparent);
+	border: 1px solid var(--warning);
+	border-radius: 5px;
+	padding: 12px 16px;
+	font-size: 12.5px;
+	color: var(--text-secondary);
 }
 .gated {
 	display: flex;

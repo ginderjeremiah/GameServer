@@ -244,6 +244,19 @@ describe('TierDetail — tab bodies', () => {
 		expect(store.setTierTab).toHaveBeenCalledWith('gateways');
 	});
 
+	it('warns the Gateways tab when a tier reordered off root still carries prerequisites (#2275)', () => {
+		const stranded = makeStore(tier({ pathOrdinal: 1, prerequisiteIds: [3] }), { tierTab: 'milestones' });
+		render(TierDetail, { props: { store: stranded } });
+		const strandedTab = screen.getByText('Gateways').closest('button');
+		expect(strandedTab?.querySelector('svg')).toBeTruthy();
+		cleanup();
+
+		const rootGateway = makeStore(tier({ pathOrdinal: 0, prerequisiteIds: [3] }), { tierTab: 'milestones' });
+		render(TierDetail, { props: { store: rootGateway } });
+		const rootTab = screen.getByText('Gateways').closest('button');
+		expect(rootTab?.querySelector('svg')).toBeNull();
+	});
+
 	it('lists an existing prerequisite chip, removes it, and adds a new one', async () => {
 		// Gateways are cross-path only (#2128), so the prerequisite candidates live on a different
 		// path than the gated tier's own (pathId 0, the tier() default).
