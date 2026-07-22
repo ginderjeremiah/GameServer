@@ -13,7 +13,7 @@ namespace Game.Api.Models.Auth
         [Length(UsernamePolicy.MinLength, UsernamePolicy.MaxLength)]
         public required string Username { get; set; }
 
-        [Length(1, 256)]
+        [Length(PasswordPolicy.MinLength, PasswordPolicy.MaxLength)]
         public required string Password { get; set; }
     }
 }

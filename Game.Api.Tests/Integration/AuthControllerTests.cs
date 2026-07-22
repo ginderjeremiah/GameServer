@@ -144,7 +144,7 @@ namespace Game.Api.Tests.Integration
         public async Task CreateAccount_ValidCredentials_Succeeds()
         {
             // Signup creates the account only — no character, so no class is supplied (#1256).
-            var creds = new { Username = "newuser", Password = "newpass" };
+            var creds = new { Username = "newuser", Password = "newpass1" };
 
             var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
 
@@ -165,7 +165,7 @@ namespace Game.Api.Tests.Integration
                 await TestDataSeeder.CreateUserAsync(context, "duplicate", "pass");
             }
 
-            var creds = new { Username = "duplicate", Password = "anotherpass" };
+            var creds = new { Username = "duplicate", Password = "anotherpass1" };
 
             // Act
             var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
@@ -181,7 +181,7 @@ namespace Game.Api.Tests.Integration
         public async Task CreateAccount_UsernameAtMaxLength_Succeeds()
         {
             // Exactly the 20-char column limit (UsernamePolicy.MaxLength) — the boundary that must still fit storage.
-            var creds = new { Username = new string('u', UsernamePolicy.MaxLength), Password = "newpass" };
+            var creds = new { Username = new string('u', UsernamePolicy.MaxLength), Password = "newpass1" };
 
             var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
 
@@ -198,7 +198,7 @@ namespace Game.Api.Tests.Integration
             // reject it (as a ValidationProblemDetails 400, its standard shape for a DataAnnotations failure)
             // before it ever reaches the database, rather than letting a Postgres string-truncation error
             // escape the self-commit as a 500.
-            var creds = new { Username = new string('u', UsernamePolicy.MaxLength + 1), Password = "newpass" };
+            var creds = new { Username = new string('u', UsernamePolicy.MaxLength + 1), Password = "newpass1" };
 
             var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
 
@@ -213,7 +213,38 @@ namespace Game.Api.Tests.Integration
         [InlineData("bad\tname")] // embedded control character
         public async Task CreateAccount_InvalidUsername_ReturnsError(string username)
         {
-            var creds = new { Username = username, Password = "newpass" };
+            var creds = new { Username = username, Password = "newpass1" };
+
+            var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task CreateAccount_PasswordUnderMinLength_ReturnsValidationErrorNotServerError()
+        {
+            // One under PasswordPolicy.MinLength — [ApiController]'s automatic model validation must reject
+            // it (as a ValidationProblemDetails 400) before the request ever reaches AccountService, the same
+            // way an over-max-length username is rejected above.
+            var creds = new { Username = "weakpassapi", Password = "short12" };
+
+            var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(CancellationToken);
+            Assert.NotNull(problem);
+            Assert.Contains(nameof(CreateAccountRequest.Password), problem.Errors.Keys);
+        }
+
+        [Fact]
+        public async Task CreateAccount_PasswordMissingDigit_ReturnsError()
+        {
+            // Right length, but fails the domain-level letter+digit rule — this reaches AccountService's
+            // PasswordPolicy check (unlike the too-short case above, which never gets past model validation).
+            var creds = new { Username = "weakpassapi", Password = "nodigits" };
 
             var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
 
@@ -233,7 +264,7 @@ namespace Game.Api.Tests.Integration
                 await TestDataSeeder.CreateUserAsync(context, "padded", "pass");
             }
 
-            var creds = new { Username = "  padded  ", Password = "newpass" };
+            var creds = new { Username = "  padded  ", Password = "newpass1" };
 
             var response = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
 
@@ -248,7 +279,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task CreateAccount_ConcurrentDuplicate_ReturnsCleanErrorNotServerError()
         {
-            var creds = new { Username = "raceuser", Password = "racepass" };
+            var creds = new { Username = "raceuser", Password = "racepass1" };
 
             // Two concurrent requests racing past the existence check both reach the commit. The
             // active-username unique index lets exactly one through; the loser must surface as a clean
