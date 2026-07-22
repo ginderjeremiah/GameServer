@@ -172,7 +172,7 @@ namespace Game.Application.Tests.DataAccess
             // No NotifyChanged call at all — the sweep can only have come from the reconciliation interval.
             await WaitUntilAsync(() => cache.CompletedReloads == 1, "the periodic reconciliation sweep to run");
 
-            Assert.Contains(harness.Logs.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("reconciliation", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(harness.Logs.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("reconciliation", StringComparison.OrdinalIgnoreCase));
         }
 
         [Fact]
@@ -202,7 +202,7 @@ namespace Game.Application.Tests.DataAccess
             // primed to fire immediately after.
             await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
             Assert.Equal(1, cache.CompletedReloads);
-            Assert.DoesNotContain(harness.Logs.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("reconciliation", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(harness.Logs.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("reconciliation", StringComparison.OrdinalIgnoreCase));
         }
 
         [Fact]

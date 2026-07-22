@@ -63,8 +63,11 @@ namespace Game.DataAccess
 
                     if (reconciling)
                     {
-                        logger.LogInformation(
-                            "No reference-cache change signal received in {Interval}; running a periodic reconciliation sweep.",
+                        // Routine idle-steady-state activity (no admin write happened anywhere in the cluster
+                        // in this window) rather than evidence of a missed signal, so this logs at Debug, not
+                        // Information — an operator skimming logs shouldn't read it as a delivery problem.
+                        logger.LogDebug(
+                            "Periodic reference-cache reconciliation sweep running ({Interval} since the last sweep).",
                             policy.ReconciliationInterval);
                     }
 
