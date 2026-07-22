@@ -140,6 +140,17 @@ describe('reference-data-backed select options', () => {
 		]);
 	});
 
+	it('excludes the Home zone from spawn-target picker options (#2276)', () => {
+		staticData.zones[1].isHome = true;
+		expect(reference.zoneOptions().map((o) => o.value)).toEqual([0]);
+	});
+
+	it('keeps the Home zone visible when it is the current value (#2276)', () => {
+		staticData.zones[1].isHome = true;
+		expect(reference.zoneOptions(1)).toContainEqual({ value: 1, text: 'Frost Cavern · L6–10' });
+		expect(reference.zoneOptions().map((o) => o.value)).not.toContain(1);
+	});
+
 	it('lists every enemy as an enemy option', () => {
 		expect(reference.enemyOptions().map((o) => o.text)).toEqual([
 			'Cave Bat',

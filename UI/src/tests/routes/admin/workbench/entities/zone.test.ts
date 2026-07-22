@@ -206,6 +206,16 @@ describe('zoneEntity', () => {
 			expect(enemiesWarn?.(z)).toBeNull();
 		});
 
+		it('blocks Save when a Home zone carries spawn rows (#2276, backend-enforced)', () => {
+			const z = { ...zoneEntity.newItem(1), isHome: true, zoneEnemies: [{ enemyId: 0, weight: 3 }] };
+			expect(enemiesWarn?.(z)).toEqual({ message: 'The Home zone cannot have enemy spawns', blocking: true });
+		});
+
+		it('passes a Home zone with no spawn rows, without the "no enemies spawn here" nag (#2276)', () => {
+			const z = { ...zoneEntity.newItem(1), isHome: true, zoneEnemies: [] };
+			expect(enemiesWarn?.(z)).toBeNull();
+		});
+
 		it("share total excludes a retired sibling's weight from the denominator", () => {
 			const rows = [
 				{ enemyId: 1, weight: 5 },
@@ -261,6 +271,19 @@ describe('zoneEntity', () => {
 
 		it('passes when no dedicated boss is assigned', () => {
 			expect(identityWarn?.(zoneEntity.newItem(1))).toBeNull();
+		});
+
+		it('blocks Save when a Home zone carries a dedicated boss (#2276, backend-enforced)', () => {
+			const enemies: unknown[] = [];
+			enemies[7] = { id: 7, name: 'Warden', isBoss: true };
+			staticData.enemies = enemies;
+			const z = { ...zoneEntity.newItem(1), isHome: true, bossEnemyId: 7 };
+			expect(identityWarn?.(z)).toEqual({ message: 'The Home zone cannot have a boss', blocking: true });
+		});
+
+		it('passes a Home zone with no dedicated boss (#2276)', () => {
+			const z = { ...zoneEntity.newItem(1), isHome: true };
+			expect(identityWarn?.(z)).toBeNull();
 		});
 	});
 });
