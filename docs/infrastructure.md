@@ -101,7 +101,7 @@ The backend re-simulates **every** battle after the client reports it (the anti-
 
 Under Central Package Management, a version-bump PR should only ever touch `Directory.Packages.props` — but Dependabot's NuGet updater has a known rebase artifact: when a PR is rebased because another PR merged and touched `Directory.Packages.props` first, the updater can re-add a redundant `<PackageReference>` (with an explicit version) to a `*.csproj` that already gets that dependency transitively (#2299). That's out of scope for a version bump and leaves a dead direct reference behind if merged as-is.
 
-`run-tests.yml`'s `guard-dependabot-csproj-scope` job catches this at the CI boundary rather than relying on manual review: it runs only when `github.actor == 'dependabot[bot]'` and the PR's diff touches any `.csproj` (via the `detect-changes` path-filter), and fails outright — a version bump from Dependabot has no legitimate reason to touch project files, so this only ever guards against the artifact, never a real bump.
+`run-tests.yml`'s `guard-dependabot-csproj-scope` job catches this at the CI boundary rather than relying on manual review: it runs only when `github.event.pull_request.user.login == 'dependabot[bot]'` (the PR's author, not whoever triggered the run — a maintainer manually re-running CI on a Dependabot PR must not silently bypass the guard) and the PR's diff touches any `.csproj` (via the `detect-changes` path-filter), and fails outright — a version bump from Dependabot has no legitimate reason to touch project files, so this only ever guards against the artifact, never a real bump.
 
 ## Code coverage
 
