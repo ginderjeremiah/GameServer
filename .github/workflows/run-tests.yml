@@ -89,7 +89,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       github.event_name == 'pull_request' &&
-      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
       needs.detect-changes.outputs.csproj == 'true'
     runs-on: ubuntu-latest
     steps:
