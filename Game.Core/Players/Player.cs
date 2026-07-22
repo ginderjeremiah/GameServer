@@ -71,13 +71,20 @@ namespace Game.Core.Players
         /// Persists the active idle-loop mode: <paramref name="enabled"/> enters boss mode (auto-challenging
         /// the current zone's dedicated boss), <c>false</c> returns the loop to idle-farming. Anti-cheat
         /// validation of the current zone (in circulation, unlocked, has a boss) is the caller's
-        /// responsibility. Raises a <see cref="PlayerCoreUpdatedEvent"/> so the change rides the existing
-        /// write-behind save.
+        /// responsibility. A no-op (the mode already matches <paramref name="enabled"/>) raises no event and
+        /// returns <c>false</c>; otherwise raises a <see cref="PlayerCoreUpdatedEvent"/> so the change rides
+        /// the existing write-behind save and returns <c>true</c>.
         /// </summary>
-        public void SetAutoChallengeBoss(bool enabled)
+        public bool SetAutoChallengeBoss(bool enabled)
         {
+            if (AutoChallengeBoss == enabled)
+            {
+                return false;
+            }
+
             AutoChallengeBoss = enabled;
             RaiseCoreUpdated();
+            return true;
         }
 
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
