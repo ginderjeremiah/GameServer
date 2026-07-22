@@ -5,6 +5,7 @@ using Game.Api.Services;
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Application;
+using Game.Core;
 using Game.Core.Players;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
@@ -120,6 +121,48 @@ namespace Game.Api.Tests.Unit
             // The valid command after the dequeue fault still ran, proving the loop survived.
             Assert.Equal(["ok-1"], commands.ExecutedCommandIds);
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("dequeuing"));
+        }
+
+        [Fact]
+        public async Task Processor_EnvelopeFailsToDeserialize_DeadLettersRawPayloadAndNotifiesTheClientThenKeepsDraining()
+        {
+            // #2272: an envelope-level break (e.g. wire-shape skew during a rolling deploy) is popped before
+            // GetSocketCommandProcessor discovers it can't even parse into a SocketCommandInfo. Unlike a
+            // faulted-but-parseable command, there is no command name to report — the raw payload is what
+            // must be dead-lettered, and the queue must keep draining into the following valid command.
+            var commands = new CapturingCommandFactory(throwOn: _ => null);
+            var (processor, pubSub) = BuildProcessor(commands);
+
+            var queue = new FakeQueue(
+                FakeQueueStep.YieldRaw("this-is-not-json"),
+                new SocketCommandInfo("WillSucceed") { Id = "ok-1" });
+
+            await processor(queue);
+
+            var deadLettered = Assert.Single(pubSub.DeadLetterQueue.Added);
+            Assert.Equal("this-is-not-json", deadLettered);
+
+            // The re-sync notice still goes out, with a sentinel name since the failed command can't be named.
+            Assert.Equal(["ServerCommandFailed", "WillSucceed"], commands.ExecutedCommandNames);
+            Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("malformed envelope"));
+            Assert.Equal(["<null>", "ok-1"], commands.ExecutedCommandIds);
+        }
+
+        [Fact]
+        public async Task Processor_EnvelopeDeserializesToNull_DeadLettersRawPayloadAndNotifiesTheClient()
+        {
+            // A literal JSON "null" deserializes cleanly but carries no command — the same poison-payload
+            // treatment as an outright parse failure applies.
+            var commands = new CapturingCommandFactory(throwOn: _ => null);
+            var (processor, pubSub) = BuildProcessor(commands);
+
+            var queue = new FakeQueue(FakeQueueStep.YieldRaw("null"));
+
+            await processor(queue);
+
+            var deadLettered = Assert.Single(pubSub.DeadLetterQueue.Added);
+            Assert.Equal("null", deadLettered);
+            Assert.Equal(["ServerCommandFailed"], commands.ExecutedCommandNames);
         }
 
         [Fact]
@@ -348,24 +391,31 @@ namespace Game.Api.Tests.Unit
             }
         }
 
-        /// <summary>A scripted step for <see cref="FakeQueue"/>: either yield a command or throw on dequeue.
-        /// An implicit conversion from <see cref="SocketCommandInfo"/> keeps the plain command cases terse.</summary>
+        /// <summary>A scripted step for <see cref="FakeQueue"/>: yield a well-formed command, yield a raw
+        /// (possibly malformed) payload verbatim, or throw on dequeue. An implicit conversion from
+        /// <see cref="SocketCommandInfo"/> keeps the plain command cases terse.</summary>
         private sealed class FakeQueueStep
         {
             public SocketCommandInfo? Command { get; private init; }
+            public string? RawMessage { get; private init; }
             public Exception? Error { get; private init; }
 
             public static FakeQueueStep Yield(SocketCommandInfo command) => new() { Command = command };
+            public static FakeQueueStep YieldRaw(string rawMessage) => new() { RawMessage = rawMessage };
             public static FakeQueueStep Throw(Exception error) => new() { Error = error };
 
             public static implicit operator FakeQueueStep(SocketCommandInfo command) => Yield(command);
         }
 
+        /// <summary>An in-memory queue that hands back the raw serialized payload for each step, mirroring
+        /// production's pop-then-deserialize split (#2272): <see cref="GetSocketCommandProcessor"/> now pops
+        /// via the non-generic <see cref="GetNextAsync(CancellationToken)"/> and deserializes separately, so a
+        /// scripted <see cref="FakeQueueStep.YieldRaw"/> payload can exercise the envelope-malformed path.</summary>
         private sealed class FakeQueue(params FakeQueueStep[] steps) : IPubSubQueue
         {
             private readonly Queue<FakeQueueStep> _steps = new(steps);
 
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default)
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
                 if (_steps.TryDequeue(out var next))
                 {
@@ -374,16 +424,13 @@ namespace Game.Api.Tests.Unit
                         throw next.Error;
                     }
 
-                    if (next.Command is T typed)
-                    {
-                        return Task.FromResult<T?>(typed);
-                    }
+                    return Task.FromResult<string?>(next.RawMessage ?? next.Command?.Serialize());
                 }
 
-                return Task.FromResult<T?>(default);
+                return Task.FromResult<string?>(null);
             }
 
-            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -403,13 +450,13 @@ namespace Game.Api.Tests.Unit
         {
             public int Attempts { get; private set; }
 
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default)
+            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default)
             {
                 Attempts++;
                 throw toThrow;
             }
 
-            public Task<string?> GetNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AcknowledgeAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> ReclaimProcessingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();

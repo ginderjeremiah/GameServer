@@ -219,6 +219,22 @@ namespace Game.Api.Tests.Integration
         /// <summary>A live socket's own pub/sub queue name.</summary>
         protected static string SocketQueueName(string socketId) => $"{Constants.PUBSUB_SOCKET_QUEUE_PREFIX}_{socketId}";
 
+        /// <summary>A live socket's own pub/sub channel name.</summary>
+        protected static string SocketChannel(string socketId) => $"{Constants.PUBSUB_SOCKET_CHANNEL_PREFIX}_{socketId}";
+
+        /// <summary>
+        /// Publishes a raw payload directly onto a live socket's own queue and wakes its command processor —
+        /// bypassing <c>SocketManagerService.EmitSocketCommand</c>'s <see cref="SocketCommandInfo"/> typing so
+        /// a test can simulate a malformed server push landing on the wire (#2272), which a well-formed
+        /// <see cref="SocketCommandInfo"/> can never reproduce.
+        /// </summary>
+        protected async Task PublishRawToSocketAsync(string socketId, string rawMessage)
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            await pubsub.Publish(SocketChannel(socketId), SocketQueueName(socketId), rawMessage);
+        }
+
         /// <summary>Wraps a server-initiated command as the socket-command dead-letter envelope shape
         /// <see cref="Game.Api.Services.Admin.SocketCommandDeadLetters"/> replays, for tests seeding the
         /// socket dead-letter queue directly.</summary>
