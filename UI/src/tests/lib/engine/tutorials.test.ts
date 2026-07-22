@@ -201,6 +201,32 @@ describe('evaluateScreenTrigger', () => {
 
 		expect(mockMarkLessonRead).not.toHaveBeenCalled();
 	});
+
+	it('queues a locked lesson as unread instead of replacing an already-playing tour (#2269)', () => {
+		const activeLesson = makeLesson({ id: 10, screenKey: 'fight' });
+		tutorialTour.play(activeLesson);
+		const lesson = makeLesson({ id: 2, screenKey: 'attributes' });
+		staticData.lessons = [lesson];
+
+		evaluateScreenTrigger('attributes');
+
+		expect(mockUnlockLesson).toHaveBeenCalledWith(2);
+		// $state wraps the played lesson in a reactive proxy, so compare by value, not identity.
+		expect(tutorialTour.activeLesson).toEqual(activeLesson);
+		expect(navigation.requestedScreen).toBeNull();
+	});
+
+	it('still marks a zero-step lesson read immediately even while another tour is playing', () => {
+		const activeLesson = makeLesson({ id: 10, screenKey: 'fight' });
+		tutorialTour.play(activeLesson);
+		const lesson = makeLesson({ id: 9, screenKey: 'attributes', steps: [] });
+		staticData.lessons = [lesson];
+
+		evaluateScreenTrigger('attributes');
+
+		expect(mockMarkLessonRead).toHaveBeenCalledWith(9);
+		expect(tutorialTour.activeLesson).toEqual(activeLesson);
+	});
 });
 
 describe('evaluateMechanicTriggers', () => {

@@ -50,6 +50,11 @@ export function closeTutorialTour() {
  * already uses (`routes/game/+page.svelte`; screens are registry state, not routes). The first
  * activation of a screen with a locked screen-anchored lesson plays its tour immediately, since the
  * player just navigated there.
+ *
+ * This effect also re-runs on a navigation `openLesson` itself triggers (#2269): if another tour is
+ * already playing, playing this one too would silently replace it before the player sees a step.
+ * Queue it as unread instead — mirroring the mechanic-anchored trigger's AFK-safe behavior — rather
+ * than skip it outright, since the screen genuinely did just become active.
  */
 export function evaluateScreenTrigger(screenKey: string) {
 	const lesson = liveLessons().find(
@@ -58,9 +63,14 @@ export function evaluateScreenTrigger(screenKey: string) {
 			candidate.screenKey === screenKey &&
 			isLocked(candidate.id)
 	);
-	if (lesson) {
-		openLesson(lesson);
+	if (!lesson) {
+		return;
 	}
+	if (lesson.steps.length > 0 && tutorialTour.activeLesson) {
+		playerManager.unlockLesson(lesson.id);
+		return;
+	}
+	openLesson(lesson);
 }
 
 /** Whether `event` occurred among this tick's activations, per the shared content-events detectors. */
