@@ -959,9 +959,10 @@ namespace Game.Application.Tests.DataAccess
                 AutoChallengeBoss: false,
                 LastCreditedBattleSeed: null);
 
+            var message = Serialize(validEvent);
             var realPubSub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var queue = realPubSub.GetQueue(Constants.PUBSUB_PLAYER_QUEUE);
-            await queue.AddToQueueAsync(Serialize(validEvent));
+            await queue.AddToQueueAsync(message);
 
             var logger = new CapturingLogger<DataProviderSynchronizer>();
             var pubsub = new SubscribeSuppressingPubSubService(realPubSub);
@@ -976,7 +977,7 @@ namespace Game.Application.Tests.DataAccess
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
 
             // The event was never drained: it is still waiting on the queue and the player is unchanged.
-            Assert.Equal(Serialize(validEvent), await queue.GetNextAsync());
+            Assert.Equal(message, await queue.GetNextAsync());
 
             using var verifyScope = CreateScope();
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
@@ -1267,6 +1268,59 @@ namespace Game.Application.Tests.DataAccess
             Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("stranded"));
             Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
             Assert.Empty(await queue.PeekProcessingAsync(10));
+        }
+
+        [Fact]
+        public async Task ProcessQueue_DuplicatePayloadReplacesProcessingHeadWithinGracePeriod_RestartsClockInsteadOfReclaiming()
+        {
+            using var scope = CreateScope();
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var synchronizer = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+
+            // Two independently-raised envelopes with byte-identical Type+Payload (e.g. a duplicated
+            // SkillUnlockedEvent) must not alias one another in the stranded-head clock (#2341): DomainEventEnvelope
+            // now carries its own Id, so two envelopes built from the same event content still serialize to
+            // distinct raw strings. Before that fix, "itemB" below would be indistinguishable from "itemA" by
+            // value, and the clock would (wrongly) treat itemB as itemA still dwelling at the head.
+            var itemA = new DomainEventEnvelope { Type = nameof(PlayerCoreUpdatedEvent), Payload = "not valid json" }.Serialize();
+            var itemB = new DomainEventEnvelope { Type = nameof(PlayerCoreUpdatedEvent), Payload = "not valid json" }.Serialize();
+            Assert.NotEqual(itemA, itemB);
+
+            var queue = new InMemoryPubSubQueue();
+            await queue.AddToQueueAsync(itemA);
+            Assert.NotNull(await queue.ReserveNextAsync());
+
+            // First pass only starts the clock against itemA.
+            await synchronizer.ProcessQueue(queue);
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+
+            // itemA is acknowledged and a duplicate-content item takes its place at the head, all before the
+            // original clock's grace period would have elapsed.
+            await queue.AcknowledgeAsync(itemA);
+            await queue.AddToQueueAsync(itemB);
+            Assert.NotNull(await queue.ReserveNextAsync());
+
+            timeProvider.Advance(TimeSpan.FromSeconds(31));
+
+            // A clock keyed on raw value alone (with no per-envelope identity) would treat itemB as the same
+            // item still dwelling at the head and reclaim here — tracking must restart against it instead.
+            await synchronizer.ProcessQueue(queue);
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
+            Assert.Single(await queue.PeekProcessingAsync(10));
+
+            // Only once itemB has itself dwelled at the head past the grace period does it reclaim (and, once
+            // reclaimed, dead-letter on its own malformed inner payload rather than being lost).
+            timeProvider.Advance(TimeSpan.FromSeconds(31));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("stranded"));
+            Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+            Assert.Empty(await queue.PeekProcessingAsync(10));
+            Assert.Equal([itemB], await DrainDeadLetterQueue(pubsub));
         }
 
         [Fact]
