@@ -42,6 +42,11 @@ interface BattleEndResult {
 	cooldown: number;
 	nextEnemy?: IEnemyInstance;
 	nextZoneId?: number;
+	/** True only when the server definitively rejected the victory claim — an error response that still
+	 *  carries `data` (see docs/frontend-sockets.md: a transport-level failure, the ambiguous case, never
+	 *  carries `data` at all). Lets a caller tell "the claim genuinely didn't happen" apart from "we don't
+	 *  know if it happened," so it can skip celebrating a win the server never credited. */
+	rejected: boolean;
 }
 
 /** A server-prefetched next idle battle, held across the post-battle cooldown so the loop can begin it
@@ -678,11 +683,20 @@ export class EnemyManager {
 		// awaits below — otherwise the clear and the "next zone unlocked" check could target the wrong zone.
 		const clearedZoneId = playerManager.currentZone;
 
-		await this.claimVictory();
+		const { rejected } = await this.claimVictory();
 		// A stop / retreat that landed during the victory claim has already transitioned us out of the boss
 		// loop (or this resolution spans a stop()→start() cycle, #2331); abandon so we don't resurrect the
 		// cleared overlay over the new state.
 		if (!this.bossLoopActive(generation)) {
+			return;
+		}
+		if (rejected) {
+			// The server definitively rejected the claim (not just a lost/ambiguous response) — the zone was
+			// never actually cleared, so skip the celebration entirely rather than faking the Zone-Cleared
+			// seal/overlay and, with auto-fight on, looping rejected claims against that fanfare. Fall back to
+			// the idle loop, mirroring a boss loss/draw.
+			this.returnToIdle();
+			await this.getNewEnemy();
 			return;
 		}
 
@@ -803,7 +817,8 @@ export class EnemyManager {
 		return {
 			cooldown: defeatResponse.data?.cooldown ?? 0,
 			nextEnemy: defeatResponse.data?.nextEnemy,
-			nextZoneId: defeatResponse.data?.nextZoneId
+			nextZoneId: defeatResponse.data?.nextZoneId,
+			rejected: !!defeatResponse.error && defeatResponse.data !== undefined
 		};
 	}
 }
