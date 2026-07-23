@@ -182,6 +182,13 @@ jobs:
     - name: Run lint (ESLint + svelte-check)
       run: npm run lint
 
+    - name: Build production (SSR) bundle
+      # The UI ships as a SvelteKit adapter-node SSR service (svelte.config.js; nginx.conf routes
+      # / to the SSR host); nothing else in CI runs `vite build`, so a production-build-only
+      # failure (SSR-incompatible browser global, adapter-node bundling error) would otherwise
+      # first surface on the Railway deploy rather than here.
+      run: npm run build
+
   test-backend:
     needs: [detect-changes]
     # always()/!cancelled() lets this evaluate even when detect-changes was skipped (push events).
