@@ -144,8 +144,8 @@ namespace Game.DataAccess.Repositories
                 device.BrowserInfo.SecChUa ??= Truncate(secChUa, BrowserInfo.MaxClientHintLength);
                 device.BrowserInfo.SecChUaMobile ??= Truncate(secChUaMobile, BrowserInfo.MaxClientHintLength);
                 device.BrowserInfo.SecChUaPlatform ??= Truncate(secChUaPlatform, BrowserInfo.MaxClientHintLength);
-                device.DeviceMemory = deviceMemory;
-                device.HardwareConcurrency = hardwareConcurrency;
+                device.DeviceMemory ??= deviceMemory;
+                device.HardwareConcurrency ??= hardwareConcurrency;
             }, cancellationToken);
         }
 

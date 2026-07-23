@@ -212,6 +212,34 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(8, device.HardwareConcurrency);
         }
 
+        [Fact]
+        public async Task SaveDeviceInfo_LaterCallWithoutHints_DoesNotClearPreviouslyCapturedValues()
+        {
+            // navigator.deviceMemory/hardwareConcurrency are unsupported in some browsers and stripped by some
+            // privacy extensions, so a later request can legitimately carry nulls for a device an earlier
+            // request already enriched (#2342) — those earlier values must survive, not be overwritten.
+            int userId;
+            using (var seedScope = CreateScope())
+            {
+                var context = seedScope.ServiceProvider.GetRequiredService<GameContext>();
+                userId = (await TestDataSeeder.CreateUserAsync(context)).Id;
+            }
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IUserLogins>();
+                await repo.RecordConnection(userId, Ip, Fingerprint(0), UserAgent, null, null, null, CancellationToken);
+                await repo.SaveDeviceInfo(userId, Fingerprint(0), null, null, null, 16, 8, CancellationToken);
+                await repo.SaveDeviceInfo(userId, Fingerprint(0), null, null, null, null, null, CancellationToken);
+            }
+
+            using var assertScope = CreateScope();
+            var assertContext = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+            var device = await assertContext.Devices.SingleAsync(d => d.DeviceFingerprintHash == Fingerprint(0), CancellationToken);
+            Assert.Equal(16, device.DeviceMemory);
+            Assert.Equal(8, device.HardwareConcurrency);
+        }
+
         // A distinct, deterministic fingerprint per index — real fingerprints are 64 lowercase hex chars, but
         // the repository itself doesn't enforce that shape (only the HTTP-layer ClientHints does), so a
         // simple distinguishable string is enough here.
