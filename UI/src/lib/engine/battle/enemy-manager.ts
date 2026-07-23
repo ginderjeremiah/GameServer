@@ -77,21 +77,21 @@ export class EnemyManager {
 	#battleStageUnhook?: Action;
 	/** Guards the challenge/retreat transitions so a resolving stage change for the battle being
 	 *  swapped out is not mistaken for an outcome of the new one. Stays set across a supersession (a
-	 *  press that takes over an in-flight transition) — only the transition that ends up current clears it. */
+	 *  press that takes over an in-flight transition) — only the transition that ends up current clears it.
+	 *  Force-cleared by {@link stop}, since a torn-down manager can't rely on a zombie transition's `finally`
+	 *  to release it (that `finally` may run after {@link start} begins a fresh session, see `#generation`). */
 	#transitioning = false;
-	/** Bumped whenever a new transition supersedes an in-flight one. A running transition captures this at
-	 *  its start and, after each await, abandons (without applying its result) once it no longer matches — so
-	 *  a superseded challenge/retreat can't clobber the transition that took over, and the superseded one's
-	 *  finally won't release the `transitioning` guard the new transition still holds. */
-	#transitionGeneration = 0;
+	/** The single supersedable-operation epoch (consolidating the ad-hoc `fetchGeneration`/`transitionGeneration`
+	 *  pair per #1736): bumped by {@link interruptFetch} (a Home entry, a control transition, or a stop) and by
+	 *  every fresh {@link start}. Every async continuation — the enemy-fetch loop, a challenge/retreat
+	 *  transition, and each battle-end resolution (idle victory, boss victory/loss) — captures this value where
+	 *  it begins and re-checks it via {@link isCurrent} after each await before touching shared state. A
+	 *  continuation whose captured value no longer matches has been superseded — by another operation, or by a
+	 *  stop()→start() cycle it spanned (#2331) — and abandons instead of resuming into whatever is current now. */
+	#generation = 0;
 	/** Re-entrancy guard for getNewEnemy: overlapping stage handlers must not both spawn-and-notify an
 	 *  enemy (a double-spawn the backend replay would flag as cheating). */
 	#fetchingEnemy = false;
-	/** Bumped whenever the active enemy-fetch loop is superseded (a stop, or a transition taking over).
-	 *  The running getNewEnemy captures this value and exits once it no longer matches, so a stale loop
-	 *  under a sustained outage can't keep spinning — nor later clobber the new fight with an enemy
-	 *  nobody is waiting for. */
-	#fetchGeneration = 0;
 	/** The generation the in-flight fetch loop captured at its start. Lets a fresh getNewEnemy tell a
 	 *  genuine re-entrant duplicate (same generation — the running loop will still spawn, so drop) apart
 	 *  from a superseded loop (older generation — it will abandon without spawning, so wait it out then
@@ -128,6 +128,9 @@ export class EnemyManager {
 	public start(activeBattle?: IEnemyInstance) {
 		if (!this.started) {
 			this.started = true;
+			// A fresh session: any continuation still holding an older value is a zombie from before this
+			// start() (or before a preceding stop()) and must abandon rather than resume into it (#2331).
+			this.#generation++;
 			this.#isFirstFetch = true;
 			this.#battleStageUnhook = onBattleStageChanged((stage) => this.watchBattleStage(stage));
 			if (activeBattle) {
@@ -143,9 +146,14 @@ export class EnemyManager {
 	public stop() {
 		if (this.started) {
 			this.started = false;
+			// Force-clear rather than rely on an in-flight transition's own `finally`: that finally checks
+			// its captured generation against the bump `interruptFetch()` below makes, which — after this
+			// stop() — it will never match again, so it would otherwise leave the guard stuck.
+			this.#transitioning = false;
 			this.#battleStageUnhook?.();
 			// Cut short an in-flight retry backoff so a getNewEnemy parked under a sustained outage exits
-			// at once on the cleared `started` flag rather than after the full backoff window.
+			// at once on the cleared `started` flag rather than after the full backoff window; also bumps
+			// the generation so any continuation parked mid-await recognizes this teardown (#2331).
 			this.interruptFetch();
 			// Teardown (screen unmount / session end), not a user intent change, so don't sync the persisted
 			// loop mode — clobbering it to idle here would lose a disconnecting boss-farmer's mode.
@@ -210,7 +218,7 @@ export class EnemyManager {
 	 * (#1690), mirroring the unconditional discard `ChallengeBoss` already applies server-side.
 	 */
 	public async getNewEnemy(prepared?: PreparedBattle, forceAbandon = false): Promise<void> {
-		const generation = this.#fetchGeneration;
+		const generation = this.#generation;
 		// Looped (not a one-shot if): a fetch already running when we arrive is checked again after each
 		// wait. Two same-generation callers can both queue behind an older, superseded fetch — the first
 		// to resume starts a fresh fetch (synchronously re-arming fetchingEnemy/fetchingGeneration before
@@ -229,7 +237,7 @@ export class EnemyManager {
 			// down, then loop back and re-check rather than assuming the guard is now clear.
 			await this.#inFlightFetch;
 			// The wait can overlap a stop or a further supersession; bail if either landed meanwhile.
-			if (!this.started || generation !== this.#fetchGeneration) {
+			if (!this.isCurrent(generation)) {
 				return;
 			}
 		}
@@ -256,7 +264,7 @@ export class EnemyManager {
 			// lands between capture and present (bumping the generation) skips it — so the prefetched idle
 			// enemy can't double-spawn or clobber the fight the supersession moved to. Used only while still
 			// valid (same zone, unchanged player battle-state); otherwise fall through to a fresh fetch.
-			if (prepared && this.started && generation === this.#fetchGeneration && this.preparedStillValid(prepared)) {
+			if (prepared && this.isCurrent(generation) && this.preparedStillValid(prepared)) {
 				this.currentEnemy = prepared.enemy;
 				notifyNewEnemyLoaded(this.currentEnemy);
 				return;
@@ -280,7 +288,7 @@ export class EnemyManager {
 			// as `stop()` flips `started` or a transition supersedes this fetch (bumping the generation);
 			// because the retry backoff is cancellable, either takes effect immediately rather than after
 			// the full delay — so the controls don't feel frozen while a backoff is parked.
-			while (this.started && generation === this.#fetchGeneration) {
+			while (this.isCurrent(generation)) {
 				const result = await apiSocket.sendSocketCommand('NewEnemy', {
 					newZoneId: playerManager.currentZone,
 					clientBattleMs,
@@ -290,7 +298,7 @@ export class EnemyManager {
 				// transition that lands while parked on the await above (not on the cancellable backoff)
 				// would otherwise still apply this response. Re-check before applying so a successful
 				// NewEnemy can't clobber the fight the supersession already moved on to.
-				if (!this.started || generation !== this.#fetchGeneration) {
+				if (!this.isCurrent(generation)) {
 					return;
 				}
 				if (result.data?.enemyInstance) {
@@ -314,7 +322,7 @@ export class EnemyManager {
 						await battleEngine.startLoading(result.data.cooldown);
 						// The awaited cooldown can overlap a stop / superseding transition; re-check before
 						// presenting so a resolved wait can't clobber the fight the supersession moved on to.
-						if (!this.started || generation !== this.#fetchGeneration) {
+						if (!this.isCurrent(generation)) {
 							return;
 						}
 					}
@@ -368,27 +376,36 @@ export class EnemyManager {
 	 *  bumped generation no longer matches) and its retry backoff is cut short so the supersession takes
 	 *  effect immediately rather than after the parked delay. */
 	private interruptFetch() {
-		this.#fetchGeneration++;
+		this.#generation++;
 		this.#cancelBackoff?.();
 	}
 
 	/** Begins a control transition (challenge/retreat), superseding any in-flight one: it holds the
-	 *  `transitioning` guard, bumps the transition generation (so a superseded transition abandons its
+	 *  `transitioning` guard, bumps the shared generation (so a superseded transition abandons its
 	 *  result), and cuts short any parked enemy-fetch backoff so the takeover is immediate. Returns the new
 	 *  generation for the caller to re-check after each await. */
 	private beginTransition(): number {
 		this.#transitioning = true;
 		this.interruptFetch();
-		return ++this.#transitionGeneration;
+		return this.#generation;
 	}
 
 	/** Ends a control transition, releasing the guard — but only if this transition is still the current
 	 *  one. A superseded transition leaving its finally must not clear the flag the transition that took
 	 *  over still holds. */
 	private endTransition(generation: number) {
-		if (generation === this.#transitionGeneration) {
+		if (generation === this.#generation) {
 			this.#transitioning = false;
 		}
+	}
+
+	/** Whether `generation` (a value captured from {@link #generation} where a continuation began) is still
+	 *  current — false once a stop, a fresh start, a control transition, or a Home entry has superseded it.
+	 *  The one check every battle-end resolution and control transition re-runs after each await so a stale
+	 *  continuation — including one spanning a stop()→start() cycle (#2331) — abandons instead of resuming
+	 *  into whatever the loop has moved on to. */
+	private isCurrent(generation: number): boolean {
+		return this.started && generation === this.#generation;
 	}
 
 	/**
@@ -421,7 +438,7 @@ export class EnemyManager {
 			});
 			// A stop, or a later press superseding this challenge, landed while ChallengeBoss was in flight;
 			// abandon so its result can't clobber the transition that took over (mirrors getNewEnemy's guard).
-			if (!this.started || generation !== this.#transitionGeneration) {
+			if (!this.isCurrent(generation)) {
 				return;
 			}
 			if (result.data?.enemyInstance) {
@@ -433,7 +450,7 @@ export class EnemyManager {
 					await battleEngine.startLoading(result.data.cooldown);
 					// The awaited cooldown can overlap a stop / superseding transition; re-check before
 					// presenting so a resolved wait can't clobber the fight the supersession moved on to.
-					if (!this.started || generation !== this.#transitionGeneration) {
+					if (!this.isCurrent(generation)) {
 						return;
 					}
 				}
@@ -540,19 +557,19 @@ export class EnemyManager {
 		void apiSocket.sendSocketCommand('SetAutoChallengeBoss', enabled);
 	}
 
-	/** Whether the boss loop is still the active, settled context — false once a stop / retreat / handoff
-	 *  has transitioned us away. A boss-victory resolution re-checks this after each await so a transition
-	 *  landing mid-resolution abandons it instead of clobbering the new state. */
-	private get bossLoopActive(): boolean {
-		return this.started && this.mode === 'boss' && !this.#transitioning;
+	/** Whether the boss loop is still the active, settled context for a resolution that captured `generation`
+	 *  — false once a stop, a fresh start, or a retreat/handoff has moved on. A boss-victory resolution
+	 *  re-checks this after each await so a stale or superseded continuation abandons instead of clobbering
+	 *  the new state. */
+	private bossLoopActive(generation: number): boolean {
+		return this.isCurrent(generation) && this.mode === 'boss' && !this.#transitioning;
 	}
 
-	/** Whether `generation` (a {@link transitionGeneration} snapshot) is still current — false once a stop
-	 *  or a superseding challenge/retreat (which bumps the generation via {@link beginTransition}) has moved
-	 *  on. Unlike {@link bossLoopActive}, this doesn't require `mode === 'boss'`: boss-loss resolution leaves
-	 *  boss mode itself partway through (via returnToIdle), so it re-checks this after each await instead. */
-	private transitionCurrent(generation: number): boolean {
-		return this.started && generation === this.#transitionGeneration;
+	/** Whether the idle loop is still the active, settled context for a resolution that captured `generation`
+	 *  — false once a stop, a fresh start, or a boss challenge has moved on. Mirrors {@link bossLoopActive}
+	 *  for the idle side; an idle battle-end resolution re-checks this after each await. */
+	private idleLoopActive(generation: number): boolean {
+		return this.isCurrent(generation) && this.mode === 'idle' && !this.#transitioning;
 	}
 
 	private async watchBattleStage(stage: BattleStage) {
@@ -560,29 +577,39 @@ export class EnemyManager {
 		if (this.#transitioning) {
 			return;
 		}
+		// Captured once here (not re-read inside the resolution methods) so every await boundary they cross
+		// checks against the value current when this stage change was dispatched — see `#generation`.
+		const generation = this.#generation;
 		if (this.mode === 'boss') {
-			await this.watchBossStage(stage);
+			await this.watchBossStage(stage, generation);
 		} else {
-			await this.watchIdleStage(stage);
+			await this.watchIdleStage(stage, generation);
 		}
 	}
 
-	private async watchIdleStage(stage: BattleStage) {
+	private async watchIdleStage(stage: BattleStage, generation: number) {
 		let prepared: PreparedBattle | undefined;
 		if (stage === BattleStage.Victorious && this.currentEnemy) {
 			const { cooldown, nextEnemy, nextZoneId } = await this.claimVictory();
 			// Capture the server-prefetched next battle (with the current player state) before waiting out the
 			// cooldown, so a build change during the cooldown can be detected when deciding whether to use it.
 			prepared = this.capturePreparedBattle(nextEnemy, nextZoneId);
+			// The claim above can overlap a stop()/start() cycle, a boss handoff, or a Home entry (which also
+			// bumps the generation via interruptFetch) — check before starting the cooldown wait so a stale
+			// continuation doesn't stomp whatever stage the superseding action already set (#2331).
+			if (!this.idleLoopActive(generation)) {
+				return;
+			}
 			if (cooldown > 0) {
 				await battleEngine.startLoading(cooldown);
 			}
 		}
 
 		// The awaited claim/cooldown above can overlap a boss challenge or retreat that hands the loop
-		// off (and resolves the cooldown early via reset); if we've since left idle mode or a transition
-		// is mid-flight, don't spawn an idle enemy over the new fight.
-		if (this.#transitioning || this.mode !== 'idle') {
+		// off (and resolves the cooldown early via reset), or a stop()/start() cycle; if we've since left
+		// idle mode, moved on to a new session, or a transition is mid-flight, don't spawn an idle enemy
+		// over the new fight.
+		if (!this.idleLoopActive(generation)) {
 			return;
 		}
 
@@ -626,17 +653,17 @@ export class EnemyManager {
 		return prepared.zoneId === playerManager.currentZone && battleEngine.playerBattleStateMatches(prepared.playerState);
 	}
 
-	private async watchBossStage(stage: BattleStage) {
+	private async watchBossStage(stage: BattleStage, generation: number) {
 		if (stage === BattleStage.Victorious && this.currentEnemy) {
-			await this.resolveBossVictory();
+			await this.resolveBossVictory(generation);
 		} else if (stage === BattleStage.Defeated && this.currentEnemy) {
-			await this.resolveBossLoss();
+			await this.resolveBossLoss(generation);
 		} else if (stage === BattleStage.Drawn && this.currentEnemy) {
 			await this.resolveBossDraw();
 		}
 	}
 
-	private async resolveBossVictory() {
+	private async resolveBossVictory(generation: number) {
 		// Snapshot the boss's zone up front: it identifies the zone being cleared and the gate this clear
 		// may unlock, and must stay fixed even if currentZone shifts (a zone-change / retreat) during the
 		// awaits below — otherwise the clear and the "next zone unlocked" check could target the wrong zone.
@@ -644,8 +671,9 @@ export class EnemyManager {
 
 		await this.claimVictory();
 		// A stop / retreat that landed during the victory claim has already transitioned us out of the boss
-		// loop; abandon the resolution so we don't resurrect the cleared overlay over the new state.
-		if (!this.bossLoopActive) {
+		// loop (or this resolution spans a stop()→start() cycle, #2331); abandon so we don't resurrect the
+		// cleared overlay over the new state.
+		if (!this.bossLoopActive(generation)) {
 			return;
 		}
 
@@ -664,7 +692,7 @@ export class EnemyManager {
 			await playerChallenges.load(true);
 			// Re-guard after the reload for the same reason — a stop / retreat may have landed while the
 			// challenge refresh was in flight.
-			if (!this.bossLoopActive) {
+			if (!this.bossLoopActive(generation)) {
 				return;
 			}
 		}
@@ -674,7 +702,7 @@ export class EnemyManager {
 
 		await delay(BOSS_VICTORY_OVERLAY_MS);
 		// A retreat / stop during the overlay window already transitioned us elsewhere.
-		if (!this.bossLoopActive) {
+		if (!this.bossLoopActive(generation)) {
 			return;
 		}
 		this.bossOutcome = undefined;
@@ -686,21 +714,17 @@ export class EnemyManager {
 		}
 	}
 
-	private async resolveBossLoss() {
-		// Snapshot the transition generation up front: a challenge/retreat pressed during either await below
-		// bumps it (via beginTransition), and its result can resolve the parked startLoading below early
-		// (finishLoading) — so this resolution must not then hand a stale prepared idle battle to a fresh
-		// getNewEnemy call and clobber the fight the supersession already started (#1696).
-		const generation = this.#transitionGeneration;
+	private async resolveBossLoss(generation: number) {
 		// Record the loss explicitly (turning auto-fight off) and drop back to the boss-available
 		// state — the normal idle farm loop — honoring the post-loss cooldown. Report the duration the
 		// client simulated alongside the claim, mirroring claimVictory's diagnostic-only clientTotalMs.
 		const lostResponse = await apiSocket.sendSocketCommand('BattleLost', {
 			clientTotalMs: battleEngine.timeElapsed
 		});
-		// A retreat/challenge superseded this resolution while BattleLost was in flight; the superseding
-		// transition already owns the loop's state, so abandon rather than clobber it below.
-		if (!this.transitionCurrent(generation)) {
+		// A retreat/challenge superseded this resolution while BattleLost was in flight (bumping the
+		// generation via beginTransition), or it spans a stop()→start() cycle (#2331); the superseding
+		// operation already owns the loop's state, so abandon rather than clobber it below.
+		if (!this.isCurrent(generation)) {
 			return;
 		}
 		if (lostResponse.error) {
@@ -717,7 +741,7 @@ export class EnemyManager {
 			await battleEngine.startLoading(cooldown);
 			// Re-check after the cooldown: a challenge pressed during it can resolve this parked startLoading
 			// early, so a fresh getNewEnemy below must not present the stale prepared battle over the new fight.
-			if (!this.transitionCurrent(generation)) {
+			if (!this.isCurrent(generation)) {
 				return;
 			}
 		}
