@@ -135,16 +135,16 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(c => c.Name)
-                    .HasMaxLength(100);
+                    .HasMaxLength(ContentFieldLengths.ChallengeNameMaxLength);
 
                 entity.Property(c => c.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.ChallengeDescriptionMaxLength);
 
                 entity.Property(c => c.ProgressGoal)
                     .HasPrecision(36, 3);
 
                 entity.Property(c => c.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.ChallengeDesignerNotesMaxLength);
             });
 
             modelBuilder.Entity<ChallengeType>(entity =>
@@ -172,13 +172,13 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(c => c.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ClassNameMaxLength);
 
                 entity.Property(c => c.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.ClassDescriptionMaxLength);
 
                 entity.Property(c => c.Word)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ClassWordMaxLength);
 
                 entity.Property(c => c.PassiveAmount)
                     .HasPrecision(18, 3);
@@ -187,7 +187,7 @@ namespace Game.Infrastructure.Database
                     .HasPrecision(18, 3);
 
                 entity.Property(c => c.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.ClassDesignerNotesMaxLength);
             });
 
             modelBuilder.Entity<ClassAttributeDistribution>(entity =>
@@ -242,10 +242,10 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(e => e.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.EnemyNameMaxLength);
 
                 entity.Property(e => e.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.EnemyDesignerNotesMaxLength);
             });
 
             modelBuilder.Entity<EnemySkill>()
@@ -277,16 +277,16 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(i => i.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ItemNameMaxLength);
 
                 entity.Property(i => i.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.ItemDescriptionMaxLength);
 
                 entity.Property(i => i.IconPath)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ItemIconPathMaxLength);
 
                 entity.Property(i => i.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.ItemDesignerNotesMaxLength);
 
                 // The proficiency gate is an optional reference to a proficiency. Navigation-less FK (like the
                 // zone unlock challenge): deleting the referenced proficiency clears the gate (SetNull),
@@ -339,13 +339,13 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(im => im.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ItemModNameMaxLength);
 
                 entity.Property(im => im.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.ItemModDescriptionMaxLength);
 
                 entity.Property(im => im.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.ItemModDesignerNotesMaxLength);
 
                 // Explicit join entity (ItemModTag) backs the ItemMod.Tags skip navigation; see the Item.Tags
                 // configuration above for the rationale and the load-bearing cascade.
@@ -513,25 +513,25 @@ namespace Game.Infrastructure.Database
                     .HasPrecision(18, 3);
 
                 entity.Property(s => s.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.SkillNameMaxLength);
 
                 entity.Property(s => s.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.SkillDescriptionMaxLength);
 
                 entity.Property(s => s.IconPath)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.SkillIconPathMaxLength);
 
                 entity.Property(s => s.Word)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.SkillWordMaxLength);
 
                 entity.Property(s => s.Pronunciation)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.SkillPronunciationMaxLength);
 
                 entity.Property(s => s.Translation)
-                    .HasMaxLength(100);
+                    .HasMaxLength(ContentFieldLengths.SkillTranslationMaxLength);
 
                 entity.Property(s => s.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.SkillDesignerNotesMaxLength);
             });
 
             modelBuilder.Entity<SkillDamagePortion>(entity =>
@@ -576,7 +576,7 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(r => r.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.SkillRecipeDesignerNotesMaxLength);
 
                 // The result skill is retired, never deleted, so Restrict (it is also referenced by the recipe's
                 // own input rows). The recipe is itself retired, never deleted.
@@ -727,16 +727,16 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(l => l.Key)
-                    .HasMaxLength(100);
+                    .HasMaxLength(ContentFieldLengths.LessonKeyMaxLength);
 
                 entity.Property(l => l.Name)
-                    .HasMaxLength(100);
+                    .HasMaxLength(ContentFieldLengths.LessonNameMaxLength);
 
                 entity.Property(l => l.ScreenKey)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.LessonScreenKeyMaxLength);
 
                 entity.Property(l => l.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.LessonDesignerNotesMaxLength);
 
                 // A lesson's stable authoring slug is how the progression-graph lint matches it against
                 // content-design's taught-by-blurb candidates, so two lessons must never share one.
@@ -749,10 +749,10 @@ namespace Game.Infrastructure.Database
                 entity.HasKey(s => new { s.LessonId, s.Ordinal });
 
                 entity.Property(s => s.Text)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.LessonStepTextMaxLength);
 
                 entity.Property(s => s.AnchorKey)
-                    .HasMaxLength(100);
+                    .HasMaxLength(ContentFieldLengths.LessonStepAnchorKeyMaxLength);
 
                 entity.HasOne(s => s.Lesson)
                     .WithMany(l => l.Steps)
@@ -797,7 +797,7 @@ namespace Game.Infrastructure.Database
 
             modelBuilder.Entity<Tag>()
                 .Property(t => t.Name)
-                .HasMaxLength(50);
+                .HasMaxLength(ContentFieldLengths.TagNameMaxLength);
 
             modelBuilder.Entity<TagCategory>(entity =>
             {
@@ -917,13 +917,13 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(z => z.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ZoneNameMaxLength);
 
                 entity.Property(z => z.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.ZoneDescriptionMaxLength);
 
                 entity.Property(z => z.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.ZoneDesignerNotesMaxLength);
 
                 entity.Property(z => z.BossLevel)
                     .HasDefaultValue(1);

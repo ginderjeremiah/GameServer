@@ -55,6 +55,18 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Theory]
+        [InlineData(nameof(ContentFieldLengths.EnemyNameMaxLength))]
+        [InlineData(nameof(ContentFieldLengths.SkillDesignerNotesMaxLength))]
+        public void GetClientMirroredConstantFields_IncludesContentFieldLengths(string fieldName)
+        {
+            var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()
+                .Select(field => field.Name)
+                .ToList();
+
+            Assert.Contains(fieldName, fieldNames);
+        }
+
+        [Theory]
         [InlineData(nameof(ServerGameConstants.MaxExpRewardMultiplier))] // server-authoritative reward clamp
         [InlineData(nameof(ServerGameConstants.MaxExpPerGrant))]         // server-only anti-cheat backstop
         public void GetClientMirroredConstantFields_ExcludesServerOnlyConstants(string fieldName)
@@ -78,11 +90,18 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void GetClientMirroredConstantFields_IsOrderedDeterministically()
         {
-            var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()
-                .Select(field => field.Name)
+            // Ordering is grouped by declaring type then field name (not a flat alphabetical sort by
+            // name alone), so this holds regardless of how many [ClientMirrored] constant classes exist.
+            var actual = ApiCodeGenerator.GetClientMirroredConstantFields()
+                .Select(field => (TypeName: field.DeclaringType?.Name, field.Name))
                 .ToList();
 
-            Assert.Equal(fieldNames.OrderBy(name => name), fieldNames);
+            var expected = actual
+                .OrderBy(entry => entry.TypeName)
+                .ThenBy(entry => entry.Name)
+                .ToList();
+
+            Assert.Equal(expected, actual);
         }
     }
 }
