@@ -4,11 +4,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const h = vi.hoisted(() => ({
 	toastWarning: vi.fn(),
 	unhook: vi.fn(),
+	unhookLogicalUpdate: vi.fn(),
 	state: {
 		lsStore: {} as Record<string, string>,
 		lsAvailable: true,
 		setItemThrows: false,
-		idleTimeLostCb: undefined as ((ms: number) => void) | undefined
+		idleTimeLostCb: undefined as ((ms: number) => void) | undefined,
+		logicalUpdateCb: undefined as ((tickMs: number, unhook: () => void) => void) | undefined
 	}
 }));
 
@@ -29,11 +31,16 @@ vi.mock('$lib/common/local-storage', () => ({
 			: null
 }));
 
-// Capture the callback the monitor registers so the test can drive lost-time events directly.
+// Capture the callbacks the monitor registers so the test can drive lost-time and regular-tick
+// events directly.
 vi.mock('$lib/engine/logical-engine', () => ({
 	onIdleTimeLost: (cb: (ms: number) => void) => {
 		h.state.idleTimeLostCb = cb;
 		return h.unhook;
+	},
+	onLogicalUpdate: (cb: (tickMs: number, unhook: () => void) => void) => {
+		h.state.logicalUpdateCb = cb;
+		return h.unhookLogicalUpdate;
 	}
 }));
 
@@ -58,6 +65,7 @@ describe('BackgroundThrottleMonitor', () => {
 		h.state.lsAvailable = true;
 		h.state.setItemThrows = false;
 		h.state.idleTimeLostCb = undefined;
+		h.state.logicalUpdateCb = undefined;
 		hidden = false;
 		Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
 		monitor = new BackgroundThrottleMonitor();
@@ -72,6 +80,9 @@ describe('BackgroundThrottleMonitor', () => {
 	});
 
 	const lose = (ms: number) => h.state.idleTimeLostCb?.(ms);
+	// Simulates a regular logical tick that lost nothing — the common case, since the worker tick
+	// source polls every 10ms regardless of visibility.
+	const tick = () => h.state.logicalUpdateCb?.(10, h.unhookLogicalUpdate);
 
 	it('shows a one-time dismissible notice after a hidden period loses past the threshold', () => {
 		monitor.start();
@@ -110,6 +121,36 @@ describe('BackgroundThrottleMonitor', () => {
 		lose(70_000); // a genuine later foreground stall — ignored
 
 		expect(h.toastWarning).not.toHaveBeenCalled();
+	});
+
+	it('disarms the resume credit once a regular tick passes with nothing lost, so a later foreground stall is not misattributed', () => {
+		monitor.start();
+		goHidden();
+		goVisible(); // arms the one-shot resume credit
+		tick(); // a normal post-resume tick with nothing lost — the credit must not survive this
+		lose(70_000); // hours-later foreground stall (OS suspend, debugger pause, etc.)
+
+		expect(h.toastWarning).not.toHaveBeenCalled();
+	});
+
+	it('does not let a stale resume-guard subscription from an earlier cycle disarm a fresh one', () => {
+		monitor.start();
+		goHidden();
+		goVisible(); // arms guard #1
+		goHidden();
+		goVisible(); // re-arms: guard #1 must be unhooked, not left to fire later
+		lose(70_000); // credited to guard #2's hidden period
+
+		expect(h.toastWarning).toHaveBeenCalledTimes(1);
+	});
+
+	it('unsubscribes the pending resume guard on stop', () => {
+		monitor.start();
+		goHidden();
+		goVisible(); // arms the guard
+		monitor.stop();
+
+		expect(h.unhookLogicalUpdate).toHaveBeenCalled();
 	});
 
 	it('ignores idle time lost while the tab is visible (a foreground stall is not backgrounding)', () => {
