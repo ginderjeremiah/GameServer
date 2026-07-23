@@ -56,8 +56,8 @@ namespace Game.Core.TestInfrastructure.Performance
 
             for (var sample = 0; sample < sampleCount; sample++)
             {
-                // Build all inputs for this sample untimed, so combatant construction (and the
-                // garbage it produces) stays out of the measured region.
+                // Build all inputs for this sample untimed, so input construction (and the garbage it
+                // produces) stays out of the measured region.
                 for (var i = 0; i < operationsPerSample; i++)
                 {
                     inputs[i] = createInput();
