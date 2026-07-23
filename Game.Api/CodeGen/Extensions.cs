@@ -108,7 +108,11 @@ namespace Game.Api.CodeGen
 
         private static bool IsClassThatNeedsInterface(Type type)
         {
-            return type.IsClass && !type.IsGenericParameter && type != typeof(string);
+            // Arrays are IsClass but not IsGenericType, so IsEnumerable rejects them and they would
+            // otherwise reach here and wrongly resolve to an interface reference. Excluding them lets
+            // NeedsInterface return false so GetTypeText hits its deliberate unmapped-type throw instead
+            // of silently emitting a reference to an interface that reflects the array's CLR members.
+            return type.IsClass && !type.IsGenericParameter && !type.IsArray && type != typeof(string);
         }
 
         // Structs intended to be mirrored to TypeScript as interfaces. This is an explicit allow-list,

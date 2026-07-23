@@ -391,6 +391,16 @@ namespace Game.Api.Tests.CodeGen
             var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
             Assert.Contains("DateTimeOffset", ex.Message);
         }
+
+        [Fact]
+        public void GetTypeText_UnmappedArray_Throws()
+        {
+            // Arrays have no TypeScript mapping (List<>/IEnumerable<> are the supported shapes);
+            // NeedsInterface must reject them so this throws instead of emitting a garbage IString[].
+            var descriptor = GetPropertyDescriptor<ModelWithArray>("Tags");
+            var ex = Assert.Throws<InvalidOperationException>(() => CodeGenTypeFormatter.GetTypeText(descriptor));
+            Assert.Contains("String[]", ex.Message);
+        }
     }
 
     public class GenericHolder
