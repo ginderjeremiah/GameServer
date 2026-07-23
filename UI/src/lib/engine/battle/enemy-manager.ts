@@ -78,8 +78,10 @@ export class EnemyManager {
 	/** Guards the challenge/retreat transitions so a resolving stage change for the battle being
 	 *  swapped out is not mistaken for an outcome of the new one. Stays set across a supersession (a
 	 *  press that takes over an in-flight transition) — only the transition that ends up current clears it.
-	 *  Force-cleared by {@link stop}, since a torn-down manager can't rely on a zombie transition's `finally`
-	 *  to release it (that `finally` may run after {@link start} begins a fresh session, see `#generation`). */
+	 *  Force-cleared by {@link stop} and {@link enterHome}, since neither is itself a transition but both call
+	 *  {@link interruptFetch}, whose generation bump decouples a zombie transition's `finally → endTransition`
+	 *  from the value it captured — without the force-clear, that `finally` would never match `#generation`
+	 *  again and the guard would stay stuck, wedging the loop (see `#generation`). */
 	#transitioning = false;
 	/** The single supersedable-operation epoch (consolidating the ad-hoc `fetchGeneration`/`transitionGeneration`
 	 *  pair per #1736): bumped by {@link interruptFetch} (a Home entry, a control transition, or a stop) and by
@@ -194,6 +196,13 @@ export class EnemyManager {
 	 * leaves Home (the standard zone-change/abandon machinery).
 	 */
 	private enterHome() {
+		// A Home entry supersedes any in-flight transition just as a stop does — mirrors stop()'s force-clear.
+		// interruptFetch()'s generation bump decouples endTransition from that transition's captured value, so
+		// its own finally would otherwise never release the guard: a retreat sets mode='idle' before its await
+		// (unlike a challenge, which sets mode='boss' and hard-disables zone nav), so zone nav — including
+		// Home — stays reachable while its own getNewEnemy is still in flight; entering Home there would
+		// otherwise strand `#transitioning` true forever, silently stalling the idle loop.
+		this.#transitioning = false;
 		this.interruptFetch();
 		this.returnToIdle();
 		this.currentEnemy = undefined;

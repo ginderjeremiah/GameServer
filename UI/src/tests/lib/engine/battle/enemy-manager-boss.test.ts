@@ -712,6 +712,40 @@ describe('EnemyManager boss mode', () => {
 		expect(loaded).toEqual([normalInstance]);
 	});
 
+	it('releases the transitioning guard when a retreat is superseded by a Home entry mid-fetch (#2331 regression)', async () => {
+		// A retreat sets mode='idle' synchronously before its await (unlike a challenge, which sets mode='boss'
+		// and hard-disables zone nav) — so zone nav, including Home, stays reachable while retreatFromBoss's own
+		// getNewEnemy is still in flight. Entering Home there supersedes the retreat via interruptFetch without
+		// itself being a transition, so it must also force-clear `#transitioning` (mirroring stop()) or the
+		// zombie retreat's own finally can never match the bumped generation to release the guard — silently
+		// wedging watchBattleStage's `if (this.#transitioning) return;` gate for every future stage change.
+		h.staticData.zones = [];
+		h.staticData.zones[3] = zone(3, 0);
+		h.staticData.zones[5] = { ...zone(5, 1), isHome: true };
+		await manager.challengeBoss();
+		let releaseNewEnemy!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		const newEnemyGate = new Promise<IApiSocketResponse<'NewEnemy'>>((resolve) => (releaseNewEnemy = resolve));
+		send.mockImplementation((name: string) => (name === 'NewEnemy' ? newEnemyGate : Promise.resolve(newEnemyResponse)));
+
+		const retreat = manager.retreatFromBoss();
+		await flush(); // parked on the retreat's in-flight NewEnemy (mode already 'idle', zone nav reachable)
+		expect(manager.mode).toBe('idle');
+
+		manager.navigateToZone(5); // enters Home mid-retreat: supersedes via interruptFetch, not itself a transition
+		releaseNewEnemy(newEnemyResponse); // the superseded retreat's fetch resolves and abandons (generation moved on)
+		await retreat;
+
+		// Leave Home and win a fight: if the retreat's finally had failed to release `#transitioning` (the
+		// regression), watchBattleStage would silently swallow this stage change and DefeatEnemy would never send.
+		manager.navigateToZone(3);
+		await vi.waitFor(() => expect(manager.currentEnemy).toEqual(normalInstance));
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Victorious);
+
+		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.anything());
+	});
+
 	it('a challenge supersedes an in-flight retreat, cancelling its parked backoff', async () => {
 		// In a boss fight the player Retreats; NewEnemy is down so the retreat parks in its (held-open) retry
 		// backoff. Pressing Challenge supersedes it: the parked backoff is cut short and the boss reloads
