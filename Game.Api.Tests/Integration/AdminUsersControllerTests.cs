@@ -949,6 +949,43 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task ArchiveUser_NonAdminTarget_CommitsBeforeReturningSuccess()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+
+            var target = await TestDataSeeder.CreateUserAsync(context, "quietlyarchived", "pw");
+            var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+
+            var status = await users.ArchiveUser(actor.Id, target.Id, CancellationToken);
+
+            Assert.Equal(UserActionStatus.Success, status);
+            // AsNoTracking forces a fresh query rather than reading the local change tracker, so this only
+            // passes if the write already reached the database — the guarantee AdminUsersController relies on
+            // to never revoke a live socket ahead of a durable ban/archive (#2339).
+            var reloaded = await context.Users.AsNoTracking().FirstAsync(u => u.Id == target.Id, CancellationToken);
+            Assert.NotNull(reloaded.ArchivedAt);
+        }
+
+        [Fact]
+        public async Task BanUser_NonAdminTarget_CommitsBeforeReturningSuccess()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var users = scope.ServiceProvider.GetRequiredService<IUsers>();
+
+            var target = await TestDataSeeder.CreateUserAsync(context, "quietlybanned", "pw");
+            var actor = await TestDataSeeder.CreateUserAsync(context, "ghostactor", "pw");
+
+            var status = await users.BanUser(actor.Id, target.Id, CancellationToken);
+
+            Assert.Equal(UserActionStatus.Success, status);
+            var reloaded = await context.Users.AsNoTracking().FirstAsync(u => u.Id == target.Id, CancellationToken);
+            Assert.NotNull(reloaded.BannedAt);
+        }
+
+        [Fact]
         public async Task ArchiveUser_ArchivingLastAdmin_IsRejected()
         {
             // Driven through the repository so the actor is a valid-token admin who is no longer a usable

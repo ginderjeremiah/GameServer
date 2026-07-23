@@ -338,6 +338,12 @@ namespace Game.DataAccess.Repositories
             if (!targetHasAdminRole)
             {
                 setTimestamp(user);
+
+                // Commit here (rather than deferring to the per-request unit of work) so the row is durable
+                // before AdminUsersController revokes the target's live socket: without this, a transient
+                // commit failure in the deferred path could kick the socket while leaving the account
+                // un-banned/un-archived (#2339).
+                await _context.SaveChangesAsync(cancellationToken);
                 return UserActionStatus.Success;
             }
 
