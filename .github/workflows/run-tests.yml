@@ -301,7 +301,42 @@ jobs:
       # (An earlier revision built the image via buildx with a GitHub Actions layer cache; measured
       # runs showed the cache-transfer + image-load overhead outweighed the savings on the hosted
       # runners, so the plain compose build is both simpler and faster here.)
+      #
+      # `up -d` returns once the containers start, not once the API finishes migrating/seeding, so
+      # the Node/Playwright setup below runs concurrently with that startup work instead of blocking
+      # on it — the blocking wait moved to "Apply the e2e admin-role fixture", just before the tests.
       run: docker compose up -d --build
+
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: UI/.nvmrc
+        cache: npm
+        cache-dependency-path: UI/package-lock.json
+
+    - name: Install node modules
+      working-directory: UI
+      run: npm ci
+
+    - name: Cache Playwright browser
+      id: playwright-cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('UI/package-lock.json') }}
+        restore-keys: |
+          playwright-${{ runner.os }}-${{ matrix.browser }}-
+
+    - name: Install Playwright browser
+      working-directory: UI
+      # Only this job's browser is needed. On a cache hit the binaries are already present, so just
+      # (re)install the OS-level dependencies, which actions/cache can't carry. On a miss, install both.
+      run: |
+        if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+          npx playwright install-deps ${{ matrix.browser }}
+        else
+          npx playwright install --with-deps ${{ matrix.browser }}
+        fi
 
     - name: Apply the e2e admin-role fixture
       # The API seeds the static content (Skills, Enemies, Zones, …) itself on startup from the
@@ -331,35 +366,6 @@ jobs:
         wait_for_api
         # Runs inside the Postgres container so it needs no client tooling on the runner; idempotent.
         docker compose exec -T postgres psql -U game -d game -p 5544 -v ON_ERROR_STOP=1 -f - < e2e-admin-provision.sql
-
-    - name: Set up Node
-      uses: actions/setup-node@v7
-      with:
-        node-version-file: UI/.nvmrc
-        cache: npm
-        cache-dependency-path: UI/package-lock.json
-
-    - name: Install node modules
-      working-directory: UI
-      run: npm ci
-
-    - name: Cache Playwright browser
-      id: playwright-cache
-      uses: actions/cache@v6
-      with:
-        path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('UI/package-lock.json') }}
-
-    - name: Install Playwright browser
-      working-directory: UI
-      # Only this job's browser is needed. On a cache hit the binaries are already present, so just
-      # (re)install the OS-level dependencies, which actions/cache can't carry. On a miss, install both.
-      run: |
-        if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-          npx playwright install-deps ${{ matrix.browser }}
-        else
-          npx playwright install --with-deps ${{ matrix.browser }}
-        fi
 
     - name: Run Playwright e2e tests
       working-directory: UI
