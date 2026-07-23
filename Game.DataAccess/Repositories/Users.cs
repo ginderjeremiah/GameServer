@@ -332,7 +332,7 @@ namespace Game.DataAccess.Repositories
             }
 
             // Only acting on an admin can trip the lockout rules; archiving/banning a non-admin carries no
-            // hazard and applies on the deferred unit-of-work path.
+            // such hazard, but still commits in-tier below for the socket-revoke durability guarantee.
             const int adminRoleId = (int)ERole.Admin;
             var targetHasAdminRole = user.Roles.Any(r => r.Id == adminRoleId);
             if (!targetHasAdminRole)
