@@ -1,4 +1,5 @@
 using Game.Abstractions.Infrastructure;
+using Game.Core;
 using Game.TestInfrastructure.Base;
 using Game.TestInfrastructure.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,10 +41,10 @@ namespace Game.Application.Tests.DataAccess
             await pubsub.PublishBatch(channel, queueName, payloads);
 
             var queue = pubsub.GetQueue(queueName);
-            Assert.Equal(payloads[0], await queue.GetNextAsync<SamplePayload>());
-            Assert.Equal(payloads[1], await queue.GetNextAsync<SamplePayload>());
-            Assert.Equal(payloads[2], await queue.GetNextAsync<SamplePayload>());
-            Assert.Null(await queue.GetNextAsync<SamplePayload>());
+            Assert.Equal(payloads[0], (await queue.GetNextAsync()).Deserialize<SamplePayload>());
+            Assert.Equal(payloads[1], (await queue.GetNextAsync()).Deserialize<SamplePayload>());
+            Assert.Equal(payloads[2], (await queue.GetNextAsync()).Deserialize<SamplePayload>());
+            Assert.Null(await queue.GetNextAsync());
         }
 
         [Fact]
@@ -57,7 +58,7 @@ namespace Game.Application.Tests.DataAccess
             // An empty batch must not touch the queue (an empty RPUSH would otherwise be an error).
             await pubsub.PublishBatch(channel, queueName, Array.Empty<SamplePayload>());
 
-            Assert.Null(await pubsub.GetQueue(queueName).GetNextAsync<SamplePayload>());
+            Assert.Null(await pubsub.GetQueue(queueName).GetNextAsync());
         }
 
         private sealed record SamplePayload(int Id, string Name);

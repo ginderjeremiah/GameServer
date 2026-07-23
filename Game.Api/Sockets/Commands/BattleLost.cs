@@ -56,6 +56,11 @@ namespace Game.Api.Sockets.Commands
             }
             else
             {
+                // A rejected already-credited claim clears the stale battle off PlayerState in memory (see
+                // BattleAlreadyCredited) — save unconditionally, like NewEnemy, so that clear is durable
+                // rather than lost the moment this connection closes.
+                await context.Session.SavePlayerStateAsync(cancellationToken);
+
                 return ErrorWithData("Battle was not a loss.", new BattleLostResponse
                 {
                     Cooldown = 0,

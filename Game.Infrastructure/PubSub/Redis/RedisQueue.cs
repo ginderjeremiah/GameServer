@@ -1,5 +1,4 @@
 ﻿using Game.Abstractions.Infrastructure;
-using Game.Core;
 using Game.Infrastructure.Redis;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -45,12 +44,6 @@ namespace Game.Infrastructure.PubSub.Redis
             }
 
             return value;
-        }
-
-        public async Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default)
-        {
-            var val = await GetNextAsync(cancellationToken);
-            return val.Deserialize<T>();
         }
 
         public async Task<string?> ReserveNextAsync(CancellationToken cancellationToken = default)
@@ -171,11 +164,6 @@ namespace Game.Infrastructure.PubSub.Redis
         {
             _logger.LogTrace("Added value to RedisQueue: {QueueName}, value: {Value}", QueueName, value);
             return ObserveWrite(_redis.ListRightPushAsync(QueueName, value), cancellationToken);
-        }
-
-        public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default)
-        {
-            return AddToQueueAsync(value.Serialize(), cancellationToken);
         }
 
         // Unlike every other write here, this one is not abandoned on a mid-flight cancellation once dispatched:

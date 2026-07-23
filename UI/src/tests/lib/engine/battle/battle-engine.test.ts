@@ -289,6 +289,26 @@ describe('BattleEngine', () => {
 			expect(engine.stage).toBe(BattleStage.Active);
 		});
 
+		it('falls back to a placeholder name and logs a debug line for an unknown enemy id (#2345)', () => {
+			engine.start();
+
+			// A freshly-authored enemy the client's static reference cache hasn't caught up to yet — no
+			// mockEnemies entry for id 999, reproducing a stale mid-session reference cache.
+			const enemyInstance = {
+				id: 999,
+				level: 1,
+				seed: 0,
+				enemyRating: 100,
+				selectedSkills: [0],
+				attributes: [],
+				isBossBattle: false
+			};
+			enemyLoadedCallbacks[0](enemyInstance);
+
+			expect(engine.enemy.name).toBe('Unknown enemy');
+			expect(vi.mocked(logMessage)).toHaveBeenCalledWith(ELogType.Debug, expect.stringContaining('unknown id 999'));
+		});
+
 		it('transitions to Victorious when enemy dies', () => {
 			engine.start();
 
