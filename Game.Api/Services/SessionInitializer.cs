@@ -5,9 +5,10 @@ namespace Game.Api.Services
     /// <summary>
     /// Loads the authenticated user's player session on demand. <c>SessionLoaderMiddleware</c> records the
     /// user id (and the token's selected-player claim) on every request, but the <c>GetSession</c> round-trip
-    /// (and the rehydration on a miss) is paid only where a consumer actually needs player state — the socket
-    /// handshake and the Status/ActiveSession auth endpoints. Every other authenticated HTTP request (admin
-    /// tooling, refresh, device-info) never touches the session cache.
+    /// (and the rehydration on a miss) is paid only where a consumer actually needs the *token's own* player
+    /// state — the socket handshake and the Status auth endpoint. <c>ActiveSession</c> checks presence for an
+    /// explicit target instead, so it never calls this. Every other authenticated HTTP request (admin
+    /// tooling, refresh, device-info) never touches the session cache either.
     /// </summary>
     public class SessionInitializer(
         SessionService sessionService,

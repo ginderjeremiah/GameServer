@@ -39,15 +39,27 @@ describe('PlayerSelectView — select', () => {
 		deps = makeDeps();
 	});
 
-	it('binds the character, confirms takeover, and enters the world on success', async () => {
+	it('confirms takeover, binds the character, and enters the world on success', async () => {
 		const view = new PlayerSelectView(deps, [summary(1)]);
 
 		await view.select(1);
 
+		expect(deps.confirmTakeover).toHaveBeenCalledWith(1);
 		expect(deps.selectPlayer).toHaveBeenCalledWith(1);
-		expect(deps.confirmTakeover).toHaveBeenCalledTimes(1);
 		expect(deps.enterWorld).toHaveBeenCalledWith(player(1));
 		expect(view.error).toBeNull();
+	});
+
+	it('checks takeover before binding — declining never calls selectPlayer', async () => {
+		deps = makeDeps({ confirmTakeover: vi.fn().mockResolvedValue(false) });
+		const view = new PlayerSelectView(deps, [summary(1)]);
+
+		await view.select(1);
+
+		expect(deps.confirmTakeover).toHaveBeenCalledWith(1);
+		expect(deps.selectPlayer).not.toHaveBeenCalled();
+		expect(deps.enterWorld).not.toHaveBeenCalled();
+		expect(view.pendingId).toBeNull();
 	});
 
 	it('surfaces a select error and re-enables the UI without entering', async () => {
@@ -58,31 +70,21 @@ describe('PlayerSelectView — select', () => {
 
 		expect(view.error).toBe('nope');
 		expect(view.pendingId).toBeNull();
-		expect(deps.confirmTakeover).not.toHaveBeenCalled();
+		expect(deps.confirmTakeover).toHaveBeenCalledWith(1);
 		expect(deps.enterWorld).not.toHaveBeenCalled();
-	});
-
-	it('aborts entry when the takeover is declined', async () => {
-		deps = makeDeps({ confirmTakeover: vi.fn().mockResolvedValue(false) });
-		const view = new PlayerSelectView(deps, [summary(1)]);
-
-		await view.select(1);
-
-		expect(deps.enterWorld).not.toHaveBeenCalled();
-		expect(view.pendingId).toBeNull();
 	});
 
 	it('ignores a second select while one is already in flight', async () => {
-		let resolve!: (v: { ok: true; player: IPlayerData }) => void;
-		const selectPlayer = vi.fn().mockReturnValue(new Promise((r) => (resolve = r)));
-		deps = makeDeps({ selectPlayer });
+		let resolve!: (v: boolean) => void;
+		const confirmTakeover = vi.fn().mockReturnValue(new Promise((r) => (resolve = r)));
+		deps = makeDeps({ confirmTakeover });
 		const view = new PlayerSelectView(deps, [summary(1), summary(2)]);
 
 		const first = view.select(1);
 		await view.select(2); // ignored — busy
 
-		expect(selectPlayer).toHaveBeenCalledTimes(1);
-		resolve({ ok: true, player: player(1) });
+		expect(confirmTakeover).toHaveBeenCalledTimes(1);
+		resolve(true);
 		await first;
 	});
 });

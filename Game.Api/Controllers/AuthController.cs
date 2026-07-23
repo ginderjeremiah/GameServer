@@ -137,25 +137,23 @@ namespace Game.Api.Controllers
         }
 
         /// <summary>
-        /// Reports whether the authenticated player already has a live game connection open elsewhere.
-        /// The login flow calls this before entering the game (which would open a websocket and take over
-        /// any existing session) so it can warn the user first.
+        /// Reports whether <paramref name="playerId"/> — one of the authenticated account's characters —
+        /// already has a live game connection open elsewhere. Takes an explicit target rather than reading
+        /// the token's currently-selected player so a caller can check a character it has not yet committed
+        /// to entering (binding it rotates the token and, for an in-game switch, tears down whichever
+        /// character is currently live) — see the character-select/switcher flow in frontend.md for why the
+        /// check must run before that commit, not after (#1518).
         /// </summary>
         [HttpGet]
-        public async Task<ApiResponse<ActiveSessionResult>> ActiveSession()
+        public async Task<ApiResponse<ActiveSessionResult>> ActiveSession(int playerId)
         {
-            // Load (or rehydrate) the session so the selected player id resolves for the presence check;
-            // the HTTP pipeline no longer reads the session cache per request.
-            await _sessionInitializer.EnsureSessionLoaded(HttpContext.RequestAborted);
-
-            // A pre-selection token (post-Login, pre-SelectPlayer) has no player to check presence for —
-            // mirrors Status's guard rather than probing player id 0.
-            if (_sessionService.TokenSelectedPlayerId is null)
+            // Anti-cheat: the caller may only probe presence for one of its own characters.
+            if (!await _accountService.OwnsPlayer(_sessionService.UserId, playerId, HttpContext.RequestAborted))
             {
-                return ApiResponse.Error("No character selected.", ApiErrorCategory.NoPlayerSelected);
+                return ApiResponse.Error("That character does not belong to your account.", ApiErrorCategory.BadRequest);
             }
 
-            var active = await _socketManager.HasActiveSocket(_sessionService.SelectedPlayerId);
+            var active = await _socketManager.HasActiveSocket(playerId);
             return ApiResponse.Success(new ActiveSessionResult { Active = active });
         }
 

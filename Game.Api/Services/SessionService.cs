@@ -57,8 +57,8 @@ namespace Game.Api.Services
         /// <summary>
         /// Loads the authenticated user's in-flight player state from the session store. A cache miss leaves
         /// <see cref="HasPlayerSession"/> false so the caller can rehydrate it (see
-        /// <see cref="SessionInitializer"/>). Only invoked where a consumer actually needs player state (the
-        /// socket handshake and the Status/ActiveSession auth endpoints), never on every HTTP request.
+        /// <see cref="SessionInitializer"/>). Only invoked where a consumer actually needs the *token's own*
+        /// player state (the socket handshake and the Status auth endpoint), never on every HTTP request.
         /// </summary>
         public async Task LoadPlayerState(CancellationToken cancellationToken = default)
         {
