@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EActivityKey, EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
+
+const { staticData } = vi.hoisted(() => ({
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	staticData: {} as any
+}));
+vi.mock('$stores', () => ({ staticData }));
+
 import {
 	activityKeyGroups,
 	cumulativeXp,
@@ -18,10 +25,17 @@ import {
 	proficiencyWarnings,
 	renumberTiers,
 	rewardAtLevel,
+	rewardSkillFlagWarnings,
 	tiersOfPath,
 	xpCostCurve
 } from '$routes/admin/workbench/progression/progression-helpers';
 import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+
+beforeEach(() => {
+	for (const key of Object.keys(staticData)) {
+		delete staticData[key];
+	}
+});
 
 const tier = (overrides: Partial<WorkbenchProficiency> & Pick<WorkbenchProficiency, 'id'>): WorkbenchProficiency => ({
 	...newProficiency(overrides.id, overrides.pathId ?? 1, overrides.pathOrdinal ?? 0),
@@ -191,6 +205,26 @@ describe('validation', () => {
 
 		const nonRootNoPrereqs = tier({ id: 3, pathOrdinal: 1, prerequisiteIds: [] });
 		expect(prerequisiteRootWarnings(nonRootNoPrereqs)).toHaveLength(0);
+	});
+
+	it('rewardSkillFlagWarnings flags a milestone reward skill that lost its Player flag, blocking Save (#2333)', () => {
+		staticData.skills = [
+			{ id: 0, name: 'Slash', acquisition: ESkillAcquisition.Player },
+			{ id: 1, name: 'Roar', acquisition: ESkillAcquisition.Enemy } // flag stripped after being made a reward
+		];
+
+		const flagLost = tier({ id: 1, maxLevel: 5, levelRewards: [{ level: 3, rewardSkillId: 1 }] });
+		expect(rewardSkillFlagWarnings(flagLost)).toEqual([
+			"Reward skill 'Roar' is no longer flagged as Player-acquirable"
+		]);
+		expect(proficiencyBlockingWarnings(flagLost)).toContain(
+			"Reward skill 'Roar' is no longer flagged as Player-acquirable"
+		);
+		expect(proficiencyWarnings(flagLost)).toContain("Reward skill 'Roar' is no longer flagged as Player-acquirable");
+
+		const stillFlagged = tier({ id: 2, maxLevel: 5, levelRewards: [{ level: 3, rewardSkillId: 0 }] });
+		expect(rewardSkillFlagWarnings(stillFlagged)).toHaveLength(0);
+		expect(proficiencyBlockingWarnings(stillFlagged)).toHaveLength(0);
 	});
 });
 

@@ -69,7 +69,12 @@
 import { childChanged } from '../save-helpers';
 import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, TierTab } from './progression-store.svelte';
-import { levelRangeWarnings, payoutLevels, prerequisiteRootWarnings } from './progression-helpers';
+import {
+	levelRangeWarnings,
+	payoutLevels,
+	prerequisiteRootWarnings,
+	rewardSkillFlagWarnings
+} from './progression-helpers';
 import DetailHeader from '../components/DetailHeader.svelte';
 import ConlangIdentity from './ConlangIdentity.svelte';
 import XpCurve from './XpCurve.svelte';
@@ -112,7 +117,9 @@ const identityWarn = $derived(
 			!tier.iconPath.trim())
 );
 const xpWarn = $derived(!!tier && (tier.maxLevel < 1 || !(tier.baseXp > 0) || !(tier.xpGrowth > 0)));
-const milestoneWarn = $derived(!!tier && levelRangeWarnings(tier).length > 0);
+const milestoneWarn = $derived(
+	!!tier && (levelRangeWarnings(tier).length > 0 || rewardSkillFlagWarnings(tier).length > 0)
+);
 const gatewaysWarn = $derived(!!tier && prerequisiteRootWarnings(tier).length > 0);
 const milestonesDirty = $derived(
 	!!baseline &&

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EAttribute, EEquipmentSlot, EItemCategory, EModifierType } from '$lib/api';
-import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
+import { EAttribute, EEquipmentSlot, EItemCategory, EModifierType, ESkillAcquisition } from '$lib/api';
+import type { ChipsSectionConfig, TableSectionConfig } from '$routes/admin/workbench/entities/types';
 
 /* Only the refresh() write-through added for #1633 — classEntity's field/table configs aren't touched here.
    `fetchSocketData` is stubbed; the write-through into staticData.classes is what retire-confirm's reference
@@ -31,6 +31,10 @@ import { classEntity, type WorkbenchClass } from '$routes/admin/workbench/entiti
 /** The starter-equipment table section, for exercising its `newRow`/column-options/`warn` (#1782). */
 const starterEquipmentSection = () =>
 	classEntity.sections.find((s) => s.key === 'starterEquipment') as TableSectionConfig<WorkbenchClass>;
+
+/** The starter-skills chips section, for exercising its Player-flag `warn` predicate. */
+const starterSkillsSection = () =>
+	classEntity.sections.find((s) => s.key === 'starterSkills') as ChipsSectionConfig<WorkbenchClass>;
 
 const blankClass = (starterEquipment: WorkbenchClass['starterEquipment'] = []): WorkbenchClass => ({
 	...classEntity.newItem(0),
@@ -133,5 +137,31 @@ describe('starterEquipment section (#1782)', () => {
 			message: "Item doesn't match its equipment slot's category",
 			blocking: true
 		});
+	});
+});
+
+describe('starterSkills chips section (#2333)', () => {
+	beforeEach(() => {
+		staticData.skills = [
+			{ id: 0, name: 'Slash', acquisition: ESkillAcquisition.Player },
+			{ id: 1, name: 'Bite', acquisition: ESkillAcquisition.Enemy } // flag stripped after assignment
+		];
+	});
+
+	it('warn flags a starter skill that lost its Player flag, blocking Save (backend-enforced)', () => {
+		const cls: WorkbenchClass = { ...classEntity.newItem(0), starterSkillIds: [0, 1] };
+		expect(starterSkillsSection().warn?.(cls)).toEqual({
+			message: "'Bite' is no longer flagged as Player-acquirable",
+			blocking: true
+		});
+	});
+
+	it('warn is null when every starter skill is still Player-flagged', () => {
+		const cls: WorkbenchClass = { ...classEntity.newItem(0), starterSkillIds: [0] };
+		expect(starterSkillsSection().warn?.(cls)).toBeNull();
+	});
+
+	it('warn falls back to the advisory "no starter skills" nag when the list is empty', () => {
+		expect(starterSkillsSection().warn?.(classEntity.newItem(0))).toBe('No starter skills');
 	});
 });

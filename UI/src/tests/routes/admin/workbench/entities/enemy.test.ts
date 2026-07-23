@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EChangeType } from '$lib/api';
+import { EChangeType, ESkillAcquisition } from '$lib/api';
 import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
 
 /* Enemy config transforms: `newItem` defaults, the boss list badge, and the
@@ -48,6 +48,9 @@ const tableSection = (key: string) =>
 
 /** The spawns section, used to exercise its boss-aware `warn` predicate. */
 const spawnsWarn = () => enemyEntity.sections.find((s) => s.key === 'spawns')?.warn;
+
+/** The skills chips section, used to exercise its Enemy-flag `warn` predicate. */
+const skillsWarn = () => enemyEntity.sections.find((s) => s.key === 'skills')?.warn;
 
 beforeEach(() => {
 	mockPost.mockReset().mockResolvedValue(undefined);
@@ -243,6 +246,19 @@ describe('enemyEntity', () => {
 		expect(warn?.({ ...baseline, spawns: [{ zoneId: 0, weight: 5 }], bossZones: [] })).toBeNull();
 		// Neither a spawn nor a boss assignment → it never appears, so warn.
 		expect(warn?.({ ...baseline, spawns: [], bossZones: [] })).toBe('Not assigned to any zone');
+	});
+
+	it('skills warn flags a pool skill that lost its Enemy flag, blocking Save (backend-enforced) (#2333)', () => {
+		const warn = skillsWarn();
+		staticData.skills = [
+			{ id: 0, name: 'Claw', acquisition: ESkillAcquisition.Enemy },
+			{ id: 1, name: 'Roar', acquisition: ESkillAcquisition.Player } // flag stripped after assignment
+		];
+		expect(warn?.({ ...baseline, skillPool: [0] })).toBeNull();
+		expect(warn?.({ ...baseline, skillPool: [0, 1] })).toEqual({
+			message: "'Roar' is no longer flagged as an Enemy skill",
+			blocking: true
+		});
 	});
 
 	describe('newRow factories', () => {
