@@ -18,7 +18,6 @@
 **/npm-debug.log
 **/obj
 LICENSE
-README.md
 *.md
 
 # Not needed by any Docker image build (API image only needs the runtime projects, the root
