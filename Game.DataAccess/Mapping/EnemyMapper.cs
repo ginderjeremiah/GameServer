@@ -14,7 +14,8 @@ namespace Game.DataAccess.Mapping
     internal static class EnemyMapper
     {
         /// <summary>Maps an entity <see cref="EntityEnemy"/> (with its child collections loaded) to the
-        /// reference-data read <see cref="Contracts.Enemy"/> contract.</summary>
+        /// reference-data read <see cref="Contracts.Enemy"/> contract. Child collections are ordered
+        /// deterministically so the reference set's version hash is stable across reloads.</summary>
         public static Contracts.Enemy ToContract(EntityEnemy entity)
         {
             return new Contracts.Enemy
@@ -24,14 +25,16 @@ namespace Game.DataAccess.Mapping
                 IsBoss = entity.IsBoss,
                 DesignerNotes = entity.DesignerNotes,
                 AttributeDistribution = entity.AttributeDistributions
+                    .OrderBy(ad => ad.AttributeId)
                     .Select(ad => new Contracts.AttributeDistribution
                     {
                         AttributeId = (EAttribute)ad.AttributeId,
                         BaseAmount = ad.BaseAmount,
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
-                SkillPool = entity.EnemySkills.Select(es => es.SkillId).ToList(),
+                SkillPool = entity.EnemySkills.Select(es => es.SkillId).OrderBy(id => id).ToList(),
                 Spawns = entity.ZoneEnemies
+                    .OrderBy(ze => ze.ZoneId)
                     .Select(ze => new Contracts.EnemySpawn
                     {
                         ZoneId = ze.ZoneId,
@@ -86,7 +89,8 @@ namespace Game.DataAccess.Mapping
         /// every battle setup (#584). <paramref name="mappedSkills"/> is a build-scoped cache shared across all
         /// templates so each distinct skill is mapped to its immutable <see cref="CoreSkill"/> once, not once
         /// per (enemy, skill) pair; sharing the instance is safe because reference-data skills are immutable
-        /// (docs/backend.md → Reference Data).
+        /// (docs/backend.md → Reference Data). Child collections are ordered deterministically so a rebuilt
+        /// snapshot's derived structures don't ride on unguaranteed EF row order.
         /// </summary>
         public static EnemyTemplate ToTemplate(EntityEnemy entity, IReadOnlyList<EntitySkill> allSkills, Dictionary<int, CoreSkill> mappedSkills)
         {
@@ -96,6 +100,7 @@ namespace Game.DataAccess.Mapping
                 Name = entity.Name,
                 IsBoss = entity.IsBoss,
                 AttributeDistributions = entity.AttributeDistributions
+                    .OrderBy(ad => ad.AttributeId)
                     .Select(ad => new AttributeDistribution
                     {
                         AttributeId = (EAttribute)ad.AttributeId,
@@ -103,6 +108,7 @@ namespace Game.DataAccess.Mapping
                         AmountPerLevel = ad.AmountPerLevel,
                     }).ToList(),
                 AvailableSkills = entity.EnemySkills
+                    .OrderBy(es => es.SkillId)
                     .Select(es => ResolveSkill(entity, es.SkillId, allSkills, mappedSkills))
                     .ToList(),
             };

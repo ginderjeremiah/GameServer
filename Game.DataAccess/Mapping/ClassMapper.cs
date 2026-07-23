@@ -14,7 +14,8 @@ namespace Game.DataAccess.Mapping
     internal static class ClassMapper
     {
         /// <summary>Maps an entity <see cref="EntityClass"/> (with its child collections loaded) to the
-        /// reference-data read <see cref="Contracts.Class"/> contract.</summary>
+        /// reference-data read <see cref="Contracts.Class"/> contract. Child collections are ordered
+        /// deterministically so the reference set's version hash is stable across reloads.</summary>
         public static Contracts.Class ToContract(EntityClass entity)
         {
             return new Contracts.Class
@@ -29,14 +30,16 @@ namespace Game.DataAccess.Mapping
                 PassiveScalingAmount = entity.PassiveScalingAmount,
                 PassiveModifierType = (EModifierType)entity.PassiveModifierType,
                 DesignerNotes = entity.DesignerNotes,
-                StarterSkillIds = entity.StarterSkills.Select(s => s.SkillId).ToList(),
+                StarterSkillIds = entity.StarterSkills.Select(s => s.SkillId).OrderBy(id => id).ToList(),
                 StarterEquipment = entity.StarterEquipment
+                    .OrderBy(e => e.EquipmentSlotId)
                     .Select(e => new Contracts.ClassStarterEquipment
                     {
                         ItemId = e.ItemId,
                         EquipmentSlot = (EEquipmentSlot)e.EquipmentSlotId,
                     }).ToList(),
                 AttributeDistributions = entity.AttributeDistributions
+                    .OrderBy(ad => ad.AttributeId)
                     .Select(ad => new Contracts.AttributeDistribution
                     {
                         AttributeId = (EAttribute)ad.AttributeId,
@@ -89,21 +92,24 @@ namespace Game.DataAccess.Mapping
         }
 
         /// <summary>Maps an entity <see cref="EntityClass"/> (with its child collections loaded) to the lean,
-        /// immutable <see cref="CoreClass"/> domain model the gameplay reads share by reference.</summary>
+        /// immutable <see cref="CoreClass"/> domain model the gameplay reads share by reference. Child
+        /// collections are ordered deterministically (see <see cref="ToContract"/>).</summary>
         public static CoreClass ToCore(EntityClass entity)
         {
             return new CoreClass
             {
                 Id = entity.Id,
                 Name = entity.Name,
-                StarterSkillIds = entity.StarterSkills.Select(s => s.SkillId).ToList(),
+                StarterSkillIds = entity.StarterSkills.Select(s => s.SkillId).OrderBy(id => id).ToList(),
                 StarterEquipment = entity.StarterEquipment
+                    .OrderBy(e => e.EquipmentSlotId)
                     .Select(e => new CoreStarterEquipment
                     {
                         ItemId = e.ItemId,
                         EquipmentSlot = (EEquipmentSlot)e.EquipmentSlotId,
                     }).ToList(),
                 AttributeDistributions = entity.AttributeDistributions
+                    .OrderBy(ad => ad.AttributeId)
                     .Select(ad => new AttributeDistribution
                     {
                         AttributeId = (EAttribute)ad.AttributeId,

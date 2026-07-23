@@ -13,7 +13,9 @@ namespace Game.DataAccess.Mapping
     internal static class SkillMapper
     {
         /// <summary>Maps an entity <see cref="EntitySkill"/> (with its damage portions, damage multipliers and
-        /// effects loaded) to the reference-data read <see cref="Contracts.Skill"/> contract.</summary>
+        /// effects loaded) to the reference-data read <see cref="Contracts.Skill"/> contract. Child collections
+        /// are ordered deterministically so the reference set's version hash is stable across reloads, and so
+        /// the damage-portion order (the <c>PrimaryDamageType</c> tie-break) agrees with the client's copy.</summary>
         public static Contracts.Skill ToContract(EntitySkill entity)
         {
             return new Contracts.Skill
@@ -32,18 +34,21 @@ namespace Game.DataAccess.Mapping
                 Acquisition = (ESkillAcquisition)entity.Acquisition,
                 DesignerNotes = entity.DesignerNotes,
                 DamagePortions = entity.SkillDamagePortions
+                    .OrderBy(p => p.DamageType)
                     .Select(p => new Contracts.SkillDamagePortion
                     {
                         Type = (EDamageType)p.DamageType,
                         Weight = p.Weight,
                     }).ToList(),
                 DamageMultipliers = entity.SkillDamageMultipliers
+                    .OrderBy(sdm => sdm.AttributeId)
                     .Select(sdm => new Contracts.AttributeMultiplier
                     {
                         AttributeId = (EAttribute)sdm.AttributeId,
                         Multiplier = sdm.Multiplier,
                     }).ToList(),
                 Effects = entity.SkillEffects
+                    .OrderBy(se => se.Id)
                     .Select(se => new Contracts.SkillEffect
                     {
                         Id = se.Id,
@@ -113,7 +118,9 @@ namespace Game.DataAccess.Mapping
 
         /// <summary>
         /// Maps an entity <see cref="EntitySkill"/> (with its damage portions, damage multipliers and effects
-        /// loaded) to a domain <see cref="Skill"/>.
+        /// loaded) to a domain <see cref="Skill"/>. Child collections are ordered deterministically (see
+        /// <see cref="ToContract"/>) so the battle-relevant <c>PrimaryDamageType</c> tie-break doesn't ride on
+        /// unguaranteed EF row order.
         /// </summary>
         public static Skill ToCore(EntitySkill entity)
         {
@@ -126,18 +133,21 @@ namespace Game.DataAccess.Mapping
                 Description = entity.Description,
                 CooldownMs = entity.CooldownMs,
                 DamagePortions = entity.SkillDamagePortions
+                    .OrderBy(p => p.DamageType)
                     .Select(p => new SkillDamagePortion
                     {
                         Type = (EDamageType)p.DamageType,
                         Weight = (double)p.Weight,
                     }).ToList(),
                 DamageMultipliers = entity.SkillDamageMultipliers
+                    .OrderBy(sdm => sdm.AttributeId)
                     .Select(sdm => new DamageMultiplier
                     {
                         Attribute = (EAttribute)sdm.AttributeId,
                         Amount = (double)sdm.Multiplier,
                     }).ToList(),
                 Effects = entity.SkillEffects
+                    .OrderBy(se => se.Id)
                     .Select(se => new CoreSkillEffect
                     {
                         Id = se.Id,

@@ -66,8 +66,9 @@ export class Skill implements ISkill {
 	}
 
 	/** The leaf type the display surfaces (icon/colour) read as "the skill's type": the highest-weight
-	 *  portion, first-authored on a tie. Mirrors the backend `Skill.PrimaryDamageType`; derived (not
-	 *  stored) so it tracks the portion set. The direct hit reads the full `damagePortions` split. */
+	 *  portion, the first in the received (backend-ordered) list on a tie. Mirrors the backend
+	 *  `Skill.PrimaryDamageType`; derived (not stored) so it tracks the portion set. The direct hit reads
+	 *  the full `damagePortions` split. */
 	get primaryDamageType(): EDamageType {
 		return primaryDamageType(this.damagePortions);
 	}

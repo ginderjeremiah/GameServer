@@ -3,6 +3,8 @@ using Game.DataAccess.Mapping;
 using Xunit;
 using EntitySkill = Game.Infrastructure.Entities.Skill;
 using EntityPortion = Game.Infrastructure.Entities.SkillDamagePortion;
+using EntityMultiplier = Game.Infrastructure.Entities.SkillDamageMultiplier;
+using EntityEffect = Game.Infrastructure.Entities.SkillEffect;
 
 namespace Game.Application.Tests.Mapping
 {
@@ -77,6 +79,62 @@ namespace Game.Application.Tests.Mapping
                 p => { Assert.Equal(EDamageType.Fire, p.Type); Assert.Equal(0.6, p.Weight); });
             // The highest-weight portion drives the derived primary type.
             Assert.Equal(EDamageType.Fire, core.PrimaryDamageType);
+        }
+
+        [Fact]
+        public void ToContract_OrdersChildCollectionsRegardlessOfEntityOrder()
+        {
+            var entity = NewSkill(ESkillAcquisition.Player);
+            // Deliberately shuffled (descending) so a stable ordering isn't a coincidence of insertion order.
+            entity.SkillDamagePortions =
+            [
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Fire, Weight = 0.4m },
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Physical, Weight = 0.6m },
+            ];
+            entity.SkillDamageMultipliers =
+            [
+                new EntityMultiplier { SkillId = 0, AttributeId = (int)EAttribute.Intellect, Multiplier = 1m },
+                new EntityMultiplier { SkillId = 0, AttributeId = (int)EAttribute.Strength, Multiplier = 2m },
+            ];
+            entity.SkillEffects =
+            [
+                new EntityEffect { Id = 9, SkillId = 0 },
+                new EntityEffect { Id = 2, SkillId = 0 },
+            ];
+
+            var contract = SkillMapper.ToContract(entity);
+
+            // Ordered by damage type / attribute id / own id for a version hash stable across reloads.
+            Assert.Equal([EDamageType.Physical, EDamageType.Fire], contract.DamagePortions.Select(p => p.Type));
+            Assert.Equal([EAttribute.Strength, EAttribute.Intellect], contract.DamageMultipliers.Select(m => m.AttributeId));
+            Assert.Equal([2, 9], contract.Effects.Select(e => e.Id));
+        }
+
+        [Fact]
+        public void ToCore_OrdersChildCollectionsRegardlessOfEntityOrder()
+        {
+            var entity = NewSkill(ESkillAcquisition.Player);
+            entity.SkillDamagePortions =
+            [
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Fire, Weight = 0.4m },
+                new EntityPortion { SkillId = 0, DamageType = (int)EDamageType.Physical, Weight = 0.6m },
+            ];
+            entity.SkillDamageMultipliers =
+            [
+                new EntityMultiplier { SkillId = 0, AttributeId = (int)EAttribute.Intellect, Multiplier = 1m },
+                new EntityMultiplier { SkillId = 0, AttributeId = (int)EAttribute.Strength, Multiplier = 2m },
+            ];
+            entity.SkillEffects =
+            [
+                new EntityEffect { Id = 9, SkillId = 0 },
+                new EntityEffect { Id = 2, SkillId = 0 },
+            ];
+
+            var core = SkillMapper.ToCore(entity);
+
+            Assert.Equal([EDamageType.Physical, EDamageType.Fire], core.DamagePortions.Select(p => p.Type));
+            Assert.Equal([EAttribute.Strength, EAttribute.Intellect], core.DamageMultipliers.Select(m => m.Attribute));
+            Assert.Equal([2, 9], core.Effects.Select(e => e.Id));
         }
 
         [Fact]

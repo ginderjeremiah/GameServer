@@ -91,6 +91,52 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
+        public void ToContract_OrdersChildCollectionsRegardlessOfEntityOrder()
+        {
+            // Deliberately shuffled (descending) so a stable ordering isn't a coincidence of insertion order.
+            var entity = NewProficiency(
+                modifiers:
+                [
+                    Modifier(level: 5, EAttribute.Strength, 10m),
+                    Modifier(level: 1, EAttribute.Endurance, 2m),
+                    Modifier(level: 1, EAttribute.Strength, 1m),
+                ],
+                rewards:
+                [
+                    Reward(level: 5, rewardSkillId: 7),
+                    Reward(level: 3, rewardSkillId: 9),
+                ]);
+            entity.Prerequisites =
+            [
+                new() { ProficiencyId = 0, PrerequisiteProficiencyId = 5 },
+                new() { ProficiencyId = 0, PrerequisiteProficiencyId = 2 },
+            ];
+
+            var contract = ProficiencyMapper.ToContract(entity);
+
+            Assert.Equal(
+                [(1, EAttribute.Strength), (1, EAttribute.Endurance), (5, EAttribute.Strength)],
+                contract.LevelModifiers.Select(m => (m.Level, m.AttributeId)));
+            Assert.Equal([3, 5], contract.LevelRewards.Select(r => r.Level));
+            Assert.Equal([2, 5], contract.PrerequisiteIds);
+        }
+
+        [Fact]
+        public void ToCore_OrdersPrerequisitesRegardlessOfEntityOrder()
+        {
+            var entity = NewProficiency();
+            entity.Prerequisites =
+            [
+                new() { ProficiencyId = 0, PrerequisiteProficiencyId = 5 },
+                new() { ProficiencyId = 0, PrerequisiteProficiencyId = 2 },
+            ];
+
+            var core = ProficiencyMapper.ToCore(entity);
+
+            Assert.Equal([2, 5], core.PrerequisiteIds);
+        }
+
+        [Fact]
         public void PathMapper_ToContract_RoundTripsActivityKey()
         {
             var path = new Entities.Path

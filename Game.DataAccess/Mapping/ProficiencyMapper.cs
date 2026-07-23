@@ -12,7 +12,8 @@ namespace Game.DataAccess.Mapping
     internal static class ProficiencyMapper
     {
         /// <summary>Maps an entity <see cref="EntityProficiency"/> (with its level modifiers, level rewards,
-        /// prerequisites, and skill contributions loaded) to the read/authoring contract.</summary>
+        /// prerequisites, and skill contributions loaded) to the read/authoring contract. Child collections
+        /// are ordered deterministically so the reference set's version hash is stable across reloads.</summary>
         public static Contracts.Proficiency ToContract(EntityProficiency entity)
         {
             return new Contracts.Proficiency
@@ -32,6 +33,7 @@ namespace Game.DataAccess.Mapping
                 DesignerNotes = entity.DesignerNotes,
                 RetiredAt = entity.RetiredAt,
                 LevelModifiers = entity.LevelModifiers
+                    .OrderBy(m => m.Level).ThenBy(m => m.AttributeId)
                     .Select(m => new Contracts.ProficiencyLevelModifier
                     {
                         Level = m.Level,
@@ -40,13 +42,16 @@ namespace Game.DataAccess.Mapping
                         Amount = m.Amount,
                     }).ToList(),
                 LevelRewards = entity.LevelRewards
+                    .OrderBy(r => r.Level)
                     .Select(r => new Contracts.ProficiencyLevelReward
                     {
                         Level = r.Level,
                         RewardSkillId = r.RewardSkillId,
                     }).ToList(),
                 PrerequisiteIds = entity.Prerequisites
-                    .Select(p => p.PrerequisiteProficiencyId).ToList(),
+                    .Select(p => p.PrerequisiteProficiencyId)
+                    .OrderBy(id => id)
+                    .ToList(),
             };
         }
 
@@ -97,7 +102,8 @@ namespace Game.DataAccess.Mapping
 
         /// <summary>Maps an entity <see cref="EntityProficiency"/> (with its child collections loaded) to a
         /// domain <see cref="CoreProficiency"/>, grouping the flat per-level modifier/reward rows into one
-        /// ascending <see cref="ProficiencyLevel"/> list.</summary>
+        /// ascending <see cref="ProficiencyLevel"/> list. Modifiers within a level, and prerequisite ids, are
+        /// ordered deterministically (see <see cref="ToContract"/>).</summary>
         public static CoreProficiency ToCore(EntityProficiency entity)
         {
             var modifiersByLevel = entity.LevelModifiers
@@ -105,6 +111,7 @@ namespace Game.DataAccess.Mapping
                 .ToDictionary(
                     g => g.Key,
                     g => (IReadOnlyList<ProficiencyModifier>)g
+                        .OrderBy(m => m.AttributeId)
                         .Select(m => new ProficiencyModifier
                         {
                             Attribute = (EAttribute)m.AttributeId,
@@ -134,7 +141,10 @@ namespace Game.DataAccess.Mapping
                 MaxLevel = entity.MaxLevel,
                 BaseXp = (double)entity.BaseXp,
                 XpGrowth = (double)entity.XpGrowth,
-                PrerequisiteIds = entity.Prerequisites.Select(p => p.PrerequisiteProficiencyId).ToList(),
+                PrerequisiteIds = entity.Prerequisites
+                    .Select(p => p.PrerequisiteProficiencyId)
+                    .OrderBy(id => id)
+                    .ToList(),
                 Levels = levels,
             };
         }
