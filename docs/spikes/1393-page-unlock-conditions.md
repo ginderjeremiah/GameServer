@@ -36,7 +36,7 @@ a proficiency. (This will also provide an opportunity to stagger feature tutoria
 
 ## Audit: does any current screen actually warrant hiding?
 
-Went through all fifteen registered screens (`GAME_SCREENS`) individually:
+Went through all sixteen registered screens (`GAME_SCREENS`) individually:
 
 | Screen | Always-relevant from character creation? | Notes |
 | --- | --- | --- |
