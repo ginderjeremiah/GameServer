@@ -17,7 +17,8 @@ const fetchChallenges = async () => {
 		// fetchSocketData throws on a socket error, preserving this try/catch contract.
 		const result = (await fetchSocketData('GetPlayerChallenges')) ?? [];
 		if (loader.isStale(epoch)) {
-			// reset() ran while this fetch was in flight; this write belongs to a discarded session.
+			// Either reset() ran while this fetch was in flight (a discarded session), or markCompleted()
+			// applied a push mid-flight — this response predates that push and would revert it.
 			return;
 		}
 		challenges = result;
@@ -60,7 +61,8 @@ export const playerChallenges = {
 
 	/** Mark a challenge completed locally (e.g. on the `ChallengeCompleted` push) so completion-gated
 	 *  UI — zone navigation — reflects it immediately without re-fetching. A later `load(force)` will
-	 *  reconcile against the authoritative server progress. */
+	 *  reconcile against the authoritative server progress; a fetch already in flight is invalidated
+	 *  so its response (computed before this push landed) can't overwrite the completion. */
 	markCompleted(challengeId: number) {
 		const existing = challenges.find((c) => c.challengeId === challengeId);
 		if (existing?.completed) {
@@ -71,6 +73,7 @@ export const playerChallenges = {
 		} else {
 			challenges = [...challenges, { challengeId, progress: 0, completed: true }];
 		}
+		loader.invalidate();
 	},
 
 	/** Reset to the unloaded state (e.g. on logout / session replacement). */

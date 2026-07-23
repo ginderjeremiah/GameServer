@@ -229,6 +229,21 @@ describe('proficiencies store', () => {
 			expect(playerProficiencies.all).toEqual([playerProficiency(5, 1, 3)]);
 		});
 
+		it('is not reverted by a fetch already in flight when it resolves with pre-gain data (#2332)', async () => {
+			const stale = Promise.withResolvers<IPlayerProficiency[]>();
+			mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+			const initial = playerProficiencies.load();
+			playerProficiencies.applyXpGained({ proficiencies: [xpResult(0, 4, 5)], opened: [] });
+
+			// The in-flight fetch was issued before the push landed, so its response — computed before
+			// the XP gain was persisted server-side — must not revert it when it resolves.
+			stale.resolve([playerProficiency(0, 3, 20)]);
+			await initial;
+
+			expect(playerProficiencies.all).toEqual([playerProficiency(0, 4, 5)]);
+		});
+
 		it('reassigns the array so battleModifiers re-derives after a level change', async () => {
 			staticData.proficiencies = [proficiency(0, [additive(1, EAttribute.Strength, 4)])];
 			mockFetchSocket.mockResolvedValue([playerProficiency(0, 1)]);

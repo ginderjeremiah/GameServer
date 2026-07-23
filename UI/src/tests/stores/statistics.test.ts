@@ -131,6 +131,21 @@ describe('statistics store', () => {
 		expect(statistics.stats).toEqual([]);
 	});
 
+	it('is not reverted by a fetch already in flight when it resolves with pre-clear data (#2332)', async () => {
+		const stale = Promise.withResolvers<IPlayerStatistic[]>();
+		mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+		const initial = statistics.load();
+		statistics.markZoneCleared(3);
+
+		// The in-flight fetch was issued before the push landed, so its response — computed before
+		// the clear was persisted server-side — must not revert it when it resolves.
+		stale.resolve([zonesCleared(3, 0)]);
+		await initial;
+
+		expect(statistics.isZoneCleared(3)).toBe(true);
+	});
+
 	it('no-ops when marking an already-cleared zone (no duplicate row, value untouched)', async () => {
 		mockFetchSocket.mockResolvedValue([zonesCleared(3, 1)]);
 		await statistics.load();

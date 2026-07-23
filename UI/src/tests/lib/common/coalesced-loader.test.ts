@@ -214,4 +214,64 @@ describe('CoalescedLoader', () => {
 		expect(h.loader.isStale(epoch)).toBe(true);
 		expect(h.loader.isStale(h.loader.currentEpoch)).toBe(false);
 	});
+
+	it('invalidate() bumps the epoch so isStale recognizes a fetch issued before it', async () => {
+		const h = harness();
+		const epoch = h.loader.currentEpoch;
+		expect(h.loader.isStale(epoch)).toBe(false);
+
+		h.loader.invalidate();
+		expect(h.loader.isStale(epoch)).toBe(true);
+		expect(h.loader.isStale(h.loader.currentEpoch)).toBe(false);
+	});
+
+	it('invalidate() leaves in-flight/queued fetch state alone, unlike reset()', async () => {
+		const h = harness();
+		const initial = h.loader.load();
+
+		h.loader.invalidate();
+
+		// A concurrent non-forced load still coalesces onto the in-flight fetch instead of a reset()'s
+		// abandon-and-restart behavior starting a second one.
+		const second = h.loader.load();
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+
+		h.settle(0);
+		await Promise.all([initial, second]);
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+	});
+
+	it('invalidate() racing a queued force does not strand freshQueued, so a later force still queues fresh', async () => {
+		const h = harness();
+		const initial = h.loader.load();
+		const forced = h.loader.load(true);
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+
+		// A push (e.g. a battle victory) lands mid-flight and invalidates the epoch the queued force
+		// captured as its chainEpoch, so that chain will abort without ever fetching.
+		h.loader.invalidate();
+
+		h.settle(0);
+		await initial;
+		await forced;
+		await flush();
+		// The aborted chain never issued a second fetch — expected either way.
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+
+		// A brand-new fetch starts, and a force issued while it's in flight must still be honored
+		// with a genuinely fresh fetch — not silently coalesce onto it the way a stuck freshQueued
+		// flag (left over from the aborted chain above) would cause.
+		const second = h.loader.load(true);
+		expect(h.fetchFn).toHaveBeenCalledTimes(2);
+		const thirdForce = h.loader.load(true);
+		expect(h.fetchFn).toHaveBeenCalledTimes(2);
+
+		h.settle(1);
+		await second;
+		await flush();
+		expect(h.fetchFn).toHaveBeenCalledTimes(3);
+
+		h.settle(2);
+		await thirdForce;
+	});
 });
