@@ -365,6 +365,58 @@ describe('EnemyManager boss mode', () => {
 		expect(send).toHaveBeenCalledWith('ChallengeBoss', expect.objectContaining({ zoneId: 3 }));
 	});
 
+	it('on a boss victory the server definitively rejects: skips the celebration and falls back to idle (#2344)', async () => {
+		// A definitive rejection carries `data` (e.g. the cooldown) alongside the error — the signal that
+		// distinguishes "the server said no" from the ambiguous lost-response case below, which never
+		// carries `data` at all.
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy'
+				? Promise.resolve({
+						id: '1',
+						name: 'DefeatEnemy',
+						error: 'Enemy could not be defeated.',
+						data: { cooldown: 0 }
+					} as IApiSocketResponse<'DefeatEnemy'>)
+				: Promise.resolve(newEnemyResponse)
+		);
+
+		await manager.challengeBoss();
+		manager.setAutoFight(true);
+		send.mockClear(); // isolate the calls the victory resolution itself makes
+
+		await fireStage(h.BattleStage.Victorious);
+
+		expect(h.statistics.markZoneCleared).not.toHaveBeenCalled();
+		expect(manager.bossOutcome).toBeUndefined();
+		// Even with auto-fight on, a rejected claim must not loop back into another boss challenge — fall
+		// back to the idle loop exactly like a loss/draw instead.
+		expect(manager.mode).toBe('idle');
+		expect(send).not.toHaveBeenCalledWith('ChallengeBoss', expect.anything());
+		expect(send).toHaveBeenCalledWith('NewEnemy', expect.objectContaining({ newZoneId: 3 }));
+	});
+
+	it('on a boss victory with an ambiguous (lost-response) DefeatEnemy error: keeps the optimistic celebration', async () => {
+		// A transport-level failure (timeout/dropped connection) never carries `data` — the command may
+		// still have succeeded server-side, so the boss path keeps today's optimistic behavior instead of
+		// treating it as a rejection.
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy'
+				? Promise.resolve({
+						id: '1',
+						name: 'DefeatEnemy',
+						error: 'Timed out waiting for the server.'
+					} as IApiSocketResponse<'DefeatEnemy'>)
+				: Promise.resolve(newEnemyResponse)
+		);
+
+		await manager.challengeBoss();
+
+		await fireStage(h.BattleStage.Victorious);
+
+		expect(h.statistics.markZoneCleared).toHaveBeenCalledWith(3);
+		expect(manager.mode).toBe('idle');
+	});
+
 	it('on a boss victory that completes the next zone gate: refetches and flags the unlock', async () => {
 		// Cleared zone 3; zone 4 (next by order) is gated behind challenge 7. The gate is incomplete
 		// until the post-victory refetch flips it (mirroring the backend completing it on the clear).
