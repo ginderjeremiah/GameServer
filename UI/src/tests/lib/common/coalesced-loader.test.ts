@@ -240,4 +240,38 @@ describe('CoalescedLoader', () => {
 		await Promise.all([initial, second]);
 		expect(h.fetchFn).toHaveBeenCalledTimes(1);
 	});
+
+	it('invalidate() racing a queued force does not strand freshQueued, so a later force still queues fresh', async () => {
+		const h = harness();
+		const initial = h.loader.load();
+		const forced = h.loader.load(true);
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+
+		// A push (e.g. a battle victory) lands mid-flight and invalidates the epoch the queued force
+		// captured as its chainEpoch, so that chain will abort without ever fetching.
+		h.loader.invalidate();
+
+		h.settle(0);
+		await initial;
+		await forced;
+		await flush();
+		// The aborted chain never issued a second fetch — expected either way.
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+
+		// A brand-new fetch starts, and a force issued while it's in flight must still be honored
+		// with a genuinely fresh fetch — not silently coalesce onto it the way a stuck freshQueued
+		// flag (left over from the aborted chain above) would cause.
+		const second = h.loader.load(true);
+		expect(h.fetchFn).toHaveBeenCalledTimes(2);
+		const thirdForce = h.loader.load(true);
+		expect(h.fetchFn).toHaveBeenCalledTimes(2);
+
+		h.settle(1);
+		await second;
+		await flush();
+		expect(h.fetchFn).toHaveBeenCalledTimes(3);
+
+		h.settle(2);
+		await thirdForce;
+	});
 });

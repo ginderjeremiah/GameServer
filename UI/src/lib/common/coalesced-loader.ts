@@ -63,12 +63,18 @@ export class CoalescedLoader {
 	}
 
 	/** Bumps the epoch so an already-in-flight fetch's eventual response is recognized as stale by
-	 *  {@link isStale}, without discarding the in-flight/queued fetch state itself (unlike
-	 *  {@link reset}, which is a full session teardown). Call this when a push mutates the store's
-	 *  data directly: the fetch's response was computed before the push landed, so a later `load()`
-	 *  should not still get to overwrite the push with it. */
+	 *  {@link isStale}, without discarding the in-flight fetch itself (unlike {@link reset}, which is
+	 *  a full session teardown). Call this when a push mutates the store's data directly: the fetch's
+	 *  response was computed before the push landed, so a later `load()` should not still get to
+	 *  overwrite the push with it.
+	 *
+	 *  Also clears `freshQueued`: a force already queued behind the in-flight fetch captured the
+	 *  pre-bump epoch as its `chainEpoch` (see {@link load}), so this bump makes that queued chain
+	 *  abort without ever clearing the flag itself — leaving it stuck and silently disabling the
+	 *  force-queue path for the rest of the session unless cleared here. */
 	invalidate(): void {
 		this.epoch += 1;
+		this.freshQueued = false;
 	}
 
 	/** Current epoch, bumped by {@link reset} and {@link invalidate}. `fetchFn` should capture this
