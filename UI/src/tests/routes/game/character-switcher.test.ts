@@ -109,7 +109,7 @@ describe('CharacterSwitcher', () => {
 		expect(getMock).toHaveBeenCalledWith('Players');
 	});
 
-	it('switches: tears down the game, credits via SwitchPlayer, confirms takeover, and reloads', async () => {
+	it('confirms takeover for the target character, then tears down the game, credits via SwitchPlayer, and reloads', async () => {
 		postMock.mockResolvedValue({
 			status: 200,
 			data: { tokens: { accessToken: 'a2', refreshToken: 'r2' }, player: { id: 2, name: 'Rogue' } }
@@ -119,6 +119,8 @@ describe('CharacterSwitcher', () => {
 		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
 		await fireEvent.click(screen.getAllByTestId('player-card')[0]);
 
+		// The takeover check runs for the target character before anything commits (#1518).
+		await waitFor(() => expect(confirmTakeoverMock).toHaveBeenCalledWith(2));
 		await waitFor(() =>
 			expect(postMock).toHaveBeenCalledWith('Players/SwitchPlayer', { playerId: 2, refreshToken: 'r' })
 		);
@@ -126,8 +128,23 @@ describe('CharacterSwitcher', () => {
 		expect(stopEnginesMock).toHaveBeenCalled();
 		expect(disconnectMock).toHaveBeenCalled();
 		expect(setTokensMock).toHaveBeenCalledWith({ accessToken: 'a2', refreshToken: 'r2' });
-		await waitFor(() => expect(confirmTakeoverMock).toHaveBeenCalled());
 		await waitFor(() => expect(window.location.href).toBe('/'));
+	});
+
+	it('leaves the live game running when the takeover is declined', async () => {
+		confirmTakeoverMock.mockResolvedValue(false);
+		render(CharacterSwitcher, { open: true, onClose: vi.fn() });
+
+		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(1));
+		await fireEvent.click(screen.getAllByTestId('player-card')[0]);
+
+		await waitFor(() => expect(confirmTakeoverMock).toHaveBeenCalledWith(2));
+		// A decline runs before any commit, so the currently-live character's game is never touched and
+		// no switch is ever attempted — a healthy session is no longer destroyed by saying "no" (#1518).
+		expect(stopEnginesMock).not.toHaveBeenCalled();
+		expect(disconnectMock).not.toHaveBeenCalled();
+		expect(postMock).not.toHaveBeenCalledWith('Players/SwitchPlayer', expect.anything());
+		expect(window.location.href).toBe('');
 	});
 
 	it('reads the refresh token after settling any pre-emptive refresh, not before', async () => {

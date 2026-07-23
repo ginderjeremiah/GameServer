@@ -1,12 +1,13 @@
 <!-- In-game character switcher (#1072). An overlay that lets the player switch to another of the
 	account's characters without re-logging in. It reuses the login-flow player-select UI (the shared
 	`PlayerSelectPanel` driven by `PlayerSelectView`) with switch-flavoured behaviour injected: picking a
-	character tears down the live game, credits the departed character server-side via `Players/SwitchPlayer`
-	(the lossless-switch backend, #1071), then reloads so the boot gate resumes as the entered character —
-	whose catch-up summary the existing welcome-back gate surfaces on re-entry.
+	character first runs the target's active-session takeover check (`PlayerSelectView.select`, #1518) and,
+	only once confirmed, tears down the live game and credits the departed character server-side via
+	`Players/SwitchPlayer` (the lossless-switch backend, #1071), then reloads so the boot gate resumes as the
+	entered character — whose catch-up summary the existing welcome-back gate surfaces on re-entry.
 
-	The game keeps running while the overlay is open, so cancelling is instant and lossless; only committing
-	to a switch tears anything down. -->
+	The game keeps running until a switch is actually confirmed, so cancelling (or declining the takeover
+	check) is instant and lossless; only a confirmed switch tears anything down. -->
 <!-- The overlay chrome (backdrop, Escape dismissal, focus trap, focus capture+restore, scroll lock) is
 	owned by the shared `Popover` primitive per docs/frontend.md; this component supplies only the content. -->
 <Popover {open} {onClose} label="Switch character" closeLabel="Cancel">

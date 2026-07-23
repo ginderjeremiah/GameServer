@@ -164,6 +164,7 @@ export type ApiRequestTypes = {
 	'AdminTools/UnarchiveUser': IUserActionData;
 	'AdminTools/UnbanUser': IUserActionData;
 	'Auth': ILoginCredentials;
+	'Auth/ActiveSession': { playerId: number };
 	'Auth/CreateAccount': ICreateAccountRequest;
 	'Auth/DeviceInfo': IDeviceInfoRequest;
 	'Auth/Logout': IRefreshRequest;

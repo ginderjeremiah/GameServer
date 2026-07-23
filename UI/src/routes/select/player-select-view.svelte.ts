@@ -1,8 +1,8 @@
 /* Character-select screen view-model (#1070). Sits between the login page and the loading screen:
    it lists the account's characters (handed off from `Login`), lets the player create a new one
-   (bounded server-side by the per-account cap), and on selection binds the session — `SelectPlayer`
-   rotates the token to carry the chosen player — then runs the per-player active-session takeover
-   check before entering the world.
+   (bounded server-side by the per-account cap), and on selection runs the per-player active-session
+   takeover check for the chosen character *before* binding the session — `SelectPlayer` rotates the
+   token to carry the chosen player — so a declined takeover never commits to a character (#1518).
 
    The API/navigation touch points are injected so the orchestration is unit-testable without real
    I/O; the `+page.svelte` wires the real `SelectPlayer`/`CreatePlayer` calls, token storage, the
@@ -23,9 +23,10 @@ export interface PlayerSelectDeps {
 	 *  view-model blocks creation until one is selected — so this never receives a null. Resolves its
 	 *  summary or a surfaced error message. */
 	createPlayer: (name: string, classId: number) => Promise<CreateResult>;
-	/** Confirms the active-session takeover after selection (a per-player presence check). Returns
-	 *  true to proceed into the game, false when the player declined. */
-	confirmTakeover: () => Promise<boolean>;
+	/** Confirms the active-session takeover for the given player *before* selection commits (a per-player
+	 *  presence check targeted at the character about to be entered). Returns true to proceed with the
+	 *  selection, false when the player declined. */
+	confirmTakeover: (playerId: number) => Promise<boolean>;
 	/** Initializes the player manager from the loaded character and navigates into the game. */
 	enterWorld: (player: IPlayerData) => void;
 	/** Loads the create-character class options (the bespoke `Players/CharacterCreationData` payload,
@@ -108,13 +109,13 @@ export class PlayerSelectView {
 	readonly busy = $derived(this.pendingId !== null || this.creating);
 
 	/**
-	 * Enters the game as the chosen character: binds + loads it, then runs the per-player takeover
-	 * check before handing off to the world. A failed bind surfaces an error and re-enables the UI.
-	 * On a declined takeover this view-model just aborts and clears the busy state; what the user sees
-	 * then is up to the injected `confirmTakeover` — the production `confirmSessionTakeover` logs the
-	 * freshly-issued session out (a full-page redirect to login), so a decline returns to login rather
-	 * than resting on the select screen. On success the busy state is held so the controls stay
-	 * disabled through the navigation `enterWorld` performs.
+	 * Enters the game as the chosen character: runs the per-player takeover check *before* committing to
+	 * it, then binds + loads it and hands off to the world. Checking first means a decline never commits
+	 * — no token rotation, and for the in-game switcher no teardown of whatever character is currently
+	 * live (#1518) — so this view-model just aborts and clears the busy state on a decline, leaving the
+	 * caller exactly where it was. A failed bind (after a confirmed takeover) surfaces an error and
+	 * re-enables the UI the same way. On success the busy state is held so the controls stay disabled
+	 * through the navigation `enterWorld` performs.
 	 */
 	async select(playerId: number): Promise<void> {
 		if (this.busy) {
@@ -123,14 +124,14 @@ export class PlayerSelectView {
 		this.error = null;
 		this.pendingId = playerId;
 
-		const result = await this.deps.selectPlayer(playerId);
-		if (!result.ok) {
-			this.error = result.error;
+		if (!(await this.deps.confirmTakeover(playerId))) {
 			this.pendingId = null;
 			return;
 		}
 
-		if (!(await this.deps.confirmTakeover())) {
+		const result = await this.deps.selectPlayer(playerId);
+		if (!result.ok) {
+			this.error = result.error;
 			this.pendingId = null;
 			return;
 		}

@@ -382,21 +382,42 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task ActiveSession_PreSelectionToken_ReturnsNoPlayerSelectedNotProbingPlayerZero()
+        public async Task ActiveSession_PreSelectionToken_ChecksPresenceForExplicitOwnedCharacter()
         {
-            // Mirrors Status_PreSelectionToken_ReturnsNoPlayerSelectedNotOpaque404 (#2242): a pre-selection
-            // token must surface the same distinguishable NoPlayerSelected category rather than resolving
-            // SelectedPlayerId to 0 and probing that socket's presence.
+            // A pre-selection token (post-Login, pre-SelectPlayer) carries no player claim at all — but
+            // ActiveSession no longer needs one. The client checks presence for the character it is about
+            // to select, *before* selecting it, so the check must work off an explicit target rather than
+            // the token's (absent) selected player (#1518).
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var user = await TestDataSeeder.CreateUserAsync(context, "playerlessactive", "pass");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
 
             var client = Factory.CreateClient();
             TestAuthHelper.AddAuthHeader(client, user.Id);
 
-            var response = await client.GetAsync("/api/Auth/ActiveSession", CancellationToken);
+            var result = await GetActiveSessionAsync(client, player.Id);
 
-            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.NotNull(result?.Data);
+            Assert.Null(result.ErrorMessage);
+            Assert.False(result.Data.Active);
+            client.Dispose();
+        }
+
+        [Fact]
+        public async Task ActiveSession_UnownedPlayer_ReturnsError()
+        {
+            // Anti-cheat: a caller may only probe presence for one of its own characters, mirroring
+            // SelectPlayer's ownership check (#1518).
+            var (userId, _) = await SeedAsync("checkeruser", "pass");
+            var (_, otherPlayerId) = await SeedAsync("otheruser", "pass");
+
+            var client = Factory.CreateClient();
+            TestAuthHelper.AddAuthHeader(client, userId);
+
+            var response = await client.GetAsync($"/api/Auth/ActiveSession?playerId={otherPlayerId}", CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<ActiveSessionResult>>(CancellationToken);
             Assert.Null(result?.Data);
             Assert.NotNull(result?.ErrorMessage);
@@ -404,21 +425,20 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task ActiveSession_ValidTokenWithNoSessionCache_RehydratesAndReturnsResult()
+        public async Task ActiveSession_NoSessionCacheEstablished_ChecksPresenceWithoutTouchingCache()
         {
-            // The pre-game active-session takeover warning is the user-visible breakage from #693: an evicted
-            // session must rehydrate and report the (absent) active socket, not "not logged in".
-            var (client, userId, _) = await SeedUserWithTokenButNoSessionAsync("evictedactive");
+            // ActiveSession takes an explicit playerId rather than reading the token's selected player, so
+            // unlike Status it never reads or writes the session cache (#1518) — confirm that holds even for
+            // a user with no cached session at all (the "valid token, evicted/absent session" state #693
+            // originally pinned Status's rehydration against).
+            var (client, userId, playerId) = await SeedUserWithTokenButNoSessionAsync("evictedactive");
 
-            var response = await client.GetAsync("/api/Auth/ActiveSession", CancellationToken);
+            var result = await GetActiveSessionAsync(client, playerId);
 
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<ActiveSessionResult>>(CancellationToken);
             Assert.NotNull(result?.Data);
             Assert.Null(result.ErrorMessage);
             Assert.False(result.Data.Active);
 
-            // Rehydration is in-memory only — the presence check resolves the player without writing the cache (#937).
             await AssertSessionNotEstablishedAsync(userId);
             client.Dispose();
         }
@@ -482,12 +502,12 @@ namespace Game.Api.Tests.Integration
         public async Task ActiveSession_NoOpenSocket_ReturnsFalse()
         {
             // Arrange — a logged-in user who has not opened a game connection.
-            await SeedAsync("nosocketuser", "nosocketpass");
+            var (_, playerId) = await SeedAsync("nosocketuser", "nosocketpass");
 
             var (authClient, _) = await LoginAndBuildClientAsync("nosocketuser", "nosocketpass");
 
             // Act
-            var result = await GetActiveSessionAsync(authClient);
+            var result = await GetActiveSessionAsync(authClient, playerId);
 
             // Assert — no live connection means no other session to warn about.
             Assert.NotNull(result?.Data);
@@ -499,7 +519,7 @@ namespace Game.Api.Tests.Integration
         public async Task ActiveSession_WithOpenSocket_ReturnsTrue()
         {
             // Arrange — a logged-in user with a live websocket connection registered.
-            var (userId, _) = await SeedAsync("livesocketuser", "livesocketpass");
+            var (userId, playerId) = await SeedAsync("livesocketuser", "livesocketpass");
 
             var (authClient, _) = await LoginAndBuildClientAsync("livesocketuser", "livesocketpass");
 
@@ -511,7 +531,7 @@ namespace Game.Api.Tests.Integration
             await socketClient.SendCommandAsync<object>("GetStatisticTypes");
 
             // Act
-            var result = await GetActiveSessionAsync(authClient);
+            var result = await GetActiveSessionAsync(authClient, playerId);
 
             // Assert — the open connection is reported as an active session.
             Assert.NotNull(result?.Data);
@@ -519,9 +539,9 @@ namespace Game.Api.Tests.Integration
             authClient.Dispose();
         }
 
-        private static async Task<ApiResponse<ActiveSessionResult>?> GetActiveSessionAsync(HttpClient client)
+        private static async Task<ApiResponse<ActiveSessionResult>?> GetActiveSessionAsync(HttpClient client, int playerId)
         {
-            var response = await client.GetAsync("/api/Auth/ActiveSession", CancellationToken);
+            var response = await client.GetAsync($"/api/Auth/ActiveSession?playerId={playerId}", CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             return await response.Content.ReadFromJsonAsync<ApiResponse<ActiveSessionResult>>(CancellationToken);
         }
