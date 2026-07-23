@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import { EAttribute, EModifierType } from '$lib/api';
+import { EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
 
 // Hoisted so individual tests can seed staticData and assert the retire-confirm flow, mirroring
 // WorkbenchDetail.test.ts's pattern for the generic Workbench's retire dialog.
@@ -255,6 +255,22 @@ describe('TierDetail — tab bodies', () => {
 		render(TierDetail, { props: { store: rootGateway } });
 		const rootTab = screen.getByText('Gateways').closest('button');
 		expect(rootTab?.querySelector('svg')).toBeNull();
+	});
+
+	it('warns the Milestones tab when a reward skill lost its Player flag (#2333)', () => {
+		staticData.skills = [{ id: 0, name: 'Roar', acquisition: ESkillAcquisition.Enemy }]; // flag stripped after reward
+
+		const flagLost = makeStore(tier({ maxLevel: 5, levelRewards: [{ level: 3, rewardSkillId: 0 }] }));
+		render(TierDetail, { props: { store: flagLost } });
+		const flagLostTab = screen.getByText('Milestones').closest('button');
+		expect(flagLostTab?.querySelector('svg')).toBeTruthy();
+		cleanup();
+
+		staticData.skills = [{ id: 0, name: 'Roar', acquisition: ESkillAcquisition.Player }];
+		const stillFlagged = makeStore(tier({ maxLevel: 5, levelRewards: [{ level: 3, rewardSkillId: 0 }] }));
+		render(TierDetail, { props: { store: stillFlagged } });
+		const stillFlaggedTab = screen.getByText('Milestones').closest('button');
+		expect(stillFlaggedTab?.querySelector('svg')).toBeNull();
 	});
 
 	it('lists an existing prerequisite chip, removes it, and adds a new one', async () => {

@@ -1,4 +1,6 @@
-import { ApiRequest, EItemCategory, ERarity, fetchSocketData, type IItem } from '$lib/api';
+import { ApiRequest, EItemCategory, ERarity, ESkillAcquisition, fetchSocketData, type IItem } from '$lib/api';
+import { isWeaponLeaf, primaryDamageType } from '$lib/battle/damage-types';
+import { hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { attributeChanges, childChanged, guardedSave, modSlotChanges, persistEntity } from '../save-helpers';
@@ -64,19 +66,43 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 			glyph: 'tag',
 			desc: 'Name, category & rarity',
 			kind: 'fields',
-			// The no-stranding invariant, hard-rejected by AdminItems on save, so every branch blocks (#2217):
-			// a weapon must declare a weapon type and a granted signature skill; only a weapon may carry one.
+			// The no-stranding invariant, hard-rejected by AdminItems on save (#2217): a weapon must
+			// declare a weapon type and a granted signature skill; only a weapon may carry one; and the
+			// granted skill's own signature type must match the weapon's (FindWeaponInvariantViolation).
+			// Independently, any granted skill (weapon or not) must stay Item-flagged — the picker's
+			// `keep` exception leaves a flag-lost grant visible as a stale value, so this is the
+			// backstop (FindGrantedSkillFlagViolation).
 			warn: (it) => {
 				if (it.itemCategoryId === EItemCategory.Weapon) {
 					if (it.weaponType === -1) {
 						return { message: 'Weapon needs a weapon type', blocking: true };
 					}
-					if (it.grantedSkillId === -1) {
+					if (it.grantedSkillId == null || it.grantedSkillId === -1) {
 						return { message: 'Weapon needs a granted skill', blocking: true };
 					}
-					return null;
+					const grantedSkill = staticData.skills?.[it.grantedSkillId];
+					if (grantedSkill) {
+						const signatureType = primaryDamageType(grantedSkill.damagePortions);
+						if (isWeaponLeaf(signatureType) && signatureType !== it.weaponType) {
+							return {
+								message: "Weapon type doesn't match its granted skill's signature type, which strands the wielder",
+								blocking: true
+							};
+						}
+					}
+				} else if (it.weaponType !== -1) {
+					return { message: 'Only weapons have a weapon type', blocking: true };
 				}
-				return it.weaponType === -1 ? null : { message: 'Only weapons have a weapon type', blocking: true };
+				if (it.grantedSkillId != null && it.grantedSkillId !== -1) {
+					const grantedSkill = staticData.skills?.[it.grantedSkillId];
+					if (grantedSkill && !hasFlag(grantedSkill.acquisition, ESkillAcquisition.Item)) {
+						return {
+							message: `Granted skill '${grantedSkill.name}' is no longer flagged as Item-acquirable`,
+							blocking: true
+						};
+					}
+				}
+				return null;
 			},
 			fields: [
 				{

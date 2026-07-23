@@ -148,7 +148,19 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			glyph: 'rune',
 			desc: 'Skills granted at character creation',
 			count: (c) => c.starterSkillIds.length,
-			warn: (c) => (c.starterSkillIds.length ? null : 'No starter skills'),
+			// A starter skill that's since lost its Player flag stays visible as a removable chip
+			// (the catalogue's `addable` filter only blocks new authoring); AdminClasses.SetClassStarterSkills
+			// (FindStarterSkillFlagViolation) hard-rejects the whole list if any assigned skill lacks the
+			// flag, so this blocks Save too.
+			warn: (c) => {
+				const flagLost = c.starterSkillIds
+					.map((id) => staticData.skills?.[id])
+					.find((skill) => skill && !hasFlag(skill.acquisition, ESkillAcquisition.Player));
+				if (flagLost) {
+					return { message: `'${flagLost.name}' is no longer flagged as Player-acquirable`, blocking: true };
+				}
+				return c.starterSkillIds.length ? null : 'No starter skills';
+			},
 			kind: 'chips',
 			itemsKey: 'starterSkillIds',
 			// Only Player-flagged skills can be newly assigned (the backend enforces this too); an

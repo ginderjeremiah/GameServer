@@ -1,6 +1,7 @@
 import type { IProficiencyLevelModifier, IProficiencyLevelReward } from '$lib/api';
-import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
-import { activityKeyDisplay, type ActivityKeyKind } from '$lib/common';
+import { EActivityKey, EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
+import { activityKeyDisplay, hasFlag, type ActivityKeyKind } from '$lib/common';
+import { staticData } from '$stores';
 import type { SelectOption } from '../entities/types';
 import type { WorkbenchPath, WorkbenchProficiency } from './types';
 
@@ -169,10 +170,9 @@ export const prerequisiteRootWarnings = (prof: WorkbenchProficiency): string[] =
 
 /**
  * An out-of-range modifier/reward level, checked against the tier's own (about-to-be-saved) MaxLevel.
- * This is the one proficiency condition the backend genuinely hard-rejects a save over — via
- * AdminProficiencies.FindShrunkenMaxLevelViolation (the identity edit, against a still-persisted
- * payout) or FindLevelOutOfRange (SetModifiers/SetRewards, against the tier's saved MaxLevel) — so it
- * doubles as {@link proficiencyBlockingWarnings}, unlike the rest of {@link proficiencyWarnings}.
+ * Hard-rejected by AdminProficiencies.FindShrunkenMaxLevelViolation (the identity edit, against a
+ * still-persisted payout) or FindLevelOutOfRange (SetModifiers/SetRewards, against the tier's saved
+ * MaxLevel) — so it feeds {@link proficiencyBlockingWarnings}, unlike the rest of {@link proficiencyWarnings}.
  */
 export const levelRangeWarnings = (prof: WorkbenchProficiency): string[] => {
 	const warnings: string[] = [];
@@ -185,6 +185,24 @@ export const levelRangeWarnings = (prof: WorkbenchProficiency): string[] => {
 	for (const reward of prof.levelRewards) {
 		if (reward.level < 1 || reward.level > prof.maxLevel) {
 			warnings.push(`Reward level ${reward.level} out of range`);
+			break;
+		}
+	}
+	return warnings;
+};
+
+/**
+ * A milestone reward skill that's since lost its Player acquisition flag — hard-rejected by
+ * AdminProficiencies.SetRewards (CheckPlayerSkill), mirroring the class starter-skill / enemy
+ * skill-pool flag guards. The reward picker (reference.playerSkillOptions) keeps such a skill
+ * visible via its `keep` exception, so this is the backstop that surfaces the drift.
+ */
+export const rewardSkillFlagWarnings = (prof: WorkbenchProficiency): string[] => {
+	const warnings: string[] = [];
+	for (const reward of prof.levelRewards) {
+		const skill = staticData.skills?.[reward.rewardSkillId];
+		if (skill && !hasFlag(skill.acquisition, ESkillAcquisition.Player)) {
+			warnings.push(`Reward skill '${skill.name}' is no longer flagged as Player-acquirable`);
 			break;
 		}
 	}
@@ -208,18 +226,25 @@ export const proficiencyWarnings = (prof: WorkbenchProficiency): string[] => {
 	if (!(prof.baseXp > 0) || !(prof.xpGrowth > 0)) {
 		warnings.push('XP curve must be positive');
 	}
-	return [...warnings, ...levelRangeWarnings(prof), ...prerequisiteRootWarnings(prof)];
+	return [
+		...warnings,
+		...levelRangeWarnings(prof),
+		...prerequisiteRootWarnings(prof),
+		...rewardSkillFlagWarnings(prof)
+	];
 };
 
 /**
  * The subset of {@link proficiencyWarnings} the backend is known to hard-reject a save over — see
- * {@link levelRangeWarnings} and {@link prerequisiteRootWarnings}. `MaxLevel < 1` and a non-positive XP
- * curve stay advisory-only: neither `Contracts.Proficiency` nor `AdminProficiencies` rejects them, so
- * gating Save on them would block a save the backend would actually accept.
+ * {@link levelRangeWarnings}, {@link prerequisiteRootWarnings}, and {@link rewardSkillFlagWarnings}.
+ * `MaxLevel < 1` and a non-positive XP curve stay advisory-only: neither `Contracts.Proficiency` nor
+ * `AdminProficiencies` rejects them, so gating Save on them would block a save the backend would
+ * actually accept.
  */
 export const proficiencyBlockingWarnings = (prof: WorkbenchProficiency): string[] => [
 	...levelRangeWarnings(prof),
-	...prerequisiteRootWarnings(prof)
+	...prerequisiteRootWarnings(prof),
+	...rewardSkillFlagWarnings(prof)
 ];
 
 // ── Persisted DTOs (identity-level Add/Edit; child collections go through their own endpoints) ──

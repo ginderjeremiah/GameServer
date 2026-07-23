@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EChangeType, EDamageType, EItemCategory, ERarity } from '$lib/api';
+import { EChangeType, EDamageType, EItemCategory, ERarity, ESkillAcquisition } from '$lib/api';
 import type { FieldsSectionConfig, Warning } from '$routes/admin/workbench/entities/types';
 
 /* Item config transforms specific to the WeaponType field (#1372, relaxed to any leaf by #1456): the
@@ -93,6 +93,73 @@ describe('itemEntity weapon type', () => {
 
 	it('accepts a clean non-weapon item', () => {
 		expect(identityWarn(itemEntity.newItem(1))).toBeNull();
+	});
+
+	it('warns a weapon whose granted skill signature type no longer matches its own weapon type (#2333)', () => {
+		// Axe is a martial weapon-leaf type distinct from the item's own Sword weapon type, so this
+		// mirrors an authored weapon whose granted skill's portions were retuned to a different weapon leaf.
+		staticData.skills = [
+			{
+				id: 0,
+				name: 'Axe Strike',
+				acquisition: ESkillAcquisition.Item,
+				damagePortions: [{ type: EDamageType.Axe, weight: 1 }]
+			}
+		];
+		const weapon: WorkbenchItem = {
+			...itemEntity.newItem(1),
+			itemCategoryId: EItemCategory.Weapon,
+			weaponType: EDamageType.Sword,
+			grantedSkillId: 0
+		};
+		expect(identityWarn(weapon)).toEqual({
+			message: "Weapon type doesn't match its granted skill's signature type, which strands the wielder",
+			blocking: true
+		});
+	});
+
+	it('accepts a weapon whose granted skill has no weapon-leaf signature (a caster element)', () => {
+		staticData.skills = [
+			{
+				id: 0,
+				name: 'Firebolt',
+				acquisition: ESkillAcquisition.Item,
+				damagePortions: [{ type: EDamageType.Fire, weight: 1 }]
+			}
+		];
+		const weapon: WorkbenchItem = {
+			...itemEntity.newItem(1),
+			itemCategoryId: EItemCategory.Weapon,
+			weaponType: EDamageType.Fire,
+			grantedSkillId: 0
+		};
+		expect(identityWarn(weapon)).toBeNull();
+	});
+
+	it('warns a granted skill (weapon or not) that lost its Item acquisition flag, blocking Save (#2333)', () => {
+		staticData.skills = [{ id: 0, name: 'Sword Strike', acquisition: ESkillAcquisition.Player, damagePortions: [] }];
+		const weapon: WorkbenchItem = {
+			...itemEntity.newItem(1),
+			itemCategoryId: EItemCategory.Weapon,
+			weaponType: EDamageType.Sword,
+			grantedSkillId: 0
+		};
+		expect(identityWarn(weapon)).toEqual({
+			message: "Granted skill 'Sword Strike' is no longer flagged as Item-acquirable",
+			blocking: true
+		});
+
+		const cloak: WorkbenchItem = { ...itemEntity.newItem(1), itemCategoryId: EItemCategory.Chest, grantedSkillId: 0 };
+		expect(identityWarn(cloak)).toEqual({
+			message: "Granted skill 'Sword Strike' is no longer flagged as Item-acquirable",
+			blocking: true
+		});
+	});
+
+	it('accepts a granted skill that is still Item-flagged', () => {
+		staticData.skills = [{ id: 0, name: 'Sword Strike', acquisition: ESkillAcquisition.Item, damagePortions: [] }];
+		const cloak: WorkbenchItem = { ...itemEntity.newItem(1), itemCategoryId: EItemCategory.Chest, grantedSkillId: 0 };
+		expect(identityWarn(cloak)).toBeNull();
 	});
 
 	it('weaponTypeOptions offers None plus every damage-type leaf, martial or caster', () => {

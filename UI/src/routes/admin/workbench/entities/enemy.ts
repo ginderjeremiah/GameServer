@@ -100,7 +100,19 @@ export const enemyEntity: EntityConfig<WorkbenchEnemy> = {
 			glyph: 'rune',
 			desc: 'Skill pool used in battle',
 			count: (e) => e.skillPool.length,
-			warn: (e) => (e.skillPool.length ? null : 'No skills assigned'),
+			// A pool skill that's since lost its Enemy flag stays visible as a removable chip (the
+			// catalogue's `addable` filter only blocks new authoring); AdminEnemies.SetEnemySkills
+			// (FindEnemySkillFlagViolation) hard-rejects the whole list if any assigned skill lacks the
+			// flag, so this blocks Save too.
+			warn: (e) => {
+				const flagLost = e.skillPool
+					.map((id) => staticData.skills?.[id])
+					.find((skill) => skill && !hasFlag(skill.acquisition, ESkillAcquisition.Enemy));
+				if (flagLost) {
+					return { message: `'${flagLost.name}' is no longer flagged as an Enemy skill`, blocking: true };
+				}
+				return e.skillPool.length ? null : 'No skills assigned';
+			},
 			kind: 'chips',
 			itemsKey: 'skillPool',
 			// Only Enemy-flagged skills can be newly assigned (the backend enforces this too); an
