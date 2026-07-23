@@ -4,13 +4,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const h = vi.hoisted(() => ({
 	toastWarning: vi.fn(),
 	unhook: vi.fn(),
-	unhookLogicalUpdate: vi.fn(),
 	state: {
 		lsStore: {} as Record<string, string>,
 		lsAvailable: true,
 		setItemThrows: false,
 		idleTimeLostCb: undefined as ((ms: number) => void) | undefined,
-		logicalUpdateCb: undefined as ((tickMs: number, unhook: () => void) => void) | undefined
+		// Every onLogicalUpdate() call gets its own {cb, unhook} entry (mirroring the real hook's
+		// per-subscriber tracker) so a test can tell a genuinely-unhooked stale subscription apart
+		// from one that was merely overwritten by a later subscribe.
+		logicalUpdateSubs: [] as { cb: (tickMs: number, unhook: () => void) => void; unhook: () => void }[]
 	}
 }));
 
@@ -39,8 +41,9 @@ vi.mock('$lib/engine/logical-engine', () => ({
 		return h.unhook;
 	},
 	onLogicalUpdate: (cb: (tickMs: number, unhook: () => void) => void) => {
-		h.state.logicalUpdateCb = cb;
-		return h.unhookLogicalUpdate;
+		const unhook = vi.fn<() => void>();
+		h.state.logicalUpdateSubs.push({ cb, unhook });
+		return unhook;
 	}
 }));
 
@@ -65,7 +68,7 @@ describe('BackgroundThrottleMonitor', () => {
 		h.state.lsAvailable = true;
 		h.state.setItemThrows = false;
 		h.state.idleTimeLostCb = undefined;
-		h.state.logicalUpdateCb = undefined;
+		h.state.logicalUpdateSubs = [];
 		hidden = false;
 		Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
 		monitor = new BackgroundThrottleMonitor();
@@ -80,9 +83,14 @@ describe('BackgroundThrottleMonitor', () => {
 	});
 
 	const lose = (ms: number) => h.state.idleTimeLostCb?.(ms);
+	const latestGuardSub = () => h.state.logicalUpdateSubs.at(-1);
 	// Simulates a regular logical tick that lost nothing — the common case, since the worker tick
-	// source polls every 10ms regardless of visibility.
-	const tick = () => h.state.logicalUpdateCb?.(10, h.unhookLogicalUpdate);
+	// source polls every 10ms regardless of visibility. Only the current (last-subscribed) guard is
+	// fired — a real, correctly-unhooked stale guard would never receive it.
+	const tick = () => {
+		const sub = latestGuardSub();
+		sub?.cb(10, sub.unhook);
+	};
 
 	it('shows a one-time dismissible notice after a hidden period loses past the threshold', () => {
 		monitor.start();
@@ -133,14 +141,19 @@ describe('BackgroundThrottleMonitor', () => {
 		expect(h.toastWarning).not.toHaveBeenCalled();
 	});
 
-	it('does not let a stale resume-guard subscription from an earlier cycle disarm a fresh one', () => {
+	it('unhooks a stale resume-guard subscription from an earlier cycle before arming a fresh one', () => {
 		monitor.start();
 		goHidden();
-		goVisible(); // arms guard #1
-		goHidden();
-		goVisible(); // re-arms: guard #1 must be unhooked, not left to fire later
-		lose(70_000); // credited to guard #2's hidden period
+		goVisible(); // arms guard #1; the hidden->visible edge also exercises the hidden-branch clear
+		// A second, back-to-back visible edge (no intervening hide) isolates armResumeGuard's own
+		// clearResumeGuard() call: without it, guard #1 would stay subscribed as a stale duplicate.
+		goVisible();
 
+		expect(h.state.logicalUpdateSubs).toHaveLength(2);
+		expect(h.state.logicalUpdateSubs[0].unhook).toHaveBeenCalled(); // guard #1: actually unhooked
+		expect(h.state.logicalUpdateSubs[1].unhook).not.toHaveBeenCalled(); // guard #2: still live
+
+		lose(70_000); // credited to guard #2's hidden period
 		expect(h.toastWarning).toHaveBeenCalledTimes(1);
 	});
 
@@ -150,7 +163,7 @@ describe('BackgroundThrottleMonitor', () => {
 		goVisible(); // arms the guard
 		monitor.stop();
 
-		expect(h.unhookLogicalUpdate).toHaveBeenCalled();
+		expect(latestGuardSub()?.unhook).toHaveBeenCalled();
 	});
 
 	it('ignores idle time lost while the tab is visible (a foreground stall is not backgrounding)', () => {
