@@ -99,6 +99,51 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
+        public void ToContract_OrdersChildCollectionsRegardlessOfEntityOrder()
+        {
+            var entity = NewItem();
+            // Deliberately shuffled (descending) so a stable ordering isn't a coincidence of insertion order.
+            entity.ItemAttributes =
+            [
+                new Entities.ItemAttribute { ItemId = 0, AttributeId = (int)EAttribute.Intellect, Amount = 1m },
+                new Entities.ItemAttribute { ItemId = 0, AttributeId = (int)EAttribute.Strength, Amount = 2m },
+            ];
+            entity.ItemModSlots =
+            [
+                new Entities.ItemModSlot { Id = 9, ItemId = 0, ItemModSlotTypeId = (int)EItemModType.Prefix },
+                new Entities.ItemModSlot { Id = 2, ItemId = 0, ItemModSlotTypeId = (int)EItemModType.Suffix },
+            ];
+            entity.Tags = [new Entities.Tag { Id = 5, Name = "b" }, new Entities.Tag { Id = 1, Name = "a" }];
+
+            var contract = ItemMapper.ToContract(entity);
+
+            Assert.Equal([EAttribute.Strength, EAttribute.Intellect], contract.Attributes.Select(a => a.AttributeId));
+            Assert.Equal([2, 9], contract.ModSlots.Select(s => s.Id));
+            Assert.Equal([1, 5], contract.Tags);
+        }
+
+        [Fact]
+        public void ToCore_OrdersChildCollectionsRegardlessOfEntityOrder()
+        {
+            var entity = NewItem();
+            entity.ItemAttributes =
+            [
+                new Entities.ItemAttribute { ItemId = 0, AttributeId = (int)EAttribute.Intellect, Amount = 1m },
+                new Entities.ItemAttribute { ItemId = 0, AttributeId = (int)EAttribute.Strength, Amount = 2m },
+            ];
+            entity.ItemModSlots =
+            [
+                new Entities.ItemModSlot { Id = 9, ItemId = 0, ItemModSlotTypeId = (int)EItemModType.Prefix },
+                new Entities.ItemModSlot { Id = 2, ItemId = 0, ItemModSlotTypeId = (int)EItemModType.Suffix },
+            ];
+
+            var core = ItemMapper.ToCore(entity);
+
+            Assert.Equal([EAttribute.Strength, EAttribute.Intellect], core.Attributes.Select(a => a.Attribute));
+            Assert.Equal([2, 9], core.ModSlots.Select(s => s.Id));
+        }
+
+        [Fact]
         public void ModToContract_RoundTripsScalarFieldsAndTags()
         {
             var retiredAt = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);

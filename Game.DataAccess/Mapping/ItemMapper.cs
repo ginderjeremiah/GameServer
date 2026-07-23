@@ -26,6 +26,7 @@ namespace Game.DataAccess.Mapping
                 RequiredProficiencyId = entity.RequiredProficiencyId,
                 RequiredProficiencyLevel = entity.RequiredProficiencyLevel,
                 Attributes = entity.ItemAttributes
+                    .OrderBy(ia => ia.AttributeId)
                     .Select(ia => new AttributeModifier
                     {
                         Attribute = (EAttribute)ia.AttributeId,
@@ -34,6 +35,7 @@ namespace Game.DataAccess.Mapping
                         Source = EAttributeModifierSource.Item,
                     }).ToList(),
                 ModSlots = entity.ItemModSlots
+                    .OrderBy(ims => ims.Id)
                     .Select(ims => new ItemModSlot
                     {
                         Id = ims.Id,
@@ -52,6 +54,7 @@ namespace Game.DataAccess.Mapping
                 Type = (EItemModType)entity.ItemModTypeId,
                 Rarity = (ERarity)entity.RarityId,
                 Attributes = entity.ItemModAttributes
+                    .OrderBy(ima => ima.AttributeId)
                     .Select(ima => new AttributeModifier
                     {
                         Attribute = (EAttribute)ima.AttributeId,
@@ -122,7 +125,8 @@ namespace Game.DataAccess.Mapping
         }
 
         /// <summary>Maps an entity <see cref="EntityItem"/> (with its child collections loaded) to the
-        /// reference-data read <see cref="Contracts.Item"/> contract.</summary>
+        /// reference-data read <see cref="Contracts.Item"/> contract. Child collections are ordered
+        /// deterministically so the reference set's version hash is stable across reloads.</summary>
         public static Contracts.Item ToContract(EntityItem entity)
         {
             return new Contracts.Item
@@ -139,25 +143,28 @@ namespace Game.DataAccess.Mapping
                 RequiredProficiencyLevel = entity.RequiredProficiencyLevel,
                 DesignerNotes = entity.DesignerNotes,
                 Attributes = entity.ItemAttributes
+                    .OrderBy(ia => ia.AttributeId)
                     .Select(ia => new Contracts.BattlerAttribute
                     {
                         AttributeId = (EAttribute)ia.AttributeId,
                         Amount = ia.Amount,
                     }).ToList(),
                 ModSlots = entity.ItemModSlots
+                    .OrderBy(ims => ims.Id)
                     .Select(ims => new Contracts.ItemModSlot
                     {
                         Id = ims.Id,
                         ItemId = ims.ItemId,
                         ItemModSlotTypeId = (EItemModType)ims.ItemModSlotTypeId,
                     }).ToList(),
-                Tags = entity.Tags.Select(t => t.Id).ToList(),
+                Tags = entity.Tags.OrderBy(t => t.Id).Select(t => t.Id).ToList(),
                 RetiredAt = entity.RetiredAt,
             };
         }
 
         /// <summary>Maps an entity <see cref="EntityItemMod"/> (with its child collections loaded) to the
-        /// reference-data read <see cref="Contracts.ItemMod"/> contract.</summary>
+        /// reference-data read <see cref="Contracts.ItemMod"/> contract. Child collections are ordered
+        /// deterministically so the reference set's version hash is stable across reloads.</summary>
         public static Contracts.ItemMod ModToContract(EntityItemMod entity)
         {
             return new Contracts.ItemMod
@@ -169,12 +176,13 @@ namespace Game.DataAccess.Mapping
                 RarityId = (ERarity)entity.RarityId,
                 DesignerNotes = entity.DesignerNotes,
                 Attributes = entity.ItemModAttributes
+                    .OrderBy(ima => ima.AttributeId)
                     .Select(ima => new Contracts.BattlerAttribute
                     {
                         AttributeId = (EAttribute)ima.AttributeId,
                         Amount = ima.Amount,
                     }).ToList(),
-                Tags = entity.Tags.Select(t => t.Id).ToList(),
+                Tags = entity.Tags.OrderBy(t => t.Id).Select(t => t.Id).ToList(),
                 RetiredAt = entity.RetiredAt,
             };
         }

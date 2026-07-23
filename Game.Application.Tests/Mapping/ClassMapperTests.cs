@@ -69,6 +69,27 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
+        public void Mappers_OrderChildCollectionsRegardlessOfEntityOrder()
+        {
+            // Deliberately shuffled (descending) so a stable ordering isn't a coincidence of insertion order.
+            var entity = NewClass(
+                starterSkillIds: [7, 3],
+                equipment: [(ItemId: 9, Slot: EEquipmentSlot.HelmSlot), (ItemId: 4, Slot: EEquipmentSlot.WeaponSlot)],
+                distributions: [(EAttribute.Endurance, 3m, 2m), (EAttribute.Strength, 5m, 1m)]);
+
+            var contract = ClassMapper.ToContract(entity);
+            var core = ClassMapper.ToCore(entity);
+
+            Assert.Equal([3, 7], contract.StarterSkillIds);
+            Assert.Equal([EEquipmentSlot.HelmSlot, EEquipmentSlot.WeaponSlot], contract.StarterEquipment.Select(e => e.EquipmentSlot));
+            Assert.Equal([EAttribute.Strength, EAttribute.Endurance], contract.AttributeDistributions.Select(d => d.AttributeId));
+
+            Assert.Equal([3, 7], core.StarterSkillIds);
+            Assert.Equal([EEquipmentSlot.HelmSlot, EEquipmentSlot.WeaponSlot], core.StarterEquipment.Select(e => e.EquipmentSlot));
+            Assert.Equal([EAttribute.Strength, EAttribute.Endurance], core.AttributeDistributions.Select(d => d.AttributeId));
+        }
+
+        [Fact]
         public void Mappers_PreserveNullScalingAttribute()
         {
             var entity = NewClass();

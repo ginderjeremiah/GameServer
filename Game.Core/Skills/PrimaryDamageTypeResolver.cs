@@ -1,8 +1,9 @@
 namespace Game.Core.Skills
 {
     /// <summary>
-    /// The shared "primary damage type" tie-break rule: the highest-weight portion wins, the first-authored
-    /// portion wins a weight tie, and an empty split falls back to <see cref="EDamageType.Physical"/>. Generic
+    /// The shared "primary damage type" tie-break rule: the highest-weight portion wins, the first portion in
+    /// the given list wins a weight tie (the mappers order portions by damage type, so this is the
+    /// lowest-numbered type on a tie), and an empty split falls back to <see cref="EDamageType.Physical"/>. Generic
     /// over the three skill representations that each carry a portion split under different property names and
     /// weight numeric types (the domain <see cref="Skill.DamagePortions"/>, the read contract, and the
     /// persisted entity) so all three resolve through one implementation instead of drifting independently.

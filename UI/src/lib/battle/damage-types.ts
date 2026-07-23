@@ -20,7 +20,8 @@ import {
 } from '$lib/api/types/damage-types';
 
 /** The "primary" leaf type of a weighted damage-portion set (spike #1343): the highest-weight portion,
- *  the first in authored order on a tie. Falls back to `Physical` for a malformed empty set. Feeds the
+ *  the first in the received list on a tie (the backend mapper orders portions by damage type, so this
+ *  is the lowest-numbered type on a tie). Falls back to `Physical` for a malformed empty set. Feeds the
  *  display surfaces (icon/colour) and the interim single-type direct-hit call. Mirrors the backend
  *  `Skill.PrimaryDamageType` — the strict `>` keeps the first portion winning a weight tie. */
 export function primaryDamageType(portions: readonly ISkillDamagePortion[]): EDamageType {

@@ -58,6 +58,22 @@ namespace Game.Application.Tests.Mapping
                 s => { Assert.Equal(4, s.ZoneId); Assert.Equal(20, s.Weight); });
         }
 
+        [Fact]
+        public void ToContract_OrdersChildCollectionsRegardlessOfEntityOrder()
+        {
+            // Deliberately shuffled (descending) so a stable ordering isn't a coincidence of insertion order.
+            var entity = NewEnemy(
+                distributions: [(EAttribute.Endurance, 3m, 2m), (EAttribute.Strength, 5m, 1m)],
+                skillPool: [7, 3],
+                spawns: [(ZoneId: 4, Weight: 20), (ZoneId: 1, Weight: 10)]);
+
+            var contract = EnemyMapper.ToContract(entity);
+
+            Assert.Equal([EAttribute.Strength, EAttribute.Endurance], contract.AttributeDistribution.Select(d => d.AttributeId));
+            Assert.Equal([3, 7], contract.SkillPool);
+            Assert.Equal([1, 4], contract.Spawns.Select(s => s.ZoneId));
+        }
+
         private static Entities.Enemy NewEnemy(
             bool isBoss = false,
             DateTime? retiredAt = null,

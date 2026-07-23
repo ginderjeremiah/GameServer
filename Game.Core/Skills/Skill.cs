@@ -42,11 +42,13 @@
 
         /// <summary>
         /// The leaf damage type the display surfaces (icon/colour) read as "the skill's type": the
-        /// highest-weight portion, the first in authored order on a tie. Falls back to
-        /// <see cref="EDamageType.Physical"/> for a malformed skill carrying no portions, so a display read
-        /// never throws. The direct-hit pipeline reads the full <see cref="DamagePortions"/> split, not this
-        /// single primary type. Resolved by the shared <see cref="PrimaryDamageTypeResolver"/> — also used by
-        /// the read-contract and persisted-entity mirrors of this accessor.
+        /// highest-weight portion, the lowest-numbered <see cref="EDamageType"/> winning a weight tie (the
+        /// mappers order <see cref="DamagePortions"/> by type so the tie-break is deterministic — see
+        /// <c>SkillMapper</c>). Falls back to <see cref="EDamageType.Physical"/> for a malformed skill
+        /// carrying no portions, so a display read never throws. The direct-hit pipeline reads the full
+        /// <see cref="DamagePortions"/> split, not this single primary type. Resolved by the shared
+        /// <see cref="PrimaryDamageTypeResolver"/> — also used by the read-contract and persisted-entity
+        /// mirrors of this accessor.
         /// </summary>
         public EDamageType PrimaryDamageType =>
             PrimaryDamageTypeResolver.Resolve(DamagePortions, p => p.Weight, p => p.Type);
