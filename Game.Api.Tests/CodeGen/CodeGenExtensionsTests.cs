@@ -244,6 +244,20 @@ namespace Game.Api.Tests.CodeGen
             Assert.True(typeof(Dictionary<TestEnum, SimpleModel>).NeedsInterface());
         }
 
+        [Fact]
+        public void NeedsInterface_IntArray_ReturnsFalse()
+        {
+            // Arrays are IsClass but not enumerable per IsEnumerable (not generic); NeedsInterface must
+            // reject them too so GetTypeText's unmapped-type throw fires instead of emitting IInt32[].
+            Assert.False(typeof(int[]).NeedsInterface());
+        }
+
+        [Fact]
+        public void NeedsInterface_ClassArray_ReturnsFalse()
+        {
+            Assert.False(typeof(SimpleModel[]).NeedsInterface());
+        }
+
         [Theory]
         [InlineData("HelloWorld", "helloWorld")]
         [InlineData("A", "a")]

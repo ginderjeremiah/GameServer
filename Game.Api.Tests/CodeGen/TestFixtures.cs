@@ -109,6 +109,14 @@ namespace Game.Api.Tests.CodeGen
         public string Title { get; set; } = "";
     }
 
+    // An array-typed member has no TypeScript mapping (List<>/IEnumerable<> are the supported shapes);
+    // GetTypeText must throw rather than silently emit a reference to an interface reflecting the
+    // array's CLR members (Length, SyncRoot, ...).
+    public class ModelWithArray : IModel
+    {
+        public string[] Tags { get; set; } = [];
+    }
+
     public class ModelWithDictionary : IModel
     {
         public Dictionary<string, int> StringToInt { get; set; } = [];
