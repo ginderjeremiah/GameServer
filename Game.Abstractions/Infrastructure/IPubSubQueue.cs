@@ -3,7 +3,6 @@
     public interface IPubSubQueue
     {
         public Task<string?> GetNextAsync(CancellationToken cancellationToken = default);
-        public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Atomically moves the next item from the head of this queue onto a side processing list and returns it
@@ -67,7 +66,6 @@
         public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default);
 
         public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default);
-        public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Pushes multiple values onto the queue in a single round-trip (one multi-value LPUSH),

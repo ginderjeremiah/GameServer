@@ -72,7 +72,12 @@ namespace Game.Api.Sockets.Commands
             }
             else
             {
-                // BattleService logs the specific rejection reason (and its diagnostics) at the source.
+                // BattleService logs the specific rejection reason (and its diagnostics) at the source. A
+                // rejected already-credited claim clears the stale battle off PlayerState in memory (see
+                // BattleAlreadyCredited) — save unconditionally, like NewEnemy, so that clear is durable
+                // rather than lost the moment this connection closes.
+                await context.Session.SavePlayerStateAsync(cancellationToken);
+
                 var now = DateTime.UtcNow;
                 return ErrorWithData("Enemy could not be defeated.", new DefeatEnemyResponse
                 {

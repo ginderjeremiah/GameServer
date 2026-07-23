@@ -427,7 +427,7 @@ namespace Game.Application.Services
         public required IReadOnlyList<ProficiencyXpResult> ProficiencyGains { get; init; }
 
         /// <summary>The proficiency nodes opened over the window (a maxed tier's next tier or a newly-satisfied
-        /// gateway), each with the seed skill it granted (if any).</summary>
+        /// gateway) — notification-only, opening grants no skill itself (see <see cref="ProficiencyOpened"/>).</summary>
         public required IReadOnlyList<ProficiencyOpened> OpenedProficiencies { get; init; }
 
         /// <summary>

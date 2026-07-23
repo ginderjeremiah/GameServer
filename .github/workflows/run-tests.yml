@@ -365,7 +365,9 @@ jobs:
 
         wait_for_api
         # Runs inside the Postgres container so it needs no client tooling on the runner; idempotent.
-        docker compose exec -T postgres psql -U game -d game -p 5544 -v ON_ERROR_STOP=1 -f - < e2e-admin-provision.sql
+        # Mirrors docker-compose.yml's own POSTGRES_USER/POSTGRES_DB/POSTGRES_PORT overrides so a customized
+        # stack doesn't fail this step looking like a DB outage.
+        docker compose exec -T postgres psql -U "${POSTGRES_USER:-game}" -d "${POSTGRES_DB:-game}" -p "${POSTGRES_PORT:-5544}" -v ON_ERROR_STOP=1 -f - < e2e-admin-provision.sql
 
     - name: Run Playwright e2e tests
       working-directory: UI

@@ -1,5 +1,7 @@
+using Game.Abstractions.DataAccess;
 using Game.Api.Models.Enemies;
 using Game.Api.Services;
+using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Infrastructure.Database;
 using Game.TestInfrastructure.Fixtures;
@@ -27,7 +29,16 @@ namespace Game.Api.Tests.Integration
             await sessionService.SavePlayerStateAsync();
         }
 
-        private async Task<int> SeedWeakPlayerVsStrongEnemyAsync()
+        private async Task<PlayerState> GetPlayerState(int userId)
+        {
+            using var scope = CreateScope();
+            var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
+            sessionService.SetAuthenticatedUser(userId);
+            await sessionService.LoadPlayerState();
+            return sessionService.PlayerState;
+        }
+
+        private async Task<(int userId, int playerId)> SeedWeakPlayerVsStrongEnemyAsync()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -73,7 +84,7 @@ namespace Game.Api.Tests.Integration
                 new { Username = "weakplayer", Password = "weakpass" });
             Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
 
-            return user.Id;
+            return (user.Id, player.Id);
         }
 
         private async Task<int> SeedNormalPlayerAsync()
@@ -119,7 +130,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task BattleLost_ValidLoss_Succeeds()
         {
-            var userId = await SeedWeakPlayerVsStrongEnemyAsync();
+            var (userId, _) = await SeedWeakPlayerVsStrongEnemyAsync();
 
             var wsClient = Factory.Server.CreateWebSocketClient();
 
@@ -165,7 +176,7 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task BattleLost_ClaimedBeforeBattleCouldFinish_ReturnsError()
         {
-            var userId = await SeedWeakPlayerVsStrongEnemyAsync();
+            var (userId, _) = await SeedWeakPlayerVsStrongEnemyAsync();
 
             await using var socketClient = new TestSocketClient();
             var wsClient = Factory.Server.CreateWebSocketClient();
@@ -181,6 +192,95 @@ namespace Game.Api.Tests.Integration
             var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost", new { });
 
             Assert.NotNull(response.Error);
+        }
+
+        [Fact]
+        public async Task BattleLost_BattleAlreadyCredited_PersistsClearedBattleState()
+        {
+            var (userId, playerId) = await SeedWeakPlayerVsStrongEnemyAsync();
+
+            var wsClient = Factory.Server.CreateWebSocketClient();
+
+            await using (var socketClient1 = new TestSocketClient())
+            {
+                await socketClient1.ConnectAsync(wsClient, userId);
+
+                var newEnemyResponse = await socketClient1.SendCommandAsync<NewEnemyModel>(
+                    "NewEnemy", new { NewZoneId = (int?)null });
+                Assert.Null(newEnemyResponse.Error);
+
+                await socketClient1.CloseAsync();
+            }
+
+            // Capture this battle's identity before crediting it, then backdate so it resolves as a genuine
+            // loss — the fields are restored onto the session further down to reproduce the reconnect gap
+            // (#1874/#1993) this test targets.
+            int activeEnemyId = 0, activeEnemyLevel = 0, battleZoneId = 0;
+            List<int> activeEnemySkillIds = null!;
+            uint battleSeed = 0;
+            BattleSnapshot snapshot = null!;
+            bool isBossBattle = false;
+
+            await SetPlayerState(userId, state =>
+            {
+                activeEnemyId = state.ActiveEnemyId!.Value;
+                activeEnemyLevel = state.ActiveEnemyLevel!.Value;
+                activeEnemySkillIds = state.ActiveEnemySkillIds!;
+                battleSeed = state.BattleSeed!.Value;
+                snapshot = state.Snapshot!;
+                battleZoneId = state.BattleZoneId ?? 0;
+                isBossBattle = state.IsBossBattle;
+
+                state.SetActiveBattle(
+                    activeEnemyId, activeEnemyLevel, activeEnemySkillIds, battleSeed,
+                    startTime: DateTime.UtcNow.AddMinutes(-30),
+                    snapshot, zoneId: battleZoneId, isBossBattle: isBossBattle);
+            });
+
+            await using (var socketClient2 = new TestSocketClient())
+            {
+                await socketClient2.ConnectAsync(wsClient, userId);
+
+                var creditResponse = await socketClient2.SendCommandAsync<BattleLostResponse>("BattleLost", new { });
+                Assert.Null(creditResponse.Error);
+
+                await socketClient2.CloseAsync();
+            }
+
+            // The player-cache write behind the credit is fire-and-forget (docs/backend-persistence.md), so
+            // poll until it lands before restoring the session to the now-credited battle below.
+            using (var scope = CreateScope())
+            {
+                var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+                await PollingHelper.PollUntilAsync(
+                    () => playerRepo.GetPlayer(playerId),
+                    p => p?.LastCreditedBattleSeed == battleSeed);
+            }
+
+            // Reproduce the reconnect gap (#1874/#1993): the durable credit landed, but the session's own
+            // PlayerState still shows this exact (now-credited) battle as active.
+            await SetPlayerState(userId, state =>
+            {
+                state.SetActiveBattle(
+                    activeEnemyId, activeEnemyLevel, activeEnemySkillIds, battleSeed,
+                    startTime: DateTime.UtcNow.AddMinutes(-30),
+                    snapshot, zoneId: battleZoneId, isBossBattle: isBossBattle);
+            });
+
+            await using (var socketClient3 = new TestSocketClient())
+            {
+                await socketClient3.ConnectAsync(wsClient, userId);
+
+                var rejectedResponse = await socketClient3.SendCommandAsync<BattleLostResponse>("BattleLost", new { });
+                Assert.NotNull(rejectedResponse.Error);
+
+                await socketClient3.CloseAsync();
+            }
+
+            // The rejection clears the stale battle in memory (BattleAlreadyCredited) — pin that the clear is
+            // actually persisted rather than lost the moment socketClient3 disconnects (#2345).
+            var persistedState = await GetPlayerState(userId);
+            Assert.False(persistedState.HasActiveBattle);
         }
     }
 }

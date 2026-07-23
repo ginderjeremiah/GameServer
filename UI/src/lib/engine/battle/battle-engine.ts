@@ -200,6 +200,13 @@ export class BattleEngine {
 
 	public reset = (enemyInstance: IEnemyInstance) => {
 		const enemyData = staticData.enemies ?? [];
+		const staticEnemy = enemyData[enemyInstance.id];
+		if (!staticEnemy) {
+			// A freshly-authored enemy against a stale mid-session reference cache: degrade gracefully
+			// (mirroring InventoryManager.initialize's missing-item skip) rather than fielding a battler
+			// with an undefined name.
+			logMessage(ELogType.Debug, `Spawned enemy with unknown id ${enemyInstance.id}; reference cache may be stale.`);
+		}
 		// Re-arming the battle cancels any in-flight post-victory cooldown so its render hook is removed
 		// and the awaiting caller is released rather than stranded mid-countdown.
 		this.finishLoading?.();
@@ -209,7 +216,7 @@ export class BattleEngine {
 		this.#rng = new Mulberry32(enemyInstance.seed);
 		this.flushEffectDamage();
 		this.resetPlayer();
-		this.enemy.reset({ ...enemyInstance, ...enemyData[enemyInstance.id] });
+		this.enemy.reset({ ...enemyInstance, ...staticEnemy, name: staticEnemy?.name ?? 'Unknown enemy' });
 		// A non-null elapsedOffsetMs (#1595/#1596) means the server handed back a battle already in
 		// progress rather than a fresh spawn — fast-forward to its real elapsed time before going live.
 		if (enemyInstance.elapsedOffsetMs != null) {

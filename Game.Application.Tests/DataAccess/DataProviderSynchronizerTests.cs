@@ -2088,8 +2088,6 @@ namespace Game.Application.Tests.DataAccess
             }
 
             // Not exercised by DataProviderSynchronizer.ProcessQueue.
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -2185,8 +2183,6 @@ namespace Game.Application.Tests.DataAccess
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -2283,8 +2279,6 @@ namespace Game.Application.Tests.DataAccess
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -2450,8 +2444,6 @@ namespace Game.Application.Tests.DataAccess
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -2482,8 +2474,6 @@ namespace Game.Application.Tests.DataAccess
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => inner.RemoveAsync(value, cancellationToken);
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => inner.AddToQueueAsync(value, cancellationToken);
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => inner.AddRangeToQueueAsync(values, cancellationToken);
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => inner.RemoveRangeAsync(values, cancellationToken);
         }
 
@@ -2576,8 +2566,6 @@ namespace Game.Application.Tests.DataAccess
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
@@ -2608,8 +2596,6 @@ namespace Game.Application.Tests.DataAccess
             public Task<bool> RemoveAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<T?> GetNextAsync<T>(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task AddToQueueAsync<T>(T value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
 
