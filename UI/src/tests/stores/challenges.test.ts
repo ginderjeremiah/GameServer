@@ -118,6 +118,21 @@ describe('challenges store', () => {
 
 			expect(playerChallenges.all.filter((c) => c.challengeId === 3)).toHaveLength(1);
 		});
+
+		it('is not reverted by a fetch already in flight when it resolves with pre-completion data (#2332)', async () => {
+			const stale = Promise.withResolvers<IPlayerChallenge[]>();
+			mockFetchSocket.mockReturnValueOnce(stale.promise);
+
+			const initial = playerChallenges.load();
+			playerChallenges.markCompleted(3);
+
+			// The in-flight fetch was issued before the push landed, so its response — computed before
+			// the completion was persisted server-side — must not revert it when it resolves.
+			stale.resolve([challenge(3, false)]);
+			await initial;
+
+			expect(playerChallenges.isChallengeCompleted(3)).toBe(true);
+		});
 	});
 
 	it('reset() clears state and allows a fresh load', async () => {

@@ -3,7 +3,9 @@
  * honest: a forced load issued mid-flight queues one fresh fetch behind the stale in-flight one
  * (concurrent forces share it) rather than resolving with data requested before the call. The
  * player-progress stores rely on that guarantee for post-victory gate checks and for the
- * divergence-recovery reload after a failed server push.
+ * divergence-recovery reload after a failed server push. They also call {@link invalidate} when a
+ * push mutates local state while a fetch is in flight, so that fetch's response — computed before
+ * the push landed — is discarded instead of reverting it.
  *
  * Deliberately not re-exported from the `$lib/common` barrel: the stores consume it, and the barrel
  * transitively imports the stores (via enemy-attributes → battle-attributes), so a barrel import
@@ -60,14 +62,25 @@ export class CoalescedLoader {
 		this.epoch += 1;
 	}
 
-	/** Current reset epoch, bumped by {@link reset}. `fetchFn` should capture this before its first
-	 *  `await` and pass it to {@link isStale} afterward to detect a `reset()` that ran mid-flight. */
+	/** Bumps the epoch so an already-in-flight fetch's eventual response is recognized as stale by
+	 *  {@link isStale}, without discarding the in-flight/queued fetch state itself (unlike
+	 *  {@link reset}, which is a full session teardown). Call this when a push mutates the store's
+	 *  data directly: the fetch's response was computed before the push landed, so a later `load()`
+	 *  should not still get to overwrite the push with it. */
+	invalidate(): void {
+		this.epoch += 1;
+	}
+
+	/** Current epoch, bumped by {@link reset} and {@link invalidate}. `fetchFn` should capture this
+	 *  before its first `await` and pass it to {@link isStale} afterward to detect either running
+	 *  mid-flight. */
 	get currentEpoch(): number {
 		return this.epoch;
 	}
 
 	/** Whether `epoch` (captured from {@link currentEpoch} before an await) no longer matches — a
-	 *  `reset()` ran mid-flight, so a write gated on this epoch belongs to a discarded session. */
+	 *  `reset()` or `invalidate()` ran mid-flight, so a write gated on this epoch is stale (a
+	 *  discarded session, or a push whose mutation the write would otherwise revert). */
 	isStale(epoch: number): boolean {
 		return epoch !== this.epoch;
 	}

@@ -20,7 +20,8 @@ const fetchProficiencies = async () => {
 		// fetchSocketData throws on a socket error, preserving this try/catch contract.
 		const result = (await fetchSocketData('GetPlayerProficiencies')) ?? [];
 		if (loader.isStale(epoch)) {
-			// reset() ran while this fetch was in flight; this write belongs to a discarded session.
+			// Either reset() ran while this fetch was in flight (a discarded session), or applyXpGained()
+			// applied a push mid-flight — this response predates that push and would revert it.
 			return;
 		}
 		proficiencies = result;
@@ -85,8 +86,10 @@ export const playerProficiencies = {
 	 *  attribute bonuses — reflects it immediately without a refetch. Each result's new level/xp is set
 	 *  (inserting the proficiency if it was previously unopened), and any newly-opened proficiency the
 	 *  battle did not also train is added at level 0 so it appears straight away. A later `load(force)`
-	 *  reconciles against the authoritative server progress. The array is reassigned (not mutated) so the
-	 *  `battleModifiers` derived recomputes and the battle engine's by-reference change detection fires. */
+	 *  reconciles against the authoritative server progress; a fetch already in flight is invalidated so
+	 *  its response (computed before this push landed) can't overwrite the gain. The array is reassigned
+	 *  (not mutated) so the `battleModifiers` derived recomputes and the battle engine's by-reference
+	 *  change detection fires. */
 	applyXpGained(model: IProficiencyXpGainedModel) {
 		// Update each already-tracked proficiency in place to its new level/xp.
 		let next = proficiencies.map((existing): IPlayerProficiency => {
@@ -106,6 +109,7 @@ export const playerProficiencies = {
 			}
 		}
 		proficiencies = next;
+		loader.invalidate();
 	},
 
 	/** Fetch the player's proficiency progress. Idempotent — only hits the network the first time

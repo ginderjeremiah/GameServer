@@ -17,7 +17,8 @@ const fetchStats = async () => {
 		// fetchSocketData throws on a socket error, preserving this try/catch contract.
 		const result = (await fetchSocketData('GetPlayerStatistics')) ?? [];
 		if (loader.isStale(epoch)) {
-			// reset() ran while this fetch was in flight; this write belongs to a discarded session.
+			// Either reset() ran while this fetch was in flight (a discarded session), or markZoneCleared()
+			// applied a push mid-flight — this response predates that push and would revert it.
 			return;
 		}
 		stats = result;
@@ -58,8 +59,9 @@ export const statistics = {
 		return stats.some((s) => s.statisticTypeId === EStatisticType.ZonesCleared && s.entityId === zoneId && s.value > 0);
 	},
 
-	/** Optimistically record a zone clear so the "Cleared" seal appears immediately
-	 *  on a boss victory; the authoritative value is reconciled on the next load. */
+	/** Optimistically record a zone clear so the "Cleared" seal appears immediately on a boss
+	 *  victory; the authoritative value is reconciled on the next load. A fetch already in flight is
+	 *  invalidated so its response (computed before this push landed) can't revert the clear. */
 	markZoneCleared(zoneId: number) {
 		if (this.isZoneCleared(zoneId)) {
 			return;
@@ -70,6 +72,7 @@ export const statistics = {
 		} else {
 			stats = [...stats, { statisticTypeId: EStatisticType.ZonesCleared, entityId: zoneId, value: 1 }];
 		}
+		loader.invalidate();
 	},
 
 	/** Reset to the unloaded state (e.g. on logout / session replacement). */

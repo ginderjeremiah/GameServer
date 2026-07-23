@@ -214,4 +214,30 @@ describe('CoalescedLoader', () => {
 		expect(h.loader.isStale(epoch)).toBe(true);
 		expect(h.loader.isStale(h.loader.currentEpoch)).toBe(false);
 	});
+
+	it('invalidate() bumps the epoch so isStale recognizes a fetch issued before it', async () => {
+		const h = harness();
+		const epoch = h.loader.currentEpoch;
+		expect(h.loader.isStale(epoch)).toBe(false);
+
+		h.loader.invalidate();
+		expect(h.loader.isStale(epoch)).toBe(true);
+		expect(h.loader.isStale(h.loader.currentEpoch)).toBe(false);
+	});
+
+	it('invalidate() leaves in-flight/queued fetch state alone, unlike reset()', async () => {
+		const h = harness();
+		const initial = h.loader.load();
+
+		h.loader.invalidate();
+
+		// A concurrent non-forced load still coalesces onto the in-flight fetch instead of a reset()'s
+		// abandon-and-restart behavior starting a second one.
+		const second = h.loader.load();
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+
+		h.settle(0);
+		await Promise.all([initial, second]);
+		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+	});
 });
