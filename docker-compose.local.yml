@@ -28,7 +28,7 @@ services:
   postgres:
     image: postgres:18-alpine
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-game}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-game}
@@ -42,7 +42,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 3s
@@ -54,7 +54,7 @@ services:
       context: .
       dockerfile: Game.Api/Dockerfile
     ports:
-      - "${API_PORT:-5008}:5008"
+      - "127.0.0.1:${API_PORT:-5008}:5008"
     depends_on:
       postgres:
         condition: service_healthy
