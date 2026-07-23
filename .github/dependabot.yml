@@ -4,6 +4,12 @@ updates:
     directory: "/UI"
     schedule:
       interval: "weekly"
+    groups:
+      dev-minor-patch:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       - dependency-name: "@emnapi/core"
       - dependency-name: "@emnapi/runtime"
