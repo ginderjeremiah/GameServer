@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
 		timeElapsed: 8880, // the simulated battle duration claimVictory reports as clientTotalMs
 		startLoading: vi.fn(() => Promise.resolve()),
 		pause: vi.fn(),
+		rest: vi.fn(),
 		// The idle loop captures the player's battle-state at a battle's end and compares it after the
 		// cooldown to decide whether a server-bundled next battle is still parity-safe to present.
 		capturePlayerBattleState: vi.fn(() => ({ token: 'state' })),
@@ -581,6 +582,30 @@ describe('EnemyManager boss mode', () => {
 		expect(send.mock.calls.filter((c: unknown[]) => c[0] === 'NewEnemy').length).toBe(1);
 	});
 
+	it('abandons a boss-loss resolution that spans a stop()→start() cycle (#2331)', async () => {
+		// The exact #2331 scenario applied to the boss-loss path: BattleLost is in flight when the player
+		// navigates off (stop()) and back on (start()) before it resolves. The zombie resolution's stale
+		// guard read `this.started` live (true again after the restart) instead of a session epoch, so it
+		// would otherwise stomp the fresh session with the old battle's post-loss cooldown wait.
+		await manager.challengeBoss();
+		let releaseLost!: (r: IApiSocketResponse<'BattleLost'>) => void;
+		const lostGate = new Promise<IApiSocketResponse<'BattleLost'>>((resolve) => (releaseLost = resolve));
+		send.mockImplementation((name: string) => (name === 'BattleLost' ? lostGate : Promise.resolve(newEnemyResponse)));
+
+		const handled = fireStage(h.BattleStage.Defeated);
+		await flush(); // park the loss resolution on the in-flight BattleLost
+
+		manager.stop();
+		manager.start(); // a fresh session begins before the stale BattleLost resolves
+
+		releaseLost(lostResponse); // bundles a 5000ms cooldown
+		await handled;
+
+		// The zombie must not start the stale post-loss Loading wait nor spawn over the fresh session.
+		expect(h.battleEngine.startLoading).not.toHaveBeenCalledWith(5000);
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
+	});
+
 	it('does not spawn the stale prepared idle enemy when a challenge lands during the post-loss cooldown', async () => {
 		// #1696's exact failure scenario: BattleLost bundles a prefetched idle enemy and a cooldown; a
 		// challenge pressed during that cooldown resolves the parked startLoading early (finishLoading) and
@@ -685,6 +710,40 @@ describe('EnemyManager boss mode', () => {
 		expect(manager.mode).toBe('idle');
 		expect(manager.currentEnemy).toEqual(normalInstance);
 		expect(loaded).toEqual([normalInstance]);
+	});
+
+	it('releases the transitioning guard when a retreat is superseded by a Home entry mid-fetch (#2331 regression)', async () => {
+		// A retreat sets mode='idle' synchronously before its await (unlike a challenge, which sets mode='boss'
+		// and hard-disables zone nav) — so zone nav, including Home, stays reachable while retreatFromBoss's own
+		// getNewEnemy is still in flight. Entering Home there supersedes the retreat via interruptFetch without
+		// itself being a transition, so it must also force-clear `#transitioning` (mirroring stop()) or the
+		// zombie retreat's own finally can never match the bumped generation to release the guard — silently
+		// wedging watchBattleStage's `if (this.#transitioning) return;` gate for every future stage change.
+		h.staticData.zones = [];
+		h.staticData.zones[3] = zone(3, 0);
+		h.staticData.zones[5] = { ...zone(5, 1), isHome: true };
+		await manager.challengeBoss();
+		let releaseNewEnemy!: (r: IApiSocketResponse<'NewEnemy'>) => void;
+		const newEnemyGate = new Promise<IApiSocketResponse<'NewEnemy'>>((resolve) => (releaseNewEnemy = resolve));
+		send.mockImplementation((name: string) => (name === 'NewEnemy' ? newEnemyGate : Promise.resolve(newEnemyResponse)));
+
+		const retreat = manager.retreatFromBoss();
+		await flush(); // parked on the retreat's in-flight NewEnemy (mode already 'idle', zone nav reachable)
+		expect(manager.mode).toBe('idle');
+
+		manager.navigateToZone(5); // enters Home mid-retreat: supersedes via interruptFetch, not itself a transition
+		releaseNewEnemy(newEnemyResponse); // the superseded retreat's fetch resolves and abandons (generation moved on)
+		await retreat;
+
+		// Leave Home and win a fight: if the retreat's finally had failed to release `#transitioning` (the
+		// regression), watchBattleStage would silently swallow this stage change and DefeatEnemy would never send.
+		manager.navigateToZone(3);
+		await vi.waitFor(() => expect(manager.currentEnemy).toEqual(normalInstance));
+		send.mockClear();
+
+		await fireStage(h.BattleStage.Victorious);
+
+		expect(send).toHaveBeenCalledWith('DefeatEnemy', expect.anything());
 	});
 
 	it('a challenge supersedes an in-flight retreat, cancelling its parked backoff', async () => {
@@ -1114,6 +1173,67 @@ describe('EnemyManager boss mode', () => {
 		// The never-fought prefetch reports clientBattleMs 0, so the backend records no phantom abandon for it.
 		expect(send).toHaveBeenCalledWith('NewEnemy', { newZoneId: 3, clientBattleMs: 0, forceAbandon: false });
 		expect(manager.currentEnemy).toEqual(normalInstance);
+	});
+
+	it('abandons an idle victory resolution that spans a stop()→start() cycle (#2331)', async () => {
+		// The core #2331 scenario: the player wins, DefeatEnemy is in flight, they navigate off /game (stop())
+		// and back on (start()) before it resolves. Before the fix, the zombie continuation's post-claim guard
+		// only checked `this.#transitioning`/`this.mode` — both reset back to "valid" by the restart — so it
+		// would stomp the fresh session's stage with the stale battle's post-victory Loading wait and spawn
+		// over whatever the new session had already begun.
+		await manager.getNewEnemy(); // idle enemy loaded; mode stays idle
+		let releaseDefeat!: () => void;
+		const defeatGate = new Promise<void>((resolve) => (releaseDefeat = resolve));
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy'
+				? defeatGate.then(() => resp('DefeatEnemy', { cooldown: 4500, rewards: defeatRewards }))
+				: Promise.resolve(newEnemyResponse)
+		);
+		send.mockClear();
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush(); // park on the in-flight claim
+
+		manager.stop();
+		manager.start(); // a fresh session begins before the stale claim resolves
+
+		releaseDefeat();
+		await handled;
+
+		// The zombie must not start the stale post-victory Loading wait nor spawn over the fresh session.
+		expect(h.battleEngine.startLoading).not.toHaveBeenCalledWith(4500);
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
+	});
+
+	it('does not start the post-victory cooldown wait when the player enters Home mid-claim (#2331)', async () => {
+		// The smaller in-session variant from #2331: no restart needed. Home entry mid-claim (interruptFetch)
+		// used to leave the resolution's post-claim guard unaware — it would still call startLoading and flip
+		// the resting state to Loading, and nothing ever set it back (getNewEnemy's own Home guard only skips
+		// the spawn, not the stray Loading stage it had already entered).
+		h.staticData.zones = [];
+		h.staticData.zones[3] = zone(3, 0);
+		h.staticData.zones[5] = { ...zone(5, 1), isHome: true };
+		await manager.getNewEnemy(); // idle enemy loaded in zone 3
+		let releaseDefeat!: () => void;
+		const defeatGate = new Promise<void>((resolve) => (releaseDefeat = resolve));
+		send.mockImplementation((name: string) =>
+			name === 'DefeatEnemy'
+				? defeatGate.then(() => resp('DefeatEnemy', { cooldown: 4000, rewards: defeatRewards }))
+				: Promise.resolve(newEnemyResponse)
+		);
+		send.mockClear();
+
+		const handled = fireStage(h.BattleStage.Victorious);
+		await flush(); // park on the in-flight claim
+
+		manager.navigateToZone(5); // enters Home mid-claim: interruptFetch bumps the generation
+
+		releaseDefeat();
+		await handled;
+
+		// The resolution must bail before starting the stale cooldown wait, leaving the resting state alone.
+		expect(h.battleEngine.startLoading).not.toHaveBeenCalledWith(4000);
+		expect(send).not.toHaveBeenCalledWith('NewEnemy', expect.anything());
 	});
 
 	it('presents the server-bundled next idle enemy after a boss loss, with no NewEnemy round-trip', async () => {
