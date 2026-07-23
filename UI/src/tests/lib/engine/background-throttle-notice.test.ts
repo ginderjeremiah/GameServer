@@ -8,7 +8,11 @@ const h = vi.hoisted(() => ({
 		lsStore: {} as Record<string, string>,
 		lsAvailable: true,
 		setItemThrows: false,
-		idleTimeLostCb: undefined as ((ms: number) => void) | undefined
+		idleTimeLostCb: undefined as ((ms: number) => void) | undefined,
+		// Every onLogicalUpdate() call gets its own {cb, unhook} entry (mirroring the real hook's
+		// per-subscriber tracker) so a test can tell a genuinely-unhooked stale subscription apart
+		// from one that was merely overwritten by a later subscribe.
+		logicalUpdateSubs: [] as { cb: (tickMs: number, unhook: () => void) => void; unhook: () => void }[]
 	}
 }));
 
@@ -29,11 +33,17 @@ vi.mock('$lib/common/local-storage', () => ({
 			: null
 }));
 
-// Capture the callback the monitor registers so the test can drive lost-time events directly.
+// Capture the callbacks the monitor registers so the test can drive lost-time and regular-tick
+// events directly.
 vi.mock('$lib/engine/logical-engine', () => ({
 	onIdleTimeLost: (cb: (ms: number) => void) => {
 		h.state.idleTimeLostCb = cb;
 		return h.unhook;
+	},
+	onLogicalUpdate: (cb: (tickMs: number, unhook: () => void) => void) => {
+		const unhook = vi.fn<() => void>();
+		h.state.logicalUpdateSubs.push({ cb, unhook });
+		return unhook;
 	}
 }));
 
@@ -58,6 +68,7 @@ describe('BackgroundThrottleMonitor', () => {
 		h.state.lsAvailable = true;
 		h.state.setItemThrows = false;
 		h.state.idleTimeLostCb = undefined;
+		h.state.logicalUpdateSubs = [];
 		hidden = false;
 		Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
 		monitor = new BackgroundThrottleMonitor();
@@ -72,6 +83,14 @@ describe('BackgroundThrottleMonitor', () => {
 	});
 
 	const lose = (ms: number) => h.state.idleTimeLostCb?.(ms);
+	const latestGuardSub = () => h.state.logicalUpdateSubs.at(-1);
+	// Simulates a regular logical tick that lost nothing — the common case, since the worker tick
+	// source polls every 10ms regardless of visibility. Only the current (last-subscribed) guard is
+	// fired — a real, correctly-unhooked stale guard would never receive it.
+	const tick = () => {
+		const sub = latestGuardSub();
+		sub?.cb(10, sub.unhook);
+	};
 
 	it('shows a one-time dismissible notice after a hidden period loses past the threshold', () => {
 		monitor.start();
@@ -110,6 +129,41 @@ describe('BackgroundThrottleMonitor', () => {
 		lose(70_000); // a genuine later foreground stall — ignored
 
 		expect(h.toastWarning).not.toHaveBeenCalled();
+	});
+
+	it('disarms the resume credit once a regular tick passes with nothing lost, so a later foreground stall is not misattributed', () => {
+		monitor.start();
+		goHidden();
+		goVisible(); // arms the one-shot resume credit
+		tick(); // a normal post-resume tick with nothing lost — the credit must not survive this
+		lose(70_000); // hours-later foreground stall (OS suspend, debugger pause, etc.)
+
+		expect(h.toastWarning).not.toHaveBeenCalled();
+	});
+
+	it('unhooks a stale resume-guard subscription from an earlier cycle before arming a fresh one', () => {
+		monitor.start();
+		goHidden();
+		goVisible(); // arms guard #1; the hidden->visible edge also exercises the hidden-branch clear
+		// A second, back-to-back visible edge (no intervening hide) isolates armResumeGuard's own
+		// clearResumeGuard() call: without it, guard #1 would stay subscribed as a stale duplicate.
+		goVisible();
+
+		expect(h.state.logicalUpdateSubs).toHaveLength(2);
+		expect(h.state.logicalUpdateSubs[0].unhook).toHaveBeenCalled(); // guard #1: actually unhooked
+		expect(h.state.logicalUpdateSubs[1].unhook).not.toHaveBeenCalled(); // guard #2: still live
+
+		lose(70_000); // credited to guard #2's hidden period
+		expect(h.toastWarning).toHaveBeenCalledTimes(1);
+	});
+
+	it('unsubscribes the pending resume guard on stop', () => {
+		monitor.start();
+		goHidden();
+		goVisible(); // arms the guard
+		monitor.stop();
+
+		expect(latestGuardSub()?.unhook).toHaveBeenCalled();
 	});
 
 	it('ignores idle time lost while the tab is visible (a foreground stall is not backgrounding)', () => {

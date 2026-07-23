@@ -1,4 +1,4 @@
-import { onIdleTimeLost } from './logical-engine';
+import { onIdleTimeLost, onLogicalUpdate } from './logical-engine';
 import { toastWarning } from '$stores';
 import { safeLocalStorage } from '$lib/common/local-storage';
 import type { Action } from '$lib/common';
@@ -42,6 +42,7 @@ export const backgroundThrottleGuidance = (): string => {
  */
 export class BackgroundThrottleMonitor {
 	private unhookIdleTimeLost?: Action;
+	private unhookResumeGuard?: Action;
 	private lostWhileHiddenMs = 0;
 	private resumeCatchUpPending = false;
 	private running = false;
@@ -53,6 +54,7 @@ export class BackgroundThrottleMonitor {
 		this.running = true;
 		this.lostWhileHiddenMs = 0;
 		this.resumeCatchUpPending = false;
+		this.clearResumeGuard();
 		this.unhookIdleTimeLost = onIdleTimeLost((lostMs) => this.recordLostTime(lostMs));
 		document.addEventListener('visibilitychange', this.handleVisibilityChange);
 	}
@@ -64,6 +66,7 @@ export class BackgroundThrottleMonitor {
 		this.running = false;
 		this.lostWhileHiddenMs = 0;
 		this.resumeCatchUpPending = false;
+		this.clearResumeGuard();
 		this.unhookIdleTimeLost?.();
 		this.unhookIdleTimeLost = undefined;
 		document.removeEventListener('visibilitychange', this.handleVisibilityChange);
@@ -81,6 +84,7 @@ export class BackgroundThrottleMonitor {
 		// that just ended rather than dropping it as a foreground stall.
 		if (this.resumeCatchUpPending) {
 			this.resumeCatchUpPending = false;
+			this.clearResumeGuard();
 			this.lostWhileHiddenMs += lostMs;
 			this.evaluate();
 		}
@@ -92,13 +96,32 @@ export class BackgroundThrottleMonitor {
 			// Entering a new hidden period — measure it on its own.
 			this.lostWhileHiddenMs = 0;
 			this.resumeCatchUpPending = false;
+			this.clearResumeGuard();
 			return;
 		}
 		// Back in the foreground. A throttled tab has already accumulated its loss (evaluate it now);
-		// a frozen tab's loss arrives as the next catch-up poll, so arm the one-shot resume credit.
+		// a frozen tab's loss arrives as the next catch-up poll, so arm the one-shot resume credit —
+		// but only through the very next logical tick. If that tick isn't itself the catch-up poll,
+		// nothing was actually lost to backgrounding, so the credit must not linger to be misapplied
+		// to some unrelated foreground stall much later.
 		this.resumeCatchUpPending = true;
+		this.armResumeGuard();
 		this.evaluate();
 	};
+
+	private armResumeGuard() {
+		this.clearResumeGuard();
+		this.unhookResumeGuard = onLogicalUpdate((_tickMs, unhook) => {
+			unhook();
+			this.unhookResumeGuard = undefined;
+			this.resumeCatchUpPending = false;
+		});
+	}
+
+	private clearResumeGuard() {
+		this.unhookResumeGuard?.();
+		this.unhookResumeGuard = undefined;
+	}
 
 	// Nudges once if the hidden period cost a meaningful amount of idle progress.
 	private evaluate() {
