@@ -11,15 +11,27 @@
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
-**/azds.yaml
 **/bin
-**/charts
 **/docker-compose*
 **/Dockerfile*
 **/node_modules
 **/npm-debug.log
 **/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
 LICENSE
 README.md
+*.md
+
+# Not needed by any Docker image build (API image only needs the runtime projects, the root
+# props/solution files, and content/*.json). Excluding these keeps the build context small and
+# stops UI/docs/test churn from invalidating the csproj-first restore layer in Game.Api/Dockerfile.
+UI/
+docs/
+.github/
+.claude/
+coverage/
+Game.Api.Tests/
+Game.Application.Tests/
+Game.Core.Tests/
+Game.Core.TestInfrastructure/
+Game.Infrastructure.Tests/
+Game.TestInfrastructure/
