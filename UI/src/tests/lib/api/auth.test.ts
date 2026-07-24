@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from '$lib/api/auth';
+import { ensureValidAccessToken, getRotatedRefreshToken, handleAuthFailure, refreshTokens } from '$lib/api/auth';
 import { getTokens, setTokens } from '$lib/api/token-store';
 
 function makeAccessToken(secondsFromNow: number): string {
@@ -243,6 +243,45 @@ describe('auth', () => {
 			const result = await ensureValidAccessToken();
 
 			expect(result).toEqual({ accessToken: null, rejected: false });
+		});
+	});
+
+	describe('getRotatedRefreshToken', () => {
+		it('returns the stored refresh token without refreshing when the access token is still valid', async () => {
+			setTokens({ accessToken: makeAccessToken(600), refreshToken: 'r' });
+			const fetchMock = vi.fn();
+			vi.stubGlobal('fetch', fetchMock);
+
+			const result = await getRotatedRefreshToken();
+
+			expect(result).toBe('r');
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('settles a due refresh first, returning the rotated token rather than the stale one', async () => {
+			// The exact race #1767/#2370 fix: reading the refresh token before a due pre-emptive refresh
+			// rotates it would hand a caller the already-consumed token.
+			setTokens({ accessToken: makeAccessToken(10), refreshToken: 'stale' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => okResponse('fresh-access', 'rotated'))
+			);
+
+			const result = await getRotatedRefreshToken();
+
+			expect(result).toBe('rotated');
+		});
+
+		it('returns null when the refresh is definitively rejected', async () => {
+			setTokens({ accessToken: makeAccessToken(10), refreshToken: 'r' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => ({ ok: false, status: 400, json: async () => ({}) }))
+			);
+
+			const result = await getRotatedRefreshToken();
+
+			expect(result).toBeNull();
 		});
 	});
 

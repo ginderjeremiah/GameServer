@@ -8,7 +8,7 @@ const {
 	postMock,
 	getMock,
 	setTokensMock,
-	getRefreshTokenMock,
+	getRotatedRefreshTokenMock,
 	gotoMock,
 	takeMock,
 	initializeMock,
@@ -17,7 +17,7 @@ const {
 	postMock: vi.fn(),
 	getMock: vi.fn(),
 	setTokensMock: vi.fn(),
-	getRefreshTokenMock: vi.fn(),
+	getRotatedRefreshTokenMock: vi.fn(),
 	gotoMock: vi.fn(),
 	takeMock: vi.fn(),
 	initializeMock: vi.fn(),
@@ -52,7 +52,7 @@ vi.mock('$lib/api', async (importOriginal) => ({
 		get = () => getMock(this.route);
 	},
 	setTokens: setTokensMock,
-	getRefreshToken: getRefreshTokenMock,
+	getRotatedRefreshToken: getRotatedRefreshTokenMock,
 	reportDeviceInfo: vi.fn(),
 	logout: vi.fn()
 }));
@@ -73,7 +73,7 @@ beforeEach(() => {
 	// The create form fetches its class options over HTTP (Players/CharacterCreationData).
 	getMock.mockResolvedValue({ status: 200, data: [CREATABLE_CLASS] });
 	setTokensMock.mockClear();
-	getRefreshTokenMock.mockReturnValue('r');
+	getRotatedRefreshTokenMock.mockReset().mockResolvedValue('r');
 	gotoMock.mockClear();
 	takeMock.mockReset();
 	initializeMock.mockClear();
@@ -135,6 +135,25 @@ describe('Select page', () => {
 		expect(setTokensMock).toHaveBeenCalledWith({ accessToken: 'a2', refreshToken: 'r2' });
 		await waitFor(() => expect(initializeMock).toHaveBeenCalledWith({ id: 2, name: 'Rogue' }));
 		expect(gotoMock).toHaveBeenCalledWith('/loading');
+	});
+
+	it('sends the token getRotatedRefreshToken resolves, settled before ApiRequest can rotate it (#2370)', async () => {
+		// A hesitated takeover confirm can cross into ApiRequest's own pre-emptive refresh window;
+		// getRotatedRefreshToken settles that first so the token read here is the one actually sent.
+		getRotatedRefreshTokenMock.mockResolvedValue('rotated');
+		takeMock.mockReturnValue(SUMMARIES);
+		postMock.mockResolvedValue({
+			status: 200,
+			data: { tokens: { accessToken: 'a2', refreshToken: 'r2' }, player: { id: 2, name: 'Rogue' } }
+		});
+		render(SelectPage);
+
+		await waitFor(() => expect(screen.getAllByTestId('player-card')).toHaveLength(2));
+		await fireEvent.click(screen.getAllByTestId('player-card')[1]);
+
+		await waitFor(() =>
+			expect(postMock).toHaveBeenCalledWith('Players/SelectPlayer', { playerId: 2, refreshToken: 'rotated' })
+		);
 	});
 
 	it('creates a character and appends it to the list', async () => {
