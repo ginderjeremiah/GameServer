@@ -224,43 +224,57 @@ namespace Game.DataAccess.Repositories
             return progress;
         }
 
+        private const int StatisticRowKind = 0;
+        private const int ChallengeRowKind = 1;
+        private const int ProficiencyRowKind = 2;
+
+        /// <summary>
+        /// Cold path only (first read after a TTL lapse/eviction, or a brand-new player) — reads the three
+        /// progress tables as one <c>UNION ALL</c> round trip instead of three sequential ones. EF Core cannot
+        /// run independent queries concurrently on one <see cref="GameContext"/>, so batching them onto one
+        /// round trip means projecting all three onto one shared anonymous shape and
+        /// <see cref="Queryable.Concat{T}"/>-ing them (the shape a translatable set operation requires) rather
+        /// than awaiting each in turn. Every column is populated for every row kind — defaulted rather than left
+        /// null on the kinds that don't use it — discriminated by <c>Kind</c> on the way back out, so the
+        /// reconstruction below never needs the null-forgiving operator.
+        /// </summary>
         private async Task<CachedPlayerProgress> LoadFromDb(int playerId, CancellationToken cancellationToken)
         {
-            var statistics = await _context.PlayerStatistics
+            var statistics = _context.PlayerStatistics
                 .AsNoTracking()
                 .Where(ps => ps.PlayerId == playerId)
-                .Select(ps => new CachedPlayerStatistic
-                {
-                    StatisticTypeId = ps.StatisticTypeId,
-                    EntityId = ps.EntityId,
-                    Value = ps.Value,
-                })
-                .ToListAsync(cancellationToken);
+                .Select(ps => new { Kind = StatisticRowKind, Id = ps.StatisticTypeId, EntityId = ps.EntityId, Level = 0, Amount = ps.Value, Completed = false, CompletedAt = (DateTime?)null });
 
-            var challenges = await _context.PlayerChallenges
+            var challenges = _context.PlayerChallenges
                 .AsNoTracking()
                 .Where(pc => pc.PlayerId == playerId)
-                .Select(pc => new CachedPlayerChallenge
-                {
-                    ChallengeId = pc.ChallengeId,
-                    Progress = pc.Progress,
-                    Completed = pc.Completed,
-                    CompletedAt = pc.CompletedAt,
-                })
-                .ToListAsync(cancellationToken);
+                .Select(pc => new { Kind = ChallengeRowKind, Id = pc.ChallengeId, EntityId = (int?)null, Level = 0, Amount = pc.Progress, Completed = pc.Completed, CompletedAt = pc.CompletedAt });
 
-            var proficiencies = await _context.PlayerProficiencies
+            var proficiencies = _context.PlayerProficiencies
                 .AsNoTracking()
                 .Where(pp => pp.PlayerId == playerId)
-                .Select(pp => new CachedPlayerProficiency
-                {
-                    ProficiencyId = pp.ProficiencyId,
-                    Level = pp.Level,
-                    Xp = pp.Xp,
-                })
-                .ToListAsync(cancellationToken);
+                .Select(pp => new { Kind = ProficiencyRowKind, Id = pp.ProficiencyId, EntityId = (int?)null, Level = pp.Level, Amount = pp.Xp, Completed = false, CompletedAt = (DateTime?)null });
 
-            return new CachedPlayerProgress { Statistics = statistics, Challenges = challenges, Proficiencies = proficiencies };
+            var rows = await statistics.Concat(challenges).Concat(proficiencies).ToListAsync(cancellationToken);
+
+            var progress = new CachedPlayerProgress();
+            foreach (var row in rows)
+            {
+                switch (row.Kind)
+                {
+                    case StatisticRowKind:
+                        progress.Statistics.Add(new CachedPlayerStatistic { StatisticTypeId = row.Id, EntityId = row.EntityId, Value = row.Amount });
+                        break;
+                    case ChallengeRowKind:
+                        progress.Challenges.Add(new CachedPlayerChallenge { ChallengeId = row.Id, Progress = row.Amount, Completed = row.Completed, CompletedAt = row.CompletedAt });
+                        break;
+                    case ProficiencyRowKind:
+                        progress.Proficiencies.Add(new CachedPlayerProficiency { ProficiencyId = row.Id, Level = row.Level, Xp = row.Amount });
+                        break;
+                }
+            }
+
+            return progress;
         }
 
         private static CoreStat ToCoreStatistic(CachedPlayerStatistic cached) => new()

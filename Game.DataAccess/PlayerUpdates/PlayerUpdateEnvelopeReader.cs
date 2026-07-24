@@ -4,30 +4,28 @@ using System.Text.Json;
 namespace Game.DataAccess.PlayerUpdates
 {
     /// <summary>
-    /// Reads the owning player id out of a raw queued envelope generically (every persisted player-update
-    /// event's payload carries a <c>playerId</c>), without coupling to each concrete event type. Shared by the
-    /// dead-letter inspector (<see cref="Repositories.Admin.PlayerUpdateDeadLetters"/>, classifying entries for
-    /// display) and <see cref="DataProviderSynchronizer"/> (routing reserved items to a per-player ordering lane
-    /// for bounded cross-player concurrency, #1701). This is a best-effort peek, not an authoritative parse: a
-    /// malformed envelope or payload simply yields no player id here, and is left to whichever caller owns the
-    /// authoritative parse (the dead-letter classifier, or <c>ProcessMessage</c>'s own deserialize) to treat it
-    /// as a poison message.
+    /// Parses a raw queued envelope and reads the owning player id out of it generically (every persisted
+    /// player-update event's payload carries a <c>playerId</c>), without coupling to each concrete event type.
+    /// Shared by the dead-letter inspector (<see cref="Repositories.Admin.PlayerUpdateDeadLetters"/>, classifying
+    /// entries for display) and <see cref="DataProviderSynchronizer"/> (routing reserved items to a per-player
+    /// ordering lane for bounded cross-player concurrency, #1701, and threading the one parsed envelope through
+    /// to <c>ProcessMessage</c> rather than re-deserializing it). The player-id read is a best-effort peek, not
+    /// an authoritative parse: a malformed payload simply yields no player id here, and is left to whichever
+    /// caller owns the authoritative parse (the dead-letter classifier, or the event dispatcher's own inner
+    /// deserialize) to treat it as a poison message.
     /// </summary>
     internal static class PlayerUpdateEnvelopeReader
     {
-        public static int? TryReadPlayerId(string rawMessage)
+        public static (DomainEventEnvelope? Envelope, JsonException? ParseError) TryParseEnvelope(string rawMessage)
         {
-            DomainEventEnvelope? envelope;
             try
             {
-                envelope = rawMessage.Deserialize<DomainEventEnvelope>();
+                return (rawMessage.Deserialize<DomainEventEnvelope>(), null);
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
-                return null;
+                return (null, ex);
             }
-
-            return envelope is null ? null : TryReadPlayerIdFromPayload(envelope.Payload);
         }
 
         public static int? TryReadPlayerIdFromPayload(string? payload)
