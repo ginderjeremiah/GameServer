@@ -11,8 +11,7 @@ const {
 	postMock,
 	disconnectMock,
 	stopEnginesMock,
-	ensureValidAccessTokenMock,
-	getRefreshTokenMock,
+	getRotatedRefreshTokenMock,
 	setTokensMock,
 	confirmTakeoverMock
 } = vi.hoisted(() => ({
@@ -20,8 +19,7 @@ const {
 	postMock: vi.fn(),
 	disconnectMock: vi.fn(),
 	stopEnginesMock: vi.fn(),
-	ensureValidAccessTokenMock: vi.fn(),
-	getRefreshTokenMock: vi.fn(),
+	getRotatedRefreshTokenMock: vi.fn(),
 	setTokensMock: vi.fn(),
 	confirmTakeoverMock: vi.fn()
 }));
@@ -36,8 +34,7 @@ vi.mock('$lib/api', async (importOriginal) => ({
 		post = (body: unknown) => postMock(this.route, body);
 	},
 	apiSocket: { disconnect: disconnectMock },
-	ensureValidAccessToken: ensureValidAccessTokenMock,
-	getRefreshToken: getRefreshTokenMock,
+	getRotatedRefreshToken: getRotatedRefreshTokenMock,
 	setTokens: setTokensMock
 }));
 vi.mock('$lib/engine', () => ({
@@ -82,8 +79,7 @@ beforeEach(() => {
 	postMock.mockReset();
 	disconnectMock.mockReset();
 	stopEnginesMock.mockReset();
-	ensureValidAccessTokenMock.mockReset().mockResolvedValue({ accessToken: 'a', rejected: false });
-	getRefreshTokenMock.mockReset().mockReturnValue('r');
+	getRotatedRefreshTokenMock.mockReset().mockResolvedValue('r');
 	setTokensMock.mockReset();
 	confirmTakeoverMock.mockReset().mockResolvedValue(true);
 	originalLocation = window.location;
@@ -147,13 +143,8 @@ describe('CharacterSwitcher', () => {
 		expect(window.location.href).toBe('');
 	});
 
-	it('reads the refresh token after settling any pre-emptive refresh, not before', async () => {
-		// Simulate ApiRequest's own pre-emptive refresh rotating the token pair while it settles, the
-		// exact race #1767 fixed: reading the token first would capture the now-stale 'r'.
-		ensureValidAccessTokenMock.mockImplementation(async () => {
-			getRefreshTokenMock.mockReturnValue('rotated');
-			return { accessToken: 'a2', rejected: false };
-		});
+	it('sends the token getRotatedRefreshToken resolves, settled before ApiRequest can rotate it (#1767)', async () => {
+		getRotatedRefreshTokenMock.mockResolvedValue('rotated');
 		postMock.mockResolvedValue({
 			status: 200,
 			data: { tokens: { accessToken: 'a2', refreshToken: 'r2' }, player: { id: 2, name: 'Rogue' } }

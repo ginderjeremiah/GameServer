@@ -157,6 +157,17 @@ export const ensureValidAccessToken = async (): Promise<AccessTokenResult> => {
 };
 
 /**
+ * Reads the stored refresh token for a caller that sends it in a request body rather than relying on
+ * `ApiRequest`'s own pre-emptive refresh (e.g. `SelectPlayer`/`SwitchPlayer`). Settles any due refresh
+ * first, so the token read here is the one that will actually be sent rather than one `execute`'s own
+ * `ensureValidAccessToken` is about to rotate out from under it (#1767, #2370).
+ */
+export const getRotatedRefreshToken = async (): Promise<string | null> => {
+	await ensureValidAccessToken();
+	return getRefreshToken();
+};
+
+/**
  * Handles an unrecoverable auth failure (refresh definitively rejected): clears the stored tokens and
  * returns the user to the login screen. A full-page navigation tears down all in-memory game state,
  * mirroring the logout flow. The redirect is skipped when already on the login page to avoid a reload loop.

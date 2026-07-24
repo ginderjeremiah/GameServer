@@ -20,7 +20,7 @@
 import { onMount } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { ApiRequest, getRefreshToken, logout, reportDeviceInfo, setTokens } from '$lib/api';
+import { ApiRequest, getRotatedRefreshToken, logout, reportDeviceInfo, setTokens } from '$lib/api';
 import type { IPlayerData } from '$lib/api';
 import { playerManager } from '$lib/engine';
 import { confirmSessionTakeover } from '../login/session-takeover';
@@ -33,7 +33,7 @@ let view = $state<PlayerSelectView | null>(null);
 // Bind the chosen character: rotate the token to carry it (SelectPlayer), store the new pair, and
 // return the loaded player. A missing refresh token means the session is no longer usable here.
 const selectPlayer: PlayerSelectDeps['selectPlayer'] = async (playerId) => {
-	const refreshToken = getRefreshToken();
+	const refreshToken = await getRotatedRefreshToken();
 	if (!refreshToken) {
 		return { ok: false, error: 'Your session is no longer valid. Please log in again.' };
 	}
