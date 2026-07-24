@@ -225,53 +225,64 @@ describe('CoalescedLoader', () => {
 		expect(h.loader.isStale(h.loader.currentEpoch)).toBe(false);
 	});
 
-	it('invalidate() leaves in-flight/queued fetch state alone, unlike reset()', async () => {
+	it('invalidate() while unloaded queues a fresh fetch, and a concurrent load coalesces onto it', async () => {
 		const h = harness();
 		const initial = h.loader.load();
 
+		// A push lands (e.g. a ChallengeCompleted event) while the store's first-ever load is still in
+		// flight. Discarding that response without queuing a replacement would strand the store on
+		// push-delta-only data forever, since nothing else retries a store that already has some data.
 		h.loader.invalidate();
-
-		// A concurrent non-forced load still coalesces onto the in-flight fetch instead of a reset()'s
-		// abandon-and-restart behavior starting a second one.
 		const second = h.loader.load();
+		// The queued fetch hasn't fired yet (it waits on the stale in-flight one), and `second` coalesces
+		// onto it rather than starting a third, independent fetch.
 		expect(h.fetchFn).toHaveBeenCalledTimes(1);
 
 		h.settle(0);
-		await Promise.all([initial, second]);
-		expect(h.fetchFn).toHaveBeenCalledTimes(1);
+		await initial;
+		await flush();
+		// Settling the stale fetch releases the fresh one invalidate() queued.
+		expect(h.fetchFn).toHaveBeenCalledTimes(2);
+
+		h.settle(1);
+		await second;
 	});
 
-	it('invalidate() racing a queued force does not strand freshQueued, so a later force still queues fresh', async () => {
+	it('invalidate() leaves an in-flight/queued fetch alone once the store is loaded, unlike reset()', async () => {
+		const h = harness();
+		const first = h.loader.load();
+		h.settle(0);
+		await first;
+
+		const forced = h.loader.load(true);
+		// The store already has a full baseline (loaded), so unlike the unloaded case above, invalidate()
+		// must not queue an extra fetch on top of the force already running.
+		h.loader.invalidate();
+		expect(h.fetchFn).toHaveBeenCalledTimes(2);
+
+		h.settle(1);
+		await forced;
+		expect(h.fetchFn).toHaveBeenCalledTimes(2);
+	});
+
+	it('invalidate() racing a queued force does not abort it — the force still gets a genuinely fresh fetch', async () => {
 		const h = harness();
 		const initial = h.loader.load();
 		const forced = h.loader.load(true);
 		expect(h.fetchFn).toHaveBeenCalledTimes(1);
 
-		// A push (e.g. a battle victory) lands mid-flight and invalidates the epoch the queued force
-		// captured as its chainEpoch, so that chain will abort without ever fetching.
+		// A push lands mid-flight and invalidates while a force is already queued behind the in-flight
+		// fetch. The force's caller (e.g. resolveBossVictory's gate re-check) depends on genuinely fresh
+		// data, so this must not silently cancel the queued fetch and resolve the force with nothing.
 		h.loader.invalidate();
 
 		h.settle(0);
 		await initial;
-		await forced;
 		await flush();
-		// The aborted chain never issued a second fetch — expected either way.
-		expect(h.fetchFn).toHaveBeenCalledTimes(1);
-
-		// A brand-new fetch starts, and a force issued while it's in flight must still be honored
-		// with a genuinely fresh fetch — not silently coalesce onto it the way a stuck freshQueued
-		// flag (left over from the aborted chain above) would cause.
-		const second = h.loader.load(true);
-		expect(h.fetchFn).toHaveBeenCalledTimes(2);
-		const thirdForce = h.loader.load(true);
+		// The queued force fetch still fires once the stale in-flight fetch settles.
 		expect(h.fetchFn).toHaveBeenCalledTimes(2);
 
 		h.settle(1);
-		await second;
-		await flush();
-		expect(h.fetchFn).toHaveBeenCalledTimes(3);
-
-		h.settle(2);
-		await thirdForce;
+		await forced;
 	});
 });

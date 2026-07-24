@@ -14,10 +14,15 @@
 export class CoalescedLoader {
 	/** Tail of the current load pipeline; concurrent callers await it instead of re-fetching. */
 	private inFlight: Promise<void> | undefined;
-	/** Whether a fresh (post-force) fetch is already queued behind the in-flight one. */
+	/** Whether a fresh fetch is already queued behind the in-flight one (via a force or {@link invalidate}). */
 	private freshQueued = false;
-	/** Bumped by {@link reset} so a queued fresh fetch from a discarded session never fires. */
+	/** Bumped by {@link reset} and {@link invalidate}; exposed via {@link currentEpoch}/{@link isStale}
+	 *  so `fetchFn` can recognize its own in-flight response as no longer trustworthy. */
 	private epoch = 0;
+	/** Bumped only by {@link reset}. A queued fresh fetch aborts on this moving (a discarded session)
+	 *  but, unlike {@link epoch}, does NOT move on {@link invalidate} — an invalidation must not abort
+	 *  a chain that still owes real data to a `loaded` store or a waiting `force` caller. */
+	private resetEpoch = 0;
 
 	/** `fetchFn` must never reject — the stores' fetchers catch and record errors internally. */
 	constructor(
@@ -40,17 +45,7 @@ export class CoalescedLoader {
 		if (force && !this.freshQueued) {
 			// The in-flight fetch predates this force, so its response may be stale — queue one
 			// fresh fetch behind it; later forces coalesce onto that queued fetch.
-			this.freshQueued = true;
-			const chainEpoch = this.epoch;
-			this.track(
-				this.inFlight.then(() => {
-					if (this.epoch !== chainEpoch) {
-						return;
-					}
-					this.freshQueued = false;
-					return this.fetchFn();
-				})
-			);
+			this.queueFreshFetch(this.inFlight);
 		}
 		await this.inFlight;
 	}
@@ -60,6 +55,7 @@ export class CoalescedLoader {
 		this.inFlight = undefined;
 		this.freshQueued = false;
 		this.epoch += 1;
+		this.resetEpoch += 1;
 	}
 
 	/** Bumps the epoch so an already-in-flight fetch's eventual response is recognized as stale by
@@ -68,13 +64,16 @@ export class CoalescedLoader {
 	 *  response was computed before the push landed, so a later `load()` should not still get to
 	 *  overwrite the push with it.
 	 *
-	 *  Also clears `freshQueued`: a force already queued behind the in-flight fetch captured the
-	 *  pre-bump epoch as its `chainEpoch` (see {@link load}), so this bump makes that queued chain
-	 *  abort without ever clearing the flag itself — leaving it stuck and silently disabling the
-	 *  force-queue path for the rest of the session unless cleared here. */
+	 *  If that now-stale in-flight fetch was the only thing that would ever bring the store to
+	 *  `loaded`, queue a fresh fetch behind it — otherwise a push landing before the store's first
+	 *  load ever completes strands it on push-delta-only data forever. A fetch already queued (from
+	 *  an earlier force, or a previous invalidation) is left alone: it isn't aborted by this bump (see
+	 *  {@link resetEpoch}), so it still delivers real data to whatever is waiting on it. */
 	invalidate(): void {
 		this.epoch += 1;
-		this.freshQueued = false;
+		if (this.inFlight && !this.isLoaded() && !this.freshQueued) {
+			this.queueFreshFetch(this.inFlight);
+		}
 	}
 
 	/** Current epoch, bumped by {@link reset} and {@link invalidate}. `fetchFn` should capture this
@@ -89,6 +88,23 @@ export class CoalescedLoader {
 	 *  discarded session, or a push whose mutation the write would otherwise revert). */
 	isStale(epoch: number): boolean {
 		return epoch !== this.epoch;
+	}
+
+	/** Queues a fresh fetch behind `inFlight`, replacing it as the tracked in-flight promise. Aborts
+	 *  without fetching only if {@link reset} runs before `inFlight` settles — an {@link invalidate}
+	 *  in that window must not cancel a fetch this chain owes to a `loaded` store or a `force` caller. */
+	private queueFreshFetch(inFlight: Promise<void>): void {
+		this.freshQueued = true;
+		const chainResetEpoch = this.resetEpoch;
+		this.track(
+			inFlight.then(() => {
+				if (this.resetEpoch !== chainResetEpoch) {
+					return;
+				}
+				this.freshQueued = false;
+				return this.fetchFn();
+			})
+		);
 	}
 
 	/** Publishes `pipeline` as the awaitable in-flight load, clearing it once it settles unless a
