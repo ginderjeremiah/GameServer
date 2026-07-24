@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const postMock = vi.fn();
-const constructorMock = vi.fn();
+const { postMock, constructorMock, getRotatedRefreshTokenMock } = vi.hoisted(() => ({
+	postMock: vi.fn(),
+	constructorMock: vi.fn(),
+	getRotatedRefreshTokenMock: vi.fn()
+}));
 
 vi.mock('$lib/api/api-request', () => ({
 	ApiRequest: class {
@@ -10,6 +13,10 @@ vi.mock('$lib/api/api-request', () => ({
 		}
 		post = postMock;
 	}
+}));
+
+vi.mock('$lib/api/auth', () => ({
+	getRotatedRefreshToken: getRotatedRefreshTokenMock
 }));
 
 import { logout } from '$lib/api/logout';
@@ -21,6 +28,7 @@ describe('logout', () => {
 	beforeEach(() => {
 		constructorMock.mockReset();
 		postMock.mockReset().mockResolvedValue({ status: 200 });
+		getRotatedRefreshTokenMock.mockReset().mockImplementation(async () => getTokens()?.refreshToken ?? null);
 		localStorage.clear();
 		setTokens({ accessToken: 'access', refreshToken: 'refresh' });
 		originalLocation = window.location;
@@ -75,5 +83,16 @@ describe('logout', () => {
 		await pending;
 
 		expect(window.location.href).toBe('/');
+	});
+
+	it('sends the token getRotatedRefreshToken resolves, settled before ApiRequest can rotate it (#2386)', async () => {
+		// A pre-emptive refresh due inside ApiRequest's own execute() can rotate the stored refresh
+		// token out from under a plain read; getRotatedRefreshToken settles that first so the token
+		// sent here is the one actually live in storage.
+		getRotatedRefreshTokenMock.mockResolvedValue('rotated');
+
+		await logout();
+
+		expect(postMock).toHaveBeenCalledWith({ refreshToken: 'rotated' });
 	});
 });
