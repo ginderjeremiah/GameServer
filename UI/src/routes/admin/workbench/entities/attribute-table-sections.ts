@@ -32,10 +32,11 @@ export const attributeDistributionSection = <T extends Identified>(config: {
 	 */
 	attributeFilter?: (attributeId: number) => boolean;
 }): TableSectionConfig<T> => {
+	const { attributeFilter } = config;
 	const rowsOf = (rec: T) => fieldsOf(rec)[config.itemsKey] as AttributeDistributionRow[];
 	const attributeOptions = () =>
-		config.attributeFilter
-			? reference.attributeOptions().filter((o) => config.attributeFilter!(o.value))
+		attributeFilter
+			? reference.attributeOptions().filter((o) => attributeFilter(o.value))
 			: reference.attributeOptions();
 	return {
 		key: config.key,
@@ -50,7 +51,7 @@ export const attributeDistributionSection = <T extends Identified>(config: {
 			}
 			// A row can violate the restriction even though the picker excludes it from new authoring —
 			// e.g. it was set before the restriction existed. Hard-rejected on save, so it blocks (#2376).
-			const violator = config.attributeFilter && rows.find((r) => !config.attributeFilter!(r.attributeId));
+			const violator = attributeFilter && rows.find((r) => !attributeFilter(r.attributeId));
 			if (violator) {
 				return {
 					message: `'${attributeName(violator.attributeId, staticData.attributes)}' is not a core attribute and cannot have a distribution here`,
