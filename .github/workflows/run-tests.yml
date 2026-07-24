@@ -35,6 +35,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       csproj: ${{ steps.filter.outputs.csproj }}
+      hooks: ${{ steps.filter.outputs.hooks }}
     steps:
     - name: Checkout
       uses: actions/checkout@v7
@@ -77,6 +78,9 @@ jobs:
             - '.github/workflows/**'
           csproj:
             - '**/*.csproj'
+          hooks:
+            - '.claude/hooks/**'
+            - '.github/workflows/**'
 
   # Guards against a known dependabot-core artifact under Central Package Management: rebasing a
   # NuGet version-bump PR (because another PR touched Directory.Packages.props first) can make
@@ -99,6 +103,23 @@ jobs:
         echo "Under Central Package Management, a version bump should only touch Directory.Packages.props."
         echo "This is a known dependabot-core rebase artifact (see issue #2299) — strip the spurious <PackageReference> edit before merging."
         exit 1
+
+  # The SessionStart hook provisions the backing services remote sessions run integration tests
+  # against, so a regression there surfaces as confusing test-infra failures rather than as a hook
+  # bug. Its tests stub docker/postgres/redis, so this needs nothing but bash.
+  test-hooks:
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' || needs.detect-changes.outputs.hooks == 'true')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Run session-start hook tests
+      run: bash .claude/hooks/session-start.test.sh
 
   # Non-test backend verifications (codegen drift + formatter), split out of test-backend so that
   # job is left with just build + tests/coverage (its longest path). Both checks need the build, so
@@ -396,7 +417,7 @@ jobs:
     # skipped (path-filtered out); fails if any job failed or was cancelled, including
     # detect-changes itself (a change-detection failure should block the PR, not silently skip tests).
     if: always()
-    needs: [detect-changes, guard-dependabot-csproj-scope, verify-backend, verify-frontend, test-backend, test-frontend, test-e2e]
+    needs: [detect-changes, guard-dependabot-csproj-scope, test-hooks, verify-backend, verify-frontend, test-backend, test-frontend, test-e2e]
     runs-on: ubuntu-latest
     steps:
     - name: Verify all jobs passed or were skipped

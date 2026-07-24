@@ -62,6 +62,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MARKER_FILE="$PROJECT_ROOT/.container-info.json"
 
+# Clear any stale marker from a prior session up front. Only the success paths below write a
+# fresh one, so a session whose services fail (or partially fail) never leaves the fixtures
+# pointed at another session's dead containers.
+rm -f "$MARKER_FILE"
+
 # Backing-service configuration. Images match the Testcontainers fixtures so the reuse path
 # behaves identically to the normal path.
 POSTGRES_IMAGE="postgres:18-alpine"
@@ -101,8 +106,6 @@ if docker info >/dev/null 2>&1 \
     && docker info 2>/dev/null | grep -q "Storage Driver: overlay2" \
     && docker network ls 2>/dev/null | grep -q bridge; then
   log "Docker is fully functional (overlay2 + bridge); Testcontainers will be used. No setup needed."
-  # Remove any stale marker so the fixtures don't wrongly enter reuse mode.
-  rm -f "$MARKER_FILE"
   exit 0
 fi
 
