@@ -3,6 +3,7 @@ using Game.Api.Models.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Threading.RateLimiting;
@@ -57,6 +58,18 @@ namespace Game.Api.RateLimiting
         private static async ValueTask OnRejected(OnRejectedContext context, CancellationToken token)
         {
             context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+            // UseRateLimiter runs before UseRequestLogging, so a 429 never reaches the structured request
+            // log otherwise (#2375) — log it here instead of moving the limiter into that middleware,
+            // which would pay full structured-logging volume under attack.
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                .CreateLogger(typeof(RateLimiterServiceCollectionExtensions).FullName!);
+            // OnRejected is registered globally, so it fires for every policy's rejections. "IP" is correct
+            // today since the only policy (auth) partitions purely by client IP; revisit if an
+            // account-partitioned policy is ever added.
+            logger.LogWarning(
+                "Rate limit rejected {Path} PartitionKeyType={PartitionKeyType} PartitionKey={PartitionKey}",
+                context.HttpContext.Request.Path.Value, "IP", ClientIp.Resolve(context.HttpContext));
 
             if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
             {
