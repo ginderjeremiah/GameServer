@@ -82,6 +82,16 @@ namespace Game.Core.Players
             return EnemyCooldown > now;
         }
 
+        /// <summary>
+        /// Milliseconds left on the enemy cooldown at <paramref name="now"/>, or 0 once it has elapsed. The
+        /// single source for what a battle-outcome response tells the client to wait — every such response
+        /// (success or rejection) reports the same figure, so they cannot drift apart.
+        /// </summary>
+        public double RemainingCooldownMs(DateTime now)
+        {
+            return IsOnCooldown(now) ? (EnemyCooldown - now).TotalMilliseconds : 0;
+        }
+
         public void ClearBattle()
         {
             ActiveEnemyId = null;

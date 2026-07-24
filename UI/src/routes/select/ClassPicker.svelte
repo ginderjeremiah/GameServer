@@ -99,7 +99,14 @@ const selected = $derived(classes.find((c) => c.id === selectedClassId) ?? null)
    Enter/Space need no handling: these are real <button>s, so activation already fires onclick. */
 let optionsEl = $state<HTMLDivElement>();
 
-const ARROW_STEPS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+// Partial<> so the lookup is honestly `number | undefined` and the miss check below stays load-bearing
+// in the type system, not just at runtime.
+const ARROW_STEPS: Partial<Record<string, number>> = {
+	ArrowRight: 1,
+	ArrowDown: 1,
+	ArrowLeft: -1,
+	ArrowUp: -1
+};
 
 const tabStop = $derived(
 	Math.max(

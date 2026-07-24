@@ -342,21 +342,30 @@ namespace Game.Core.Progress
 
         /// <summary>
         /// Converts a battle-derived <see cref="double"/> tally into the <see cref="decimal"/> the statistic
-        /// rows store, saturating the non-finite and out-of-range values authored content can reach rather
-        /// than throwing. The avoided-damage tallies are the realistic route there — a dodge/parry records
-        /// the damage of a hit that never lands, so nothing caps it at the defender's health, and a stacking
-        /// multiplicative self-buff compounds toward infinity over a long draw. An unguarded cast would fail
-        /// the whole battle's recording (statistics, challenge evaluation and all) over one saturated tally.
+        /// rows store, without letting a value authored content can push out of range throw and take the whole
+        /// battle's recording (statistics, challenge evaluation and all) down with it. The avoided-damage
+        /// tallies are the realistic route out of range — a dodge/parry records the damage of a hit that never
+        /// lands, so nothing caps it at the defender's health, and a stacking multiplicative self-buff
+        /// compounds toward infinity over a long draw.
         /// </summary>
         private static decimal ToStatisticValue(double value)
         {
-            if (double.IsNaN(value))
+            // A non-finite tally (infinity from that compounding, or a NaN from 0 × infinity) has no
+            // magnitude worth recording, so it degrades to a zero delta — no row, no dirty mark, no
+            // challenge re-evaluation. Deliberately not saturated to a large number: that would be treated
+            // as a real value downstream, poisoning a monotone lifetime Sum, locking a Max statistic where
+            // nothing can beat it, and completing every open damage-threshold challenge on the touched-key
+            // evaluation. It would also only defer the crash — the saturated values accumulate in
+            // <see cref="Increment"/> until the running total overflows decimal a few battles later, and the
+            // authored content that produced the infinity reproduces it every battle.
+            if (!double.IsFinite(value))
             {
                 return 0m;
             }
 
             // Rounded as a double before the conversion, so every in-range value keeps the exact figure the
-            // statistic rows have always stored.
+            // statistic rows have always stored. The clamp below then only has to keep a finite-but-absurd
+            // double inside decimal's range — the one remaining way the cast itself can fail.
             var rounded = Math.Round(value, 3);
             if (rounded >= MaxRecordedValue)
             {

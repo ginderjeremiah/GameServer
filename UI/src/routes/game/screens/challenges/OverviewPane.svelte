@@ -56,7 +56,7 @@
 							<div class="mono-label sm" class:done={complete}>{stats.done}/{stats.total} unlocked</div>
 						</div>
 					</div>
-					<div class="type-card-reward" class:raised={next2?.reward}>
+					<div class="type-card-reward" class:raised={!!next2?.reward}>
 						{#if next2}
 							<RewardAffordance reward={next2.reward} variant="chip" />
 						{:else}
@@ -217,10 +217,14 @@ const { summary, nextUp, groups, onPick }: Props = $props();
 
 	// Raised above the full-bleed overlay so the reward chip's own tooltip trigger stays clickable.
 	// Only raised when there is a chip: both non-interactive states ("All unlocked", and a next
-	// challenge with no authored reward) stay flat so clicks fall through to the overlay.
+	// challenge with no authored reward) stay flat so clicks fall through to the overlay. The raised
+	// region is shrunk to the chip too — this strip is a full-width block, so the empty space beside
+	// an inline-flex chip would otherwise be raised over the overlay and swallow clicks landing there.
 	&.raised {
 		position: relative;
 		z-index: 2;
+		width: fit-content;
+		max-width: 100%;
 	}
 }
 

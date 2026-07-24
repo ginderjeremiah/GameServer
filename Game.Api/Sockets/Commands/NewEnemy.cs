@@ -26,7 +26,7 @@ namespace Game.Api.Sockets.Commands
             {
                 return Success(new NewEnemyModel
                 {
-                    Cooldown = (state.EnemyCooldown - now).TotalMilliseconds
+                    Cooldown = state.RemainingCooldownMs(now)
                 });
             }
 
