@@ -1,4 +1,4 @@
-﻿using Game.Infrastructure.Cache;
+using Game.Infrastructure.Cache;
 using Game.Infrastructure.PubSub;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,58 +8,70 @@ namespace Game.Infrastructure.Redis
 {
     internal static class RedisMultiplexerFactory
     {
-        // Multiplexers are keyed by the *original* connection string under a single lock. Keying by the raw
-        // string (rather than comparing against ConnectionMultiplexer.Configuration, which StackExchange.Redis
-        // normalizes/rewrites) makes reuse reliable: the cache and pub/sub services share one multiplexer
-        // whenever their connection strings match, and two getters racing on first startup resolve to the same
-        // instance instead of each opening their own (#696). The whole get-or-add runs under the lock, so a
-        // partially-constructed multiplexer is never published to another thread.
+        // Multiplexers are keyed by the *original* connection string. Keying by the raw string (rather than
+        // comparing against ConnectionMultiplexer.Configuration, which StackExchange.Redis normalizes/rewrites)
+        // makes reuse reliable: the cache and pub/sub services share one multiplexer whenever their connection
+        // strings match.
         private static readonly Dictionary<string, IConnectionMultiplexer> _multiplexers = new();
+
+        // A connect attempt that failed recently, keyed the same way. Checked before paying for another ~5s
+        // Connect() so an outage fails callers fast instead of serializing them one behind another (#2371).
+        private static readonly Dictionary<string, ConnectFailure> _recentFailures = new();
         private static readonly object _lock = new();
+
+        // How long a failed connect is remembered before the next resolver is allowed to retry. Bounds the
+        // fail-fast window to roughly one connect attempt's worth of time so the app notices Redis recovering
+        // promptly, while still collapsing a burst of concurrent callers during an outage onto one attempt.
+        private static readonly TimeSpan FailureBackoff = TimeSpan.FromSeconds(5);
 
         // Minimum size to grow the thread pool to before connecting (see ConnectMultiplexer).
         private const int MinThreadPoolThreads = 32;
 
-        public static IConnectionMultiplexer GetMultiplexer(ICacheOptions config)
+        public static IConnectionMultiplexer GetMultiplexer(ICacheOptions config, ILogger logger)
         {
             if (config.CacheConnectionString is null)
             {
                 throw new InvalidOperationException($"{nameof(config.CacheConnectionString)} cannot be null.");
             }
 
-            return GetOrConnect(config.CacheConnectionString);
+            return GetOrConnect(config.CacheConnectionString, logger);
         }
 
-        public static IConnectionMultiplexer GetMultiplexer(IPubSubOptions config)
+        public static IConnectionMultiplexer GetMultiplexer(IPubSubOptions config, ILogger logger)
         {
             if (config.PubSubConnectionString is null)
             {
                 throw new InvalidOperationException($"{nameof(config.PubSubConnectionString)} cannot be null.");
             }
 
-            return GetOrConnect(config.PubSubConnectionString);
+            return GetOrConnect(config.PubSubConnectionString, logger);
         }
 
-        private static IConnectionMultiplexer GetOrConnect(string connectionString)
+        private static IConnectionMultiplexer GetOrConnect(string connectionString, ILogger logger)
         {
-            return GetOrAdd(_multiplexers, _lock, connectionString, ConnectMultiplexer);
+            return GetOrConnect(_multiplexers, _recentFailures, _lock, connectionString, ConnectMultiplexer, m => DiscardLoser(m, logger), logger, () => DateTime.UtcNow);
         }
 
         /// <summary>
-        /// Closes and disposes every cached multiplexer, clearing the cache so a later request reconnects fresh.
-        /// Called from the host's graceful-shutdown hook (<see cref="RedisConnectionLifetime"/>) so the process-
-        /// lifetime connections are torn down cleanly on stop rather than left to be force-killed (#954). Each
-        /// connection is closed independently so one faulting close still lets the rest tear down.
+        /// Closes and disposes every cached multiplexer and clears any remembered connect failures, so a later
+        /// request reconnects fresh. Called from the host's graceful-shutdown hook (<see cref="RedisConnectionLifetime"/>)
+        /// so the process-lifetime connections are torn down cleanly on stop rather than left to be force-killed
+        /// (#954). Each connection is closed independently so one faulting close still lets the rest tear down.
         /// </summary>
-        public static Task DisposeAllAsync(ILogger logger)
+        public static async Task DisposeAllAsync(ILogger logger)
         {
-            return DisposeAllAsync(_multiplexers, _lock, logger);
+            await DisposeAllAsync(_multiplexers, _lock, logger);
+
+            lock (_lock)
+            {
+                _recentFailures.Clear();
+            }
         }
 
         /// <summary>
         /// Locked drain-and-dispose of a multiplexer cache: snapshots the values under <paramref name="syncRoot"/>,
         /// clears the cache, then disposes each entry. Generic and seam-extracted so the dispose/clear semantics
-        /// are unit-testable with a fake disposable, mirroring how <see cref="GetOrAdd{T}"/> is tested without a
+        /// are unit-testable with a fake disposable, mirroring how <see cref="GetOrConnect{T}"/> is tested without a
         /// live connection (#954). Each entry's dispose is wrapped independently so a faulting close is logged and
         /// skipped rather than aborting the rest of the drain.
         /// </summary>
@@ -87,25 +99,68 @@ namespace Game.Infrastructure.Redis
         }
 
         /// <summary>
-        /// Locked get-or-add: returns the value cached for <paramref name="key"/>, or invokes
-        /// <paramref name="factory"/> under <paramref name="syncRoot"/> to create and cache one on first request.
-        /// Running the whole lookup-and-create inside the lock is what makes the cache safe to read from multiple
-        /// threads without a partially-constructed value escaping, and what collapses a first-startup race onto a
-        /// single created instance. Generic over the value type so the keyed-reuse semantics are unit-testable
-        /// without a live connection (#696); production keys <see cref="ConnectionMultiplexer"/> by connection
-        /// string.
+        /// Locked get-or-connect with a fail-fast negative cache and a connect step that runs *outside* the lock
+        /// (#2371). The lock only ever guards short dictionary reads/writes: whether <paramref name="key"/> is
+        /// already connected, whether a recent failure is still within <see cref="FailureBackoff"/> (throw the
+        /// remembered exception immediately rather than retry), and publishing the result of a connect attempt.
+        /// The potentially-slow <paramref name="factory"/> call itself is never made under the lock, so a Redis
+        /// outage no longer serializes every resolver behind one blocking ~5s connect apiece.
+        /// Two callers can race a first-time connect for the same key since neither holds the lock while
+        /// connecting; whichever publishes first wins and the loser's already-open connection is discarded via
+        /// <paramref name="discardLoser"/> — every future caller for that key still shares the one winning
+        /// instance (#696), even though the connect attempt itself wasn't serialized.
         /// </summary>
-        internal static T GetOrAdd<T>(Dictionary<string, T> cache, object syncRoot, string key, Func<string, T> factory)
+        internal static T GetOrConnect<T>(
+            Dictionary<string, T> cache,
+            Dictionary<string, ConnectFailure> recentFailures,
+            object syncRoot,
+            string key,
+            Func<string, T> factory,
+            Action<T> discardLoser,
+            ILogger logger,
+            Func<DateTime> utcNow)
         {
             lock (syncRoot)
             {
-                if (!cache.TryGetValue(key, out var value))
+                if (cache.TryGetValue(key, out var existing))
                 {
-                    value = factory(key);
-                    cache[key] = value;
+                    return existing;
                 }
 
-                return value;
+                if (recentFailures.TryGetValue(key, out var failure) && utcNow() - failure.OccurredAtUtc < FailureBackoff)
+                {
+                    // Fail fast: rethrow the remembered failure rather than pay for another attempt this soon.
+                    throw failure.Error;
+                }
+            }
+
+            T created;
+            try
+            {
+                created = factory(key);
+            }
+            catch (Exception ex)
+            {
+                lock (syncRoot)
+                {
+                    recentFailures[key] = new ConnectFailure(utcNow(), ex);
+                }
+
+                logger.LogWarning(ex, "Redis connect failed; remembering the failure for {Backoff} so concurrent/subsequent resolvers fail fast instead of each retrying immediately.", FailureBackoff);
+                throw;
+            }
+
+            lock (syncRoot)
+            {
+                if (cache.TryGetValue(key, out var winner))
+                {
+                    discardLoser(created);
+                    return winner;
+                }
+
+                cache[key] = created;
+                recentFailures.Remove(key);
+                return created;
             }
         }
 
@@ -136,5 +191,26 @@ namespace Game.Infrastructure.Redis
 
             return ConnectionMultiplexer.Connect(connectionString);
         }
+
+        // A discarded loser's connection failing to close cleanly doesn't affect the winner already published
+        // for other callers, but it's still worth surfacing rather than swallowing outright.
+        private static void DiscardLoser(IConnectionMultiplexer multiplexer, ILogger logger)
+        {
+            _ = DiscardLoserAsync(multiplexer, logger);
+        }
+
+        private static async Task DiscardLoserAsync(IConnectionMultiplexer multiplexer, ILogger logger)
+        {
+            try
+            {
+                await multiplexer.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to close a duplicate Redis multiplexer created while racing another connect for the same key.");
+            }
+        }
+
+        internal readonly record struct ConnectFailure(DateTime OccurredAtUtc, Exception Error);
     }
 }

@@ -6,18 +6,21 @@ using Xunit;
 namespace Game.Infrastructure.Tests
 {
     /// <summary>
-    /// Tests the keyed get-or-add reuse semantics of <see cref="RedisMultiplexerFactory"/> (#696). The connect
-    /// step itself opens a real Redis connection, so it is covered by integration tests rather than here; this
-    /// exercises the cache/lock logic through the generic <c>GetOrAdd</c> seam with sentinel values and a stub
-    /// factory, which is exactly the branch that decides whether two requests share a multiplexer or each open
-    /// their own.
+    /// Tests the keyed get-or-connect reuse semantics of <see cref="RedisMultiplexerFactory"/> (#696, #2371). The
+    /// connect step itself opens a real Redis connection, so it is covered by integration tests rather than here;
+    /// this exercises the cache/lock/negative-cache logic through the generic <c>GetOrConnect</c> seam with
+    /// sentinel values and a stub factory, which is exactly the branch that decides whether resolvers share a
+    /// multiplexer, race a first connect, or fail fast during an outage.
     /// </summary>
     public class RedisMultiplexerFactoryTests
     {
+        private static readonly Action<object> NoOpDiscard = _ => { };
+
         [Fact]
-        public void GetOrAdd_SameKey_ReturnsSameValueAndCreatesOnce()
+        public void GetOrConnect_SameKey_ReturnsSameValueAndCreatesOnce()
         {
             var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
             var syncRoot = new object();
             var created = 0;
             object Factory(string _)
@@ -26,58 +29,77 @@ namespace Game.Infrastructure.Tests
                 return new object();
             }
 
-            var first = RedisMultiplexerFactory.GetOrAdd(cache, syncRoot, "localhost:6379", Factory);
-            var second = RedisMultiplexerFactory.GetOrAdd(cache, syncRoot, "localhost:6379", Factory);
+            var first = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => DateTime.UtcNow);
+            var second = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => DateTime.UtcNow);
 
-            // Same key reuses the cached instance and never invokes the factory again.
+            // Same key reuses the cached instance and never invokes the factory again once one is published.
             Assert.Same(first, second);
             Assert.Equal(1, created);
         }
 
         [Fact]
-        public void GetOrAdd_DifferentKeys_ReturnsDistinctValues()
+        public void GetOrConnect_DifferentKeys_ReturnsDistinctValues()
         {
             var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
             var syncRoot = new object();
             object Factory(string _) => new object();
 
-            var cacheValue = RedisMultiplexerFactory.GetOrAdd(cache, syncRoot, "cache:6379", Factory);
-            var pubSubValue = RedisMultiplexerFactory.GetOrAdd(cache, syncRoot, "pubsub:6380", Factory);
+            var cacheValue = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "cache:6379", Factory, NoOpDiscard, NullLogger.Instance, () => DateTime.UtcNow);
+            var pubSubValue = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "pubsub:6380", Factory, NoOpDiscard, NullLogger.Instance, () => DateTime.UtcNow);
 
             // Distinct connection strings get distinct instances; identical ones (above) would share.
             Assert.NotSame(cacheValue, pubSubValue);
         }
 
         [Fact]
-        public void GetOrAdd_KeysByExactString_DoesNotNormalize()
+        public void GetOrConnect_KeysByExactString_DoesNotNormalize()
         {
             var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
             var syncRoot = new object();
             object Factory(string _) => new object();
 
             // Two strings that are semantically equivalent but not byte-identical are treated as different keys —
             // the deliberate trade-off of keying by the raw string rather than a normalized configuration.
-            var lower = RedisMultiplexerFactory.GetOrAdd(cache, syncRoot, "localhost:6379", Factory);
-            var upper = RedisMultiplexerFactory.GetOrAdd(cache, syncRoot, "LOCALHOST:6379", Factory);
+            var lower = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => DateTime.UtcNow);
+            var upper = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "LOCALHOST:6379", Factory, NoOpDiscard, NullLogger.Instance, () => DateTime.UtcNow);
 
             Assert.NotSame(lower, upper);
         }
 
         [Fact]
-        public void GetOrAdd_ConcurrentFirstRequests_ShareOneCreatedValue()
+        public void GetOrConnect_ConcurrentFirstRequests_PublishOneWinner_AndDiscardEveryLoser()
         {
             var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
             var syncRoot = new object();
-            var created = 0;
+            var createdValues = new List<object>();
+            var createdGate = new object();
             object Factory(string _)
             {
-                Interlocked.Increment(ref created);
-                return new object();
+                var value = new object();
+                lock (createdGate)
+                {
+                    createdValues.Add(value);
+                }
+
+                return value;
             }
 
-            // Many threads racing on the same key must collapse onto a single created instance — the startup race
-            // the locked get-or-add closes. Dedicated threads (not the thread pool) start together on a barrier so
-            // the race is genuine and so the test does not starve the pool the BackgroundWorker tests share.
+            var discarded = new List<object>();
+            var discardGate = new object();
+            void Discard(object value)
+            {
+                lock (discardGate)
+                {
+                    discarded.Add(value);
+                }
+            }
+
+            // Many threads racing on the same key no longer serialize behind one connect (#2371): each may create
+            // its own value, but only one is ever published and every other created value is discarded exactly
+            // once, so callers still converge on a single shared instance.
             const int threadCount = 16;
             var results = new object[threadCount];
             using var barrier = new Barrier(threadCount);
@@ -89,7 +111,7 @@ namespace Game.Infrastructure.Tests
                 threads[index] = new Thread(() =>
                 {
                     barrier.SignalAndWait();
-                    results[index] = RedisMultiplexerFactory.GetOrAdd(cache, syncRoot, "localhost:6379", Factory);
+                    results[index] = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, Discard, NullLogger.Instance, () => DateTime.UtcNow);
                 });
                 threads[index].Start();
             }
@@ -99,8 +121,114 @@ namespace Game.Infrastructure.Tests
                 thread.Join();
             }
 
-            Assert.Equal(1, created);
-            Assert.All(results, value => Assert.Same(results[0], value));
+            var winner = results[0];
+            Assert.All(results, value => Assert.Same(winner, value));
+            Assert.Contains(winner, createdValues);
+
+            // Every created value except the published winner was discarded, and none twice.
+            var expectedDiscarded = createdValues.Where(value => !ReferenceEquals(value, winner)).ToList();
+            Assert.Equal(expectedDiscarded.Count, discarded.Count);
+            Assert.All(expectedDiscarded, value => Assert.Contains(value, discarded));
+            Assert.All(discarded, value => Assert.Contains(value, expectedDiscarded));
+        }
+
+        [Fact]
+        public void GetOrConnect_FactoryThrows_CachesFailureAndFailsFastWithoutRetryingWithinBackoff()
+        {
+            var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
+            var syncRoot = new object();
+            var attempts = 0;
+            var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            object Factory(string _)
+            {
+                attempts++;
+                throw new InvalidOperationException("redis unreachable");
+            }
+
+            var first = Assert.Throws<InvalidOperationException>(() =>
+                RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => now));
+
+            // A second resolver arriving moments later must not pay for another ~5s connect attempt — it gets the
+            // same remembered failure back immediately instead.
+            var second = Assert.Throws<InvalidOperationException>(() =>
+                RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => now));
+
+            Assert.Equal(1, attempts);
+            Assert.Same(first, second);
+        }
+
+        [Fact]
+        public void GetOrConnect_FactoryThrows_RetriesOnceBackoffElapses()
+        {
+            var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
+            var syncRoot = new object();
+            var attempts = 0;
+            var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            object Factory(string _)
+            {
+                attempts++;
+                throw new InvalidOperationException($"redis unreachable, attempt {attempts}");
+            }
+
+            Assert.Throws<InvalidOperationException>(() =>
+                RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => now));
+
+            // Once the backoff window has fully elapsed, the next resolver is allowed to retry rather than being
+            // fast-failed forever.
+            var later = now.AddSeconds(10);
+            Assert.Throws<InvalidOperationException>(() =>
+                RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => later));
+
+            Assert.Equal(2, attempts);
+        }
+
+        [Fact]
+        public void GetOrConnect_SucceedsAfterAPriorFailure_ClearsTheRememberedFailure()
+        {
+            var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
+            var syncRoot = new object();
+            var attempts = 0;
+            var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            object Factory(string _)
+            {
+                attempts++;
+                if (attempts == 1)
+                {
+                    throw new InvalidOperationException("redis unreachable");
+                }
+
+                return new object();
+            }
+
+            Assert.Throws<InvalidOperationException>(() =>
+                RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => now));
+
+            var later = now.AddSeconds(10);
+            var value = RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, NullLogger.Instance, () => later);
+
+            Assert.NotNull(value);
+            Assert.Empty(failures);
+            Assert.Same(value, cache["localhost:6379"]);
+        }
+
+        [Fact]
+        public void GetOrConnect_FactoryThrows_LogsAWarning()
+        {
+            var cache = new Dictionary<string, object>();
+            var failures = new Dictionary<string, RedisMultiplexerFactory.ConnectFailure>();
+            var syncRoot = new object();
+            var logger = new CapturingLogger();
+            object Factory(string _) => throw new InvalidOperationException("redis unreachable");
+
+            Assert.Throws<InvalidOperationException>(() =>
+                RedisMultiplexerFactory.GetOrConnect(cache, failures, syncRoot, "localhost:6379", Factory, NoOpDiscard, logger, () => DateTime.UtcNow));
+
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.IsType<InvalidOperationException>(entry.Exception);
         }
 
         [Fact]

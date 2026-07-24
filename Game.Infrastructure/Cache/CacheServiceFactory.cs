@@ -21,7 +21,8 @@ namespace Game.Infrastructure.Cache
 
         private static ICacheService CreateRedisService(ICacheOptions config, ILoggerFactory loggerFactory)
         {
-            return new RedisService(RedisMultiplexerFactory.GetMultiplexer(config), loggerFactory.CreateLogger<RedisService>());
+            var multiplexer = RedisMultiplexerFactory.GetMultiplexer(config, loggerFactory.CreateLogger(nameof(RedisMultiplexerFactory)));
+            return new RedisService(multiplexer, loggerFactory.CreateLogger<RedisService>());
         }
     }
 }
