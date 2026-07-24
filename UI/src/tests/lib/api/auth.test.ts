@@ -216,8 +216,23 @@ describe('auth', () => {
 			expect(result).toEqual({ accessToken: null, rejected: true });
 		});
 
-		it('reports retryable (not rejected) without a token on a network error', async () => {
-			setTokens({ accessToken: makeAccessToken(10), refreshToken: 'r' });
+		it('falls back to the stored access token on a retryable failure when it has not actually expired', async () => {
+			const token = makeAccessToken(10);
+			setTokens({ accessToken: token, refreshToken: 'r' });
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => {
+					throw new TypeError('Failed to fetch');
+				})
+			);
+
+			const result = await ensureValidAccessToken();
+
+			expect(result).toEqual({ accessToken: token, rejected: false });
+		});
+
+		it('reports retryable (not rejected) without a token when the stored token has actually expired', async () => {
+			setTokens({ accessToken: makeAccessToken(-10), refreshToken: 'r' });
 			vi.stubGlobal(
 				'fetch',
 				vi.fn(async () => {

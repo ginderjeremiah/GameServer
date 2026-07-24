@@ -140,10 +140,17 @@ export const ensureValidAccessToken = async (): Promise<AccessTokenResult> => {
 
 	if (expiry === null || expiry - EXPIRY_LEEWAY_SECONDS <= nowSeconds) {
 		const outcome = await refreshTokens();
-		return {
-			accessToken: outcome.status === 'success' ? outcome.tokens.accessToken : null,
-			rejected: outcome.status === 'rejected'
-		};
+		if (outcome.status === 'success') {
+			return { accessToken: outcome.tokens.accessToken, rejected: false };
+		}
+
+		// A retryable failure (rate limit, transient 5xx, network blip) doesn't invalidate the stored
+		// token — if it hasn't actually expired yet, use it rather than forcing a guaranteed 401.
+		if (outcome.status === 'retryable' && expiry !== null && expiry > nowSeconds) {
+			return { accessToken: getAccessToken(), rejected: false };
+		}
+
+		return { accessToken: null, rejected: outcome.status === 'rejected' };
 	}
 
 	return { accessToken: getAccessToken(), rejected: false };
