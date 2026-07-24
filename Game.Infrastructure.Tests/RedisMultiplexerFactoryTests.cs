@@ -232,6 +232,33 @@ namespace Game.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task DiscardLoserAsync_DisposesTheDiscardedValue()
+        {
+            var loser = new FakeAsyncDisposable();
+
+            await RedisMultiplexerFactory.DiscardLoserAsync(loser, NullLogger.Instance);
+
+            Assert.Equal(1, loser.DisposeCount);
+        }
+
+        [Fact]
+        public async Task DiscardLoserAsync_DisposeFaults_LogsAWarning_AndDoesNotThrow()
+        {
+            var loser = new FakeAsyncDisposable(throwOnDispose: true);
+            var logger = new CapturingLogger();
+
+            // A discarded loser's connection failing to close cleanly must not propagate out of the caller (the
+            // publish path that decided this instance lost the race) — the same contract DisposeAllAsync holds
+            // for a faulting shutdown close.
+            await RedisMultiplexerFactory.DiscardLoserAsync(loser, logger);
+
+            Assert.Equal(1, loser.DisposeCount);
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.NotNull(entry.Exception);
+        }
+
+        [Fact]
         public async Task DisposeAllAsync_DisposesEveryEntry_AndClearsTheCache()
         {
             var cache = new Dictionary<string, FakeAsyncDisposable>();

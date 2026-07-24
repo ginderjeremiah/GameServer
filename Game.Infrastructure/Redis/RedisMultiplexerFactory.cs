@@ -199,11 +199,14 @@ namespace Game.Infrastructure.Redis
             _ = DiscardLoserAsync(multiplexer, logger);
         }
 
-        private static async Task DiscardLoserAsync(IConnectionMultiplexer multiplexer, ILogger logger)
+        // Generic (rather than IConnectionMultiplexer-specific) so the dispose/log branch is unit-testable with a
+        // fake IAsyncDisposable, mirroring DisposeAllAsync<T> above.
+        internal static async Task DiscardLoserAsync<T>(T disposable, ILogger logger)
+            where T : IAsyncDisposable
         {
             try
             {
-                await multiplexer.DisposeAsync();
+                await disposable.DisposeAsync();
             }
             catch (Exception ex)
             {
