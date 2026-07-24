@@ -17,6 +17,7 @@ namespace Game.Api.Services
         private readonly ILogger<SocketManagerService> _logger;
         private readonly SocketCommandFactory _commandFactory;
         private readonly SocketConnectionRegistry _socketRegistry;
+        private readonly TimeProvider _timeProvider;
 
         /// <summary>
         /// Time-to-live on the per-player socket-presence key (and the account-level "current live player"
@@ -54,11 +55,16 @@ namespace Game.Api.Services
         private static readonly TimeSpan SocketQueueTtl = TimeSpan.FromHours(1);
 
         /// <summary>
-        /// Sentinel value <see cref="TryClaimForSwitchCredit"/> writes into a presence key: not a real socket
-        /// id, so <see cref="RegisterSocket"/> must recognize it (rather than notifying it as a replaced
-        /// connection) and <see cref="CurrentSocketId"/>'s callers must never treat it as a live socket.
+        /// Sentinel prefix <see cref="TryClaimForSwitchCredit"/> writes into a presence key, followed by a
+        /// unique suffix per claim (rather than one shared literal): not a real socket id, so
+        /// <see cref="RegisterSocket"/> must recognize it (rather than notifying it as a replaced connection)
+        /// and <see cref="CurrentSocketId"/>'s callers must never treat it as a live socket. The per-claim
+        /// uniqueness lets <see cref="ClaimPresenceKey"/> tell a still-in-flight claim it's already waiting on
+        /// apart from a newer one that replaced it (#2374) — a shared literal made every claim indistinguishable,
+        /// so a registration that had been waiting a while could CAS over a seconds-old claim while its
+        /// read-modify-write was still in flight.
         /// </summary>
-        private const string SwitchCreditClaimValue = "switch-credit";
+        private const string SwitchCreditClaimPrefix = "switch-credit:";
 
         /// <summary>
         /// TTL on a switch-away credit's claim (see <see cref="TryClaimForSwitchCredit"/>). Generous relative to
@@ -71,7 +77,7 @@ namespace Game.Api.Services
         /// <summary>Poll interval <see cref="RegisterSocket"/> uses while waiting out a switch-credit claim.</summary>
         private static readonly TimeSpan SwitchCreditWaitPollInterval = TimeSpan.FromMilliseconds(50);
 
-        public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory, SocketConnectionRegistry socketRegistry)
+        public SocketManagerService(IPubSubService pubSub, ICacheService cache, SocketCommandFactory commandFactory, IServiceScopeFactory scopeFactory, ILoggerFactory loggerFactory, SocketConnectionRegistry socketRegistry, TimeProvider? timeProvider = null)
         {
             _pubSub = pubSub;
             _cache = cache;
@@ -80,6 +86,7 @@ namespace Game.Api.Services
             _logger = loggerFactory.CreateLogger<SocketManagerService>();
             _commandFactory = commandFactory;
             _socketRegistry = socketRegistry;
+            _timeProvider = timeProvider ?? TimeProvider.System;
         }
 
         public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService, bool isAdmin)
@@ -143,7 +150,7 @@ namespace Game.Api.Services
                 // normally a no-op and only fires for a client that opened a second character's socket
                 // without doing so (a stale/second tab, or a misbehaving client).
                 var otherSocketId = await CurrentSocketId(otherPlayerId);
-                if (otherSocketId is not null && otherSocketId != SwitchCreditClaimValue)
+                if (otherSocketId is not null && !IsSwitchCreditClaim(otherSocketId))
                 {
                     await NotifyReplacedSocket(otherSocketId, otherPlayerId);
                 }
@@ -240,23 +247,33 @@ namespace Game.Api.Services
         /// Atomically claims <paramref name="playerId"/>'s presence key for an in-flight switch-away credit
         /// (<c>CharacterSelectionService.CreditDepartedCharacter</c>, #2041), replacing a plain presence read: the read
         /// and the claim happen in one Redis round trip, so there is no gap between "no socket is here" and
-        /// "reserve this slot" for a concurrent <see cref="RegisterSocket"/> to land in. Returns
-        /// <see langword="false"/> when the key is already held — a genuinely live socket (the credit must be
-        /// skipped, its battle loop owns the saves) or another switch-credit already claiming it.
+        /// "reserve this slot" for a concurrent <see cref="RegisterSocket"/> to land in. Returns the claim value
+        /// to pass back to <see cref="ReleaseSwitchCreditClaim"/> on success, or <see langword="null"/> when the
+        /// key is already held — a genuinely live socket (the credit must be skipped, its battle loop owns the
+        /// saves) or another switch-credit already claiming it.
         /// </summary>
-        public async Task<bool> TryClaimForSwitchCredit(int playerId)
+        public async Task<string?> TryClaimForSwitchCredit(int playerId)
         {
-            return await _cache.CompareAndSet(CurrentSocketKey(playerId), null, SwitchCreditClaimValue, SwitchCreditClaimTtl);
+            var claimValue = SwitchCreditClaimPrefix + Guid.NewGuid().ToString("N");
+            return await _cache.CompareAndSet(CurrentSocketKey(playerId), null, claimValue, SwitchCreditClaimTtl) ? claimValue : null;
         }
 
         /// <summary>
-        /// Releases a switch-away credit's claim taken by <see cref="TryClaimForSwitchCredit"/>. Compare-and-
-        /// delete so it only clears the key while the claim is still ours — a concurrent <see cref="RegisterSocket"/>
-        /// may have already kicked it and claimed the key for a real socket, which must be left intact.
+        /// Releases a switch-away credit's claim taken by <see cref="TryClaimForSwitchCredit"/>, given the exact
+        /// <paramref name="claimValue"/> it returned. Compare-and-delete so it only clears the key while the
+        /// claim is still ours — a concurrent <see cref="RegisterSocket"/> may have already kicked it and
+        /// claimed the key for a real socket, or a newer switch-credit claim may have landed after this one's
+        /// own TTL lapsed, either of which must be left intact.
         /// </summary>
-        public async Task ReleaseSwitchCreditClaim(int playerId)
+        public async Task ReleaseSwitchCreditClaim(int playerId, string claimValue)
         {
-            await _cache.CompareAndDelete(CurrentSocketKey(playerId), SwitchCreditClaimValue);
+            await _cache.CompareAndDelete(CurrentSocketKey(playerId), claimValue);
+        }
+
+        /// <summary>Whether <paramref name="value"/> is a switch-credit claim rather than a real socket id.</summary>
+        private static bool IsSwitchCreditClaim(string? value)
+        {
+            return value is not null && value.StartsWith(SwitchCreditClaimPrefix, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -265,29 +282,40 @@ namespace Game.Api.Services
         /// key and writing it can never be kicked: the write only lands if the key's value is still what was
         /// just read, so a claim (or another registration) that lands first makes the CompareAndSet fail, and
         /// the loop re-reads and retries against whatever is there now instead of blindly overwriting it — the
-        /// gap a separate wait-then-unconditional-write would leave open. While the read value is the claim
-        /// sentinel, the loop defers (polling at <see cref="SwitchCreditWaitPollInterval"/>) rather than racing
-        /// it, capped at <see cref="SwitchCreditClaimTtl"/> — the claim's own TTL — so a credit that faults
-        /// without releasing can never wedge a registration past that bound; only once that deadline passes
-        /// does an attempt targeting the (by then stale) sentinel proceed. Returns the previous real socket id,
+        /// gap a separate wait-then-unconditional-write would leave open. While the read value is a switch-credit
+        /// claim, the loop defers (polling at <see cref="SwitchCreditWaitPollInterval"/>) rather than racing it,
+        /// against a deadline that restarts every time the observed claim's value changes (#2374) — each claim
+        /// carries a unique id (see <see cref="SwitchCreditClaimPrefix"/>), so a fresh claim that replaced the one
+        /// we started waiting on gets its own full <see cref="SwitchCreditClaimTtl"/> window rather than
+        /// inheriting whatever was left of the original wait, which could otherwise let this loop CAS over a
+        /// seconds-old claim while its read-modify-write is still in flight. A claim that faults without
+        /// releasing still can't wedge a registration past one TTL window once no newer claim replaces it; only
+        /// then does an attempt targeting the (by then stale) claim proceed. Returns the previous real socket id,
         /// or <see langword="null"/> if the key was unset or held only a switch-credit claim.
         /// </summary>
         private async Task<string?> ClaimPresenceKey(string presenceKey, string newSocketId)
         {
-            var deadline = DateTime.UtcNow + SwitchCreditClaimTtl;
             var currentValue = await _cache.Get(presenceKey);
+            var observedClaim = IsSwitchCreditClaim(currentValue) ? currentValue : null;
+            var deadline = _timeProvider.GetUtcNow() + SwitchCreditClaimTtl;
             while (true)
             {
-                if (currentValue == SwitchCreditClaimValue && DateTime.UtcNow < deadline)
+                if (IsSwitchCreditClaim(currentValue) && _timeProvider.GetUtcNow() < deadline)
                 {
                     await Task.Delay(SwitchCreditWaitPollInterval);
                     currentValue = await _cache.Get(presenceKey);
+                    if (IsSwitchCreditClaim(currentValue) && currentValue != observedClaim)
+                    {
+                        observedClaim = currentValue;
+                        deadline = _timeProvider.GetUtcNow() + SwitchCreditClaimTtl;
+                    }
+
                     continue;
                 }
 
                 if (await _cache.CompareAndSet(presenceKey, currentValue, newSocketId, SocketPresenceTtl))
                 {
-                    return currentValue == SwitchCreditClaimValue ? null : currentValue;
+                    return IsSwitchCreditClaim(currentValue) ? null : currentValue;
                 }
 
                 // Another writer (a fresh switch-credit claim, a competing registration) won the race between
@@ -368,7 +396,7 @@ namespace Game.Api.Services
             foreach (var playerId in playerIds)
             {
                 var socketId = await CurrentSocketId(playerId);
-                if (socketId is not null && socketId != SwitchCreditClaimValue)
+                if (socketId is not null && !IsSwitchCreditClaim(socketId))
                 {
                     await EmitSocketCommand(new AccessRevokedInfo(), socketId);
                 }
@@ -403,7 +431,7 @@ namespace Game.Api.Services
         public async Task<bool> EmitSocketCommand(SocketCommandInfo commandInfo, int playerId)
         {
             var socketId = await CurrentSocketId(playerId);
-            if (socketId is not null && socketId != SwitchCreditClaimValue)
+            if (socketId is not null && !IsSwitchCreditClaim(socketId))
             {
                 await EmitSocketCommand(commandInfo, socketId);
                 return true;

@@ -356,23 +356,24 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task TryClaimForSwitchCredit_KeyUnset_ClaimsAndReturnsTrue()
+        public async Task TryClaimForSwitchCredit_KeyUnset_ClaimsAndReturnsTheClaimValue()
         {
             const int playerId = 765432;
 
             using var scope = CreateScope();
             var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
 
-            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+            var claimValue = await socketManager.TryClaimForSwitchCredit(playerId);
+            Assert.NotNull(claimValue);
             var claimed = await ReadPresenceValueAsync(playerId);
-            Assert.NotNull(claimed);
+            Assert.Equal(claimValue, claimed);
             // The claim isn't a real socket id: HasActiveSocket still reports it as present (see the doc
             // comment on TryClaimForSwitchCredit) since the key itself is what a genuine takeover checks.
             Assert.True(await socketManager.HasActiveSocket(playerId));
         }
 
         [Fact]
-        public async Task TryClaimForSwitchCredit_ActiveSocketAlreadyPresent_ReturnsFalseAndLeavesItIntact()
+        public async Task TryClaimForSwitchCredit_ActiveSocketAlreadyPresent_ReturnsNullAndLeavesItIntact()
         {
             var (userId, playerId) = await SeedAndLoginAsync("switchcreditlive", "switchcreditlivepass");
 
@@ -385,7 +386,7 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
 
-            Assert.False(await socketManager.TryClaimForSwitchCredit(playerId));
+            Assert.Null(await socketManager.TryClaimForSwitchCredit(playerId));
             Assert.Equal(realSocketId, await ReadPresenceValueAsync(playerId));
         }
 
@@ -397,8 +398,9 @@ namespace Game.Api.Tests.Integration
             using var scope = CreateScope();
             var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
 
-            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
-            await socketManager.ReleaseSwitchCreditClaim(playerId);
+            var claimValue = await socketManager.TryClaimForSwitchCredit(playerId);
+            Assert.NotNull(claimValue);
+            await socketManager.ReleaseSwitchCreditClaim(playerId, claimValue);
 
             Assert.Null(await ReadPresenceValueAsync(playerId));
         }
@@ -410,7 +412,8 @@ namespace Game.Api.Tests.Integration
 
             using var scope = CreateScope();
             var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
-            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+            var claimValue = await socketManager.TryClaimForSwitchCredit(playerId);
+            Assert.NotNull(claimValue);
 
             // A real connection lands (and kicks the claim) while the credit that claimed it is still running.
             await using var socketA = new TestSocketClient();
@@ -421,7 +424,7 @@ namespace Game.Api.Tests.Integration
 
             // The credit's later release must be a no-op — releasing unconditionally would delete the newer
             // connection's presence key out from under it.
-            await socketManager.ReleaseSwitchCreditClaim(playerId);
+            await socketManager.ReleaseSwitchCreditClaim(playerId, claimValue);
             Assert.Equal(realSocketId, await ReadPresenceValueAsync(playerId));
         }
 
@@ -435,9 +438,10 @@ namespace Game.Api.Tests.Integration
 
             // Simulate an in-flight switch-away credit (#2041) holding the presence key before a new
             // connection for the same player arrives.
-            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+            var claimValue = await socketManager.TryClaimForSwitchCredit(playerId);
+            Assert.NotNull(claimValue);
             var claimedValue = await ReadPresenceValueAsync(playerId);
-            Assert.NotNull(claimedValue);
+            Assert.Equal(claimValue, claimedValue);
 
             // The WebSocket handshake itself completes (accepting the socket happens before RegisterSocket
             // runs), but the server won't start processing commands on it until RegisterSocket completes -
@@ -451,7 +455,7 @@ namespace Game.Api.Tests.Integration
                 "Expected the new connection to defer registration while the switch-credit claim is held.");
             Assert.Equal(claimedValue, await ReadPresenceValueAsync(playerId));
 
-            await socketManager.ReleaseSwitchCreditClaim(playerId);
+            await socketManager.ReleaseSwitchCreditClaim(playerId, claimValue);
 
             var completed = await Task.WhenAny(commandTask, Task.Delay(5000, CancellationToken));
             Assert.Same(commandTask, completed);
@@ -470,7 +474,7 @@ namespace Game.Api.Tests.Integration
 
             using var scope = CreateScope();
             var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
-            Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+            Assert.NotNull(await socketManager.TryClaimForSwitchCredit(playerId));
 
             var delivered = await socketManager.EmitSocketCommand(new SocketCommandInfo("GetStatisticTypes"), playerId);
 
@@ -583,7 +587,7 @@ namespace Game.Api.Tests.Integration
             using (var scope = CreateScope())
             {
                 var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
-                Assert.True(await socketManager.TryClaimForSwitchCredit(playerId));
+                Assert.NotNull(await socketManager.TryClaimForSwitchCredit(playerId));
 
                 await socketManager.RevokeAccess([playerId]);
             }
