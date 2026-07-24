@@ -12,9 +12,11 @@ import {
 import { Item } from '$lib/battle';
 import {
 	challengeTypeColor,
+	comparisonFor as goalComparisonOf,
 	challengeTypeName,
-	clampChallengeProgress,
 	damageTypeKeyName,
+	type ProgressInfo,
+	progressInfo as computeProgressInfo,
 	rarityGlow,
 	rarityLevel,
 	resolveUnlockReward,
@@ -48,20 +50,7 @@ export interface ResolvedReward {
 	mod?: IItemMod;
 }
 
-export interface ProgressInfo {
-	/** Minimisation goal (lower is better, e.g. TimeTrial) vs accumulating goal. */
-	atMost: boolean;
-	/** 0–100 fill for the proximity/progress bar. */
-	percent: number;
-	/* accumulating (atLeast) */
-	value: number;
-	goal: number;
-	/* minimisation (atMost) */
-	best: number;
-	target: number;
-	/** atMost only: whether a qualifying value has been recorded yet. */
-	hasData: boolean;
-}
+export type { ProgressInfo };
 
 export interface ChallengeVM {
 	id: number;
@@ -101,7 +90,7 @@ function comparisonFor(
 	if (byType) {
 		return byType.get(typeId) ?? EChallengeGoalComparison.AtLeast;
 	}
-	return staticData.challengeTypes?.find((t) => t.id === typeId)?.goalComparison ?? EChallengeGoalComparison.AtLeast;
+	return goalComparisonOf(typeId, staticData.challengeTypes);
 }
 
 /** Resolve a scoped challenge's target entity name from the relevant reference pool. */
@@ -163,28 +152,6 @@ export function resolveReward(ch: IChallenge, revealed: boolean): ResolvedReward
 	return resolved;
 }
 
-/* ─── Progress maths (branches on comparison direction) ──────────────── */
-export function progressInfo(ch: IChallenge, comparison: EChallengeGoalComparison, progress: number): ProgressInfo {
-	if (comparison === EChallengeGoalComparison.AtMost) {
-		// Stored progress is the player's current best (0 = no qualifying value yet).
-		// Closeness to the target drives the bar; a 0→goal fill would be misleading.
-		const best = progress;
-		const hasData = best > 0;
-		const percent = hasData ? Math.min(100, (ch.progressGoal / best) * 100) : 0;
-		return { atMost: true, percent, value: 0, goal: ch.progressGoal, best, target: ch.progressGoal, hasData };
-	}
-	const percent = Math.min(100, (progress / Math.max(1, ch.progressGoal)) * 100);
-	return {
-		atMost: false,
-		percent,
-		value: clampChallengeProgress(progress, ch.progressGoal),
-		goal: ch.progressGoal,
-		best: 0,
-		target: 0,
-		hasData: true
-	};
-}
-
 /* ─── View-model assembly ────────────────────────────────────────────── */
 export function buildChallengeVM(
 	ch: IChallenge,
@@ -194,7 +161,7 @@ export function buildChallengeVM(
 	const completed = player?.completed ?? false;
 	const progress = player?.progress ?? 0;
 	const comparison = comparisonFor(ch.challengeTypeId, comparisonByType);
-	const prog = progressInfo(ch, comparison, progress);
+	const prog = computeProgressInfo(ch.progressGoal, comparison, progress);
 	const state: ChallengeState = completed ? 'done' : prog.percent > 0 ? 'active' : 'locked';
 	return {
 		id: ch.id,

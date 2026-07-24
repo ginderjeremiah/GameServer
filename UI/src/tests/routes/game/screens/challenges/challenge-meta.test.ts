@@ -4,7 +4,6 @@ import {
 	CHALLENGE_TYPE_META,
 	challengeTypeUnit,
 	challengeTypeBlurb,
-	formatTime,
 	formatCount
 } from '$routes/game/screens/challenges/challenge-meta';
 
@@ -39,30 +38,6 @@ describe('challengeTypeBlurb', () => {
 
 	it('falls back to an empty string for an unknown type', () => {
 		expect(challengeTypeBlurb(999 as EChallengeType)).toBe('');
-	});
-});
-
-describe('formatTime', () => {
-	it('renders sub-minute durations in seconds', () => {
-		expect(formatTime(45)).toBe('45s');
-		expect(formatTime(9)).toBe('9s');
-	});
-
-	it('renders minute-spanning durations as m:ss with a zero-padded seconds field', () => {
-		expect(formatTime(90)).toBe('1:30');
-		expect(formatTime(125)).toBe('2:05');
-		expect(formatTime(60)).toBe('1:00');
-	});
-
-	it('rounds fractional seconds', () => {
-		expect(formatTime(45.4)).toBe('45s');
-		expect(formatTime(89.6)).toBe('1:30');
-	});
-
-	it('renders a dash for zero, negative, or missing input', () => {
-		expect(formatTime(0)).toBe('—');
-		expect(formatTime(-5)).toBe('—');
-		expect(formatTime(NaN)).toBe('—');
 	});
 });
 
