@@ -503,9 +503,5 @@ namespace Game.Application.Services
     /// </summary>
     public record OfflineRewards(
         IReadOnlyList<CompletedChallenge> CompletedChallenges,
-        ProficiencyAccrualResult ProficiencyGains)
-    {
-        /// <summary>No rewards: nothing was simulated in the window.</summary>
-        public static OfflineRewards Empty { get; } = new([], ProficiencyAccrualResult.Empty);
-    }
+        ProficiencyAccrualResult ProficiencyGains);
 }
