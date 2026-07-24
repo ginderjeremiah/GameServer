@@ -2,6 +2,7 @@ using Game.Core.Attributes;
 using Game.Core.Attributes.Modifiers;
 using Game.Core.Battle;
 using Game.Core.Skills;
+using Game.Core.TestInfrastructure.Performance;
 using Xunit;
 using static Game.Core.EAttribute;
 

@@ -1,4 +1,4 @@
-namespace Game.Core.Tests.Battle.Performance
+namespace Game.Core.TestInfrastructure.Performance
 {
     /// <summary>
     /// Per-operation timing statistics produced by <see cref="PerformanceMeasurement"/>. All figures
