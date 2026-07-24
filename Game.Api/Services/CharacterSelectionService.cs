@@ -134,7 +134,8 @@ namespace Game.Api.Services
             // is) or defers behind this claim (SocketManagerService.RegisterSocket) until it's released below —
             // closing the gap where a socket opening between a read and the credit that followed it could still
             // race its own battle loop's saves against this HTTP-thread credit (#2041).
-            if (!await _socketManager.TryClaimForSwitchCredit(departedPlayerId))
+            var claimValue = await _socketManager.TryClaimForSwitchCredit(departedPlayerId);
+            if (claimValue is null)
             {
                 _logger.LogWarning(
                     "Skipping the switch-away credit for player {DepartedPlayerId}: it still has a live socket (or another switch-away credit is already claiming it), so its battle loop owns its saves. The client should close its game socket before switching.",
@@ -160,7 +161,7 @@ namespace Game.Api.Services
                 // Release even on failure/cancellation so a faulted credit doesn't wedge a reconnect for the
                 // full claim TTL — RegisterSocket's own bound would still recover it, but there's no reason to
                 // make a legitimate reconnect wait that long when we can release promptly instead.
-                await _socketManager.ReleaseSwitchCreditClaim(departedPlayerId);
+                await _socketManager.ReleaseSwitchCreditClaim(departedPlayerId, claimValue);
             }
         }
     }

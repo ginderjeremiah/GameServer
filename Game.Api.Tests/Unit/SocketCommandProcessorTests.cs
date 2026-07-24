@@ -258,6 +258,41 @@ namespace Game.Api.Tests.Unit
         }
 
         [Fact]
+        public async Task RegisterSocket_NewerSwitchCreditClaimReplacesTheOneBeingWaitedOn_RestartsTheDeadlineInsteadOfStompingIt()
+        {
+            // #2374: before the fix, ClaimPresenceKey anchored its wait deadline to when the wait began rather
+            // than to the claim it was actually observing (all claims wrote the same sentinel, so the loop
+            // couldn't tell them apart). A registration that had burned most of its wait window behind claim #1
+            // would, the moment that stale deadline lapsed, CAS straight over a seconds-old claim #2 even though
+            // claim #2's own read-modify-write (CreditDepartedCharacter -> SimulateSwitchProgress) was still in
+            // flight — reopening the exact #2041 lost-update race the claim exists to prevent. Each claim now
+            // carries a unique id, so the wait loop must restart its deadline whenever the observed claim
+            // changes. DeadlineRestartCacheService scripts claim #1 being replaced by claim #2 — advancing the
+            // fake clock past claim #1's original deadline as a side effect of that read — followed by claim
+            // #2's own release; the eventual CompareAndSet must only fire once claim #2 is actually gone
+            // (expectedValue: null), proving the loop kept deferring through the stale-deadline instant instead
+            // of overwriting the still-live claim.
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var cache = new DeadlineRestartCacheService(timeProvider);
+            var pubSub = new CapturingPubSubService();
+            var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
+            var registry = new SocketConnectionRegistry(new NoOpHostLifetime(), NullLogger<SocketConnectionRegistry>.Instance);
+            var manager = new SocketManagerService(
+                pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry, timeProvider);
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var session = new SessionService(new NoOpSessionStore());
+            await session.CreateSession(userId: 1, playerId: 77);
+
+            var context = await manager.RegisterSocket(socket, session, isAdmin: false);
+
+            Assert.NotNull(context);
+            Assert.Equal(3, cache.PresenceGetCalls);
+            var presenceClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
+            Assert.Null(presenceClaim.ExpectedValue);
+        }
+
+        [Fact]
         public async Task Processor_PersistentDequeueFault_AbandonsAfterCeilingInsteadOfHotSpinning()
         {
             var commands = new CapturingCommandFactory(throwOn: _ => null);
@@ -620,7 +655,7 @@ namespace Game.Api.Tests.Unit
         /// to compile against this fake rather than silently passing.</summary>
         private sealed class RacingClaimCacheService : ICacheService
         {
-            private const string SwitchCreditClaimValue = "switch-credit";
+            private const string SwitchCreditClaimValue = "switch-credit:aaa";
 
             public int GetCalls { get; private set; }
             public List<string?> CompareAndSetExpectedValues { get; } = [];
@@ -662,6 +697,78 @@ namespace Game.Api.Tests.Unit
             public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
             public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
+        }
+
+        /// <summary>Scripts a fresh switch-credit claim landing (then clearing) while <see cref="SocketManagerService"/>
+        /// is waiting on an older one, advancing the fake clock past the *original* claim's deadline as a side
+        /// effect of each presence-key read — pins that <c>ClaimPresenceKey</c>'s wait deadline restarts against
+        /// the newer claim (#2374) instead of staying anchored to when the wait began. Only the per-player
+        /// presence key (<see cref="Constants.CACHE_PLAYER_SOCKET_PREFIX"/>) is scripted; the account-level key
+        /// RegisterSocket claims afterward always reads as unclaimed.</summary>
+        private sealed class DeadlineRestartCacheService(FakeTimeProvider timeProvider) : ICacheService
+        {
+            private readonly FakeTimeProvider _timeProvider = timeProvider;
+
+            public int PresenceGetCalls { get; private set; }
+            public List<(string Key, string? ExpectedValue)> CompareAndSets { get; } = [];
+
+            public Task<string?> Get(string key, CancellationToken cancellationToken = default)
+            {
+                if (!key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX, StringComparison.Ordinal))
+                {
+                    return Task.FromResult<string?>(null);
+                }
+
+                PresenceGetCalls++;
+                string? result = PresenceGetCalls switch
+                {
+                    1 => "switch-credit:aaa",                                      // Initial peek: claim #1 is live.
+                    2 => AdvanceAndReturn(TimeSpan.FromSeconds(25), "switch-credit:bbb"), // Claim #1 released, claim #2 landed — the clock is now past claim #1's original deadline.
+                    3 => AdvanceAndReturn(TimeSpan.FromSeconds(1), null),           // Claim #2 released.
+                    _ => null,
+                };
+                return Task.FromResult(result);
+            }
+
+            private string? AdvanceAndReturn(TimeSpan delta, string? value)
+            {
+                _timeProvider.Advance(delta);
+                return value;
+            }
+
+            public Task<bool> CompareAndSet(string key, string? expectedValue, string newValue, TimeSpan expiry, CancellationToken cancellationToken = default)
+            {
+                CompareAndSets.Add((key, expectedValue));
+                return Task.FromResult(true);
+            }
+
+            public Task CompareAndDelete(string key, string deleteIfValue, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public Task Delete(string key, CancellationToken cancellationToken = default) => Task.CompletedTask;
+            public void ExpireAndForget(string key, TimeSpan expiry) { }
+            public void DeleteAndForget(string key) { }
+            public void ReclaimAndForget(string key, string ownerValue, TimeSpan expiry) => throw new NotSupportedException();
+            public Task<T?> Get<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> GetDelete(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetDelete<T>(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set(string key, string? value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task Set<T>(string key, T value, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<string?> GetAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<T?> GetAndRefreshExpiry<T>(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void SetAndForget(string key, string? value, TimeSpan expiry) => throw new NotSupportedException();
+            public void SetAndForget<T>(string key, T value, TimeSpan expiry) => throw new NotSupportedException();
+            public Task<Dictionary<string, string>?> HashGetAllAndRefreshExpiry(string key, TimeSpan expiry, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public void HashSetAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
+            public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
+        }
+
+        /// <summary>A controllable <see cref="TimeProvider"/> so the switch-credit wait deadline can be
+        /// crossed deterministically instead of relying on wall-clock delays.</summary>
+        private sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
+        {
+            private DateTimeOffset _now = start;
+
+            public override DateTimeOffset GetUtcNow() => _now;
+            public void Advance(TimeSpan delta) => _now += delta;
         }
 
         private sealed class NoOpHostLifetime : IHostApplicationLifetime
