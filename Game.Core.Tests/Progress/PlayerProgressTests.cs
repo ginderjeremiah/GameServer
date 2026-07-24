@@ -83,6 +83,54 @@ namespace Game.Core.Tests.Progress
         }
 
         [Fact]
+        public void RecordBattleCompleted_InfiniteTally_SaturatesInsteadOfThrowing()
+        {
+            // Nothing caps an avoided-damage tally at the defender's health — a dodge/parry books the damage
+            // of a hit that never lands — so a stacking multiplicative damage buff on a fast enemy skill can
+            // compound to +infinity over a long draw. The recording must survive it: an unguarded (decimal)
+            // cast throws, costing the player the whole battle's statistics and challenge evaluation.
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                DamageDodged = double.PositiveInfinity,
+                DamageParried = double.PositiveInfinity,
+                PlayerDamageDealt = double.PositiveInfinity,
+                HighestPlayerAttack = double.PositiveInfinity,
+                SkillStats = { [1] = new SkillStats { Uses = 1, TotalDamage = double.PositiveInfinity } },
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 120000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(1e28m, progress.GetStatisticValue(EStatisticType.DamageDodged, null));
+            Assert.Equal(1e28m, progress.GetStatisticValue(EStatisticType.DamageParried, null));
+            Assert.Equal(1e28m, progress.GetStatisticValue(EStatisticType.HighestSingleAttackDamage, null));
+            Assert.Equal(1e28m, progress.GetStatisticValue(EStatisticType.DamageDealt, 1));
+            // The unaffected statistics of the same battle still record, rather than being lost with it.
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.EnemiesKilled, null));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_NaNTally_RecordsNothingForThatStatisticInsteadOfThrowing()
+        {
+            // A NaN tally (0 × infinity anywhere upstream) has no meaningful value to record, so it degrades
+            // to a zero delta — no row, matching how any other zero delta is skipped — rather than throwing.
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                PlayerDamageDealt = double.NaN,
+                DamageDodged = double.NaN,
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDealt, null, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDodged, null, out _));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.EnemiesKilled, null));
+        }
+
+        [Fact]
         public void RecordBattleCompleted_NegativeNetUnderAbsorption_NeverRegressesAnExistingLifetimeTotal()
         {
             var progress = MakeProgress(statistics:

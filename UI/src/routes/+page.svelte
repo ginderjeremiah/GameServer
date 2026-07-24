@@ -15,7 +15,7 @@
 				onblur={() => (touched.username = true)}
 				error={!!usernameError}
 				valid={!!username && usernameValid}
-				describedById={usernameError ? STATUS_LINE_ID : undefined}
+				describedById={statusLine.field === 'username' ? STATUS_LINE_ID : undefined}
 			>
 				{#snippet trailing()}
 					{#if username}
@@ -37,7 +37,7 @@
 				onkeyup={detectCapsLock}
 				error={!!passwordError}
 				valid={!!password && passwordValid}
-				describedById={passwordError ? STATUS_LINE_ID : undefined}
+				describedById={statusLine.field === 'password' ? STATUS_LINE_ID : undefined}
 			>
 				{#snippet trailing()}
 					<button
@@ -70,7 +70,7 @@
 					onblur={() => (touched.confirm = true)}
 					error={!!confirmError}
 					valid={!!confirm && confirmValid}
-					describedById={confirmError ? STATUS_LINE_ID : undefined}
+					describedById={statusLine.field === 'confirm' ? STATUS_LINE_ID : undefined}
 				>
 					{#snippet trailing()}
 						{#if confirm}
@@ -113,7 +113,9 @@ import {
 } from './login/login-validation';
 import { playerSelectHandoff } from './select/player-select-handoff';
 
-// The live status line doubles as each field's error description (aria-describedby).
+// The live status line doubles as the error description (aria-describedby) of whichever field's message
+// it is currently showing — only that field points at it, so a screen reader never reads another
+// field's error as this one's.
 const STATUS_LINE_ID = 'login-status-line';
 
 let mode = $state<LoginMode>('login');

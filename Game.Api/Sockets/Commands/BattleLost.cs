@@ -61,9 +61,13 @@ namespace Game.Api.Sockets.Commands
                 // rather than lost the moment this connection closes.
                 await context.Session.SavePlayerStateAsync(cancellationToken);
 
+                var now = DateTime.UtcNow;
                 return ErrorWithData("Battle was not a loss.", new BattleLostResponse
                 {
-                    Cooldown = 0,
+                    // Report the live cooldown (as DefeatEnemy's equivalent branch does): the rejection is
+                    // typically a reconnecting client re-presenting an already-credited loss, and a hardcoded
+                    // 0 would send it straight into a NewEnemy round-trip the cooldown is about to reject.
+                    Cooldown = state.IsOnCooldown(now) ? (state.EnemyCooldown - now).TotalMilliseconds : 0,
                 });
             }
         }

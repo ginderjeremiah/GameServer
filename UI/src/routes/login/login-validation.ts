@@ -9,6 +9,20 @@ export type LoginMode = 'login' | 'signup';
 /** The five visual states the login status line can take. */
 export type StatusType = 'ok' | 'err' | 'warn' | 'info' | 'idle';
 
+/** The form field a status-line message belongs to, when it is a field's own validation error. */
+export type StatusField = 'username' | 'password' | 'confirm';
+
+export interface StatusLine {
+	type: StatusType;
+	text: string;
+	/**
+	 * The field this message describes, when it is that field's validation error — the single line is
+	 * shared, so only the owning field points its `aria-describedby` at it. Absent for the messages that
+	 * belong to no one field (server errors, caps lock, strength, the resting states).
+	 */
+	field?: StatusField;
+}
+
 export interface FieldValidity {
 	/** Whether the field currently satisfies its rules. */
 	ok: boolean;
@@ -134,7 +148,7 @@ export interface StatusLineState {
  * then advisory states (caps lock, password strength), and finally a "Ready" / idle
  * resting state. Kept pure so the precedence rules can be unit-tested directly.
  */
-export const deriveStatusLine = (state: StatusLineState): { type: StatusType; text: string } => {
+export const deriveStatusLine = (state: StatusLineState): StatusLine => {
 	if (state.serverError) {
 		return { type: 'err', text: state.serverError };
 	}
@@ -145,13 +159,13 @@ export const deriveStatusLine = (state: StatusLineState): { type: StatusType; te
 		};
 	}
 	if (state.usernameError) {
-		return { type: 'err', text: 'Username · ' + state.usernameError.toLowerCase() };
+		return { type: 'err', text: 'Username · ' + state.usernameError.toLowerCase(), field: 'username' };
 	}
 	if (state.passwordError) {
-		return { type: 'err', text: 'Password · ' + state.passwordError.toLowerCase() };
+		return { type: 'err', text: 'Password · ' + state.passwordError.toLowerCase(), field: 'password' };
 	}
 	if (state.confirmError) {
-		return { type: 'err', text: 'Confirm · ' + state.confirmError.toLowerCase() };
+		return { type: 'err', text: 'Confirm · ' + state.confirmError.toLowerCase(), field: 'confirm' };
 	}
 	if (state.capsLock) {
 		return { type: 'warn', text: 'Caps Lock is on' };

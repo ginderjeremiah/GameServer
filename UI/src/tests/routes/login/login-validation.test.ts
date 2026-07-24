@@ -148,16 +148,29 @@ describe('deriveStatusLine', () => {
 	it('prefixes field errors and lowercases the message in username/password/confirm precedence', () => {
 		expect(deriveStatusLine({ ...base, usernameError: 'Required', passwordError: 'Required' })).toEqual({
 			type: 'err',
-			text: 'Username · required'
+			text: 'Username · required',
+			field: 'username'
 		});
 		expect(deriveStatusLine({ ...base, passwordError: 'At least 8 characters' })).toEqual({
 			type: 'err',
-			text: 'Password · at least 8 characters'
+			text: 'Password · at least 8 characters',
+			field: 'password'
 		});
 		expect(deriveStatusLine({ ...base, confirmError: "Passwords don't match" })).toEqual({
 			type: 'err',
-			text: "Confirm · passwords don't match"
+			text: "Confirm · passwords don't match",
+			field: 'confirm'
 		});
+	});
+
+	it('claims no owning field for the messages that belong to the form rather than one input', () => {
+		// Only the owning field points its aria-describedby at the shared line, so a message with no owner
+		// (server error, caps lock, strength, resting state) must describe no field at all.
+		expect(deriveStatusLine({ ...base, serverError: 'Nope' }).field).toBeUndefined();
+		expect(deriveStatusLine({ ...base, success: true }).field).toBeUndefined();
+		expect(deriveStatusLine({ ...base, capsLock: true }).field).toBeUndefined();
+		expect(deriveStatusLine({ ...base, mode: 'signup', password: 'abc', strengthLabel: 'Weak' }).field).toBeUndefined();
+		expect(deriveStatusLine(base).field).toBeUndefined();
 	});
 
 	it('warns about caps lock when there are no field errors', () => {

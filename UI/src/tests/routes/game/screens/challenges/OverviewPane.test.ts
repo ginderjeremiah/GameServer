@@ -81,4 +81,29 @@ describe('OverviewPane — accessible type-card (no nested buttons)', () => {
 		await fireEvent.click(container.querySelector('.type-card .overlay-button')!);
 		expect(onPick).toHaveBeenCalledWith(EChallengeType.EnemiesKilled);
 	});
+
+	it('raises the reward strip only while it holds an interactive chip', () => {
+		const { container } = renderPane();
+		expect(container.querySelector('.type-card-reward')?.classList.contains('raised')).toBe(true);
+	});
+
+	it('leaves the reward strip flat when the next challenge has no reward, so the card stays clickable', () => {
+		// The strip renders a non-interactive "No reward" span here; raising it over the full-bleed overlay
+		// would swallow every click landing on it and leave a dead zone on the card.
+		const noReward: TypeGroup = { ...group, items: [challenge({ id: 0, reward: null })] };
+		const { container } = render(OverviewPane, {
+			props: { summary, nextUp: null, groups: [noReward], onPick: vi.fn() }
+		});
+		const strip = container.querySelector('.type-card-reward')!;
+		expect(strip.querySelector('.no-reward')).not.toBeNull();
+		expect(strip.classList.contains('raised')).toBe(false);
+	});
+
+	it('leaves the reward strip flat when every challenge of the type is unlocked', () => {
+		const allDone: TypeGroup = { ...group, items: [challenge({ id: 0, state: 'done', completed: true })] };
+		const { container } = render(OverviewPane, {
+			props: { summary, nextUp: null, groups: [allDone], onPick: vi.fn() }
+		});
+		expect(container.querySelector('.type-card-reward')?.classList.contains('raised')).toBe(false);
+	});
 });

@@ -150,6 +150,26 @@ describe('Login page', () => {
 		expect(toggle.getAttribute('aria-label')).toBe('Hide password');
 	});
 
+	it('describes only the field whose error the shared status line is currently showing', async () => {
+		render(LoginPage);
+		const username = screen.getByTestId('username-input');
+		const password = screen.getByTestId('password-input');
+
+		// Blur both fields empty: both are invalid, but the line renders the username error alone (it wins
+		// the precedence), so pointing the password at it would announce another field's message as its own.
+		await fireEvent.blur(username);
+		await fireEvent.blur(password);
+
+		const statusId = screen.getByTestId('status-line').getAttribute('id');
+		expect(username.getAttribute('aria-describedby')).toBe(statusId);
+		expect(password.getAttribute('aria-describedby')).toBeNull();
+
+		// Once the username validates, the line moves on to the password error — and so does the description.
+		await fireEvent.input(username, { target: { value: 'hero' } });
+		expect(username.getAttribute('aria-describedby')).toBeNull();
+		expect(password.getAttribute('aria-describedby')).toBe(statusId);
+	});
+
 	it('gives the strength meter a text-equivalent role and value', async () => {
 		render(LoginPage);
 

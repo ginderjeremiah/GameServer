@@ -176,6 +176,29 @@ describe('InventoryManager reactivity under statify (#1957)', () => {
 		cleanup();
 	});
 
+	it('observes a new unlock through the unlockedItems Map alone (addUnlockedItem reassigns it)', () => {
+		mockItems[1] = makeItem(1);
+		manager.initialize();
+
+		// Derive off the Map's contents only — the inventory view resolves its selection/drag this way.
+		// statify doesn't track Map mutation, so an in-place `set` would leave this stale forever.
+		let unlocked: boolean | undefined;
+		const cleanup = $effect.root(() => {
+			const derived = $derived(manager.unlockedItems.has(1));
+			$effect(() => {
+				unlocked = derived;
+			});
+		});
+		flushSync();
+		expect(unlocked).toBe(false);
+
+		manager.addUnlockedItem(makeInventoryItem({ itemId: 1 }));
+		flushSync();
+		expect(unlocked).toBe(true);
+
+		cleanup();
+	});
+
 	it('observes unlockedItems/unlockedMods changes through a resync (initialize called again)', () => {
 		mockItems[1] = makeItem(1);
 		mockItemMods[10] = makeItemMod(10);
