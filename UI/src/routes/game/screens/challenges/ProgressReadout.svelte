@@ -29,7 +29,8 @@
 </div>
 
 <script lang="ts">
-import { formatCount, formatTime } from './challenge-meta';
+import { formatTime } from '$lib/common';
+import { formatCount } from './challenge-meta';
 import ProgressBar from './ProgressBar.svelte';
 import type { ChallengeVM } from './challenges-view.svelte';
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import {
 	EAttribute,
+	EChallengeGoalComparison,
 	EChallengeType,
 	EEntityType,
 	EModifierType,
@@ -435,6 +436,36 @@ describe('CodexView dossier projections', () => {
 		const view = new CodexView();
 		view.enemiesTab.selectEnemy(0);
 		expect(view.enemiesTab.challenges[0].progressText).toBe('100/100');
+	});
+
+	it('renders an atMost (time-trial) enemy-scoped challenge as best-vs-target, not accumulating progress', () => {
+		staticData.challengeTypes = [
+			...staticData.challengeTypes,
+			{ id: EChallengeType.TimeTrial, goalComparison: EChallengeGoalComparison.AtMost, name: 'Time Trial' }
+		];
+		staticData.challenges = [
+			...staticData.challenges,
+			{
+				id: 3,
+				name: 'Quick Kill',
+				challengeTypeId: EChallengeType.TimeTrial,
+				entityType: EEntityType.Enemy,
+				targetEntityId: 0,
+				progressGoal: 60
+			}
+		];
+		// No qualifying run yet -- must not read as "0/60" (as if progress exists).
+		const notYet = new CodexView();
+		notYet.enemiesTab.selectEnemy(0);
+		expect(notYet.enemiesTab.challenges.find((c) => c.id === 3)?.progressText).toBe('no time yet · ≤1:00');
+
+		// A 45s best beats the 60s target -- must not render as "45/60" (looking three-quarters incomplete).
+		playerChallenges.all = [...playerChallenges.all, { challengeId: 3, progress: 45, completed: true }];
+		const beaten = new CodexView();
+		beaten.enemiesTab.selectEnemy(0);
+		expect(beaten.enemiesTab.challenges.find((c) => c.id === 3)).toEqual(
+			expect.objectContaining({ progressText: '45s best · ≤1:00', completed: true })
+		);
 	});
 
 	it('hides a retired enemy-scoped challenge unless it was already completed', () => {

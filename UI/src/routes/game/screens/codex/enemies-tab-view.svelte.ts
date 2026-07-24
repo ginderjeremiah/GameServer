@@ -8,8 +8,10 @@ import {
 	type EnemyAttributes,
 	challengeTypeColor,
 	challengeTypeName,
-	clampChallengeProgress,
-	enemyAttributesAtLevel
+	comparisonFor,
+	enemyAttributesAtLevel,
+	formatTime,
+	progressInfo
 } from '$lib/common';
 import { playerChallenges, staticData } from '$stores';
 import {
@@ -266,9 +268,17 @@ export class EnemiesTabView {
 					const pc = progressById.get(c.id);
 					const progress = pc?.progress ?? 0;
 					const completed = pc?.completed ?? false;
-					const clampedProgress = clampChallengeProgress(progress, c.progressGoal);
-					const progressText =
-						c.progressGoal === 1 ? (completed ? 'done' : 'sealed') : `${Math.round(clampedProgress)}/${c.progressGoal}`;
+					const comparison = comparisonFor(c.challengeTypeId, staticData.challengeTypes);
+					const prog = progressInfo(c.progressGoal, comparison, progress);
+					const progressText = prog.atMost
+						? prog.hasData
+							? `${formatTime(prog.best)} best · ≤${formatTime(prog.target)}`
+							: `no time yet · ≤${formatTime(prog.target)}`
+						: c.progressGoal === 1
+							? completed
+								? 'done'
+								: 'sealed'
+							: `${Math.round(prog.value)}/${c.progressGoal}`;
 					return {
 						id: c.id,
 						name: c.name,

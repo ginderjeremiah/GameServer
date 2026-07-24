@@ -50,7 +50,6 @@ import {
 	groupByType,
 	nextUp,
 	overallSummary,
-	progressInfo,
 	resolveReward,
 	sortChallenges,
 	typeStats
@@ -154,43 +153,6 @@ describe('resolveReward', () => {
 		expect(
 			resolveReward(challenge({ id: 99, name: 'No Reward', challengeTypeId: EChallengeType.EnemiesKilled }), true)
 		).toBeNull();
-	});
-});
-
-describe('progressInfo', () => {
-	it('computes an accumulating (atLeast) fill clamped to 100%', () => {
-		const ch = challenge({ id: 1, name: 'x', challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 50 });
-		expect(progressInfo(ch, EChallengeGoalComparison.AtLeast, 25)).toMatchObject({
-			atMost: false,
-			value: 25,
-			goal: 50,
-			percent: 50
-		});
-		expect(progressInfo(ch, EChallengeGoalComparison.AtLeast, 80).percent).toBe(100);
-	});
-
-	it('clamps an over-goal value to the goal (transient race before the ChallengeCompleted push lands)', () => {
-		const ch = challenge({ id: 2, name: 'x', challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 });
-		expect(progressInfo(ch, EChallengeGoalComparison.AtLeast, 12)).toMatchObject({ value: 10, goal: 10 });
-	});
-
-	it('treats an atMost goal as best-vs-target proximity, with 0 meaning "no data"', () => {
-		const ch = challenge({ id: 9, name: 'x', challengeTypeId: EChallengeType.TimeTrial, progressGoal: 60 });
-		// no qualifying value yet
-		expect(progressInfo(ch, EChallengeGoalComparison.AtMost, 0)).toMatchObject({
-			atMost: true,
-			hasData: false,
-			percent: 0
-		});
-		// best 120s vs 60s target -> 50% of the way there
-		expect(progressInfo(ch, EChallengeGoalComparison.AtMost, 120)).toMatchObject({
-			best: 120,
-			target: 60,
-			percent: 50,
-			hasData: true
-		});
-		// already beating the target clamps to 100%
-		expect(progressInfo(ch, EChallengeGoalComparison.AtMost, 52).percent).toBe(100);
 	});
 });
 

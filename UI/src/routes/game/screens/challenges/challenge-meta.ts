@@ -30,16 +30,6 @@ export const challengeTypeUnit = (id: EChallengeType): string => CHALLENGE_TYPE_
 /** A type's hero-banner blurb, with a sensible fallback for unknown types. */
 export const challengeTypeBlurb = (id: EChallengeType): string => CHALLENGE_TYPE_META[id]?.blurb ?? '';
 
-/** `90` -> `1:30`, `45` -> `45s`, `0`/missing -> `—`. */
-export function formatTime(seconds: number): string {
-	if (!seconds || seconds <= 0) {
-		return '—';
-	}
-	const minutes = Math.floor(seconds / 60);
-	const secs = Math.round(seconds % 60);
-	return minutes > 0 ? `${minutes}:${String(secs).padStart(2, '0')}` : `${secs}s`;
-}
-
 /** Thousands-separated for large counts, plain otherwise. */
 export function formatCount(value: number): string {
 	return value >= 1000 ? value.toLocaleString() : String(value);
