@@ -14,6 +14,14 @@ vi.mock('$lib/api/auth', () => ({
 	handleAuthFailure: vi.fn()
 }));
 
+// Mirrors auth.test.ts's helper: builds a decodable JWT-shaped access token with only the `exp` claim
+// populated (the header/signature segments are never decoded by the code under test).
+function makeAccessToken(secondsFromNow: number): string {
+	const exp = Math.floor(Date.now() / 1000) + secondsFromNow;
+	const payload = btoa(JSON.stringify({ exp })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	return `header.${payload}.signature`;
+}
+
 interface MockWebSocket {
 	readyState: number;
 	OPEN: number;
@@ -850,6 +858,104 @@ describe('ApiSocket', () => {
 			await flushMicrotasks();
 
 			expect(refreshTokens).not.toHaveBeenCalled();
+		});
+	});
+
+	// #2369: a never-opened socket close is ambiguous (auth rejection vs. a WS-specific infra failure with
+	// HTTP still fine) — the fresh-token check is how handleClose tells them apart before spending budget.
+	describe('handleClose token freshness', () => {
+		const closeUnopened = (ws: MockWebSocket, code = 1006) => {
+			ws.readyState = ws.CLOSED;
+			ws.onclose?.({ code });
+		};
+
+		it('does not refresh or spend the auth-retry budget when the presented token is demonstrably fresh', async () => {
+			// Most of a 15-minute access token's lifetime left — far past FRESH_TOKEN_MARGIN_SECONDS — so a
+			// handshake rejection can't plausibly be about that token being stale.
+			const freshToken = makeAccessToken(600);
+			setTokens({ accessToken: freshToken, refreshToken: 'r' });
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+			webSocketMock.mockClear();
+
+			closeUnopened(ws);
+			await flushMicrotasks();
+
+			expect(refreshTokens).not.toHaveBeenCalled();
+			expect(handleAuthFailure).not.toHaveBeenCalled();
+			expect(webSocketMock).not.toHaveBeenCalled();
+			expect(getTokens()).toEqual({ accessToken: freshToken, refreshToken: 'r' });
+		});
+
+		it('still reconnects via the keepalive ping after a fresh-token rejection, without spending budget', async () => {
+			vi.useFakeTimers();
+			try {
+				const freshToken = makeAccessToken(600);
+				setTokens({ accessToken: freshToken, refreshToken: 'r' });
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const ws = lastWs();
+				webSocketMock.mockClear();
+
+				closeUnopened(ws);
+				await flushMicrotasks();
+				expect(webSocketMock).not.toHaveBeenCalled();
+
+				// No active retry from this failure itself — only the next keepalive tick reconnects, the same
+				// backoff a retryable refresh failure gets.
+				await vi.advanceTimersByTimeAsync(10000);
+
+				expect(webSocketMock).toHaveBeenCalledTimes(1);
+				expect(refreshTokens).not.toHaveBeenCalled();
+				expect(internals(apiSocket).socketAuthRetries).toBe(0);
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it('still refreshes and reconnects when the presented token is genuinely near expiry', async () => {
+			// Only 10s of remaining life — inside FRESH_TOKEN_MARGIN_SECONDS — so a rejection is treated as a
+			// plausible auth failure and goes through the normal bounded refresh/reconnect path.
+			setTokens({ accessToken: makeAccessToken(10), refreshToken: 'r' });
+			vi.mocked(refreshTokens).mockResolvedValue({
+				status: 'success',
+				tokens: { accessToken: makeAccessToken(900), refreshToken: 'r2' }
+			});
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+			webSocketMock.mockClear();
+
+			closeUnopened(ws);
+			await flushMicrotasks();
+
+			expect(refreshTokens).toHaveBeenCalledTimes(1);
+			expect(webSocketMock).toHaveBeenCalledTimes(1);
+		});
+
+		it('still refreshes when the presented token has no decodable expiry', async () => {
+			// A non-JWT (or otherwise undecodable) token gives no evidence either way, so the existing
+			// refresh/retry path is the safe default rather than silently skipping it.
+			setTokens({ accessToken: 'not-a-jwt', refreshToken: 'r' });
+			vi.mocked(refreshTokens).mockResolvedValue({
+				status: 'success',
+				tokens: { accessToken: 'a2', refreshToken: 'r2' }
+			});
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+			webSocketMock.mockClear();
+
+			closeUnopened(ws);
+			await flushMicrotasks();
+
+			expect(refreshTokens).toHaveBeenCalledTimes(1);
+			expect(webSocketMock).toHaveBeenCalledTimes(1);
 		});
 	});
 
