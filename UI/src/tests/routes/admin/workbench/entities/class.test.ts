@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EAttribute, EEquipmentSlot, EItemCategory, EModifierType, ESkillAcquisition } from '$lib/api';
 import type { ChipsSectionConfig, TableSectionConfig } from '$routes/admin/workbench/entities/types';
 
+/** A non-core, derived attribute — any id past the six-member core set works for the restriction tests. */
+const NON_CORE_ATTRIBUTE = EAttribute.MaxHealth;
+
 /* Only the refresh() write-through added for #1633 — classEntity's field/table configs aren't touched here.
    `fetchSocketData` is stubbed; the write-through into staticData.classes is what retire-confirm's reference
    computation (starter-skill/starter-equipment groups) reads. */
@@ -163,5 +166,32 @@ describe('starterSkills chips section (#2333)', () => {
 
 	it('warn falls back to the advisory "no starter skills" nag when the list is empty', () => {
 		expect(starterSkillsSection().warn?.(classEntity.newItem(0))).toBe('No starter skills');
+	});
+});
+
+describe('attributes distribution section (#2376)', () => {
+	const attributesSection = () =>
+		classEntity.sections.find((s) => s.key === 'attributes') as TableSectionConfig<WorkbenchClass>;
+
+	it("the attribute picker offers only core attributes, unlike an enemy's unrestricted one", () => {
+		const options = attributesSection().columns[0].options?.();
+		expect(options?.some((o) => o.value === NON_CORE_ATTRIBUTE)).toBe(false);
+		expect(options?.some((o) => o.value === EAttribute.Strength)).toBe(true);
+	});
+
+	it('warns a distribution row on a non-core attribute, blocking Save (backend-enforced)', () => {
+		const cls: WorkbenchClass = {
+			...classEntity.newItem(0),
+			attributeDistributions: [{ attributeId: NON_CORE_ATTRIBUTE, baseAmount: 1, amountPerLevel: 0 }]
+		};
+		expect(attributesSection().warn?.(cls)).toMatchObject({ blocking: true });
+	});
+
+	it('does not warn a distribution made up entirely of core attributes', () => {
+		const cls: WorkbenchClass = {
+			...classEntity.newItem(0),
+			attributeDistributions: [{ attributeId: EAttribute.Strength, baseAmount: 1, amountPerLevel: 0 }]
+		};
+		expect(attributesSection().warn?.(cls)).toBeNull();
 	});
 });

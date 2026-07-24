@@ -71,7 +71,9 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 			// granted skill's own signature type must match the weapon's (FindWeaponInvariantViolation).
 			// Independently, any granted skill (weapon or not) must stay Item-flagged — the picker's
 			// `keep` exception leaves a flag-lost grant visible as a stale value, so this is the
-			// backstop (FindGrantedSkillFlagViolation).
+			// backstop (FindGrantedSkillFlagViolation). A gating proficiency must also stay live and
+			// the required level must stay in its range (FindProficiencyGateViolation) — the picker
+			// only excludes a retired proficiency from new authoring, not one retired after the fact.
 			warn: (it) => {
 				if (it.itemCategoryId === EItemCategory.Weapon) {
 					if (it.weaponType === -1) {
@@ -100,6 +102,23 @@ export const itemEntity: EntityConfig<WorkbenchItem> = {
 							message: `Granted skill '${grantedSkill.name}' is no longer flagged as Item-acquirable`,
 							blocking: true
 						};
+					}
+				}
+				if (it.requiredProficiencyId != null && it.requiredProficiencyId !== -1) {
+					const proficiency = staticData.proficiencies?.[it.requiredProficiencyId];
+					if (proficiency) {
+						if (proficiency.retiredAt) {
+							return {
+								message: `Required proficiency '${proficiency.name}' is retired and cannot gate an item`,
+								blocking: true
+							};
+						}
+						if (it.requiredProficiencyLevel < 1 || it.requiredProficiencyLevel > proficiency.maxLevel) {
+							return {
+								message: `Required proficiency level must be between 1 and ${proficiency.maxLevel} for '${proficiency.name}'`,
+								blocking: true
+							};
+						}
 					}
 				}
 				return null;

@@ -79,8 +79,8 @@ beforeEach(() => {
 		skill(5, 'Old Flame', { synth: true, retired: true })
 	];
 	staticData.proficiencies = [
-		{ id: 0, name: 'Fire', retiredAt: null },
-		{ id: 1, name: 'Earth', retiredAt: null }
+		{ id: 0, name: 'Fire', maxLevel: 10, retiredAt: null },
+		{ id: 1, name: 'Earth', maxLevel: 10, retiredAt: null }
 	];
 });
 
@@ -136,6 +136,29 @@ describe('skillRecipeEntity', () => {
 		]);
 	});
 
+	it('the result picker excludes a Synthesis skill already claimed by another live recipe (#2376)', () => {
+		staticData.skills = [
+			...staticData.skills,
+			skill(6, 'Cinder', { synth: true }) // a second Synthesis-flagged skill, unclaimed
+		];
+		staticData.skillRecipes = [recipe({ id: 0, resultSkillId: 3 })]; // Lava already has a producing recipe
+		const options = fieldsSection('result').fields[0].options;
+
+		// A brand-new recipe (no current value) must not offer the already-claimed Lava.
+		expect(options?.()).toEqual([{ value: 6, text: 'Cinder' }]);
+		// Editing the recipe that itself owns the Lava claim keeps Lava selectable (it's not a duplicate of itself).
+		expect(options?.(3)).toEqual([
+			{ value: 3, text: 'Lava' },
+			{ value: 6, text: 'Cinder' }
+		]);
+	});
+
+	it('newItem defaults skip a Synthesis skill already claimed by a live recipe (#2376)', () => {
+		staticData.skillRecipes = [recipe({ id: 0, resultSkillId: 3 })]; // Lava already claimed
+		staticData.skills = [...staticData.skills, skill(6, 'Cinder', { synth: true })];
+		expect(skillRecipeEntity.newItem(7).resultSkillId).toBe(6);
+	});
+
 	it('the inputs catalogue blocks adding a retired skill but keeps it visible', () => {
 		const catalogue = chipsSection('inputs').catalogue();
 		expect(catalogue.find((c) => c.id === 0)).toMatchObject({ name: 'Ember', addable: true });
@@ -178,6 +201,15 @@ describe('skillRecipeEntity', () => {
 		expect(warn?.(recipe({ conditions: [{ proficiencyId: 0, minLevel: 1 }] }))).toBeNull();
 		expect(warn?.(recipe({ conditions: [{ proficiencyId: 0, minLevel: 0 }] }))).toEqual({
 			message: 'Condition level must be at least 1',
+			blocking: true
+		});
+	});
+
+	it("warns when a condition level exceeds its proficiency's MaxLevel, blocking Save (#2376, backend-enforced)", () => {
+		const warn = tableSection('conditions').warn;
+		expect(warn?.(recipe({ conditions: [{ proficiencyId: 0, minLevel: 10 }] }))).toBeNull();
+		expect(warn?.(recipe({ conditions: [{ proficiencyId: 0, minLevel: 11 }] }))).toEqual({
+			message: "Condition level exceeds 'Fire's max level (10)",
 			blocking: true
 		});
 	});

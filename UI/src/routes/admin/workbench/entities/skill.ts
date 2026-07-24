@@ -123,7 +123,8 @@ export const skillEntity: EntityConfig<ISkill> = {
 					flags: [
 						{ label: 'Player', value: ESkillAcquisition.Player },
 						{ label: 'Item', value: ESkillAcquisition.Item },
-						{ label: 'Enemy', value: ESkillAcquisition.Enemy }
+						{ label: 'Enemy', value: ESkillAcquisition.Enemy },
+						{ label: 'Synthesis', value: ESkillAcquisition.Synthesis }
 					]
 				},
 				{

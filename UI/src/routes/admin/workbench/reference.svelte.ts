@@ -239,6 +239,20 @@ class WorkbenchReference {
 		const skill = staticData.skills?.[id];
 		return !!skill && !skill.retiredAt && hasFlag(skill.acquisition, ESkillAcquisition.Synthesis);
 	};
+	/**
+	 * {@link synthesisResultSkillOptions} narrowed further: a skill already claimed as another live
+	 * recipe's result is excluded from new authoring too (`AdminSkillRecipes.FindDuplicateResultViolation`
+	 * — each Synthesis skill may have only one producing recipe). The current value stays selectable even
+	 * if it's this recipe's own already-claimed result.
+	 */
+	availableSynthesisResultSkillOptions = (current?: number): SelectOption[] => {
+		const claimed = new Set(
+			(staticData.skillRecipes ?? [])
+				.filter((r) => !r.retiredAt && r.resultSkillId !== current)
+				.map((r) => r.resultSkillId)
+		);
+		return this.synthesisResultSkillOptions(current).filter((o) => !claimed.has(o.value));
+	};
 
 	// ── Progression (paths & proficiencies) ──
 	/**

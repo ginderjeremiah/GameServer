@@ -102,6 +102,18 @@ describe('skillEntity', () => {
 		expect(rarityField).toMatchObject({ type: 'select', label: 'Rarity' });
 	});
 
+	it('the acquisition field offers Synthesis alongside Player/Item/Enemy (#2376)', () => {
+		const identity = skillEntity.sections.find((s) => s.key === 'identity');
+		const fields = identity && 'fields' in identity ? identity.fields : [];
+		const acquisitionField = fields.find((f) => f.key === 'acquisition');
+		expect(acquisitionField?.flags?.map((f) => f.value)).toEqual([
+			ESkillAcquisition.Player,
+			ESkillAcquisition.Item,
+			ESkillAcquisition.Enemy,
+			ESkillAcquisition.Synthesis
+		]);
+	});
+
 	it('meta shows the damage, multiplier count, effect count and cooldown', () => {
 		const skill: ISkill = {
 			...skillEntity.newItem(1),
