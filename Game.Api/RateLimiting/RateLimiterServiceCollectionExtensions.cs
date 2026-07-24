@@ -64,6 +64,9 @@ namespace Game.Api.RateLimiting
             // which would pay full structured-logging volume under attack.
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(typeof(RateLimiterServiceCollectionExtensions).FullName!);
+            // OnRejected is registered globally, so it fires for every policy's rejections. "IP" is correct
+            // today since the only policy (auth) partitions purely by client IP; revisit if an
+            // account-partitioned policy is ever added.
             logger.LogWarning(
                 "Rate limit rejected {Path} PartitionKeyType={PartitionKeyType} PartitionKey={PartitionKey}",
                 context.HttpContext.Request.Path.Value, "IP", ClientIp.Resolve(context.HttpContext));
