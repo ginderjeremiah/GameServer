@@ -217,6 +217,16 @@ namespace Game.Core.Progress
             [.. _challenges.Values.Where(c => c.Completed).Select(c => c.Challenge.Id)];
 
         /// <summary>
+        /// Every (statistic type, entity) key the player currently holds a recorded row for — the full
+        /// retroactive-evaluation scope, as opposed to <see cref="RecordBattleCompleted"/>'s per-battle
+        /// touched-key return. Used by the connect-time challenge sweep (the application layer's
+        /// OfflineProgressService) so an already-satisfied Max/Min challenge — newly authored, or reinstated from
+        /// retirement — completes without the player having to beat their own record again (#2367); the
+        /// per-battle live path deliberately keeps the narrower touched-key scoping.
+        /// </summary>
+        public IReadOnlyCollection<(EStatisticType Type, int? EntityId)> StatisticKeys => [.. _statistics.Keys];
+
+        /// <summary>
         /// Looks up a recorded statistic value, collapsing "no row" and "recorded 0" to the same <c>0m</c>.
         /// Production code must always distinguish the two (see <see cref="TryGetStatisticValue"/>'s remarks) and
         /// so never calls this; it is kept as a deliberate test-only convenience — most test assertions only

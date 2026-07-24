@@ -111,14 +111,28 @@ namespace Game.Application.Services
             // actually simulated the completion.
             var awayWindowEnd = player.LastActivity + TimeSpan.FromMilliseconds(cappedAwayMs);
 
-            // Below the threshold there are no offline rewards. Re-anchor LastActivity (so the next away period
-            // starts fresh and an immediate re-claim is a no-op) and return an empty summary. Any stale
-            // in-flight battle is left for the idle loop's first StartBattle to abandon, exactly as on a normal
-            // reconnect — there is no away window to simulate, so settling it here would change nothing.
+            // Below the threshold there are no offline rewards, but this is still the once-per-connect
+            // load-time hook (#2367): evaluate every statistic-backed challenge against the player's already-
+            // recorded stats, so an already-satisfied Max/Min challenge (newly authored, or reinstated from
+            // retirement) completes on this connect rather than waiting for the player to beat their own record.
+            // Notified live (rather than folded into the summary below) since there is no welcome-back gate on
+            // this branch to carry it. Re-anchor LastActivity (so the next away period starts fresh and an
+            // immediate re-claim is a no-op) and return an empty summary. Any stale in-flight battle is left for
+            // the idle loop's first StartBattle to abandon, exactly as on a normal reconnect — there is no away
+            // window to simulate, so settling it here would change nothing.
             if (awayMs < minimumAway.TotalMilliseconds)
             {
-                player.StampActivity(now);
-                await _playerRepo.SavePlayer(player, cancellationToken);
+                using (_playerRepo.BeginBatch())
+                {
+                    var reconnectProgress = await _progressRepo.Load(player, cancellationToken);
+                    _challengeRewards.EvaluateAndApply(
+                        reconnectProgress, reconnectProgress.StatisticKeys, player, now, notify: true);
+                    await _progressRepo.Save(reconnectProgress, cancellationToken);
+
+                    player.StampActivity(now);
+                    await _playerRepo.SavePlayer(player, cancellationToken);
+                }
+
                 return OfflineProgressSummary.Empty(cappedAwayMs, player.AutoChallengeBoss, player.CurrentZoneId);
             }
 
@@ -306,27 +320,13 @@ namespace Game.Application.Services
             Player player, PlayerProgress progress, OfflineProgressResult result, DateTime timestamp,
             CancellationToken cancellationToken)
         {
-            if (result.BattlesSimulated == 0)
-            {
-                return OfflineRewards.Empty;
-            }
-
             var victoryExpRewards = new List<int>();
             var proficiencyGains = new ProficiencyGainAccumulator();
-            // Union the statistic rows touched across every battle, so the end-of-window challenge evaluation
-            // sees every moved statistic. RecordBattleCompleted returns only this call's own per-battle delta
-            // (the progress aggregate is loaded once for the whole window), so a mixed-outcome window still
-            // needs the explicit union to keep a statistic touched by a non-final battle (e.g. a kill challenge
-            // crossed by early wins before a closing loss) in scope for the end-of-window evaluation.
-            var touchedStatistics = new HashSet<(EStatisticType Type, int? EntityId)>();
             foreach (var battle in result.Battles)
             {
-                foreach (var key in progress.RecordBattleCompleted(
+                progress.RecordBattleCompleted(
                     battle.Enemy, battle.Result.Victory, battle.Result.PlayerDied, battle.Result.TotalMs,
-                    battle.Result.Stats, result.IsBossBattle, result.ZoneId))
-                {
-                    touchedStatistics.Add(key);
-                }
+                    battle.Result.Stats, result.IsBossBattle, result.ZoneId);
 
                 if (battle.Result.Victory)
                 {
@@ -362,7 +362,14 @@ namespace Game.Application.Services
             }
             _proficiencyRewards.GrantRewardSkills(proficiencyResult, player);
 
-            var completed = _challengeRewards.EvaluateAndApply(progress, touchedStatistics, player, timestamp, notify: false);
+            // Evaluate every statistic-backed challenge the player has a recorded value for — not just the ones
+            // this window's battles touched (or none, when BattlesSimulated is 0) — so a Max/Min challenge
+            // already satisfied before this session (newly authored, or reinstated from retirement) completes
+            // here too (#2367), folded into the welcome-back summary like any other window completion.
+            // Re-evaluating an already-completed challenge is a no-op (EvaluateChallenges skips it), so widening
+            // the scope from this window's touched keys to the player's full recorded set cannot double-apply a
+            // reward this window's own battles already earned.
+            var completed = _challengeRewards.EvaluateAndApply(progress, progress.StatisticKeys, player, timestamp, notify: false);
 
             await _progressRepo.Save(progress, cancellationToken);
             return new OfflineRewards(completed, proficiencyResult);
