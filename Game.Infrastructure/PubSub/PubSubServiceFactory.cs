@@ -21,7 +21,8 @@ namespace Game.Infrastructure.PubSub
 
         private static IPubSubService CreateRedisPubSubService(IPubSubOptions config, ILoggerFactory loggerFactory)
         {
-            return new RedisPubSubService(RedisMultiplexerFactory.GetMultiplexer(config), loggerFactory);
+            var multiplexer = RedisMultiplexerFactory.GetMultiplexer(config, loggerFactory.CreateLogger(nameof(RedisMultiplexerFactory)));
+            return new RedisPubSubService(multiplexer, loggerFactory);
         }
     }
 }
