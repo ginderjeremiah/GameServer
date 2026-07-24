@@ -50,6 +50,18 @@ namespace Game.Core
         public const int LessonStepTextMaxLength = 500;
         public const int LessonStepAnchorKeyMaxLength = 100;
 
+        public const int PathNameMaxLength = 50;
+        public const int PathDescriptionMaxLength = 500;
+        public const int PathDesignerNotesMaxLength = 2000;
+
+        public const int ProficiencyNameMaxLength = 50;
+        public const int ProficiencyDescriptionMaxLength = 500;
+        public const int ProficiencyIconPathMaxLength = 50;
+        public const int ProficiencyWordMaxLength = 50;
+        public const int ProficiencyPronunciationMaxLength = 50;
+        public const int ProficiencyTranslationMaxLength = 100;
+        public const int ProficiencyDesignerNotesMaxLength = 2000;
+
         public const int TagNameMaxLength = 50;
 
         public const int ZoneNameMaxLength = 50;

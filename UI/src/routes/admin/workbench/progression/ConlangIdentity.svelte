@@ -81,6 +81,17 @@
 
 <div class="notes">
 	<ProgInput
+		label="Description"
+		value={tier.description}
+		textarea
+		fullWidth
+		maxLength={500}
+		onChange={(v) => store.patchProf(tier.id, (d) => (d.description = v))}
+	/>
+</div>
+
+<div class="notes">
+	<ProgInput
 		label="Designer notes"
 		value={tier.designerNotes}
 		textarea
