@@ -8,7 +8,7 @@ import {
 import { ApiSocketRequest } from './api-socket-request';
 import { createHook } from '../common/hooks';
 import { Action } from '../common/types';
-import { getAccessToken, getRefreshToken, getTokens } from './token-store';
+import { getAccessToken, getAccessTokenExpiry, getRefreshToken, getTokens } from './token-store';
 import { ensureValidAccessToken, handleAuthFailure, refreshTokens } from './auth';
 
 /** WebSocket close code for a clean, intentional shutdown — never an auth failure. */
@@ -34,6 +34,14 @@ const MAX_SOCKET_AUTH_RETRIES = 5;
  *  rejection / flap) can't reset the count every cycle and re-enable the loop. A healthy connection
  *  trivially clears this bar and regains a full budget for a genuine future re-auth. */
 const STABLE_CONNECTION_MS = 10000;
+
+/** A pre-open close is only treated as an auth rejection when the access token it presented was
+ *  actually close to (or past) expiry. A token with more remaining life than this margin — well past
+ *  the pre-emptive refresh leeway or any plausible clock skew — failing the handshake is evidence the
+ *  WebSocket upgrade itself is broken (a proxy/AV stripping `Upgrade`, a misconfigured edge) rather
+ *  than proof the token was rejected for being stale; refreshing again would just burn another
+ *  single-use refresh token without addressing the real failure (#2369). */
+const FRESH_TOKEN_MARGIN_SECONDS = 120;
 
 /** Per-request backstop for the case the close-handler can't cover: the socket stays open but a
  *  response simply never arrives (e.g. the server processed the command but failed to send a reply,
@@ -97,6 +105,10 @@ export class ApiSocket {
 	// Consecutive handshake-auth refresh/reconnect attempts since the last *stable* open; bounded by
 	// MAX_SOCKET_AUTH_RETRIES so a flapping/post-open-rejecting server can't loop and burn refresh tokens.
 	private socketAuthRetries = 0;
+	// The `exp` claim of the access token presented in the most recent handshake attempt (null when
+	// undecodable or none was presented). Read by handleClose to tell a genuine auth rejection from a
+	// non-auth handshake failure — see FRESH_TOKEN_MARGIN_SECONDS.
+	private handshakeTokenExpiry: number | null = null;
 	// The keepalive interval handle (null = not running) so it can be cleared on a clean close, an
 	// unrecoverable auth failure, or an explicit disconnect — rather than firing for the lifetime of the
 	// module singleton and trying to resurrect a socket for a logged-out user.
@@ -169,6 +181,9 @@ export class ApiSocket {
 				return;
 			}
 		}
+		// Recorded before the handshake is attempted so handleClose can later tell whether a rejection is
+		// plausible on expiry grounds — see FRESH_TOKEN_MARGIN_SECONDS.
+		this.handshakeTokenExpiry = accessToken ? getAccessTokenExpiry() : null;
 		// Browsers can't set an Authorization header on the WebSocket handshake, so the access token is
 		// carried as a WebSocket subprotocol instead of a query-string parameter — a query string ends up
 		// verbatim in any downstream access log (e.g. the edge proxy's), while a subprotocol is a
@@ -410,6 +425,19 @@ export class ApiSocket {
 		this.closeIfLikelyHalfOpen();
 	}
 
+	/** True when the access token presented in the most recent handshake attempt had well more than
+	 *  FRESH_TOKEN_MARGIN_SECONDS of remaining life — see that constant for why this rules out an actual
+	 *  expiry-based rejection. False (not just "unfresh") when the expiry couldn't be determined at all,
+	 *  since an undecodable expiry is no evidence either way and the existing refresh/retry path is the
+	 *  safe default. */
+	private wasHandshakeTokenDemonstrablyFresh(): boolean {
+		if (this.handshakeTokenExpiry === null) {
+			return false;
+		}
+		const nowSeconds = Date.now() / 1000;
+		return this.handshakeTokenExpiry - nowSeconds > FRESH_TOKEN_MARGIN_SECONDS;
+	}
+
 	private handleError(ev: Event) {
 		console.error('A socket error occurred', ev);
 		errorHook.notify('WebSocket connection error');
@@ -422,7 +450,8 @@ export class ApiSocket {
 	 * can't loop and burn rotating refresh tokens; the budget is refilled once a reconnect proves stable
 	 * (see onStart). A socket that did open before dropping (SocketReplaced, or a transient network blip)
 	 * is left for the keepalive ping to reconnect — refreshing wouldn't help, and retrying here risks
-	 * fighting an intentional close.
+	 * fighting an intentional close. A pre-open close is only routed through the refresh/retry path at all
+	 * when it's plausibly an auth rejection — see wasHandshakeTokenDemonstrablyFresh.
 	 */
 	private handleClose(ev: CloseEvent) {
 		// A command sent before the drop will never get a response on this dead socket, and we deliberately
@@ -446,6 +475,18 @@ export class ApiSocket {
 		if (this.socketOpened) {
 			// A socket that opened before dropping flushed its queue in onStart; the keepalive ping will
 			// reconnect and re-flush anything queued since, so leave the queue for it to re-send.
+			return;
+		}
+
+		if (this.wasHandshakeTokenDemonstrablyFresh()) {
+			// The token this handshake presented had well more than FRESH_TOKEN_MARGIN_SECONDS of life left,
+			// so its rejection can't plausibly be an actual expiry — refreshing again would just burn another
+			// single-use refresh token without fixing whatever is really blocking the upgrade. Leave tokens
+			// and the queue untouched and spend no auth-retry budget; the keepalive ping's next ensureSocket()
+			// retries the connect the same way a retryable refresh failure does.
+			console.warn(
+				'Handshake rejected while presenting a demonstrably fresh access token; not treating as an auth failure.'
+			);
 			return;
 		}
 
