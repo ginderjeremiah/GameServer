@@ -11,6 +11,19 @@ import { formatNum, normalizeText } from './functions';
  * (e.g. `challengeTypeName`).
  */
 
+/** The six core attributes a player directly invests stat points into — the frontend mirror of the
+ *  backend `Attribute.CoreAttributes` invariant (`Game.Core/Attributes/Attribute.cs`). Every other
+ *  attribute is "derived" (computed from these), so this is the meaningful measure of raw attribute
+ *  investment, deliberately kept distinct from the `attributeType` display taxonomy (spike #528). */
+export const CORE_ATTRIBUTES: EAttribute[] = [
+	EAttribute.Strength,
+	EAttribute.Endurance,
+	EAttribute.Intellect,
+	EAttribute.Agility,
+	EAttribute.Dexterity,
+	EAttribute.Luck
+];
+
 /** Suffix matching the `--attr-*` custom properties (e.g. `strength`). */
 const ATTRIBUTE_KEY: Partial<Record<EAttribute, string>> = {
 	[EAttribute.Strength]: 'strength',

@@ -55,6 +55,11 @@ export const lessonEntity: EntityConfig<WorkbenchLesson> = {
 				if (l.triggerType === ELessonTriggerType.ScreenVisit && l.triggerMechanicEvent !== -1) {
 					return { message: 'Screen-visit lessons cannot also carry a mechanic-event trigger', blocking: true };
 				}
+				// A key must be unique across every lesson, including retired ones (which still hold their key) —
+				// hard-rejected by AdminLessons.FindKeyCollision, so it blocks Save (#2217).
+				if (l.key && staticData.lessons?.some((other) => other.id !== l.id && other.key === l.key)) {
+					return { message: `Another lesson already uses the key '${l.key}'`, blocking: true };
+				}
 				return null;
 			},
 			fields: [

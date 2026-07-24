@@ -50,6 +50,44 @@ describe('attributeDistributionSection', () => {
 	});
 });
 
+describe('attributeDistributionSection with an attributeFilter (#2376)', () => {
+	// A stand-in restriction (only even-numbered attribute ids) exercising the filter plumbing without
+	// depending on the real EAttribute/CoreAttributes membership.
+	const filtered = attributeDistributionSection<Distributed>({
+		key: 'attrs',
+		itemsKey: 'dist',
+		desc: 'Restricted distribution',
+		emptySub: 'No distribution yet.',
+		attributeFilter: (id) => id % 2 === 0
+	});
+
+	it('excludes filtered-out attributes from the picker options', () => {
+		const options = filtered.columns[0].options?.();
+		expect(options?.some((o) => o.value % 2 !== 0)).toBe(false);
+	});
+
+	it('newRow only picks a free attribute that passes the filter', () => {
+		// id 0 is taken; the next even id (2) is picked over the odd id 1.
+		const rec: Distributed = { id: 0, dist: [{ attributeId: 0, baseAmount: 0, amountPerLevel: 0 }] };
+		expect(filtered.newRow(rec).attributeId).toBe(2);
+	});
+
+	it('warns when an existing row violates the filter, blocking Save', () => {
+		const violating: Distributed = { id: 0, dist: [{ attributeId: 1, baseAmount: 1, amountPerLevel: 0 }] };
+		const warning = filtered.warn?.(violating);
+		expect(warning).toMatchObject({ blocking: true });
+	});
+
+	it('does not warn when every row passes the filter', () => {
+		const clean: Distributed = { id: 0, dist: [{ attributeId: 0, baseAmount: 1, amountPerLevel: 0 }] };
+		expect(filtered.warn?.(clean)).toBeNull();
+	});
+
+	it('still reports the advisory empty-collection warning when there are no rows', () => {
+		expect(filtered.warn?.({ id: 0, dist: [] })).toBe('No attribute distribution');
+	});
+});
+
 describe('attributeBonusSection', () => {
 	const section = attributeBonusSection<Bonused>({
 		itemsKey: 'bonuses',

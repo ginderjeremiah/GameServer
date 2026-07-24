@@ -7,7 +7,7 @@ import {
 	fetchSocketData,
 	type IClass
 } from '$lib/api';
-import { hasFlag } from '$lib/common';
+import { CORE_ATTRIBUTES, hasFlag } from '$lib/common';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, guardedSave, persistEntity } from '../save-helpers';
@@ -226,7 +226,10 @@ export const classEntity: EntityConfig<WorkbenchClass> = {
 			key: 'attributes',
 			itemsKey: 'attributeDistributions',
 			desc: 'Locked-base stat distribution per level',
-			emptySub: 'This class has no stat distribution yet.'
+			emptySub: 'This class has no stat distribution yet.',
+			// Unlike an enemy's distribution, a class distribution is core-attribute-only
+			// (AdminClasses.FindAttributeDistributionViolation).
+			attributeFilter: (id) => CORE_ATTRIBUTES.includes(id)
 		})
 	],
 	refresh,

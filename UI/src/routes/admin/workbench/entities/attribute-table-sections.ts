@@ -1,3 +1,5 @@
+import { attributeName } from '$lib/common';
+import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { firstFree } from './helpers';
 import { fieldsOf, type Identified, type TableSectionConfig } from './types';
@@ -23,15 +25,41 @@ export const attributeDistributionSection = <T extends Identified>(config: {
 	itemsKey: keyof T & string;
 	desc: string;
 	emptySub: string;
+	/**
+	 * Restricts which attributes are selectable/valid in this table — e.g. a class distribution is
+	 * core-attribute-only (`AdminClasses.FindAttributeDistributionViolation`), while an enemy's stays
+	 * unrestricted. Omit for no restriction.
+	 */
+	attributeFilter?: (attributeId: number) => boolean;
 }): TableSectionConfig<T> => {
+	const { attributeFilter } = config;
 	const rowsOf = (rec: T) => fieldsOf(rec)[config.itemsKey] as AttributeDistributionRow[];
+	const attributeOptions = () =>
+		attributeFilter
+			? reference.attributeOptions().filter((o) => attributeFilter(o.value))
+			: reference.attributeOptions();
 	return {
 		key: config.key,
 		label: 'Attributes',
 		glyph: 'bars',
 		desc: config.desc,
 		count: (rec) => rowsOf(rec).length,
-		warn: (rec) => (rowsOf(rec).length ? null : 'No attribute distribution'),
+		warn: (rec) => {
+			const rows = rowsOf(rec);
+			if (!rows.length) {
+				return 'No attribute distribution';
+			}
+			// A row can violate the restriction even though the picker excludes it from new authoring —
+			// e.g. it was set before the restriction existed. Hard-rejected on save, so it blocks (#2376).
+			const violator = attributeFilter && rows.find((r) => !attributeFilter(r.attributeId));
+			if (violator) {
+				return {
+					message: `'${attributeName(violator.attributeId, staticData.attributes)}' is not a core attribute and cannot have a distribution here`,
+					blocking: true
+				};
+			}
+			return null;
+		},
 		kind: 'table',
 		itemsKey: config.itemsKey,
 		rowKey: 'attributeId',
@@ -42,7 +70,7 @@ export const attributeDistributionSection = <T extends Identified>(config: {
 		newRow: (rec) => ({
 			attributeId: firstFree(
 				rowsOf(rec).map((a) => a.attributeId),
-				reference.attributeOptions()
+				attributeOptions()
 			),
 			baseAmount: 0,
 			amountPerLevel: 0
@@ -52,7 +80,7 @@ export const attributeDistributionSection = <T extends Identified>(config: {
 				key: 'attributeId',
 				label: 'Attribute',
 				type: 'attribute',
-				options: reference.attributeOptions,
+				options: attributeOptions,
 				min: 190,
 				unique: true
 			},

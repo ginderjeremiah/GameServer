@@ -126,6 +126,28 @@ describe('lessonEntity', () => {
 		expect(identity && 'warn' in identity ? identity.warn?.(lessonEntity.newItem(0)) : null).toBeNull();
 	});
 
+	it('warns when another lesson (including a retired one) already uses the key, blocking Save (#2376, backend-enforced)', () => {
+		staticData.lessons = [
+			{ ...screenVisitLesson(), id: 1, key: 'idle-loop-basics' },
+			{ ...screenVisitLesson(), id: 2, key: 'retired-key', retiredAt: '2026-01-01T00:00:00Z' }
+		];
+		const identity = lessonEntity.sections.find((s) => s.key === 'identity');
+		const warn = (l: ReturnType<typeof lessonEntity.newItem>) =>
+			identity && 'warn' in identity ? identity.warn?.(l) : null;
+
+		expect(warn({ ...lessonEntity.newItem(3), key: 'idle-loop-basics' })).toEqual({
+			message: "Another lesson already uses the key 'idle-loop-basics'",
+			blocking: true
+		});
+		// A retired lesson's key still collides (it still holds the key, mirroring AdminLessons.FindKeyCollision).
+		expect(warn({ ...lessonEntity.newItem(3), key: 'retired-key' })).toEqual({
+			message: "Another lesson already uses the key 'retired-key'",
+			blocking: true
+		});
+		// Editing lesson 1 itself keeps its own key selectable — it isn't a collision with itself.
+		expect(warn({ ...lessonEntity.newItem(1), id: 1, key: 'idle-loop-basics' })).toBeNull();
+	});
+
 	it('persist maps the -1 sentinel back to an absent mechanic-event trigger and drops steps', async () => {
 		const record = { ...lessonEntity.newItem(0), key: 'idle-loop-basics', name: 'New', triggerMechanicEvent: -1 };
 		const baseline = { ...record, name: 'Old' };

@@ -162,6 +162,41 @@ describe('itemEntity weapon type', () => {
 		expect(identityWarn(cloak)).toBeNull();
 	});
 
+	it('warns a gate pointing at a retired proficiency, blocking Save (#2376, backend-enforced)', () => {
+		staticData.proficiencies = [{ id: 0, name: 'Swordsmanship', maxLevel: 10, retiredAt: '2026-01-01T00:00:00Z' }];
+		const gated: WorkbenchItem = {
+			...itemEntity.newItem(1),
+			requiredProficiencyId: 0,
+			requiredProficiencyLevel: 5
+		};
+		expect(identityWarn(gated)).toEqual({
+			message: "Required proficiency 'Swordsmanship' is retired and cannot gate an item",
+			blocking: true
+		});
+	});
+
+	it("warns a required level outside the gating proficiency's [1, MaxLevel] range, blocking Save (#2376)", () => {
+		staticData.proficiencies = [{ id: 0, name: 'Swordsmanship', maxLevel: 10, retiredAt: null }];
+		const tooHigh: WorkbenchItem = { ...itemEntity.newItem(1), requiredProficiencyId: 0, requiredProficiencyLevel: 11 };
+		expect(identityWarn(tooHigh)).toEqual({
+			message: "Required proficiency level must be between 1 and 10 for 'Swordsmanship'",
+			blocking: true
+		});
+
+		const tooLow: WorkbenchItem = { ...itemEntity.newItem(1), requiredProficiencyId: 0, requiredProficiencyLevel: 0 };
+		expect(identityWarn(tooLow)).toEqual({
+			message: "Required proficiency level must be between 1 and 10 for 'Swordsmanship'",
+			blocking: true
+		});
+	});
+
+	it('accepts a live, in-range proficiency gate, and an ungated item', () => {
+		staticData.proficiencies = [{ id: 0, name: 'Swordsmanship', maxLevel: 10, retiredAt: null }];
+		const gated: WorkbenchItem = { ...itemEntity.newItem(1), requiredProficiencyId: 0, requiredProficiencyLevel: 10 };
+		expect(identityWarn(gated)).toBeNull();
+		expect(identityWarn(itemEntity.newItem(1))).toBeNull();
+	});
+
 	it('weaponTypeOptions offers None plus every damage-type leaf, martial or caster', () => {
 		const options = reference.weaponTypeOptions();
 		expect(options[0]).toEqual({ value: -1, text: 'None' });

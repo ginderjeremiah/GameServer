@@ -12,10 +12,12 @@ import { chipsSection, type EntityConfig } from './types';
  * (and retirement); the input skills and proficiency conditions are persisted through their own relationship
  * setters (the `persistEntity` child-saver pattern, mirroring how the class editor saves its child collections).
  *
- * The result/input pickers exclude retired skills (a hard block; an already-authored value stays visible), and
- * the result picker is further restricted to Synthesis-flagged skills. The remaining authoritative checks
- * (acyclicity/reachability, an input equal to the result, the proficiency-level range) live on the backend and
- * surface as a save-failure toast; the cheap, local rules are flagged as warnings here.
+ * The result/input pickers exclude retired skills (a hard block; an already-authored value stays visible), the
+ * result picker is further restricted to Synthesis-flagged skills not already claimed by another live recipe
+ * (one producing recipe per skill), and the condition-level warn covers the level range against the gating
+ * proficiency's own MaxLevel. The one remaining authoritative check the backend owns alone — acyclicity/
+ * reachability of the recipe graph — surfaces as a save-failure toast; everything else cheap enough to check
+ * locally is flagged as a warning here.
  */
 // Written through to staticData.skillRecipes so retire-confirm's reference computation (recipe-result/
 // recipe-input/recipe-condition groups) sees post-save edits, mirroring how entities/skill.ts writes through (#1633).
@@ -38,7 +40,7 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 	newItem: (id) => ({
 		id,
 		// Default to the first authorable Synthesis result; -1 (no valid option yet) surfaces as a warning.
-		resultSkillId: reference.synthesisResultSkillOptions()[0]?.value ?? -1,
+		resultSkillId: reference.availableSynthesisResultSkillOptions()[0]?.value ?? -1,
 		designerNotes: '',
 		inputSkillIds: [],
 		conditions: []
@@ -72,7 +74,7 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 					key: 'resultSkillId',
 					label: 'Result Skill',
 					type: 'select',
-					options: reference.synthesisResultSkillOptions,
+					options: reference.availableSynthesisResultSkillOptions,
 					width: 260
 				},
 				{
@@ -116,11 +118,25 @@ export const skillRecipeEntity: EntityConfig<ISkillRecipe> = {
 			glyph: 'gauge',
 			desc: 'Proficiency-level gates that must be met',
 			count: (r) => r.conditions.length,
-			// Hard-rejected by AdminSkillRecipes.SetConditions, so it blocks Save (#2217).
-			warn: (r) =>
-				r.conditions.some((c) => c.minLevel < 1)
-					? { message: 'Condition level must be at least 1', blocking: true }
-					: null,
+			// Hard-rejected by AdminSkillRecipes.SetConditions, so it blocks Save (#2217); a level above
+			// the gating proficiency's own MaxLevel is equally rejected (AdminSkillRecipes.cs:152).
+			warn: (r) => {
+				if (r.conditions.some((c) => c.minLevel < 1)) {
+					return { message: 'Condition level must be at least 1', blocking: true };
+				}
+				const overCap = r.conditions.find((c) => {
+					const proficiency = staticData.proficiencies?.[c.proficiencyId];
+					return proficiency && c.minLevel > proficiency.maxLevel;
+				});
+				if (overCap) {
+					const proficiency = staticData.proficiencies?.[overCap.proficiencyId];
+					return {
+						message: `Condition level exceeds '${proficiency?.name}'s max level (${proficiency?.maxLevel})`,
+						blocking: true
+					};
+				}
+				return null;
+			},
 			kind: 'table',
 			itemsKey: 'conditions',
 			rowKey: 'proficiencyId',

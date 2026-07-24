@@ -31,7 +31,7 @@ import {
 	type ISkill
 } from '$lib/api';
 import { BattleAttributes, isSkillDormant } from '$lib/battle';
-import { attributeName, SaveFlash } from '$lib/common';
+import { attributeName, CORE_ATTRIBUTES, SaveFlash } from '$lib/common';
 import { safeLocalStorage } from '$lib/common/local-storage';
 import { inventoryManager, playerManager } from '$lib/engine';
 import { staticData, toastError } from '$stores';
@@ -47,20 +47,12 @@ const sum = (arr: number[]): number => arr.reduce((a, b) => a + b, 0);
  *  which a coarser 2-decimal round would collapse to zero and drop from the surfaced yields. */
 const roundYield = (n: number): number => Math.round(n * 1e6) / 1e6;
 
-/** The six core attributes that accept stat-point allocation (EAttribute 0..5), in display order.
- *  This is the **allocation domain** (the frontend mirror of the backend `Attribute.CoreAttributes`
- *  invariant), deliberately kept distinct from the `attributeType` display taxonomy — the spike (#528)
- *  warns the two must not be collapsed, though the `Primary` set is expected to equal this one. The
- *  per-attribute display metadata (name/code) is read from the reference set via `attributeName`/
- *  `attributeCode`; only the allocatable membership stays a domain constant here. */
-export const CORE_ATTRIBUTES: EAttribute[] = [
-	EAttribute.Strength,
-	EAttribute.Endurance,
-	EAttribute.Intellect,
-	EAttribute.Agility,
-	EAttribute.Dexterity,
-	EAttribute.Luck
-];
+/** Re-exported for this screen's own consumers (`Attributes.svelte`, `TheoryRow.svelte`, etc.), which
+ *  import it from here rather than reaching into `$lib/common` directly — the allocation domain
+ *  (EAttribute 0..5, in display order) now lives in `$lib/common/attribute-display` since the admin
+ *  Workbench needs it too (a class's stat distribution is core-attribute-only), but this screen is
+ *  still where its "allocation domain" meaning is documented. */
+export { CORE_ATTRIBUTES };
 
 /** Display grouping for the derived-stats panel. Rendered in this order; groups
  *  with no surfaced stats are skipped. */
