@@ -134,6 +134,9 @@ describe('statistics store', () => {
 	it('is not reverted by a fetch already in flight when it resolves with pre-clear data (#2332)', async () => {
 		const stale = Promise.withResolvers<IPlayerStatistic[]>();
 		mockFetchSocket.mockReturnValueOnce(stale.promise);
+		// The store isn't loaded yet, so invalidate() (#2366) queues a fresh fetch behind the stale
+		// one; it resolves after the clear was persisted server-side, so it already reflects it.
+		mockFetchSocket.mockResolvedValue([zonesCleared(3, 1)]);
 
 		const initial = statistics.load();
 		statistics.markZoneCleared(3);
@@ -142,6 +145,7 @@ describe('statistics store', () => {
 		// the clear was persisted server-side — must not revert it when it resolves.
 		stale.resolve([zonesCleared(3, 0)]);
 		await initial;
+		await vi.waitFor(() => expect(statistics.loaded).toBe(true));
 
 		expect(statistics.isZoneCleared(3)).toBe(true);
 	});

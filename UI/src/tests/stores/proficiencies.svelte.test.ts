@@ -232,6 +232,9 @@ describe('proficiencies store', () => {
 		it('is not reverted by a fetch already in flight when it resolves with pre-gain data (#2332)', async () => {
 			const stale = Promise.withResolvers<IPlayerProficiency[]>();
 			mockFetchSocket.mockReturnValueOnce(stale.promise);
+			// The store isn't loaded yet, so invalidate() (#2366) queues a fresh fetch behind the stale
+			// one; it resolves after the XP gain was persisted server-side, so it already reflects it.
+			mockFetchSocket.mockResolvedValue([playerProficiency(0, 4, 5)]);
 
 			const initial = playerProficiencies.load();
 			playerProficiencies.applyXpGained({ proficiencies: [xpResult(0, 4, 5)], opened: [] });
@@ -240,6 +243,7 @@ describe('proficiencies store', () => {
 			// the XP gain was persisted server-side — must not revert it when it resolves.
 			stale.resolve([playerProficiency(0, 3, 20)]);
 			await initial;
+			await vi.waitFor(() => expect(playerProficiencies.loaded).toBe(true));
 
 			expect(playerProficiencies.all).toEqual([playerProficiency(0, 4, 5)]);
 		});

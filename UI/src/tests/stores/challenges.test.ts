@@ -122,6 +122,9 @@ describe('challenges store', () => {
 		it('is not reverted by a fetch already in flight when it resolves with pre-completion data (#2332)', async () => {
 			const stale = Promise.withResolvers<IPlayerChallenge[]>();
 			mockFetchSocket.mockReturnValueOnce(stale.promise);
+			// The store isn't loaded yet, so invalidate() (#2366) queues a fresh fetch behind the stale
+			// one; it resolves after the completion was persisted server-side, so it already reflects it.
+			mockFetchSocket.mockResolvedValue([challenge(3, true)]);
 
 			const initial = playerChallenges.load();
 			playerChallenges.markCompleted(3);
@@ -130,6 +133,7 @@ describe('challenges store', () => {
 			// the completion was persisted server-side — must not revert it when it resolves.
 			stale.resolve([challenge(3, false)]);
 			await initial;
+			await vi.waitFor(() => expect(playerChallenges.loaded).toBe(true));
 
 			expect(playerChallenges.isChallengeCompleted(3)).toBe(true);
 		});
