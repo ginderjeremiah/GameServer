@@ -424,9 +424,10 @@ namespace Game.DataAccess
                         break;
                     }
 
-                    var playerId = PlayerUpdateEnvelopeReader.TryReadPlayerId(next) ?? UnknownPlayerLane;
+                    var (envelope, parseError) = PlayerUpdateEnvelopeReader.TryParseEnvelope(next);
+                    var playerId = envelope is null ? UnknownPlayerLane : PlayerUpdateEnvelopeReader.TryReadPlayerIdFromPayload(envelope.Payload) ?? UnknownPlayerLane;
                     var previous = playerLanes.TryGetValue(playerId, out var existingLane) ? existingLane : Task.CompletedTask;
-                    var itemTask = ProcessReservedItemAsync(previous, next, queue, deadLetterQueue, concurrencyGate, cancellationToken);
+                    var itemTask = ProcessReservedItemAsync(previous, next, envelope, parseError, queue, deadLetterQueue, concurrencyGate, cancellationToken);
                     playerLanes[playerId] = itemTask;
                     inFlight.Add(itemTask);
 
@@ -535,12 +536,12 @@ namespace Game.DataAccess
         /// converging, so a stop mid-drain still ends at a bounded number of in-flight items rather than an
         /// unbounded one.
         /// </summary>
-        private async Task ProcessReservedItemAsync(Task previous, string message, IPubSubQueue queue, IPubSubQueue deadLetterQueue, SemaphoreSlim concurrencyGate, CancellationToken cancellationToken)
+        private async Task ProcessReservedItemAsync(Task previous, string message, DomainEventEnvelope? envelope, JsonException? parseError, IPubSubQueue queue, IPubSubQueue deadLetterQueue, SemaphoreSlim concurrencyGate, CancellationToken cancellationToken)
         {
             try
             {
                 await previous;
-                await ProcessMessage(message, deadLetterQueue, cancellationToken);
+                await ProcessMessage(message, envelope, parseError, deadLetterQueue, cancellationToken);
                 await queue.AcknowledgeAsync(message);
             }
             finally
@@ -621,27 +622,26 @@ namespace Game.DataAccess
         }
 
         /// <summary>
-        /// Processes a single queued message. Malformed payloads (which can never succeed) are dead-lettered
-        /// immediately, while a valid event that fails on an unexpected error (e.g. a transient database error)
-        /// is retried with exponential backoff per <see cref="PlayerUpdateRetryPolicy"/>. Once retries are
-        /// exhausted, a genuine per-write failure is dead-lettered so the change is never silently dropped —
-        /// but a database-<b>infrastructure</b> failure (<see cref="InfrastructureFailureClassifier"/>) instead
-        /// propagates out of this method, leaving the item reserved rather than dead-lettered (see the catch
-        /// clause below and <see cref="SettleInFlightItemsAsync"/>). The apply itself runs uncancelled (so a
-        /// reserved item finishes cleanly); only the dead-time backoff between failed attempts honors
-        /// <paramref name="cancellationToken"/>, so a shutdown isn't stalled waiting one out.
+        /// Processes a single queued message. <paramref name="envelope"/>/<paramref name="parseError"/> are the
+        /// result of <see cref="DrainQueueAsync"/>'s single upfront <see cref="PlayerUpdateEnvelopeReader"/>
+        /// parse (reused here rather than re-deserializing <paramref name="message"/>) — <paramref name="message"/>
+        /// itself is kept only for acknowledge/dead-letter, which correctly key off the raw string. Malformed
+        /// payloads (which can never succeed) are dead-lettered immediately, while a valid event that fails on an
+        /// unexpected error (e.g. a transient database error) is retried with exponential backoff per
+        /// <see cref="PlayerUpdateRetryPolicy"/>. Once retries are exhausted, a genuine per-write failure is
+        /// dead-lettered so the change is never silently dropped — but a database-<b>infrastructure</b> failure
+        /// (<see cref="InfrastructureFailureClassifier"/>) instead propagates out of this method, leaving the item
+        /// reserved rather than dead-lettered (see the catch clause below and <see cref="SettleInFlightItemsAsync"/>).
+        /// The apply itself runs uncancelled (so a reserved item finishes cleanly); only the dead-time backoff
+        /// between failed attempts honors <paramref name="cancellationToken"/>, so a shutdown isn't stalled
+        /// waiting one out.
         /// </summary>
-        private async Task ProcessMessage(string message, IPubSubQueue deadLetterQueue, CancellationToken cancellationToken)
+        private async Task ProcessMessage(string message, DomainEventEnvelope? envelope, JsonException? parseError, IPubSubQueue deadLetterQueue, CancellationToken cancellationToken)
         {
-            DomainEventEnvelope? envelope;
-            try
-            {
-                envelope = message.Deserialize<DomainEventEnvelope>();
-            }
-            catch (JsonException ex)
+            if (parseError is not null)
             {
                 // A malformed payload can never be parsed successfully, so it is dead-lettered for inspection rather than retried.
-                _logger.LogWarning(ex, "Dead-lettering malformed player data event from queue '{Queue}'. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, message);
+                _logger.LogWarning(parseError, "Dead-lettering malformed player data event from queue '{Queue}'. Raw message: {Message}", Constants.PUBSUB_PLAYER_QUEUE, message);
                 await deadLetterQueue.AddToQueueAsync(message);
                 return;
             }
