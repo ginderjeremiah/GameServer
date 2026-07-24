@@ -8,6 +8,10 @@ namespace Game.Core.Progress
 {
     public class PlayerProgress
     {
+        // The largest magnitude a battle-derived statistic is recorded at (see ToStatisticValue). Kept well
+        // inside decimal's range so the saturation itself can never overflow the conversion.
+        private const double MaxRecordedValue = 1e28;
+
         private readonly Dictionary<(EStatisticType Type, int? EntityId), PlayerStatistic> _statistics;
         private readonly Dictionary<int, PlayerChallenge> _challenges;
         private readonly Dictionary<int, PlayerProficiency> _proficiencies;
@@ -68,22 +72,22 @@ namespace Game.Core.Progress
             // damaging). Floored here, at the Sum-aggregated lifetime-statistic seam, so an absorption-heavy
             // battle's net can never regress the monotone lifetime totals or an in-flight challenge's progress
             // (#2127) — mirroring how the sibling signed channels were floored (#2091, #2101).
-            Record(EStatisticType.DamageDealt, null, (decimal)Math.Round(Math.Max(0, stats.PlayerDamageDealt), 3));
-            Record(EStatisticType.HighestSingleAttackDamage, null, (decimal)Math.Round(stats.HighestPlayerAttack, 3));
-            Record(EStatisticType.DamageTaken, null, (decimal)Math.Round(Math.Max(0, stats.PlayerDamageTaken), 3));
-            Record(EStatisticType.DamageHealed, null, (decimal)Math.Round(stats.PlayerDamageHealed, 3));
+            Record(EStatisticType.DamageDealt, null, ToStatisticValue(Math.Max(0, stats.PlayerDamageDealt)));
+            Record(EStatisticType.HighestSingleAttackDamage, null, ToStatisticValue(stats.HighestPlayerAttack));
+            Record(EStatisticType.DamageTaken, null, ToStatisticValue(Math.Max(0, stats.PlayerDamageTaken)));
+            Record(EStatisticType.DamageHealed, null, ToStatisticValue(stats.PlayerDamageHealed));
             Record(EStatisticType.EnemiesEncountered, null, 1);
             Record(EStatisticType.EnemiesEncountered, enemy.Id, 1);
 
             // Player-only crit/dodge/parry tallies — recorded globally only (no per-skill/per-enemy breakdown),
             // alongside the damage statistics they mirror.
             Record(EStatisticType.CriticalHits, null, stats.CriticalHits);
-            Record(EStatisticType.CriticalDamageDealt, null, (decimal)Math.Round(Math.Max(0, stats.CriticalDamageDealt), 3));
+            Record(EStatisticType.CriticalDamageDealt, null, ToStatisticValue(Math.Max(0, stats.CriticalDamageDealt)));
             Record(EStatisticType.AttacksDodged, null, stats.AttacksDodged);
-            Record(EStatisticType.DamageDodged, null, (decimal)Math.Round(stats.DamageDodged, 3));
+            Record(EStatisticType.DamageDodged, null, ToStatisticValue(stats.DamageDodged));
             Record(EStatisticType.AttacksParried, null, stats.AttacksParried);
-            Record(EStatisticType.DamageParried, null, (decimal)Math.Round(stats.DamageParried, 3));
-            Record(EStatisticType.CounterDamageDealt, null, (decimal)Math.Round(stats.PlayerCounterDamageDealt, 3));
+            Record(EStatisticType.DamageParried, null, ToStatisticValue(stats.DamageParried));
+            Record(EStatisticType.CounterDamageDealt, null, ToStatisticValue(stats.PlayerCounterDamageDealt));
 
             if (victory)
             {
@@ -144,8 +148,8 @@ namespace Game.Core.Progress
             foreach (var (skillId, skillStats) in stats.SkillStats)
             {
                 Record(EStatisticType.SkillsUsed, skillId, skillStats.Uses);
-                Record(EStatisticType.DamageDealt, skillId, (decimal)Math.Round(Math.Max(0, skillStats.TotalDamage), 3));
-                Record(EStatisticType.HighestSingleAttackDamage, skillId, (decimal)Math.Round(skillStats.HighestSingleAttack, 3));
+                Record(EStatisticType.DamageDealt, skillId, ToStatisticValue(Math.Max(0, skillStats.TotalDamage)));
+                Record(EStatisticType.HighestSingleAttackDamage, skillId, ToStatisticValue(skillStats.HighestSingleAttack));
             }
 
             return [.. _touchedThisBattle];
@@ -334,6 +338,45 @@ namespace Game.Core.Progress
             {
                 Record(EStatisticType.KillsByDamageType, (int)key, 1);
             }
+        }
+
+        /// <summary>
+        /// Converts a battle-derived <see cref="double"/> tally into the <see cref="decimal"/> the statistic
+        /// rows store, without letting a value authored content can push out of range throw and take the whole
+        /// battle's recording (statistics, challenge evaluation and all) down with it. The avoided-damage
+        /// tallies are the realistic route out of range — a dodge/parry records the damage of a hit that never
+        /// lands, so nothing caps it at the defender's health, and a stacking multiplicative self-buff
+        /// compounds toward infinity over a long draw.
+        /// </summary>
+        private static decimal ToStatisticValue(double value)
+        {
+            // A non-finite tally (infinity from that compounding, or a NaN from 0 × infinity) has no
+            // magnitude worth recording, so it degrades to a zero delta — no row, no dirty mark, no
+            // challenge re-evaluation. Deliberately not saturated to a large number: that would be treated
+            // as a real value downstream, poisoning a monotone lifetime Sum, locking a Max statistic where
+            // nothing can beat it, and completing every open damage-threshold challenge on the touched-key
+            // evaluation. It would also only defer the crash — the saturated values accumulate in
+            // <see cref="Increment"/> until the running total overflows decimal a few battles later, and the
+            // authored content that produced the infinity reproduces it every battle.
+            if (!double.IsFinite(value))
+            {
+                return 0m;
+            }
+
+            // Rounded as a double before the conversion, so every in-range value keeps the exact figure the
+            // statistic rows have always stored. The clamp below then only has to keep a finite-but-absurd
+            // double inside decimal's range — the one remaining way the cast itself can fail.
+            var rounded = Math.Round(value, 3);
+            if (rounded >= MaxRecordedValue)
+            {
+                return (decimal)MaxRecordedValue;
+            }
+            if (rounded <= -MaxRecordedValue)
+            {
+                return (decimal)-MaxRecordedValue;
+            }
+
+            return (decimal)rounded;
         }
 
         /// <summary>

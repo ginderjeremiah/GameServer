@@ -195,6 +195,40 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task BattleLost_RejectedWhileOnCooldown_ReportsTheLiveCooldown()
+        {
+            var (userId, _) = await SeedWeakPlayerVsStrongEnemyAsync();
+
+            var wsClient = Factory.Server.CreateWebSocketClient();
+
+            await using (var socketClient1 = new TestSocketClient())
+            {
+                await socketClient1.ConnectAsync(wsClient, userId);
+
+                var newEnemyResponse = await socketClient1.SendCommandAsync<NewEnemyModel>(
+                    "NewEnemy", new { NewZoneId = (int?)null });
+                Assert.Null(newEnemyResponse.Error);
+
+                await socketClient1.CloseAsync();
+            }
+
+            // Put the player on a live cooldown while a battle is still active, so the loss claim below is
+            // rejected (it could not have finished yet, #1630) with a cooldown genuinely outstanding.
+            await SetPlayerState(userId, state => state.SetCooldown(DateTime.UtcNow.AddSeconds(30)));
+
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            var response = await socketClient.SendCommandAsync<BattleLostResponse>("BattleLost", new { });
+
+            // A rejection must still report the cooldown the client has to wait out (mirroring DefeatEnemy) —
+            // a hardcoded 0 sends a reconnecting client straight into a NewEnemy round-trip it can't use yet.
+            Assert.NotNull(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.True(response.Data.Cooldown > 0);
+        }
+
+        [Fact]
         public async Task BattleLost_BattleAlreadyCredited_PersistsClearedBattleState()
         {
             var (userId, playerId) = await SeedWeakPlayerVsStrongEnemyAsync();

@@ -64,7 +64,7 @@ namespace Game.Api.Sockets.Commands
                 var now = DateTime.UtcNow;
                 return Success(new DefeatEnemyResponse
                 {
-                    Cooldown = state.IsOnCooldown(now) ? (state.EnemyCooldown - now).TotalMilliseconds : 0,
+                    Cooldown = state.RemainingCooldownMs(now),
                     Rewards = new DefeatRewards(rewards),
                     NextEnemy = nextEnemy,
                     NextZoneId = nextZoneId,
@@ -81,7 +81,7 @@ namespace Game.Api.Sockets.Commands
                 var now = DateTime.UtcNow;
                 return ErrorWithData("Enemy could not be defeated.", new DefeatEnemyResponse
                 {
-                    Cooldown = state.IsOnCooldown(now) ? (state.EnemyCooldown - now).TotalMilliseconds : 0,
+                    Cooldown = state.RemainingCooldownMs(now),
                 });
             }
         }

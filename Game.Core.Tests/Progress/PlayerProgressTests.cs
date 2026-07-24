@@ -82,6 +82,79 @@ namespace Game.Core.Tests.Progress
             Assert.False(progress.TryGetStatisticValue(EStatisticType.CriticalDamageDealt, null, out _));
         }
 
+        [Theory]
+        [InlineData(double.PositiveInfinity)]
+        [InlineData(double.NegativeInfinity)]
+        [InlineData(double.NaN)]
+        public void RecordBattleCompleted_NonFiniteTally_RecordsNothingForItButKeepsTheRestOfTheBattle(double tally)
+        {
+            // Nothing caps an avoided-damage tally at the defender's health — a dodge/parry books the damage
+            // of a hit that never lands — so a stacking multiplicative damage buff on a fast enemy skill can
+            // compound to infinity over a long draw. Such a value has no magnitude worth recording, so it
+            // degrades to a zero delta (no row) rather than throwing on the (decimal) cast, and rather than
+            // saturating to a large number that would poison the lifetime totals it lands in.
+            var progress = MakeProgress();
+            var stats = new BattleStats
+            {
+                DamageDodged = tally,
+                DamageParried = tally,
+                PlayerDamageDealt = tally,
+                HighestPlayerAttack = tally,
+                SkillStats = { [1] = new SkillStats { Uses = 1, TotalDamage = tally } },
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 120000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDodged, null, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageParried, null, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDealt, null, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.HighestSingleAttackDamage, null, out _));
+            Assert.False(progress.TryGetStatisticValue(EStatisticType.DamageDealt, 1, out _));
+            // The unaffected statistics of the same battle still record, rather than being lost with it.
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.EnemiesKilled, null));
+            Assert.Equal(1m, progress.GetStatisticValue(EStatisticType.SkillsUsed, 1));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_NonFiniteTally_LeavesAnExistingLifetimeTotalUntouched()
+        {
+            // The content bug producing an infinite tally reproduces every battle, so the degraded value must
+            // not accumulate: a monotone Sum total (and a Max nothing could ever beat) has no way back.
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.DamageDodged, null, 500m),
+                Stat(EStatisticType.HighestSingleAttackDamage, null, 75m),
+            ]);
+            var stats = new BattleStats
+            {
+                DamageDodged = double.PositiveInfinity,
+                HighestPlayerAttack = double.PositiveInfinity,
+            };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(500m, progress.GetStatisticValue(EStatisticType.DamageDodged, null));
+            Assert.Equal(75m, progress.GetStatisticValue(EStatisticType.HighestSingleAttackDamage, null));
+        }
+
+        [Fact]
+        public void RecordBattleCompleted_FiniteButOutOfDecimalRangeTally_ClampsInsteadOfThrowing()
+        {
+            // The clamp's remaining job: a finite double can still exceed decimal's range, where the cast
+            // alone would throw. Unlike a non-finite tally this one has a real (if absurd) magnitude, so it
+            // records at the ceiling rather than degrading to nothing.
+            var progress = MakeProgress();
+            var stats = new BattleStats { DamageDodged = 1e30, PlayerDamageHealed = -1e30 };
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000, stats,
+                isBossBattle: false, zoneId: 0);
+
+            Assert.Equal(1e28m, progress.GetStatisticValue(EStatisticType.DamageDodged, null));
+            Assert.Equal(-1e28m, progress.GetStatisticValue(EStatisticType.DamageHealed, null));
+        }
+
         [Fact]
         public void RecordBattleCompleted_NegativeNetUnderAbsorption_NeverRegressesAnExistingLifetimeTotal()
         {

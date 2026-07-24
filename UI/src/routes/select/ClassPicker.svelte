@@ -8,17 +8,19 @@
      nothing until the class options arrive (or if they fail to load). -->
 {#if classes.length > 0}
 	<div class="class-picker" data-testid="class-picker">
-		<div class="class-options" role="radiogroup" aria-label="Class">
-			{#each classes as cls (cls.id)}
+		<div class="class-options" role="radiogroup" aria-label="Class" bind:this={optionsEl}>
+			{#each classes as cls, index (cls.id)}
 				<button
 					type="button"
 					class="class-option"
 					class:selected={cls.id === selectedClassId}
 					role="radio"
 					aria-checked={cls.id === selectedClassId}
+					tabindex={index === tabStop ? 0 : -1}
 					data-testid="class-option-{cls.id}"
 					{disabled}
 					onclick={() => onSelect(cls.id)}
+					onkeydown={(event) => handleKeydown(event, index)}
 				>
 					<span class="class-name">{cls.name}</span>
 					<WordOfPower text={cls.word} label={cls.name} size={12} />
@@ -89,6 +91,50 @@ interface Props {
 const { classes, selectedClassId, onSelect, disabled = false }: Props = $props();
 
 const selected = $derived(classes.find((c) => c.id === selectedClassId) ?? null);
+
+/* ── radiogroup keyboard model ─────────────────────────────────────────────
+   A radiogroup is one tab stop, navigated internally with the arrow keys — so the group exposes a
+   single roving `tabindex=0` (the chosen option, or the first before anything is chosen) and the
+   arrows move focus between the options, selecting as they go per the WAI-ARIA radio pattern.
+   Enter/Space need no handling: these are real <button>s, so activation already fires onclick. */
+let optionsEl = $state<HTMLDivElement>();
+
+// Partial<> so the lookup is honestly `number | undefined` and the miss check below stays load-bearing
+// in the type system, not just at runtime.
+const ARROW_STEPS: Partial<Record<string, number>> = {
+	ArrowRight: 1,
+	ArrowDown: 1,
+	ArrowLeft: -1,
+	ArrowUp: -1
+};
+
+const tabStop = $derived(
+	Math.max(
+		0,
+		classes.findIndex((c) => c.id === selectedClassId)
+	)
+);
+
+/** Selects the option at `index` (wrapping around the group) and moves focus onto it. */
+const moveTo = (index: number) => {
+	const wrapped = (index + classes.length) % classes.length;
+	onSelect(classes[wrapped].id);
+	optionsEl?.querySelectorAll<HTMLButtonElement>('.class-option')[wrapped]?.focus();
+};
+
+const handleKeydown = (event: KeyboardEvent, index: number) => {
+	const step = ARROW_STEPS[event.key];
+	if (step !== undefined) {
+		event.preventDefault();
+		moveTo(index + step);
+	} else if (event.key === 'Home') {
+		event.preventDefault();
+		moveTo(0);
+	} else if (event.key === 'End') {
+		event.preventDefault();
+		moveTo(classes.length - 1);
+	}
+};
 
 // The fingerprint reads strongest-first so the class's defining attributes lead.
 const fingerprint = $derived(

@@ -371,7 +371,10 @@ export class InventoryManager {
 			logMessage(ELogType.Debug, `Skipped unlocking item with unknown id ${invItem.itemId}.`);
 			return;
 		}
-		this.unlockedItems.set(invItem.itemId, item);
+		// Reassign (not mutate) the Map so statify/$state tracks the change, mirroring addUnlockedMod — a
+		// consumer deriving off the Map alone (the inventory view's selection/drag lookups) would otherwise
+		// never see the new item, since statify doesn't special-case Map/Set.
+		this.unlockedItems = new Map(this.unlockedItems).set(invItem.itemId, item);
 		this.publish();
 		logMessage(ELogType.ItemFound, `Unlocked: ${item.name}!`);
 	}
