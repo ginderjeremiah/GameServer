@@ -1,5 +1,6 @@
 import { ApiRequest } from './api-request';
-import { clearTokens, getRefreshToken } from './token-store';
+import { getRotatedRefreshToken } from './auth';
+import { clearTokens } from './token-store';
 
 /**
  * Ends the current session: revokes the refresh token on the server, clears the locally stored token
@@ -11,7 +12,9 @@ import { clearTokens, getRefreshToken } from './token-store';
  * no stored tokens and keeps the user on the login screen.
  */
 export const logout = async () => {
-	const refreshToken = getRefreshToken();
+	// Settled before reading, so a refresh due to fire inside ApiRequest's own pre-emptive check
+	// (execute -> ensureValidAccessToken) can't rotate the token out from under this read (#2386).
+	const refreshToken = await getRotatedRefreshToken();
 	try {
 		if (refreshToken) {
 			await new ApiRequest('Auth/Logout').post({ refreshToken });
