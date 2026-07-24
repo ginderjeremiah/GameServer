@@ -112,6 +112,40 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SimulateOfflineProgress_BelowThreshold_StillCompletesAnAlreadySatisfiedRetroactiveChallenge()
+        {
+            // Regression for #2367: a Min-backed challenge (a time trial) authored after the player's
+            // FastestVictory record was already set can never be reached through the ordinary per-battle
+            // touched-key path — there is no battle at all on this branch. The connect-time retroactive sweep
+            // must still evaluate it against the player's already-recorded stats and complete it.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var setup = await SeedWinningScenarioAsync(scope, reload: false);
+            await TestDataSeeder.AddPlayerStatisticAsync(context, setup.PlayerId, EStatisticType.FastestVictory, 5m);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            // Authored after the player's 5s record was already set — "win within 10s" is already satisfied.
+            var challenge = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.TimeTrial, progressGoal: 10m, rewardItemId: item.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            // Under the 5-minute floor: no offline window is replayed, but the connect-time sweep still runs.
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-1);
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            // The summary itself stays empty (no welcome-back gate on this branch) — the completion is
+            // notified live instead, but its durable effects land regardless.
+            Assert.False(summary.HasProgress);
+            Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
+            Assert.Contains(player.Inventory.UnlockedItems, u => u.ItemId == item.Id);
+        }
+
+        [Fact]
         public async Task SimulateOfflineProgress_ChallengeCrossedMidWindow_CompletesOnceAndUnlocksReward()
         {
             using var scope = CreateScope();
@@ -134,6 +168,43 @@ namespace Game.Application.Tests.Services
 
             // The challenge appears once in the summary, is marked completed in progress, and its reward is
             // unlocked on the player.
+            Assert.Single(summary.CompletedChallenges, c => c.ChallengeId == challenge.Id);
+            Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
+            Assert.Contains(player.Inventory.UnlockedItems, u => u.ItemId == item.Id);
+        }
+
+        [Fact]
+        public async Task SimulateOfflineProgress_MultiBattleAway_CompletesAChallengeSatisfiedByARecordNoBattleInTheWindowTouches()
+        {
+            // Regression for #2367: the window's own simulated battles never beat (or even match) an
+            // already-set record, so RecordBattleCompleted's per-battle touched-key scope never includes it —
+            // the retroactive sweep (evaluating against the player's full recorded statistic set) must still
+            // complete a challenge that record already satisfies.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var setup = await SeedWinningScenarioAsync(scope, reload: false);
+            // Far faster than any battle this window could simulate, so SetMin never touches it again.
+            await TestDataSeeder.AddPlayerStatisticAsync(context, setup.PlayerId, EStatisticType.FastestVictory, 0.001m);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            var challenge = await TestDataSeeder.CreateChallengeAsync(
+                context, challengeTypeId: EChallengeType.TimeTrial, progressGoal: 10m, rewardItemId: item.Id);
+            await ReloadReferenceCachesAsync();
+
+            var (player, state) = await LoadAsync(scope, setup.PlayerId);
+            var offlineProgressService = scope.ServiceProvider.GetRequiredService<OfflineProgressService>();
+            var progressRepo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            player.LastActivity = DateTime.UtcNow.AddMinutes(-30);
+
+            var summary = await offlineProgressService.SimulateOfflineProgress(player, state, CancellationToken);
+
+            Assert.True(summary.BattlesWon > 1, "Expected the away window to win multiple battles.");
+            // The pre-existing record is untouched by this window (still 0.001s), yet the challenge still
+            // completes and unlocks its reward.
+            var fastestVictory = Assert.Single(await progressRepo.GetStatistics(setup.PlayerId),
+                s => s.Type == EStatisticType.FastestVictory && s.EntityId == null);
+            Assert.Equal(0.001m, fastestVictory.Value);
             Assert.Single(summary.CompletedChallenges, c => c.ChallengeId == challenge.Id);
             Assert.Contains(challenge.Id, await progressRepo.GetCompletedChallengeIds(setup.PlayerId));
             Assert.Contains(player.Inventory.UnlockedItems, u => u.ItemId == item.Id);

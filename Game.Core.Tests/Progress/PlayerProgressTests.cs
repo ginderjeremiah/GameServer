@@ -1333,6 +1333,78 @@ namespace Game.Core.Tests.Progress
             Assert.Empty(progress.CompletedChallengeIds());
         }
 
+        // ── StatisticKeys (retroactive challenge-evaluation scope, #2367) ────
+
+        [Fact]
+        public void StatisticKeys_ReturnsEveryRecordedStatisticRow()
+        {
+            var progress = MakeProgress(statistics:
+            [
+                Stat(EStatisticType.EnemiesKilled, null, 5m),
+                Stat(EStatisticType.FastestVictory, 3, 8m),
+            ]);
+
+            Assert.Equal(2, progress.StatisticKeys.Count);
+            Assert.Contains((EStatisticType.EnemiesKilled, (int?)null), progress.StatisticKeys);
+            Assert.Contains((EStatisticType.FastestVictory, (int?)3), progress.StatisticKeys);
+        }
+
+        [Fact]
+        public void StatisticKeys_NoStatisticsRecorded_IsEmpty()
+        {
+            var progress = MakeProgress();
+
+            Assert.Empty(progress.StatisticKeys);
+        }
+
+        [Fact]
+        public void StatisticKeys_FedToChallengeIndex_SurfacesAnAlreadySatisfiedChallengeNeverTouchedThisSession()
+        {
+            // Regression for #2367: a Min-backed challenge authored (or reinstated) after the player's record
+            // was already set can never be reached through RecordBattleCompleted's per-battle touched-key scope
+            // — SetMin only adds a key to the touched set on a first write or a strict improvement, so an
+            // unimproved record is neither touched nor dirtied. The retroactive load-time sweep instead
+            // evaluates against the player's full recorded set (StatisticKeys), which does surface it.
+            var progress = MakeProgress(statistics:
+            [
+                // The player's best victory (8s) already beats a "win within 10s" time trial authored afterwards.
+                Stat(EStatisticType.FastestVictory, null, 8m),
+            ]);
+            var timeTrial = MakeChallenge(id: 0, EChallengeType.TimeTrial, goal: 10);
+            var index = new ChallengeIndex([timeTrial]);
+
+            // The touched-key scope an ordinary battle (that didn't improve the record) would return is empty,
+            // so the normal battle-completion path never reaches this challenge.
+            Assert.DoesNotContain(timeTrial, index.RelevantTo([]));
+
+            // The retroactive sweep's broader scope — every statistic key the player has a row for — does.
+            var relevantToFullRecord = index.RelevantTo(progress.StatisticKeys).ToList();
+            Assert.Contains(timeTrial, relevantToFullRecord);
+
+            var completed = progress.EvaluateChallenges(relevantToFullRecord, Timestamp);
+
+            Assert.Single(completed);
+            Assert.True(Assert.Single(progress.ChallengeProgress).Completed);
+        }
+
+        [Fact]
+        public void StatisticKeys_FedToChallengeIndex_DoesNotReCompleteAnAlreadyCompletedChallenge()
+        {
+            // The retroactive sweep re-evaluates every recorded statistic key every time it runs (e.g. on every
+            // reconnect), so it must not re-report — or re-apply the reward for — a challenge the player has
+            // already completed.
+            var timeTrial = MakeChallenge(id: 0, EChallengeType.TimeTrial, goal: 10);
+            var alreadyCompleted = new PlayerChallenge(timeTrial, progress: 8m, completed: true, completedAt: DateTime.UtcNow);
+            var progress = MakeProgress(
+                statistics: [Stat(EStatisticType.FastestVictory, null, 8m)],
+                challenges: [alreadyCompleted]);
+            var index = new ChallengeIndex([timeTrial]);
+
+            var completed = progress.EvaluateChallenges(index.RelevantTo(progress.StatisticKeys), Timestamp);
+
+            Assert.Empty(completed);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static PlayerProgress MakeProgress(
