@@ -200,7 +200,7 @@ const chips = $derived(trainedBy(path.activityKey));
 .blurb {
 	margin: 10px 0 0;
 	font-size: 12.5px;
-	line-height: 1.55;
+	line-height: 1.5;
 	color: var(--text-secondary);
 }
 

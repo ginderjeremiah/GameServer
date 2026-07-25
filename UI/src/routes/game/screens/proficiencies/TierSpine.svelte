@@ -62,9 +62,11 @@ const wordCount = $derived(path.tiers.length === 1 ? '1 WORD KNOWN' : `${path.ti
 	padding: 26px 36px 38px;
 }
 
+// Top-aligned, not centred: the text column's height varies with the authored blurb, so centring would
+// float the icon down to sit beside the prose rather than beside the path word it labels.
 .path-header {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 14px;
 	padding-bottom: 18px;
 	border-bottom: 1px solid var(--border-subtle);
@@ -115,7 +117,7 @@ const wordCount = $derived(path.tiers.length === 1 ? '1 WORD KNOWN' : `${path.ti
 	margin: 8px 0 0;
 	max-width: 64ch;
 	font-size: 12.5px;
-	line-height: 1.55;
+	line-height: 1.5;
 	color: var(--text-secondary);
 }
 
