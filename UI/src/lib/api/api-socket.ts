@@ -241,21 +241,27 @@ export class ApiSocket {
 			return;
 		}
 		this.socket = socket;
-		// Handlers are scoped to the socket they were bound to, not to the instance: a superseded socket can
-		// still deliver events — `readyState` reaches CLOSED before the close event is dispatched, so a
-		// reconnect can slip in ahead of it — and everything these handlers touch (the stability timer, the
-		// queued commands, this session's auth-retry budget) belongs to whichever connection is current by
-		// then. `handleClose` takes the socket rather than being wrapped, because a stale close still has to
-		// settle the requests its own socket carried before it bails.
+		// Handlers are scoped to the socket they were bound to, not to the instance: `readyState` reaches
+		// CLOSED before the close event is dispatched, so a reconnect can open in that gap and leave the old
+		// socket's events to land on a connection they never belonged to — where they would cancel the live
+		// socket's budget refill, error commands it is about to send, or answer a ping nobody sent. An event
+		// queued *before* the close is still delivered after it, so this window is just as real for messages
+		// as for the close itself. The two handlers carrying data therefore take their socket and decide per
+		// concern rather than being wrapped: a stale close still settles the requests its socket carried, and
+		// a stale message still delivers an answer the server genuinely sent (see each for why).
 		socket.onopen = this.scopedToSocket(socket, () => this.onStart());
-		socket.onmessage = this.scopedToSocket(socket, (ev: MessageEvent) => this.receiveResponse(ev));
+		socket.onmessage = (ev) => this.receiveResponse(socket, ev);
+		// An error on a connection this instance has already replaced is not the live session's to report —
+		// the stale socket's own close settles whatever it carried, and a toast about it would be noise for a
+		// session that is fine. `onopen` is guarded for completeness rather than reachability: a socket is
+		// only ever superseded once it is CLOSED, and a CLOSED socket has no open event left to fire.
 		socket.onerror = this.scopedToSocket(socket, (ev: Event) => this.handleError(ev));
 		socket.onclose = (ev) => this.handleClose(socket, ev);
 	}
 
 	/** Wraps a socket event handler so it runs only while that socket is still this instance's current
-	 *  connection, making "an event only ever affects the connection it came from" structural rather than
-	 *  something each handler (and each new branch inside it) has to re-derive. */
+	 *  connection, keeping the check in one place rather than at each binding. Only for handlers with
+	 *  nothing socket-specific to preserve — `handleClose`/`receiveResponse` take their socket instead. */
 	private scopedToSocket<TEvent>(socket: WebSocket, handler: (ev: TEvent) => void) {
 		return (ev: TEvent) => {
 			if (this.socket !== socket) {
@@ -467,17 +473,32 @@ export class ApiSocket {
 		}
 	}
 
-	private receiveResponse(ev: MessageEvent) {
+	private receiveResponse(socket: WebSocket, ev: MessageEvent) {
 		const now = performance.now();
 		if (ev.data == 'pong') {
+			// Pong tracking measures the health of the connection this instance currently holds, so a
+			// straggling pong from a socket that has since been replaced must not clear the live socket's
+			// missed-ping count (or report its own round trip as the live connection's latency).
+			if (this.socket !== socket) {
+				return;
+			}
 			this.resetPongTracking();
 			pingHook.notify(now - this.lastPing);
 			return;
 		} else if (ev.data === 'ping') {
-			this.socket?.send('pong');
+			// Answered on the socket that asked, never on `this.socket` — a straggling ping must not put a
+			// pong on the connection that replaced it. A CLOSING/CLOSED socket discards the send, which is
+			// exactly the intent.
+			socket.send('pong');
 			return;
 		}
 
+		// Everything below is delivered even from a socket that has since been superseded. Unlike the
+		// keepalive bookkeeping above, a response or push is something the server genuinely sent on that
+		// connection, and the close behind it is about to settle the same request with CONNECTION_LOST_ERROR
+		// — so dropping it would tell the caller of a non-idempotent command (DefeatEnemy) the connection
+		// was lost for work the server actually completed. Responses are matched by command id, which is
+		// unique per instance, so a stale answer can only ever resolve the request it belongs to.
 		try {
 			const data = JSON.parse(ev.data) as IApiSocketResponse<ApiSocketCommand>;
 			const hook = this.getOrCreateHook(data.name);

@@ -64,7 +64,7 @@ function createMockWebSocket(url?: string, protocols?: string | string[]): MockW
 const webSocketMock = vi.fn(createMockWebSocket);
 vi.stubGlobal('WebSocket', webSocketMock);
 
-import { ApiSocket, fetchSocketData, onSocketError } from '$lib/api/api-socket';
+import { ApiSocket, fetchSocketData, onSocketError, onPingMeasured } from '$lib/api/api-socket';
 import { setTokens, getAccessToken, getTokens, clearTokens } from '$lib/api/token-store';
 import {
 	ensureValidAccessToken,
@@ -1664,10 +1664,6 @@ describe('ApiSocket', () => {
 		const stableTimer = (s: ApiSocket) =>
 			(s as unknown as { connectionStableTimer: ReturnType<typeof setTimeout> | null }).connectionStableTimer;
 
-		/** Drives the interleave the guard exists for: the current socket reaches CLOSED (its close event
-		 *  still queued), then a command opens a replacement, so the stale close lands on a live connection.
-		 *  The command also lifts any teardown mark, which is what puts the straggler past handleClose's
-		 *  teardown short-circuit in the first place. */
 		/** Makes the next socket stay CONNECTING, so commands sent through it sit queued-but-unsent. A
 		 *  function expression (not an arrow) so the mock can still be invoked with `new WebSocket()`. */
 		const connectingSocketOnce = () => {
@@ -1678,14 +1674,19 @@ describe('ApiSocket', () => {
 			});
 		};
 
+		/** Drives the interleave the guard exists for: the current socket reaches CLOSED (its close event
+		 *  still queued), then a command opens a replacement, so the stale close lands on a live connection.
+		 *  The command also lifts any teardown mark, which is what puts the straggler past handleClose's
+		 *  teardown short-circuit in the first place. Its promise is returned so a test can assert the live
+		 *  connection's own command is left alone by its predecessor's close. */
 		const supersedeCurrentSocket = async () => {
 			const stale = lastWs();
 			stale.readyState = stale.CLOSED;
-			apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1, forceAbandon: false });
+			const livePromise = apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1, forceAbandon: false });
 			await flushMicrotasks();
 			const live = lastWs();
 			expect(live).not.toBe(stale);
-			return { stale, live };
+			return { stale, live, livePromise };
 		};
 
 		it('does not refresh, retry, or cancel the live budget refill on a superseded socket close', async () => {
@@ -1743,7 +1744,7 @@ describe('ApiSocket', () => {
 			// than leave the caller waiting out the per-request timeout.
 			const stranded = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
-			const { stale, live } = await supersedeCurrentSocket();
+			const { stale, live, livePromise } = await supersedeCurrentSocket();
 			expect(stale.send).toHaveBeenCalledTimes(1);
 
 			live.onopen?.();
@@ -1754,14 +1755,39 @@ describe('ApiSocket', () => {
 			await flushMicrotasks();
 
 			expect((await stranded).error).toBe('Connection lost. Please try again.');
-			// The replacement's own in-flight command survives its predecessor's close and still resolves.
+			// The replacement's own in-flight command is untouched by its predecessor's close and still
+			// resolves normally — this is the half that pins the per-socket filter, since a settled request
+			// is pruned and its later response would simply be dropped.
 			receive(live, JSON.stringify({ id: onLive.id, name: 'NewEnemy', data: {} }));
+			expect((await livePromise).error).toBeUndefined();
 		});
 
-		it('ignores messages and errors from a superseded socket', async () => {
+		it('still delivers a response that arrived on the socket before it was superseded', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			// A message queued before the close is dispatched after it, so the server's answer can land once
+			// the socket is already stale. Dropping it would report a lost connection for a non-idempotent
+			// command the server actually completed.
+			const answered = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const { stale } = await supersedeCurrentSocket();
+			const onStale = JSON.parse(stale.send.mock.calls[0][0]);
+
+			receive(stale, JSON.stringify({ id: onStale.id, name: 'DefeatEnemy', data: { cooldown: 42 } }));
+			stale.onclose?.({ code: 1006 });
+			await flushMicrotasks();
+
+			const response = await answered;
+			expect(response.error).toBeUndefined();
+			expect(response.data).toEqual({ cooldown: 42 });
+		});
+
+		it('keeps a superseded socket keepalive traffic and errors off the live connection', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			const errors: string[] = [];
-			const unhook = onSocketError((message) => errors.push(message));
+			const latencies: number[] = [];
+			const unhookError = onSocketError((message) => errors.push(message));
+			const unhookPing = onPingMeasured((ms) => latencies.push(ms));
 			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
@@ -1770,16 +1796,22 @@ describe('ApiSocket', () => {
 			live.onopen?.();
 			await flushMicrotasks();
 			live.send.mockClear();
+			stale.send.mockClear();
 
 			stale.onmessage?.({ data: 'ping' });
+			stale.onmessage?.({ data: 'pong' });
 			stale.onerror?.();
 
-			// A stale ping must not be answered on the live socket, and a dead connection's error must not
-			// surface a toast for the session that replaced it.
+			// A stale ping is answered on the socket that asked, never on the connection that replaced it;
+			// a stale pong says nothing about the live connection's health, so it reports no latency; and a
+			// dead connection's error must not surface a toast for the session that replaced it.
+			expect(stale.send).toHaveBeenCalledWith('pong');
 			expect(live.send).not.toHaveBeenCalled();
+			expect(latencies).toEqual([]);
 			expect(errors).toEqual([]);
 			errorSpy.mockRestore();
-			unhook();
+			unhookError();
+			unhookPing();
 		});
 	});
 });
