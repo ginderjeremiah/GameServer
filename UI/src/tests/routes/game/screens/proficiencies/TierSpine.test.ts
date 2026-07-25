@@ -10,6 +10,7 @@ import type {
 
 const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	name: `Tier ${o.id}`,
+	description: '',
 	pathOrdinal: o.id,
 	level: 0,
 	maxLevel: 10,
@@ -28,13 +29,15 @@ const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	...o
 });
 
-const pathView = (tiers: TierView[]): PathView => ({
+const pathView = (tiers: TierView[], o: Partial<PathView> = {}): PathView => ({
 	id: 0,
 	name: 'Pyromancy',
+	description: '',
 	word: tiers[0]?.word ?? '',
 	iconPath: '',
 	activityKey: EActivityKey.Physical,
-	tiers
+	tiers,
+	...o
 });
 
 const stubController = (): WordTooltipController => ({
@@ -58,6 +61,17 @@ describe('TierSpine', () => {
 	it('uses the plural word count for a multi-tier path', () => {
 		renderSpine(pathView([tierView({ id: 0 }), tierView({ id: 1 })]));
 		expect(screen.getByText('Pyromancy · 2 WORDS KNOWN')).toBeTruthy();
+	});
+
+	it('renders the path’s authored description in the header', () => {
+		renderSpine(pathView([tierView({ id: 0 })], { description: 'Words that bind flame to will.' }));
+		expect(screen.getByTestId('path-description').textContent).toBe('Words that bind flame to will.');
+	});
+
+	it('omits the path description entirely when it is empty', () => {
+		// The field is `required` but may legitimately be '' — no empty paragraph may be left behind.
+		renderSpine(pathView([tierView({ id: 0 })], { description: '' }));
+		expect(screen.queryByTestId('path-description')).toBeNull();
 	});
 
 	it('draws the spine most-advanced first (root last)', () => {

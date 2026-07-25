@@ -1,7 +1,8 @@
 <!-- The word-detail inspector pane (#1218): the right column detailing the selected tier — a compact
-     header (name + school + state pill), the tier's word of power illuminated by its decipher stage (the
-     hover target driving the shared decipher tooltip), an XP progress bar, the per-level breakdown ladder
-     (each level's attribute payout + milestone reward skills), the seed skill, and the "Trained by" chips.
+     header (name + school + state pill), the authored blurb, the tier's word of power illuminated by its
+     decipher stage (the hover target driving the shared decipher tooltip), an XP progress bar, the
+     per-level breakdown ladder (each level's attribute payout + milestone reward skills), and the
+     "Trained by" chips.
      All formatting/derivation lives in the pure `word-detail` module; this only resolves reference-data
      names from the live stores and renders. -->
 <aside class="inspector" data-testid="word-detail">
@@ -14,6 +15,14 @@
 		</div>
 		<span class="pill pill-{pill.key}" data-testid="state-pill">{pill.label}</span>
 	</div>
+
+	<!-- The authored blurb, as a lede under the name it describes. Deliberately *not* gated by decipher
+	     stage: the stage gates the word of power (glyph/pronunciation/translation), while the tier's own
+	     identity — name, payouts, milestones — is already fully legible at every stage. Omitted entirely
+	     when unauthored so no empty paragraph is left behind. -->
+	{#if tier.description}
+		<p class="blurb" data-testid="tier-description">{tier.description}</p>
+	{/if}
 
 	<!-- The word being deciphered: the glyph illuminates dim → accent → gold as it levels, over a reveal
 	     line, and the whole block surfaces the shared decipher tooltip on hover/focus. A focusable
@@ -185,6 +194,14 @@ const chips = $derived(trainedBy(path.activityKey));
 	color: var(--text-secondary);
 	background: color-mix(in srgb, var(--white) 5%, transparent);
 	border-color: var(--border-medium);
+}
+
+// The authored blurb — body copy, so it reads a step quieter than the name but ahead of the mono chrome.
+.blurb {
+	margin: 10px 0 0;
+	font-size: 12.5px;
+	line-height: 1.55;
+	color: var(--text-secondary);
 }
 
 // The decipher word block — a focusable presentational trigger surfacing the shared decipher tooltip on
