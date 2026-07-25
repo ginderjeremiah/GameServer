@@ -49,7 +49,7 @@ net = … × (1 − LastStandBonus × missingHpFraction)
   - `Battler.cs:225` (`TakeDamage`, the real hit) — ✅ wants last-stand.
   - `BattleContext.cs:262` — `Stats.DamageDodged`, which feeds Evasion's proficiency accrual (`ProficiencyAccrual.cs:182`).
   - `BattleContext.cs:247` — the same shape for `DamageParried`.
-  - `CombatRating.cs:239` — a **synthetic reference defender**, whose `CurrentHealth` is not a meaningful quantity; the offense rating would silently acquire a term keyed to it.
+  - `CombatRating.cs:263` — a **synthetic reference defender**, whose `CurrentHealth` is not a meaningful quantity; the offense rating would silently acquire a term keyed to it.
 
   So a multiplier added inside `ComputeNetDamage` is not a no-op: it silently changes two accrual signals (arguably *correctly* — those tallies are counterfactual "what would this hit have done", so a health-scaled answer may be right — but that should be a decision, not a side effect) and pollutes the combat rating. **The precedent cuts toward the fire path:** Cull put its live read in `BattleContext.DamageTarget`, which is exactly why it disturbed neither the tallies nor `CombatRating`. "Mirror Cull exactly" therefore argues for the fire path here too. The frontend widens it slightly further — `mitigateDamage` is a free function over attributes (`battle-formulas.ts`), so a health term changes its signature. Open question **Q3**.
 - Commitment rule: ✅ authored-only enabler, `0` when uncommitted. Trains on a prevented-damage tally (Evasion's precedent).
@@ -154,6 +154,8 @@ Not planning these into implementation issues until there is a read on:
 **My recommendation if a read is wanted:** ship **last-stand first** (smallest, and bounded under the stated authoring invariant), take **sustain second and only with the §4 cap**, and **defer the shield** behind the §6 content experiment. That ordering also keeps the compounding analysis tractable — one new defensive lever at a time. One coordination note: last-stand should be scoped together with the **rage** passive from the [#1219 spike](./1219-class-system-v2.md) (§6) rather than separately, since they are the two halves of one own-health read.
 
 ## 8. Documentation to update on landing
+
+**Re-check this doc's line-numbered citations against `main` in the same pass.** They are unusually load-bearing here — §3.1's four-consumer enumeration is what reframes Q3 from two options into three — and a parked spike doc accumulates rot silently: #2400 (splitting the effect machinery out of `Battler.cs`) and #2428 (the `CombatRating` proc-chance clamp, which moved the reference-defender call from `:239` to `:263`) both landed while this doc sat in review. A reader who follows a rotted citation lands on an unrelated line and the argument reads as unsupported.
 
 **When the implementation issues are split out, also amend [#1219](https://github.com/ginderjeremiah/GameServer/issues/1219)** to strike its *"nothing reads live state like a current-health ratio mid-tick"* claim (§2) and revise its cost estimate for conditional "stance" passives downward. Left in place, that stale claim will be re-cited by the next spike to look at the same ground — which has **already happened**: the [#1219 spike](./1219-class-system-v2.md) (PR [#2402](https://github.com/ginderjeremiah/GameServer/pull/2402)) hit the same line independently, so two spikes now depend on it being corrected.
 
