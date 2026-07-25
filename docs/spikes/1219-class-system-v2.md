@@ -175,8 +175,7 @@ Per the ideation brief, exploring past the two listed directions:
   — `EStatisticType.KillsByDamageType`, `EChallengeType.KillsByDamageType`, the recorder, the `DamageType`
   breakdown axis, admin validation and the Workbench UI are all in the tree — so this is pure Workbench
   authoring, available now. **If the goal is felt class identity soonest, this outranks both of #1219's items,
-  and unlike them it waits on nothing.** (`content-design.md` §5 still carried a "⚠ assumes a statistic that
-  does not exist yet" warning on those routes; it went stale when #1455 shipped and is corrected in this change.)
+  and unlike them it waits on nothing.**
 - **Signature-passive expressiveness is capped at one modifier.** `ClassSignaturePassive` grants exactly one
   attribute. Before adding conditional channels, it is worth asking whether a class wants *two* passive terms
   (e.g. a fingerprint nudge plus an archetype enabler) — a smaller, purely additive change to the same seam.
@@ -204,8 +203,8 @@ They should be **designed as one channel family, not twice**, and that shared pa
    point is the obvious template, and it *does* transfer).
 2. **Pricing in `CombatRating`** — the reference constant must be re-derived rather than inherited from Cull's
    `RefMissingHealthFraction`, and its build-correlation with the survivability term resolved (see
-   [§3](#two-constraints-any-new-channel-must-satisfy)). This is the decision most at risk of being made
-   silently by whichever half ships first.
+   [Two constraints any new channel must satisfy](#two-constraints-any-new-channel-must-satisfy)). This is the
+   decision most at risk of being made silently by whichever half ships first.
 3. **Tally + activity key** — what a self-health channel books, and whether both halves share one path or take
    two, under the commitment rule.
 
