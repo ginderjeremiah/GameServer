@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
 	EActivityKey,
 	EAttribute,
-	EAttributeType,
 	EModifierType,
 	type IAttribute,
 	type IProficiencyLevelModifier,
@@ -17,26 +16,14 @@ import {
 	xpProgressText,
 	type SkillNameResolver
 } from '$routes/game/screens/proficiencies/word-detail';
-import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import { attribute, tierView } from './lexicon-test-utils';
 
 /* ── fixtures ──────────────────────────────────────────────────────────────── */
 
-const attr = (id: EAttribute, name: string, isPercentage = false): IAttribute => ({
-	id,
-	name,
-	description: '',
-	attributeType: EAttributeType.Secondary,
-	isPercentage,
-	isHarmful: false,
-	code: '',
-	displayOrder: 0,
-	decimals: 1
-});
-
 // A percentage attribute (renders a `+2%`-style delta) and a flat one (renders a plain `+5`).
 const ATTRIBUTES: IAttribute[] = [
-	attr(EAttribute.CriticalChanceMultiplier, 'Fire Damage', true),
-	attr(EAttribute.Toughness, 'Toughness', false)
+	attribute(EAttribute.CriticalChanceMultiplier, 'Fire Damage', true),
+	attribute(EAttribute.Toughness, 'Toughness', false)
 ];
 
 const modifier = (o: Partial<IProficiencyLevelModifier> & { level: number }): IProficiencyLevelModifier => ({
@@ -47,27 +34,6 @@ const modifier = (o: Partial<IProficiencyLevelModifier> & { level: number }): IP
 });
 
 const reward = (level: number, rewardSkillId: number): IProficiencyLevelReward => ({ level, rewardSkillId });
-
-const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
-	name: `Tier ${o.id}`,
-	description: '',
-	pathOrdinal: 0,
-	level: 0,
-	maxLevel: 10,
-	xp: 0,
-	xpForNext: 100,
-	state: 'unlocked',
-	frontier: false,
-	milestoneLevels: [],
-	levelModifiers: [],
-	levelRewards: [],
-	decipher: 'undeciphered',
-	word: `word${o.id}`,
-	pronunciation: `pron${o.id}`,
-	translation: `means${o.id}`,
-	iconPath: '',
-	...o
-});
 
 // Resolves a handful of skill ids; everything else is unknown (undefined), exercising the drop path.
 const SKILL_NAMES: Record<number, string> = { 100: 'Fireball', 200: 'Ember Strike', 300: 'Flame Burst' };

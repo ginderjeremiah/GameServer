@@ -1,51 +1,13 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/svelte';
-import { EActivityKey } from '$lib/api';
 import TierSpine from '$routes/game/screens/proficiencies/TierSpine.svelte';
-import type {
-	PathView,
-	TierView,
-	WordTooltipController
-} from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import type { PathView, TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import { pathView as basePathView, stubController, tierView } from './lexicon-test-utils';
 
-const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
-	name: `Tier ${o.id}`,
-	description: '',
-	pathOrdinal: o.id,
-	level: 0,
-	maxLevel: 10,
-	xp: 0,
-	xpForNext: 100,
-	state: 'unlocked',
-	frontier: false,
-	milestoneLevels: [],
-	levelModifiers: [],
-	levelRewards: [],
-	decipher: 'undeciphered',
-	word: `word${o.id}`,
-	pronunciation: `pron${o.id}`,
-	translation: `means${o.id}`,
-	iconPath: '',
-	...o
-});
-
-const pathView = (tiers: TierView[], o: Partial<PathView> = {}): PathView => ({
-	id: 0,
-	name: 'Pyromancy',
-	description: '',
-	word: tiers[0]?.word ?? '',
-	iconPath: '',
-	activityKey: EActivityKey.Physical,
-	tiers,
-	...o
-});
-
-const stubController = (): WordTooltipController => ({
-	describedById: 'tooltip-1',
-	show: vi.fn(),
-	move: vi.fn(),
-	hide: vi.fn()
-});
+// This suite builds a path *from* its spine, so the root tier's word carries up to the path (which is what
+// the header renders) — the shared builder takes a plain override object and defaults to an empty spine.
+const pathView = (tiers: TierView[], o: Partial<PathView> = {}): PathView =>
+	basePathView({ word: tiers[0]?.word ?? '', tiers, ...o });
 
 const renderSpine = (path: PathView) =>
 	render(TierSpine, { path, selectedTierId: undefined, onSelect: vi.fn(), controller: stubController() });

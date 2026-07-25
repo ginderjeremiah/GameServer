@@ -1,37 +1,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/svelte';
 import TierCard from '$routes/game/screens/proficiencies/TierCard.svelte';
-import type { TierView, WordTooltipController } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import { stubController, tierView } from './lexicon-test-utils';
 
-const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
-	name: `Tier ${o.id}`,
-	description: '',
-	pathOrdinal: 0,
-	level: 0,
-	maxLevel: 10,
-	xp: 0,
-	xpForNext: 100,
-	state: 'unlocked',
-	frontier: false,
-	milestoneLevels: [],
-	levelModifiers: [],
-	levelRewards: [],
-	decipher: 'undeciphered',
-	word: `word${o.id}`,
-	pronunciation: `pron${o.id}`,
-	translation: `means${o.id}`,
-	iconPath: '',
-	...o
-});
-
-const stubController = (): WordTooltipController => ({
-	describedById: 'tooltip-9',
-	show: vi.fn(),
-	move: vi.fn(),
-	hide: vi.fn()
-});
-
-const renderCard = (tier: TierView, controller = stubController(), selected = false, last = true) => {
+const renderCard = (tier: TierView, controller = stubController('tooltip-9'), selected = false, last = true) => {
 	const onSelect = vi.fn();
 	render(TierCard, { tier, selected, last, onSelect, controller });
 	return { onSelect, controller };

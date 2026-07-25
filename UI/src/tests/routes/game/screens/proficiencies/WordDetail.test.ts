@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/svelte';
-import { EActivityKey, EAttribute, EAttributeType, EModifierType } from '$lib/api';
-import type {
-	PathView,
-	TierView,
-	WordTooltipController
-} from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
+import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
+import { attribute, pathView, stubController, tierView } from './lexicon-test-utils';
 
 /* WordDetail reads the proficiency/skill/attribute reference data from staticData (skills are id-indexed,
    mirroring ItemTooltip); the rest of $stores stays real (the $components barrel transitively imports the
@@ -24,18 +21,6 @@ import WordDetail from '$routes/game/screens/proficiencies/WordDetail.svelte';
 
 /* ── fixtures ──────────────────────────────────────────────────────────────── */
 
-const attribute = (id: EAttribute, name: string, isPercentage = false) => ({
-	id,
-	name,
-	description: '',
-	attributeType: EAttributeType.Secondary,
-	isPercentage,
-	isHarmful: false,
-	code: '',
-	displayOrder: 0,
-	decimals: 1
-});
-
 // Skills are id-indexed (staticData.skills[id]); a sparse array keyed by id matches the live shape.
 const SKILLS: { id: number; name: string }[] = [];
 for (const s of [
@@ -48,46 +33,7 @@ for (const s of [
 	SKILLS[s.id] = s;
 }
 
-const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
-	name: `Tier ${o.id}`,
-	description: '',
-	pathOrdinal: 0,
-	level: 0,
-	maxLevel: 10,
-	xp: 0,
-	xpForNext: 100,
-	state: 'unlocked',
-	frontier: false,
-	milestoneLevels: [],
-	levelModifiers: [],
-	levelRewards: [],
-	decipher: 'undeciphered',
-	word: `word${o.id}`,
-	pronunciation: `pron${o.id}`,
-	translation: `means${o.id}`,
-	iconPath: '',
-	...o
-});
-
-const pathView = (o: Partial<PathView> = {}): PathView => ({
-	id: 0,
-	name: 'Pyromancy',
-	description: '',
-	word: 'aenkor',
-	iconPath: '',
-	activityKey: EActivityKey.Physical,
-	tiers: [],
-	...o
-});
-
-const stubController = (): WordTooltipController => ({
-	describedById: 'tooltip-7',
-	show: vi.fn(),
-	move: vi.fn(),
-	hide: vi.fn()
-});
-
-const renderInspector = (tier: TierView, path = pathView(), controller = stubController()) => {
+const renderInspector = (tier: TierView, path = pathView(), controller = stubController('tooltip-7')) => {
 	render(WordDetail, { tier, path, controller });
 	return { controller };
 };
