@@ -623,13 +623,13 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(p => p.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.PathNameMaxLength);
 
                 entity.Property(p => p.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.PathDescriptionMaxLength);
 
                 entity.Property(p => p.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.PathDesignerNotesMaxLength);
             });
 
             modelBuilder.Entity<Proficiency>(entity =>
@@ -638,25 +638,25 @@ namespace Game.Infrastructure.Database
                     .HasIdentityOptions(0, 1, 0);
 
                 entity.Property(p => p.Name)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ProficiencyNameMaxLength);
 
                 entity.Property(p => p.Description)
-                    .HasMaxLength(500);
+                    .HasMaxLength(ContentFieldLengths.ProficiencyDescriptionMaxLength);
 
                 entity.Property(p => p.IconPath)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ProficiencyIconPathMaxLength);
 
                 entity.Property(p => p.Word)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ProficiencyWordMaxLength);
 
                 entity.Property(p => p.Pronunciation)
-                    .HasMaxLength(50);
+                    .HasMaxLength(ContentFieldLengths.ProficiencyPronunciationMaxLength);
 
                 entity.Property(p => p.Translation)
-                    .HasMaxLength(100);
+                    .HasMaxLength(ContentFieldLengths.ProficiencyTranslationMaxLength);
 
                 entity.Property(p => p.DesignerNotes)
-                    .HasMaxLength(2000);
+                    .HasMaxLength(ContentFieldLengths.ProficiencyDesignerNotesMaxLength);
 
                 entity.Property(p => p.BaseXp)
                     .HasPrecision(18, 3);

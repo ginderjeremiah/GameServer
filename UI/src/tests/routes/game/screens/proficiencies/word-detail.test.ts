@@ -50,6 +50,7 @@ const reward = (level: number, rewardSkillId: number): IProficiencyLevelReward =
 
 const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	name: `Tier ${o.id}`,
+	description: '',
 	pathOrdinal: 0,
 	level: 0,
 	maxLevel: 10,

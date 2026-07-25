@@ -34,7 +34,13 @@ interface Props {
 	fullWidth?: boolean;
 	mono?: boolean;
 	warn?: boolean;
-	maxLength?: number;
+	/**
+	 * The EF `HasMaxLength` bound for the column this input writes, read from the generated
+	 * `ContentFieldLengths` mirror (`game-constants.ts`) — never a hand-copied literal (#2377).
+	 * Required so a new progression input can't silently ship unbounded and fail as an opaque
+	 * `DbUpdateException` on save; `field-lengths.test.ts` pins each field to the right constant.
+	 */
+	maxLength: number;
 }
 
 const {

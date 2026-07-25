@@ -219,6 +219,18 @@ describe('buildLexicon — grouping & discovery', () => {
 		expect(pyromancy?.iconPath).toBe('icon-0');
 	});
 
+	it('carries the authored path and tier descriptions onto the view-models', () => {
+		const profs = [prof({ id: 10, pathId: 9, pathOrdinal: 0, description: 'The first ember.' })];
+		const lexicon = buildLexicon(
+			profs,
+			[path({ id: 9, description: 'Words that bind flame to will.' })],
+			[row(10, 0)],
+			[]
+		);
+		expect(byId(lexicon, 9)?.description).toBe('Words that bind flame to will.');
+		expect(byId(lexicon, 9)?.tiers[0].description).toBe('The first ember.');
+	});
+
 	it('drops a retired mid-spine tier and re-links the spine contiguously', () => {
 		const profs: IProficiency[] = [
 			prof({ id: 10, pathId: 9, pathOrdinal: 0 }),
