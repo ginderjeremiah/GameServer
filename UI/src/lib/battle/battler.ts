@@ -8,11 +8,36 @@ import { EAttributeModifierSource, type AttributeModifier } from './attribute-mo
 import { MAX_SELECTED_SKILLS } from '$lib/api/types/game-constants';
 import { staticData } from '$stores';
 
-interface BattlerData {
+export interface BattlerData {
 	attributes: IBattlerAttribute[];
 	selectedSkills: number[];
 	level: number;
 	name: string;
+}
+
+/** Everything a {@link Battler} is assembled from, as a named options object rather than a positional
+ *  argument list (#2380). Every field is optional and an omitted one behaves exactly as the absent
+ *  positional argument did — a data-less `{}` is the idle re-arm (see {@link Battler.reset}). This is a
+ *  parity surface, which is why it is named rather than positional (#2380): the six were structurally
+ *  interchangeable enough (two attribute/modifier lists, a `number[]`, a bare `number`) that a transposed
+ *  argument compiled clean and silently desynced the two simulators. */
+export interface BattlerInit {
+	battlerData?: BattlerData;
+	/** Attributes layered on top of {@link BattlerData.attributes} before derivation (the player's equipment
+	 *  stats), sitting with the base set so they compose exactly like the backend's snapshot rebuild. */
+	additionalAttributes?: IBattlerAttribute[];
+	/** The equipped items' signature skills (including the bare-handed punch), in `EEquipmentSlot` order —
+	 *  appended after the selected skills and de-duplicated by id (see {@link Battler.fillSkills}). */
+	grantedSkillIds?: number[];
+	/** Modifiers handed to the attribute set with the base data (the class locked base, then the proficiency
+	 *  bonuses) so they accumulate before the static engine modifiers, matching the backend order (#1189). */
+	additionalModifiers?: AttributeModifier[];
+	/** Gates weapon-leaf-typed skills to the equipped weapon (#1342); `undefined` leaves the battler ungated
+	 *  (an enemy fields its full authored loadout). */
+	equippedWeaponType?: EDamageType;
+	/** The parry riposte's skill (#1457) — the equipped weapon's signature or the punch; `undefined` leaves
+	 *  the battler with no counter. */
+	counterSkillId?: number;
 }
 
 /** One contributing skill-effect source folded into an {@link ActiveEffectView}, for the chip tooltip's
@@ -130,22 +155,8 @@ export class Battler {
 		return cooldownMultiplier(this.attributes);
 	}
 
-	constructor(
-		battlerData?: BattlerData,
-		additionalAttributes?: IBattlerAttribute[],
-		grantedSkillIds?: number[],
-		additionalModifiers?: AttributeModifier[],
-		equippedWeaponType?: EDamageType,
-		counterSkillId?: number
-	) {
-		this.reset(
-			battlerData,
-			additionalAttributes,
-			grantedSkillIds,
-			additionalModifiers,
-			equippedWeaponType,
-			counterSkillId
-		);
+	constructor(init: BattlerInit = {}) {
+		this.reset(init);
 	}
 
 	/** Advances each skill's charge by `timeDelta * cdMultiplier` **in loadout order**, invoking `onFire`
@@ -384,14 +395,17 @@ export class Battler {
 		}
 	}
 
-	public reset(
-		battlerData?: BattlerData,
-		additionalAttributes?: IBattlerAttribute[],
-		grantedSkillIds?: number[],
-		additionalModifiers?: AttributeModifier[],
-		equippedWeaponType?: EDamageType,
-		counterSkillId?: number
-	) {
+	/** Re-arms this battler for a new fight. With no `battlerData` this is the idle re-arm (#811) — the
+	 *  existing attribute set and skills are kept, only the active effects, skill charges and health are
+	 *  reset; supplying it rebuilds the whole attribute graph and loadout. */
+	public reset({
+		battlerData,
+		additionalAttributes,
+		grantedSkillIds,
+		additionalModifiers,
+		equippedWeaponType,
+		counterSkillId
+	}: BattlerInit = {}) {
 		// Remove the active effects' modifiers, not just the bookkeeping — a data-less reset keeps the
 		// existing attribute set, so leaving the modifiers would carry the previous battle's buffs over.
 		for (const modifier of this.#effectModifiers.values()) {

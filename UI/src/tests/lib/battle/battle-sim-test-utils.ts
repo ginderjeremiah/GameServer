@@ -129,15 +129,15 @@ export function battlerFactory(registry: ISkill[]) {
 	): Battler => {
 		const selectedSkills = skills.map((spec) => registerSkill(registry, spec));
 
-		return new Battler(
-			{
+		return new Battler({
+			battlerData: {
 				name: 'Battler',
 				level: 1,
 				selectedSkills,
 				attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
 			},
-			equipment
-		);
+			additionalAttributes: equipment
+		});
 	};
 }
 
@@ -165,19 +165,17 @@ export function grantedBattlerFactory(registry: ISkill[]) {
 			equippedWeaponType?: EDamageType,
 			counterSkillId?: number
 		): Battler =>
-			new Battler(
-				{
+			new Battler({
+				battlerData: {
 					name: 'Battler',
 					level: 1,
 					selectedSkills: selectedSkillIds,
 					attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
 				},
-				undefined,
 				grantedSkillIds,
-				undefined,
 				equippedWeaponType,
 				counterSkillId
-			)
+			})
 	};
 }
 

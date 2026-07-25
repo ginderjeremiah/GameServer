@@ -216,7 +216,9 @@ export class BattleEngine {
 		this.#rng = new Mulberry32(enemyInstance.seed);
 		this.flushEffectDamage();
 		this.resetPlayer();
-		this.enemy.reset({ ...enemyInstance, ...staticEnemy, name: staticEnemy?.name ?? 'Unknown enemy' });
+		this.enemy.reset({
+			battlerData: { ...enemyInstance, ...staticEnemy, name: staticEnemy?.name ?? 'Unknown enemy' }
+		});
 		// A non-null elapsedOffsetMs (#1595/#1596) means the server handed back a battle already in
 		// progress rather than a fresh spawn — fast-forward to its real elapsed time before going live.
 		if (enemyInstance.elapsedOffsetMs != null) {
@@ -289,14 +291,14 @@ export class BattleEngine {
 		// equippedWeaponType drives the weapon-match gate (#1342) and counterSkillId the parry riposte (#1457):
 		// only the player battler carries them; the enemy rebuild below passes neither and fields its full
 		// authored loadout with no counter.
-		this.player.reset(
-			playerManager,
-			equipmentStats,
-			inventoryManager.grantedSkillIds,
-			playerBattleModifiers(lockedBaseModifiers, proficiencyModifiers),
-			inventoryManager.equippedWeaponType,
-			inventoryManager.counterSkillId
-		);
+		this.player.reset({
+			battlerData: playerManager,
+			additionalAttributes: equipmentStats,
+			grantedSkillIds: inventoryManager.grantedSkillIds,
+			additionalModifiers: playerBattleModifiers(lockedBaseModifiers, proficiencyModifiers),
+			equippedWeaponType: inventoryManager.equippedWeaponType,
+			counterSkillId: inventoryManager.counterSkillId
+		});
 		// The signature passive lands LAST — after the locked base, proficiency bonuses, and static engine
 		// modifiers the rebuild just assembled — via the shared applySignaturePassive step, the same ordering
 		// composePlayerBattleAttributes canonicalises. The data-less re-arm above keeps this modifier (setData

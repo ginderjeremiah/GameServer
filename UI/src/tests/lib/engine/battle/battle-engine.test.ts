@@ -1560,14 +1560,14 @@ describe('BattleEngine', () => {
 				isBossBattle: false
 			});
 
-			expect(resetSpy).toHaveBeenCalledWith(
-				mockPlayerManager,
-				newStats,
-				mockInventoryManager.grantedSkillIds,
-				mockPlayerProficiencies.battleModifiers,
-				mockInventoryManager.equippedWeaponType,
-				mockInventoryManager.counterSkillId
-			);
+			expect(resetSpy).toHaveBeenCalledWith({
+				battlerData: mockPlayerManager,
+				additionalAttributes: newStats,
+				grantedSkillIds: mockInventoryManager.grantedSkillIds,
+				additionalModifiers: mockPlayerProficiencies.battleModifiers,
+				equippedWeaponType: mockInventoryManager.equippedWeaponType,
+				counterSkillId: mockInventoryManager.counterSkillId
+			});
 		});
 
 		it('re-derives the player when the level changes between spawns (keeps the fight card level fresh)', () => {
@@ -1585,14 +1585,14 @@ describe('BattleEngine', () => {
 				isBossBattle: false
 			});
 
-			expect(resetSpy).toHaveBeenCalledWith(
-				mockPlayerManager,
-				mockInventoryManager.equipmentStats,
-				mockInventoryManager.grantedSkillIds,
-				mockPlayerProficiencies.battleModifiers,
-				mockInventoryManager.equippedWeaponType,
-				mockInventoryManager.counterSkillId
-			);
+			expect(resetSpy).toHaveBeenCalledWith({
+				battlerData: mockPlayerManager,
+				additionalAttributes: mockInventoryManager.equipmentStats,
+				grantedSkillIds: mockInventoryManager.grantedSkillIds,
+				additionalModifiers: mockPlayerProficiencies.battleModifiers,
+				equippedWeaponType: mockInventoryManager.equippedWeaponType,
+				counterSkillId: mockInventoryManager.counterSkillId
+			});
 		});
 
 		// Proficiency bonuses (#982 area E / #1119) are a derivation input too: a level-up while idling
@@ -1614,14 +1614,14 @@ describe('BattleEngine', () => {
 				isBossBattle: false
 			});
 
-			expect(resetSpy).toHaveBeenCalledWith(
-				mockPlayerManager,
-				mockInventoryManager.equipmentStats,
-				mockInventoryManager.grantedSkillIds,
-				newModifiers,
-				mockInventoryManager.equippedWeaponType,
-				mockInventoryManager.counterSkillId
-			);
+			expect(resetSpy).toHaveBeenCalledWith({
+				battlerData: mockPlayerManager,
+				additionalAttributes: mockInventoryManager.equipmentStats,
+				grantedSkillIds: mockInventoryManager.grantedSkillIds,
+				additionalModifiers: newModifiers,
+				equippedWeaponType: mockInventoryManager.equippedWeaponType,
+				counterSkillId: mockInventoryManager.counterSkillId
+			});
 		});
 
 		it('re-arms (no re-derive) when the proficiency modifiers reference is unchanged', () => {
@@ -1660,14 +1660,14 @@ describe('BattleEngine', () => {
 				isBossBattle: false
 			});
 
-			expect(resetSpy).toHaveBeenCalledWith(
-				mockPlayerManager,
-				mockInventoryManager.equipmentStats,
-				mockInventoryManager.grantedSkillIds,
-				newLockedBase,
-				mockInventoryManager.equippedWeaponType,
-				mockInventoryManager.counterSkillId
-			);
+			expect(resetSpy).toHaveBeenCalledWith({
+				battlerData: mockPlayerManager,
+				additionalAttributes: mockInventoryManager.equipmentStats,
+				grantedSkillIds: mockInventoryManager.grantedSkillIds,
+				additionalModifiers: newLockedBase,
+				equippedWeaponType: mockInventoryManager.equippedWeaponType,
+				counterSkillId: mockInventoryManager.counterSkillId
+			});
 		});
 
 		// The class signature passive (#1126 area E) is composed at this seam — added LAST, after the rebuild's
@@ -1726,14 +1726,14 @@ describe('BattleEngine', () => {
 				isBossBattle: false
 			});
 
-			expect(resetSpy).toHaveBeenCalledWith(
-				mockPlayerManager,
-				mockInventoryManager.equipmentStats,
-				mockInventoryManager.grantedSkillIds,
-				[...lockedBase, ...proficiency],
-				mockInventoryManager.equippedWeaponType,
-				mockInventoryManager.counterSkillId
-			);
+			expect(resetSpy).toHaveBeenCalledWith({
+				battlerData: mockPlayerManager,
+				additionalAttributes: mockInventoryManager.equipmentStats,
+				grantedSkillIds: mockInventoryManager.grantedSkillIds,
+				additionalModifiers: [...lockedBase, ...proficiency],
+				equippedWeaponType: mockInventoryManager.equippedWeaponType,
+				counterSkillId: mockInventoryManager.counterSkillId
+			});
 		});
 	});
 });
