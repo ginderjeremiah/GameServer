@@ -29,7 +29,7 @@
 						value={path.name}
 						grow
 						warn={!path.name.trim()}
-						maxLength={50}
+						maxLength={PATH_NAME_MAX_LENGTH}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.name = v))}
 					/>
 					<ProgSelect
@@ -46,7 +46,7 @@
 						value={path.description}
 						textarea
 						fullWidth
-						maxLength={500}
+						maxLength={PATH_DESCRIPTION_MAX_LENGTH}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.description = v))}
 					/>
 				</div>
@@ -56,7 +56,7 @@
 						value={path.designerNotes}
 						textarea
 						fullWidth
-						maxLength={2000}
+						maxLength={PATH_DESIGNER_NOTES_MAX_LENGTH}
 						onChange={(v) => store.patchPath(path.id, (d) => (d.designerNotes = v))}
 					/>
 				</div>
@@ -71,6 +71,11 @@
 {/if}
 
 <script lang="ts">
+import {
+	PATH_DESCRIPTION_MAX_LENGTH,
+	PATH_DESIGNER_NOTES_MAX_LENGTH,
+	PATH_NAME_MAX_LENGTH
+} from '$lib/api/types/game-constants';
 import { denseByLiveId, referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
 import { activityKeyGroups, hasTierCollision, pathWarnings } from './progression-helpers';

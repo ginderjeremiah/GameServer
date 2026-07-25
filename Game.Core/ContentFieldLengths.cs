@@ -5,8 +5,10 @@ namespace Game.Core
     /// edits, named per entity+property (<c>GameContext</c> configures each column against the matching
     /// constant here). Marked <see cref="ClientMirroredAttribute"/> so the code generator mirrors each
     /// value into <c>game-constants.ts</c>, giving the Workbench field configs (<c>workbench/entities/*.ts</c>)
-    /// a single source of truth to assert against instead of a hand-copied literal that can silently drift
-    /// from the DB bound (issue #2318; the convention itself is #2257).
+    /// and the bespoke progression surface (<c>workbench/progression/*.svelte</c>, which authors paths and
+    /// proficiency tiers outside the generic entity configs) a single source of truth to read instead of a
+    /// hand-copied literal that can silently drift from the DB bound (issues #2318/#2377; the convention
+    /// itself is #2257).
     /// </summary>
     [ClientMirrored]
     public static class ContentFieldLengths
@@ -49,6 +51,18 @@ namespace Game.Core
 
         public const int LessonStepTextMaxLength = 500;
         public const int LessonStepAnchorKeyMaxLength = 100;
+
+        public const int PathNameMaxLength = 50;
+        public const int PathDescriptionMaxLength = 500;
+        public const int PathDesignerNotesMaxLength = 2000;
+
+        public const int ProficiencyNameMaxLength = 50;
+        public const int ProficiencyDescriptionMaxLength = 500;
+        public const int ProficiencyIconPathMaxLength = 50;
+        public const int ProficiencyWordMaxLength = 50;
+        public const int ProficiencyPronunciationMaxLength = 50;
+        public const int ProficiencyTranslationMaxLength = 100;
+        public const int ProficiencyDesignerNotesMaxLength = 2000;
 
         public const int TagNameMaxLength = 50;
 

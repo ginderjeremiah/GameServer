@@ -57,6 +57,9 @@ namespace Game.Api.Tests.CodeGen
         [Theory]
         [InlineData(nameof(ContentFieldLengths.EnemyNameMaxLength))]
         [InlineData(nameof(ContentFieldLengths.SkillDesignerNotesMaxLength))]
+        // The bespoke progression surface's bounds (#2377) mirror through the same generated file.
+        [InlineData(nameof(ContentFieldLengths.PathNameMaxLength))]
+        [InlineData(nameof(ContentFieldLengths.ProficiencyDescriptionMaxLength))]
         public void GetClientMirroredConstantFields_IncludesContentFieldLengths(string fieldName)
         {
             var fieldNames = ApiCodeGenerator.GetClientMirroredConstantFields()

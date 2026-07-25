@@ -4,7 +4,7 @@
 		value={tier.name}
 		grow
 		warn={!tier.name.trim()}
-		maxLength={50}
+		maxLength={PROFICIENCY_NAME_MAX_LENGTH}
 		onChange={(v) => store.patchProf(tier.id, (d) => (d.name = v))}
 	/>
 	<ProgInput
@@ -12,7 +12,7 @@
 		value={tier.iconPath}
 		mono
 		warn={!tier.iconPath.trim()}
-		maxLength={50}
+		maxLength={PROFICIENCY_ICON_PATH_MAX_LENGTH}
 		onChange={(v) => store.patchProf(tier.id, (d) => (d.iconPath = v))}
 	/>
 	<div class="ro">
@@ -23,6 +23,19 @@
 		<span class="lbl">Tier</span>
 		<div class="ro-box mono center">{tier.pathOrdinal}</div>
 	</div>
+</div>
+
+<!-- Player-facing tier blurb. Unlike `designerNotes` (blanked for non-admin connections) this ships
+     unredacted to every client, so it is authored content, not a design note. -->
+<div class="desc">
+	<ProgInput
+		label="Description"
+		value={tier.description}
+		textarea
+		fullWidth
+		maxLength={PROFICIENCY_DESCRIPTION_MAX_LENGTH}
+		onChange={(v) => store.patchProf(tier.id, (d) => (d.description = v))}
+	/>
 </div>
 
 <div class="wop">
@@ -37,7 +50,7 @@
 			mono
 			fullWidth
 			warn={!tier.word.trim()}
-			maxLength={50}
+			maxLength={PROFICIENCY_WORD_MAX_LENGTH}
 			onChange={(v) => store.patchProf(tier.id, (d) => (d.word = v))}
 		/>
 		<ProgInput
@@ -45,7 +58,7 @@
 			value={tier.pronunciation}
 			fullWidth
 			warn={!tier.pronunciation.trim()}
-			maxLength={50}
+			maxLength={PROFICIENCY_PRONUNCIATION_MAX_LENGTH}
 			onChange={(v) => store.patchProf(tier.id, (d) => (d.pronunciation = v))}
 		/>
 		<ProgInput
@@ -53,7 +66,7 @@
 			value={tier.translation}
 			fullWidth
 			warn={!tier.translation.trim()}
-			maxLength={100}
+			maxLength={PROFICIENCY_TRANSLATION_MAX_LENGTH}
 			onChange={(v) => store.patchProf(tier.id, (d) => (d.translation = v))}
 		/>
 	</div>
@@ -85,12 +98,21 @@
 		value={tier.designerNotes}
 		textarea
 		fullWidth
-		maxLength={2000}
+		maxLength={PROFICIENCY_DESIGNER_NOTES_MAX_LENGTH}
 		onChange={(v) => store.patchProf(tier.id, (d) => (d.designerNotes = v))}
 	/>
 </div>
 
 <script lang="ts">
+import {
+	PROFICIENCY_DESCRIPTION_MAX_LENGTH,
+	PROFICIENCY_DESIGNER_NOTES_MAX_LENGTH,
+	PROFICIENCY_ICON_PATH_MAX_LENGTH,
+	PROFICIENCY_NAME_MAX_LENGTH,
+	PROFICIENCY_PRONUNCIATION_MAX_LENGTH,
+	PROFICIENCY_TRANSLATION_MAX_LENGTH,
+	PROFICIENCY_WORD_MAX_LENGTH
+} from '$lib/api/types/game-constants';
 import WordOfPower from '$components/WordOfPower.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
 import { decipherThresholds } from './progression-helpers';
@@ -117,6 +139,7 @@ const thresholds = $derived(decipherThresholds(tier.maxLevel));
 .gap12 {
 	gap: 12px;
 }
+.desc,
 .notes {
 	margin-top: 18px;
 }
