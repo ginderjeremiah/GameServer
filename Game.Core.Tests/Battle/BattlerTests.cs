@@ -11,10 +11,12 @@ namespace Game.Core.Tests.Battle
     /// Direct unit tests for the combat arithmetic on <see cref="Battler"/>.
     /// <para>
     /// These mirror the frontend suite <c>UI/src/tests/lib/battle/battler.test.ts</c>:
-    /// the <see cref="Battler.TakeDamage"/> toughness-curve/death cases and the
-    /// <see cref="Battler.GetCooldownMultiplier"/> formula are asserted here with the
+    /// the <see cref="Battler.TakeDamage"/> toughness-curve/death cases, the
+    /// <see cref="Battler.GetCooldownMultiplier"/> formula, and the
+    /// <see cref="Battler.EffectiveParryChance"/>/<see cref="Battler.EffectiveDodgeChance"/>
+    /// avoidance products are asserted here with the
     /// <b>same scenarios and the same expected results</b> as the frontend, so a future
-    /// divergence in the mitigation/cooldown math fails on both sides (the same parity
+    /// divergence in the mitigation/cadence/avoidance math fails on both sides (the same parity
     /// discipline used for <see cref="Mulberry32ParityTests"/> ⇄ <c>mulberry32-parity.test.ts</c>).
     /// Frontend-only concerns (skill-slot filling, render cooldowns, name/level wiring) are
     /// not part of the backend <see cref="Battler"/> and are intentionally not mirrored.
@@ -72,6 +74,89 @@ namespace Game.Core.Tests.Battle
             var battler = MakeBattler((EAttribute.CooldownBonus, 0.5));
 
             Assert.Equal(1.5, battler.GetCooldownMultiplier(), 10);
+        }
+
+        // ── EffectiveParryChance / EffectiveDodgeChance: enabler × multiplier (#2429) ──
+        // The products the engine's own draws read (BattleContext.DamageTarget) and the combat rating prices.
+        // Mirrors the frontend battler.test.ts cases with the same scenarios and results.
+
+        [Fact]
+        public void EffectiveParryChance_NoEnabler_IsZeroRegardlessOfLuck()
+        {
+            // ParryChance is an authored-only enabler idling at 0, so Luck only lifts the (idle) multiplier:
+            // 0 × 1.1 = 0. An un-enabled build never parries.
+            var battler = MakeBattler((EAttribute.Luck, 50));
+
+            Assert.Equal(0.0, battler.EffectiveParryChance, 10);
+        }
+
+        [Fact]
+        public void EffectiveParryChance_AuthoredChance_ScalesByLuckAmplifiedMultiplier()
+        {
+            // ParryChance 0.2 (authored enabler) × ParryChanceMultiplier (1 + 0.002·Luck(20) = 1.04) = 0.208.
+            var battler = MakeBattler((EAttribute.ParryChance, 0.2), (EAttribute.Luck, 20));
+
+            Assert.Equal(0.2 * (1 + 0.002 * 20), battler.EffectiveParryChance, 10);
+        }
+
+        [Fact]
+        public void EffectiveParryChance_AuthoredChance_NoLuck_UsesBaseMultiplier()
+        {
+            // With no Luck the multiplier stays at its base 1, so the enabler passes through verbatim.
+            var battler = MakeBattler((EAttribute.ParryChance, 0.2));
+
+            Assert.Equal(0.2, battler.EffectiveParryChance, 10);
+        }
+
+        [Fact]
+        public void EffectiveParryChance_ProductAboveOne_IsNotClamped()
+        {
+            // Deliberately unclamped: the engine draws against [0, 1), so a product at or above 1 saturates
+            // naturally. Clamping is CombatRating's concern (it prices an expectation, not a draw), and folding
+            // it in here would change engine behavior for no reason. 0.8 × (1 + 0.002·500 = 2) = 1.6.
+            var battler = MakeBattler((EAttribute.ParryChance, 0.8), (EAttribute.Luck, 500));
+
+            Assert.Equal(1.6, battler.EffectiveParryChance, 10);
+        }
+
+        [Fact]
+        public void EffectiveParryChance_IsReadLive_ReflectingAMidBattleMultiplierChange()
+        {
+            // Read at consumption (per draw), not frozen at assembly, so a timed effect on either factor takes
+            // effect on the next fire — the same live-read contract as GetCooldownMultiplier.
+            var battler = MakeBattler((EAttribute.ParryChance, 0.2));
+            Assert.Equal(0.2, battler.EffectiveParryChance, 10);
+
+            battler.ApplyEffect(ParryMultiplierBuff, ParryMultiplierBuff.Amount);
+
+            Assert.Equal(0.4, battler.EffectiveParryChance, 10);
+        }
+
+        [Fact]
+        public void EffectiveDodgeChance_NoEnabler_IsZeroRegardlessOfAgility()
+        {
+            // DodgeChance shares ParryChance's authored-only, base-0 enabler shape, so Agility alone dodges
+            // nothing: 0 × 1.1 = 0.
+            var battler = MakeBattler((EAttribute.Agility, 50));
+
+            Assert.Equal(0.0, battler.EffectiveDodgeChance, 10);
+        }
+
+        [Fact]
+        public void EffectiveDodgeChance_AuthoredChance_ScalesByAgilityAmplifiedMultiplier()
+        {
+            // DodgeChance 0.25 × DodgeChanceMultiplier (1 + 0.002·Agility(20) = 1.04) = 0.26.
+            var battler = MakeBattler((EAttribute.DodgeChance, 0.25), (EAttribute.Agility, 20));
+
+            Assert.Equal(0.25 * (1 + 0.002 * 20), battler.EffectiveDodgeChance, 10);
+        }
+
+        [Fact]
+        public void EffectiveDodgeChance_AuthoredChance_NoAgility_UsesBaseMultiplier()
+        {
+            var battler = MakeBattler((EAttribute.DodgeChance, 0.25));
+
+            Assert.Equal(0.25, battler.EffectiveDodgeChance, 10);
         }
 
         // ── TakeDamage: Toughness mitigation curve ─────────────────────────────
@@ -332,6 +417,22 @@ namespace Game.Core.Tests.Battle
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// A +1 additive <see cref="EAttribute.ParryChanceMultiplier"/> buff — lands on the base 1, doubling
+        /// the composed parry chance.
+        /// </summary>
+        private static readonly SkillEffect ParryMultiplierBuff = new()
+        {
+            Id = 1,
+            Target = ESkillEffectTarget.Self,
+            AttributeId = EAttribute.ParryChanceMultiplier,
+            ModifierType = EModifierType.Additive,
+            Amount = 1.0,
+            DurationMs = 1000,
+            ScalingAttributeId = EAttribute.Luck,
+            ScalingAmount = 0,
+        };
 
         /// <summary>
         /// Builds a <see cref="Battler"/> from a set of additive attribute amounts (sourced as

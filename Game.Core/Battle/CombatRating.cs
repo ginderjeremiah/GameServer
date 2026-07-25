@@ -38,8 +38,9 @@ namespace Game.Core.Battle
     /// <para>
     /// Server-only: this is never simulated client-side (display values are sent, not recomputed), so it
     /// carries no frontend/backend parity surface. Reuses the exact <see cref="Battler"/>/<see cref="BattleSkill"/>
-    /// methods the engine itself uses (<see cref="BattleSkill.CalculateRawDamage"/>, <see cref="Battler.AmplifyDamage"/>,
-    /// <see cref="Battler.ComputeNetDamage"/>, <see cref="Battler.GetCooldownMultiplier"/>) — the anti-drift
+    /// members the engine itself uses (<see cref="BattleSkill.CalculateRawDamage"/>, <see cref="Battler.AmplifyDamage"/>,
+    /// <see cref="Battler.ComputeNetDamage"/>, <see cref="Battler.GetCooldownMultiplier"/>,
+    /// <see cref="Battler.EffectiveParryChance"/>/<see cref="Battler.EffectiveDodgeChance"/>) — the anti-drift
     /// mechanism that keeps the rating from silently diverging from the real damage pipeline.
     /// </para>
     /// <para>
@@ -67,17 +68,18 @@ namespace Game.Core.Battle
             return Math.Clamp(chance, 0.0, 1.0);
         }
 
-        // The two avoidance chances, each read once so the offense (riposte) and survivability readings cannot
-        // drift apart — the very failure this clamp exists to fix was those two sites disagreeing about what a
-        // parry chance means. Mirrors the engine's own products (BattleContext.cs:230-233).
-        private static double EffectiveParryChance(Battler caster)
+        // The two avoidance chances as this rating prices them: the engine's own composed products
+        // (Battler.EffectiveParryChance/EffectiveDodgeChance — the same accessors the live draws read, so the
+        // composition cannot drift), clamped to what a draw can deliver. Each is read once here so the offense
+        // (riposte) and survivability readings cannot disagree about what a parry chance means (#2416).
+        private static double ParryProcChance(Battler caster)
         {
-            return ProcChance(caster.GetAttributeValue(ParryChance) * caster.GetAttributeValue(ParryChanceMultiplier));
+            return ProcChance(caster.EffectiveParryChance);
         }
 
-        private static double EffectiveDodgeChance(Battler caster)
+        private static double DodgeProcChance(Battler caster)
         {
-            return ProcChance(caster.GetAttributeValue(DodgeChance) * caster.GetAttributeValue(DodgeChanceMultiplier));
+            return ProcChance(caster.EffectiveDodgeChance);
         }
 
         /// <summary>
@@ -232,10 +234,10 @@ namespace Game.Core.Battle
             // Reflect: DamageReflection × the reference incoming DPS.
             total += effectiveCaster.GetAttributeValue(DamageReflection) * ServerGameConstants.RefDps;
 
-            // Riposte (player-side only): effectiveParryChance × reference attack rate × the counter's expected hit.
+            // Riposte (player-side only): parry proc chance × reference attack rate × the counter's expected hit.
             if (isPlayer && battler.CounterSkill is Skill counterSkill)
             {
-                total += EffectiveParryChance(effectiveCaster) * ServerGameConstants.RefAttackRate
+                total += ParryProcChance(effectiveCaster) * ServerGameConstants.RefAttackRate
                     * ExpectedDirectHit(counterSkill, isPlayer, effectiveCaster, referenceDefense);
             }
 
@@ -294,8 +296,8 @@ namespace Game.Core.Battle
             var avoid = 0.0;
             if (isPlayer)
             {
-                var parry = EffectiveParryChance(effectiveCaster);
-                var dodge = EffectiveDodgeChance(effectiveCaster);
+                var parry = ParryProcChance(effectiveCaster);
+                var dodge = DodgeProcChance(effectiveCaster);
                 avoid = parry + (1 - parry) * dodge;
             }
 

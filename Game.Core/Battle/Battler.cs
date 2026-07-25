@@ -79,6 +79,24 @@ namespace Game.Core.Battle
                 + _attributes[CooldownBonus] * _attributes[CooldownBonusMultiplier];
         }
 
+        /// <summary>
+        /// This battler's composed parry chance — <c>ParryChance × ParryChanceMultiplier</c>, the product the
+        /// engine draws against (<see cref="BattleContext.DamageTarget"/>). Composed here at consumption like
+        /// <see cref="GetCooldownMultiplier"/>, so the live draw and <see cref="CombatRating"/>'s pricing of the
+        /// same capability cannot derive it differently (#2429). <see cref="EAttribute.ParryChance"/> is an
+        /// authored-only enabler idling at <c>0</c>, so an un-enabled build parries at exactly <c>0</c>
+        /// regardless of Luck. Deliberately <b>unclamped</b>: a draw against <c>[0, 1)</c> saturates naturally,
+        /// and clamping is a rating-side concern (it prices an expectation, not a draw).
+        /// </summary>
+        public double EffectiveParryChance => _attributes[ParryChance] * _attributes[ParryChanceMultiplier];
+
+        /// <summary>
+        /// This battler's composed dodge chance — <c>DodgeChance × DodgeChanceMultiplier</c>, the engine's own
+        /// draw product. Shares <see cref="EffectiveParryChance"/>'s rationale, enabler shape (authored-only,
+        /// base <c>0</c>, Agility-scaled multiplier), and unclamped semantics.
+        /// </summary>
+        public double EffectiveDodgeChance => _attributes[DodgeChance] * _attributes[DodgeChanceMultiplier];
+
         public double GetAttributeValue(EAttribute attribute)
         {
             return _attributes[attribute];

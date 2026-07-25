@@ -227,10 +227,8 @@ namespace Game.Core.Battle
                 // second draw was retired, spike #1330), and the parry counter's crit — all taken unconditionally
                 // so the seeded stream advances as a pure function of the fire sequence, never of a roll outcome
                 // or of the defender's build (a 0-chance draw still consumes). A parry takes precedence over a dodge.
-                var isParry = _rng.Next() < _targetBattler.GetAttributeValue(ParryChance)
-                    * _targetBattler.GetAttributeValue(ParryChanceMultiplier);
-                var isDodge = _rng.Next() < _targetBattler.GetAttributeValue(DodgeChance)
-                    * _targetBattler.GetAttributeValue(DodgeChanceMultiplier);
+                var isParry = _rng.Next() < _targetBattler.EffectiveParryChance;
+                var isDodge = _rng.Next() < _targetBattler.EffectiveDodgeChance;
                 var counterCritDraw = _rng.Next();
 
                 if (isParry)
