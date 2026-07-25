@@ -2,41 +2,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import { EAttribute, EModifierType } from '$lib/api';
 
-// MilestonesEditor's Reward-skill select reads staticData.skills via the reference module —
-// mirrors TierDetail.test.ts's hoisted staticData mock.
-const { staticData } = vi.hoisted(() => ({
-	staticData: { skills: [] as unknown[] }
-}));
-vi.mock('$stores', () => ({ staticData }));
+// MilestonesEditor's Reward-skill select reads staticData.skills via the reference module. `vi.mock` is
+// hoisted within this file, so the factory resolves the shared stub by dynamic import.
+vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import MilestonesEditor from '$routes/admin/workbench/progression/MilestonesEditor.svelte';
-import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
 import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import { asStore, resetStores, tier as baseTier } from './progression-test-utils';
 
-const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => ({
-	id: 5,
-	name: 'Blades',
-	description: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 0,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	designerNotes: '',
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...over
-});
+// The payout assertions below target tier id 5.
+const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => baseTier({ id: 5, ...over });
 
-// A fake store exposing exactly what MilestonesEditor reads/calls — mirrors GatewaysEditor.test.ts's
-// fake-store pattern rather than driving the real ProgressionStore through a socket-backed load().
+// A fake store exposing exactly what MilestonesEditor reads/calls.
 const makeStore = (selectedLevel: number, overrides: Record<string, unknown> = {}) =>
-	({
+	asStore({
 		selectedLevel,
 		selectLevel: vi.fn(),
 		updateModifier: vi.fn(),
@@ -46,12 +25,9 @@ const makeStore = (selectedLevel: number, overrides: Record<string, unknown> = {
 		addPayout: vi.fn(),
 		removePayout: vi.fn(),
 		...overrides
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	}) as any as ProgressionStore;
+	});
 
-beforeEach(() => {
-	staticData.skills = [];
-});
+beforeEach(resetStores);
 afterEach(cleanup);
 
 describe('MilestonesEditor — level 0 (on-open) payouts (#2178)', () => {

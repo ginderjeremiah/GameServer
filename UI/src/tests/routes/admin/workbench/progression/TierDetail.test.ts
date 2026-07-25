@@ -2,90 +2,33 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
 
-// Hoisted so individual tests can seed staticData and assert the retire-confirm flow, mirroring
-// WorkbenchDetail.test.ts's pattern for the generic Workbench's retire dialog.
-const { staticData, dangerModal } = vi.hoisted(() => ({
-	staticData: {
-		enemies: [] as unknown[],
-		zones: [] as unknown[],
-		challenges: [] as unknown[],
-		items: [] as unknown[],
-		classes: [] as unknown[],
-		skillRecipes: [] as unknown[],
-		proficiencies: [] as unknown[],
-		skills: [] as unknown[]
-	},
-	dangerModal: vi.fn()
-}));
-vi.mock('$stores', () => ({ staticData, dangerModal }));
+// `vi.mock` is hoisted within this file, so the factory resolves the shared stub by dynamic import
+// rather than closing over the static one below.
+vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import TierDetail from '$routes/admin/workbench/progression/TierDetail.svelte';
-import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
 import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import {
+	dangerModal,
+	makeTierStore as makeStore,
+	resetStores,
+	staticData,
+	tier as baseTier
+} from './progression-test-utils';
 
-const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => ({
-	id: 5,
-	name: 'Blades',
-	description: '',
-	iconPath: 'i.png',
-	word: 'sijren',
-	pronunciation: 'sij-ren',
-	translation: 'The Riven Frost',
-	pathId: 0,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	designerNotes: '',
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...over
-});
+// Tiers here carry id 5 and populated conlang fields: the retire/tab assertions below target id 5,
+// and ConlangIdentity's decipher preview reads the authored word/pronunciation/translation.
+const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency =>
+	baseTier({
+		id: 5,
+		iconPath: 'i.png',
+		word: 'sijren',
+		pronunciation: 'sij-ren',
+		translation: 'The Riven Frost',
+		...over
+	});
 
-// A fake store exposing exactly what TierDetail + ConlangIdentity (the 'identity' tab) read —
-// mirrors ProgressionMap.test.ts's fake-store pattern rather than driving the real ProgressionStore
-// through a socket-backed load(), since only TierDetail's own wiring (header, tabs, retire) is under
-// test here.
-const makeStore = (drilledTier: WorkbenchProficiency, overrides: Record<string, unknown> = {}) =>
-	({
-		drilledTier,
-		profs: [drilledTier],
-		paths: [],
-		tierTab: 'identity',
-		selectedPath: { name: 'Fire Path' },
-		selectedLevel: 1,
-		profStatus: vi.fn(() => 'clean'),
-		isRetired: vi.fn(() => false),
-		setTierTab: vi.fn(),
-		resetProf: vi.fn(),
-		retireProf: vi.fn(),
-		back: vi.fn(),
-		profBaseline: vi.fn(() => drilledTier),
-		patchProf: vi.fn(),
-		selectLevel: vi.fn(),
-		updateModifier: vi.fn(),
-		removeModifier: vi.fn(),
-		addModifier: vi.fn(),
-		setReward: vi.fn(),
-		addPayout: vi.fn(),
-		removePayout: vi.fn(),
-		addPrerequisite: vi.fn(),
-		removePrerequisite: vi.fn(),
-		...overrides
-	}) as unknown as ProgressionStore;
-
-beforeEach(() => {
-	dangerModal.mockReset();
-	staticData.enemies = [];
-	staticData.zones = [];
-	staticData.challenges = [];
-	staticData.items = [];
-	staticData.classes = [];
-	staticData.skillRecipes = [];
-	staticData.proficiencies = [];
-	staticData.skills = [];
-});
+beforeEach(resetStores);
 afterEach(cleanup);
 
 describe('TierDetail', () => {

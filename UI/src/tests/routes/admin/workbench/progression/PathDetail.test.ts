@@ -2,90 +2,26 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { EActivityKey } from '$lib/api';
 
-// Hoisted so individual tests can seed staticData and assert the retire-confirm flow, mirroring
-// TierDetail.test.ts's pattern for the progression editor's retire dialog.
-const { staticData, dangerModal } = vi.hoisted(() => ({
-	staticData: {
-		enemies: [] as unknown[],
-		zones: [] as unknown[],
-		challenges: [] as unknown[],
-		items: [] as unknown[],
-		classes: [] as unknown[],
-		skillRecipes: [] as unknown[],
-		proficiencies: [] as unknown[],
-		skills: [] as unknown[],
-		paths: [] as unknown[]
-	},
-	dangerModal: vi.fn()
-}));
-vi.mock('$stores', () => ({ staticData, dangerModal }));
+// `vi.mock` is hoisted within this file, so the factory resolves the shared stub by dynamic import
+// rather than closing over the static one below.
+vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import PathDetail from '$routes/admin/workbench/progression/PathDetail.svelte';
-import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
-import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import {
+	dangerModal,
+	makePathStore as makeStore,
+	path,
+	resetStores,
+	staticData,
+	tier as baseTier
+} from './progression-test-utils';
 
-const path = (over: Partial<WorkbenchPath> = {}): WorkbenchPath => ({
-	id: 5,
-	name: 'Fire Path',
-	description: '',
-	designerNotes: '',
-	activityKey: EActivityKey.Fire,
-	...over
-});
+// PathDetail's retire check walks the tiers carrying the selected path's id, so tiers here default
+// onto path 5 (`path()`'s id) rather than the shared fixture's path 0.
+const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => baseTier({ pathId: 5, ...over });
 
-const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => ({
-	id: 0,
-	name: 'Blades',
-	description: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 5,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	designerNotes: '',
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...over
-});
-
-// A fake store exposing exactly what PathDetail reads — mirrors TierDetail.test.ts's fake-store
-// pattern rather than driving the real ProgressionStore through a socket-backed load().
-const makeStore = (selectedPath: WorkbenchPath, overrides: Record<string, unknown> = {}) =>
-	({
-		selectedPath,
-		profs: [],
-		paths: [],
-		currentTiers: [],
-		pathTab: 'identity',
-		saving: false,
-		pathStatus: vi.fn(() => 'clean'),
-		isRetired: vi.fn(() => false),
-		setPathTab: vi.fn(),
-		resetPath: vi.fn(),
-		retirePath: vi.fn(),
-		removePath: vi.fn(),
-		pathBaseline: vi.fn(() => selectedPath),
-		patchPath: vi.fn(),
-		...overrides
-	}) as unknown as ProgressionStore;
-
-beforeEach(() => {
-	dangerModal.mockReset();
-	staticData.enemies = [];
-	staticData.zones = [];
-	staticData.challenges = [];
-	staticData.items = [];
-	staticData.classes = [];
-	staticData.skillRecipes = [];
-	staticData.proficiencies = [];
-	staticData.skills = [];
-	staticData.paths = [];
-});
+beforeEach(resetStores);
 afterEach(cleanup);
 
 describe('PathDetail', () => {
