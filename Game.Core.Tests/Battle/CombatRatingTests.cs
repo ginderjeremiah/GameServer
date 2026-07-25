@@ -119,6 +119,80 @@ namespace Game.Core.Tests.Battle
             Assert.False(double.IsInfinity(rate));
         }
 
+        // ── Rate: offense-side proc-chance clamp (#2416) ────────────────────────
+
+        [Fact]
+        public void Rate_RiposteChanceBeyondCertainty_RatesTheSameAsExactlyAtCertainty()
+        {
+            // The engine draws a parry from [0, 1), so ParryChance 1.0 already parries every incoming attack —
+            // authoring more cannot buy additional riposte fires. The offense-side riposte term must price the
+            // clamped chance, not the raw product (which would scale the counter's expected hit linearly).
+            var counter = MakeSkill(cooldownMs: 1000, baseDamage: 20);
+            var atCertainty = MakeBattlerWithSkills([(ParryChance, 1.0)], [], counterSkill: counter);
+            var beyondCertainty = MakeBattlerWithSkills([(ParryChance, 5.0)], [], counterSkill: counter);
+
+            Assert.Equal(
+                CombatRating.Rate(atCertainty, isPlayer: true),
+                CombatRating.Rate(beyondCertainty, isPlayer: true), 6);
+        }
+
+        [Fact]
+        public void Rate_NegativeParryChance_IsPricedAsNoRiposte()
+        {
+            // A debuffed-below-zero ParryChance never procs in the engine, so the riposte term must contribute
+            // nothing — an unclamped product would price it as a negative offense contribution instead.
+            var counter = MakeSkill(cooldownMs: 1000, baseDamage: 20);
+            var negativeParry = MakeBattlerWithSkills([(ParryChance, -0.5)], [], counterSkill: counter);
+            var noParry = MakeBattlerWithSkills([], [], counterSkill: counter);
+
+            Assert.Equal(
+                CombatRating.Rate(noParry, isPlayer: true),
+                CombatRating.Rate(negativeParry, isPlayer: true), 6);
+        }
+
+        [Fact]
+        public void Rate_CriticalChanceBeyondCertainty_RatesTheSameAsExactlyAtCertainty()
+        {
+            // Same clamp on the crit expectation: a skill authored at CriticalChance 1.0 already crits every
+            // fire, so the CriticalDamage premium must not keep scaling past it.
+            var atCertainty = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 50, criticalChance: 1.0)]);
+            var beyondCertainty = MakeBattlerWithSkills([], [MakeSkill(cooldownMs: 1000, baseDamage: 50, criticalChance: 5.0)]);
+
+            Assert.Equal(
+                CombatRating.Rate(atCertainty, isPlayer: true),
+                CombatRating.Rate(beyondCertainty, isPlayer: true), 6);
+        }
+
+        [Fact]
+        public void Rate_CriticalChanceRampedPastCertaintyByMultiplier_RatesTheSameAsExactlyAtCertainty()
+        {
+            // The realistic route past 1: a modestly authored CriticalChance times a Luck-ramped
+            // CriticalChanceMultiplier. 0.5 × 2 already reaches certainty, so 0.5 × 4 must rate identically.
+            var atCertainty = MakeBattlerWithSkills(
+                [(CriticalChanceMultiplier, 1.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50, criticalChance: 0.5)]);
+            var beyondCertainty = MakeBattlerWithSkills(
+                [(CriticalChanceMultiplier, 3.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50, criticalChance: 0.5)]);
+
+            Assert.Equal(
+                CombatRating.Rate(atCertainty, isPlayer: true),
+                CombatRating.Rate(beyondCertainty, isPlayer: true), 6);
+        }
+
+        [Fact]
+        public void Rate_ParryPastCertaintyDoesNotLetDodgeSubtractAvoidance()
+        {
+            // The survivability composition `parry + (1 - parry) × dodge` is only meaningful for probabilities:
+            // an unclamped parry above 1 makes (1 - parry) negative, so adding dodge would *lower* the credit.
+            // With both clamped, certain parry already avoids everything and dodge cannot reduce it.
+            var parryOnly = MakeBattlerWithSkills([(ParryChance, 1.01)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+            var parryAndDodge = MakeBattlerWithSkills(
+                [(ParryChance, 1.01), (DodgeChance, 50.0)], [MakeSkill(cooldownMs: 1000, baseDamage: 50)]);
+
+            Assert.Equal(
+                CombatRating.Rate(parryOnly, isPlayer: true),
+                CombatRating.Rate(parryAndDodge, isPlayer: true), 6);
+        }
+
         // ── Rate: offense ─────────────────────────────────────────────────────
 
         [Fact]

@@ -55,6 +55,18 @@ namespace Game.Core.Battle
         // zero-survivability battler never divides a downstream consumer (e.g. a rating ratio) by zero.
         private const double Epsilon = 1e-6;
 
+        // A proc chance as the engine can actually deliver it. Every proc draw is `_rng.Next() < chance`
+        // against a [0, 1) draw (BattleContext.DamageTarget/ResolvePlayerHit), so a product at or above 1
+        // always fires and one at or below 0 never does. The authored-only enablers (ParryChance,
+        // DodgeChance, a skill's CriticalChance) are uncapped and their derived multipliers can be ramped
+        // by shared-expiry effect stacking, so the raw product overshoots what the engine can produce —
+        // pricing it unclamped would credit unreachable capability. Structural, not tunable: this is the
+        // definition of a probability, unlike ServerGameConstants.MaxMitigationCredit's tuned ceiling.
+        private static double ProcChance(double chance)
+        {
+            return Math.Clamp(chance, 0.0, 1.0);
+        }
+
         /// <summary>
         /// The rating for <paramref name="battler"/> as assembled — <c>√(OffenseRate × Survivability)</c>
         /// against the fixed reference profiles in <see cref="ServerGameConstants"/>. Pass
@@ -210,7 +222,8 @@ namespace Game.Core.Battle
             // Riposte (player-side only): effectiveParryChance × reference attack rate × the counter's expected hit.
             if (isPlayer && battler.CounterSkill is Skill counterSkill)
             {
-                var effectiveParryChance = effectiveCaster.GetAttributeValue(ParryChance) * effectiveCaster.GetAttributeValue(ParryChanceMultiplier);
+                var effectiveParryChance = ProcChance(
+                    effectiveCaster.GetAttributeValue(ParryChance) * effectiveCaster.GetAttributeValue(ParryChanceMultiplier));
                 total += effectiveParryChance * ServerGameConstants.RefAttackRate
                     * ExpectedDirectHit(counterSkill, isPlayer, effectiveCaster, referenceDefense);
             }
@@ -243,7 +256,7 @@ namespace Game.Core.Battle
             // damage pipeline enforces (BattleContext.DamageTarget), so an authored enemy CriticalChance is
             // never priced as a capability that cannot fire.
             var critExpectation = isPlayer
-                ? 1.0 + skill.CriticalChance * effectiveCaster.GetAttributeValue(CriticalChanceMultiplier)
+                ? 1.0 + ProcChance(skill.CriticalChance * effectiveCaster.GetAttributeValue(CriticalChanceMultiplier))
                       * (effectiveCaster.GetAttributeValue(CriticalDamage) - 1.0)
                 : 1.0;
             // Enemies never execute in this engine either — ResolvePlayerHit (BattleContext.DamageTarget) is the
@@ -264,12 +277,16 @@ namespace Game.Core.Battle
             var regenRate = effectiveCaster.GetAttributeValue(HealthRegenPerSecond);
             var effectiveHealth = maxHealth + regenRate * ServerGameConstants.RefFightDuration;
 
-            // Avoid (parry-then-dodge) is player-only — enemies never parry or dodge in this engine.
+            // Avoid (parry-then-dodge) is player-only — enemies never parry or dodge in this engine. Each
+            // chance is clamped before composing: the sequential form only holds for probabilities, so a raw
+            // parry product above 1 would turn (1 - parry) negative and have dodge *subtract* avoidance.
             var avoid = 0.0;
             if (isPlayer)
             {
-                var parry = effectiveCaster.GetAttributeValue(ParryChance) * effectiveCaster.GetAttributeValue(ParryChanceMultiplier);
-                var dodge = effectiveCaster.GetAttributeValue(DodgeChance) * effectiveCaster.GetAttributeValue(DodgeChanceMultiplier);
+                var parry = ProcChance(
+                    effectiveCaster.GetAttributeValue(ParryChance) * effectiveCaster.GetAttributeValue(ParryChanceMultiplier));
+                var dodge = ProcChance(
+                    effectiveCaster.GetAttributeValue(DodgeChance) * effectiveCaster.GetAttributeValue(DodgeChanceMultiplier));
                 avoid = parry + (1 - parry) * dodge;
             }
 
