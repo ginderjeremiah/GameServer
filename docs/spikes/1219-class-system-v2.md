@@ -158,8 +158,12 @@ For whatever conditional channels do get built, the shape matters far more than 
   rather than inherited. Worse, the player's average missing health is an inverse function of the survivability
   term `Rate = √(Offense × Survivability)` already computes, so a flat constant systematically over-values rage
   on tanky builds and under-values it on fragile ones — and because the rating feeds `ratingDenominator`, that
-  misvaluation lands back on accrual rates. See [§5](#5-overlap-with-1331): this is a named deliverable of the
-  shared design pass, not something to inherit by assumption from whichever half lands first.
+  misvaluation lands back on accrual rates. **That feedback is not hypothetical:** the proc-chance clamp
+  ([#2416](https://github.com/ginderjeremiah/GameServer/issues/2416)) fixed exactly this failure mode from the
+  other direction — pricing capability the engine cannot deliver "inflat[ed] `OffenseRate` and undercut[] that
+  player's XP and proficiency gains" — so a rating term that misprices a real channel has already been shown to
+  reach accrual. See [§5](#5-overlap-with-1331): this is a named deliverable of the shared design pass, not
+  something to inherit by assumption from whichever half lands first.
 
 ---
 
