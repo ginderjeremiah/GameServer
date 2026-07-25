@@ -1,28 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/svelte';
 import WordOfPowerTooltip from '$routes/game/screens/proficiencies/WordOfPowerTooltip.svelte';
-import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
-
-const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
-	name: `Tier ${o.id}`,
-	description: '',
-	pathOrdinal: 0,
-	level: 0,
-	maxLevel: 10,
-	xp: 0,
-	xpForNext: 100,
-	state: 'unlocked',
-	frontier: false,
-	milestoneLevels: [],
-	levelModifiers: [],
-	levelRewards: [],
-	decipher: 'undeciphered',
-	word: `word${o.id}`,
-	pronunciation: `pron${o.id}`,
-	translation: `means${o.id}`,
-	iconPath: '',
-	...o
-});
+import { tierView } from './lexicon-test-utils';
 
 afterEach(() => cleanup());
 
