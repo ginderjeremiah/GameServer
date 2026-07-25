@@ -1,20 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { IZone } from '$lib/api';
 import { isZoneUnlocked, navigableZones, nextZoneByOrder, zonesByOrder } from '$lib/common/zone-progression';
+import { makeZone } from '../../fixtures/zones';
 
-const zone = (id: number, order: number, unlockChallengeId?: number, retiredAt?: string): IZone => ({
-	id,
-	name: `Zone ${id}`,
-	description: '',
-	designerNotes: '',
-	order,
-	levelMin: 1,
-	levelMax: 10,
-	bossLevel: 1,
-	unlockChallengeId,
-	isHome: false,
-	retiredAt
-});
+const zone = (id: number, order: number, unlockChallengeId?: number, retiredAt?: string): IZone =>
+	makeZone({ id, order, unlockChallengeId, retiredAt });
 
 describe('zonesByOrder', () => {
 	it('sorts by authored order without mutating the input', () => {

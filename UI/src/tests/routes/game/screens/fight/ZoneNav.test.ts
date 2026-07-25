@@ -49,6 +49,7 @@ vi.mock('$stores', () => ({
 }));
 
 import ZoneNav from '$routes/game/screens/fight/ZoneNav.svelte';
+import { makeZone } from '../../../../fixtures/zones';
 
 const challenge = (id: number, name: string, description: string): IChallenge =>
 	({ id, name, description, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 }) as IChallenge;
@@ -60,19 +61,7 @@ const zone = (
 	unlockChallengeId?: number,
 	retiredAt?: string,
 	isHome = false
-): IZone => ({
-	id,
-	name,
-	description: '',
-	designerNotes: '',
-	order,
-	levelMin: 1,
-	levelMax: 10,
-	bossLevel: 1,
-	unlockChallengeId,
-	isHome,
-	retiredAt
-});
+): IZone => makeZone({ id, name, order, unlockChallengeId, isHome, retiredAt });
 
 beforeEach(() => {
 	playerChallenges.isChallengeCompleted.mockReset();

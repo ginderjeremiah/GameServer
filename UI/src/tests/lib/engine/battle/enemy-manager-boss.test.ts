@@ -3,6 +3,7 @@ import { apiSocket, ELogType, type IApiSocketResponse, type IEnemyInstance, type
 import { delay } from '$lib/common';
 import { logMessage } from '$lib/engine/log';
 import { EnemyManager, onNewEnemyLoaded } from '$lib/engine/battle/enemy-manager';
+import { makeZone } from '../../../fixtures/zones';
 
 // Share a holder so the mocked onBattleStageChanged can hand the registered stage callback back
 // to the test, letting it drive Victorious/Defeated transitions deterministically.
@@ -178,18 +179,8 @@ describe('EnemyManager boss mode', () => {
 		return release;
 	};
 
-	const zone = (id: number, order: number, unlockChallengeId?: number): IZone => ({
-		id,
-		name: `Zone ${id}`,
-		description: '',
-		designerNotes: '',
-		order,
-		levelMin: 1,
-		levelMax: 10,
-		bossLevel: 1,
-		unlockChallengeId,
-		isHome: false
-	});
+	const zone = (id: number, order: number, unlockChallengeId?: number): IZone =>
+		makeZone({ id, order, unlockChallengeId });
 
 	// bossUnlockedNextZone is reset by returnToIdle/challengeBoss once the (mocked-immediate) overlay
 	// delay elapses, so capture it at the overlay moment — the instant `delay` is called, right after

@@ -22,30 +22,18 @@ vi.mock('$lib/engine', () => ({ enemyManager, playerManager }));
 vi.mock('$stores', () => ({ staticData, statistics }));
 
 import { BossView } from '$routes/game/screens/fight/boss/boss-view.svelte';
+import { makeZone } from '../../../../../fixtures/zones';
 
-const bossZone: IZone = {
+const bossZone: IZone = makeZone({
 	id: 3,
 	name: 'Forgotten Catacombs',
-	description: '',
-	designerNotes: '',
 	order: 3,
 	levelMin: 8,
 	levelMax: 11,
 	bossEnemyId: 0,
-	bossLevel: 18,
-	isHome: false
-};
-const bosslessZone: IZone = {
-	id: 1,
-	name: 'Verdant Hollow',
-	description: '',
-	designerNotes: '',
-	order: 1,
-	levelMin: 1,
-	levelMax: 10,
-	bossLevel: 1,
-	isHome: false
-};
+	bossLevel: 18
+});
+const bosslessZone: IZone = makeZone({ id: 1, name: 'Verdant Hollow', order: 1 });
 const boss: IEnemy = {
 	id: 0,
 	name: 'Catacomb Lich',
