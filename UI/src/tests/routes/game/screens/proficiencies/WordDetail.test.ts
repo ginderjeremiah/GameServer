@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, within } from '@testing-library/svelte';
 import { EActivityKey, EAttribute, EModifierType } from '$lib/api';
 import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-lexicon';
-import { attribute, pathView, stubController, tierView } from './lexicon-test-utils';
+import { makeAttribute } from '../../../../fixtures/attributes';
+import { pathView, stubController, tierView } from './lexicon-test-utils';
 
 /* WordDetail reads the proficiency/skill/attribute reference data from staticData (skills are id-indexed,
    mirroring ItemTooltip); the rest of $stores stays real (the $components barrel transitively imports the
@@ -41,8 +42,8 @@ const renderInspector = (tier: TierView, path = pathView(), controller = stubCon
 beforeEach(() => {
 	staticData.skills = SKILLS;
 	staticData.attributes = [
-		attribute(EAttribute.CriticalChanceMultiplier, 'Fire Damage', true),
-		attribute(EAttribute.Toughness, 'Toughness')
+		makeAttribute(EAttribute.CriticalChanceMultiplier, 'Fire Damage', { isPercentage: true }),
+		makeAttribute(EAttribute.Toughness, 'Toughness')
 	];
 });
 

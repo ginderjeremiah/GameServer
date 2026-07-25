@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { EActivityKey, EAttribute, EAttributeType, type IAttribute } from '$lib/api';
+import { EActivityKey } from '$lib/api';
 import type {
 	PathView,
 	TierView,
@@ -67,18 +67,4 @@ export const stubController = (describedById = 'tooltip-1'): WordTooltipControll
 	show: vi.fn(),
 	move: vi.fn(),
 	hide: vi.fn()
-});
-
-/** An attribute reference row, for the payout-ladder formatters. `isPercentage` picks between a `+2%`-style
- *  delta and a plain `+5`, which is the only field the ladder branches on. */
-export const attribute = (id: EAttribute, name: string, isPercentage = false): IAttribute => ({
-	id,
-	name,
-	description: '',
-	attributeType: EAttributeType.Secondary,
-	isPercentage,
-	isHarmful: false,
-	code: '',
-	displayOrder: 0,
-	decimals: 1
 });

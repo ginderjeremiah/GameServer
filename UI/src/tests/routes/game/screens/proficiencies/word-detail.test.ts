@@ -16,14 +16,15 @@ import {
 	xpProgressText,
 	type SkillNameResolver
 } from '$routes/game/screens/proficiencies/word-detail';
-import { attribute, tierView } from './lexicon-test-utils';
+import { makeAttribute } from '../../../../fixtures/attributes';
+import { tierView } from './lexicon-test-utils';
 
 /* ── fixtures ──────────────────────────────────────────────────────────────── */
 
 // A percentage attribute (renders a `+2%`-style delta) and a flat one (renders a plain `+5`).
 const ATTRIBUTES: IAttribute[] = [
-	attribute(EAttribute.CriticalChanceMultiplier, 'Fire Damage', true),
-	attribute(EAttribute.Toughness, 'Toughness', false)
+	makeAttribute(EAttribute.CriticalChanceMultiplier, 'Fire Damage', { isPercentage: true }),
+	makeAttribute(EAttribute.Toughness, 'Toughness')
 ];
 
 const modifier = (o: Partial<IProficiencyLevelModifier> & { level: number }): IProficiencyLevelModifier => ({
