@@ -410,15 +410,20 @@ namespace Game.Core.Players
             return true;
         }
 
-        public bool TrySetFavorite(int itemId, bool favorite)
+        /// <summary>
+        /// Sets whether an unlocked item is favorited. A no-op (the item already matches
+        /// <paramref name="favorite"/>) raises no event, so callers skip the write-behind save for a toggle
+        /// that mutated nothing; an item the player doesn't own is rejected as anti-cheat.
+        /// </summary>
+        public SetFavoriteOutcome SetFavorite(int itemId, bool favorite)
         {
-            if (!Inventory.TrySetFavorite(itemId, favorite))
+            var outcome = Inventory.SetFavorite(itemId, favorite);
+            if (outcome == SetFavoriteOutcome.Changed)
             {
-                return false;
+                RaiseEvent(new ItemFavoriteChangedEvent(Id, itemId, favorite));
             }
 
-            RaiseEvent(new ItemFavoriteChangedEvent(Id, itemId, favorite));
-            return true;
+            return outcome;
         }
 
         // Returns whether the preference's value actually changed, so callers (SaveLogPreferences) can skip

@@ -521,41 +521,67 @@ namespace Game.Core.Tests.Players
             Assert.False(result);
         }
 
-        // ── TrySetFavorite ──────────────────────────────────────────────────
+        // ── SetFavorite ─────────────────────────────────────────────────────
 
         [Fact]
-        public void TrySetFavorite_UnlockedItem_SetsFavorite()
+        public void SetFavorite_UnlockedItem_SetsFavorite()
         {
             var inventory = new Inventory();
             AddUnlockedItem(inventory, MakeItem(1));
 
-            var result = inventory.TrySetFavorite(1, true);
+            var result = inventory.SetFavorite(1, true);
 
-            Assert.True(result);
+            Assert.Equal(SetFavoriteOutcome.Changed, result);
             Assert.True(inventory.UnlockedItems.Single().Favorite);
         }
 
         [Fact]
-        public void TrySetFavorite_CanUnsetFavorite()
+        public void SetFavorite_CanUnsetFavorite()
         {
             var inventory = new Inventory();
             AddUnlockedItem(inventory, MakeItem(1));
-            inventory.TrySetFavorite(1, true);
+            inventory.SetFavorite(1, true);
 
-            var result = inventory.TrySetFavorite(1, false);
+            var result = inventory.SetFavorite(1, false);
 
-            Assert.True(result);
+            Assert.Equal(SetFavoriteOutcome.Changed, result);
             Assert.False(inventory.UnlockedItems.Single().Favorite);
         }
 
         [Fact]
-        public void TrySetFavorite_ItemNotUnlocked_ReturnsFalse()
+        public void SetFavorite_ItemNotUnlocked_ReturnsItemNotUnlocked()
         {
             var inventory = new Inventory();
 
-            var result = inventory.TrySetFavorite(999, true);
+            var result = inventory.SetFavorite(999, true);
 
-            Assert.False(result);
+            Assert.Equal(SetFavoriteOutcome.ItemNotUnlocked, result);
+        }
+
+        [Fact]
+        public void SetFavorite_AlreadyFavorited_ReturnsUnchanged()
+        {
+            var inventory = new Inventory();
+            AddUnlockedItem(inventory, MakeItem(1));
+            inventory.SetFavorite(1, true);
+
+            var result = inventory.SetFavorite(1, true);
+
+            Assert.Equal(SetFavoriteOutcome.Unchanged, result);
+            Assert.True(inventory.UnlockedItems.Single().Favorite);
+        }
+
+        [Fact]
+        public void SetFavorite_AlreadyUnfavorited_ReturnsUnchanged()
+        {
+            // A freshly-unlocked item starts unfavorited, so unfavoriting it is the no-op on the other side.
+            var inventory = new Inventory();
+            AddUnlockedItem(inventory, MakeItem(1));
+
+            var result = inventory.SetFavorite(1, false);
+
+            Assert.Equal(SetFavoriteOutcome.Unchanged, result);
+            Assert.False(inventory.UnlockedItems.Single().Favorite);
         }
 
         // ── GetEquippedAttributeModifiers ───────────────────────────────────
@@ -729,7 +755,7 @@ namespace Game.Core.Tests.Players
             inventory.UnlockItem(item);
             inventory.UnlockMod(10);
             inventory.TryApplyMod(3, 10, 0, MakeMod(10, EItemModType.Prefix));
-            inventory.TrySetFavorite(3, true);
+            inventory.SetFavorite(3, true);
 
             var restored = inventory.Serialize().Deserialize<Inventory>();
 

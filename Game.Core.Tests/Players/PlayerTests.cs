@@ -657,18 +657,18 @@ namespace Game.Core.Tests.Players
             Assert.Empty(player.DomainEvents.OfType<ModRemovedEvent>());
         }
 
-        // ── TrySetFavorite ───────────────────────────────────────────────────
+        // ── SetFavorite ──────────────────────────────────────────────────────
 
         [Fact]
-        public void TrySetFavorite_UnlockedItem_SetsFlagAndRaisesItemFavoriteChangedEvent()
+        public void SetFavorite_UnlockedItem_SetsFlagAndRaisesItemFavoriteChangedEvent()
         {
             var player = MakePlayer();
             player.UnlockItem(MakeItem(id: 10));
             player.ClearEvents();
 
-            var result = player.TrySetFavorite(10, true);
+            var result = player.SetFavorite(10, true);
 
-            Assert.True(result);
+            Assert.Equal(SetFavoriteOutcome.Changed, result);
             Assert.True(player.Inventory.UnlockedItems.Single().Favorite);
             var evt = player.DomainEvents.OfType<ItemFavoriteChangedEvent>().SingleOrDefault();
             Assert.NotNull(evt);
@@ -678,16 +678,16 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void TrySetFavorite_CanUnfavorite_RaisesEventWithFalse()
+        public void SetFavorite_CanUnfavorite_RaisesEventWithFalse()
         {
             var player = MakePlayer();
             player.UnlockItem(MakeItem(id: 10));
-            player.TrySetFavorite(10, true);
+            player.SetFavorite(10, true);
             player.ClearEvents();
 
-            var result = player.TrySetFavorite(10, false);
+            var result = player.SetFavorite(10, false);
 
-            Assert.True(result);
+            Assert.Equal(SetFavoriteOutcome.Changed, result);
             Assert.False(player.Inventory.UnlockedItems.Single().Favorite);
             var evt = player.DomainEvents.OfType<ItemFavoriteChangedEvent>().SingleOrDefault();
             Assert.NotNull(evt);
@@ -695,13 +695,44 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void TrySetFavorite_ItemNotUnlocked_ReturnsFalseAndRaisesNoEvent()
+        public void SetFavorite_ItemNotUnlocked_ReturnsItemNotUnlockedAndRaisesNoEvent()
         {
             var player = MakePlayer();
 
-            var result = player.TrySetFavorite(999, true);
+            var result = player.SetFavorite(999, true);
 
-            Assert.False(result);
+            Assert.Equal(SetFavoriteOutcome.ItemNotUnlocked, result);
+            Assert.Empty(player.DomainEvents.OfType<ItemFavoriteChangedEvent>());
+        }
+
+        [Fact]
+        public void SetFavorite_SameValue_RaisesNoEvent()
+        {
+            var player = MakePlayer();
+            player.UnlockItem(MakeItem(id: 10));
+            player.SetFavorite(10, true);
+            player.ClearEvents();
+
+            var result = player.SetFavorite(10, true);
+
+            Assert.Equal(SetFavoriteOutcome.Unchanged, result);
+            Assert.True(player.Inventory.UnlockedItems.Single().Favorite);
+            Assert.Empty(player.DomainEvents.OfType<ItemFavoriteChangedEvent>());
+        }
+
+        [Fact]
+        public void SetFavorite_SameValueOnAFreshlyUnlockedItem_RaisesNoEvent()
+        {
+            // The unfavorite-an-already-unfavorited-item side of the no-op, which a client resending the
+            // default state would hit — it must not enqueue a write-behind save either.
+            var player = MakePlayer();
+            player.UnlockItem(MakeItem(id: 10));
+            player.ClearEvents();
+
+            var result = player.SetFavorite(10, false);
+
+            Assert.Equal(SetFavoriteOutcome.Unchanged, result);
+            Assert.False(player.Inventory.UnlockedItems.Single().Favorite);
             Assert.Empty(player.DomainEvents.OfType<ItemFavoriteChangedEvent>());
         }
 
