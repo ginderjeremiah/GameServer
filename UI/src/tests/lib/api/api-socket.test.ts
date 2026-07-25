@@ -1041,6 +1041,36 @@ describe('ApiSocket', () => {
 			expect(response.error).toBeDefined();
 			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
 		});
+
+		it('settles an unsent queued command when the keepalive shuts down on a cleared token', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+				const promise = queueOnConnectingSocket(apiSocket);
+				await flushMicrotasks();
+				const ws = lastWs();
+				// Open then drop: handleClose deliberately keeps the queue for the keepalive to re-flush, so
+				// this is the state in which the keepalive is the queue's only remaining owner.
+				ws.onopen?.();
+				await flushMicrotasks();
+				ws.readyState = ws.CLOSED;
+				ws.onclose?.({ code: 1006 });
+				expect(ws.send).not.toHaveBeenCalled();
+
+				// Another tab logs out (or hits an auth failure) and clears the shared tokens.
+				localStorage.clear();
+				const socketsBefore = socketInstances.length;
+				vi.advanceTimersByTime(10000);
+
+				expect(internals(apiSocket).pingIntervalId).toBeNull();
+				expect(socketInstances.length).toBe(socketsBefore);
+				const response = await promise;
+				expect(response.error).toBe('Connection lost. Please try again.');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
 	});
 
 	describe('listenCommand unhook', () => {

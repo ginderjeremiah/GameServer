@@ -128,7 +128,7 @@ export class ApiSocket {
 	 * race to create (and leak) two sockets.
 	 */
 	private ensureSocket(): Promise<void> {
-		if (this.socket && this.socket.readyState !== this.socket.CLOSED) {
+		if (this.hasUnclosedSocket()) {
 			return Promise.resolve();
 		}
 		if (this.connecting) {
@@ -247,6 +247,14 @@ export class ApiSocket {
 		// token, which would otherwise produce post-logout reconnect noise.
 		if (!getAccessToken()) {
 			this.stopPingInterval();
+			// Stopping the keepalive removes the only thing that would ever reconnect and re-flush the queue,
+			// so — unless a socket is still around to flush it (onStart/processCommandQueue), as for a
+			// token-less anonymous session — this is terminal and the queue must be settled here like every
+			// other terminal branch. In-flight requests need no handling: they only exist on a socket that can
+			// still answer them, and every close path already settles them.
+			if (!this.hasFlushableSocket()) {
+				this.settleQueuedRequests(CONNECTION_LOST_ERROR);
+			}
 			return;
 		}
 		void this.ensureSocket();
@@ -278,9 +286,22 @@ export class ApiSocket {
 	public disconnect() {
 		this.stopPingInterval();
 		this.clearConnectionStableTimer();
-		if (this.socket && this.socket.readyState !== this.socket.CLOSED) {
-			this.socket.close(NORMAL_CLOSURE);
+		if (this.hasUnclosedSocket()) {
+			this.socket?.close(NORMAL_CLOSURE);
 		}
+	}
+
+	/** True while a socket exists that hasn't reached CLOSED — i.e. one that is open, or still connecting
+	 *  and so may yet open. Not the same as "usable right now": a CONNECTING socket can't be sent on. */
+	private hasUnclosedSocket(): boolean {
+		return this.socket !== undefined && this.socket.readyState !== this.socket.CLOSED;
+	}
+
+	/** True while something is still positioned to send the queued commands: a socket already open
+	 *  (`processCommandQueue` drains it), one still connecting (`onStart` flushes it on open, and every
+	 *  close it can take instead settles the queue in `handleClose`), or an open still in flight. */
+	private hasFlushableSocket(): boolean {
+		return this.connecting !== null || this.hasUnclosedSocket();
 	}
 
 	private stopPingInterval() {
