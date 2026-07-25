@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess;
 using Game.Core;
 using Game.Core.Players;
+using Game.Core.Players.Inventories;
 using Game.Core.Progress;
 
 namespace Game.Application.Services
@@ -40,9 +41,14 @@ namespace Game.Application.Services
             return await SaveIf(player, player.TryUnequipItem(slot), cancellationToken);
         }
 
+        // A same-value toggle saves nothing (no mutation, no event) but is still accepted — accepting is not
+        // the same as changing, so only an item the player doesn't own is reported as a failure.
         public async Task<bool> SetFavorite(Player player, int itemId, bool favorite, CancellationToken cancellationToken = default)
         {
-            return await SaveIf(player, player.TrySetFavorite(itemId, favorite), cancellationToken);
+            var outcome = player.SetFavorite(itemId, favorite);
+            await SaveIf(player, outcome == SetFavoriteOutcome.Changed, cancellationToken);
+
+            return outcome != SetFavoriteOutcome.ItemNotUnlocked;
         }
 
         public async Task<bool> SetSelectedSkills(Player player, IReadOnlyList<int> orderedSkillIds, CancellationToken cancellationToken = default)

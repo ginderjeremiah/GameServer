@@ -10,7 +10,7 @@ namespace Game.Core.Players.Inventories
         /// <summary>
         /// All unlocked items indexed by <see cref="UnlockedItemSlot.ItemId"/>. The index is the backing
         /// store for the public <see cref="UnlockedItems"/> view, so every per-item lookup
-        /// (<see cref="GetUnlockedItem"/> and the Try* methods below) is O(1) rather than a linear scan —
+        /// (<see cref="GetUnlockedItem"/> and the mutation methods below) is O(1) rather than a linear scan —
         /// the unlocked set grows unbounded as a player progresses and is read on the battle-start hot path.
         /// </summary>
         private readonly Dictionary<int, UnlockedItemSlot> _unlockedItems = [];
@@ -171,16 +171,26 @@ namespace Game.Core.Players.Inventories
             return unlocked.AppliedMods.Remove(applied);
         }
 
-        public bool TrySetFavorite(int itemId, bool favorite)
+        /// <summary>
+        /// Sets whether an unlocked item is favorited, reporting whether the flag actually flipped so the
+        /// caller can skip the event and the write-behind save for a same-value toggle (the "no mutation → no
+        /// save" pattern every sibling command follows).
+        /// </summary>
+        public SetFavoriteOutcome SetFavorite(int itemId, bool favorite)
         {
             var unlocked = GetUnlockedItem(itemId);
             if (unlocked is null)
             {
-                return false;
+                return SetFavoriteOutcome.ItemNotUnlocked;
+            }
+
+            if (unlocked.Favorite == favorite)
+            {
+                return SetFavoriteOutcome.Unchanged;
             }
 
             unlocked.Favorite = favorite;
-            return true;
+            return SetFavoriteOutcome.Changed;
         }
 
         /// <summary>

@@ -452,6 +452,70 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SetFavorite_SameValue_IsNoOpButStillReturnsTrue()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            var item = await TestDataSeeder.CreateItemAsync(context);
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerEntity.Id, item.Id);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            // The first toggle actually flips the flag, so it must enqueue a write-behind event — proving the
+            // no-op assertion below isn't trivially true (e.g. from a broken queue rather than the guard).
+            Assert.True(await playerService.SetFavorite(player, item.Id, favorite: true));
+            Assert.Equal(1, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            // Re-sending the same value is accepted (still returns true — accepting is not the same as
+            // changing) but must raise no event and enqueue no save.
+            var success = await playerService.SetFavorite(player, item.Id, favorite: true);
+
+            Assert.True(success);
+            Assert.True(player.Inventory.UnlockedItems.Single(i => i.ItemId == item.Id).Favorite);
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+        }
+
+        [Fact]
+        public async Task SetFavorite_ItemNotUnlocked_ReturnsFalseAndEnqueuesNothing()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            // Seeded but deliberately never linked to the player, so favoriting it is an anti-cheat rejection
+            // rather than the accepted-but-unchanged no-op above.
+            var item = await TestDataSeeder.CreateItemAsync(context);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            var success = await playerService.SetFavorite(player, item.Id, favorite: true);
+
+            Assert.False(success);
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+        }
+
+        [Fact]
         public async Task SetSelectedSkills_PersistsLoadoutToDatabase()
         {
             using var scope = CreateScope();
