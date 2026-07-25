@@ -3,6 +3,8 @@ import { flushSync } from 'svelte';
 import { EAttribute, EItemCategory, EItemModType, ERarity } from '$lib/api';
 import type { IInventoryData, IInventoryItem, IItem, IItemMod } from '$lib/api';
 import { statify } from '$lib/common';
+// Aliased: this suite's own `makeItem` is an id-only adapter over the shared contract builder.
+import { makeItem as makeItemContract } from '../../../fixtures/items';
 
 const mockInventoryData: IInventoryData = {
 	unlockedItems: [],
@@ -52,19 +54,17 @@ vi.mock('$lib/engine/log', () => ({ logMessage: vi.fn() }));
 
 import { InventoryManager, EEquipmentSlot } from '$lib/engine/player/inventory-manager';
 
-const makeItem = (id: number): IItem => ({
-	id,
-	name: `Item ${id}`,
-	description: `Description ${id}`,
-	designerNotes: '',
-	itemCategoryId: EItemCategory.Weapon,
-	rarityId: ERarity.Common,
-	iconPath: `/icons/${id}.png`,
-	requiredProficiencyLevel: 0,
-	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
-	modSlots: [{ id: 0, itemId: id, itemModSlotTypeId: EItemModType.Component }],
-	tags: []
-});
+/** Defaults to a Weapon with 5 Strength and one Component slot — the reactivity assertions here
+ *  equip the item and apply a mod into that slot. */
+const makeItem = (id: number): IItem =>
+	makeItemContract({
+		id,
+		description: `Description ${id}`,
+		itemCategoryId: EItemCategory.Weapon,
+		iconPath: `/icons/${id}.png`,
+		attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
+		modSlots: [{ id: 0, itemId: id, itemModSlotTypeId: EItemModType.Component }]
+	});
 
 const makeItemMod = (id: number): IItemMod => ({
 	id,
