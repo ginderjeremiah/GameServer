@@ -160,9 +160,10 @@ For whatever conditional channels do get built, the shape matters far more than 
   on tanky builds and under-values it on fragile ones — and because the rating feeds `ratingDenominator`, that
   misvaluation lands back on accrual rates. **That feedback is not hypothetical:** the proc-chance clamp
   ([#2416](https://github.com/ginderjeremiah/GameServer/issues/2416)) fixed exactly this failure mode from the
-  other direction — pricing capability the engine cannot deliver "inflat[ed] `OffenseRate` and undercut[] that
-  player's XP and proficiency gains" — so a rating term that misprices a real channel has already been shown to
-  reach accrual. See [§5](#5-overlap-with-1331): this is a named deliverable of the shared design pass, not
+  other direction: an unclamped proc chance priced capability the engine cannot deliver, which inflated
+  `OffenseRate`, and that inflation reached the player's own XP and proficiency gains through the
+  `max(PlayerRating, EnemyRating)` denominator. So a rating term that misprices a real channel has already been
+  shown to reach accrual. See [§5](#5-overlap-with-1331): this is a named deliverable of the shared design pass, not
   something to inherit by assumption from whichever half lands first.
 
 ---
