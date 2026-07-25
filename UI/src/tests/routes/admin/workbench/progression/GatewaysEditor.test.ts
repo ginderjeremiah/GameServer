@@ -2,51 +2,19 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/svelte';
 
 import GatewaysEditor from '$routes/admin/workbench/progression/GatewaysEditor.svelte';
-import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
 import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
-import { EActivityKey } from '$lib/api';
+import { asStore, path, tier } from './progression-test-utils';
 
 afterEach(cleanup);
 
-const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => ({
-	id: 0,
-	name: 'Blades',
-	description: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 0,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	designerNotes: '',
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...over
-});
-
-const path = (over: Partial<WorkbenchPath> = {}): WorkbenchPath => ({
-	id: 0,
-	name: 'Fire',
-	description: '',
-	activityKey: EActivityKey.Fire,
-	designerNotes: '',
-	...over
-});
-
-// A fake store exposing exactly what GatewaysEditor reads/calls — mirrors TierDetail.test.ts's
-// fake-store pattern rather than driving the real ProgressionStore through a socket-backed load().
+// A fake store exposing exactly what GatewaysEditor reads/calls.
 const makeStore = (profs: WorkbenchProficiency[], paths: WorkbenchPath[] = []) =>
-	({
+	asStore({
 		profs,
 		paths,
 		addPrerequisite: vi.fn(),
 		removePrerequisite: vi.fn()
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	}) as any as ProgressionStore;
+	});
 
 describe('GatewaysEditor — cross-path-only prerequisite picker (#2128)', () => {
 	it('excludes tiers of the gated tier\'s own path from the "Add prerequisite" options', async () => {

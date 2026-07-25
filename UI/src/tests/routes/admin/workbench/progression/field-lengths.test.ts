@@ -1,6 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EActivityKey } from '$lib/api';
 import {
 	PATH_DESCRIPTION_MAX_LENGTH,
 	PATH_DESIGNER_NOTES_MAX_LENGTH,
@@ -30,74 +29,25 @@ import {
    rather than constant identity, and is the residual the direct imports already make a deliberate act
    rather than a drift. */
 
-const { staticData, dangerModal } = vi.hoisted(() => ({
-	staticData: {
-		enemies: [] as unknown[],
-		zones: [] as unknown[],
-		challenges: [] as unknown[],
-		items: [] as unknown[],
-		classes: [] as unknown[],
-		skillRecipes: [] as unknown[],
-		proficiencies: [] as unknown[],
-		skills: [] as unknown[],
-		paths: [] as unknown[]
-	},
-	dangerModal: vi.fn()
-}));
-vi.mock('$stores', () => ({ staticData, dangerModal }));
+// `vi.mock` is hoisted within this file, so the factory resolves the shared stub by dynamic import
+// rather than closing over the static one below.
+vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import ConlangIdentity from '$routes/admin/workbench/progression/ConlangIdentity.svelte';
 import PathDetail from '$routes/admin/workbench/progression/PathDetail.svelte';
-import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
-import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import { makePathStore, path as pathFixture, tier as tierFixture } from './progression-test-utils';
 
-const path: WorkbenchPath = {
-	id: 5,
-	name: 'Fire Path',
-	description: '',
-	designerNotes: '',
-	activityKey: EActivityKey.Fire
-};
+const path = pathFixture();
+const tier = tierFixture({ pathId: path.id });
 
-const tier: WorkbenchProficiency = {
-	id: 0,
-	name: 'Blades',
-	description: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 5,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	designerNotes: '',
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: []
-};
-
-// Exposes only what the two identity surfaces read — the fake-store pattern PathDetail/TierDetail's
-// own tests use, rather than driving the real ProgressionStore through a socket-backed load().
-const store = {
-	selectedPath: path,
+// Only the two identity surfaces are rendered, so the path store carries the tier reads on top.
+const store = makePathStore(path, {
 	profs: [tier],
 	paths: [path],
 	currentTiers: [tier],
-	pathTab: 'identity',
-	saving: false,
-	pathStatus: vi.fn(() => 'clean'),
 	profStatus: vi.fn(() => 'clean'),
-	isRetired: vi.fn(() => false),
-	setPathTab: vi.fn(),
-	resetPath: vi.fn(),
-	retirePath: vi.fn(),
-	removePath: vi.fn(),
-	pathBaseline: vi.fn(() => path),
-	patchPath: vi.fn(),
 	patchProf: vi.fn()
-} as unknown as ProgressionStore;
+});
 
 /**
  * Every control `ProgInput` rendered, keyed by accessible label -> its `maxlength` (null when unbounded).
