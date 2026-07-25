@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EActivityKey, EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
 
-const { staticData } = vi.hoisted(() => ({
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	staticData: {} as any
-}));
-vi.mock('$stores', () => ({ staticData }));
+// `vi.mock` is hoisted within this file, so the factory resolves the shared stub by dynamic import
+// rather than closing over the static one below.
+vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import {
 	activityKeyGroups,
@@ -30,12 +28,9 @@ import {
 	xpCostCurve
 } from '$routes/admin/workbench/progression/progression-helpers';
 import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import { resetStores, staticData } from './progression-test-utils';
 
-beforeEach(() => {
-	for (const key of Object.keys(staticData)) {
-		delete staticData[key];
-	}
-});
+beforeEach(resetStores);
 
 const tier = (overrides: Partial<WorkbenchProficiency> & Pick<WorkbenchProficiency, 'id'>): WorkbenchProficiency => ({
 	...newProficiency(overrides.id, overrides.pathId ?? 1, overrides.pathOrdinal ?? 0),
@@ -225,6 +220,16 @@ describe('validation', () => {
 		const stillFlagged = tier({ id: 2, maxLevel: 5, levelRewards: [{ level: 3, rewardSkillId: 0 }] });
 		expect(rewardSkillFlagWarnings(stillFlagged)).toHaveLength(0);
 		expect(proficiencyBlockingWarnings(stillFlagged)).toHaveLength(0);
+	});
+
+	it('tolerates the pre-load catalogue state, when the reward lookup runs before skills load', () => {
+		// `staticData.skills` is genuinely `undefined` until the loading screen populates it, which is
+		// what `rewardSkillFlagWarnings`' `?.` guards; warn on nothing rather than throwing.
+		staticData.skills = undefined;
+
+		const withReward = tier({ id: 1, maxLevel: 5, levelRewards: [{ level: 3, rewardSkillId: 1 }] });
+		expect(rewardSkillFlagWarnings(withReward)).toHaveLength(0);
+		expect(proficiencyBlockingWarnings(withReward)).toHaveLength(0);
 	});
 });
 
