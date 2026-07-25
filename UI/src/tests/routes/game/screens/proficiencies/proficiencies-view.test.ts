@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EActivityKey, EDamageType } from '$lib/api';
 import type { IPath, IPlayerProficiency, IProficiency } from '$lib/api';
+import { makePath as path, makeProficiency } from '../../../../fixtures/proficiencies';
 
 /* The pure derivation (buildLexicon and friends) takes explicit args and needs no mocks; the
    ProficienciesView reads the live stores, so those are stubbed with mutable stand-ins the view-class
@@ -38,30 +39,9 @@ import { ProficienciesView } from '$routes/game/screens/proficiencies/proficienc
 
 /* ── fixtures ──────────────────────────────────────────────────────────────── */
 
-const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdinal: number }): IProficiency => ({
-	name: `Prof ${o.id}`,
-	description: '',
-	designerNotes: '',
-	iconPath: `icon-${o.id}`,
-	word: `w${o.id}`,
-	pronunciation: `p${o.id}`,
-	translation: `t${o.id}`,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1,
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...o
-});
-
-const path = (o: Partial<IPath> & { id: number }): IPath => ({
-	name: `Path ${o.id}`,
-	description: '',
-	designerNotes: '',
-	activityKey: EActivityKey.Physical,
-	...o
-});
+// A spine tier must state where it sits, so the local signature keeps pathId/pathOrdinal required.
+const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdinal: number }): IProficiency =>
+	makeProficiency(o);
 
 const row = (proficiencyId: number, level: number, xp = 0): IPlayerProficiency => ({ proficiencyId, level, xp });
 

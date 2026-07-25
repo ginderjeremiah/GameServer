@@ -18,6 +18,7 @@ import {
 import { EAttributeModifierSource } from '$lib/battle/attribute-modifier';
 import { playerProficiencies } from '$stores/proficiencies.svelte';
 import { staticData } from '$stores/static-data.svelte';
+import { makeProficiency } from '../fixtures/proficiencies';
 
 const playerProficiency = (proficiencyId: number, level: number, xp = 0): IPlayerProficiency => ({
 	proficiencyId,
@@ -26,24 +27,8 @@ const playerProficiency = (proficiencyId: number, level: number, xp = 0): IPlaye
 });
 
 // A minimal proficiency reference record whose only meaningful payload here is its per-level modifiers.
-const proficiency = (id: number, levelModifiers: IProficiency['levelModifiers']): IProficiency => ({
-	id,
-	name: `Proficiency ${id}`,
-	description: '',
-	designerNotes: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 0,
-	pathOrdinal: id,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1,
-	levelModifiers,
-	levelRewards: [],
-	prerequisiteIds: []
-});
+const proficiency = (id: number, levelModifiers: IProficiency['levelModifiers']): IProficiency =>
+	makeProficiency({ id, pathOrdinal: id, levelModifiers });
 
 const additive = (level: number, attributeId: EAttribute, amount: number) => ({
 	level,

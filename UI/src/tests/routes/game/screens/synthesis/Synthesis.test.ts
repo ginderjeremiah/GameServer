@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { makeProficiency } from '../../../../fixtures/proficiencies';
 
 /* The screen drives the real playerProficiencies store (fetched over the socket) for the gate state and
    reads recipes/skills/proficiencies from staticData, so the socket fetch + staticData are stubbed; the
@@ -62,26 +63,7 @@ const SKILLS: ISkill[] = [
 	skill(6, { name: 'Graverend', rarityId: ERarity.Epic })
 ];
 
-const PROFICIENCIES: IProficiency[] = [
-	{
-		id: 0,
-		name: 'Geomancy',
-		description: '',
-		designerNotes: '',
-		iconPath: '',
-		word: '',
-		pronunciation: '',
-		translation: '',
-		pathId: 0,
-		pathOrdinal: 0,
-		maxLevel: 10,
-		baseXp: 100,
-		xpGrowth: 1,
-		levelModifiers: [],
-		levelRewards: [],
-		prerequisiteIds: []
-	}
-];
+const PROFICIENCIES: IProficiency[] = [makeProficiency({ id: 0, name: 'Geomancy' })];
 
 const RECIPES: ISkillRecipe[] = [
 	{ id: 0, resultSkillId: 3, inputSkillIds: [0, 1], conditions: [], designerNotes: '' }, // ready (owns 0,1)
