@@ -153,9 +153,10 @@ export class ApiSocket {
 		this.resetPongTracking();
 		// Superseded before this open even began — handleClose's auth-retry refresh can resolve and call
 		// processCommandQueue after the teardown. Bail before arming the keepalive below (see
-		// teardownRequested), which nothing would then own.
+		// teardownRequested), which nothing would then own — and settle the queue, since that leaves nothing
+		// to re-flush it.
 		if (this.teardownRequested) {
-			this.settleSupersededQueue();
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			return;
 		}
 		// Armed before the refresh await (not after the handshake is built) so a retryable bail below still
@@ -170,9 +171,10 @@ export class ApiSocket {
 		const ensured = await ensureValidAccessToken();
 		// Superseded while the refresh was in flight (e.g. the SocketReplaced modal acknowledged mid-reconnect).
 		// Connecting now would resurrect the very socket the teardown exists to prevent — a takeover leaves the
-		// tokens valid, so nothing else stops it.
+		// tokens valid, so nothing else stops it. Terminal, so the queue is settled rather than left for a
+		// reconnect that won't happen.
 		if (this.teardownRequested) {
-			this.settleSupersededQueue();
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			return;
 		}
 		// A teardown that landed and was then lifted by a new command stopped the interval armed above (this
@@ -323,9 +325,23 @@ export class ApiSocket {
 		this.teardownRequested = true;
 		this.stopPingInterval();
 		this.clearConnectionStableTimer();
+		this.resetHandshakeState();
 		// close() on an already-CLOSED socket is a spec no-op, and on a CONNECTING one it aborts the
 		// handshake — which is exactly the intent here — so no readyState guard is needed.
 		this.socket?.close(NORMAL_CLOSURE);
+	}
+
+	/** Clears the handshake bookkeeping that is scoped to a single session. The auth-retry budget means
+	 *  "rejections in a row since the last stable open" *within one session*, and the only thing that ever
+	 *  refills it — the stability timer — was just cleared, so without this the next session on this
+	 *  singleton (a character switch, or a re-login after a SocketReplaced teardown) would inherit whatever
+	 *  the previous one burned. The other two are overwritten before they are next read, and are reset with
+	 *  it so "no session state survives a teardown" stays a property of this one place rather than an
+	 *  argument to re-derive whenever new per-session bookkeeping lands on the singleton. */
+	private resetHandshakeState() {
+		this.socketAuthRetries = 0;
+		this.socketOpened = false;
+		this.handshakeTokenExpiry = null;
 	}
 
 	/** True while a socket exists that hasn't reached CLOSED — i.e. one that is open, or still connecting
@@ -488,12 +504,6 @@ export class ApiSocket {
 		}
 	}
 
-	/** Settles the queue of an open a teardown superseded (the caller bails out itself). Terminal like every
-	 *  other settling path: the keepalive is stopped and must stay stopped, so nothing will re-flush it. */
-	private settleSupersededQueue() {
-		this.settleQueuedRequests(CONNECTION_LOST_ERROR);
-	}
-
 	/** Backstop for a request that was sent but whose response never arrived while the socket stayed
 	 *  open (so the close-handler never settled it). Settles it through the same resolve-with-error
 	 *  contract and prunes the entry, so the caller surfaces it via `response.error` rather than
@@ -545,6 +555,17 @@ export class ApiSocket {
 
 		// The socket didn't stay open, so cancel any pending "connection is now stable" budget refill.
 		this.clearConnectionStableTimer();
+
+		if (this.teardownRequested) {
+			// The session was explicitly torn down, so there is nothing left to recover: every branch below
+			// either reconnects or spends auth-retry budget to reconnect, and openSocket would bail on the
+			// teardown mark anyway. Short-circuiting keeps a straggling close (a CONNECTING handshake this
+			// very teardown aborted surfaces as 1006, not NORMAL_CLOSURE) from burning a single-use refresh
+			// token for a dead session — and from re-dirtying the state disconnect() just reset. Terminal
+			// like every other non-reconnecting close, so the unsent queue is settled here.
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
+			return;
+		}
 
 		if (ev.code === NORMAL_CLOSURE) {
 			// A clean, intentional close (e.g. an explicit disconnect or a server-side graceful shutdown):
@@ -601,7 +622,12 @@ export class ApiSocket {
 			if (outcome.status === 'success') {
 				// Only a rotation that still failed to open spends budget — a retryable outage never burns
 				// a refresh token, so it must not count toward the bound that exists to stop that burn.
-				this.socketAuthRetries++;
+				// A teardown that landed while this refresh was in flight (the close above predates it, so
+				// the guard at the top of handleClose couldn't catch it) spends nothing either: the budget
+				// belongs to a session that has ended, and counting it would undo disconnect()'s reset.
+				if (!this.teardownRequested) {
+					this.socketAuthRetries++;
+				}
 				// processCommandQueue ensures the socket (now with the freshly refreshed token) and flushes
 				// any queued-but-unsent commands.
 				void this.processCommandQueue();

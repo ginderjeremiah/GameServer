@@ -111,9 +111,15 @@ describe('ApiSocket', () => {
 	const lastWs = () => socketInstances[socketInstances.length - 1];
 
 	// The lifecycle fixes touch internal timer/counter bookkeeping, so read it directly to assert the
-	// keepalive interval is cleared and the auth-retry budget is bounded.
+	// keepalive interval is cleared, the auth-retry budget is bounded, and no per-session handshake state
+	// survives a teardown.
 	const internals = (s: ApiSocket) =>
-		s as unknown as { pingIntervalId: ReturnType<typeof setInterval> | null; socketAuthRetries: number };
+		s as unknown as {
+			pingIntervalId: ReturnType<typeof setInterval> | null;
+			socketAuthRetries: number;
+			socketOpened: boolean;
+			handshakeTokenExpiry: number | null;
+		};
 
 	const receive = (ws: MockWebSocket, data: string) => {
 		if (!ws.onmessage) {
@@ -1525,6 +1531,129 @@ describe('ApiSocket', () => {
 			ws.readyState = ws.CLOSED;
 			ws.onclose?.({ code: 1006 });
 			expect(stableTimer(apiSocket)).toBeNull();
+		});
+
+		// The budget is "rejections in a row since the last stable open" *within one session*, but the
+		// singleton outlives the session (SocketReplaced and a character switch both tear down and start a
+		// new session in the same tab), so a teardown must hand the next session a full budget rather than
+		// the spent one — the stability timer that would otherwise refill it is cleared by the same call.
+		describe('per-session reset on teardown', () => {
+			it('refills the auth-retry budget on disconnect()', async () => {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				vi.mocked(refreshTokens).mockResolvedValue({
+					status: 'success',
+					tokens: { accessToken: 'a2', refreshToken: 'r2' }
+				});
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+
+				// Flap through part of the budget without ever reaching a stable open, so nothing refills it.
+				for (let i = 0; i < 4; i++) {
+					rejectHandshake(lastWs());
+					await flushMicrotasks();
+				}
+				expect(internals(apiSocket).socketAuthRetries).toBe(4);
+
+				apiSocket.disconnect();
+
+				expect(internals(apiSocket).socketAuthRetries).toBe(0);
+			});
+
+			it('gives the next session in the same tab the full budget, not the previous one’s remainder', async () => {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				vi.mocked(refreshTokens).mockResolvedValue({
+					status: 'success',
+					tokens: { accessToken: 'a2', refreshToken: 'r2' }
+				});
+				const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				for (let i = 0; i < 4; i++) {
+					rejectHandshake(lastWs());
+					await flushMicrotasks();
+				}
+				expect(refreshTokens).toHaveBeenCalledTimes(4);
+
+				// The session ends (SocketReplaced / character switch) and a new one starts on the same
+				// instance — an explicit command is what lifts the teardown.
+				apiSocket.disconnect();
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+
+				// The behavioural assertion the counter check above only implies: the new session gets all
+				// five handshake-auth retries. Inheriting the spent budget would allow exactly one more (5
+				// calls total) and then bounce the user to login on a single stale-token rejection.
+				for (let i = 0; i < 10; i++) {
+					rejectHandshake(lastWs());
+					await flushMicrotasks();
+				}
+				expect(refreshTokens).toHaveBeenCalledTimes(4 + 5);
+				warnSpy.mockRestore();
+			});
+
+			it('clears the rest of the per-session handshake bookkeeping on disconnect()', async () => {
+				setTokens({ accessToken: makeAccessToken(3600), refreshToken: 'r' });
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				lastWs().onopen?.();
+				expect(internals(apiSocket).socketOpened).toBe(true);
+				expect(internals(apiSocket).handshakeTokenExpiry).not.toBeNull();
+
+				apiSocket.disconnect();
+
+				// Both are overwritten before they are next read, so this pins the invariant ("no session
+				// state survives a teardown") rather than a behaviour that would otherwise break.
+				expect(internals(apiSocket).socketOpened).toBe(false);
+				expect(internals(apiSocket).handshakeTokenExpiry).toBeNull();
+			});
+
+			it('does not refresh or reconnect on a close that lands after the teardown', async () => {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				const socketsBefore = socketInstances.length;
+
+				// disconnect() aborts a still-CONNECTING handshake, which the browser surfaces as 1006 (not
+				// NORMAL_CLOSURE) — so this close would otherwise fall straight into the auth-retry path and
+				// burn a single-use refresh token recovering a session that has already ended.
+				apiSocket.disconnect();
+				rejectHandshake(lastWs());
+				await flushMicrotasks();
+
+				expect(refreshTokens).not.toHaveBeenCalled();
+				expect(socketInstances.length).toBe(socketsBefore);
+				expect(internals(apiSocket).socketAuthRetries).toBe(0);
+				// Terminal like every other non-reconnecting close: the command never sent is settled here
+				// rather than left awaiting a response nothing will produce.
+				expect((await promise).error).toBe('Connection lost. Please try again.');
+			});
+
+			it('does not re-spend the budget when an auth-retry refresh resolves after the teardown', async () => {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				let releaseRefresh: (result: RefreshOutcome) => void = () => {};
+				vi.mocked(refreshTokens).mockImplementation(
+					() => new Promise<RefreshOutcome>((resolve) => (releaseRefresh = resolve))
+				);
+
+				apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				// The close predates the teardown, so its refresh is already in flight when disconnect() lands
+				// — the one path the guard at the top of handleClose can't cover.
+				rejectHandshake(lastWs());
+				await flushMicrotasks();
+				const socketsBefore = socketInstances.length;
+
+				apiSocket.disconnect();
+				releaseRefresh({ status: 'success', tokens: { accessToken: 'a2', refreshToken: 'r2' } });
+				await flushMicrotasks();
+
+				expect(internals(apiSocket).socketAuthRetries).toBe(0);
+				expect(socketInstances.length).toBe(socketsBefore);
+			});
 		});
 	});
 });
