@@ -11,10 +11,11 @@ using System.Threading.RateLimiting;
 namespace Game.Api.RateLimiting
 {
     /// <summary>
-    /// Registers the auth-endpoint rate limiter: a per-client-IP fixed-window policy that throttles the
-    /// anonymous auth endpoints to blunt credential stuffing, refresh-token brute force, and the PBKDF2
-    /// resource-exhaustion vector (#950). The partition key is resolved the same trusted-proxy way as the
-    /// login-IP tracking, so a spoofed <c>X-Forwarded-For</c> can't shard an attacker across partitions.
+    /// Registers the auth-endpoint rate limiter: a per-client-IP fixed-window policy that throttles every
+    /// endpoint consuming credentials or a refresh token to blunt credential stuffing, refresh-token brute
+    /// force, and the PBKDF2 resource-exhaustion vector (#950). The partition key is resolved the same
+    /// trusted-proxy way as the login-IP tracking, so a spoofed <c>X-Forwarded-For</c> can't shard an
+    /// attacker across partitions.
     /// </summary>
     public static class RateLimiterServiceCollectionExtensions
     {
