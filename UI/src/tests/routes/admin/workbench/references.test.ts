@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-	EActivityKey,
 	EAttribute,
 	EChallengeType,
 	EEntityType,
@@ -26,6 +25,7 @@ import {
 	type ReferenceGroup,
 	type ReferenceSources
 } from '$routes/admin/workbench/references';
+import { makePath, makeProficiency } from '../../../fixtures/proficiencies';
 
 const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => ({
 	id,
@@ -114,34 +114,10 @@ const recipe = (id: number, resultSkillId: number, opts: Partial<ISkillRecipe> =
 	...opts
 });
 
-const path = (id: number, name: string, opts: Partial<IPath> = {}): IPath => ({
-	id,
-	name,
-	description: '',
-	activityKey: EActivityKey.Fire,
-	designerNotes: '',
-	...opts
-});
+const path = (id: number, name: string, opts: Partial<IPath> = {}): IPath => makePath({ id, name, ...opts });
 
-const proficiency = (id: number, name: string, opts: Partial<IProficiency> = {}): IProficiency => ({
-	id,
-	name,
-	description: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 0,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	designerNotes: '',
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...opts
-});
+const proficiency = (id: number, name: string, opts: Partial<IProficiency> = {}): IProficiency =>
+	makeProficiency({ id, name, ...opts });
 
 /** Places each record at its own id as the array index, honouring the zero-based-id/index invariant. */
 const bySlot = <T extends { id: number }>(...items: T[]): T[] => {

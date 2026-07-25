@@ -6,6 +6,7 @@ import {
 	representativeRecipe,
 	type RecipeState
 } from '$routes/game/screens/synthesis/synthesis';
+import { makeProficiency } from '../../../../fixtures/proficiencies';
 
 /* The derivation takes explicit args and needs no mocks. The reference catalogues are zero-based-id
    arrays (resolved by index), so the fixtures keep ids contiguous with their array position. */
@@ -38,24 +39,7 @@ const recipe = (
 	over: Partial<ISkillRecipe> = {}
 ): ISkillRecipe => ({ id, resultSkillId, inputSkillIds, conditions, designerNotes: '', ...over });
 
-const prof = (id: number, name: string): IProficiency => ({
-	id,
-	name,
-	description: '',
-	designerNotes: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 0,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1,
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: []
-});
+const prof = (id: number, name: string): IProficiency => makeProficiency({ id, name });
 
 /* A small fixed world: skills 0..3 are inputs, skills 4..6 are synthesis results. */
 const skills: ISkill[] = [

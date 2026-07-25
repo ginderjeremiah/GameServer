@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import type { IPath, IProficiency } from '$lib/api';
 import { EActivityKey } from '$lib/api';
+import { makePath, makeProficiency } from '../../../../fixtures/proficiencies';
 
 /* The screen drives the real playerProficiencies store (fetched over the socket) and reads the
    proficiency/path reference data from staticData, so the socket fetch and staticData are stubbed; the
@@ -27,22 +28,9 @@ vi.mock('$stores', async (importOriginal) => {
 import Proficiencies from '$routes/game/screens/proficiencies/Proficiencies.svelte';
 import { playerProficiencies } from '$stores';
 
-const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdinal: number }): IProficiency => ({
-	name: `Prof ${o.id}`,
-	description: '',
-	designerNotes: '',
-	iconPath: '',
-	word: `w${o.id}`,
-	pronunciation: '',
-	translation: '',
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1,
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...o
-});
+// A spine tier must state where it sits, so the local signature keeps pathId/pathOrdinal required.
+const prof = (o: Partial<IProficiency> & { id: number; pathId: number; pathOrdinal: number }): IProficiency =>
+	makeProficiency(o);
 
 const PROFICIENCIES: IProficiency[] = [
 	prof({ id: 0, pathId: 0, pathOrdinal: 0, name: 'Fire' }),
@@ -50,8 +38,8 @@ const PROFICIENCIES: IProficiency[] = [
 	prof({ id: 2, pathId: 1, pathOrdinal: 0, name: 'Earth' })
 ];
 const PATHS: IPath[] = [
-	{ id: 0, name: 'Pyromancy', description: '', designerNotes: '', activityKey: EActivityKey.Fire },
-	{ id: 1, name: 'Geomancy', description: '', designerNotes: '', activityKey: EActivityKey.Earth }
+	makePath({ id: 0, name: 'Pyromancy', activityKey: EActivityKey.Fire }),
+	makePath({ id: 1, name: 'Geomancy', activityKey: EActivityKey.Earth })
 ];
 
 beforeEach(() => {
