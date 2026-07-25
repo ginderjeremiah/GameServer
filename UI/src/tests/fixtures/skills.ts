@@ -6,7 +6,11 @@ import { EDamageType, ERarity, ESkillAcquisition, type ISkill } from '$lib/api';
    · `lib/battle/battle-sim-test-utils.ts` (`registerSkill`) assigns ids by registry position so a
      Battler resolves a skill exactly as the live game does — it builds on this module but owns the id.
    · `routes/game/screens/fight/fight-fixtures.ts` (`makeSkill`) returns a live `Skill` domain object
-     bound to an owner, not the `ISkill` contract, so it consumes this module rather than replacing it. */
+     bound to an owner, not the `ISkill` contract, so it consumes this module rather than replacing it.
+   · Nine suites seed untyped skill literals into a `staticData: {} as any` mock (codex, workbench
+     entities/progression). They type-check as nothing, so they pay no contract-drift tax — and filling
+     their previously-`undefined` fields could change what the suite renders. Left alone deliberately;
+     a `grep` for skill-shaped literals under `src/tests/` still finding them is expected, not a gap. */
 
 /**
  * Builds an {@link ISkill} reference-data entry for tests. Everything but the id is a neutral

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { EModifierType, EAttribute } from '$lib/api';
-import { makeSkill } from '../../../../fixtures/skills';
+import { makeSkill as skill } from '../../../../fixtures/skills';
 import type { IChallenge, IEnemy, ISignaturePassive, ISkill, IZone } from '$lib/api';
 import type { AttributeModifier } from '$lib/battle';
 import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
@@ -67,8 +67,6 @@ vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
 
 import { SkillsView } from '$routes/game/screens/skills/skills-view.svelte';
 import EquippedBand from '$routes/game/screens/skills/EquippedBand.svelte';
-
-const skill = (over: Partial<ISkill> & { id: number }): ISkill => makeSkill(over);
 
 const SKILLS: ISkill[] = [
 	skill({ id: 0, name: 'Alpha' }),
