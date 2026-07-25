@@ -15,12 +15,11 @@ export interface BattlerData {
 	name: string;
 }
 
-/** Everything a {@link Battler} is assembled from, as a named options object rather than a positional
- *  argument list (#2380). Every field is optional and an omitted one behaves exactly as the absent
- *  positional argument did — a data-less `{}` is the idle re-arm (see {@link Battler.reset}). This is a
- *  parity surface, which is why it is named rather than positional (#2380): the six were structurally
- *  interchangeable enough (two attribute/modifier lists, a `number[]`, a bare `number`) that a transposed
- *  argument compiled clean and silently desynced the two simulators. */
+/** Everything a {@link Battler} is assembled from. Every field is optional; a data-less `{}` is the idle
+ *  re-arm (see {@link Battler.reset}). Named rather than positional because this is a parity surface
+ *  (#2380) — the fields are structurally interchangeable enough (two attribute/modifier lists, a
+ *  `number[]`, a bare `number`) that a transposed argument would compile clean and silently desync the two
+ *  simulators. */
 export interface BattlerInit {
 	battlerData?: BattlerData;
 	/** Attributes layered on top of {@link BattlerData.attributes} before derivation (the player's equipment

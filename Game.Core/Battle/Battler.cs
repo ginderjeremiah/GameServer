@@ -14,12 +14,14 @@ namespace Game.Core.Battle
         private readonly AttributeCollection _attributes;
 
         /// <summary>
-        /// This battler's timed skill-effect bookkeeping — the per-attribute effect stacks and the backend-only
-        /// overlay tallies reading them (#2380). Applying and expiring effects goes through
-        /// <see cref="ApplyEffect"/>/<see cref="AdvanceEffects"/> so the MaxHealth re-clamp can't be skipped;
-        /// this is exposed for the overlay readers, which never mutate state.
+        /// This battler's timed skill-effect bookkeeping (#2380). Exposed as the read-only
+        /// <see cref="IBattlerEffectTallies"/> view, so the only way to apply or expire an effect is
+        /// <see cref="ApplyEffect"/>/<see cref="AdvanceEffects"/> — which own the MaxHealth re-clamp a raw
+        /// <see cref="BattlerEffects.Apply"/> would skip.
         /// </summary>
-        public BattlerEffects Effects { get; }
+        public IBattlerEffectTallies Effects => _effects;
+
+        private readonly BattlerEffects _effects;
 
         public double CurrentHealth { get; private set; }
 
@@ -51,7 +53,7 @@ namespace Game.Core.Battle
             ClassSignaturePassive? signaturePassive = null)
         {
             _attributes = attributes;
-            Effects = new BattlerEffects(attributes);
+            _effects = new BattlerEffects(attributes);
             CurrentHealth = _attributes[MaxHealth];
             Skills = skills.Select(s => new BattleSkill(s)).ToList();
             Level = level;
@@ -379,7 +381,7 @@ namespace Game.Core.Battle
                 // shape. An absorbed or fully-overkilled tick (booked ≤ 0) trains nothing.
                 if (recordHexBonus is not null && bookedTick > 0)
                 {
-                    var hexBonus = Effects.HexBonusForHit(bookedTick, accumulators[i].Type);
+                    var hexBonus = _effects.HexBonusForHit(bookedTick, accumulators[i].Type);
                     if (hexBonus > 0)
                     {
                         recordHexBonus(hexBonus);
@@ -425,14 +427,13 @@ namespace Game.Core.Battle
         /// Applies <paramref name="effect"/> as a timed attribute modifier on this battler (see
         /// <see cref="BattlerEffects.Apply"/> for the stacking / shared-expiry rules and the overlay-tracking
         /// flags). A new modifier may shift <see cref="MaxHealth"/>, so the health is re-clamped here — the
-        /// reason applying an effect stays on the battler rather than being reached through
-        /// <see cref="Effects"/> directly.
+        /// reason applying an effect is the battler's job and not reachable through <see cref="Effects"/>.
         /// </summary>
         public void ApplyEffect(
             SkillEffect effect, double amount,
             bool tracksVulnerability = false, bool tracksMomentum = false, bool tracksSunder = false)
         {
-            Effects.Apply(effect, amount, tracksVulnerability, tracksMomentum, tracksSunder);
+            _effects.Apply(effect, amount, tracksVulnerability, tracksMomentum, tracksSunder);
             ClampHealthToMaxHealth();
         }
 
@@ -443,7 +444,7 @@ namespace Game.Core.Battle
         /// </summary>
         public void AdvanceEffects(int ms)
         {
-            if (Effects.Advance(ms))
+            if (_effects.Advance(ms))
             {
                 ClampHealthToMaxHealth();
             }

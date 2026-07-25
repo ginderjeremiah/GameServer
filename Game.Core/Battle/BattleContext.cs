@@ -173,7 +173,7 @@ namespace Game.Core.Battle
         /// <c>totalNet</c> — one swing is one attack, and it deliberately keeps the full uncapped net. Every
         /// overlay training signal books the <b>same share-claim shape</b> (#1481): the portion's booked
         /// (health-capped) net × <c>φ</c> of the overlay's own investment
-        /// (<see cref="BattlerEffects.NormalizeInvestment"/>) — Precision
+        /// (<see cref="OverlayTally.NormalizeInvestment"/>) — Precision
         /// (<see cref="BattleStats.CriticalBonusDealt"/>, #1448, on the whole crit hit's booked total with the
         /// crit-damage investment <c>m − 1</c>), Hex (<see cref="BattleStats.HexBonusDealt"/>, #1427, on the
         /// opponent-applied vulnerability), Sunder (<see cref="BattleStats.SunderBonusDealt"/>, #1429, on the
@@ -365,13 +365,13 @@ namespace Game.Core.Battle
                 var rampContribution = _activeBattler.Effects.AppliedMomentum(type);
                 if (rampContribution > 0)
                 {
-                    Stats.MomentumBonusDealt += overlayBasis * BattlerEffects.NormalizeInvestment(rampContribution);
+                    Stats.MomentumBonusDealt += overlayBasis * OverlayTally.NormalizeInvestment(rampContribution);
                 }
                 // Cull (#1430): the execute-investment share. The executeMultiplier still scales the real
                 // damage above — that part stays parity-critical and unchanged; only the tally is reshaped.
                 if (executeInvestment > 0)
                 {
-                    Stats.CullBonusDealt += overlayBasis * BattlerEffects.NormalizeInvestment(executeInvestment);
+                    Stats.CullBonusDealt += overlayBasis * OverlayTally.NormalizeInvestment(executeInvestment);
                 }
             }
 
@@ -382,7 +382,7 @@ namespace Game.Core.Battle
             // to at most the enemy's health pool — the same enemy-authored share every overlay tally holds.
             if (cadenceInvestment > 0)
             {
-                Stats.CadenceBonusDealt += totalBooked * BattlerEffects.NormalizeInvestment(cadenceInvestment);
+                Stats.CadenceBonusDealt += totalBooked * OverlayTally.NormalizeInvestment(cadenceInvestment);
             }
 
             Stats.PlayerDamageDealt += totalNet;
@@ -399,7 +399,7 @@ namespace Game.Core.Battle
                 // trains nothing, rather than booking a negative (or, at exactly 0, a −∞) claim.
                 if (critMultiplier > 1.0)
                 {
-                    Stats.CriticalBonusDealt += totalBooked * BattlerEffects.NormalizeInvestment(critMultiplier - 1.0);
+                    Stats.CriticalBonusDealt += totalBooked * OverlayTally.NormalizeInvestment(critMultiplier - 1.0);
                 }
             }
 

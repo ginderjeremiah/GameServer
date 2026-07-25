@@ -31,7 +31,7 @@ namespace Game.Core.Battle
         /// The Precision (<c>Crit</c> activity key) training signal — distinct from the player-facing
         /// <see cref="CriticalDamageDealt"/> statistic. Each crit books the hit's booked (post-mitigation,
         /// health-capped — #1482) damage × <c>φ(m − 1)</c>, where <c>m</c> is <see cref="EAttribute.CriticalDamage"/>
-        /// and <c>φ</c> is the shared overlay saturation (<see cref="Battle.BattlerEffects.NormalizeInvestment"/>) — the
+        /// and <c>φ</c> is the shared overlay saturation (<see cref="Battle.OverlayTally.NormalizeInvestment"/>) — the
         /// uniform share-claim tally every overlay uses (#1481, superseding the counterfactual normalized marginal
         /// of #1448): proportional to crit-damage investment through <c>φ</c> (which the full-hit
         /// <see cref="CriticalDamageDealt"/> is not), and bounded per battle by the enemy's health pool through

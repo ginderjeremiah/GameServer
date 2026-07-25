@@ -28,7 +28,12 @@ const granted = grantedBattlerFactory(mockSkills);
 // counterSkillId, exactly how the live engine threads InventoryManager.counterSkillId; the counter is
 // deliberately not fielded as a loadout skill (mirroring the backend MakeBattlerWithCounter helper).
 const makeParryBattler = (attrs: { id: EAttribute; amount: number }[], counterSpec: SkillSpec) =>
-	granted.build(attrs, [], [], undefined, granted.register(counterSpec));
+	granted.build({
+		attrs,
+		selectedSkillIds: [],
+		grantedSkillIds: [],
+		counterSkillId: granted.register(counterSpec)
+	});
 // A throwaway RNG for the steps that exercise no crit/dodge (their chances are 0, so the draws never
 // change an outcome). The dedicated rolls + draw-order are covered by the crit/dodge block.
 const noRng = () => new Mulberry32(0);

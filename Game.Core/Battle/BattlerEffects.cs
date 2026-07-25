@@ -14,12 +14,13 @@ namespace Game.Core.Battle
     /// <para>
     /// Only <see cref="Apply"/> and <see cref="Advance"/> are parity-relevant (they own the stacking, shared
     /// expiry and combined-modifier folding the frontend mirrors in <c>battler.ts</c>); both report back to the
-    /// battler rather than touching health, since the MaxHealth re-clamp is the battler's own concern — and both
-    /// are <c>internal</c> so the only way in from outside the domain is <see cref="Battler.ApplyEffect"/> /
+    /// battler rather than touching health, since the MaxHealth re-clamp is the battler's own concern. That is
+    /// why <see cref="Battler.Effects"/> hands out only the read-only <see cref="IBattlerEffectTallies"/> view:
+    /// applying or expiring an effect stays reachable only through <see cref="Battler.ApplyEffect"/> /
     /// <see cref="Battler.AdvanceEffects"/>, which cannot skip that re-clamp.
     /// </para>
     /// </summary>
-    public sealed class BattlerEffects
+    public sealed class BattlerEffects : IBattlerEffectTallies
     {
         private readonly AttributeCollection _attributes;
 
@@ -46,17 +47,6 @@ namespace Game.Core.Battle
         /// comparison rather than a per-tick countdown.
         /// </summary>
         private long _elapsedMs;
-
-        /// <summary>
-        /// The shared overlay-tally saturation <c>φ(a) = a / (1 + a)</c>, applied to an overlay's own investment
-        /// magnitude when booking its share claim (#1481): ~linear at the low end so a token investment trains
-        /// proportionally little, asymptoting to <c>1</c> so even a huge investment claims at most the full booked
-        /// hit. Every overlay signal (crit, Hex, Momentum, Sunder, Cull, Cadence) uses it on its own investment.
-        /// </summary>
-        public static double NormalizeInvestment(double investment)
-        {
-            return investment / (1.0 + investment);
-        }
 
         /// <summary>
         /// Applies <paramref name="effect"/> as a timed attribute modifier, using the already-resolved
@@ -186,7 +176,7 @@ namespace Game.Core.Battle
         /// The Hex bonus for a hit that booked <paramref name="bookedNet"/> (the post-mitigation damage capped at
         /// the health it actually removed, #1482) of <paramref name="damageType"/> against the battler these
         /// effects belong to — the attacker's Hex signal (#1427), booked as <c>bookedNet × φ(v)</c>
-        /// (<see cref="NormalizeInvestment"/>). The vulnerability <c>v</c> is the opponent's own applied resistance
+        /// (<see cref="OverlayTally.NormalizeInvestment"/>). The vulnerability <c>v</c> is the opponent's own applied resistance
         /// reduction for the type (<see cref="AppliedVulnerability"/>) — tracked as the modifiers the opponent
         /// contributed, so it credits the <b>work the debuff did</b> regardless of the target's base resistance or
         /// its own resistance buffs. A <b>share claim on the damage that actually landed</b>, not a counterfactual
@@ -204,7 +194,7 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            return bookedNet * NormalizeInvestment(vulnerability);
+            return bookedNet * OverlayTally.NormalizeInvestment(vulnerability);
         }
 
         /// <summary>
@@ -218,11 +208,6 @@ namespace Game.Core.Battle
         /// </summary>
         public double AppliedVulnerability(EDamageType damageType)
         {
-            if (_attributeStacks is null)
-            {
-                return 0;
-            }
-
             var contribution = 0.0;
             var resistanceAttributes = DamageTypes.ResistanceAttributes(damageType);
             for (var i = 0; i < resistanceAttributes.Count; i++)
@@ -238,7 +223,7 @@ namespace Game.Core.Battle
         /// <summary>
         /// The Sunder bonus for a hit that booked <paramref name="bookedNet"/> (the post-mitigation damage capped
         /// at the health it actually removed, #1482) against the battler these effects belong to — the attacker's
-        /// Sunder signal (#1429), booked as <c>bookedNet × φ(investment)</c> (<see cref="NormalizeInvestment"/>),
+        /// Sunder signal (#1429), booked as <c>bookedNet × φ(investment)</c> (<see cref="OverlayTally.NormalizeInvestment"/>),
         /// where the investment is the opponent-applied Toughness reduction (<see cref="AppliedSunder"/>) made
         /// dimensionless by the curve's own characteristic magnitude
         /// (<see cref="GameConstants.ToughnessMitigationConstant"/>) — the same constant the live mitigation curve
@@ -256,7 +241,7 @@ namespace Game.Core.Battle
                 return 0;
             }
 
-            return bookedNet * NormalizeInvestment(sunder / GameConstants.ToughnessMitigationConstant);
+            return bookedNet * OverlayTally.NormalizeInvestment(sunder / GameConstants.ToughnessMitigationConstant);
         }
 
         /// <summary>
@@ -285,11 +270,6 @@ namespace Game.Core.Battle
         /// </summary>
         public double AppliedMomentum(EDamageType damageType)
         {
-            if (_attributeStacks is null)
-            {
-                return 0;
-            }
-
             var contribution = 0.0;
             var amplificationAttributes = DamageTypes.AmplificationAttributes(damageType);
             for (var i = 0; i < amplificationAttributes.Count; i++)
