@@ -36,6 +36,9 @@ export type DecipherStage = 'undeciphered' | 'pronunciation' | 'translated';
 export interface TierView {
 	id: number;
 	name: string;
+	/** The authored blurb describing the tier, rendered by the inspector. Ungated by decipher stage (the
+	 *  stage gates the *word*, not the tier's identity) and legitimately empty when unauthored. */
+	description: string;
 	pathOrdinal: number;
 	level: number;
 	maxLevel: number;
@@ -67,6 +70,9 @@ export interface TierView {
 export interface PathView {
 	id: number;
 	name: string;
+	/** The authored blurb describing the path, rendered by the spine header; legitimately empty when
+	 *  unauthored. */
+	description: string;
 	/** The rail reuses the root tier's word/icon — there is no path-level word. */
 	word: string;
 	iconPath: string;
@@ -190,6 +196,7 @@ export function buildLexicon(
 		result.push({
 			id: path.id,
 			name: path.name,
+			description: path.description,
 			word: tiers[0].word,
 			iconPath: tiers[0].iconPath,
 			activityKey: path.activityKey,
@@ -250,6 +257,7 @@ function derivePathSpine(
 		return {
 			id: prof.id,
 			name: prof.name,
+			description: prof.description,
 			pathOrdinal: prof.pathOrdinal,
 			level,
 			maxLevel: prof.maxLevel,

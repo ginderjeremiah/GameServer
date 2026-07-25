@@ -50,6 +50,7 @@ for (const s of [
 
 const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	name: `Tier ${o.id}`,
+	description: '',
 	pathOrdinal: 0,
 	level: 0,
 	maxLevel: 10,
@@ -71,6 +72,7 @@ const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 const pathView = (o: Partial<PathView> = {}): PathView => ({
 	id: 0,
 	name: 'Pyromancy',
+	description: '',
 	word: 'aenkor',
 	iconPath: '',
 	activityKey: EActivityKey.Physical,
@@ -119,6 +121,33 @@ describe('WordDetail — header & state pill', () => {
 		cleanup();
 		renderInspector(tierView({ id: 3, state: 'unlocked' }));
 		expect(screen.getByTestId('state-pill').textContent).toBe('LEARNING');
+	});
+});
+
+/* ── authored blurb ────────────────────────────────────────────────────────── */
+
+describe('WordDetail — description blurb', () => {
+	it('renders the tier’s authored description', () => {
+		renderInspector(tierView({ id: 1, description: 'The art of coaxing flame from raw aether.' }));
+		const inspector = screen.getByTestId('word-detail');
+		expect(within(inspector).getByTestId('tier-description').textContent).toBe(
+			'The art of coaxing flame from raw aether.'
+		);
+	});
+
+	it('omits the blurb entirely when the description is empty', () => {
+		renderInspector(tierView({ id: 1, description: '' }));
+		// The field is `required` but may legitimately be '' — no empty paragraph may be left behind.
+		expect(screen.queryByTestId('tier-description')).toBeNull();
+	});
+
+	it('shows the blurb at every decipher stage', () => {
+		// The decipher stage gates the word of power, never the tier's own description.
+		for (const decipher of ['undeciphered', 'pronunciation', 'translated'] as const) {
+			renderInspector(tierView({ id: 1, decipher, description: 'Ungated prose.' }));
+			expect(screen.getByTestId('tier-description').textContent).toBe('Ungated prose.');
+			cleanup();
+		}
 	});
 });
 

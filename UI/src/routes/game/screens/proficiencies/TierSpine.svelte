@@ -1,5 +1,6 @@
-<!-- The centre column for the selected path: a header (the path's root word of power + how many words it
-     holds) over the spine of tier cards, drawn most-advanced at the top down to the root at the bottom. -->
+<!-- The centre column for the selected path: a header (the path's root word of power, how many words it
+     holds, and its authored blurb) over the spine of tier cards, drawn most-advanced at the top down to
+     the root at the bottom. -->
 <div class="spine-col">
 	<div class="path-header">
 		<div class="path-icon">
@@ -11,6 +12,11 @@
 		<div class="path-text">
 			<WordOfPower class="path-word" text={path.word} label={path.name} size={46} />
 			<div class="path-sub">{path.name} · {wordCount}</div>
+			<!-- The path's authored blurb — this header is the one surface presenting the path as a subject
+			     rather than a list row, so it is where the blurb belongs. Omitted when unauthored. -->
+			{#if path.description}
+				<p class="path-blurb" data-testid="path-description">{path.description}</p>
+			{/if}
 		</div>
 	</div>
 
@@ -56,9 +62,11 @@ const wordCount = $derived(path.tiers.length === 1 ? '1 WORD KNOWN' : `${path.ti
 	padding: 26px 36px 38px;
 }
 
+// Top-aligned, not centred: the text column's height varies with the authored blurb, so centring would
+// float the icon down to sit beside the prose rather than beside the path word it labels.
 .path-header {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 14px;
 	padding-bottom: 18px;
 	border-bottom: 1px solid var(--border-subtle);
@@ -102,6 +110,15 @@ const wordCount = $derived(path.tiers.length === 1 ? '1 WORD KNOWN' : `${path.ti
 	font-size: 11px;
 	letter-spacing: 0.8px;
 	color: var(--text-tertiary);
+}
+
+// Measure-capped so the blurb stays readable as the spine column grows past its 440px minimum.
+.path-blurb {
+	margin: 8px 0 0;
+	max-width: 64ch;
+	font-size: 12.5px;
+	line-height: 1.5;
+	color: var(--text-secondary);
 }
 
 .spine {

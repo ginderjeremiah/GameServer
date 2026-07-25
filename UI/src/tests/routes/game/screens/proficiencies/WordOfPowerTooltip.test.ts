@@ -5,6 +5,7 @@ import type { TierView } from '$routes/game/screens/proficiencies/proficiencies-
 
 const tierView = (o: Partial<TierView> & { id: number }): TierView => ({
 	name: `Tier ${o.id}`,
+	description: '',
 	pathOrdinal: 0,
 	level: 0,
 	maxLevel: 10,
