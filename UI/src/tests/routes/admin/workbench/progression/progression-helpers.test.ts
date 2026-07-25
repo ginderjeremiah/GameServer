@@ -221,6 +221,16 @@ describe('validation', () => {
 		expect(rewardSkillFlagWarnings(stillFlagged)).toHaveLength(0);
 		expect(proficiencyBlockingWarnings(stillFlagged)).toHaveLength(0);
 	});
+
+	it('tolerates the pre-load catalogue state, when the reward lookup runs before skills load', () => {
+		// `staticData.skills` is genuinely `undefined` until the loading screen populates it, which is
+		// what `rewardSkillFlagWarnings`' `?.` guards; warn on nothing rather than throwing.
+		staticData.skills = undefined;
+
+		const withReward = tier({ id: 1, maxLevel: 5, levelRewards: [{ level: 3, rewardSkillId: 1 }] });
+		expect(rewardSkillFlagWarnings(withReward)).toHaveLength(0);
+		expect(proficiencyBlockingWarnings(withReward)).toHaveLength(0);
+	});
 });
 
 describe('DTO builders', () => {

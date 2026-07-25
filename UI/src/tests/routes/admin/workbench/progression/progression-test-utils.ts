@@ -12,17 +12,32 @@ import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbenc
    import that did would re-enter the factory resolving it. Everything below `$lib/api` is `import type`
    and therefore erased, which is what keeps that true today. */
 
-/** The last-saved `staticData` catalogues the editor's reference lookups read. */
-export const staticData = {
-	enemies: [] as unknown[],
-	zones: [] as unknown[],
-	challenges: [] as unknown[],
-	items: [] as unknown[],
-	classes: [] as unknown[],
-	skillRecipes: [] as unknown[],
-	proficiencies: [] as unknown[],
-	skills: [] as unknown[],
-	paths: [] as unknown[]
+const catalogueKeys = [
+	'enemies',
+	'zones',
+	'challenges',
+	'items',
+	'classes',
+	'skillRecipes',
+	'proficiencies',
+	'skills',
+	'paths'
+] as const;
+
+/* The last-saved `staticData` catalogues the editor's reference lookups read. Each slot is
+   `unknown[] | undefined` because the real store's is: the backing `$state` is genuinely `undefined`
+   until the loading screen populates it, and that state is load-bearing (`static-data.svelte.ts`), so
+   production readers guard with `?.`. A suite covering a pre-load read assigns `undefined` directly. */
+export const staticData: Record<(typeof catalogueKeys)[number], unknown[] | undefined> = {
+	enemies: [],
+	zones: [],
+	challenges: [],
+	items: [],
+	classes: [],
+	skillRecipes: [],
+	proficiencies: [],
+	skills: [],
+	paths: []
 };
 
 export const dangerModal = vi.fn();
@@ -40,8 +55,8 @@ export const stubStores = () => ({ staticData, dangerModal });
 /** Restores the stub to its empty, uncalled baseline. Call from `beforeEach`. */
 export const resetStores = () => {
 	dangerModal.mockReset();
-	for (const catalogue of Object.values(staticData)) {
-		catalogue.length = 0;
+	for (const key of catalogueKeys) {
+		staticData[key] = [];
 	}
 };
 
@@ -86,11 +101,9 @@ export const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProfici
    assertions read the generated `Path {id}` name back out of the rendered column header. The two
    adapters below keep the field set in one place while preserving both. */
 
-/** Positional path fixture for the map suites — `Path {id}`, keyed on physical damage. */
 export const mapPath = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath =>
 	path({ id, name: `Path ${id}`, activityKey: EActivityKey.Physical, ...over });
 
-/** Positional tier fixture for the map suites — `Tier {id}` at `ordinal` on `pathId`. */
 export const mapTier = (
 	id: number,
 	pathId: number,
