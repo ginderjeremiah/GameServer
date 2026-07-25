@@ -2,10 +2,12 @@ using Game.Abstractions.Contracts;
 using Game.Abstractions.Contracts.Identity;
 using Game.Api.Models.Auth;
 using Game.Api.Models.Common;
+using Game.Api.RateLimiting;
 using Game.Api.Services;
 using Game.Application.Services;
 using Game.Core.Players;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Game.Api.Controllers
 {
@@ -31,6 +33,9 @@ namespace Game.Api.Controllers
         /// later request (and the socket handshake) resolves it from the token. The active-session takeover
         /// check is made by the client after this step, since it is a per-player presence check.
         /// </summary>
+        // Consumes a raw refresh token, so it draws from the same combined per-IP budget as the
+        // refresh-token endpoints on AuthController rather than offering an unthrottled probe of one (#2417).
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost]
         public async Task<ApiResponse<SelectPlayerResult>> SelectPlayer([FromBody] SelectPlayerRequest request)
         {
@@ -49,6 +54,9 @@ namespace Game.Api.Controllers
         /// <see cref="CharacterSelectionService.SwitchPlayer"/> for the departed-character credit and
         /// anti-cheat mechanics.
         /// </summary>
+        // Same combined per-IP budget as SelectPlayer above: it consumes a raw refresh token through the
+        // same path, and each call additionally runs the departed character's offline-credit simulation.
+        [EnableRateLimiting(RateLimitingOptions.AuthPolicy)]
         [HttpPost]
         public async Task<ApiResponse<SelectPlayerResult>> SwitchPlayer([FromBody] SelectPlayerRequest request)
         {

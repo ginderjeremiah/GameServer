@@ -12,12 +12,13 @@ namespace Game.Api.RateLimiting
         /// <summary>The configuration section this options class binds from.</summary>
         public const string SectionName = "RateLimiting";
 
-        /// <summary>The named policy applied to the anonymous auth endpoints.</summary>
+        /// <summary>The named policy applied to every endpoint consuming credentials or a refresh token.</summary>
         public const string AuthPolicy = "auth";
 
         /// <summary>
-        /// The per-client-IP window for the anonymous auth endpoints (login, refresh, account creation, logout) —
-        /// the credential-stuffing, refresh-token brute-force, and PBKDF2 resource-exhaustion surface.
+        /// The per-client-IP window for every endpoint that consumes credentials or a refresh token (login,
+        /// refresh, account creation, logout, and the authenticated select/switch-character calls) — the
+        /// credential-stuffing, refresh-token brute-force, and PBKDF2 resource-exhaustion surface.
         /// </summary>
         public RateLimitWindow Auth { get; set; } = new() { PermitLimit = 10, WindowSeconds = 60 };
     }

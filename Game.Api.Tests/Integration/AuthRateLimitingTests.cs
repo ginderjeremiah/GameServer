@@ -10,11 +10,11 @@ using Xunit;
 namespace Game.Api.Tests.Integration
 {
     /// <summary>
-    /// Covers the per-client-IP auth rate limiter (#950): the anonymous auth endpoints are throttled with
-    /// the project's standard error envelope once the configured limit is exceeded, the limit is a shared
-    /// budget across those endpoints, and a request under the limit is unaffected. The factory pins the
-    /// limit to a small value so the throttle can be exercised deterministically (the in-memory TestServer
-    /// has no socket peer, so every request shares the "unknown" partition).
+    /// Covers the per-client-IP auth rate limiter (#950): every endpoint consuming credentials or a refresh
+    /// token is throttled with the project's standard error envelope once the configured limit is exceeded,
+    /// the limit is one shared budget across those endpoints, and a request under the limit is unaffected.
+    /// The factory pins the limit to a small value so the throttle can be exercised deterministically (the
+    /// in-memory TestServer has no socket peer, so every request shares the "unknown" partition).
     /// </summary>
     [Collection("Integration")]
     public class AuthRateLimitingTests : ApiIntegrationTestBase
@@ -54,34 +54,54 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task AuthEndpoints_ShareOnePerIpBudget()
         {
-            var creds = new { Username = "nobody", Password = "wrong" };
-
-            // Exhaust the budget via Login.
-            for (var i = 0; i < PermitLimit; i++)
-            {
-                await Client.PostAsJsonAsync("/api/Auth", creds, CancellationToken);
-            }
+            await ExhaustBudgetViaLogin();
 
             // A sibling auth endpoint draws from the same per-IP partition, so it is already throttled.
-            var createAccount = await Client.PostAsJsonAsync("/api/Auth/CreateAccount", creds, CancellationToken);
+            var createAccount = await Client.PostAsJsonAsync(
+                "/api/Auth/CreateAccount", new { Username = "nobody", Password = "wrong" }, CancellationToken);
             Assert.Equal(HttpStatusCode.TooManyRequests, createAccount.StatusCode);
         }
 
         [Fact]
         public async Task Logout_DrawsFromThePerIpBudget()
         {
-            // Exhaust the budget via Login.
-            for (var i = 0; i < PermitLimit; i++)
-            {
-                await Client.PostAsJsonAsync(
-                    "/api/Auth", new { Username = "nobody", Password = "wrong" }, CancellationToken);
-            }
+            await ExhaustBudgetViaLogin();
 
             // Logout is anonymous like its siblings, so it must also be throttled once the shared budget is
             // spent — closing the gap where it could be spammed unthrottled as a token-revocation surface.
             var loggedOut = await Client.PostAsJsonAsync(
                 "/api/Auth/Logout", new { RefreshToken = "any-token" }, CancellationToken);
             Assert.Equal(HttpStatusCode.TooManyRequests, loggedOut.StatusCode);
+        }
+
+        // SelectPlayer/SwitchPlayer consume a raw refresh token just like Refresh/Logout do, so they must
+        // draw from the same budget rather than offering an unthrottled probe of one (#2417). The limiter
+        // runs ahead of authentication, so an over-budget call is rejected as 429 before the 401 it would
+        // otherwise get — which is exactly what pins the endpoint into the policy.
+        [Theory]
+        [InlineData("/api/Players/SelectPlayer")]
+        [InlineData("/api/Players/SwitchPlayer")]
+        public async Task RefreshTokenConsumingPlayerEndpoints_DrawFromThePerIpBudget(string path)
+        {
+            await ExhaustBudgetViaLogin();
+
+            var response = await Client.PostAsJsonAsync(
+                path, new { PlayerId = 1, RefreshToken = "any-token" }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task PlayerEndpointsConsumingNoToken_StayOutsideThePerIpBudget()
+        {
+            await ExhaustBudgetViaLogin();
+
+            // The policy is scoped to credential/token-consuming endpoints, so the rest of the pre-game
+            // surface must not be collaterally throttled — it is rejected as unauthenticated instead.
+            var response = await Client.PostAsJsonAsync(
+                "/api/Players/CreatePlayer", new { Name = "Nobody", ClassId = 0 }, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
 
         [Fact]
@@ -91,6 +111,17 @@ namespace Game.Api.Tests.Integration
                 "/api/Auth", new { Username = "nobody", Password = "wrong" }, CancellationToken);
 
             Assert.NotEqual(HttpStatusCode.TooManyRequests, response.StatusCode);
+        }
+
+        // Spends the whole per-IP window on Login, leaving the shared budget exhausted for whichever
+        // sibling endpoint the caller is pinning.
+        private async Task ExhaustBudgetViaLogin()
+        {
+            for (var i = 0; i < PermitLimit; i++)
+            {
+                await Client.PostAsJsonAsync(
+                    "/api/Auth", new { Username = "nobody", Password = "wrong" }, CancellationToken);
+            }
         }
 
         private sealed class RateLimitedFactory(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
