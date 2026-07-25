@@ -5,7 +5,12 @@ import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbenc
 
 /* Shared scaffolding for the progression editor's component suites (#2405). Each suite still declares
    its own `vi.mock('$stores', …)` — `vi.mock` is hoisted within the file it appears in — but the factory
-   resolves this module's singletons, so the stub's shape lives in exactly one place. */
+   resolves this module's singletons, so the stub's shape lives in exactly one place.
+
+   Because the suites resolve it from inside that factory, this module is evaluated *while `$stores` is
+   being mocked, so it must stay free of runtime imports that transitively reach `$stores`* — a value
+   import that did would re-enter the factory resolving it. Everything below `$lib/api` is `import type`
+   and therefore erased, which is what keeps that true today. */
 
 /** The last-saved `staticData` catalogues the editor's reference lookups read. */
 export const staticData = {
@@ -35,8 +40,8 @@ export const stubStores = () => ({ staticData, dangerModal });
 /** Restores the stub to its empty, uncalled baseline. Call from `beforeEach`. */
 export const resetStores = () => {
 	dangerModal.mockReset();
-	for (const catalogue of Object.keys(staticData) as (keyof typeof staticData)[]) {
-		staticData[catalogue] = [];
+	for (const catalogue of Object.values(staticData)) {
+		catalogue.length = 0;
 	}
 };
 
