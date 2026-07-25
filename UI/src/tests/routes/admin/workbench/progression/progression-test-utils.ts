@@ -62,10 +62,6 @@ export const resetStores = () => {
 	}
 };
 
-/* `WorkbenchPath`/`WorkbenchProficiency` are plain aliases of `IPath`/`IProficiency`, so the two builders
-   below are the shared contract fixtures with the workbench's divergent defaults stated on top (#2426).
-   Only the divergences are restated here — everything else follows the contract fixture. */
-
 /** Base path fixture — id 5, the path the detail suites open. */
 export const path = (over: Partial<WorkbenchPath> = {}): WorkbenchPath =>
 	makePath({ id: 5, name: 'Fire Path', activityKey: EActivityKey.Fire, ...over });
