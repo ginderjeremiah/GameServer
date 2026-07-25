@@ -11,10 +11,12 @@ namespace Game.Core.Tests.Battle
     /// Direct unit tests for the combat arithmetic on <see cref="Battler"/>.
     /// <para>
     /// These mirror the frontend suite <c>UI/src/tests/lib/battle/battler.test.ts</c>:
-    /// the <see cref="Battler.TakeDamage"/> toughness-curve/death cases and the
-    /// <see cref="Battler.GetCooldownMultiplier"/> formula are asserted here with the
+    /// the <see cref="Battler.TakeDamage"/> toughness-curve/death cases, the
+    /// <see cref="Battler.GetCooldownMultiplier"/> formula, and the
+    /// <see cref="Battler.EffectiveParryChance"/>/<see cref="Battler.EffectiveDodgeChance"/>
+    /// avoidance products are asserted here with the
     /// <b>same scenarios and the same expected results</b> as the frontend, so a future
-    /// divergence in the mitigation/cooldown math fails on both sides (the same parity
+    /// divergence in the mitigation/cadence/avoidance math fails on both sides (the same parity
     /// discipline used for <see cref="Mulberry32ParityTests"/> ⇄ <c>mulberry32-parity.test.ts</c>).
     /// Frontend-only concerns (skill-slot filling, render cooldowns, name/level wiring) are
     /// not part of the backend <see cref="Battler"/> and are intentionally not mirrored.
