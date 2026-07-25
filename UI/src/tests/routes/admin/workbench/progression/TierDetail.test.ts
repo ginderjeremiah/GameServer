@@ -112,6 +112,21 @@ describe('TierDetail', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Fire Path' }));
 		expect(store.back).toHaveBeenCalledOnce();
 	});
+
+	// `description` round-tripped through profIdentityDto and was bounded in EF, but had no editor input
+	// and so could never be authored (#2377) — unlike `designerNotes`, it ships unredacted to every client.
+	it('authors the tier description through the store', async () => {
+		const edited = tier();
+		const store = makeStore(edited);
+		render(TierDetail, { props: { store } });
+
+		await fireEvent.input(screen.getByLabelText('Description'), { target: { value: 'A riven-frost blade art.' } });
+
+		expect(store.patchProf).toHaveBeenCalledWith(5, expect.any(Function));
+		const patch = vi.mocked(store.patchProf).mock.calls[0][1];
+		patch(edited);
+		expect(edited.description).toBe('A riven-frost blade art.');
+	});
 });
 
 describe('TierDetail — retire confirm dialog', () => {
