@@ -18,7 +18,7 @@ The issue's own lean was *"shield/last-stand lean toward the skill-effect system
 
 Three shipped mechanics materially re-rank these candidates:
 
-- **`ExecuteBonus` / Cull ([#1430](./1398-utility-in-proficiency-system.md)) reads live battle state mid-fire.** The attacker samples the target's missing-health fraction `(MaxHealth − CurrentHealth) / MaxHealth`, clamped `[0,1]`, **once per fire**, and folds it into that fire's damage multiplier (`BattleContext.DamageTarget` ↔ `battle-step`'s `dealPortionedDamage`). This is the single most important finding here: **last-stand is the defender-side mirror of a read the engine already performs**, not a net-new mechanism. [#1219](https://github.com/ginderjeremiah/GameServer/issues/1219)'s statement that *"nothing reads live state like a current-health ratio mid-tick"* was true when written and is **no longer accurate** — that issue's cost estimate for conditional passives should be revised down accordingly.
+- **`ExecuteBonus` / Cull ([#1430](https://github.com/ginderjeremiah/GameServer/issues/1430), from spike [#1398](./1398-utility-in-proficiency-system.md)) reads live battle state mid-fire.** The attacker samples the target's missing-health fraction `(MaxHealth − CurrentHealth) / MaxHealth`, clamped `[0,1]`, **once per fire**, and folds it into that fire's damage multiplier — placed in `BattleContext.DamageTarget` ↔ `battle-step`'s `dealPortionedDamage`, i.e. **the fire path, not `ComputeNetDamage`** (§3.1 shows why that placement matters). This is the single most important finding here: **last-stand is the defender-side mirror of a read the engine already performs**, not a net-new mechanism. [#1219](https://github.com/ginderjeremiah/GameServer/issues/1219)'s statement that *"nothing reads live state like a current-health ratio mid-tick"* was true when written and is **no longer accurate** — that issue's cost estimate for conditional passives should be revised down accordingly.
 
 - **Parry/Riposte ([#1457](https://github.com/ginderjeremiah/GameServer/issues/1457)) established the defensive-path tally shape.** A defensive mechanic with no damage output of its own still needs a proficiency training signal; Evasion trains on `BattleStats.DamageDodged` (post-mitigation damage *prevented*, `ProficiencyAccrual:182`) and Riposte on counter damage. So a **prevented-damage tally** is precedented and cheap.
 
@@ -30,13 +30,13 @@ Ranked by cost, which **inverts the issue's original framing**:
 
 | Candidate | Original framing | Actual shape today | New state? | Parity surface | Cost |
 |---|---|---|---|---|---|
-| **Last stand** | "skill effect; needs its own design pass" | Cull's expression on the defender — an authored attribute read per hit | none | one multiplier in `ComputeNetDamage` | **small** |
+| **Last stand** | "skill effect; needs its own design pass" | Cull's expression on the defender — an authored attribute read per hit | none | one multiplier, but **placement is a real call** (§3.1) | **small** |
 | **Mitigation → sustain** | "authored attribute like reflection" | correct, but has a hard blocker (§4) | none | one heal channel after mitigation | **medium** |
 | **Absorb shield** | "skill effect, not an attribute" | needs a second health-like pool on `Battler` | **yes — a new state dimension** | wide (§5.3) | **large** |
 
 ### 3.1 Last stand — the cheapest, and already half-built
 
-Mirror Cull exactly. An authored-only `LastStandBonus` (base `0`, no `StaticAttributeModifiers` derivation, like `DamageReflection`/`ExecuteBonus`) scales the defender's *own* missing-health fraction into a mitigation multiplier applied inside `ComputeNetDamage`:
+Mirror Cull exactly. An authored-only `LastStandBonus` (base `0`, no `StaticAttributeModifiers` derivation, like `DamageReflection`/`ExecuteBonus`) scales the defender's *own* missing-health fraction into a mitigation multiplier on the incoming hit — **where** that multiplier is applied is itself an open call (see the placement bullet below):
 
 ```
 missingHpFraction = clamp((MaxHealth − CurrentHealth) / MaxHealth, 0, 1)
@@ -44,8 +44,14 @@ net = … × (1 − LastStandBonus × missingHpFraction)
 ```
 
 - **Continuous, not a threshold step.** The issue says *"below an HP threshold"*, but a step function reintroduces exactly the discontinuous breakpoint pathology #1330 spent a spike removing from flat Defense. Cull already chose the continuous ramp for the offensive mirror; matching it keeps one shape in the codebase and no cliff. **Recommend continuous.**
-- **Bounded by construction.** With `LastStandBonus < 1` the multiplier stays in `(0, 1]` — it can reduce a hit but never heal, so it cannot invert the sign and cannot reach immunity. This is the property §4 shows sustain lacks.
-- **Where it sits in the pipeline is a real call** — folding it in alongside the Toughness curve (so it multiplies) vs. adding to `Toughness` itself (so it rides the diminishing curve) give very different endgame behavior. Multiplying is simpler and legible; adding is self-limiting. Open question **Q3**.
+- **Bounded — but by an authoring invariant, not by construction.** *Provided* `LastStandBonus < 1`, the multiplier stays in `(0, 1]`, so it can reduce a hit but never heal: it cannot invert the sign and cannot reach immunity. That is the property §4 shows sustain lacks, and it is the whole argument for shipping last-stand first — so it must be stated as the assumption it is. **Nothing enforces the bound.** Authored attributes are read unclamped throughout (`DamageReflection` is multiplied raw at `BattleContext.cs:495-501`, and `ComputeNetDamage`'s own comment says *"no clamp is needed"* for the analogous resistance case, `Battler.cs:118-122`), so an authored `LastStandBonus ≥ 1` against a near-dead defender drives the multiplier to `≤ 0` and turns the hit into a heal — exactly the flat-Defense pathology #1330 removed. This is plausibly fine under the house precedent of [#1478](https://github.com/ginderjeremiah/GameServer/issues/1478) (the negative-Toughness pole is left unguarded as *"unreachable by authored content"*), but it is that class of assumption, not a guarantee. Either name the authoring invariant explicitly or specify the clamp. (The interval's open lower bound is likewise conditional: at `LastStandBonus = 1` the multiplier reaches exactly `0`, but only when `missingHpFraction = 1`, which means the defender is already dead.)
+- **Where it sits in the pipeline is a real call, and wider than it first looks.** `Battler.ComputeNetDamage` is today a **pure function of attributes**, with four consumers — only one of which is the damage path:
+  - `Battler.cs:225` (`TakeDamage`, the real hit) — ✅ wants last-stand.
+  - `BattleContext.cs:262` — `Stats.DamageDodged`, which feeds Evasion's proficiency accrual (`ProficiencyAccrual.cs:182`).
+  - `BattleContext.cs:247` — the same shape for `DamageParried`.
+  - `CombatRating.cs:239` — a **synthetic reference defender**, whose `CurrentHealth` is not a meaningful quantity; the offense rating would silently acquire a term keyed to it.
+
+  So a multiplier added inside `ComputeNetDamage` is not a no-op: it silently changes two accrual signals (arguably *correctly* — those tallies are counterfactual "what would this hit have done", so a health-scaled answer may be right — but that should be a decision, not a side effect) and pollutes the combat rating. **The precedent cuts toward the fire path:** Cull put its live read in `BattleContext.DamageTarget`, which is exactly why it disturbed neither the tallies nor `CombatRating`. "Mirror Cull exactly" therefore argues for the fire path here too. The frontend widens it slightly further — `mitigateDamage` is a free function over attributes (`battle-formulas.ts`), so a health term changes its signature. Open question **Q3**.
 - Commitment rule: ✅ authored-only enabler, `0` when uncommitted. Trains on a prevented-damage tally (Evasion's precedent).
 
 ### 3.2 Mitigation → sustain — right shape, one hard blocker
@@ -54,7 +60,7 @@ Follows reflection's template as the issue said: an authored-only `MitigationSus
 
 ### 3.3 Absorb shield — collides with a load-bearing invariant
 
-*"The game has no overheal/shield concept"* is asserted in **4 code sites** (`Battler.cs:219,244,298,398`, mirrored in `battler.ts:199,215,245`) and **3 doc sites** (`game-design.md:132`, `backend-battle.md:36,73`), and it is the stated *reason* three separate heal channels cap at MaxHealth. A shield is not an increment on that design — it reverses it, and every cap that cites it needs re-deciding. §5.3 enumerates the collision surface.
+*"The game has no overheal/shield concept"* is asserted at **7 code sites — 4 backend (`Battler.cs:219,244,298,398`) and 3 frontend (`battler.ts:199,215,245`), so the invariant is parity-pinned on both simulators** — and **3 doc sites** (`game-design.md:132`, `backend-battle.md:36,73`), and it is the stated *reason* three separate heal channels cap at MaxHealth. A shield is not an increment on that design — it reverses it, and every cap that cites it needs re-deciding. §5.3 enumerates the collision surface.
 
 ## 4. The blocker: mitigation→sustain has an immortality breakpoint
 
@@ -85,7 +91,11 @@ That threshold is reachable with ordinary investment, not degenerate stacking:
 
 At Toughness 800 with 30% type resistance, a **16% sustain rate makes the battler strictly immune to direct hits** — and the immunity *deepens* as mitigation grows, because more mitigation means more absorbed damage means more healing. Worse, `DamageReflection` keeps working while immortal, so the outcome is not the 2-minute timeout draw a pure wall gets today — it is a **guaranteed win against any non-DoT enemy**.
 
-This is precisely the failure class #1330 existed to eliminate: flat Defense's degenerate immunity breakpoint at the `0` floor. Naively coupling healing to mitigation puts a breakpoint back, just further along the curve. DoT is the only residual pressure valve (it bypasses the Toughness curve — `backend-battle.md:34`), and it is content-dependent: against an enemy that authors no DoT, the immunity is absolute.
+That last step is worth spelling out, because the obvious objection is that reflection should switch off: `ReflectDamage` early-returns on `netDamage <= 0` (`BattleContext.cs:488-493`). It doesn't apply here. Sustain never drives `net` non-positive — `net` stays exactly what mitigation produced, and the heal is a *separate channel* that simply outruns it. So reflection fires on every hit for the entire battle while the defender's health never falls. The escalation from "unkillable wall" to "wins every fight" is what makes this a blocker rather than a balance note.
+
+**The MaxHealth heal cap does not defuse this.** §3.2 notes the sustain heal would be capped at MaxHealth like every other heal channel, which reads as a safeguard; it isn't one. The cap removes *overheal* only. Past the breakpoint the battler settles into a steady state just below full health — each hit removes `net`, the sustain heal refills the room that hit just made, and `Δhealth` clamps to `0` at the top of the bar instead of going negative. Never dying, forever. The `S ≤ m/(1−m)` analysis is unchanged; the cap only pins the equilibrium rather than letting health run away.
+
+This is precisely the failure class #1330 existed to eliminate: flat Defense's degenerate immunity breakpoint at the `0` floor. Naively coupling healing to mitigation puts a breakpoint back, just further along the curve. DoT is the only residual pressure valve (it bypasses the Toughness curve — `backend-battle.md:36`), and it is content-dependent: against an enemy that authors no DoT, the immunity is absolute.
 
 **Four ways out, with my read on each:**
 
@@ -136,12 +146,15 @@ Not planning these into implementation issues until there is a read on:
 
 - **Q1.** Should sustain credit **resistance-only** mitigation (consistent with `TypeResistanceMitigated`'s reasoning) or **resistance + Toughness** (consistent with #1331's tank-coupled intent)?
 - **Q2.** Is §4's option (2) — capping the sustain heal at a fraction of the damage that landed — an acceptable shape, or does the immortality breakpoint make the whole candidate not worth carrying?
-- **Q3.** For last-stand: fold the bonus as a **separate multiplier** in `ComputeNetDamage` (simple, legible) or **add into `Toughness`** so it rides the diminishing curve (self-limiting)?
+- **Q3.** Where does last-stand's bonus go (§3.1)? Three options, not two: **(a) a fire-path multiplier** in `BattleContext.DamageTarget` ↔ `dealPortionedDamage` — Cull's own placement, leaving the two prevented-damage tallies and `CombatRating` untouched; **(b) a multiplier inside `ComputeNetDamage`** — simplest to write, but then `DamageDodged`/`DamageParried` accrual and the synthetic reference defender each need an explicit call; or **(c) additive into `Toughness`**, so it rides the diminishing curve and is self-limiting. (a) is my lean, on the "mirror Cull exactly" argument. Relatedly: is the `LastStandBonus < 1` bound an authoring invariant of the #1478 class, or should it be clamped?
 - **Q4.** Do sustain and last-stand earn **new Technique paths**, or route onto **Restoration** / an existing key?
 - **Q5.** Is the absorb shield worth reversing the "no overheal/shield concept" invariant at all — or should we try the §6 approximation on existing primitives first and reassess?
 
 **My recommendation if a read is wanted:** ship **last-stand first** (smallest, bounded by construction, mirrors a shipped mechanic), take **sustain second and only with the §4 cap**, and **defer the shield** behind the §6 content experiment. That ordering also keeps the compounding analysis tractable — one new defensive lever at a time.
 
 ## 8. Documentation to update on landing
+
+**When the implementation issues are split out, also amend [#1219](https://github.com/ginderjeremiah/GameServer/issues/1219)** to strike its *"nothing reads live state like a current-health ratio mid-tick"* claim (§2) and revise its cost estimate for conditional "stance" passives downward. Left in place, that stale claim will be re-cited by the next spike to look at the same ground.
+
 
 Whichever land: `docs/game-design.md` (the archetype-split section) and `docs/game-design-combat.md` (a per-mechanic subsection alongside reflection and parry). A shield additionally requires retracting the "no overheal/shield concept" statement from `game-design.md`, `backend-battle.md`, and all seven code comments that cite it.
