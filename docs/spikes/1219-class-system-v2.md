@@ -32,7 +32,7 @@
 
 | #1219 premise | Current state |
 | --- | --- |
-| "nothing reads live state like a current-health ratio mid-tick" | **Stale.** Cull's execute bonus samples the *target's* live missing-health fraction once per fire and folds it into that fire's damage multiplier — `BattleContext.cs:316-320`, mirrored in `battle-step.ts:57-58`. |
+| "nothing reads live state like a current-health ratio mid-tick" | **Stale.** Cull's execute bonus samples the *target's* live missing-health fraction once per fire and folds it into that fire's damage multiplier — `BattleContext.cs:314-318`, mirrored in `battle-step.ts:57-58`. |
 | "today modifiers are snapshot-fixed plus timed skill effects" | **Half stale.** Timed effects already mutate the live `AttributeCollection` mid-battle (`BattlerEffects.Apply`/`Advance`, with a `MaxHealth` re-clamp on both), so mid-battle attribute mutation is routine. What is genuinely absent is a modifier that is a *continuous function of live state*. |
 | "in-class bonus … re-couples class into the just-tuned proficiency XP accrual / attribute pipelines" | **Overstated on the plumbing; partly conceded on the tuning.** The wiring is free: the accrual is a pure `Game.Core` function taking a `ProficiencyCatalog` (#1602), its live adapter (`ProficiencyRewardService.AccrueAndApply`) already receives the `Player`, and the offline simulator already carries `ResolveClass` + `BattleSnapshot.ClassId` — the class is in hand at every call site. The *balance* half of the worry is real though smaller than stated: see §2's `ratingDenominator` caveat for the residual coupling. |
 | "an in-class bonus … changes efficiency, not access" | **Confirmed** — and stronger than assumed, see §2. |
@@ -62,7 +62,7 @@ Worth stating explicitly so it isn't rediscovered as a bug during tuning.
   `ProficiencyAccrual.Accrue` (or threaded into `Split`). Boosting the pie for in-class paths is the same
   arithmetic — there is no meaningful choice between the two.
 - **Zero parity surface.** Proficiency accrual is server-side only; the tallies it consumes are documented as
-  "backend-only side channels — no parity surface" (`BattleContext.cs:355`), and `CombatRating` is explicitly
+  "backend-only side channels — no parity surface" (`BattleContext.cs:353`), and `CombatRating` is explicitly
   server-only. Nothing in this direction touches the frontend simulator.
 - **Both call sites already hold the class.** `ProficiencyRewardService.AccrueAndApply(..., Player player, ...)`
   and `OfflineProgressSimulator` (via `OfflineSimulationParameters.ResolveClass` + `BattleSnapshot.ClassId`).
@@ -253,3 +253,8 @@ purely a call for the owner: both rosters are coherent, they just disagree.
    hold it for a V2 direction that cannot start until Q5 is answered?
 
 **No implementation issues have been created yet** — per the ideation rule, splitting waits on the answers above.
+
+When they are split, re-check this doc's five line-numbered citations against `main` in the same pass, and amend
+[#1219](https://github.com/ginderjeremiah/GameServer/issues/1219) to strike its stale *"nothing reads live state
+like a current-health ratio mid-tick"* claim (§1). Both docs in this pair have accumulated citation rot while
+parked — see [`1331-defensive-mechanics.md`](./1331-defensive-mechanics.md) §8 for the movers.
