@@ -79,6 +79,9 @@ type InFlightRequest = {
 	startTime: number;
 	// Cleared when the response resolves; fires the timeout backstop if it never does.
 	timer: ReturnType<typeof setTimeout>;
+	// The socket the command was actually sent on, so a close settles exactly the requests that
+	// connection carried rather than whatever happens to be pending on the instance (see handleClose).
+	socket: WebSocket;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous queue of requests for differing commands; ApiSocketRequest<T> is invariant in T so a common supertype isn't expressible.
 	command: ApiSocketRequest<any>;
 };
@@ -238,10 +241,28 @@ export class ApiSocket {
 			return;
 		}
 		this.socket = socket;
-		socket.onopen = this.onStart.bind(this);
-		socket.onmessage = this.receiveResponse.bind(this);
-		socket.onerror = this.handleError.bind(this);
-		socket.onclose = this.handleClose.bind(this);
+		// Handlers are scoped to the socket they were bound to, not to the instance: a superseded socket can
+		// still deliver events — `readyState` reaches CLOSED before the close event is dispatched, so a
+		// reconnect can slip in ahead of it — and everything these handlers touch (the stability timer, the
+		// queued commands, this session's auth-retry budget) belongs to whichever connection is current by
+		// then. `handleClose` takes the socket rather than being wrapped, because a stale close still has to
+		// settle the requests its own socket carried before it bails.
+		socket.onopen = this.scopedToSocket(socket, () => this.onStart());
+		socket.onmessage = this.scopedToSocket(socket, (ev: MessageEvent) => this.receiveResponse(ev));
+		socket.onerror = this.scopedToSocket(socket, (ev: Event) => this.handleError(ev));
+		socket.onclose = (ev) => this.handleClose(socket, ev);
+	}
+
+	/** Wraps a socket event handler so it runs only while that socket is still this instance's current
+	 *  connection, making "an event only ever affects the connection it came from" structural rather than
+	 *  something each handler (and each new branch inside it) has to re-derive. */
+	private scopedToSocket<TEvent>(socket: WebSocket, handler: (ev: TEvent) => void) {
+		return (ev: TEvent) => {
+			if (this.socket !== socket) {
+				return;
+			}
+			handler(ev);
+		};
 	}
 
 	public async sendSocketCommand<T extends ApiSocketCommandNoRequest>(commandName: T): Promise<IApiSocketResponse<T>>;
@@ -432,15 +453,16 @@ export class ApiSocket {
 
 	private async processCommandQueue() {
 		await this.ensureSocket();
-		if (this.socket && this.socket.readyState === this.socket.OPEN) {
+		const socket = this.socket;
+		if (socket && socket.readyState === socket.OPEN) {
 			let request: ApiSocketRequest | undefined;
 			while ((request = this.socketCommandQueue.shift())) {
 				// Arm the timeout only now that the command is actually sent — a command can sit queued
 				// during a reconnect, and that wait shouldn't count against its per-request budget.
 				const id = request.id;
 				const timer = setTimeout(() => this.timeoutRequest(id), REQUEST_TIMEOUT_MS);
-				this.inFlightRequests.set(id, { startTime: performance.now(), timer, command: request });
-				this.socket.send(JSON.stringify(request.getCommandInfo()));
+				this.inFlightRequests.set(id, { startTime: performance.now(), timer, socket, command: request });
+				socket.send(JSON.stringify(request.getCommandInfo()));
 			}
 		}
 	}
@@ -481,15 +503,21 @@ export class ApiSocket {
 		}
 	}
 
-	/** Resolves every still-pending in-flight request with an error response and clears the tracking map.
-	 *  Reuses the transport's resolve-with-error contract (rather than rejecting) so existing callers handle
-	 *  a dropped connection through the same `response.error` path they already use for server errors. */
-	private settleInFlightRequests(error: string) {
-		for (const { command, timer } of this.inFlightRequests.values()) {
-			clearTimeout(timer);
-			command.settleWithError(error);
+	/** Resolves every still-pending request sent on `socket` with an error response and prunes it from the
+	 *  tracking map. Reuses the transport's resolve-with-error contract (rather than rejecting) so existing
+	 *  callers handle a dropped connection through the same `response.error` path they already use for
+	 *  server errors. Scoped to one socket because the map outlives any single connection: a socket that has
+	 *  since been superseded must still settle its own commands (nothing will ever answer them) without
+	 *  touching those of the connection that replaced it. */
+	private settleInFlightRequests(socket: WebSocket, error: string) {
+		for (const [id, inFlight] of this.inFlightRequests) {
+			if (inFlight.socket !== socket) {
+				continue;
+			}
+			clearTimeout(inFlight.timer);
+			this.inFlightRequests.delete(id);
+			inFlight.command.settleWithError(error);
 		}
-		this.inFlightRequests.clear();
 	}
 
 	/** Resolves every queued-but-unsent command with an error response and empties the queue. These
@@ -546,12 +574,26 @@ export class ApiSocket {
 	 * is left for the keepalive ping to reconnect — refreshing wouldn't help, and retrying here risks
 	 * fighting an intentional close. A pre-open close is only routed through the refresh/retry path at all
 	 * when it's plausibly an auth rejection — see wasHandshakeTokenDemonstrablyFresh.
+	 *
+	 * Every decision below is about the connection this instance currently holds, so a close from a socket
+	 * that has already been superseded is ignored past settling its own requests.
 	 */
-	private handleClose(ev: CloseEvent) {
+	private handleClose(socket: WebSocket, ev: CloseEvent) {
 		// A command sent before the drop will never get a response on this dead socket, and we deliberately
 		// don't blind-resend (commands like DefeatEnemy aren't idempotent). Settle each pending request with
-		// an error so the awaiting caller surfaces a toast / retries instead of hanging forever.
-		this.settleInFlightRequests(CONNECTION_LOST_ERROR);
+		// an error so the awaiting caller surfaces a toast / retries instead of hanging forever. Done ahead
+		// of the staleness check below because these commands belong to *this* socket whether or not it is
+		// still the current one — skipping them would leave their callers waiting out the request timeout.
+		this.settleInFlightRequests(socket, CONNECTION_LOST_ERROR);
+
+		if (this.socket !== socket) {
+			// A superseded socket's close. Acting on it would judge a dead connection's event against the
+			// live one's state: cancelling the budget refill a healthy socket just armed, erroring commands
+			// that socket is about to send, and burning a single-use refresh token for a handshake nobody is
+			// waiting on. Nothing else needs doing — a socket this instance no longer holds has no lifecycle
+			// left to manage.
+			return;
+		}
 
 		// The socket didn't stay open, so cancel any pending "connection is now stable" budget refill.
 		this.clearConnectionStableTimer();
