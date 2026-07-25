@@ -64,7 +64,7 @@ function createMockWebSocket(url?: string, protocols?: string | string[]): MockW
 const webSocketMock = vi.fn(createMockWebSocket);
 vi.stubGlobal('WebSocket', webSocketMock);
 
-import { ApiSocket, fetchSocketData, onSocketError } from '$lib/api/api-socket';
+import { ApiSocket, fetchSocketData, onSocketError, onPingMeasured } from '$lib/api/api-socket';
 import { setTokens, getAccessToken, getTokens, clearTokens } from '$lib/api/token-store';
 import {
 	ensureValidAccessToken,
@@ -1654,6 +1654,164 @@ describe('ApiSocket', () => {
 				expect(internals(apiSocket).socketAuthRetries).toBe(0);
 				expect(socketInstances.length).toBe(socketsBefore);
 			});
+		});
+	});
+
+	// A socket reaches CLOSED before its close event is dispatched, so a reconnect can open in between and
+	// leave the old socket's event to land on a connection it no longer belongs to. The handlers are bound
+	// per socket so a straggler can't act on the live connection's state (#2432).
+	describe('socket-scoped event handling', () => {
+		const stableTimer = (s: ApiSocket) =>
+			(s as unknown as { connectionStableTimer: ReturnType<typeof setTimeout> | null }).connectionStableTimer;
+
+		/** Makes the next socket stay CONNECTING, so commands sent through it sit queued-but-unsent. A
+		 *  function expression (not an arrow) so the mock can still be invoked with `new WebSocket()`. */
+		const connectingSocketOnce = () => {
+			webSocketMock.mockImplementationOnce(function (url?: string, protocols?: string | string[]) {
+				const ws = createMockWebSocket(url, protocols);
+				ws.readyState = 0;
+				return ws;
+			});
+		};
+
+		/** Drives the interleave the guard exists for: the current socket reaches CLOSED (its close event
+		 *  still queued), then a command opens a replacement, so the stale close lands on a live connection.
+		 *  The command also lifts any teardown mark, which is what puts the straggler past handleClose's
+		 *  teardown short-circuit in the first place. Its promise is returned so a test can assert the live
+		 *  connection's own command is left alone by its predecessor's close. */
+		const supersedeCurrentSocket = async () => {
+			const stale = lastWs();
+			stale.readyState = stale.CLOSED;
+			const livePromise = apiSocket.sendSocketCommand('NewEnemy', { newZoneId: 1, forceAbandon: false });
+			await flushMicrotasks();
+			const live = lastWs();
+			expect(live).not.toBe(stale);
+			return { stale, live, livePromise };
+		};
+
+		it('does not refresh, retry, or cancel the live budget refill on a superseded socket close', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			// A handshake this teardown aborts surfaces as 1006, so the straggling close would otherwise
+			// reach the auth-retry path once the command below lifts the mark.
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			apiSocket.disconnect();
+			const { stale, live } = await supersedeCurrentSocket();
+
+			live.onopen?.(); // the replacement is healthy: its budget refill is now armed
+			expect(stableTimer(apiSocket)).not.toBeNull();
+
+			stale.onclose?.({ code: 1006 });
+			await flushMicrotasks();
+
+			expect(refreshTokens).not.toHaveBeenCalled();
+			expect(internals(apiSocket).socketAuthRetries).toBe(0);
+			// The live socket's refill and keepalive are untouched by another connection's close.
+			expect(stableTimer(apiSocket)).not.toBeNull();
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+		});
+
+		it('does not settle the live connection queued commands on a superseded socket close', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			// Both sockets stay CONNECTING, so neither command is ever sent — the queued-but-unsent state a
+			// terminal close settles.
+			connectingSocketOnce();
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			connectingSocketOnce();
+			const { stale, live } = await supersedeCurrentSocket();
+			expect(live.send).not.toHaveBeenCalled();
+
+			// A clean stale close would otherwise stop the keepalive and error the queue as terminal.
+			stale.onclose?.({ code: 1000 });
+			await flushMicrotasks();
+
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+			live.readyState = live.OPEN;
+			live.onopen?.();
+			await flushMicrotasks();
+			// Both survived to be flushed on the replacement (the keepalive's own 'ping' send aside).
+			const flushed = live.send.mock.calls.map((call) => call[0]).filter((payload: string) => payload !== 'ping');
+			expect(flushed.map((payload: string) => JSON.parse(payload).name)).toEqual(['DefeatEnemy', 'NewEnemy']);
+		});
+
+		it('still settles the requests the superseded socket itself carried', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			// Sent on the stale socket, so nothing will ever answer it — the close must settle it rather
+			// than leave the caller waiting out the per-request timeout.
+			const stranded = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const { stale, live, livePromise } = await supersedeCurrentSocket();
+			expect(stale.send).toHaveBeenCalledTimes(1);
+
+			live.onopen?.();
+			await flushMicrotasks();
+			const onLive = JSON.parse(live.send.mock.calls[0][0]);
+
+			stale.onclose?.({ code: 1006 });
+			await flushMicrotasks();
+
+			expect((await stranded).error).toBe('Connection lost. Please try again.');
+			// The replacement's own in-flight command is untouched by its predecessor's close and still
+			// resolves normally — this is the half that pins the per-socket filter, since a settled request
+			// is pruned and its later response would simply be dropped.
+			receive(live, JSON.stringify({ id: onLive.id, name: 'NewEnemy', data: {} }));
+			expect((await livePromise).error).toBeUndefined();
+		});
+
+		it('still delivers a response that arrived on the socket before it was superseded', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+			// A message queued before the close is dispatched after it, so the server's answer can land once
+			// the socket is already stale. Dropping it would report a lost connection for a non-idempotent
+			// command the server actually completed.
+			const answered = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const { stale } = await supersedeCurrentSocket();
+			const onStale = JSON.parse(stale.send.mock.calls[0][0]);
+
+			receive(stale, JSON.stringify({ id: onStale.id, name: 'DefeatEnemy', data: { cooldown: 42 } }));
+			stale.onclose?.({ code: 1006 });
+			await flushMicrotasks();
+
+			const response = await answered;
+			expect(response.error).toBeUndefined();
+			expect(response.data).toEqual({ cooldown: 42 });
+		});
+
+		it('keeps a superseded socket keepalive traffic and errors off the live connection', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			const errors: string[] = [];
+			const latencies: number[] = [];
+			const unhookError = onSocketError((message) => errors.push(message));
+			const unhookPing = onPingMeasured((ms) => latencies.push(ms));
+			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const { stale, live } = await supersedeCurrentSocket();
+			live.onopen?.();
+			await flushMicrotasks();
+			live.send.mockClear();
+			stale.send.mockClear();
+
+			stale.onmessage?.({ data: 'ping' });
+			stale.onmessage?.({ data: 'pong' });
+			stale.onerror?.();
+
+			// A stale ping is answered on the socket that asked, never on the connection that replaced it;
+			// a stale pong says nothing about the live connection's health, so it reports no latency; and a
+			// dead connection's error must not surface a toast for the session that replaced it.
+			expect(stale.send).toHaveBeenCalledWith('pong');
+			expect(live.send).not.toHaveBeenCalled();
+			expect(latencies).toEqual([]);
+			expect(errors).toEqual([]);
+			errorSpy.mockRestore();
+			unhookError();
+			unhookPing();
 		});
 	});
 });
