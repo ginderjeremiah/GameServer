@@ -136,7 +136,7 @@ export class ApiSocket {
 	 * race to create (and leak) two sockets.
 	 */
 	private ensureSocket(): Promise<void> {
-		if (this.socket && this.socket.readyState !== this.socket.CLOSED) {
+		if (this.hasUnclosedSocket()) {
 			return Promise.resolve();
 		}
 		if (this.connecting) {
@@ -178,8 +178,13 @@ export class ApiSocket {
 		// A teardown that landed and was then lifted by a new command stopped the interval armed above (this
 		// open is shared, so ensureSocket didn't start a fresh one). Re-assert it rather than completing into a
 		// socket no keepalive owns — no half-open detection, and handleClose would hold the queue for a
-		// background reconnect that never runs.
-		this.ensurePingInterval();
+		// background reconnect that never runs. Skipped once the session's tokens are gone: attemptPing tears
+		// the keepalive down precisely because the session ended, so reviving it here would resurrect the
+		// post-logout ping noise that branch exists to prevent — and would defer this connect's queue to a
+		// keepalive that immediately stops again.
+		if (getAccessToken() !== null) {
+			this.ensurePingInterval();
+		}
 		let accessToken = ensured.accessToken;
 		// A logged-in session (one that had a refresh token) whose pre-emptive refresh didn't yield a
 		// token: bail out without opening rather than handing the server a stale/missing token. A
@@ -189,6 +194,7 @@ export class ApiSocket {
 				// The failure was retryable (network blip, transient server error): leave the queue and
 				// tokens intact and just bail out — the keepalive ping's next ensureSocket() call retries
 				// the connect rather than forcing a logout over a transient failure.
+				this.settleQueueIfKeepaliveStopped();
 				return;
 			}
 			// A concurrent tab can rotate in a fresh pair in the gap between the refresh's own re-read
@@ -275,6 +281,14 @@ export class ApiSocket {
 		// token, which would otherwise produce post-logout reconnect noise.
 		if (!getAccessToken()) {
 			this.stopPingInterval();
+			// Stopping the keepalive removes the only thing that would ever reconnect and re-flush the queue,
+			// so — unless a socket is still around to flush it (onStart/processCommandQueue), as for a
+			// token-less anonymous session — this is terminal and the queue must be settled here like every
+			// other terminal branch. In-flight requests need no handling: they only exist on a socket that can
+			// still answer them, and every close path already settles them.
+			if (!this.hasFlushableSocket()) {
+				this.settleQueuedRequests(CONNECTION_LOST_ERROR);
+			}
 			return;
 		}
 		void this.ensureSocket();
@@ -309,8 +323,33 @@ export class ApiSocket {
 		this.teardownRequested = true;
 		this.stopPingInterval();
 		this.clearConnectionStableTimer();
-		if (this.socket && this.socket.readyState !== this.socket.CLOSED) {
-			this.socket.close(NORMAL_CLOSURE);
+		// close() on an already-CLOSED socket is a spec no-op, and on a CONNECTING one it aborts the
+		// handshake — which is exactly the intent here — so no readyState guard is needed.
+		this.socket?.close(NORMAL_CLOSURE);
+	}
+
+	/** True while a socket exists that hasn't reached CLOSED — i.e. one that is open, or still connecting
+	 *  and so may yet open. Not the same as "usable right now": a CONNECTING socket can't be sent on. */
+	private hasUnclosedSocket(): boolean {
+		return this.socket !== undefined && this.socket.readyState !== this.socket.CLOSED;
+	}
+
+	/** True while something is still positioned to send the queued commands: a socket already open
+	 *  (`processCommandQueue` drains it), one still connecting (`onStart` flushes it on open, and every
+	 *  close it can take instead settles the queue — directly, or via `settleQueueIfKeepaliveStopped`
+	 *  on the branches that would otherwise defer to the keepalive), or an open still in flight. */
+	private hasFlushableSocket(): boolean {
+		return this.connecting !== null || this.hasUnclosedSocket();
+	}
+
+	/** Settles the queued-but-unsent commands if the keepalive is no longer running. Every branch that
+	 *  leaves the queue in place does so on the assumption that the keepalive will reconnect and re-flush
+	 *  it — but a concurrent logout can tear the keepalive down mid-connect (see `attemptPing`), which
+	 *  makes that branch terminal after all. Calling this at each such exit keeps the "queued commands are
+	 *  always settled on a terminal path" invariant true no matter how the two interleave. */
+	private settleQueueIfKeepaliveStopped() {
+		if (this.pingIntervalId === null) {
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 		}
 	}
 
@@ -520,6 +559,7 @@ export class ApiSocket {
 		if (this.socketOpened) {
 			// A socket that opened before dropping flushed its queue in onStart; the keepalive ping will
 			// reconnect and re-flush anything queued since, so leave the queue for it to re-send.
+			this.settleQueueIfKeepaliveStopped();
 			return;
 		}
 
@@ -532,6 +572,7 @@ export class ApiSocket {
 			console.warn(
 				'Handshake rejected while presenting a demonstrably fresh access token; not treating as an auth failure.'
 			);
+			this.settleQueueIfKeepaliveStopped();
 			return;
 		}
 

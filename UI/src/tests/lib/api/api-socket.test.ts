@@ -1047,6 +1047,103 @@ describe('ApiSocket', () => {
 			expect(response.error).toBeDefined();
 			expect(handleAuthFailure).toHaveBeenCalledTimes(1);
 		});
+
+		it('settles an unsent queued command when the keepalive shuts down on a cleared token', async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+
+				const promise = queueOnConnectingSocket(apiSocket);
+				await flushMicrotasks();
+				const ws = lastWs();
+				// Open then drop: handleClose deliberately keeps the queue for the keepalive to re-flush, so
+				// this is the state in which the keepalive is the queue's only remaining owner. The mock is
+				// deliberately left CONNECTING across onopen — that's what keeps the command unsent through
+				// onStart's processCommandQueue; flipping it to OPEN here would flush the queue and make the
+				// assertion below vacuous.
+				ws.onopen?.();
+				await flushMicrotasks();
+				ws.readyState = ws.CLOSED;
+				ws.onclose?.({ code: 1006 });
+				expect(ws.send).not.toHaveBeenCalled();
+
+				// Another tab logs out (or hits an auth failure) and clears the shared tokens.
+				localStorage.clear();
+				const socketsBefore = socketInstances.length;
+				vi.advanceTimersByTime(10000);
+
+				expect(internals(apiSocket).pingIntervalId).toBeNull();
+				expect(socketInstances.length).toBe(socketsBefore);
+				const response = await promise;
+				expect(response.error).toBe('Connection lost. Please try again.');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		// The two branches that deliberately leave the queue for the keepalive to re-flush, exercised with
+		// the keepalive already torn down by a concurrent logout — which makes them terminal after all.
+		it('settles an unsent queued command when a fresh-token rejection outlives the keepalive', async () => {
+			vi.useFakeTimers();
+			try {
+				// A handshake that hangs (a proxy stripping Upgrade) while presenting a token with far more
+				// than FRESH_TOKEN_MARGIN_SECONDS of life, so its eventual close takes the no-refresh branch.
+				setTokens({ accessToken: makeAccessToken(600), refreshToken: 'r' });
+
+				const promise = queueOnConnectingSocket(apiSocket);
+				await flushMicrotasks();
+				const connecting = lastWs();
+				expect(connecting.send).not.toHaveBeenCalled();
+
+				// Another tab logs out while the handshake is still in flight; the ping tick then tears the
+				// keepalive down but leaves the queue, since the connecting socket could still flush it.
+				localStorage.clear();
+				vi.advanceTimersByTime(10000);
+				expect(internals(apiSocket).pingIntervalId).toBeNull();
+
+				connecting.readyState = connecting.CLOSED;
+				connecting.onclose?.({ code: 1006 });
+				await flushMicrotasks();
+
+				expect(refreshTokens).not.toHaveBeenCalled();
+				const response = await promise;
+				expect(response.error).toBe('Connection lost. Please try again.');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
+
+		it("settles an unsent queued command when openSocket's retryable bail outlives the keepalive", async () => {
+			vi.useFakeTimers();
+			try {
+				setTokens({ accessToken: 'a', refreshToken: 'r' });
+				// Hold the pre-emptive refresh open so the ping tick lands while `connecting` is still in
+				// flight, then resolve it retryably (no token, not rejected) to take openSocket's bail.
+				let releaseRefresh: (result: AccessTokenResult) => void = () => {};
+				vi.mocked(ensureValidAccessToken).mockImplementation(
+					() => new Promise<AccessTokenResult>((resolve) => (releaseRefresh = resolve))
+				);
+
+				const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+				await flushMicrotasks();
+				expect(webSocketMock).not.toHaveBeenCalled();
+
+				localStorage.clear();
+				vi.advanceTimersByTime(10000);
+				expect(internals(apiSocket).pingIntervalId).toBeNull();
+
+				releaseRefresh({ accessToken: null, rejected: false });
+				await flushMicrotasks();
+
+				// The bail must not force a logout — it's still a transient failure, just a terminal one now.
+				expect(handleAuthFailure).not.toHaveBeenCalled();
+				expect(webSocketMock).not.toHaveBeenCalled();
+				const response = await promise;
+				expect(response.error).toBe('Connection lost. Please try again.');
+			} finally {
+				vi.useRealTimers();
+			}
+		});
 	});
 
 	describe('listenCommand unhook', () => {
