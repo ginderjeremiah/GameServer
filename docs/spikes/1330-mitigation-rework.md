@@ -98,7 +98,7 @@ from the mitigation call path on both simulators.
 
 ## Out of scope / deferred
 
-- **Other defensive mechanics** — mitigation→sustain, absorb shield, last-stand — tracked in [#1331](https://github.com/ginderjeremiah/GameServer/issues/1331) (shield/last-stand lean toward the skill-effect system; mitigation→sustain toward an authored attribute like reflection).
+- **Other defensive mechanics** — mitigation→sustain, absorb shield, last-stand — tracked in [#1331](https://github.com/ginderjeremiah/GameServer/issues/1331), researched in [`1331-defensive-mechanics.md`](./1331-defensive-mechanics.md). That spike **revises the lean recorded here** (shield/last-stand → skill effects, sustain → an authored attribute): last-stand is now the cheapest of the three (the defender-side mirror of Cull's live missing-health read), the shield the most expensive (it reverses the "no overheal/shield concept" invariant), and sustain carries an immortality breakpoint that needs a cap.
 - **Ramping "fortify"** (tankier the longer the fight) — a candidate **class passive**, noted in [#1219](https://github.com/ginderjeremiah/GameServer/issues/1219); deepens attrition without a kill condition, so it pairs with reflection rather than replacing it.
 - **Anti-burst damage cap** (no hit exceeds X% of MaxHealth) — **not pursued for now**: deliberately avoiding a stat that exists only to counter specific enemies, especially one keyed to a single player archetype. Revisit only if a genuine burst meta emerges.
 - **Enemy reflection / retaliation as a boss mechanic** — the authored-only model makes it free to add later; out of this V1.
