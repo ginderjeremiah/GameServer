@@ -198,14 +198,8 @@ export function battleStep(
 			// draw was retired, #1330), and the parry counter's crit — all taken unconditionally so the seeded
 			// stream advances as a pure function of the fire sequence, never of a roll outcome or of the
 			// defender's build (a 0-chance draw still consumes). A parry takes precedence over a dodge.
-			const parried =
-				rng.next() <
-				player.attributes.getValue(EAttribute.ParryChance) *
-					player.attributes.getValue(EAttribute.ParryChanceMultiplier);
-			const dodged =
-				rng.next() <
-				player.attributes.getValue(EAttribute.DodgeChance) *
-					player.attributes.getValue(EAttribute.DodgeChanceMultiplier);
+			const parried = rng.next() < player.effectiveParryChance;
+			const dodged = rng.next() < player.effectiveDodgeChance;
 			const counterCritDraw = rng.next();
 			const raw = skill.calculateDamage();
 			// A parry or dodge zeroes the WHOLE multi-typed hit; otherwise the raw hit is split across the

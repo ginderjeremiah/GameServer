@@ -125,6 +125,100 @@ describe('Battler', () => {
 			expect(battler.cdMultiplier).toBe(2);
 		});
 
+		// effectiveParryChance/effectiveDodgeChance = enabler × multiplier (#2429) — the products the engine's
+		// own draws read (see battleStep) and the backend combat rating prices. Mirrors the backend BattlerTests
+		// EffectiveParryChance/EffectiveDodgeChance cases with the same scenarios and results.
+		it('parries at exactly 0 regardless of Luck with no ParryChance enabler', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Luck, amount: 50 }] })
+			});
+
+			// ParryChance is an authored-only enabler idling at 0, so Luck only lifts the (idle) multiplier.
+			expect(battler.effectiveParryChance).toBeCloseTo(0, 10);
+		});
+
+		it('scales an authored ParryChance by the Luck-amplified ParryChanceMultiplier', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.ParryChance, amount: 0.2 },
+						{ attributeId: EAttribute.Luck, amount: 20 }
+					]
+				})
+			});
+
+			// ParryChance 0.2 × ParryChanceMultiplier (1 + 0.002·LUK(20) = 1.04) = 0.208.
+			expect(battler.effectiveParryChance).toBeCloseTo(0.2 * (1 + 0.002 * 20), 10);
+		});
+
+		it('passes an authored ParryChance through verbatim when Luck is zero (base multiplier)', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.ParryChance, amount: 0.2 }] })
+			});
+
+			expect(battler.effectiveParryChance).toBeCloseTo(0.2, 10);
+		});
+
+		it('leaves a parry product above 1 unclamped', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.ParryChance, amount: 0.8 },
+						{ attributeId: EAttribute.Luck, amount: 500 }
+					]
+				})
+			});
+
+			// Deliberately unclamped: the engine draws against [0, 1), so a product at or above 1 saturates
+			// naturally. Clamping is the backend combat rating's concern (it prices an expectation, not a draw).
+			expect(battler.effectiveParryChance).toBeCloseTo(1.6, 10);
+		});
+
+		it('reads effectiveParryChance live, reflecting a mid-battle ParryChanceMultiplier buff', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.ParryChance, amount: 0.2 }] })
+			});
+			expect(battler.effectiveParryChance).toBeCloseTo(0.2, 10);
+
+			// A +1.0 buff lands on the base 1.0 multiplier, doubling the composed chance to 0.4.
+			battler.applyEffect(
+				makeEffect(1, ESkillEffectTarget.Self, EAttribute.ParryChanceMultiplier, EModifierType.Additive, 1, 1000)
+			);
+
+			expect(battler.effectiveParryChance).toBeCloseTo(0.4, 10);
+		});
+
+		it('dodges at exactly 0 regardless of Agility with no DodgeChance enabler', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Agility, amount: 50 }] })
+			});
+
+			// DodgeChance shares ParryChance's authored-only, base-0 enabler shape.
+			expect(battler.effectiveDodgeChance).toBeCloseTo(0, 10);
+		});
+
+		it('scales an authored DodgeChance by the Agility-amplified DodgeChanceMultiplier', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({
+					attributes: [
+						{ attributeId: EAttribute.DodgeChance, amount: 0.25 },
+						{ attributeId: EAttribute.Agility, amount: 20 }
+					]
+				})
+			});
+
+			// DodgeChance 0.25 × DodgeChanceMultiplier (1 + 0.002·AGI(20) = 1.04) = 0.26.
+			expect(battler.effectiveDodgeChance).toBeCloseTo(0.25 * (1 + 0.002 * 20), 10);
+		});
+
+		it('passes an authored DodgeChance through verbatim when Agility is zero (base multiplier)', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.DodgeChance, amount: 0.25 }] })
+			});
+
+			expect(battler.effectiveDodgeChance).toBeCloseTo(0.25, 10);
+		});
+
 		it('sets isDead to false', () => {
 			const battler = new Battler({ battlerData: makeBattlerData() });
 			expect(battler.isDead).toBe(false);

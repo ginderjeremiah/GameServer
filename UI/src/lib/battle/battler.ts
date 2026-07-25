@@ -154,6 +154,27 @@ export class Battler {
 		return cooldownMultiplier(this.attributes);
 	}
 
+	/** This battler's composed parry chance — `ParryChance × ParryChanceMultiplier`, the product the engine
+	 *  draws against (see `battleStep`). Composed here at consumption like {@link cdMultiplier}, so the live
+	 *  draw and the backend combat rating's pricing of the same capability cannot derive it differently
+	 *  (#2429). `ParryChance` is an authored-only enabler idling at 0, so an un-enabled build parries at
+	 *  exactly 0 regardless of Luck. Deliberately UNCLAMPED: a draw against `[0, 1)` saturates naturally.
+	 *  Mirrors the backend `Battler.EffectiveParryChance`. */
+	public get effectiveParryChance(): number {
+		return (
+			this.attributes.getValue(EAttribute.ParryChance) * this.attributes.getValue(EAttribute.ParryChanceMultiplier)
+		);
+	}
+
+	/** This battler's composed dodge chance — `DodgeChance × DodgeChanceMultiplier`, the engine's own draw
+	 *  product. Shares {@link effectiveParryChance}'s rationale, enabler shape (authored-only, base 0,
+	 *  Agility-scaled multiplier), and unclamped semantics. Mirrors the backend `Battler.EffectiveDodgeChance`. */
+	public get effectiveDodgeChance(): number {
+		return (
+			this.attributes.getValue(EAttribute.DodgeChance) * this.attributes.getValue(EAttribute.DodgeChanceMultiplier)
+		);
+	}
+
 	constructor(init: BattlerInit = {}) {
 		this.reset(init);
 	}
