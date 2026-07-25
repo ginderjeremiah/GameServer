@@ -67,6 +67,19 @@ namespace Game.Core.Battle
             return Math.Clamp(chance, 0.0, 1.0);
         }
 
+        // The two avoidance chances, each read once so the offense (riposte) and survivability readings cannot
+        // drift apart — the very failure this clamp exists to fix was those two sites disagreeing about what a
+        // parry chance means. Mirrors the engine's own products (BattleContext.cs:230-233).
+        private static double EffectiveParryChance(Battler caster)
+        {
+            return ProcChance(caster.GetAttributeValue(ParryChance) * caster.GetAttributeValue(ParryChanceMultiplier));
+        }
+
+        private static double EffectiveDodgeChance(Battler caster)
+        {
+            return ProcChance(caster.GetAttributeValue(DodgeChance) * caster.GetAttributeValue(DodgeChanceMultiplier));
+        }
+
         /// <summary>
         /// The rating for <paramref name="battler"/> as assembled — <c>√(OffenseRate × Survivability)</c>
         /// against the fixed reference profiles in <see cref="ServerGameConstants"/>. Pass
@@ -222,9 +235,7 @@ namespace Game.Core.Battle
             // Riposte (player-side only): effectiveParryChance × reference attack rate × the counter's expected hit.
             if (isPlayer && battler.CounterSkill is Skill counterSkill)
             {
-                var effectiveParryChance = ProcChance(
-                    effectiveCaster.GetAttributeValue(ParryChance) * effectiveCaster.GetAttributeValue(ParryChanceMultiplier));
-                total += effectiveParryChance * ServerGameConstants.RefAttackRate
+                total += EffectiveParryChance(effectiveCaster) * ServerGameConstants.RefAttackRate
                     * ExpectedDirectHit(counterSkill, isPlayer, effectiveCaster, referenceDefense);
             }
 
@@ -283,10 +294,8 @@ namespace Game.Core.Battle
             var avoid = 0.0;
             if (isPlayer)
             {
-                var parry = ProcChance(
-                    effectiveCaster.GetAttributeValue(ParryChance) * effectiveCaster.GetAttributeValue(ParryChanceMultiplier));
-                var dodge = ProcChance(
-                    effectiveCaster.GetAttributeValue(DodgeChance) * effectiveCaster.GetAttributeValue(DodgeChanceMultiplier));
+                var parry = EffectiveParryChance(effectiveCaster);
+                var dodge = EffectiveDodgeChance(effectiveCaster);
                 avoid = parry + (1 - parry) * dodge;
             }
 
