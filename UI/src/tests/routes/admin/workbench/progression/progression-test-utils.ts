@@ -81,6 +81,23 @@ export const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProfici
 	...over
 });
 
+/* The map suites (`ProgressionMap.test.ts`, `progression-map.test.ts`) build topology — several tiers
+   across several paths — so identity is positional at their call sites (`mapTier(10, 0, 0)`), and their
+   assertions read the generated `Path {id}` name back out of the rendered column header. The two
+   adapters below keep the field set in one place while preserving both. */
+
+/** Positional path fixture for the map suites — `Path {id}`, keyed on physical damage. */
+export const mapPath = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath =>
+	path({ id, name: `Path ${id}`, activityKey: EActivityKey.Physical, ...over });
+
+/** Positional tier fixture for the map suites — `Tier {id}` at `ordinal` on `pathId`. */
+export const mapTier = (
+	id: number,
+	pathId: number,
+	ordinal: number,
+	over: Partial<WorkbenchProficiency> = {}
+): WorkbenchProficiency => tier({ id, name: `Tier ${id}`, pathId, pathOrdinal: ordinal, ...over });
+
 /**
  * Casts a partial fake to the store the components read. The suites drive these rather than the real
  * `ProgressionStore`, which only loads through a socket-backed `load()`.

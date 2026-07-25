@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
-import { EActivityKey } from '$lib/api';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import ProgressionMap from '$routes/admin/workbench/progression/ProgressionMap.svelte';
 import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
 import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import { mapPath as path, mapTier as tier } from './progression-test-utils';
 
 // jsdom has no ResizeObserver; the map observes its container on mount.
 class ResizeObserverStub {
@@ -14,40 +14,6 @@ class ResizeObserverStub {
 
 beforeAll(() => {
 	(globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub;
-});
-
-const path = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath => ({
-	id,
-	name: `Path ${id}`,
-	description: '',
-	designerNotes: '',
-	activityKey: EActivityKey.Physical,
-	...over
-});
-
-const tier = (
-	id: number,
-	pathId: number,
-	ordinal: number,
-	over: Partial<WorkbenchProficiency> = {}
-): WorkbenchProficiency => ({
-	id,
-	name: `Tier ${id}`,
-	description: '',
-	designerNotes: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId,
-	pathOrdinal: ordinal,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...over
 });
 
 const makeStore = (paths: WorkbenchPath[], profs: WorkbenchProficiency[]) =>

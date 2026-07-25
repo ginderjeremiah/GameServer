@@ -1,41 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { EActivityKey } from '$lib/api';
 import { bezierPath, mapColumns, mapEdgeDefs, tierNodeId } from '$routes/admin/workbench/progression/progression-map';
-import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
-
-const path = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath => ({
-	id,
-	name: `Path ${id}`,
-	description: '',
-	designerNotes: '',
-	activityKey: EActivityKey.Physical,
-	...over
-});
-
-const tier = (
-	id: number,
-	pathId: number,
-	ordinal: number,
-	over: Partial<WorkbenchProficiency> = {}
-): WorkbenchProficiency => ({
-	id,
-	name: `Tier ${id}`,
-	description: '',
-	designerNotes: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId,
-	pathOrdinal: ordinal,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...over
-});
+import { mapPath as path, mapTier as tier } from './progression-test-utils';
 
 describe('tierNodeId', () => {
 	it('prefixes the tier id with t', () => {
