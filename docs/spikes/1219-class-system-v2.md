@@ -34,7 +34,7 @@
 | --- | --- |
 | "nothing reads live state like a current-health ratio mid-tick" | **Stale.** Cull's execute bonus samples the *target's* live missing-health fraction once per fire and folds it into that fire's damage multiplier — `BattleContext.cs:316-320`, mirrored in `battle-step.ts:57-58`. |
 | "today modifiers are snapshot-fixed plus timed skill effects" | **Half stale.** Timed effects already mutate the live `AttributeCollection` mid-battle (`BattlerEffects.Apply`/`Advance`, with a `MaxHealth` re-clamp on both), so mid-battle attribute mutation is routine. What is genuinely absent is a modifier that is a *continuous function of live state*. |
-| "in-class bonus … re-couples class into the just-tuned proficiency XP accrual" | **Overstated.** The accrual is a pure `Game.Core` function taking a `ProficiencyCatalog` (#1602); its live adapter (`ProficiencyRewardService.AccrueAndApply`) already receives the `Player`, and the offline simulator already carries `ResolveClass` + `BattleSnapshot.ClassId`. The class is in hand at every call site. |
+| "in-class bonus … re-couples class into the just-tuned proficiency XP accrual / attribute pipelines" | **Overstated on the plumbing; partly conceded on the tuning.** The wiring is free: the accrual is a pure `Game.Core` function taking a `ProficiencyCatalog` (#1602), its live adapter (`ProficiencyRewardService.AccrueAndApply`) already receives the `Player`, and the offline simulator already carries `ResolveClass` + `BattleSnapshot.ClassId` — the class is in hand at every call site. The *balance* half of the worry is real though smaller than stated: see §2's `ratingDenominator` caveat for the residual coupling. |
 | "an in-class bonus … changes efficiency, not access" | **Confirmed** — and stronger than assumed, see §2. |
 
 ---
@@ -142,12 +142,24 @@ For whatever conditional channels do get built, the shape matters far more than 
   a tallied magnitude. A new offense channel added with no tally and no activity key is universal free value
   that trains nothing. **Open question:** a signature passive is free *within* its class (no opportunity cost
   paid), so does a class passive granting an archetype enabler satisfy the rule, or does the rule need an
-  explicit carve-out for authored-only class enablers? PR #2401 raises the identical question for a shield pool;
-  the two should be answered together.
-- **Rating classification.** `ECombatRatingClassification` is exhaustiveness-tested (#1526 decision 9), so a new
-  attribute fails the build until it is priced. A player-only conditional channel slots into `AsymmetryGated`
-  alongside crit/dodge/parry/execute — but a rating term for a *conditional* channel is a genuine modelling
-  question (Cull is already priced this way; reuse its treatment rather than inventing a second one).
+  explicit carve-out for authored-only class enablers? The defensive-mechanics spike
+  ([`1331-defensive-mechanics.md`](./1331-defensive-mechanics.md), in review as
+  [PR #2401](https://github.com/ginderjeremiah/GameServer/pull/2401)) raises the identical question for a shield
+  pool; the two should be answered together.
+- **Rating classification — the structure reuses, the constant does not.**
+  `ECombatRatingClassification` is exhaustiveness-tested (#1526 decision 9,
+  `CombatRatingTests.Classify_IsDefinedForEveryAttribute`), so a new attribute fails the build until it is
+  priced. A player-only conditional channel slots into `AsymmetryGated` alongside crit/dodge/parry/execute, and
+  the *shape* of Cull's term (a reference constant × the attribute) carries over. **Its constant does not.**
+  Cull is priced `1 + ExecuteBonus × RefMissingHealthFraction` with `RefMissingHealthFraction = 0.5` justified
+  by "health depletes from full to empty over the reference fight" (`ServerGameConstants.cs:122-129`) — a
+  derivation that holds only because the sampled entity is *the one that dies*. A self-health channel samples
+  the rated player, who does not deplete to empty in a won reference fight, so the constant must be re-derived
+  rather than inherited. Worse, the player's average missing health is an inverse function of the survivability
+  term `Rate = √(Offense × Survivability)` already computes, so a flat constant systematically over-values rage
+  on tanky builds and under-values it on fragile ones — and because the rating feeds `ratingDenominator`, that
+  misvaluation lands back on accrual rates. See [§5](#5-overlap-with-1331): this is a named deliverable of the
+  shared design pass, not something to inherit by assumption from whichever half lands first.
 
 ---
 
@@ -155,32 +167,50 @@ For whatever conditional channels do get built, the shape matters far more than 
 
 Per the ideation brief, exploring past the two listed directions:
 
-- **Class-tailored challenges are the highest-value identity lever and cost no engine work.**
-  `content-design.md` §5 already designs a per-class progression route built out of challenges keyed on the
-  class's natural activity ("kill N enemies with sword skills"), class-*flavoured* but never class-locked. That
-  delivers "my class plays differently" through content alone. It is blocked only on the kills-by-damage-type
-  statistic ([#1455](https://github.com/ginderjeremiah/GameServer/issues/1455)) — a far smaller unblock than
-  either direction here. **If the goal is felt class identity soonest, this outranks both of #1219's items.**
+- **Class-tailored challenges are the highest-value identity lever, cost no engine work, and are unblocked
+  today.** `content-design.md` §5 already designs a per-class progression route built out of challenges keyed on
+  the class's natural activity ("kill N enemies with sword skills"), class-*flavoured* but never class-locked.
+  That delivers "my class plays differently" through content alone. The kills-by-damage-type statistic those
+  routes depend on ([#1455](https://github.com/ginderjeremiah/GameServer/issues/1455)) **shipped on 2026-07-02**
+  — `EStatisticType.KillsByDamageType`, `EChallengeType.KillsByDamageType`, the recorder, the `DamageType`
+  breakdown axis, admin validation and the Workbench UI are all in the tree — so this is pure Workbench
+  authoring, available now. **If the goal is felt class identity soonest, this outranks both of #1219's items,
+  and unlike them it waits on nothing.** (`content-design.md` §5 still carried a "⚠ assumes a statistic that
+  does not exist yet" warning on those routes; it went stale when #1455 shipped and is corrected in this change.)
 - **Signature-passive expressiveness is capped at one modifier.** `ClassSignaturePassive` grants exactly one
   attribute. Before adding conditional channels, it is worth asking whether a class wants *two* passive terms
   (e.g. a fingerprint nudge plus an archetype enabler) — a smaller, purely additive change to the same seam.
 - **Word-of-power depth.** Classes render a flat decorative label; proficiencies decipher theirs as they level.
   A class label that deciphers on account/character milestones is pure cosmetic identity with no balance surface.
-- **Explicitly still rejected:** class-locked nodes (#982 decision 2), class-gated gear (#1124 covers it softly),
-  and any out-of-class *tax* (fights the multi-character design). Nothing found here reopens those.
+- **Explicitly still rejected:** class-locked nodes (#982 decision 2), class-gated gear — and the soft
+  alternative is no longer hypothetical, since the proficiency gear-gate
+  ([#1124](https://github.com/ginderjeremiah/GameServer/issues/1124)) shipped on 2026-06-27, so
+  "heavy armour requires the martial proficiency" is authorable today — and any out-of-class *tax* (fights the
+  multi-character design). Nothing found here reopens those.
 
 ---
 
 ## 5. Overlap with #1331
 
 **Rage (this issue) and last-stand (#1331) are the offense and defence halves of one mechanic** — both read the
-player's own live health fraction. The in-review spike [PR #2401](https://github.com/ginderjeremiah/GameServer/pull/2401)
-reaches the same conclusion from the other side (it cites #1219's now-stale "nothing reads live state" line as
-grounds to revise this issue's cost estimate down).
+player's own live health fraction. The sibling spike [`1331-defensive-mechanics.md`](./1331-defensive-mechanics.md)
+(in review as [PR #2401](https://github.com/ginderjeremiah/GameServer/pull/2401)) reaches the same conclusion
+from the other side (it cites #1219's now-stale "nothing reads live state" line as grounds to revise this
+issue's cost estimate down).
 
-They should be **designed as one channel family, not twice**: one decision about how self-health-conditional
-multipliers are sampled, priced in `CombatRating`, and tallied for a path — then two authored attributes on top.
-Whichever lands first should set the template.
+They should be **designed as one channel family, not twice**, and that shared pass owes three decisions:
+
+1. **Sampling** — where in the fire the player's own health fraction is read (Cull's once-per-fire sampling
+   point is the obvious template, and it *does* transfer).
+2. **Pricing in `CombatRating`** — the reference constant must be re-derived rather than inherited from Cull's
+   `RefMissingHealthFraction`, and its build-correlation with the survivability term resolved (see
+   [§3](#two-constraints-any-new-channel-must-satisfy)). This is the decision most at risk of being made
+   silently by whichever half ships first.
+3. **Tally + activity key** — what a self-health channel books, and whether both halves share one path or take
+   two, under the commitment rule.
+
+Only then the two authored attributes on top. Whichever lands first should set the template *explicitly*, not
+by precedent.
 
 ---
 
@@ -204,15 +234,18 @@ purely a call for the owner: both rosters are coherent, they just disagree.
    class-specific runtime work? If so, #1219 direction 2 should be **closed into those three**, and the class
    half becomes content authoring.
 2. **The commitment-rule carve-out.** Does a class signature passive granting an archetype enabler count as
-   "committed" (it is free within the class), or does it need an explicit exemption? Same question PR #2401
-   raises for the shield — please answer them together.
+   "committed" (it is free within the class), or does it need an explicit exemption? Same question
+   [`1331-defensive-mechanics.md`](./1331-defensive-mechanics.md) raises for the shield — please answer them
+   together.
 3. **Direction 1's association.** Authored bias list on `Class` (recommended) or a skill-effect→activity-key
    derivation? The kit-derived option in the issue only covers offense keys and misses every archetype path.
 4. **Direction 1's timing.** Keep it gated behind authored content, or is a strawman multiplier (~+20%) with no
    content to tune against still worth landing early to de-risk the seam?
 5. **The roster.** Swordsman/Bowman/Wizard/Knight (content-design.md, and what shipped code already names) or
    Warrior/Mage/Ranger (#1126/#1219)? This blocks #1127, #1226, #1492 and both gates here.
-6. **Priority check.** Given §4, would you rather spend the next class-identity slice on the tailored-challenge
-   routes (blocked only on #1455) than on either V2 direction?
+6. **Priority check — and it is not a sequencing question.** The §4 tailored-challenge routes are **available
+   right now** (#1455 shipped; they are pure Workbench authoring), while **both** V2 directions are gated on the
+   unauthored roster in §6. So: spend the next class-identity slice on the routes, which can start today, or
+   hold it for a V2 direction that cannot start until Q5 is answered?
 
 **No implementation issues have been created yet** — per the ideation rule, splitting waits on the answers above.
