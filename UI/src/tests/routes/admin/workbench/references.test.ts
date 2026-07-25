@@ -26,6 +26,7 @@ import {
 } from '$routes/admin/workbench/references';
 import { makePath, makeProficiency } from '../../../fixtures/proficiencies';
 import { makeSkill } from '../../../fixtures/skills';
+import { makeItem } from '../../../fixtures/items';
 
 const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => ({
 	id,
@@ -62,20 +63,8 @@ const challenge = (id: number, name: string, opts: Partial<IChallenge> = {}): IC
 	...opts
 });
 
-const item = (id: number, name: string, opts: Partial<IItem> = {}): IItem => ({
-	id,
-	name,
-	description: '',
-	itemCategoryId: EItemCategory.Helm,
-	rarityId: ERarity.Common,
-	iconPath: '',
-	attributes: [],
-	modSlots: [],
-	tags: [],
-	requiredProficiencyLevel: 1,
-	designerNotes: '',
-	...opts
-});
+const item = (id: number, name: string, opts: Partial<IItem> = {}): IItem =>
+	makeItem({ id, name, itemCategoryId: EItemCategory.Helm, ...opts });
 
 const itemMod = (id: number, name: string, opts: Partial<IItemMod> = {}): IItemMod => ({
 	id,

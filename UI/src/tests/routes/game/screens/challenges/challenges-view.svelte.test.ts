@@ -54,21 +54,20 @@ import {
 	sortChallenges,
 	typeStats
 } from '$routes/game/screens/challenges/challenges-view.svelte';
+import { makeItem } from '../../../../fixtures/items';
 
-const item = (id: number, name: string, rarity: ERarity, cat: EItemCategory, extra: Partial<IItem> = {}): IItem => ({
-	id,
-	name,
-	description: `${name} description`,
-	designerNotes: '',
-	itemCategoryId: cat,
-	rarityId: rarity,
-	iconPath: '',
-	requiredProficiencyLevel: 0,
-	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
-	modSlots: [{ id: id * 10, itemId: id, itemModSlotTypeId: EItemModType.Prefix }],
-	tags: [],
-	...extra
-});
+/** Carries attributes and a mod slot by default — the reward tooltip renders both. */
+const item = (id: number, name: string, rarity: ERarity, cat: EItemCategory, extra: Partial<IItem> = {}): IItem =>
+	makeItem({
+		id,
+		name,
+		description: `${name} description`,
+		itemCategoryId: cat,
+		rarityId: rarity,
+		attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
+		modSlots: [{ id: id * 10, itemId: id, itemModSlotTypeId: EItemModType.Prefix }],
+		...extra
+	});
 
 const mod = (id: number, name: string, rarity: ERarity): IItemMod => ({
 	id,

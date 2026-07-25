@@ -1,22 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { EItemCategory, ERarity, type IItem } from '$lib/api';
+import type { IItem } from '$lib/api';
 import { itemProficiencyRequirement, meetsItemProficiencyRequirement } from '$lib/common';
+import { makeItem } from '../../fixtures/items';
 
 const item = (requiredProficiencyId?: number, requiredProficiencyLevel = 0): IItem =>
-	({
-		id: 1,
-		name: 'Item',
-		description: '',
-		designerNotes: '',
-		itemCategoryId: EItemCategory.Accessory,
-		rarityId: ERarity.Common,
-		iconPath: '',
-		requiredProficiencyId,
-		requiredProficiencyLevel,
-		attributes: [],
-		modSlots: [],
-		tags: []
-	}) as IItem;
+	makeItem({ id: 1, requiredProficiencyId, requiredProficiencyLevel });
 
 // A simple per-proficiency level lookup; a missing id is the "never trained" state (level 0).
 const levelOf = (levels: Record<number, number>) => (id: number) => levels[id] ?? 0;

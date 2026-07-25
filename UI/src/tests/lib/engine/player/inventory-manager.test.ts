@@ -3,6 +3,8 @@ import { EAttribute, EDamageType, EItemCategory, EItemModType, ELogType, ERarity
 import type { IInventoryData, IItem, IItemMod, ISkill } from '$lib/api';
 import { PUNCH_SKILL_ID } from '$lib/api/types/game-constants';
 import { makeSkill } from '../../../fixtures/skills';
+// Aliased: this suite's own `makeItem` is a positional adapter over the shared contract builder.
+import { makeItem as makeItemContract } from '../../../fixtures/items';
 
 const mockInventoryData: IInventoryData = {
 	unlockedItems: [],
@@ -64,26 +66,22 @@ import { logMessage } from '$lib/engine/log';
 import { playerManager } from '$lib/engine';
 import type { IInventoryItem } from '$lib/api';
 
+/** Defaults to a Weapon carrying 5 Strength — the equipment-stat assertions here read that amount. */
 const makeItem = (
 	id: number,
 	category: EItemCategory = EItemCategory.Weapon,
 	grantedSkillId?: number,
 	weaponType?: EDamageType
-): IItem => ({
-	id,
-	name: `Item ${id}`,
-	description: `Description ${id}`,
-	designerNotes: '',
-	itemCategoryId: category,
-	rarityId: ERarity.Common,
-	iconPath: `/icons/${id}.png`,
-	grantedSkillId,
-	weaponType,
-	requiredProficiencyLevel: 0,
-	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }],
-	modSlots: [],
-	tags: []
-});
+): IItem =>
+	makeItemContract({
+		id,
+		description: `Description ${id}`,
+		itemCategoryId: category,
+		iconPath: `/icons/${id}.png`,
+		grantedSkillId,
+		weaponType,
+		attributes: [{ attributeId: EAttribute.Strength, amount: 5 }]
+	});
 
 const makeItemMod = (id: number): IItemMod => ({
 	id,

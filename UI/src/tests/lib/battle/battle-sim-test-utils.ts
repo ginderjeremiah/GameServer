@@ -1,10 +1,10 @@
 import { Battler, newItem } from '$lib/battle';
 // Aliased: this module's own `makeSkill` builds a `SkillSpec` (pre-registration), not the contract.
 import { makeSkill as makeSkillContract } from '../../fixtures/skills';
+import { makeItem } from '../../fixtures/items';
 import {
 	EAttribute,
 	EDamageType,
-	EItemCategory,
 	ERarity,
 	type EModifierType,
 	type ESkillEffectTarget,
@@ -223,19 +223,7 @@ export function equipmentFactory(itemRegistry: IItem[], itemModRegistry: IItemMo
 		});
 
 		const itemId = itemRegistry.length;
-		itemRegistry.push({
-			id: itemId,
-			name: `Item ${itemId}`,
-			description: '',
-			designerNotes: '',
-			itemCategoryId: EItemCategory.Accessory,
-			rarityId: ERarity.Common,
-			iconPath: '',
-			requiredProficiencyLevel: 0,
-			attributes: spec.attributes,
-			modSlots: [],
-			tags: []
-		});
+		itemRegistry.push(makeItem({ id: itemId, attributes: spec.attributes }));
 
 		const item = newItem({ itemId, equipped: true, favorite: false, appliedMods });
 		// The item was just registered, so resolution is guaranteed; assert it to satisfy the nullable
