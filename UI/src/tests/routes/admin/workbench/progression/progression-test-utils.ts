@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { EActivityKey } from '$lib/api';
 import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
 import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import { makePath, makeProficiency } from '../../../../fixtures/proficiencies';
 
 /* Shared scaffolding for the progression editor's component suites (#2405). Each suite still declares
    its own `vi.mock('$stores', …)` — `vi.mock` is hoisted within the file it appears in — but the factory
@@ -9,8 +10,9 @@ import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbenc
 
    Because the suites resolve it from inside that factory, this module is evaluated *while `$stores` is
    being mocked, so it must stay free of runtime imports that transitively reach `$stores`* — a value
-   import that did would re-enter the factory resolving it. Everything below `$lib/api` is `import type`
-   and therefore erased, which is what keeps that true today. */
+   import that did would re-enter the factory resolving it. The only value imports here are `vitest`,
+   `$lib/api`, and `tests/fixtures/proficiencies` (whose own only import is `$lib/api`); everything else
+   is `import type` and therefore erased, which is what keeps that true today. */
 
 const catalogueKeys = [
 	'enemies',
@@ -60,49 +62,48 @@ export const resetStores = () => {
 	}
 };
 
+/* `WorkbenchPath`/`WorkbenchProficiency` are plain aliases of `IPath`/`IProficiency`, so the two builders
+   below are the shared contract fixtures with the workbench's divergent defaults stated on top (#2426).
+   Only the divergences are restated here — everything else follows the contract fixture. */
+
 /** Base path fixture — id 5, the path the detail suites open. */
-export const path = (over: Partial<WorkbenchPath> = {}): WorkbenchPath => ({
-	id: 5,
-	name: 'Fire Path',
-	description: '',
-	designerNotes: '',
-	activityKey: EActivityKey.Fire,
-	...over
-});
+export const path = (over: Partial<WorkbenchPath> = {}): WorkbenchPath =>
+	makePath({ id: 5, name: 'Fire Path', activityKey: EActivityKey.Fire, ...over });
 
 /**
  * Base tier fixture — id 0 on path 0, with blank conlang fields.
  *
+ * The blank `iconPath`/`word`/`pronunciation`/`translation` deliberately diverge from `makeProficiency`'s
+ * id-generated ones: these suites drive the *editor*, where an empty field is the authoring state under
+ * test, and a generated string would quietly pre-fill inputs the detail suites assert on. `xpGrowth: 1.4`
+ * likewise diverges so the XP curve is visibly non-flat.
+ *
  * A suite whose assertions depend on a different identity (TierDetail's populated conlang strings, say)
  * wraps this with its own defaults rather than changing them here; those divergences are load-bearing.
  */
-export const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => ({
-	id: 0,
-	name: 'Blades',
-	description: '',
-	iconPath: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	pathId: 0,
-	pathOrdinal: 0,
-	maxLevel: 10,
-	baseXp: 100,
-	xpGrowth: 1.4,
-	designerNotes: '',
-	levelModifiers: [],
-	levelRewards: [],
-	prerequisiteIds: [],
-	...over
-});
+export const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency =>
+	makeProficiency({
+		id: 0,
+		name: 'Blades',
+		iconPath: '',
+		word: '',
+		pronunciation: '',
+		translation: '',
+		xpGrowth: 1.4,
+		...over
+	});
 
 /* The map suites (`ProgressionMap.test.ts`, `progression-map.test.ts`) build topology — several tiers
    across several paths — so identity is positional at their call sites (`mapTier(10, 0, 0)`), and their
    assertions read the generated `Path {id}` name back out of the rendered column header. The two
-   adapters below keep the field set in one place while preserving both. */
+   adapters below keep the field set in one place while preserving both.
 
-export const mapPath = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath =>
-	path({ id, name: `Path ${id}`, activityKey: EActivityKey.Physical, ...over });
+   `mapPath` goes to `makePath` directly rather than through `path`: the shared fixture already defaults to
+   the generated `Path {id}` name and a neutral `Physical` activity, so routing through `path` would set the
+   detail suites' `Fire Path`/`Fire` only to override both straight back. `mapTier` does go through `tier`,
+   because it wants that builder's blank conlang fields. */
+
+export const mapPath = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath => makePath({ id, ...over });
 
 export const mapTier = (
 	id: number,
