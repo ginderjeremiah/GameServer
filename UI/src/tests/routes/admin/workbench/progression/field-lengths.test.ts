@@ -22,8 +22,13 @@ import {
    Both sides now read `ContentFieldLengths` (via the generated `game-constants.ts`), so a *drifted* value
    is structurally impossible and `ProgInput.maxLength` is required so an *unbounded* input fails
    svelte-check. What neither catches is a field wired to the wrong constant, so this asserts the whole
-   rendered field set of each surface by exact equality: a mis-wired bound, a new input registered against
-   no constant, and a removed one all surface as a diff rather than passing silently. */
+   rendered field set of each surface by exact equality.
+
+   Caught unconditionally: an input registered against no constant, and a removed one. A *mis-wired*
+   bound only surfaces where the two constants differ in value — five of these ten are 50, so swapping
+   e.g. `Name` and `Icon path` reads identically here. That is inherent to asserting rendered values
+   rather than constant identity, and is the residual the direct imports already make a deliberate act
+   rather than a drift. */
 
 const { staticData, dangerModal } = vi.hoisted(() => ({
 	staticData: {
@@ -94,10 +99,18 @@ const store = {
 	patchProf: vi.fn()
 } as unknown as ProgressionStore;
 
-/** Every rendered text input/textarea keyed by its accessible label -> its `maxlength` (null when unbounded). */
+/**
+ * Every control `ProgInput` rendered, keyed by accessible label -> its `maxlength` (null when unbounded).
+ *
+ * Scoped to `.inp` (ProgInput's own class) rather than sweeping every `input`: `ProgNumber` renders
+ * through `NumInput`, which is *also* `type="text"` (with `inputmode="decimal"`) and correctly carries no
+ * `maxlength` — so a blanket sweep would report a legitimately unbounded numeric field as a length-guard
+ * failure the day one is added to either surface. Selecting nothing fails loudly against the non-empty
+ * expectations below rather than silently passing.
+ */
 const boundsOf = (container: HTMLElement): Record<string, number | null> =>
 	Object.fromEntries(
-		[...container.querySelectorAll('input, textarea')].map((element) => {
+		[...container.querySelectorAll('.inp')].map((element) => {
 			const bound = element.getAttribute('maxlength');
 			return [element.getAttribute('aria-label') ?? '(unlabelled)', bound === null ? null : Number(bound)];
 		})
