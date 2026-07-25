@@ -119,6 +119,12 @@ export class ApiSocket {
 	// Single-flight guard for the async open path: the in-flight open promise (null when not connecting),
 	// shared by concurrent ensureSocket callers so the pre-emptive-refresh await can't race two opens.
 	private connecting: Promise<void> | null = null;
+	// Set by disconnect() so an open that is already under way — suspended on the pre-emptive refresh await,
+	// or started afterwards by handleClose's auth-retry refresh resolving — can see that it has been
+	// superseded and bail, instead of handing back a socket the teardown it raced can no longer tear down.
+	// Cleared only by sendSocketCommand: an explicit command is the one legitimate way a new session starts,
+	// and the keepalive deliberately isn't (it exists to stop background reconnects after a teardown).
+	private disconnected = false;
 
 	/**
 	 * Ensures a live (or still-connecting) socket exists, opening one if needed. The open path is async
@@ -143,6 +149,13 @@ export class ApiSocket {
 	private async openSocket(): Promise<void> {
 		this.socketOpened = false;
 		this.resetPongTracking();
+		// A disconnect() already tore this session down before the open even began (handleClose's auth-retry
+		// refresh can resolve and call processCommandQueue after the teardown), so don't connect — and in
+		// particular don't arm the keepalive below, which nothing would then own or ever stop.
+		if (this.disconnected) {
+			this.abortSupersededConnect();
+			return;
+		}
 		// Armed before the refresh await (not after the handshake is built) so a retryable bail below still
 		// leaves the keepalive running to retry the connect — otherwise the very first connect of a page
 		// session (or any connect after the interval was last stopped) could bail with nothing left to ever
@@ -155,6 +168,14 @@ export class ApiSocket {
 		// single-use refresh token recovering in handleClose.
 		const hadRefreshToken = getRefreshToken() !== null;
 		const ensured = await ensureValidAccessToken();
+		// A disconnect() landed while the refresh was in flight (e.g. the SocketReplaced modal being
+		// acknowledged mid-reconnect). Connecting now would resurrect the very socket the teardown exists to
+		// prevent — tokens are still valid after a takeover, so nothing else stops it — and the keepalive
+		// that would normally close a stale socket has already been torn down, so nothing would own it.
+		if (this.disconnected) {
+			this.abortSupersededConnect();
+			return;
+		}
 		let accessToken = ensured.accessToken;
 		// A logged-in session (one that had a refresh token) whose pre-emptive refresh didn't yield a
 		// token: bail out without opening rather than handing the server a stale/missing token. A
@@ -218,6 +239,9 @@ export class ApiSocket {
 	): Promise<IApiSocketResponse<T>>;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; TS cannot narrow the conditional param type from the generic T here.
 	public async sendSocketCommand<T extends ApiSocketCommand>(commandName: T, params?: any) {
+		// An explicit command is a deliberate new session, so it lifts a prior disconnect()'s bail flag —
+		// otherwise a torn-down singleton could never connect again for the rest of the page's life.
+		this.disconnected = false;
 		const id = (this.commandCounter++).toString();
 		const request = new ApiSocketRequest(id, commandName, params);
 		this.socketCommandQueue.push(request);
@@ -276,11 +300,21 @@ export class ApiSocket {
 	 * the SocketReplaced case, fight the session that just took over.
 	 */
 	public disconnect() {
+		// Closing `this.socket` isn't enough on its own: an open already past ensureSocket's "is there a
+		// socket?" check has no socket to close yet, and would go on to create one after this returns.
+		this.disconnected = true;
 		this.stopPingInterval();
 		this.clearConnectionStableTimer();
 		if (this.socket && this.socket.readyState !== this.socket.CLOSED) {
 			this.socket.close(NORMAL_CLOSURE);
 		}
+	}
+
+	/** Bails out of an open that a `disconnect()` superseded. The keepalive is already stopped and must stay
+	 *  that way, so nothing will reconnect to re-flush the queue — settle it like every other terminal path
+	 *  rather than leaving a caller awaiting a response that can never arrive. */
+	private abortSupersededConnect() {
+		this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 	}
 
 	private stopPingInterval() {
