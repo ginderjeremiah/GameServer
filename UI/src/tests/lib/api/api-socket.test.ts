@@ -1130,7 +1130,7 @@ describe('ApiSocket', () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
 			// Hold the pre-emptive refresh open so the disconnect lands while openSocket is suspended on it —
 			// the session-takeover window: the modal is acknowledged mid-reconnect and the tokens stay valid.
-			let releaseRefresh!: (result: AccessTokenResult) => void;
+			let releaseRefresh: (result: AccessTokenResult) => void = () => {};
 			vi.mocked(ensureValidAccessToken).mockImplementation(
 				() => new Promise<AccessTokenResult>((resolve) => (releaseRefresh = resolve))
 			);
@@ -1153,7 +1153,7 @@ describe('ApiSocket', () => {
 
 		it('does not connect when handleClose auth-retry refresh resolves after a disconnect()', async () => {
 			setTokens({ accessToken: 'a', refreshToken: 'r' });
-			let releaseRefresh!: (result: RefreshOutcome) => void;
+			let releaseRefresh: (result: RefreshOutcome) => void = () => {};
 			vi.mocked(refreshTokens).mockImplementation(
 				() => new Promise<RefreshOutcome>((resolve) => (releaseRefresh = resolve))
 			);
@@ -1185,11 +1185,36 @@ describe('ApiSocket', () => {
 			apiSocket.disconnect();
 			const socketsBefore = socketInstances.length;
 
-			// The bail flag suppresses background reconnects, not a deliberate new session.
+			// The teardown suppresses background reconnects, not a deliberate new session.
 			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
 			await flushMicrotasks();
 
 			expect(socketInstances.length).toBe(socketsBefore + 1);
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+		});
+
+		it('re-arms the keepalive when a new command lifts a teardown mid-connect', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			let releaseRefresh: (result: AccessTokenResult) => void = () => {};
+			vi.mocked(ensureValidAccessToken).mockImplementation(
+				() => new Promise<AccessTokenResult>((resolve) => (releaseRefresh = resolve))
+			);
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			// The teardown stops the interval that connect armed before suspending on the refresh.
+			apiSocket.disconnect();
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
+
+			// A new command lifts the teardown, and ensureSocket hands it the *same* in-flight connect rather
+			// than starting a fresh one — so that connect completes with its own arming already undone.
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			releaseRefresh({ accessToken: 'a', rejected: false });
+			await flushMicrotasks();
+
+			expect(socketInstances.length).toBe(1);
+			// A socket with no keepalive has no half-open detection, and handleClose would hold its queue for a
+			// background reconnect that never runs.
 			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 		});
 	});
