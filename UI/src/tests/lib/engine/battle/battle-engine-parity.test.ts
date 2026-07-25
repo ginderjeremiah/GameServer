@@ -223,8 +223,8 @@ describe('BattleEngine parity with the headless BattleSimulator', () => {
 			// The reference outcome from the headless simulator, built from the same registered skills, raw
 			// allocations, and seed the engine is about to run.
 			const simResult = new BattleSimulator(
-				granted.build(scenario.playerAttrs, playerSkillIds, []),
-				granted.build(scenario.enemyAttrs, enemySkillIds, []),
+				granted.build({ attrs: scenario.playerAttrs, selectedSkillIds: playerSkillIds, grantedSkillIds: [] }),
+				granted.build({ attrs: scenario.enemyAttrs, selectedSkillIds: enemySkillIds, grantedSkillIds: [] }),
 				PARITY_SEED
 			).simulate();
 			// Cross-check the transcription against the documented matrix value before comparing consumers.

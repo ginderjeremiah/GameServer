@@ -31,7 +31,7 @@ namespace Game.Core.Battle
         /// The Precision (<c>Crit</c> activity key) training signal — distinct from the player-facing
         /// <see cref="CriticalDamageDealt"/> statistic. Each crit books the hit's booked (post-mitigation,
         /// health-capped — #1482) damage × <c>φ(m − 1)</c>, where <c>m</c> is <see cref="EAttribute.CriticalDamage"/>
-        /// and <c>φ</c> is the shared overlay saturation (<see cref="Battle.Battler.NormalizeInvestment"/>) — the
+        /// and <c>φ</c> is the shared overlay saturation (<see cref="Battle.OverlayTally.NormalizeInvestment"/>) — the
         /// uniform share-claim tally every overlay uses (#1481, superseding the counterfactual normalized marginal
         /// of #1448): proportional to crit-damage investment through <c>φ</c> (which the full-hit
         /// <see cref="CriticalDamageDealt"/> is not), and bounded per battle by the enemy's health pool through
@@ -54,9 +54,9 @@ namespace Game.Core.Battle
         /// The Hex (<c>Hex</c> activity key) training signal — the share of the player's landed damage claimed by
         /// an applied vulnerability (#1427, reshaped to the uniform share claim by #1481). <c>v</c> is the
         /// resistance the player's own debuff removed (tracked from the applied effect —
-        /// <see cref="Battle.Battler.AppliedVulnerability"/> — so the target's base resistance or its own
+        /// <see cref="Battle.BattlerEffects.AppliedVulnerability"/> — so the target's base resistance or its own
         /// resistance buffs can't rob the player of credit). Each direct hit and DoT tick books its booked
-        /// (health-capped) damage × <c>φ(v)</c> (<see cref="Battle.Battler.HexBonusForHit"/>). Because the booked
+        /// (health-capped) damage × <c>φ(v)</c> (<see cref="Battle.BattlerEffects.HexBonusForHit"/>). Because the booked
         /// basis sums to at most the enemy's health pool per battle, a fixed investment trains ≈ its coverage
         /// share of that pool × <c>φ(v)</c> regardless of the enemy's mitigation — enemy-independent at the
         /// accrual level, with no counterfactual curve evaluation. Like the crit bonus this is a backend-only side
@@ -69,7 +69,7 @@ namespace Game.Core.Battle
         /// claimed by an applied ramp (#1428, reshaped to the uniform share claim by #1481). A ramp is a stacking
         /// self-buff to one of the attacker's typed amplification attributes; <c>r</c> is the amplification the
         /// buff itself contributed (tracked from the applied effect, isolated from any static amplification the
-        /// attacker already carries — <see cref="Battle.Battler.AppliedMomentum"/>). Each direct hit whose type
+        /// attacker already carries — <see cref="Battle.BattlerEffects.AppliedMomentum"/>). Each direct hit whose type
         /// the ramp amplifies books its booked (health-capped) damage × <c>φ(r)</c>. Direct-hit only: a DoT's
         /// frozen amplification already includes whatever ramp was active when it was cast, but the tally does not
         /// extend to DoT ticks. Backend-only like the other overlay tallies.
@@ -95,9 +95,9 @@ namespace Game.Core.Battle
         /// claimed by an applied Toughness debuff (#1429, aligned with the uniform share claim by #1481; Sunder
         /// pioneered the no-counterfactual shape, since the nonlinear Toughness curve has no target-flat
         /// marginal). Each direct hit books its booked (health-capped) damage × <c>φ(investment)</c>, where the
-        /// investment is the opponent-applied Toughness reduction (<see cref="Battle.Battler.AppliedSunder"/>)
+        /// investment is the opponent-applied Toughness reduction (<see cref="Battle.BattlerEffects.AppliedSunder"/>)
         /// made dimensionless by the curve's own characteristic magnitude
-        /// (see <see cref="Battle.Battler.SunderBonusForHit"/>). Direct-hit only: DoT bypasses the Toughness
+        /// (see <see cref="Battle.BattlerEffects.SunderBonusForHit"/>). Direct-hit only: DoT bypasses the Toughness
         /// curve entirely, so a Toughness debuff cannot affect it. Backend-only like the other overlay tallies.
         /// </summary>
         public double SunderBonusDealt { get; set; }

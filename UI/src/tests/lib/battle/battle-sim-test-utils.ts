@@ -129,16 +129,30 @@ export function battlerFactory(registry: ISkill[]) {
 	): Battler => {
 		const selectedSkills = skills.map((spec) => registerSkill(registry, spec));
 
-		return new Battler(
-			{
+		return new Battler({
+			battlerData: {
 				name: 'Battler',
 				level: 1,
 				selectedSkills,
 				attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
 			},
-			equipment
-		);
+			additionalAttributes: equipment
+		});
 	};
+}
+
+/** One granted-skill harness battler. `equippedWeaponType` drives the weapon-match gate (#1342): a
+ *  weapon-leaf-typed skill is fielded only when it matches it; weapon-agnostic skills always field, and
+ *  omitting it leaves the battler ungated (an enemy). The bare-hands punch / the weapon's signature ride
+ *  `grantedSkillIds` exactly as the live InventoryManager appends them, so the harness exercises the same
+ *  fielded set the engine builds. `counterSkillId` is the parry riposte's skill (#1457) — the weapon's
+ *  signature / punch, as `InventoryManager.counterSkillId` resolves it; omitting it leaves no counter. */
+interface GrantedBattlerSpec {
+	attrs: { id: EAttribute; amount: number }[];
+	selectedSkillIds: number[];
+	grantedSkillIds: number[];
+	equippedWeaponType?: EDamageType;
+	counterSkillId?: number;
 }
 
 /**
@@ -152,32 +166,27 @@ export function battlerFactory(registry: ISkill[]) {
 export function grantedBattlerFactory(registry: ISkill[]) {
 	return {
 		register: (spec: SkillSpec): number => registerSkill(registry, spec),
-		// `equippedWeaponType` drives the weapon-match gate (#1342): a weapon-leaf-typed skill is fielded only
-		// when it matches it; weapon-agnostic skills always field. Undefined leaves the battler ungated (an
-		// enemy). The bare-hands punch / the weapon's signature ride `grantedSkillIds` exactly as the live
-		// InventoryManager appends them, so the harness exercises the same fielded set the engine builds.
-		// `counterSkillId` is the parry riposte's skill (#1457) — the weapon's signature / punch, exactly as
-		// the live InventoryManager.counterSkillId resolves it; undefined leaves the battler with no counter.
-		build: (
-			attrs: { id: EAttribute; amount: number }[],
-			selectedSkillIds: number[],
-			grantedSkillIds: number[],
-			equippedWeaponType?: EDamageType,
-			counterSkillId?: number
-		): Battler =>
-			new Battler(
-				{
+		// Named like `BattlerInit` for the same reason (#2380): `selectedSkillIds` and `grantedSkillIds` are
+		// adjacent `number[]`s, and a transposition here is worse than one at a Battler call site — it would
+		// have this harness assert a different loadout than its backend mirror while both stayed green.
+		build: ({
+			attrs,
+			selectedSkillIds,
+			grantedSkillIds,
+			equippedWeaponType,
+			counterSkillId
+		}: GrantedBattlerSpec): Battler =>
+			new Battler({
+				battlerData: {
 					name: 'Battler',
 					level: 1,
 					selectedSkills: selectedSkillIds,
 					attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
 				},
-				undefined,
 				grantedSkillIds,
-				undefined,
 				equippedWeaponType,
 				counterSkillId
-			)
+			})
 	};
 }
 

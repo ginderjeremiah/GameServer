@@ -19,10 +19,12 @@ import { Battler } from '$lib/battle';
  */
 const makeBattler = (attrs: { id: EAttribute; amount: number }[]) =>
 	new Battler({
-		name: 'B',
-		level: 1,
-		selectedSkills: [],
-		attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
+		battlerData: {
+			name: 'B',
+			level: 1,
+			selectedSkills: [],
+			attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
+		}
 	});
 
 describe('Battler damage/heal-over-time', () => {

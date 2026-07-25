@@ -14,7 +14,7 @@ vi.mock('$stores', () => ({
 	}
 }));
 
-import { Battler } from '$lib/battle/battler';
+import { Battler, type BattlerData } from '$lib/battle/battler';
 import type { Skill } from '$lib/battle/skill';
 
 const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISkill => ({
@@ -41,7 +41,7 @@ const makeTypedSkillData = (id: number, type: EDamageType): ISkill => ({
 	damagePortions: [{ type, weight: 1 }]
 });
 
-const makeBattlerData = (overrides: Partial<Parameters<Battler['reset']>[0] & {}> = {}) => ({
+const makeBattlerData = (overrides: Partial<BattlerData> = {}): BattlerData => ({
 	name: 'TestBattler',
 	level: 5,
 	selectedSkills: [0],
@@ -61,21 +61,21 @@ describe('Battler', () => {
 
 	describe('reset', () => {
 		it('sets name and level from battler data', () => {
-			const battler = new Battler(makeBattlerData({ name: 'Hero', level: 10 }));
+			const battler = new Battler({ battlerData: makeBattlerData({ name: 'Hero', level: 10 }) });
 
 			expect(battler.name).toBe('Hero');
 			expect(battler.level).toBe(10);
 		});
 
 		it('calculates currentHealth from derived MaxHealth', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.Strength, amount: 10 },
 						{ attributeId: EAttribute.Endurance, amount: 20 }
 					]
 				})
-			);
+			});
 
 			const expectedMaxHealth = 50 + 20 * 20 + 5 * 10;
 			expect(battler.currentHealth).toBe(expectedMaxHealth);
@@ -84,14 +84,14 @@ describe('Battler', () => {
 		// cdMultiplier = CooldownRecovery + CooldownBonus × CooldownBonusMultiplier (#1426). Mirrors the backend
 		// BattlerTests GetCooldownMultiplier cases with the same scenarios and results.
 		it('charges at the base rate regardless of Agility with no CooldownBonus enabler', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.Agility, amount: 50 },
 						{ attributeId: EAttribute.Dexterity, amount: 20 }
 					]
 				})
-			);
+			});
 
 			// CDR is severed from the core attributes: with no authored CooldownBonus, Agility only lifts the
 			// (idle) CooldownBonusMultiplier, so the effective rate is exactly the base-1 CooldownRecovery.
@@ -99,14 +99,14 @@ describe('Battler', () => {
 		});
 
 		it('scales an authored CooldownBonus by the Agility-amplified CooldownBonusMultiplier', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.CooldownBonus, amount: 0.5 },
 						{ attributeId: EAttribute.Agility, amount: 20 }
 					]
 				})
-			);
+			});
 
 			// CooldownBonus 0.5 × CooldownBonusMultiplier (1 + 0.002·AGI(20) = 1.04) on the base-1 CDR → 1.52.
 			const expected = 1 + 0.5 * (1 + 0.002 * 20);
@@ -114,18 +114,18 @@ describe('Battler', () => {
 		});
 
 		it('adds an authored CooldownBonus verbatim when Agility is zero (base multiplier)', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [{ attributeId: EAttribute.CooldownBonus, amount: 0.5 }]
 				})
-			);
+			});
 
 			// With no Agility the multiplier stays at its base 1, so the bonus adds verbatim: 1 + 0.5·1 = 1.5.
 			expect(battler.cdMultiplier).toBeCloseTo(1.5, 10);
 		});
 
 		it('reads cdMultiplier live, reflecting a mid-battle CooldownRecovery change', () => {
-			const battler = new Battler(makeBattlerData({ attributes: [] }));
+			const battler = new Battler({ battlerData: makeBattlerData({ attributes: [] }) });
 			// No allocations, so CooldownRecovery is just the static base 1.0 → multiplier 1.0.
 			expect(battler.cdMultiplier).toBe(1);
 
@@ -141,12 +141,12 @@ describe('Battler', () => {
 		});
 
 		it('sets isDead to false', () => {
-			const battler = new Battler(makeBattlerData());
+			const battler = new Battler({ battlerData: makeBattlerData() });
 			expect(battler.isDead).toBe(false);
 		});
 
 		it('fills skill slots up to MAX_SELECTED_SKILLS', () => {
-			const battler = new Battler(makeBattlerData({ selectedSkills: [0] }));
+			const battler = new Battler({ battlerData: makeBattlerData({ selectedSkills: [0] }) });
 			expect(battler.skills).toHaveLength(4);
 			expect(battler.skills[0]).toBeDefined();
 			expect(battler.skills[1]).toBeUndefined();
@@ -169,75 +169,63 @@ describe('Battler', () => {
 				battler.skills.filter((s): s is Skill => s !== undefined).map((s) => s.id);
 
 			it('fields every skill when ungated (no equipped weapon type — an enemy battler)', () => {
-				const battler = new Battler(makeBattlerData({ selectedSkills: [1, 2, 0] }));
+				const battler = new Battler({ battlerData: makeBattlerData({ selectedSkills: [1, 2, 0] }) });
 				expect(fieldedIds(battler)).toEqual([1, 2, 0]);
 			});
 
 			it('dims off-weapon selected skills and keeps the matching + agnostic ones', () => {
-				const battler = new Battler(
-					makeBattlerData({ selectedSkills: [1, 2, 4] }),
-					undefined,
-					undefined,
-					undefined,
-					EDamageType.Sword
-				);
+				const battler = new Battler({
+					battlerData: makeBattlerData({ selectedSkills: [1, 2, 4] }),
+					equippedWeaponType: EDamageType.Sword
+				});
 				// Sword(1) matches, Axe(2) dimmed, Fire(4) is weapon-agnostic.
 				expect(fieldedIds(battler)).toEqual([1, 4]);
 			});
 
 			it('fields the Unarmed (punch-typed) skill bare-handed but dims a Sword skill', () => {
-				const battler = new Battler(
-					makeBattlerData({ selectedSkills: [3, 1] }),
-					undefined,
-					undefined,
-					undefined,
-					EDamageType.Unarmed
-				);
+				const battler = new Battler({
+					battlerData: makeBattlerData({ selectedSkills: [3, 1] }),
+					equippedWeaponType: EDamageType.Unarmed
+				});
 				expect(fieldedIds(battler)).toEqual([3]);
 			});
 
 			it('gates granted skills uniformly (an off-weapon granted skill is dormant)', () => {
 				// Selected Physical(0) kept; an Axe(2) granted while a Sword is wielded is dormant.
-				const battler = new Battler(
-					makeBattlerData({ selectedSkills: [0] }),
-					undefined,
-					[2],
-					undefined,
-					EDamageType.Sword
-				);
+				const battler = new Battler({
+					battlerData: makeBattlerData({ selectedSkills: [0] }),
+					grantedSkillIds: [2],
+					equippedWeaponType: EDamageType.Sword
+				});
 				expect(fieldedIds(battler)).toEqual([0]);
 			});
 
 			it('still fields a matching granted signature when every selected skill is dimmed (no-stranding)', () => {
 				// Selected Axe(2) is off-weapon (dimmed) while a Sword is wielded; the granted Sword(1) signature stays.
-				const battler = new Battler(
-					makeBattlerData({ selectedSkills: [2] }),
-					undefined,
-					[1],
-					undefined,
-					EDamageType.Sword
-				);
+				const battler = new Battler({
+					battlerData: makeBattlerData({ selectedSkills: [2] }),
+					grantedSkillIds: [1],
+					equippedWeaponType: EDamageType.Sword
+				});
 				expect(fieldedIds(battler)).toEqual([1]);
 			});
 
 			it('skips a granted id that resolves to no skill (e.g. an unauthored punch)', () => {
-				const battler = new Battler(
-					makeBattlerData({ selectedSkills: [0] }),
-					undefined,
-					[99],
-					undefined,
-					EDamageType.Unarmed
-				);
+				const battler = new Battler({
+					battlerData: makeBattlerData({ selectedSkills: [0] }),
+					grantedSkillIds: [99],
+					equippedWeaponType: EDamageType.Unarmed
+				});
 				expect(fieldedIds(battler)).toEqual([0]);
 			});
 		});
 
 		it('merges additional attributes', () => {
 			const additionalAttrs = [{ attributeId: EAttribute.Strength, amount: 5 }];
-			const battler = new Battler(
-				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
-				additionalAttrs
-			);
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				additionalAttributes: additionalAttrs
+			});
 
 			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 		});
@@ -245,11 +233,9 @@ describe('Battler', () => {
 		// Proficiency bonuses (#982 area E / #1119) ride the modifier pipeline (by their additive/
 		// multiplicative type), composing through computeAttributes exactly like the backend's snapshot.
 		it('applies additional (proficiency) modifiers through the attribute pipeline', () => {
-			const battler = new Battler(
-				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
-				undefined,
-				undefined,
-				[
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				additionalModifiers: [
 					{
 						attribute: EAttribute.Strength,
 						amount: 5,
@@ -263,32 +249,33 @@ describe('Battler', () => {
 						source: EAttributeModifierSource.Proficiency
 					}
 				]
-			);
+			});
 
 			// (10 alloc + 5 additive) * 2 multiplicative = 30, the additive-then-multiplicative order.
 			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(30);
 		});
 
 		it('reflects additional modifiers in derived MaxHealth (applied before health is read)', () => {
-			const battler = new Battler(makeBattlerData({ attributes: [] }), undefined, undefined, [
-				{
-					attribute: EAttribute.Endurance,
-					amount: 10,
-					type: EModifierType.Additive,
-					source: EAttributeModifierSource.Proficiency
-				}
-			]);
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [] }),
+				additionalModifiers: [
+					{
+						attribute: EAttribute.Endurance,
+						amount: 10,
+						type: EModifierType.Additive,
+						source: EAttributeModifierSource.Proficiency
+					}
+				]
+			});
 
 			// MaxHealth = 50 base + 20·Endurance(10) = 250, so the proficiency Endurance bonus is in currentHealth.
 			expect(battler.currentHealth).toBe(250);
 		});
 
 		it('drops the additional modifiers on a data-less re-arm (setData replaced them; #811)', () => {
-			const battler = new Battler(
-				makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
-				undefined,
-				undefined,
-				[
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] }),
+				additionalModifiers: [
 					{
 						attribute: EAttribute.Strength,
 						amount: 5,
@@ -296,7 +283,7 @@ describe('Battler', () => {
 						source: EAttributeModifierSource.Proficiency
 					}
 				]
-			);
+			});
 			expect(battler.attributes.getValue(EAttribute.Strength)).toBe(15);
 
 			// A data-less re-arm keeps the existing attribute set (proficiency modifier included) — the engine
@@ -306,7 +293,7 @@ describe('Battler', () => {
 		});
 
 		it('re-arms skill charges on a data-less reset so an unchanged re-spawn starts at zero charge (#811)', () => {
-			const battler = new Battler(makeBattlerData({ selectedSkills: [0] }));
+			const battler = new Battler({ battlerData: makeBattlerData({ selectedSkills: [0] }) });
 			battler.skills[0]!.chargeTime = 300;
 			battler.skills[0]!.renderChargeTime = 300;
 
@@ -320,24 +307,24 @@ describe('Battler', () => {
 
 	describe('advanceCooldowns', () => {
 		it('advances skill charge time by delta * cdMultiplier', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [],
 					selectedSkills: [0]
 				})
-			);
+			});
 
 			battler.advanceCooldowns(500, () => {});
 			expect(battler.skills[0]!.chargeTime).toBe(500 * battler.cdMultiplier);
 		});
 
 		it('invokes onFire for fired skills and resets their charge time', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [],
 					selectedSkills: [0]
 				})
-			);
+			});
 
 			const fired: Skill[] = [];
 			battler.advanceCooldowns(1000, (skill) => fired.push(skill));
@@ -347,12 +334,12 @@ describe('Battler', () => {
 		});
 
 		it('does not invoke onFire when no skills are ready', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [],
 					selectedSkills: [0]
 				})
-			);
+			});
 
 			const fired: Skill[] = [];
 			battler.advanceCooldowns(100, (skill) => fired.push(skill));
@@ -360,12 +347,12 @@ describe('Battler', () => {
 		});
 
 		it('skips undefined skill slots', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [],
 					selectedSkills: [0]
 				})
-			);
+			});
 
 			expect(() => battler.advanceCooldowns(500, () => {})).not.toThrow();
 		});
@@ -377,7 +364,9 @@ describe('Battler', () => {
 
 		it('applies the Toughness mitigation curve', () => {
 			// Toughness = 2·Endurance(25) = 50 → 50/(50+200) = 0.2 reduction → 50 hit deals 40.
-			const battler = new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 25 }] }));
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 25 }] })
+			});
 			const initialHealth = battler.currentHealth;
 
 			const finalDmg = battler.takeDamage(50, EDamageType.Physical);
@@ -388,25 +377,25 @@ describe('Battler', () => {
 
 		it('mitigates exactly half at the constant (the half-point anchor)', () => {
 			// Toughness = 2·Endurance(100) = 200 = C → exactly 0.5 reduction → 50 hit deals 25 (#1487).
-			const battler = new Battler(
-				makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }] })
-			);
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }] })
+			});
 
 			expect(battler.takeDamage(50, EDamageType.Physical)).toBeCloseTo(25, 10);
 		});
 
 		it('leaves a hit unreduced with no Toughness', () => {
 			// The reduce-to-nothing identity: no Endurance → Toughness 0 → 0 reduction.
-			const battler = new Battler(makeBattlerData({ attributes: [] }));
+			const battler = new Battler({ battlerData: makeBattlerData({ attributes: [] }) });
 
 			expect(battler.takeDamage(40, EDamageType.Physical)).toBeCloseTo(40, 10);
 		});
 
 		it('never fully mitigates a hit (asymptote below 100%)', () => {
 			// Endurance 1000 → Toughness 2000; even so 5 × 200 / (2000 + 200) = 0.4545… > 0, never zero.
-			const battler = new Battler(
-				makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 1000 }] })
-			);
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 1000 }] })
+			});
 
 			const net = battler.takeDamage(5, EDamageType.Physical);
 			expect(net).toBeGreaterThan(0);
@@ -416,19 +405,18 @@ describe('Battler', () => {
 		it('has effective HP linear in Toughness', () => {
 			// The EHP multiplier (raw/net = (Toughness + C)/C) rises by a constant step per Toughness point:
 			// Toughness 0 → ×1, 200 → ×2, 400 → ×3 — equal +1 steps, so it is linear.
-			const ehp0 = 40 / new Battler(makeBattlerData({ attributes: [] })).takeDamage(40, EDamageType.Physical);
+			const ehp0 =
+				40 / new Battler({ battlerData: makeBattlerData({ attributes: [] }) }).takeDamage(40, EDamageType.Physical);
 			const ehp200 =
 				40 /
-				new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }] })).takeDamage(
-					40,
-					EDamageType.Physical
-				);
+				new Battler({
+					battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 100 }] })
+				}).takeDamage(40, EDamageType.Physical);
 			const ehp400 =
 				40 /
-				new Battler(makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 200 }] })).takeDamage(
-					40,
-					EDamageType.Physical
-				);
+				new Battler({
+					battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Endurance, amount: 200 }] })
+				}).takeDamage(40, EDamageType.Physical);
 
 			expect(ehp0).toBeCloseTo(1, 10);
 			expect(ehp200).toBeCloseTo(2, 10);
@@ -438,14 +426,14 @@ describe('Battler', () => {
 
 		it('sets isDead when health drops to 0', () => {
 			// No attributes → Toughness 0, so the hit lands in full.
-			const battler = new Battler(makeBattlerData({ attributes: [] }));
+			const battler = new Battler({ battlerData: makeBattlerData({ attributes: [] }) });
 
 			battler.takeDamage(battler.currentHealth, EDamageType.Physical);
 			expect(battler.isDead).toBe(true);
 		});
 
 		it('sets isDead when health drops below 0', () => {
-			const battler = new Battler(makeBattlerData({ attributes: [] }));
+			const battler = new Battler({ battlerData: makeBattlerData({ attributes: [] }) });
 
 			battler.takeDamage(99999, EDamageType.Physical);
 			expect(battler.isDead).toBe(true);
@@ -457,37 +445,37 @@ describe('Battler', () => {
 
 		it('applies percentage resistance before the Toughness curve', () => {
 			// FireResistance 0.5 halves the 40 hit to 20, then Toughness 200 (the half-point → 0.5) → 10.
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.Endurance, amount: 100 },
 						{ attributeId: EAttribute.FireResistance, amount: 0.5 }
 					]
 				})
-			);
+			});
 
 			expect(battler.takeDamage(40, EDamageType.Fire)).toBeCloseTo(10, 10);
 		});
 
 		it('sums resistance across the applicable keys (fire + elemental)', () => {
 			// applies(Fire) = { Fire, Elemental }: 0.25 + 0.25 = 0.5 → 40 × 0.5 = 20; no Toughness leaves it at 20.
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.FireResistance, amount: 0.25 },
 						{ attributeId: EAttribute.ElementalResistance, amount: 0.25 }
 					]
 				})
-			);
+			});
 
 			expect(battler.takeDamage(40, EDamageType.Fire)).toBeCloseTo(20, 10);
 		});
 
 		it('treats negative resistance as vulnerability (unclamped)', () => {
 			// −0.5 FireResistance makes the target take 1.5× (20 × 1.5 = 30); no Toughness leaves it at 30.
-			const battler = new Battler(
-				makeBattlerData({ attributes: [{ attributeId: EAttribute.FireResistance, amount: -0.5 }] })
-			);
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.FireResistance, amount: -0.5 }] })
+			});
 
 			expect(battler.takeDamage(20, EDamageType.Fire)).toBeCloseTo(30, 10);
 		});
@@ -495,14 +483,14 @@ describe('Battler', () => {
 		it('heals on absorption (resistance > 1) and never applies the Toughness curve', () => {
 			// FireResistance 2.0 → 20 × (1 − 2) = −20: a net heal, with the curve NOT applied. Bring the battler
 			// below MaxHealth first so the whole heal lands.
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.Endurance, amount: 0 },
 						{ attributeId: EAttribute.FireResistance, amount: 2.0 }
 					]
 				})
-			);
+			});
 			battler.takeDamage(30, EDamageType.Physical); // 30 (no Toughness) → currentHealth 20
 
 			const net = battler.takeDamage(20, EDamageType.Fire);
@@ -514,14 +502,14 @@ describe('Battler', () => {
 		it('caps the absorption heal at MaxHealth (no overheal)', () => {
 			// Consistent with applyHealOverTime: only 5 of room remains, so a −20 absorption restores 5 and the
 			// net reported is the capped −5, not −20.
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.Endurance, amount: 0 },
 						{ attributeId: EAttribute.FireResistance, amount: 2.0 }
 					]
 				})
-			);
+			});
 			battler.takeDamage(5, EDamageType.Physical); // 5 (no Toughness) → currentHealth 45
 
 			const net = battler.takeDamage(20, EDamageType.Fire);
@@ -532,14 +520,14 @@ describe('Battler', () => {
 
 		it('composes resistance then the Toughness curve for a typed hit', () => {
 			// FireResistance 0.5 halves a 50 hit to 25, then Toughness 200 (the half-point → 0.5) → 12.5.
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [
 						{ attributeId: EAttribute.Endurance, amount: 100 },
 						{ attributeId: EAttribute.FireResistance, amount: 0.5 }
 					]
 				})
-			);
+			});
 
 			expect(battler.takeDamage(50, EDamageType.Fire)).toBeCloseTo(12.5, 10);
 		});
@@ -550,9 +538,12 @@ describe('Battler', () => {
 		// keeps it correct on this path by construction; a cached flag re-synced only at the damage mutations
 		// would have missed it.
 		it('reports isDead when a MaxHealth debuff clamps health to <= 0', () => {
-			const battler = new Battler(
-				makeBattlerData({ selectedSkills: [], attributes: [{ attributeId: EAttribute.Strength, amount: 10 }] })
-			); // MaxHealth 100, currentHealth 100
+			const battler = new Battler({
+				battlerData: makeBattlerData({
+					selectedSkills: [],
+					attributes: [{ attributeId: EAttribute.Strength, amount: 10 }]
+				})
+			}); // MaxHealth 100, currentHealth 100
 			expect(battler.isDead).toBe(false);
 
 			battler.applyEffect(
@@ -566,12 +557,12 @@ describe('Battler', () => {
 
 	describe('updateRenderCooldowns', () => {
 		it('updates renderChargeTime without exceeding cooldownMs', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [],
 					selectedSkills: [0]
 				})
-			);
+			});
 
 			battler.skills[0]!.chargeTime = 500;
 			battler.updateRenderCooldowns(600);
@@ -580,12 +571,12 @@ describe('Battler', () => {
 		});
 
 		it('skips undefined skill slots', () => {
-			const battler = new Battler(
-				makeBattlerData({
+			const battler = new Battler({
+				battlerData: makeBattlerData({
 					attributes: [],
 					selectedSkills: [0]
 				})
-			);
+			});
 
 			expect(() => battler.updateRenderCooldowns(100)).not.toThrow();
 		});

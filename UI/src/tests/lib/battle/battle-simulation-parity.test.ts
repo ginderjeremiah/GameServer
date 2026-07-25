@@ -957,16 +957,16 @@ const scenarios: ParityScenario[] = [
 		name: 'forcedParryRiposte',
 		player: () => {
 			const signature = granted.register(makeSkill(30, 100_000, [], [], EDamageType.Sword));
-			return granted.build(
-				[
+			return granted.build({
+				attrs: [
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.ParryChance, amount: 1.0 }
 				],
-				[],
-				[signature],
-				EDamageType.Sword,
-				signature
-			);
+				selectedSkillIds: [],
+				grantedSkillIds: [signature],
+				equippedWeaponType: EDamageType.Sword,
+				counterSkillId: signature
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(1000, 400)]),
 		expected: { victory: true, playerDied: false, totalMs: 1200 }
@@ -979,17 +979,17 @@ const scenarios: ParityScenario[] = [
 		name: 'parryCounterCrits',
 		player: () => {
 			const signature = granted.register(makeSkill(30, 100_000, [], [], EDamageType.Sword, 1));
-			return granted.build(
-				[
+			return granted.build({
+				attrs: [
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.ParryChance, amount: 1.0 },
 					{ id: EAttribute.CriticalDamage, amount: 0.5 }
 				],
-				[],
-				[signature],
-				EDamageType.Sword,
-				signature
-			);
+				selectedSkillIds: [],
+				grantedSkillIds: [signature],
+				equippedWeaponType: EDamageType.Sword,
+				counterSkillId: signature
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(1000, 400)]),
 		expected: { victory: true, playerDied: false, totalMs: 800 }
@@ -1006,16 +1006,16 @@ const scenarios: ParityScenario[] = [
 		name: 'fractionalParryChance',
 		player: () => {
 			const signature = granted.register(makeSkill(20, 100_000, [], [], EDamageType.Sword));
-			return granted.build(
-				[
+			return granted.build({
+				attrs: [
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.ParryChance, amount: 0.5 }
 				],
-				[],
-				[signature],
-				EDamageType.Sword,
-				signature
-			);
+				selectedSkillIds: [],
+				grantedSkillIds: [signature],
+				equippedWeaponType: EDamageType.Sword,
+				counterSkillId: signature
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(10, 400)]),
 		expected: { victory: true, playerDied: false, totalMs: 2800 }
@@ -1080,17 +1080,17 @@ const scenarios: ParityScenario[] = [
 		name: 'luckAmplifiedParryChance',
 		player: () => {
 			const signature = granted.register(makeSkill(30, 100_000, [], [], EDamageType.Sword));
-			return granted.build(
-				[
+			return granted.build({
+				attrs: [
 					{ id: EAttribute.Strength, amount: 10 },
 					{ id: EAttribute.ParryChance, amount: 0.5 },
 					{ id: EAttribute.Luck, amount: 500 }
 				],
-				[],
-				[signature],
-				EDamageType.Sword,
-				signature
-			);
+				selectedSkillIds: [],
+				grantedSkillIds: [signature],
+				equippedWeaponType: EDamageType.Sword,
+				counterSkillId: signature
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 6 }], [makeSkill(1000, 400)]),
 		expected: { victory: true, playerDied: false, totalMs: 1200 }
@@ -1110,7 +1110,11 @@ const scenarios: ParityScenario[] = [
 		player: () => {
 			const selected = granted.register(makeSkill(20, 400));
 			const grant = granted.register(makeSkill(30, 400));
-			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [selected], [grant]);
+			return granted.build({
+				attrs: [{ id: EAttribute.Strength, amount: 10 }],
+				selectedSkillIds: [selected],
+				grantedSkillIds: [grant]
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 800 }
@@ -1123,7 +1127,11 @@ const scenarios: ParityScenario[] = [
 		name: 'twoItemsGrantSameSkill',
 		player: () => {
 			const grant = granted.register(makeSkill(30, 400));
-			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [], [grant, grant]);
+			return granted.build({
+				attrs: [{ id: EAttribute.Strength, amount: 10 }],
+				selectedSkillIds: [],
+				grantedSkillIds: [grant, grant]
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 1600 }
@@ -1136,7 +1144,11 @@ const scenarios: ParityScenario[] = [
 		name: 'grantedSkillDuplicatesSelected',
 		player: () => {
 			const skill = granted.register(makeSkill(22, 400));
-			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [skill], [skill]);
+			return granted.build({
+				attrs: [{ id: EAttribute.Strength, amount: 10 }],
+				selectedSkillIds: [skill],
+				grantedSkillIds: [skill]
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
@@ -1150,7 +1162,11 @@ const scenarios: ParityScenario[] = [
 		name: 'duplicateSelectedSkill',
 		player: () => {
 			const skill = granted.register(makeSkill(22, 400));
-			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [skill, skill], []);
+			return granted.build({
+				attrs: [{ id: EAttribute.Strength, amount: 10 }],
+				selectedSkillIds: [skill, skill],
+				grantedSkillIds: []
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
@@ -1171,7 +1187,11 @@ const scenarios: ParityScenario[] = [
 					[makeEffect(110, ESkillEffectTarget.Self, EAttribute.Strength, EModifierType.Additive, 10, PERMANENT)]
 				)
 			);
-			return granted.build([{ id: EAttribute.Strength, amount: 10 }], [], [grant]);
+			return granted.build({
+				attrs: [{ id: EAttribute.Strength, amount: 10 }],
+				selectedSkillIds: [],
+				grantedSkillIds: [grant]
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 20 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 2000 }
@@ -1648,7 +1668,12 @@ const scenarios: ParityScenario[] = [
 		player: () => {
 			const axe = granted.register(makeSkill(28, 400, [], [], EDamageType.Axe));
 			const swordSignature = granted.register(makeSkill(28, 400, [], [], EDamageType.Sword));
-			return granted.build([{ id: EAttribute.Strength, amount: 0 }], [axe], [swordSignature], EDamageType.Sword);
+			return granted.build({
+				attrs: [{ id: EAttribute.Strength, amount: 0 }],
+				selectedSkillIds: [axe],
+				grantedSkillIds: [swordSignature],
+				equippedWeaponType: EDamageType.Sword
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 1600 }
@@ -1662,7 +1687,12 @@ const scenarios: ParityScenario[] = [
 		player: () => {
 			const physical = granted.register(makeSkill(16, 400, [], [], EDamageType.Physical));
 			const punch = granted.register(makeSkill(24, 400, [], [], EDamageType.Unarmed));
-			return granted.build([{ id: EAttribute.Strength, amount: 0 }], [physical], [punch], EDamageType.Unarmed);
+			return granted.build({
+				attrs: [{ id: EAttribute.Strength, amount: 0 }],
+				selectedSkillIds: [physical],
+				grantedSkillIds: [punch],
+				equippedWeaponType: EDamageType.Unarmed
+			});
 		},
 		enemy: () => makeBattler([{ id: EAttribute.Strength, amount: 10 }], []),
 		expected: { victory: true, playerDied: false, totalMs: 1200 }

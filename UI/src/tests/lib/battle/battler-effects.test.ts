@@ -27,10 +27,12 @@ import { battlerFactory, makeSkill, makeEffect } from './battle-sim-test-utils';
  *  `MakeBattler(params AttributeModifier[])` helper. */
 const makeBattler = (attrs: { id: EAttribute; amount: number }[] = [{ id: EAttribute.Strength, amount: 10 }]) =>
 	new Battler({
-		name: 'B',
-		level: 1,
-		selectedSkills: [],
-		attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
+		battlerData: {
+			name: 'B',
+			level: 1,
+			selectedSkills: [],
+			attributes: attrs.map((a) => ({ attributeId: a.id, amount: a.amount }))
+		}
 	});
 
 const effect = (
