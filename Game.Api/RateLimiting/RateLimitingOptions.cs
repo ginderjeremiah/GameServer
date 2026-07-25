@@ -12,7 +12,7 @@ namespace Game.Api.RateLimiting
         /// <summary>The configuration section this options class binds from.</summary>
         public const string SectionName = "RateLimiting";
 
-        /// <summary>The named policy applied to the anonymous auth endpoints.</summary>
+        /// <summary>The named policy applied to every endpoint consuming credentials or a refresh token.</summary>
         public const string AuthPolicy = "auth";
 
         /// <summary>

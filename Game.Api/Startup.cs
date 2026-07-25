@@ -109,9 +109,10 @@ namespace Game.Api
             builder.Services.AddOptions<ForwardedHeadersOptions>()
                 .Configure<IOptions<ForwardedHeadersConfig>>((options, config) => config.Value.Apply(options));
 
-            // Throttle the anonymous auth endpoints per client IP to blunt credential stuffing, refresh-token
-            // brute force, and the PBKDF2 resource-exhaustion vector. Limits are config-bound with safe
-            // defaults so an unconfigured deployment is still protected (#950).
+            // Throttle every endpoint consuming credentials or a refresh token per client IP, to blunt
+            // credential stuffing, refresh-token brute force, and the PBKDF2 resource-exhaustion vector.
+            // Limits are config-bound with safe defaults so an unconfigured deployment is still
+            // protected (#950).
             builder.Services.AddAuthRateLimiter();
 
             // Per-account exponential login backoff layered on top of the IP limiter: defence-in-depth against
