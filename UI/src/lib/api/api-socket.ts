@@ -153,9 +153,10 @@ export class ApiSocket {
 		this.resetPongTracking();
 		// Superseded before this open even began — handleClose's auth-retry refresh can resolve and call
 		// processCommandQueue after the teardown. Bail before arming the keepalive below (see
-		// teardownRequested), which nothing would then own.
+		// teardownRequested), which nothing would then own — and settle the queue, since that leaves nothing
+		// to re-flush it.
 		if (this.teardownRequested) {
-			this.settleSupersededQueue();
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			return;
 		}
 		// Armed before the refresh await (not after the handshake is built) so a retryable bail below still
@@ -170,9 +171,10 @@ export class ApiSocket {
 		const ensured = await ensureValidAccessToken();
 		// Superseded while the refresh was in flight (e.g. the SocketReplaced modal acknowledged mid-reconnect).
 		// Connecting now would resurrect the very socket the teardown exists to prevent — a takeover leaves the
-		// tokens valid, so nothing else stops it.
+		// tokens valid, so nothing else stops it. Terminal, so the queue is settled rather than left for a
+		// reconnect that won't happen.
 		if (this.teardownRequested) {
-			this.settleSupersededQueue();
+			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 			return;
 		}
 		// A teardown that landed and was then lifted by a new command stopped the interval armed above (this
@@ -500,12 +502,6 @@ export class ApiSocket {
 		while ((request = this.socketCommandQueue.shift())) {
 			request.settleWithError(error);
 		}
-	}
-
-	/** Settles the queue of an open a teardown superseded (the caller bails out itself). Terminal like every
-	 *  other settling path: the keepalive is stopped and must stay stopped, so nothing will re-flush it. */
-	private settleSupersededQueue() {
-		this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 	}
 
 	/** Backstop for a request that was sent but whose response never arrived while the socket stayed
