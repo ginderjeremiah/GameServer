@@ -119,6 +119,14 @@ export class ApiSocket {
 	// Single-flight guard for the async open path: the in-flight open promise (null when not connecting),
 	// shared by concurrent ensureSocket callers so the pre-emptive-refresh await can't race two opens.
 	private connecting: Promise<void> | null = null;
+	// Latched by disconnect(), lifted only by sendSocketCommand — deliberately not connection state (it stays
+	// false through an ordinary close, and true while the torn-down socket may still be CLOSING). It records
+	// that a teardown happened, so background connects stay suppressed until an explicit command asks for a
+	// new session; the keepalive must not lift it, since suppressing exactly that is the point. Needed because
+	// the open path is async: an open suspended on the pre-emptive refresh await, or one handleClose's
+	// auth-retry refresh starts after the teardown, would otherwise complete into a socket disconnect() can no
+	// longer see — and with the keepalive already stopped, nothing would ever own or close it.
+	private teardownRequested = false;
 
 	/**
 	 * Ensures a live (or still-connecting) socket exists, opening one if needed. The open path is async
@@ -143,18 +151,40 @@ export class ApiSocket {
 	private async openSocket(): Promise<void> {
 		this.socketOpened = false;
 		this.resetPongTracking();
+		// Superseded before this open even began — handleClose's auth-retry refresh can resolve and call
+		// processCommandQueue after the teardown. Bail before arming the keepalive below (see
+		// teardownRequested), which nothing would then own.
+		if (this.teardownRequested) {
+			this.settleSupersededQueue();
+			return;
+		}
 		// Armed before the refresh await (not after the handshake is built) so a retryable bail below still
 		// leaves the keepalive running to retry the connect — otherwise the very first connect of a page
 		// session (or any connect after the interval was last stopped) could bail with nothing left to ever
 		// call ensureSocket() again, stranding the queue forever.
-		if (this.pingIntervalId === null) {
-			this.pingIntervalId = setInterval(() => this.attemptPing(), PING_INTERVAL_MS);
-		}
+		this.ensurePingInterval();
 		// Pre-emptively refresh an access token that is missing or about to expire (mirroring the HTTP
 		// path) so a reconnect doesn't hand the server a stale token, eat a rejected handshake, and burn a
 		// single-use refresh token recovering in handleClose.
 		const hadRefreshToken = getRefreshToken() !== null;
 		const ensured = await ensureValidAccessToken();
+		// Superseded while the refresh was in flight (e.g. the SocketReplaced modal acknowledged mid-reconnect).
+		// Connecting now would resurrect the very socket the teardown exists to prevent — a takeover leaves the
+		// tokens valid, so nothing else stops it.
+		if (this.teardownRequested) {
+			this.settleSupersededQueue();
+			return;
+		}
+		// A teardown that landed and was then lifted by a new command stopped the interval armed above (this
+		// open is shared, so ensureSocket didn't start a fresh one). Re-assert it rather than completing into a
+		// socket no keepalive owns — no half-open detection, and handleClose would hold the queue for a
+		// background reconnect that never runs. Skipped once the session's tokens are gone: attemptPing tears
+		// the keepalive down precisely because the session ended, so reviving it here would resurrect the
+		// post-logout ping noise that branch exists to prevent — and would defer this connect's queue to a
+		// keepalive that immediately stops again.
+		if (getAccessToken() !== null) {
+			this.ensurePingInterval();
+		}
 		let accessToken = ensured.accessToken;
 		// A logged-in session (one that had a refresh token) whose pre-emptive refresh didn't yield a
 		// token: bail out without opening rather than handing the server a stale/missing token. A
@@ -219,6 +249,9 @@ export class ApiSocket {
 	): Promise<IApiSocketResponse<T>>;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature behind the typed overloads above; TS cannot narrow the conditional param type from the generic T here.
 	public async sendSocketCommand<T extends ApiSocketCommand>(commandName: T, params?: any) {
+		// An explicit command is a deliberate new session, so it lifts a prior teardown's suppression —
+		// otherwise a torn-down singleton could never connect again for the rest of the page's life.
+		this.teardownRequested = false;
 		const id = (this.commandCounter++).toString();
 		const request = new ApiSocketRequest(id, commandName, params);
 		this.socketCommandQueue.push(request);
@@ -285,6 +318,9 @@ export class ApiSocket {
 	 * the SocketReplaced case, fight the session that just took over.
 	 */
 	public disconnect() {
+		// Closing `this.socket` isn't enough on its own: an open already past ensureSocket's "is there a
+		// socket?" check has no socket to close yet, and would go on to create one after this returns.
+		this.teardownRequested = true;
 		this.stopPingInterval();
 		this.clearConnectionStableTimer();
 		// close() on an already-CLOSED socket is a spec no-op, and on a CONNECTING one it aborts the
@@ -314,6 +350,14 @@ export class ApiSocket {
 	private settleQueueIfKeepaliveStopped() {
 		if (this.pingIntervalId === null) {
 			this.settleQueuedRequests(CONNECTION_LOST_ERROR);
+		}
+	}
+
+	/** Arms the keepalive unless it is already running. Idempotent so `openSocket` can re-assert it after its
+	 *  refresh await, where a teardown may have stopped the interval the same open armed before suspending. */
+	private ensurePingInterval() {
+		if (this.pingIntervalId === null) {
+			this.pingIntervalId = setInterval(() => this.attemptPing(), PING_INTERVAL_MS);
 		}
 	}
 
@@ -442,6 +486,12 @@ export class ApiSocket {
 		while ((request = this.socketCommandQueue.shift())) {
 			request.settleWithError(error);
 		}
+	}
+
+	/** Settles the queue of an open a teardown superseded (the caller bails out itself). Terminal like every
+	 *  other settling path: the keepalive is stopped and must stay stopped, so nothing will re-flush it. */
+	private settleSupersededQueue() {
+		this.settleQueuedRequests(CONNECTION_LOST_ERROR);
 	}
 
 	/** Backstop for a request that was sent but whose response never arrived while the socket stayed

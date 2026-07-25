@@ -66,7 +66,13 @@ vi.stubGlobal('WebSocket', webSocketMock);
 
 import { ApiSocket, fetchSocketData, onSocketError } from '$lib/api/api-socket';
 import { setTokens, getAccessToken, getTokens, clearTokens } from '$lib/api/token-store';
-import { ensureValidAccessToken, refreshTokens, handleAuthFailure, type AccessTokenResult } from '$lib/api/auth';
+import {
+	ensureValidAccessToken,
+	refreshTokens,
+	handleAuthFailure,
+	type AccessTokenResult,
+	type RefreshOutcome
+} from '$lib/api/auth';
 
 // Opening a socket is now asynchronous (it awaits the pre-emptive refresh before `new WebSocket`), so a
 // command no longer creates the socket synchronously. Drain the promise microtask queue to let the
@@ -1215,6 +1221,98 @@ describe('ApiSocket', () => {
 
 			expect(internals(apiSocket).pingIntervalId).toBeNull();
 			expect(ws.close).toHaveBeenCalledWith(1000);
+		});
+
+		it('disconnect() during the open path refresh await leaves no resurrected socket behind', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			// Hold the pre-emptive refresh open so the disconnect lands while openSocket is suspended on it —
+			// the session-takeover window: the modal is acknowledged mid-reconnect and the tokens stay valid.
+			let releaseRefresh: (result: AccessTokenResult) => void = () => {};
+			vi.mocked(ensureValidAccessToken).mockImplementation(
+				() => new Promise<AccessTokenResult>((resolve) => (releaseRefresh = resolve))
+			);
+
+			const promise = apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			expect(socketInstances.length).toBe(0);
+
+			apiSocket.disconnect();
+			releaseRefresh({ accessToken: 'a', rejected: false });
+			await flushMicrotasks();
+
+			// No socket may be created after the teardown, and the keepalive that would otherwise be the only
+			// thing able to close one must stay stopped.
+			expect(socketInstances.length).toBe(0);
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
+			// Nothing will reconnect to flush it, so the queued command is settled rather than left hanging.
+			expect((await promise).error).toBe('Connection lost. Please try again.');
+		});
+
+		it('does not connect when handleClose auth-retry refresh resolves after a disconnect()', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			let releaseRefresh: (result: RefreshOutcome) => void = () => {};
+			vi.mocked(refreshTokens).mockImplementation(
+				() => new Promise<RefreshOutcome>((resolve) => (releaseRefresh = resolve))
+			);
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+			// Reject the handshake before it ever opens, which routes into the refresh/retry path above.
+			ws.readyState = ws.CLOSED;
+			ws.onclose?.({ code: 1006 });
+			const socketsBefore = socketInstances.length;
+
+			apiSocket.disconnect();
+			releaseRefresh({ status: 'success', tokens: { accessToken: 'a2', refreshToken: 'r2' } });
+			await flushMicrotasks();
+
+			expect(socketInstances.length).toBe(socketsBefore);
+			// Specifically must not re-arm the keepalive: openSocket arms it before its own refresh await, so
+			// bailing after that point would leave an interval nothing owns.
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
+		});
+
+		it('an explicit command after a disconnect() opens a new socket again', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			const ws = lastWs();
+			ws.readyState = ws.CLOSED;
+			apiSocket.disconnect();
+			const socketsBefore = socketInstances.length;
+
+			// The teardown suppresses background reconnects, not a deliberate new session.
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+
+			expect(socketInstances.length).toBe(socketsBefore + 1);
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
+		});
+
+		it('re-arms the keepalive when a new command lifts a teardown mid-connect', async () => {
+			setTokens({ accessToken: 'a', refreshToken: 'r' });
+			let releaseRefresh: (result: AccessTokenResult) => void = () => {};
+			vi.mocked(ensureValidAccessToken).mockImplementation(
+				() => new Promise<AccessTokenResult>((resolve) => (releaseRefresh = resolve))
+			);
+
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			await flushMicrotasks();
+			// The teardown stops the interval that connect armed before suspending on the refresh.
+			apiSocket.disconnect();
+			expect(internals(apiSocket).pingIntervalId).toBeNull();
+
+			// A new command lifts the teardown, and ensureSocket hands it the *same* in-flight connect rather
+			// than starting a fresh one — so that connect completes with its own arming already undone.
+			apiSocket.sendSocketCommand('DefeatEnemy', { clientTotalMs: 1 });
+			releaseRefresh({ accessToken: 'a', rejected: false });
+			await flushMicrotasks();
+
+			expect(socketInstances.length).toBe(1);
+			// A socket with no keepalive has no half-open detection, and handleClose would hold its queue for a
+			// background reconnect that never runs.
+			expect(internals(apiSocket).pingIntervalId).not.toBeNull();
 		});
 	});
 
