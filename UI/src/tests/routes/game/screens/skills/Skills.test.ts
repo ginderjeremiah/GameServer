@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import {
-	EDamageType,
-	ERarity,
 	EAttribute,
 	EModifierType,
-	ESkillAcquisition,
 	ESkillEffectTarget,
 	type IChallenge,
 	type IEnemy,
@@ -14,6 +11,7 @@ import {
 	type ISkillEffect,
 	type IZone
 } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import type { AttributeModifier } from '$lib/battle';
 import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
@@ -105,24 +103,12 @@ vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
 
 import Skills from '$routes/game/screens/skills/Skills.svelte';
 
-const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
-	name: `Skill ${over.id}`,
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
-	effects: [],
-	description: 'A skill.',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Player,
-	...over
-});
+const skill = (over: Partial<ISkill> & { id: number }): ISkill =>
+	makeSkill({
+		damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
+		description: 'A skill.',
+		...over
+	});
 
 // ids 0–3 are owned (see the unlockedSkills fixture below); Echo (id 4) is unowned, so the screen
 // must never list it now that the locked/aspirational catalogue is gone.

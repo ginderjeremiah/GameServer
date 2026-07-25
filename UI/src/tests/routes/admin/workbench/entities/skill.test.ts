@@ -10,6 +10,7 @@ import {
 	type ISkill
 } from '$lib/api';
 import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
+import { makeSkill } from '../../../../fixtures/skills';
 
 /* Skill config transforms: `newItem` defaults, the derived meta line, the effects
    `newRow` defaults, and the persist path — a child-only change (effects or
@@ -235,24 +236,14 @@ describe('skillEntity', () => {
 	});
 
 	it('persist saves the effects when only effects change, without an identity Edit or a multipliers call', async () => {
-		const baseline: ISkill = {
+		const baseline = makeSkill({
 			id: 0,
 			name: 'Poison Sting',
-			designerNotes: '',
-			baseDamage: 10,
-			criticalChance: 0,
 			cooldownMs: 2000,
-			iconPath: '',
-			rarityId: ERarity.Common,
-			word: '',
-			pronunciation: '',
-			translation: '',
-			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
 			effects: [effect({ id: 1, amount: 0.5 })]
-		};
+		});
 		const record: ISkill = { ...baseline, effects: [effect({ id: 1, amount: 0.75 })] }; // only the effect amount changed
 		socket.skills = [record];
 
@@ -268,24 +259,14 @@ describe('skillEntity', () => {
 	});
 
 	it('persist saves the multipliers when only multipliers change, skipping the effects endpoint', async () => {
-		const baseline: ISkill = {
+		const baseline = makeSkill({
 			id: 0,
 			name: 'Slash',
-			designerNotes: '',
-			baseDamage: 10,
-			criticalChance: 0,
 			cooldownMs: 2000,
-			iconPath: '',
-			rarityId: ERarity.Common,
-			word: '',
-			pronunciation: '',
-			translation: '',
-			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-			acquisition: ESkillAcquisition.Player,
 			description: 'desc',
 			damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 1 }],
 			effects: [effect({ id: 1 })]
-		};
+		});
 		const record: ISkill = { ...baseline, damageMultipliers: [{ attributeId: EAttribute.Strength, multiplier: 2 }] };
 		socket.skills = [record];
 
@@ -303,24 +284,13 @@ describe('skillEntity', () => {
 	it('persist Adds a new skill and saves its effects against the resolved id', async () => {
 		// A freshly-added record has a temporary negative id; persistEntity resolves the real
 		// id from the post-save refetch before running the effects child saver.
-		const added: ISkill = {
+		const added = makeSkill({
 			id: -1,
 			name: 'Venom',
-			designerNotes: '',
 			baseDamage: 5,
-			criticalChance: 0,
-			cooldownMs: 1000,
-			iconPath: '',
-			rarityId: ERarity.Common,
-			word: '',
-			pronunciation: '',
-			translation: '',
-			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-			acquisition: ESkillAcquisition.Player,
 			description: 'Poisons the foe',
-			damageMultipliers: [],
 			effects: [effect({ id: 0, target: ESkillEffectTarget.Opponent })] // new effect, id 0
-		};
+		});
 		socket.skills = [{ ...added, id: 7 }]; // the persisted record at its real id
 
 		await skillEntity.persist({ added: [added], modified: [], deleted: [], existingIds: [] });

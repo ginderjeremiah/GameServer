@@ -3,12 +3,11 @@ import {
 	EAttribute,
 	EDamageType,
 	EModifierType,
-	ERarity,
-	ESkillAcquisition,
 	ESkillEffectTarget,
 	type IBattlerAttribute,
 	type ISkill
 } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 
 // Mutable player-manager stand-in: `save()` reassigns `attributes` and adopts the
 // server's `statPointsUsed` absolutely. Declared as a class instance (not an object
@@ -82,24 +81,7 @@ const skillsById = (skills: ISkill[]): ISkill[] => {
 };
 
 /* A skill with sensible defaults so each test only states what matters. */
-const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
-	name: `Skill ${over.id}`,
-	baseDamage: 0,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	description: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	acquisition: ESkillAcquisition.Player,
-	designerNotes: '',
-	...over
-});
+const skill = (over: Partial<ISkill> & { id: number }): ISkill => makeSkill({ baseDamage: 0, ...over });
 
 beforeEach(() => {
 	sendSocketCommand.mockReset().mockResolvedValue({ data: { attributes: allFives(), statPointsUsed: 0 } });

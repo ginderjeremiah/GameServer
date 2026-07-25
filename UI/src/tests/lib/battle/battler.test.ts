@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ERarity, EAttribute, EDamageType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
+import { EAttribute, EDamageType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { EModifierType, EAttributeModifierSource } from '$lib/battle/attribute-modifier';
 import { makeEffect } from './battle-sim-test-utils';
+import { makeSkill } from '../../fixtures/skills';
 
 const mockSkills: ISkill[] = [];
 
@@ -17,24 +18,8 @@ vi.mock('$stores', () => ({
 import { Battler, type BattlerData } from '$lib/battle/battler';
 import type { Skill } from '$lib/battle/skill';
 
-const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISkill => ({
-	id,
-	name: `Skill ${id}`,
-	baseDamage,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	cooldownMs,
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	iconPath: '',
-	rarityId: ERarity.Common,
-	designerNotes: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	acquisition: ESkillAcquisition.Player
-});
+const makeSkillData = (id: number, baseDamage: number, cooldownMs: number): ISkill =>
+	makeSkill({ id, baseDamage, cooldownMs });
 
 const makeTypedSkillData = (id: number, type: EDamageType): ISkill => ({
 	...makeSkillData(id, 10, 1000),

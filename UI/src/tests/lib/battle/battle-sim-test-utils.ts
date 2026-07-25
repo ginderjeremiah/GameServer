@@ -1,10 +1,11 @@
 import { Battler, newItem } from '$lib/battle';
+// Aliased: this module's own `makeSkill` builds a `SkillSpec` (pre-registration), not the contract.
+import { makeSkill as makeSkillContract } from '../../fixtures/skills';
 import {
 	EAttribute,
 	EDamageType,
 	EItemCategory,
 	ERarity,
-	ESkillAcquisition,
 	type EModifierType,
 	type ESkillEffectTarget,
 	type EItemModType,
@@ -88,26 +89,19 @@ export const makeEffect = (
  *  returning its assigned id so a Battler resolves it exactly as the live game does. */
 function registerSkill(registry: ISkill[], spec: SkillSpec): number {
 	const id = registry.length;
-	registry.push({
-		id,
-		name: `Skill ${id}`,
-		baseDamage: spec.baseDamage,
-		criticalChance: spec.criticalChance,
-		cooldownMs: spec.cooldownMs,
-		// The skill's weighted leaf-type split (#1343); a single full-weight portion is identical to the
-		// pre-portions single-type hit.
-		damagePortions: spec.damagePortions,
-		damageMultipliers: spec.multipliers,
-		effects: spec.effects,
-		description: '',
-		iconPath: '',
-		rarityId: ERarity.Common,
-		designerNotes: '',
-		word: '',
-		pronunciation: '',
-		translation: '',
-		acquisition: ESkillAcquisition.Player
-	});
+	registry.push(
+		makeSkillContract({
+			id,
+			baseDamage: spec.baseDamage,
+			criticalChance: spec.criticalChance,
+			cooldownMs: spec.cooldownMs,
+			// The skill's weighted leaf-type split (#1343); a single full-weight portion is identical to the
+			// pre-portions single-type hit.
+			damagePortions: spec.damagePortions,
+			damageMultipliers: spec.multipliers,
+			effects: spec.effects
+		})
+	);
 	return id;
 }
 

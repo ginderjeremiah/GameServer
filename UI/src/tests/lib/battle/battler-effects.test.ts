@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EDamageType, ERarity, EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
+import { EAttribute, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill } from '$lib/api';
 
 // A mutable skill registry backing the mocked `staticData.skills`, so the battleStep ordering test can
@@ -16,6 +16,8 @@ vi.mock('$stores', () => ({
 import { Battler, Skill, battleStep } from '$lib/battle';
 import { Mulberry32 } from '$lib/engine/mulberry32';
 import { battlerFactory, makeSkill, makeEffect } from './battle-sim-test-utils';
+// Aliased: `makeSkill` above builds a `SkillSpec` for the battler factory, not the contract.
+import { makeSkill as makeSkillContract } from '../../fixtures/skills';
 
 /**
  * Unit coverage for the timed skill-effect bookkeeping on {@link Battler}, {@link Skill} and
@@ -43,6 +45,22 @@ const effect = (
 	durationMs = 1000,
 	target: ESkillEffectTarget = ESkillEffectTarget.Self
 ) => makeEffect(id, target, attribute, type, amount, durationMs);
+
+/** A damageless skill carrying one Self and one Opponent effect, so a fire exercises both routes. */
+const dualEffectSkill = (caster: Battler) =>
+	new Skill(
+		makeSkillContract({
+			id: 0,
+			name: 'Dual',
+			baseDamage: 0,
+			cooldownMs: 40,
+			effects: [
+				effect(1, EAttribute.Strength, EModifierType.Additive, 5, 1000, ESkillEffectTarget.Self),
+				effect(2, EAttribute.Strength, EModifierType.Additive, 7, 1000, ESkillEffectTarget.Opponent)
+			]
+		}),
+		caster
+	);
 
 describe('Battler skill-effect bookkeeping', () => {
 	beforeEach(() => {
@@ -200,30 +218,7 @@ describe('Battler skill-effect bookkeeping', () => {
 	it('routes a skill’s Self effect to the caster and Opponent effect to the foe', () => {
 		const caster = makeBattler();
 		const foe = makeBattler();
-		const skill = new Skill(
-			{
-				id: 0,
-				name: 'Dual',
-				baseDamage: 0,
-				criticalChance: 0,
-				cooldownMs: 40,
-				damageMultipliers: [],
-				effects: [
-					effect(1, EAttribute.Strength, EModifierType.Additive, 5, 1000, ESkillEffectTarget.Self),
-					effect(2, EAttribute.Strength, EModifierType.Additive, 7, 1000, ESkillEffectTarget.Opponent)
-				],
-				description: '',
-				iconPath: '',
-				rarityId: ERarity.Common,
-				designerNotes: '',
-				word: '',
-				pronunciation: '',
-				translation: '',
-				damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-				acquisition: ESkillAcquisition.Player
-			},
-			caster
-		);
+		const skill = dualEffectSkill(caster);
 
 		skill.applyEffects(foe);
 
@@ -234,30 +229,7 @@ describe('Battler skill-effect bookkeeping', () => {
 	it('reports each newly-applied effect (and the battler it landed on) to the onApplied callback', () => {
 		const caster = makeBattler();
 		const foe = makeBattler();
-		const skill = new Skill(
-			{
-				id: 0,
-				name: 'Dual',
-				baseDamage: 0,
-				criticalChance: 0,
-				cooldownMs: 40,
-				damageMultipliers: [],
-				effects: [
-					effect(1, EAttribute.Strength, EModifierType.Additive, 5, 1000, ESkillEffectTarget.Self),
-					effect(2, EAttribute.Strength, EModifierType.Additive, 7, 1000, ESkillEffectTarget.Opponent)
-				],
-				description: '',
-				iconPath: '',
-				rarityId: ERarity.Common,
-				designerNotes: '',
-				word: '',
-				pronunciation: '',
-				translation: '',
-				damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-				acquisition: ESkillAcquisition.Player
-			},
-			caster
-		);
+		const skill = dualEffectSkill(caster);
 
 		const applied: { id: number; onCaster: boolean }[] = [];
 		skill.applyEffects(foe, (e, target) => applied.push({ id: e.id, onCaster: target === caster }));
@@ -403,27 +375,7 @@ describe('Battler skill-effect bookkeeping', () => {
  */
 describe('Skill effect attribute scaling', () => {
 	const skillWith = (effect: ReturnType<typeof makeEffect>, caster: Battler) =>
-		new Skill(
-			{
-				id: 0,
-				name: 'Scaler',
-				baseDamage: 0,
-				criticalChance: 0,
-				cooldownMs: 40,
-				damageMultipliers: [],
-				effects: [effect],
-				description: '',
-				iconPath: '',
-				rarityId: ERarity.Common,
-				designerNotes: '',
-				word: '',
-				pronunciation: '',
-				translation: '',
-				damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-				acquisition: ESkillAcquisition.Player
-			},
-			caster
-		);
+		new Skill(makeSkillContract({ id: 0, name: 'Scaler', baseDamage: 0, cooldownMs: 40, effects: [effect] }), caster);
 
 	const poison = (baseAmount: number, scalingAmount: number) =>
 		makeEffect(

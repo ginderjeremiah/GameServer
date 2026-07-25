@@ -1,14 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-	EDamageType,
-	ERarity,
-	EAttribute,
-	ELogType,
-	EModifierType,
-	ESkillAcquisition,
-	ESkillEffectTarget
-} from '$lib/api';
+import { EDamageType, EAttribute, ELogType, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IEnemy, IEnemyInstance } from '$lib/api';
+import { makeSkill } from '../../../fixtures/skills';
 
 // Callbacks captured from the mocked engine hooks. `onLogicalUpdate` emits a delta,
 // `onRenderUpdate` a (renderDelta, logicalDelta) pair, and `onNewEnemyLoaded` an enemy instance.
@@ -178,24 +171,7 @@ describe('BattleEngine', () => {
 		vi.mocked(evaluateMechanicTriggers).mockClear();
 
 		mockSkills.length = 0;
-		mockSkills[0] = {
-			id: 0,
-			name: 'Slash',
-			baseDamage: 100,
-			criticalChance: 0,
-			damageMultipliers: [],
-			effects: [],
-			description: '',
-			cooldownMs: 500,
-			iconPath: '',
-			rarityId: ERarity.Common,
-			designerNotes: '',
-			word: '',
-			pronunciation: '',
-			translation: '',
-			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-			acquisition: ESkillAcquisition.Player
-		};
+		mockSkills[0] = makeSkill({ id: 0, name: 'Slash', baseDamage: 100, cooldownMs: 500 });
 
 		mockEnemies.length = 0;
 		mockEnemies[1] = {
