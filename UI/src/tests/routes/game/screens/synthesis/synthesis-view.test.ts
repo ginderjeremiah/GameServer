@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import type { RecipeView } from '$routes/game/screens/synthesis/synthesis';
 
 /* The view-model reads the live stores + engine + socket, so those are mocked with mutable stand-ins the
@@ -33,25 +34,8 @@ vi.mock('$lib/api', async (importOriginal) => {
 
 import { SynthesisView } from '$routes/game/screens/synthesis/synthesis-view.svelte';
 
-const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
-	id,
-	name: `Skill ${id}`,
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Synthesis,
-	...over
-});
+const skill = (id: number, over: Partial<ISkill> = {}): ISkill =>
+	makeSkill({ id, acquisition: ESkillAcquisition.Synthesis, ...over });
 
 /** A minimal `ready` recipe view for the synthesize-action tests. */
 const readyRecipe = (over: Partial<RecipeView> = {}): RecipeView => ({

@@ -2,15 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
 	EDamageType,
 	EModifierType,
-	ERarity,
 	EAttribute,
-	ESkillAcquisition,
 	type IChallenge,
 	type IEnemy,
 	type ISignaturePassive,
 	type ISkill,
 	type IZone
 } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import { EAttributeModifierSource, type AttributeModifier } from '$lib/battle';
 import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
@@ -98,24 +97,7 @@ import { damagePerSecond } from '$lib/common';
 import { expectedCritMultiplier } from '$lib/battle';
 
 /* A skill with sensible defaults so each test only states what matters. */
-const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
-	name: `Skill ${over.id}`,
-	baseDamage: 0,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Player,
-	...over
-});
+const skill = (over: Partial<ISkill> & { id: number }): ISkill => makeSkill({ baseDamage: 0, ...over });
 
 const metric = (over: Partial<SkillMetrics> & { skill: ISkill }): SkillMetrics => ({
 	rawDamage: 0,

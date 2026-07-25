@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import { makeProficiency } from '../../../../fixtures/proficiencies';
 
 /* The screen drives the real playerProficiencies store (fetched over the socket) for the gate state and
@@ -33,25 +34,8 @@ import Synthesis from '$routes/game/screens/synthesis/Synthesis.svelte';
 import { cancelActiveModal, confirmActiveModal, navigation, playerProficiencies } from '$stores';
 import { playerManager } from '$lib/engine';
 
-const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
-	id,
-	name: `Skill ${id}`,
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Synthesis,
-	...over
-});
+const skill = (id: number, over: Partial<ISkill> = {}): ISkill =>
+	makeSkill({ id, acquisition: ESkillAcquisition.Synthesis, ...over });
 
 const SKILLS: ISkill[] = [
 	skill(0, { name: 'Ember Strike' }),

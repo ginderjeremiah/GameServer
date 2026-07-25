@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { ESkillAcquisition, type IItem, type ISkill } from '$lib/api';
 import { resolveSkillProvenance } from '$routes/game/screens/codex/skill-provenance';
+import { makeSkill } from '../../../../fixtures/skills';
 
 // Minimal fixtures — provenance only reads ids, names, the item-grant references and the flag.
 // Challenges no longer grant skills (spike #982), so item grants are the only concrete source.
-const skill = (id: number, acquisition: ESkillAcquisition): ISkill =>
-	({ id, name: `Skill ${id}`, acquisition }) as ISkill;
+const skill = (id: number, acquisition: ESkillAcquisition): ISkill => makeSkill({ id, acquisition });
 
 const item = (id: number, grantedSkillId?: number, retiredAt?: string): IItem =>
 	({ id, name: `Item ${id}`, grantedSkillId, retiredAt }) as IItem;

@@ -1,31 +1,15 @@
 /* Shared fixtures for the Fight screen tests. Not a test file (no
    .test/.spec suffix) so vitest does not collect it. */
 
-import { EDamageType, EAttribute, ERarity, ESkillAcquisition, type IBattlerAttribute, type ISkill } from '$lib/api';
+import { EAttribute, type IBattlerAttribute, type ISkill } from '$lib/api';
 import { Battler, Skill } from '$lib/battle';
+// Aliased: this module's own `makeSkill` returns a live `Skill` domain object, not the contract.
+import { makeSkill as makeSkillContract } from '../../../../fixtures/skills';
 
 /** Builds a real Skill bound to an owner, overriding only what a test cares about. */
 export const makeSkill = (owner: Battler, over: Partial<ISkill> = {}): Skill =>
 	new Skill(
-		{
-			id: 1,
-			name: 'Slash',
-			baseDamage: 10,
-			criticalChance: 0,
-			damageMultipliers: [],
-			effects: [],
-			description: 'A basic slash.',
-			cooldownMs: 1000,
-			iconPath: '/icons/slash.png',
-			rarityId: ERarity.Common,
-			word: '',
-			pronunciation: '',
-			translation: '',
-			designerNotes: '',
-			damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-			acquisition: ESkillAcquisition.Player,
-			...over
-		},
+		makeSkillContract({ id: 1, name: 'Slash', description: 'A basic slash.', iconPath: '/icons/slash.png', ...over }),
 		owner
 	);
 

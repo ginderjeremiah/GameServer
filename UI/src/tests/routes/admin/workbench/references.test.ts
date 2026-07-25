@@ -7,7 +7,6 @@ import {
 	EItemModType,
 	EModifierType,
 	ERarity,
-	ESkillAcquisition,
 	type IChallenge,
 	type IClass,
 	type IEnemy,
@@ -26,6 +25,7 @@ import {
 	type ReferenceSources
 } from '$routes/admin/workbench/references';
 import { makePath, makeProficiency } from '../../../fixtures/proficiencies';
+import { makeSkill } from '../../../fixtures/skills';
 
 const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => ({
 	id,
@@ -128,24 +128,7 @@ const bySlot = <T extends { id: number }>(...items: T[]): T[] => {
 	return arr;
 };
 
-const skill = (id: number, name: string): ISkill => ({
-	id,
-	name,
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	damagePortions: [],
-	description: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	acquisition: ESkillAcquisition.Player,
-	designerNotes: ''
-});
+const skill = (id: number, name: string): ISkill => makeSkill({ id, name });
 
 // Id-aligned reference sets shared across the computation cases. Only enemies/zones/challenges carry
 // cross-referencing fixture data by default — the item/class/recipe/proficiency describes below layer

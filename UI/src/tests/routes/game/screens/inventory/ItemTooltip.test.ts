@@ -1,14 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import {
-	EDamageType,
-	EAttribute,
-	EItemCategory,
-	EItemModType,
-	ERarity,
-	ESkillAcquisition,
-	type ISkill
-} from '$lib/api';
+import { EAttribute, EItemCategory, EItemModType, ERarity, ESkillAcquisition, type ISkill } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import type { Item } from '$lib/battle';
 import { staticData } from '$stores';
@@ -67,24 +60,8 @@ const makeItem = (): Item => {
 	} as unknown as Item;
 };
 
-const skill = (id: number, name: string): ISkill => ({
-	id,
-	name,
-	baseDamage: 0,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Item
-});
+const skill = (id: number, name: string): ISkill =>
+	makeSkill({ id, name, baseDamage: 0, acquisition: ESkillAcquisition.Item });
 
 afterEach(() => {
 	cleanup();

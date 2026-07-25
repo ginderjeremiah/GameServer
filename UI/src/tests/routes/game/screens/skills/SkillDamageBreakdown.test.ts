@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EDamageType, ERarity, EAttribute, ESkillAcquisition, type IAttribute, type ISkill } from '$lib/api';
+import { EAttribute, type IAttribute, type ISkill } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 
 // The breakdown resolves the crit-chance label and attribute names through the reference-data store,
 // so it is mocked. The object backs the hoisted `vi.mock` factory, but its `attributes` are populated
@@ -18,25 +19,7 @@ staticData.attributes = [
 	{ id: EAttribute.CriticalChanceMultiplier, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
 ] as unknown as IAttribute[];
 
-const stubSkill = (over: Partial<ISkill> = {}): ISkill => ({
-	id: 0,
-	name: 'Cleave',
-	baseDamage: 50,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Player,
-	...over
-});
+const stubSkill = (over: Partial<ISkill> = {}): ISkill => makeSkill({ id: 0, name: 'Cleave', baseDamage: 50, ...over });
 
 // The per-skill crit chance now rides SkillMetrics (#1453) rather than a page-wide SkillsView value.
 const stubMetrics = (over: Partial<SkillMetrics> = {}): SkillMetrics => ({

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EDamageType, EModifierType, ERarity, EAttribute, ESkillAcquisition } from '$lib/api';
+import { EModifierType, EAttribute } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import type { IChallenge, IEnemy, ISignaturePassive, ISkill, IZone } from '$lib/api';
 import type { AttributeModifier } from '$lib/battle';
 import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
@@ -62,24 +63,7 @@ import ChipStub from './AttributeChipStub.svelte';
 import { SkillsView } from '$routes/game/screens/skills/skills-view.svelte';
 import SkillCardStats from '$routes/game/screens/skills/SkillCardStats.svelte';
 
-const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
-	name: `Skill ${over.id}`,
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 2000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Player,
-	...over
-});
+const skill = (over: Partial<ISkill> & { id: number }): ISkill => makeSkill({ cooldownMs: 2000, ...over });
 
 let view: SkillsView;
 

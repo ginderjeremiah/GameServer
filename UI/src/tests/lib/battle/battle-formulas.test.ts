@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ERarity, EAttribute, EDamageType, ESkillAcquisition } from '$lib/api';
+import { EAttribute, EDamageType } from '$lib/api';
 import type { ISkill } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import {
@@ -12,26 +12,10 @@ import {
 	resistanceTotal,
 	skillContributions
 } from '$lib/battle/battle-formulas';
+import { makeSkill } from '../../fixtures/skills';
 
-const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
-	id: 1,
-	name: 'Slash',
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: 'A basic slash',
-	cooldownMs: 1000,
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	iconPath: '/icons/slash.png',
-	rarityId: ERarity.Common,
-	designerNotes: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	acquisition: ESkillAcquisition.Player,
-	...overrides
-});
+const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill =>
+	makeSkill({ id: 1, name: 'Slash', description: 'A basic slash', iconPath: '/icons/slash.png', ...overrides });
 
 /** Raw attribute values without the derived/static pass, so tests control every input. */
 const makeAttributes = (attrs: [EAttribute, number][] = []) =>

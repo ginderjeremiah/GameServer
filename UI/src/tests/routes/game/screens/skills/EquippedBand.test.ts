@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EDamageType, EModifierType, EAttribute, ERarity, ESkillAcquisition } from '$lib/api';
+import { EModifierType, EAttribute } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import type { IChallenge, IEnemy, ISignaturePassive, ISkill, IZone } from '$lib/api';
 import type { AttributeModifier } from '$lib/battle';
 import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
@@ -67,24 +68,7 @@ vi.mock('$lib/api/types/game-constants', async (importOriginal) => {
 import { SkillsView } from '$routes/game/screens/skills/skills-view.svelte';
 import EquippedBand from '$routes/game/screens/skills/EquippedBand.svelte';
 
-const skill = (over: Partial<ISkill> & { id: number }): ISkill => ({
-	name: `Skill ${over.id}`,
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Player,
-	...over
-});
+const skill = (over: Partial<ISkill> & { id: number }): ISkill => makeSkill(over);
 
 const SKILLS: ISkill[] = [
 	skill({ id: 0, name: 'Alpha' }),

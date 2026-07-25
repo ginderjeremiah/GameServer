@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EAttribute, EDamageType, EItemCategory, EItemModType, ELogType, ERarity } from '$lib/api';
 import type { IInventoryData, IItem, IItemMod, ISkill } from '$lib/api';
 import { PUNCH_SKILL_ID } from '$lib/api/types/game-constants';
+import { makeSkill } from '../../../fixtures/skills';
 
 const mockInventoryData: IInventoryData = {
 	unlockedItems: [],
@@ -332,24 +333,12 @@ describe('InventoryManager', () => {
 	// appended to the granted ids only when it resolves. A real weapon (any type) replaces the fists.
 	describe('virtual-fists punch + equippedWeaponType (#1342)', () => {
 		const seedPunchSkill = () => {
-			mockSkills[PUNCH_SKILL_ID] = {
+			mockSkills[PUNCH_SKILL_ID] = makeSkill({
 				id: PUNCH_SKILL_ID,
 				name: 'Punch',
 				baseDamage: 4,
-				criticalChance: 0,
-				damageMultipliers: [],
-				effects: [],
-				description: '',
-				cooldownMs: 1000,
-				damagePortions: [{ type: EDamageType.Unarmed, weight: 1 }],
-				iconPath: '',
-				rarityId: ERarity.Common,
-				designerNotes: '',
-				word: '',
-				pronunciation: '',
-				translation: '',
-				acquisition: 0
-			};
+				damagePortions: [{ type: EDamageType.Unarmed, weight: 1 }]
+			});
 		};
 
 		it('appends the punch signature when bare-handed and the punch skill resolves', () => {

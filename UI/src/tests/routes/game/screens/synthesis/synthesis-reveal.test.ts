@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { EDamageType, ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { ERarity, ESkillAcquisition, type IProficiency, type ISkill, type ISkillRecipe } from '$lib/api';
+import { makeSkill } from '../../../../fixtures/skills';
 import {
 	buildSynthesis,
 	recipeStateAccent,
@@ -11,25 +12,8 @@ import { makeProficiency } from '../../../../fixtures/proficiencies';
 /* The derivation takes explicit args and needs no mocks. The reference catalogues are zero-based-id
    arrays (resolved by index), so the fixtures keep ids contiguous with their array position. */
 
-const skill = (id: number, over: Partial<ISkill> = {}): ISkill => ({
-	id,
-	name: `Skill ${id}`,
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: '',
-	designerNotes: '',
-	cooldownMs: 1000,
-	iconPath: '',
-	rarityId: ERarity.Common,
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Synthesis,
-	...over
-});
+const skill = (id: number, over: Partial<ISkill> = {}): ISkill =>
+	makeSkill({ id, acquisition: ESkillAcquisition.Synthesis, ...over });
 
 const recipe = (
 	id: number,

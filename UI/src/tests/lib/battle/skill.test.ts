@@ -1,29 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { EDamageType, ERarity, EAttribute, EModifierType, ESkillAcquisition, ESkillEffectTarget } from '$lib/api';
+import { EAttribute, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IAttributeMultiplier } from '$lib/api';
 import { BattleAttributes } from '$lib/battle/battle-attributes';
 import { Skill } from '$lib/battle/skill';
 import { Battler } from '$lib/battle';
+import { makeSkill } from '../../fixtures/skills';
 
-const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill => ({
-	id: 1,
-	name: 'Slash',
-	baseDamage: 10,
-	criticalChance: 0,
-	damageMultipliers: [],
-	effects: [],
-	description: 'A basic slash',
-	cooldownMs: 1000,
-	iconPath: '/icons/slash.png',
-	rarityId: ERarity.Common,
-	designerNotes: '',
-	word: '',
-	pronunciation: '',
-	translation: '',
-	damagePortions: [{ type: EDamageType.Physical, weight: 1 }],
-	acquisition: ESkillAcquisition.Player,
-	...overrides
-});
+const makeSkillData = (overrides: Partial<ISkill> = {}): ISkill =>
+	makeSkill({ id: 1, name: 'Slash', description: 'A basic slash', iconPath: '/icons/slash.png', ...overrides });
 
 const makeMockOwner = (attrs: [EAttribute, number][] = []) => {
 	const attributes = new BattleAttributes(
