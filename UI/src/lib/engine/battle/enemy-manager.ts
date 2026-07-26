@@ -1,5 +1,5 @@
 import { apiSocket, ELogType, IEnemyInstance } from '$lib/api';
-import { Action, createHook, delay, isZoneUnlocked, navigableZones, nextZoneByOrder } from '$lib/common';
+import { Action, createHook, delay, isZoneUnlocked, nextNavigableZone } from '$lib/common';
 import { staticData, statistics, playerChallenges } from '$stores';
 import {
 	battleEngine,
@@ -709,7 +709,7 @@ export class EnemyManager {
 		// completes the gating challenge during claimVictory) and check whether it flipped open. Skipping
 		// the refresh when nothing could change keeps auto-fight re-farming from spamming the endpoint.
 		const completed = (id: number) => playerChallenges.isChallengeCompleted(id);
-		const nextZone = nextZoneByOrder(navigableZones(staticData.zones ?? []), clearedZoneId);
+		const nextZone = nextNavigableZone(staticData.zones ?? [], clearedZoneId);
 		const nextWasLocked = nextZone != null && !isZoneUnlocked(nextZone, completed);
 		if (nextWasLocked) {
 			await playerChallenges.load(true);
