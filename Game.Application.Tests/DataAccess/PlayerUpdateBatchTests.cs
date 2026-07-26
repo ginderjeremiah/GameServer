@@ -54,6 +54,55 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public void PlayerWriteSequence_IsUnsequencedOutsideASequencedSave()
+        {
+            var batch = NewBatch();
+            Assert.Equal(DomainEventEnvelope.Unsequenced, batch.PlayerWriteSequence);
+
+            // A bare BeginBatch scope brackets several saves rather than being one, so it supplies no sequence —
+            // anything buffered directly under it carries the sentinel rather than another save's value (#2473).
+            using (batch.BeginPlayerSave())
+            {
+                Assert.Equal(DomainEventEnvelope.Unsequenced, batch.PlayerWriteSequence);
+            }
+        }
+
+        [Fact]
+        public void PlayerWriteSequence_IsExposedForTheScopesDuration_ThenRestoredOnDisposal()
+        {
+            var batch = NewBatch();
+
+            using (batch.BeginPlayerSave(3))
+            {
+                // The publisher reads this as it buffers each envelope, so every event of one save shares it.
+                Assert.Equal(3, batch.PlayerWriteSequence);
+            }
+
+            Assert.Equal(DomainEventEnvelope.Unsequenced, batch.PlayerWriteSequence);
+        }
+
+        [Fact]
+        public void PlayerWriteSequence_NestedScope_RestoresTheOuterSavesSequenceRatherThanClearingIt()
+        {
+            var batch = NewBatch();
+
+            // Mirrors OfflineProgressService: an outer BeginBatch scope wraps several SavePlayer calls, each
+            // opening its own sequenced scope. An inner scope disposing must hand back what the outer one had,
+            // not the sentinel — otherwise anything the outer scope buffers afterwards silently goes unsequenced.
+            using (batch.BeginPlayerSave(1))
+            {
+                using (batch.BeginPlayerSave(2))
+                {
+                    Assert.Equal(2, batch.PlayerWriteSequence);
+                }
+
+                Assert.Equal(1, batch.PlayerWriteSequence);
+            }
+
+            Assert.Equal(DomainEventEnvelope.Unsequenced, batch.PlayerWriteSequence);
+        }
+
+        [Fact]
         public void RunFlushedCallbacks_RunsRegisteredActionsInOrder_ThenClearsThem()
         {
             var batch = NewBatch();

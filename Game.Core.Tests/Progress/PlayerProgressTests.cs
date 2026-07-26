@@ -1478,15 +1478,55 @@ namespace Game.Core.Tests.Progress
             Assert.Empty(completed);
         }
 
+        // ── Write-behind sequence (#2473) ─────────────────────────────────────
+
+        [Fact]
+        public void AdvanceWriteSequence_OnAFreshAggregate_StampsOneRatherThanTheUnsequencedSentinel()
+        {
+            var progress = MakeProgress();
+            Assert.Equal(0, progress.WriteSequence);
+
+            // 0 is the "carries no ordering information" sentinel the consuming guard bypasses, so a real
+            // counter must never stamp it.
+            Assert.Equal(1, progress.AdvanceWriteSequence());
+            Assert.Equal(1, progress.WriteSequence);
+        }
+
+        [Fact]
+        public void WriteSequence_SeededOnLoad_ContinuesRatherThanRestarting()
+        {
+            // Progress is reloaded per battle rather than held for the connection's lifetime, so the counter
+            // lives in the cached hash and every load must resume from it — restarting would re-stamp values
+            // this player's earlier saves already used.
+            var progress = MakeProgress(writeSequence: 4);
+
+            Assert.Equal(5, progress.AdvanceWriteSequence());
+        }
+
+        [Fact]
+        public void WriteSequence_IsIndependentOfThePlayerAggregatesCounter()
+        {
+            // The two aggregates are separate enqueues writing disjoint tables, ordered independently — a
+            // shared space would make one aggregate's saves appear to advance the other's.
+            var player = new PlayerBuilder().Build();
+            var progress = MakeProgress(player);
+
+            player.AdvanceWriteSequence();
+            player.AdvanceWriteSequence();
+
+            Assert.Equal(1, progress.AdvanceWriteSequence());
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static PlayerProgress MakeProgress(
             Player? player = null,
             IEnumerable<PlayerStatistic>? statistics = null,
             IEnumerable<PlayerChallenge>? challenges = null,
-            IEnumerable<PlayerProficiency>? proficiencies = null)
+            IEnumerable<PlayerProficiency>? proficiencies = null,
+            long writeSequence = 0)
         {
-            return new PlayerProgress(player ?? new PlayerBuilder().Build(), statistics ?? [], challenges ?? [], proficiencies ?? []);
+            return new PlayerProgress(player ?? new PlayerBuilder().Build(), statistics ?? [], challenges ?? [], proficiencies ?? [], writeSequence);
         }
 
         private static PlayerStatistic Stat(EStatisticType type, int? entityId, decimal value) =>

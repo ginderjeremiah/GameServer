@@ -117,7 +117,11 @@ namespace Game.DataAccess.Repositories
             // before/around the failure. Instead the fault is captured and the flush still runs, then the fault
             // is rethrown (wrapped, see below) once the batch's already-buffered envelopes are safely enqueued (#1819).
             Exception? dispatchFault = null;
-            using (_updateBatch.BeginPlayerSave())
+
+            // One sequence per save, shared by every envelope this save's dispatch buffers, so the consume side
+            // can order this save's writes against the same player's earlier and later ones (#2473). Advanced
+            // before the dispatch because the publisher stamps each envelope as it buffers it.
+            using (_updateBatch.BeginPlayerSave(player.AdvanceWriteSequence()))
             {
                 try
                 {

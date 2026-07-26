@@ -51,10 +51,15 @@ namespace Game.DataAccess
 
         private Task Buffer<T>(T domainEvent) where T : IDomainEvent
         {
+            // Stamped here — at buffer time — rather than when the batch flushes, so an envelope carried forward
+            // from a failed flush into a later save's flush (#1494) keeps the sequence of the save that raised it
+            // instead of being relabelled with the newer one's (#2473). Every event of one save shares the value,
+            // so the sequence orders saves against each other and imposes none within a save.
             _batch.Add(new DomainEventEnvelope
             {
                 Type = domainEvent.GetType().Name,
                 Payload = domainEvent.Serialize(),
+                Sequence = _batch.PlayerWriteSequence,
             });
 
             return Task.CompletedTask;

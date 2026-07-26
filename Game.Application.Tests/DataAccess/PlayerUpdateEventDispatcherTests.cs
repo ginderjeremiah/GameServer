@@ -29,9 +29,12 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        // PlayerUpdateContext is populated per drain scope by the dispatcher, so it is a genuine dependency of
+        // dispatching rather than test scaffolding — registered here exactly as the drain scope registers it.
         private static IServiceProvider ProviderWith(RecordingHandler handler)
             => new ServiceCollection()
                 .AddScoped<IPlayerUpdateHandler<FakeUpdateEvent>>(_ => handler)
+                .AddScoped<PlayerUpdateContext>()
                 .BuildServiceProvider();
 
         [Fact]
@@ -50,6 +53,44 @@ namespace Game.Application.Tests.DataAccess
             await dispatcher.DispatchAsync(envelope);
 
             Assert.Equal(42, handler.Received?.Value);
+        }
+
+        [Fact]
+        public async Task DispatchAsync_PublishesTheEnvelopesSequenceOntoTheScopesContext()
+        {
+            PlayerUpdateEventDispatcher.Register<FakeUpdateEvent>();
+            var provider = ProviderWith(new RecordingHandler());
+            var dispatcher = new PlayerUpdateEventDispatcher(provider);
+
+            var envelope = new DomainEventEnvelope
+            {
+                Type = nameof(FakeUpdateEvent),
+                Payload = new FakeUpdateEvent(1).Serialize(),
+                Sequence = 9,
+            };
+
+            await dispatcher.DispatchAsync(envelope);
+
+            // How a handler reads envelope-level metadata without IPlayerUpdateHandler.HandleAsync growing a
+            // positional parameter for it. No handler consumes the sequence yet — the guard is #2474 — so this
+            // pins the plumbing that guard will rely on.
+            Assert.Equal(9, provider.GetRequiredService<PlayerUpdateContext>().Sequence);
+        }
+
+        [Fact]
+        public async Task DispatchAsync_EnvelopeWithNoSequence_LeavesTheContextAtTheUnsequencedSentinel()
+        {
+            PlayerUpdateEventDispatcher.Register<FakeUpdateEvent>();
+            var provider = ProviderWith(new RecordingHandler());
+            var dispatcher = new PlayerUpdateEventDispatcher(provider);
+
+            // A pre-upgrade instance's envelope carries no sequence. It must reach the handler describing itself
+            // as unsequenced rather than as the lowest possible sequence.
+            var envelope = new DomainEventEnvelope { Type = nameof(FakeUpdateEvent), Payload = new FakeUpdateEvent(1).Serialize() };
+
+            await dispatcher.DispatchAsync(envelope);
+
+            Assert.Equal(DomainEventEnvelope.Unsequenced, provider.GetRequiredService<PlayerUpdateContext>().Sequence);
         }
 
         [Fact]

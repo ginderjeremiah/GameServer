@@ -263,6 +263,73 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task Save_StampsTheProgressAggregatesOwnSequence_AndTheCachedHashCarriesItAcrossScopes()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = await repo.Load(MakeDomainPlayer(playerId));
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
+
+                await repo.Save(progress);
+            }
+
+            // Nothing persists the counter yet (#2474 brings the watermark table it will seed from), so a cold
+            // load starts at 0 and the first save stamps 1 — never the 0 sentinel, which the consuming guard
+            // reads as "no ordering information" and bypasses.
+            Assert.Equal(1, (await DequeueProgressEnvelope(redis)).Sequence);
+
+            // Progress is reloaded per battle rather than held for the connection's lifetime, so the counter has
+            // to survive in the cached hash — a fresh scope's load must resume from it. Restarting from 0 would
+            // re-stamp 1 here, and the guard would then read this genuinely newer write as a duplicate of the
+            // older one rather than as its successor.
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = await repo.Load(MakeDomainPlayer(playerId));
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
+
+                await repo.Save(progress);
+            }
+
+            Assert.Equal(2, (await DequeueProgressEnvelope(redis)).Sequence);
+        }
+
+        [Fact]
+        public async Task Save_ThenLoadingAgainInTheSameScope_ResumesFromTheSavedSequenceRatherThanTheMemosStaleOne()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+
+            // The bundled next-battle prefetch reads progress again after a Save within one command's scope, and
+            // that read is served by the scope's memo. The memo therefore has to carry the advanced counter as
+            // well as the rows — otherwise the second aggregate reseeds from the pre-save value and re-stamps a
+            // sequence the first save already used.
+            using var scope = CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            var first = await repo.Load(MakeDomainPlayer(playerId));
+            first.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+            await repo.Save(first);
+
+            var second = await repo.Load(MakeDomainPlayer(playerId));
+            second.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+            await repo.Save(second);
+
+            Assert.Equal(1, (await DequeueProgressEnvelope(redis)).Sequence);
+            Assert.Equal(2, (await DequeueProgressEnvelope(redis)).Sequence);
+        }
+
+        [Fact]
         public async Task Load_CacheMiss_ReloadsStatisticsAndChallengeProgressFromDatabase()
         {
             var playerId = await SeedPlayerAsync();
@@ -410,16 +477,32 @@ namespace Game.Application.Tests.DataAccess
                 await repo.Save(progress);
             }
 
-            // The second save's HSET only wrote the one new proficiency field — every field the first save
-            // wrote is still present, proving a save's cache write is scoped to its own dirty rows rather than
-            // re-serializing (and re-sending) the whole cached snapshot (#1635).
+            // The second save's HSET only wrote the one new proficiency field — every row field the first save
+            // wrote is still present and unchanged, proving a save's cache write is scoped to its own dirty rows
+            // rather than re-serializing (and re-sending) the whole cached snapshot (#1635).
             var fieldsAfterSecondSave = await WaitForHashFieldCountAsync(redis, hashKey, minCount: fieldsAfterFirstSave.Length + 1);
             Assert.Equal(fieldsAfterFirstSave.Length + 1, fieldsAfterSecondSave.Length);
-            foreach (var field in fieldsAfterFirstSave)
+            foreach (var field in fieldsAfterFirstSave.Where(IsRowField))
             {
                 Assert.Contains(fieldsAfterSecondSave, f => f.Name == field.Name && f.Value == field.Value);
             }
+
+            // The write-sequence field is deliberately excluded above: it is aggregate-level state rather than a
+            // row, so every enqueuing save rewrites it. Assert it advanced rather than merely leaving it out,
+            // so a regression that stopped advancing it in the cache can't hide behind this test's row focus.
+            Assert.Equal("1", FieldValue(fieldsAfterFirstSave, WriteSequenceField));
+            Assert.Equal("2", FieldValue(fieldsAfterSecondSave, WriteSequenceField));
         }
+
+        // The reserved hash fields carrying aggregate-level state rather than a progress row: the presence
+        // marker a brand-new player's empty reload writes, and the write sequence (#2473). Both sit outside the
+        // S_/C_/P_ row-kind prefixes.
+        private const string WriteSequenceField = "_seq";
+
+        private static bool IsRowField(HashEntry field) => !((string?)field.Name)?.StartsWith('_') ?? false;
+
+        private static string? FieldValue(HashEntry[] fields, string name) =>
+            fields.SingleOrDefault(f => f.Name == name).Value;
 
         [Fact]
         public async Task Save_CacheKeyVanishesBetweenLoadAndSave_DoesNotResurrectAPartialHash()
@@ -681,16 +764,20 @@ namespace Game.Application.Tests.DataAccess
 
         private static async Task<ProgressUpdatedEvent> DequeueProgressEvent(IDatabase redis)
         {
+            var evt = (await DequeueProgressEnvelope(redis)).Payload.Deserialize<ProgressUpdatedEvent>();
+            Assert.NotNull(evt);
+            return evt;
+        }
+
+        private static async Task<DomainEventEnvelope> DequeueProgressEnvelope(IDatabase redis)
+        {
             var raw = await redis.ListLeftPopAsync(Constants.PUBSUB_PLAYER_QUEUE);
             Assert.False(raw.IsNull);
 
             var envelope = raw.ToString().Deserialize<DomainEventEnvelope>();
             Assert.NotNull(envelope);
             Assert.Equal(nameof(ProgressUpdatedEvent), envelope.Type);
-
-            var evt = envelope.Payload.Deserialize<ProgressUpdatedEvent>();
-            Assert.NotNull(evt);
-            return evt;
+            return envelope;
         }
 
         private static Enemy MakeEnemy(int id = 1) => new()

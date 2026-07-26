@@ -142,6 +142,9 @@ namespace Game.DataAccess.DependencyInjection
                 .AddScoped<IAdminTags, AdminTags>()
                 // Admin Ops: guarded inspection/replay of the player write-behind dead-letter queue (#794).
                 .AddScoped<IPlayerUpdateDeadLetters, PlayerUpdateDeadLetters>()
+                // Envelope-level metadata for the event currently being applied, populated per drain scope by
+                // PlayerUpdateEventDispatcher so handlers can read it without widening their signature (#2473).
+                .AddScoped<PlayerUpdateContext>()
                 // Per-event persistence handlers the DataProviderSynchronizer applies on the consume side.
                 .AddPlayerUpdateHandlers();
         }

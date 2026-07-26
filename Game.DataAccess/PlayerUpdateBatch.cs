@@ -28,6 +28,7 @@ namespace Game.DataAccess
         private readonly ILogger<PlayerUpdateBatch> _logger;
 
         private int _playerSaveDepth;
+        private long _playerWriteSequence = DomainEventEnvelope.Unsequenced;
 
         public PlayerUpdateBatch(ILogger<PlayerUpdateBatch> logger)
         {
@@ -44,6 +45,16 @@ namespace Game.DataAccess
         /// the inner one disposes first.
         /// </summary>
         public bool PlayerSaveInProgress => _playerSaveDepth > 0;
+
+        /// <summary>
+        /// The write sequence of the innermost in-flight <see cref="Repositories.PlayerRepository.SavePlayer"/>,
+        /// which <see cref="PlayerPersistencePublisher"/> stamps onto every envelope it buffers so all of one
+        /// save's events share a sequence (#2473). It is <see cref="DomainEventEnvelope.Unsequenced"/> outside a
+        /// sequenced save — notably inside a bare <see cref="Repositories.PlayerRepository.BeginBatch"/> scope,
+        /// which brackets several saves rather than being one. A progress save riding this same batch stamps its
+        /// own aggregate's sequence instead; the two spaces are deliberately independent.
+        /// </summary>
+        public long PlayerWriteSequence => _playerWriteSequence;
 
         public void Add(DomainEventEnvelope envelope)
         {
@@ -65,11 +76,20 @@ namespace Game.DataAccess
         /// Marks a player save as in progress until the returned scope is disposed, so a progress save raised
         /// during its event dispatch joins this batch instead of publishing independently. Safe to nest — the
         /// window stays open until every <see cref="BeginPlayerSave"/> call has had its scope disposed.
+        /// <para>
+        /// <paramref name="writeSequence"/> is the sequence buffered envelopes are stamped with for the duration
+        /// of the scope; the previous value is restored on disposal, so an inner <c>SavePlayer</c> scope opened
+        /// inside an outer <see cref="Repositories.PlayerRepository.BeginBatch"/> one doesn't leak its sequence
+        /// to whatever the outer scope buffers afterwards. Callers that bracket saves rather than performing one
+        /// (<c>BeginBatch</c>) omit it.
+        /// </para>
         /// </summary>
-        public IDisposable BeginPlayerSave()
+        public IDisposable BeginPlayerSave(long writeSequence = DomainEventEnvelope.Unsequenced)
         {
+            var previousSequence = _playerWriteSequence;
             _playerSaveDepth++;
-            return new PlayerSaveScope(this);
+            _playerWriteSequence = writeSequence;
+            return new PlayerSaveScope(this, previousSequence);
         }
 
         /// <summary>
@@ -118,9 +138,13 @@ namespace Game.DataAccess
             _onFlushed.Clear();
         }
 
-        private sealed class PlayerSaveScope(PlayerUpdateBatch batch) : IDisposable
+        private sealed class PlayerSaveScope(PlayerUpdateBatch batch, long previousSequence) : IDisposable
         {
-            public void Dispose() => batch._playerSaveDepth--;
+            public void Dispose()
+            {
+                batch._playerSaveDepth--;
+                batch._playerWriteSequence = previousSequence;
+            }
         }
     }
 }
