@@ -4,10 +4,13 @@ import type { IEnemy } from '$lib/api';
    convention.
 
    The target set comes from the throwaway-required-field probe, not a `grep` — a
-   `grep "IEnemy => ({"` finds three of the eight suites. Excluded on purpose: `lib/common/
-   enemy-attributes.test.ts`, whose two builders assert a partial literal `as IEnemy`. The cast opts
-   them out of drift detection, so the probe never sees them and converting them is #2447's call, not
-   this one's. A `grep` still finding enemy literals under `src/tests/` is expected, not a gap. */
+   `grep "IEnemy => ({"` finds three of the eight suites. Excluded on purpose:
+   `lib/common/enemy-attributes.test.ts` (two builders) and
+   `routes/game/screens/codex/enemy-level.test.ts` (one), which assert a partial literal `as IEnemy`.
+   The cast opts them out of drift detection, so the probe never sees them and converting them is
+   #2447's call, not this one's — note that issue's table lists `enemy-level.test.ts` only under
+   `IZone`, so its `IEnemy` builder needs picking up there too. A `grep` still finding enemy literals
+   under `src/tests/` is expected, not a gap. */
 
 /**
  * Builds an {@link IEnemy} reference-data entry for tests. Everything but the id is a neutral
