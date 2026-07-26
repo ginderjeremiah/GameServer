@@ -10,12 +10,16 @@
   their own bodies and call in here for the arithmetic and the filtering decisions.
 #>
 
-# Member names of a coverage-floors.json section ("gated" / "gatedNamespaces"), as a genuinely empty
-# array when the section is absent or has no members. @($section.PSObject.Properties.Name) alone
-# yields a *one-element array holding $null* in both those cases, so callers would iterate once with a
-# null name and then index the report by $null.
+# Member names of a coverage-floors.json section ("gated" / "gatedNamespaces"), always as an array.
+# Two sharp edges, both of which callers hit by taking .Count on the result:
+#   - .Name yields $null for a section that is absent *and* for one that is present but empty (an
+#     empty property collection member-enumerates to $null, not to an empty collection), so a bare
+#     @(...) produces a one-element array holding $null — callers would then iterate once with a null
+#     name and index the coverage report by $null.
+#   - a single-member section would unroll to a bare string on return, so the leading comma keeps the
+#     array intact rather than leaving callers relying on PowerShell giving scalars a .Count of 1.
 function Get-FloorSectionNames($section) {
-  return @($section.PSObject.Properties.Name | Where-Object { $null -ne $_ })
+  return ,@($section.PSObject.Properties.Name | Where-Object { $null -ne $_ })
 }
 
 # Aggregate line/branch coverage for the classes of an assembly whose names fall under any of the
@@ -81,7 +85,8 @@ function Test-TestLogProvenGreen($lines) {
 }
 
 # The signal in a test log is the `failed <test>` blocks and the run summary; the periodic
-# `[+n/-n/?n]` progress lines and blank padding are noise that would bury it.
+# `[+n/-n/?n]` progress lines and blank padding are noise that would bury it. Leading comma as above:
+# a log whose signal is a single line would otherwise unroll to a bare string.
 function Select-TestLogDetailLine($lines) {
-  return @($lines | Where-Object { $_ -notmatch '^\[\+' -and -not [string]::IsNullOrWhiteSpace($_) })
+  return ,@($lines | Where-Object { $_ -notmatch '^\[\+' -and -not [string]::IsNullOrWhiteSpace($_) })
 }

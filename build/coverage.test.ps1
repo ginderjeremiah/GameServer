@@ -34,12 +34,16 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'coverage-lib.ps1')
 
 $GateScript = Join-Path $PSScriptRoot 'coverage-gate.ps1'
+$SuggestionsScript = Join-Path $PSScriptRoot 'coverage-floor-suggestions.ps1'
 $Work = Join-Path ([System.IO.Path]::GetTempPath()) ("coverage-tests-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 
-# The executable of the host currently running, so the gate's child process runs under the same
-# PowerShell edition as the harness (powershell.exe on 5.1, pwsh on 7) rather than a hard-coded one.
-$HostExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+# The PowerShell binary of the edition running this harness, so child processes match it rather than a
+# hard-coded one. Derived from $PSHOME rather than the current process's executable: under an embedded
+# host (the ISE, or anything hosting PowerShell in-process) the process exe is that host's binary, and
+# launching it would run the wrong program and fail every child-process case confusingly.
+$psBinary = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh' } else { 'powershell.exe' }
+$HostExe = Join-Path $PSHOME $psBinary
 
 $script:passed = 0
 $script:failed = 0
@@ -54,8 +58,17 @@ function Write-Fail($name, $detail) {
   $script:failed++
 }
 
+# -eq coerces the right operand to the left's type. PowerShell 7 returns $false on a conversion it
+# can't make, but 5.1's conversion rules differ, and under $ErrorActionPreference = 'Stop' a throwing
+# comparison would abort the whole run instead of failing one case. Catching keeps it reportable.
 function Assert-Equal($name, $expected, $actual) {
-  if ($expected -eq $actual) {
+  try {
+    $isEqual = ($expected -eq $actual)
+  } catch {
+    Write-Fail $name "comparing '$expected' with '$actual' threw: $($_.Exception.Message)"
+    return
+  }
+  if ($isEqual) {
     Write-Pass $name "$expected"
   } else {
     Write-Fail $name "expected '$expected', got '$actual'"
@@ -70,8 +83,12 @@ function Assert-Null($name, $actual) {
   }
 }
 
+# Both text assertions treat "no output at all" as a failure rather than a vacuous pass: a child
+# process that never launched would otherwise satisfy Assert-NotContains and read as green.
 function Assert-Contains($name, $expected, $text) {
-  if ($text -and $text.Contains($expected)) {
+  if ([string]::IsNullOrEmpty($text)) {
+    Write-Fail $name "expected '$expected' but there was no output"
+  } elseif ($text.Contains($expected)) {
     Write-Pass $name "output carries '$expected'"
   } else {
     Write-Fail $name "output never carried '$expected'"
@@ -79,7 +96,9 @@ function Assert-Contains($name, $expected, $text) {
 }
 
 function Assert-NotContains($name, $unexpected, $text) {
-  if ($text -and $text.Contains($unexpected)) {
+  if ([string]::IsNullOrEmpty($text)) {
+    Write-Fail $name "expected output free of '$unexpected' but there was no output"
+  } elseif ($text.Contains($unexpected)) {
     Write-Fail $name "output unexpectedly carried '$unexpected'"
   } else {
     Write-Pass $name "output free of '$unexpected'"
@@ -118,9 +137,9 @@ function New-Assembly($name, $coverage, $branchCoverage, $classes) {
   }
 }
 
-# Writes a case's Summary.json / coverage-floors.json and runs the real gate against them, returning
-# its exit code and combined output. WriteAllText keeps both files BOM-less UTF-8 on either host.
-function Invoke-Gate($caseName, $assemblies, $floors) {
+# Writes a case's Summary.json / coverage-floors.json. WriteAllText keeps both BOM-less UTF-8 on
+# either host.
+function New-Fixture($caseName, $assemblies, $floors) {
   $dir = Join-Path $Work $caseName
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   $summaryPath = Join-Path $dir 'Summary.json'
@@ -128,13 +147,26 @@ function Invoke-Gate($caseName, $assemblies, $floors) {
   $summary = [pscustomobject]@{ coverage = [pscustomobject]@{ assemblies = @($assemblies) } }
   [System.IO.File]::WriteAllText($summaryPath, ($summary | ConvertTo-Json -Depth 10))
   [System.IO.File]::WriteAllText($floorsPath, ($floors | ConvertTo-Json -Depth 10))
-  return Invoke-GateAtPaths $summaryPath $floorsPath
+  return [pscustomobject]@{ SummaryPath = $summaryPath; FloorsPath = $floorsPath }
 }
 
-function Invoke-GateAtPaths($summaryPath, $floorsPath) {
-  $output = & $HostExe -NoProfile -File $GateScript -SummaryPath $summaryPath -FloorsPath $floorsPath 2>&1 |
+# Both scripts under test take the same -SummaryPath/-FloorsPath pair and signal through their exit
+# code, so one runner drives either. A child process rather than a dot-source is what makes their
+# `exit N` observable instead of terminating this harness.
+function Invoke-BuildScript($scriptPath, $summaryPath, $floorsPath) {
+  $output = & $HostExe -NoProfile -File $scriptPath -SummaryPath $summaryPath -FloorsPath $floorsPath 2>&1 |
     Out-String
   return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = $output }
+}
+
+function Invoke-Gate($caseName, $assemblies, $floors) {
+  $f = New-Fixture $caseName $assemblies $floors
+  return Invoke-BuildScript $GateScript $f.SummaryPath $f.FloorsPath
+}
+
+function Invoke-Suggestions($caseName, $assemblies, $floors) {
+  $f = New-Fixture $caseName $assemblies $floors
+  return Invoke-BuildScript $SuggestionsScript $f.SummaryPath $f.FloorsPath
 }
 
 try {
@@ -230,12 +262,20 @@ try {
   Write-Host ''
   Write-Host '=== Get-FloorSectionNames (empty / absent floor sections) ==='
 
-  # An empty or absent section must mean "nothing gated here". @() around
-  # .PSObject.Properties.Name yields a one-element array holding $null instead, which made both
-  # the gate and the reseed script iterate once with a null name and index the report by $null.
+  # An empty or absent section must mean "nothing gated here". A bare @() around
+  # .PSObject.Properties.Name yields a one-element array holding $null for *both* — an empty property
+  # collection member-enumerates to $null exactly as an absent one does — which made the gate and the
+  # reseed script iterate once with a null name and index the report by $null.
   Assert-Equal 'a populated section lists its members' 2 (Get-FloorSectionNames (ConvertFrom-Json '{"Game.Core":{},"Game.Application":{}}')).Count
   Assert-Equal 'an empty section yields no names' 0 (Get-FloorSectionNames (ConvertFrom-Json '{}')).Count
   Assert-Equal 'an absent section yields no names' 0 (Get-FloorSectionNames $null).Count
+
+  # A single-member section must still come back as an array. PowerShell unrolls a one-element array
+  # on return, and both callers take .Count on the result — which happens to work on a scalar, but is
+  # a quiet dependence rather than the array the helper's contract promises.
+  $single = Get-FloorSectionNames (ConvertFrom-Json '{"Game.Core":{}}')
+  Assert-Equal 'a single-member section yields one name' 1 $single.Count
+  Assert-Equal 'a single-member section stays an array' $true ($single -is [array])
 
   Write-Host ''
   Write-Host '=== Test-TestLogProvenGreen / Select-TestLogDetailLine ==='
@@ -264,7 +304,8 @@ try {
     '  at Game.Core.Tests.BattleTests.Fights_To_Death()',
     'Test run summary: Failed! - Game.Core.Tests.dll'
   )
-  $kept = @(Select-TestLogDetailLine $noisy)
+  # No @() wrapper: the function guarantees an array, and wrapping a returned array re-wraps it.
+  $kept = Select-TestLogDetailLine $noisy
   Assert-Equal 'filter keeps exactly the signal lines' 4 $kept.Count
   $keptText = $kept -join "`n"
   Assert-Contains 'filter keeps the failing test name' 'failed BattleTests.Fights_To_Death' $keptText
@@ -272,12 +313,18 @@ try {
   Assert-Contains 'filter keeps the stack frame' 'at Game.Core.Tests.BattleTests' $keptText
   Assert-NotContains 'filter drops the progress spinner lines' '[+' $keptText
 
+  # A log whose signal is a single line must still come back as an array rather than unrolling to a
+  # bare string, so a caller enumerating the result doesn't iterate the string's characters.
+  $oneLine = Select-TestLogDetailLine @('[+1/-0/?0]', '', 'Test run summary: Failed! - Game.Core.Tests.dll')
+  Assert-Equal 'a single surviving line stays an array' $true ($oneLine -is [array])
+  Assert-Equal 'a single surviving line is the only element' 1 $oneLine.Count
+
   Write-Host ''
   Write-Host '=== coverage-gate.ps1 (classification and exit codes) ==='
 
   # A missing summary is its own exit code, distinct from a breach: "you did not run coverage"
   # must not read as "coverage regressed".
-  $missing = Invoke-GateAtPaths (Join-Path $Work 'does-not-exist/Summary.json') (Join-Path $PSScriptRoot 'coverage-floors.json')
+  $missing = Invoke-BuildScript $GateScript (Join-Path $Work 'does-not-exist/Summary.json') (Join-Path $PSScriptRoot 'coverage-floors.json')
   Assert-Equal 'missing summary exits 2' 2 $missing.ExitCode
   Assert-Contains 'missing summary says how to produce one' 'Run build/coverage.ps1 first' $missing.Output
 
@@ -394,6 +441,68 @@ try {
   })
   Assert-Equal 'gated namespace with a missing assembly exits 1' 1 $nsNoAssembly.ExitCode
   Assert-Contains 'missing backing assembly is named' "its assembly 'Game.Api' is missing" $nsNoAssembly.Output
+
+  Write-Host ''
+  Write-Host '=== coverage-floor-suggestions.ps1 (reporting and the ratchet, end to end) ==='
+
+  # One assembly, deliberately straddling its two floors: 97.2% line against a floor of 90 must
+  # suggest a raise, while 94.1% branch against a floor of 99 must report below-current and keep 99.
+  # Both labels in one run, rendered by the real script rather than asserted on the pure function.
+  $straddle = @(
+    (New-Assembly 'Game.Core' 97.2 94.1 @((New-Class 'Game.Core.Battle.Engine' 972 1000 941 1000))),
+    (New-Assembly 'Game.Api' 61 55 @(
+      (New-Class 'Game.Api.Sockets.Handler' 970 1000 950 1000),
+      (New-Class 'Game.Api.Controllers.Player' 5 400 2 300)
+    ))
+  )
+  $populatedFloors = [pscustomobject]@{
+    gated = [pscustomobject]@{ 'Game.Core' = [pscustomobject]@{ line = 90; branch = 99 } }
+    gatedNamespaces = [pscustomobject]@{
+      'Game.Api (sockets)' = [pscustomobject]@{ assembly = 'Game.Api'; namespaces = @('Game.Api.Sockets'); line = 80; branch = 80 }
+    }
+  }
+  $sug = Invoke-Suggestions 'suggest_populated' $straddle $populatedFloors
+  Assert-Equal 'suggestions run exits 0' 0 $sug.ExitCode
+  Assert-Contains 'suggestions print the gated-assemblies header' 'Gated assemblies (margin 1pt)' $sug.Output
+  Assert-Contains 'suggestions print the gated-namespaces header' 'Gated namespaces (margin 1pt)' $sug.Output
+  Assert-Contains 'a raisable floor renders as a raise' '(raise)' $sug.Output
+  Assert-Contains 'a below-current suggestion says the ratchet only rises' 'below current' $sug.Output
+  Assert-Contains 'the exact actual percentage is printed, not the display value' '97.2000%' $sug.Output
+  Assert-Contains 'the paste-safety hint is printed' "Only the '-> N (raise)' column is ever safe to paste" $sug.Output
+
+  # The header-suppression behaviour this PR changed: a present-but-empty gatedNamespaces must print
+  # no namespaces header rather than a header with nothing under it.
+  $emptyNs = Invoke-Suggestions 'suggest_empty_ns' $straddle ([pscustomobject]@{
+    gated = [pscustomobject]@{ 'Game.Core' = [pscustomobject]@{ line = 90; branch = 99 } }
+    gatedNamespaces = [pscustomobject]@{}
+  })
+  Assert-Equal 'an empty namespaces section still exits 0' 0 $emptyNs.ExitCode
+  Assert-Contains 'the gated-assemblies section still prints' 'Gated assemblies' $emptyNs.Output
+  Assert-NotContains 'an empty namespaces section prints no header' 'Gated namespaces' $emptyNs.Output
+
+  # A gated assembly absent from the report is a warning here rather than a failure — this script
+  # reports, it never gates — but it must still name what it could not find.
+  $sugAbsent = Invoke-Suggestions 'suggest_absent' @(
+    (New-Assembly 'Game.Application' 99 99 @((New-Class 'Game.Application.Handler' 99 100 99 100)))
+  ) ([pscustomobject]@{ gated = [pscustomobject]@{ 'Game.Core' = [pscustomobject]@{ line = 90 } } })
+  Assert-Equal 'a missing gated assembly does not fail the reseed script' 0 $sugAbsent.ExitCode
+  Assert-Contains 'a missing gated assembly is named' 'missing from coverage report' $sugAbsent.Output
+
+  # A gated namespace whose backing assembly is absent warns and names the assembly.
+  $sugNoAsm = Invoke-Suggestions 'suggest_no_assembly' @(
+    (New-Assembly 'Game.Core' 99 99 @((New-Class 'Game.Core.Battle.Engine' 99 100 99 100)))
+  ) ([pscustomobject]@{
+    gated = [pscustomobject]@{}
+    gatedNamespaces = [pscustomobject]@{
+      'Game.Api (sockets)' = [pscustomobject]@{ assembly = 'Game.Api'; namespaces = @('Game.Api.Sockets'); line = 80 }
+    }
+  })
+  Assert-Equal 'a missing backing assembly does not fail the reseed script' 0 $sugNoAsm.ExitCode
+  Assert-Contains 'a missing backing assembly is named' "assembly 'Game.Api' missing from coverage report" $sugNoAsm.Output
+
+  # Same distinct exit code as the gate for "you have not run coverage yet".
+  $sugNoSummary = Invoke-BuildScript $SuggestionsScript (Join-Path $Work 'nope/Summary.json') (Join-Path $PSScriptRoot 'coverage-floors.json')
+  Assert-Equal 'a missing summary exits 2' 2 $sugNoSummary.ExitCode
 
   Write-Host ''
   Write-Host "=== $script:passed passed, $script:failed failed ==="
