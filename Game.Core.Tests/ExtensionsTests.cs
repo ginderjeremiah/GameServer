@@ -1,4 +1,5 @@
 using Game.Core;
+using Game.Core.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Core.Tests
@@ -79,6 +80,19 @@ namespace Game.Core.Tests
         }
 
         [Theory]
+        [InlineData("iron", "Iron")]
+        [InlineData("intelligence", "Intelligence")]
+        public void Capitalize_TurkishCulture_UppercasesInvariantly(string input, string expected)
+        {
+            // tr-TR's culture-sensitive ToUpper maps 'i' to the dotted 'İ'. Callers feed the result into
+            // EF seed values, so a locale-dependent name would be baked into the database rather than
+            // merely mis-rendered.
+            using var culture = new CultureScope("tr-TR");
+
+            Assert.Equal(expected, input.Capitalize());
+        }
+
+        [Theory]
         [InlineData("HelloWorld", "Hello World")]
         [InlineData("oneTwoThree", "one Two Three")]
         [InlineData("NoBreaks", "No Breaks")]
@@ -87,6 +101,16 @@ namespace Game.Core.Tests
         public void SpaceWords_InsertsSpaceBetweenLowerThenUpper(string input, string expected)
         {
             Assert.Equal(expected, input.SpaceWords());
+        }
+
+        [Fact]
+        public void SpaceWords_TurkishCulture_BreaksWordsInvariantly()
+        {
+            // The word-break regex matches ordinal ranges and is not case-insensitive, so it is already
+            // locale-independent; pinning it here keeps that true if the pattern is ever revisited.
+            using var culture = new CultureScope("tr-TR");
+
+            Assert.Equal("main Hand", "mainHand".SpaceWords());
         }
     }
 }
