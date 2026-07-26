@@ -4,6 +4,7 @@ using Game.DataAccess.PlayerUpdates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace Game.DataAccess
@@ -86,6 +87,20 @@ namespace Game.DataAccess
         // serialized drain (the gate below), so it needs no lock — the same rationale as
         // _lastReportedDeadLetterDepth.
         private (string Value, DateTimeOffset ObservedAt)? _strandedProcessingHead;
+
+        // Players (keyed the same way as a drain pass's ordering lanes, so UnknownPlayerLane included) whose
+        // oldest queued event this instance left reserved on the processing list without applying+acknowledging
+        // it — a blocked ordering lane that has to outlive the pass that created it. The per-pass playerLanes
+        // map only blocks later same-player items *within* one pass and is cleared when the pass settles, so
+        // without this a post-recovery event would get a fresh lane in the next pass and apply immediately,
+        // only to be overwritten when the stranded-processing reclaim finally replays the older parked event —
+        // a durable regression for the absolute-value handlers (#2460). While a player is listed here its
+        // newly reserved items are deferred: left reserved, unapplied, so the reclaim re-queues the whole
+        // same-player chain in its original order. Cleared under the serialized drain (after its own in-flight
+        // items have settled) once the processing list is observed empty or a reclaim has drained it, which is
+        // also what keeps a player from being deferred indefinitely if another instance applied the parked item.
+        // A dictionary rather than a HashSet because the fault path writes from concurrently applying lanes (#1701).
+        private readonly ConcurrentDictionary<int, byte> _parkedPlayerLanes = new();
 
         // Cancelled on shutdown to signal any in-flight drain (the startup drain or a pub/sub wake) to stop
         // reserving new items and unwind at a clean item boundary, and to make a late wake a no-op.
@@ -354,12 +369,14 @@ namespace Game.DataAccess
             // (#1701) — cross-instance ordering was already only best-effort, so this introduces no new hazard
             // there. Same-player items still apply strictly in order: each is chained onto a per-player "lane"
             // (playerLanes) that only starts an item once the previous same-player item has fully applied and
-            // acknowledged. The concurrency gate is acquired before reserving, not just before processing, so
-            // reservation itself is bounded by the same budget — a stop still ends at a bounded (not unbounded)
-            // number of in-flight items, reclaimed on the next startup if the drain timeout is exceeded. Once an
-            // item is reserved its apply and acknowledge run without the token so the in-flight write finishes
-            // cleanly — only the dead-time retry backoff between failed attempts honors the token (a stop during
-            // it abandons the retry, and the reserved item is reclaimed and re-applied on the next startup).
+            // acknowledged — and, for a lane left blocked by a fault, across passes too via _parkedPlayerLanes
+            // (#2460), since playerLanes itself is pass-scoped. The concurrency gate is acquired before
+            // reserving, not just before processing, so reservation itself is bounded by the same budget — a
+            // stop still ends at a bounded (not unbounded) number of in-flight items, reclaimed on the next
+            // startup if the drain timeout is exceeded. Once an item is reserved its apply and acknowledge run
+            // without the token so the in-flight write finishes cleanly — only the dead-time retry backoff
+            // between failed attempts honors the token (a stop during it abandons the retry, and the reserved
+            // item is reclaimed and re-applied on the next startup).
             var playerLanes = new Dictionary<int, Task>();
             var inFlight = new List<Task>();
             using var concurrencyGate = new SemaphoreSlim(_maxConcurrentDrainItems);
@@ -426,8 +443,24 @@ namespace Game.DataAccess
 
                     var (envelope, parseError) = PlayerUpdateEnvelopeReader.TryParseEnvelope(next);
                     var playerId = envelope is null ? UnknownPlayerLane : PlayerUpdateEnvelopeReader.TryReadPlayerIdFromPayload(envelope.Payload) ?? UnknownPlayerLane;
+
+                    if (_parkedPlayerLanes.ContainsKey(playerId))
+                    {
+                        // An earlier event for this player is still parked on the processing list from a
+                        // previous pass, so applying this newer one now would write its absolute values ahead
+                        // of the older event's eventual replay and then be regressed by it (#2460). Leave this
+                        // item reserved (neither applied nor acknowledged) instead: the reclaim re-queues the
+                        // whole same-player chain to the queue head in its original order, so the deferral
+                        // costs convergence latency for this one player, never the write itself.
+                        concurrencyGate.Release();
+                        _logger.LogDebug(
+                            "Deferring a player update for player {PlayerId} on queue '{Queue}': an earlier same-player event is still reserved awaiting reclaim, so this item is left reserved to preserve ordering.",
+                            playerId, Constants.PUBSUB_PLAYER_QUEUE);
+                        continue;
+                    }
+
                     var previous = playerLanes.TryGetValue(playerId, out var existingLane) ? existingLane : Task.CompletedTask;
-                    var itemTask = ProcessReservedItemAsync(previous, next, envelope, parseError, queue, deadLetterQueue, concurrencyGate, cancellationToken);
+                    var itemTask = ProcessReservedItemAsync(previous, playerId, next, envelope, parseError, queue, deadLetterQueue, concurrencyGate, cancellationToken);
                     playerLanes[playerId] = itemTask;
                     inFlight.Add(itemTask);
 
@@ -536,13 +569,22 @@ namespace Game.DataAccess
         /// converging, so a stop mid-drain still ends at a bounded number of in-flight items rather than an
         /// unbounded one.
         /// </summary>
-        private async Task ProcessReservedItemAsync(Task previous, string message, DomainEventEnvelope? envelope, JsonException? parseError, IPubSubQueue queue, IPubSubQueue deadLetterQueue, SemaphoreSlim concurrencyGate, CancellationToken cancellationToken)
+        private async Task ProcessReservedItemAsync(Task previous, int playerId, string message, DomainEventEnvelope? envelope, JsonException? parseError, IPubSubQueue queue, IPubSubQueue deadLetterQueue, SemaphoreSlim concurrencyGate, CancellationToken cancellationToken)
         {
             try
             {
                 await previous;
                 await ProcessMessage(message, envelope, parseError, deadLetterQueue, cancellationToken);
                 await queue.AcknowledgeAsync(message);
+            }
+            catch
+            {
+                // Whatever faulted — this item's own apply, its acknowledge, or its predecessor on the same
+                // lane — leaves the item reserved on the processing list awaiting the reclaim. Block the
+                // player's lane beyond this pass so a later same-player event can't apply ahead of it
+                // (see _parkedPlayerLanes, #2460), then let the fault surface as before.
+                _parkedPlayerLanes[playerId] = default;
+                throw;
             }
             finally
             {
@@ -573,6 +615,10 @@ namespace Game.DataAccess
             var head = await queue.PeekProcessingAsync(1, cancellationToken);
             if (head.Count == 0)
             {
+                // Nothing is reserved anywhere on the fleet, so nothing this instance parked is still awaiting
+                // a replay — including an item another instance reclaimed and applied on our behalf, which is
+                // what stops a stale entry from deferring a player's events indefinitely.
+                _parkedPlayerLanes.Clear();
                 _strandedProcessingHead = null;
                 return false;
             }
@@ -593,6 +639,11 @@ namespace Game.DataAccess
             }
 
             var reclaimed = await queue.ReclaimProcessingAsync(cancellationToken);
+
+            // The reclaim drains the whole processing list back onto the queue head in order, so every parked
+            // item — and every same-player item deferred behind one — is now queued ahead of anything newer and
+            // will be re-reserved in its original order. Unblock those lanes so the replay can actually run.
+            _parkedPlayerLanes.Clear();
             _strandedProcessingHead = null;
             if (reclaimed > 0)
             {
