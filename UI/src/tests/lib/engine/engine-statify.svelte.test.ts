@@ -7,10 +7,13 @@ const logicEngineStub = vi.hoisted(() => ({ time: 0 }));
 vi.mock('$lib/engine/engine', () => ({ logicEngine: logicEngineStub }));
 
 const rafCallbacks: (() => void)[] = [];
+// Monotonic, not `rafCallbacks.length`: the tests `shift()` callbacks off the front, which would hand
+// out the same handle twice (matching `render-engine.test.ts`, the other rAF stub).
+let rafHandleCounter = 0;
 vi.stubGlobal('window', {
 	requestAnimationFrame: vi.fn((cb: () => void) => {
 		rafCallbacks.push(cb);
-		return rafCallbacks.length;
+		return ++rafHandleCounter;
 	}),
 	cancelAnimationFrame: vi.fn(),
 	setInterval: (...args: Parameters<typeof setInterval>) => globalThis.setInterval(...args),
@@ -96,6 +99,7 @@ describe('engine internals under statify (#2123)', () => {
 
 		beforeEach(() => {
 			rafCallbacks.length = 0;
+			rafHandleCounter = 0;
 			logicEngineStub.time = 0;
 			performanceNow = 0;
 			vi.spyOn(performance, 'now').mockImplementation(() => performanceNow);

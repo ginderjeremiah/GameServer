@@ -29,7 +29,10 @@ export class LogicalEngine {
 	#countTick = getEventCounter((t) => (this.tickRate = Math.round(t)));
 	#tickSource?: TickSource;
 
-	/** The logical clock in `performance.now()` terms. Deliberately non-reactive — poll it, don't `$derived` it. */
+	/**
+	 * The logical clock in `performance.now()` terms, read across the class boundary by `RenderEngine`
+	 * to derive its interpolation lead. Deliberately non-reactive — poll it, don't `$derived` it.
+	 */
 	public get time() {
 		return this.#time;
 	}

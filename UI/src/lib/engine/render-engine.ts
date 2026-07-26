@@ -17,12 +17,17 @@ export class RenderEngine {
 	#rafHandle?: number;
 	#countTick = getEventCounter((t) => (this.tickRate = Math.round(t)));
 
-	/** The render clock in `performance.now()` terms. Deliberately non-reactive — poll it, don't `$derived` it. */
+	// Both getters are observability only — unlike `LogicalEngine.time` (which `update` below reads across
+	// the class boundary), nothing in production reads either: consumers take the frame delta and the
+	// interpolation lead from the `onRenderUpdate` payload. Kept for debugging and the clock assertions,
+	// and non-reactive by construction, since a prototype accessor stays out of the statify proxy.
+
+	/** The render clock in `performance.now()` terms. */
 	public get time() {
 		return this.#time;
 	}
 
-	/** How far the render clock leads the logical clock (floored at 0). Non-reactive, like `time`. */
+	/** How far the render clock leads the logical clock (floored at 0). */
 	public get logicalDelta() {
 		return this.#logicalDelta;
 	}
