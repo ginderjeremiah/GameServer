@@ -464,6 +464,74 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task RegisterSocket_SwitchCreditClaimActive_PinsTheSessionOnlyOnceTheClaimIsThisSockets()
+        {
+            // #2463: the handshake pins the player aggregate and session state *before* RegisterSocket, so a
+            // switch-away credit's read-modify-write can land in between and leave the connection holding
+            // pre-credit state. RegisterSocket therefore takes the re-read as a callback and runs it in the
+            // one safe window — after ClaimPresenceKey has waited the credit out and taken the key, and
+            // before any loop can run a command against what it pins.
+            var (userId, playerId) = await SeedAndLoginAsync("pinunderclaim", "pinunderclaimpass");
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+            var session = scope.ServiceProvider.GetRequiredService<SessionService>();
+            await session.CreateSession(userId, playerId, CancellationToken);
+
+            var claimValue = await socketManager.TryClaimForSwitchCredit(playerId);
+            Assert.NotNull(claimValue);
+
+            string? presenceWhenPinned = null;
+            var pinned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+            var registerTask = socketManager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: async () =>
+            {
+                presenceWhenPinned = await ReadPresenceValueAsync(playerId);
+                pinned.SetResult();
+            });
+
+            // While the credit holds the key the re-read must not have happened — running it here is exactly
+            // the stale read the fix exists to prevent.
+            await Task.Delay(300, CancellationToken);
+            Assert.False(pinned.Task.IsCompleted,
+                "Expected the pinned session to be read only after the switch-credit claim released.");
+
+            await socketManager.ReleaseSwitchCreditClaim(playerId, claimValue);
+
+            await pinned.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken);
+            var context = await registerTask;
+
+            // The key the re-read saw was this socket's own claim, not the credit's sentinel and not an unset
+            // key — so no credit could have been mid-flight, and none can start while it is held.
+            Assert.Equal(context.SocketId, presenceWhenPinned);
+
+            await socketManager.UnRegisterSocket(context);
+        }
+
+        [Fact]
+        public async Task RegisterSocket_PinningTheSessionFails_RollsTheRegistrationBackRatherThanGoingLive()
+        {
+            // A fault re-reading the pinned session leaves the connection with state read outside the presence
+            // claim — the #2463 hazard. It must roll the registration back (presence key released, nothing
+            // left claiming the player) and propagate, exactly like any other failed registration step.
+            var (userId, playerId) = await SeedAndLoginAsync("pinfailure", "pinfailurepass");
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+            var session = scope.ServiceProvider.GetRequiredService<SessionService>();
+            await session.CreateSession(userId, playerId, CancellationToken);
+
+            var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => socketManager.RegisterSocket(
+                socket, session, isAdmin: false,
+                onPresenceClaimed: () => throw new InvalidOperationException("Pinning the session failed.")));
+
+            Assert.Null(await ReadPresenceValueAsync(playerId));
+            Assert.False(await HasActiveSocketAsync(playerId));
+        }
+
+        [Fact]
         public async Task EmitSocketCommand_ByPlayerId_SwitchCreditClaimActive_ReportsNoActiveSocketRatherThanPublishingToTheClaim()
         {
             // A resolved switch-credit claim isn't a socket to publish to (#2076 review) — reporting it as

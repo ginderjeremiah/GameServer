@@ -119,7 +119,7 @@ namespace Game.Api.Tests.Integration
             var registry = Factory.Services.GetRequiredService<SocketConnectionRegistry>();
 
             var socket = new DrainableWebSocket(echoServerClose: true);
-            var context = await socketManager.RegisterSocket(socket, session, isAdmin: false);
+            var context = await socketManager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask);
             await socket.ReceiveStarted.WaitAsync(WaitTimeout, CancellationToken);
 
             await registry.DrainAsync().WaitAsync(WaitTimeout, CancellationToken);

@@ -5,9 +5,10 @@ using Game.Core;
 
 namespace Game.Api.Middleware
 {
-    public class SocketInterceptorMiddleware(RequestDelegate next)
+    public class SocketInterceptorMiddleware(RequestDelegate next, ILogger<SocketInterceptorMiddleware> logger)
     {
         private readonly RequestDelegate _next = next;
+        private readonly ILogger<SocketInterceptorMiddleware> _logger = logger;
 
         /// <summary>
         /// The application request pipeline hook.
@@ -65,7 +66,13 @@ namespace Game.Api.Middleware
                     var requestedProtocols = context.WebSockets.WebSocketRequestedProtocols;
                     var subProtocol = requestedProtocols.Count > 0 ? requestedProtocols[0] : null;
                     using var webSocket = await context.WebSockets.AcceptWebSocketAsync(subProtocol);
-                    var socketContext = await socketManager.RegisterSocket(webSocket, sessionService, isAdmin);
+                    // Re-read the session state and player aggregate from inside the presence claim (#2463):
+                    // the load above runs before the claim exists, so a switch-away credit for this same
+                    // character can land its read-modify-write in between and leave this connection pinned to
+                    // pre-credit state — which the first battle-completion save would then write back
+                    // wholesale over the credited state.
+                    var socketContext = await socketManager.RegisterSocket(webSocket, sessionService, isAdmin,
+                        () => ReloadSession(sessionService, sessionInitializer, scopeFactory, context.RequestAborted));
                     await socketContext.WaitSocketClosed();
                     await socketManager.UnRegisterSocket(socketContext);
                 }
@@ -83,11 +90,16 @@ namespace Game.Api.Middleware
         /// <summary>
         /// Establishes the player session for the connection: first loads (or rehydrates) the in-flight
         /// player state — the HTTP pipeline no longer does this per request, so the socket handshake is where
-        /// it happens — then loads the player aggregate up front so socket commands read it synchronously for
-        /// the connection's lifetime (the connection never re-reads the cache per command). The aggregate load
-        /// runs in a disposable scope so its <c>GameContext</c> is not held open for the whole connection.
-        /// Rejects a pre-selection token before any load I/O, since <see cref="SessionService.SelectedPlayerId"/>
-        /// can never resolve a real player while it's unbound (player identity starts at 1).
+        /// it happens — then loads the player aggregate so socket commands read it synchronously for the
+        /// connection's lifetime (the connection never re-reads the cache per command). Rejects a
+        /// pre-selection token before any load I/O, since <see cref="SessionService.SelectedPlayerId"/> can
+        /// never resolve a real player while it's unbound (player identity starts at 1).
+        /// <para>
+        /// This runs before the WebSocket upgrade so an unusable session is rejected with a real HTTP status
+        /// and the project's <c>{ errorMessage }</c> envelope rather than erroring on the first command. It is
+        /// therefore also before the presence claim exists, so what it pins is authoritative only until
+        /// <see cref="ReloadSession"/> re-reads it from inside that claim.
+        /// </para>
         /// </summary>
         private static async Task<PlayerLoadResult> TryLoadPlayer(SessionService sessionService, SessionInitializer sessionInitializer, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
         {
@@ -98,16 +110,50 @@ namespace Game.Api.Middleware
                 return PlayerLoadResult.NoPlayerSelected;
             }
 
+            return await TryPinPlayer(sessionService, scopeFactory, cancellationToken)
+                ? PlayerLoadResult.Loaded
+                : PlayerLoadResult.PlayerNotFound;
+        }
+
+        /// <summary>
+        /// Re-reads the session state and player aggregate the connection is pinned to, now that
+        /// <c>SocketManagerService.RegisterSocket</c> holds this player's presence key and nothing can be
+        /// running a command against them yet (#2463). Unconditional rather than gated on having observed a
+        /// switch-away claim: a credit that started and finished between the handshake's load and the claim
+        /// is never observed at all, so only a read taken from inside the claim is actually guaranteed
+        /// current. A player that no longer loads keeps the handshake's already-pinned aggregate — the row
+        /// vanishing inside this window is pathological, and a stale pin still beats leaving the connection
+        /// with none (mirroring <c>SocketHandler</c>'s own reload-before-command handling) — but it is warned
+        /// about, since that connection is knowingly going live on a pin taken outside the claim.
+        /// </summary>
+        private async Task ReloadSession(SessionService sessionService, SessionInitializer sessionInitializer, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
+        {
+            await sessionInitializer.ReloadSession(cancellationToken);
+            if (!await TryPinPlayer(sessionService, scopeFactory, cancellationToken))
+            {
+                _logger.LogWarning(
+                    "Player {PlayerId} could not be re-read while claiming its socket presence; keeping the pre-claim pin, which a concurrent switch-away credit may have left stale.",
+                    sessionService.SelectedPlayerId);
+            }
+        }
+
+        /// <summary>
+        /// Loads the session's player aggregate and pins it for synchronous access by socket commands,
+        /// reporting whether one was found. The load runs in a disposable scope so its <c>GameContext</c> is
+        /// not held open for the whole connection.
+        /// </summary>
+        private static async Task<bool> TryPinPlayer(SessionService sessionService, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
+        {
             using var scope = scopeFactory.CreateScope();
             var player = await scope.ServiceProvider.GetRequiredService<PlayerService>()
                 .LoadPlayer(sessionService.SelectedPlayerId, cancellationToken);
             if (player is null)
             {
-                return PlayerLoadResult.PlayerNotFound;
+                return false;
             }
 
             sessionService.SetPlayer(player);
-            return PlayerLoadResult.Loaded;
+            return true;
         }
     }
 
