@@ -20,6 +20,8 @@ Four `*.Tests` projects cover the layers (`Api`/`Application`/`Core`/`Infrastruc
 
 Unit tests follow the classical (Detroit) school — the project has no unmanaged dependencies, so avoid test doubles. A class that depends on an out-of-process dependency (database, cache) should hold no logic worth unit-testing; if it does, move that logic into a domain class and cover the dependency interaction with integration tests instead.
 
+Where a double is genuinely needed (usually to satisfy a constructor the test asserts nothing about), there is **one canonical double per interface**, in `Game.TestInfrastructure/Helpers` — reach for it rather than nesting a private copy in the test class. Interface-shaped duplication costs N edits every time the interface gains a member, and the copies drift (parameter names, behaviour) in the meantime. A local double is still right when it records or scripts something specific to that one test class.
+
 Judge branch coverage per-branch rather than chasing the number: defensive guards (e.g. config that is always supplied) and branches reachable only by disrupting process-wide shared infrastructure are accepted as measure-only, with the real logic pinned by integration tests against the DI-resolved interface.
 
 ### Running tests (Microsoft.Testing.Platform)

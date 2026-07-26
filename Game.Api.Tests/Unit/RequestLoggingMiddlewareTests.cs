@@ -1,7 +1,5 @@
-using Game.Abstractions.DataAccess;
 using Game.Api.Middleware;
 using Game.Api.Services;
-using Game.Core.Players;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -30,7 +28,7 @@ namespace Game.Api.Tests.Unit
             context.Request.Method = "GET";
             context.Request.Path = "/api/Auth/Status";
             context.Response.StatusCode = 500;
-            var sessionService = new SessionService(new NoOpSessionStore());
+            var sessionService = new SessionService(new FakeSessionStore());
 
             var caught = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => middleware.InvokeAsync(context, sessionService));
@@ -48,14 +46,6 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(500, statusCode);
             var elapsedMs = (long)Assert.IsType<long>(endedEntry.Properties.Single(p => p.Key == "ElapsedMs").Value);
             Assert.True(elapsedMs >= 0);
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int userId) { }
-            public Task UpdateAsync(PlayerState sessionData, int userId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
         }
     }
 }

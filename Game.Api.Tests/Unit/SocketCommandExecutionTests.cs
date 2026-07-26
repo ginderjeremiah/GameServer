@@ -189,7 +189,7 @@ namespace Game.Api.Tests.Unit
             // itself falls back to Abort() — otherwise the command lock, the handler, and the in-memory Player
             // stay pinned until process shutdown (#1760).
             var socket = new FakeWebSocket(new TaskCompletionSource().Task);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>(),
                 sendAbortTimeout: TimeSpan.FromMilliseconds(50));
@@ -274,7 +274,7 @@ namespace Game.Api.Tests.Unit
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(
@@ -309,7 +309,7 @@ namespace Game.Api.Tests.Unit
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var release = new TaskCompletionSource();
@@ -352,7 +352,7 @@ namespace Game.Api.Tests.Unit
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             session.SetPlayer(originalPlayer);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
@@ -391,7 +391,7 @@ namespace Game.Api.Tests.Unit
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(_ => null), provider.GetRequiredService<IServiceScopeFactory>(),
@@ -408,7 +408,7 @@ namespace Game.Api.Tests.Unit
         private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(throwOn, throwOnCreate, selfDelivering), _scopeFactory,
@@ -502,19 +502,6 @@ namespace Game.Api.Tests.Unit
                 await context.Close(ESocketCloseReason.SocketReplaced);
                 return Success();
             }
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int playerId) { }
-            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
-        }
-
-        private sealed class NoOpUnitOfWork : IUnitOfWork
-        {
-            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
 
         private sealed class CapturingUnitOfWork : IUnitOfWork

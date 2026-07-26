@@ -1,5 +1,6 @@
 using Game.Api.Middleware;
 using Game.Api.Models.Common;
+using Game.Api.Services;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -145,7 +146,7 @@ namespace Game.Api.Tests.Unit
             var context = CreateContextWithResponseBody();
             context.Request.Method = "GET";
             context.Request.Path = "/api/boom";
-            var sessionService = new Game.Api.Services.SessionService(new NoOpSessionStore());
+            var sessionService = new SessionService(new FakeSessionStore());
 
             // The exception is fully handled, so nothing escapes the request-logging middleware.
             await requestLogging.InvokeAsync(context, sessionService);
@@ -213,15 +214,6 @@ namespace Game.Api.Tests.Unit
             public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
             public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
                 new Microsoft.Extensions.FileProviders.NullFileProvider();
-        }
-
-        private sealed class NoOpSessionStore : Game.Abstractions.DataAccess.ISessionStore
-        {
-            public Task<Game.Core.Players.PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default)
-                => Task.FromResult<Game.Core.Players.PlayerState?>(null);
-            public void Update(Game.Core.Players.PlayerState sessionData, int userId) { }
-            public Task UpdateAsync(Game.Core.Players.PlayerState sessionData, int userId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
         }
     }
 }

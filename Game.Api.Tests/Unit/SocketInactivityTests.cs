@@ -1,9 +1,8 @@
-using Game.Abstractions.DataAccess;
 using Game.Api.Services;
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Application;
-using Game.Core.Players;
+using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
@@ -42,7 +41,7 @@ namespace Game.Api.Tests.Unit
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var socket = new IdleWebSocket();
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(), _scopeFactory, _loggerFactory.CreateLogger<SocketHandler>(),
                 () => { }, inactivityTimeout: TimeSpan.FromMilliseconds(80), inactivityPollInterval: TimeSpan.FromMilliseconds(20));
@@ -71,7 +70,7 @@ namespace Game.Api.Tests.Unit
             // last-activity.
             var cancellationToken = TestContext.Current.CancellationToken;
             var socket = new IdleWebSocket();
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             // A generous margin (10x the delivery cadence below) so a loaded CI runner overshooting a single
             // Task.Delay can't flake this into a false watchdog firing.
@@ -149,19 +148,6 @@ namespace Game.Api.Tests.Unit
         {
             public override AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
                 => throw new NotSupportedException("These tests never send a real command.");
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int playerId) { }
-            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
-        }
-
-        private sealed class NoOpUnitOfWork : IUnitOfWork
-        {
-            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }
