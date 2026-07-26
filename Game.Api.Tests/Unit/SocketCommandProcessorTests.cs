@@ -195,7 +195,7 @@ namespace Game.Api.Tests.Unit
             await session.CreateSession(userId: 1, playerId: 42);
 
             // The Subscribe failure propagates out of RegisterSocket...
-            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session, isAdmin: false));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask));
 
             // ...and the partial registration was rolled back: both the per-player presence key and the
             // account-level "current live player" key (#1817) were released via a compare-and-delete keyed on
@@ -239,7 +239,7 @@ namespace Game.Api.Tests.Unit
             await session.CreateSession(userId: 1, playerId: 99);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var context = await manager.RegisterSocket(socket, session, isAdmin: false);
+            var context = await manager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask);
             stopwatch.Stop();
 
             Assert.NotNull(context);
@@ -284,7 +284,7 @@ namespace Game.Api.Tests.Unit
             var session = new SessionService(new NoOpSessionStore());
             await session.CreateSession(userId: 1, playerId: 77);
 
-            var context = await manager.RegisterSocket(socket, session, isAdmin: false);
+            var context = await manager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask);
 
             Assert.NotNull(context);
             Assert.Equal(3, cache.PresenceGetCalls);
@@ -327,7 +327,7 @@ namespace Game.Api.Tests.Unit
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
             var session = new SessionService(new NoOpSessionStore());
             await session.CreateSession(userId: 1, playerId: 77);
-            var context = await manager.RegisterSocket(socket, session, isAdmin: false);
+            var context = await manager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask);
 
             // The unsubscribe fault during teardown must be swallowed, not propagated...
             await manager.UnRegisterSocket(context);
@@ -382,7 +382,7 @@ namespace Game.Api.Tests.Unit
             session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             // RegisterSocket wires the real processor into the fake pub/sub via RegisterSocketCommandListener,
             // so the captured callback is the production GetSocketCommandProcessor closure under test.
-            manager.RegisterSocket(socket, session, isAdmin: false).GetAwaiter().GetResult();
+            manager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask).GetAwaiter().GetResult();
 
             var processor = capturingPubSub.CapturedProcessor
                 ?? throw new InvalidOperationException("Processor was not registered.");

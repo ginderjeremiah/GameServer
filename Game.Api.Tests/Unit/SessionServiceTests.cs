@@ -1,8 +1,8 @@
-using Game.Abstractions.DataAccess;
 using Game.Api.Services;
 using Game.Core.Battle;
 using Game.Core.Players;
 using Game.Core.TestInfrastructure.Builders;
+using Game.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Api.Tests.Unit
@@ -284,33 +284,5 @@ namespace Game.Api.Tests.Unit
             Assert.Empty(store.Cleared);
         }
 
-        // An in-memory session store that serves a single optional cached session and records writes, so
-        // the cache-hit/miss and rehydration paths can be exercised without Redis.
-        private sealed class FakeSessionStore : ISessionStore
-        {
-            public PlayerState? Session { get; set; }
-            public List<(PlayerState State, int UserId)> Updates { get; } = [];
-            public List<(PlayerState State, int UserId)> AsyncUpdates { get; } = [];
-            public List<int> Cleared { get; } = [];
-            public CancellationToken LastGetSessionToken { get; private set; }
-            public CancellationToken LastUpdateAsyncToken { get; private set; }
-
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default)
-            {
-                LastGetSessionToken = cancellationToken;
-                return Task.FromResult(Session);
-            }
-
-            public void Update(PlayerState sessionData, int userId) => Updates.Add((sessionData, userId));
-
-            public Task UpdateAsync(PlayerState sessionData, int userId, CancellationToken cancellationToken = default)
-            {
-                LastUpdateAsyncToken = cancellationToken;
-                AsyncUpdates.Add((sessionData, userId));
-                return Task.CompletedTask;
-            }
-
-            public void Clear(int userId) => Cleared.Add(userId);
-        }
     }
 }

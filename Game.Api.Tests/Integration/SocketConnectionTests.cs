@@ -1,9 +1,17 @@
+using Game.Abstractions.DataAccess;
+using Game.Api.Models.Attributes;
 using Game.Api.Models.Common;
+using Game.Api.Models.Enemies;
 using Game.Api.Services;
+using Game.Api.Sockets.Commands;
+using Game.Application.Services;
+using Game.Core;
+using Game.Core.Players;
 using Game.TestInfrastructure.Fixtures;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
@@ -146,6 +154,86 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task Connect_PlayerCreditedWhileDeferringBehindSwitchClaim_PinsThePostCreditAggregate()
+        {
+            // #2463: the handshake loads and pins the player aggregate *before* RegisterSocket's presence
+            // claim, so a concurrent switch-away credit — which mutates that same aggregate over HTTP, off
+            // this player's battle loop — can commit its read-modify-write in between. The connection would
+            // then run every command against pre-credit state and write it back wholesale on the first
+            // battle-completion save, silently losing the credit's rewards.
+            var (userId, playerId) = await SeedAndLoginAsync("staleaggregate", "staleaggregatepass");
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+
+            // Hold the presence key exactly as an in-flight credit does, so the connection below defers.
+            var claimValue = await socketManager.TryClaimForSwitchCredit(playerId);
+            Assert.NotNull(claimValue);
+
+            // The handshake completes (and pins the pre-credit aggregate) while registration defers.
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+
+            // The credit's mutation lands now — after the handshake's read, before the claim releases. A
+            // reallocation stands in for the credited exp/levels: it is the same aggregate write, and unlike
+            // exp it is echoed straight back by a read-only command.
+            await ReallocateStatPointsAsync(playerId);
+
+            await socketManager.ReleaseSwitchCreditClaim(playerId, claimValue);
+
+            // An empty update mutates nothing but returns the pinned player's current allocations.
+            var response = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>(
+                nameof(UpdatePlayerStats), new List<AttributeUpdate>());
+
+            Assert.NotNull(response.Data);
+            Assert.Equal(ReallocatedStrength, AmountOf(response.Data, EAttribute.Strength));
+            Assert.Equal(ReallocatedEndurance, AmountOf(response.Data, EAttribute.Endurance));
+        }
+
+        [Fact]
+        public async Task Connect_SessionBattleSettledWhileDeferringBehindSwitchClaim_PinsThePostCreditSessionState()
+        {
+            // The other half of #2463: the credit also resolves the departed character's in-flight battle and
+            // clears it off the session state. A connection pinned to the pre-credit state still shows that
+            // battle as active, and the aggregate it was pinned alongside carries the pre-credit
+            // LastCreditedBattleSeed — so the already-credited fight can be credited a second time.
+            var (userId, playerId) = await SeedAndLoginAsync("stalesession", "stalesessionpass");
+
+            using var scope = CreateScope();
+            var socketManager = scope.ServiceProvider.GetRequiredService<SocketManagerService>();
+            var sessionStore = scope.ServiceProvider.GetRequiredService<ISessionStore>();
+
+            var activeBattle = new PlayerState
+            {
+                PlayerId = playerId,
+                ActiveEnemyId = 1,
+                ActiveEnemyLevel = 1,
+                BattleSeed = 1234u,
+                BattleStartTime = DateTime.UtcNow,
+            };
+            await sessionStore.UpdateAsync(activeBattle, userId, CancellationToken);
+
+            var claimValue = await socketManager.TryClaimForSwitchCredit(playerId);
+            Assert.NotNull(claimValue);
+
+            await using var socketClient = new TestSocketClient();
+            await socketClient.ConnectAsync(Factory.Server.CreateWebSocketClient(), userId, playerId);
+
+            // The credit settles the battle and clears it off the session state while registration defers.
+            await sessionStore.UpdateAsync(new PlayerState { PlayerId = playerId }, userId, CancellationToken);
+
+            await socketManager.ReleaseSwitchCreditClaim(playerId, claimValue);
+
+            // BattleLost short-circuits on the connection's own in-memory PlayerState, so its rejection is a
+            // direct read of what the connection is pinned to: with the pre-credit snapshot it would instead
+            // credit the loss of a battle the switch-away credit already settled.
+            var response = await socketClient.SendCommandAsync<BattleLostResponse>(
+                nameof(BattleLost), new BattleLostRequest { ClientTotalMs = 1000 });
+
+            Assert.Equal("No active battle.", response.Error);
+        }
+
+        [Fact]
         public async Task Connect_SetsPresenceKeyWithTtl()
         {
             var (userId, playerId) = await SeedAndLoginAsync();
@@ -192,6 +280,37 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(refreshed);
             Assert.True(decayed < initial, $"Expected the TTL to decay below {initial} but it was {decayed}.");
             Assert.True(refreshed > decayed, $"Expected activity to refresh the TTL above {decayed} but it was {refreshed}.");
+        }
+
+        /// <summary>The seeded player's stat allocations after <see cref="ReallocateStatPointsAsync"/>.</summary>
+        private const decimal ReallocatedStrength = 40m;
+        private const decimal ReallocatedEndurance = 60m;
+
+        /// <summary>
+        /// Commits a stat reallocation to the persisted player aggregate out-of-band, standing in for a
+        /// switch-away credit's read-modify-write landing on the same player.
+        /// </summary>
+        private async Task ReallocateStatPointsAsync(int playerId)
+        {
+            using var scope = CreateScope();
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerService.LoadPlayer(playerId, CancellationToken);
+            Assert.NotNull(player);
+
+            var reallocated = await playerService.TryUpdateAttributes(
+                player,
+                [
+                    new AttributeUpdate { AttributeId = (int)EAttribute.Strength, Amount = -10 },
+                    new AttributeUpdate { AttributeId = (int)EAttribute.Endurance, Amount = 10 },
+                ],
+                CancellationToken);
+
+            Assert.True(reallocated, "The out-of-band reallocation standing in for the credit must have applied.");
+        }
+
+        private static decimal AmountOf(UpdatePlayerStatsResponse response, EAttribute attribute)
+        {
+            return response.Attributes.Single(allocation => allocation.AttributeId == attribute).Amount;
         }
 
         /// <summary>

@@ -27,7 +27,25 @@ namespace Game.Api.Services
         /// no-op once the right player is bound. A pre-selection token (no player claim) leaves the request
         /// unbound (the caller surfaces that as a graceful error).
         /// </summary>
-        public async Task EnsureSessionLoaded(CancellationToken cancellationToken = default)
+        public Task EnsureSessionLoaded(CancellationToken cancellationToken = default)
+        {
+            return LoadSession(forceReload: false, cancellationToken);
+        }
+
+        /// <summary>
+        /// Re-reads the session state from the store even when one is already bound, replacing whatever this
+        /// request currently holds. <see cref="EnsureSessionLoaded"/>'s idempotence is what makes it unusable
+        /// for the socket handshake's post-registration re-read (#2463): the handshake binds the state before
+        /// <c>SocketManagerService.RegisterSocket</c> claims the presence key, so a concurrent switch-away
+        /// credit can settle the player's in-flight battle in between and leave the connection holding a
+        /// pre-credit snapshot.
+        /// </summary>
+        public Task ReloadSession(CancellationToken cancellationToken = default)
+        {
+            return LoadSession(forceReload: true, cancellationToken);
+        }
+
+        private async Task LoadSession(bool forceReload, CancellationToken cancellationToken)
         {
             if (_sessionService.TokenSelectedPlayerId is not int selectedPlayerId)
             {
@@ -40,7 +58,14 @@ namespace Game.Api.Services
                 return;
             }
 
-            if (_sessionService.HasPlayerSession && _sessionService.SelectedPlayerId == selectedPlayerId)
+            if (forceReload)
+            {
+                // Drop the currently-bound state up front: LoadPlayerState keeps what is already bound when
+                // the store has nothing, so without this a cache miss would silently leave the very snapshot
+                // this reload exists to discard in place.
+                _sessionService.RehydrateSession(selectedPlayerId);
+            }
+            else if (_sessionService.HasPlayerSession && _sessionService.SelectedPlayerId == selectedPlayerId)
             {
                 return;
             }

@@ -89,7 +89,19 @@ namespace Game.Api.Services
             _timeProvider = timeProvider ?? TimeProvider.System;
         }
 
-        public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService, bool isAdmin)
+        /// <summary>
+        /// Establishes a freshly-accepted socket: claims the player's presence key (and the account-level
+        /// live-character slot), subscribes its command listener, and starts its loops.
+        /// </summary>
+        /// <param name="onPresenceClaimed">
+        /// Invoked once this socket owns the presence key but before its command listener or read loop can
+        /// run anything. That window is the only point at which the connection's pinned session state and
+        /// player aggregate can be read safely (#2463): before the claim, an in-flight switch-away credit's
+        /// read-modify-write can still land and leave the read stale; after the loops start, replacing the
+        /// pinned aggregate would swap it under a running command. A fault here rolls the registration back
+        /// like any other, rather than leaving a live socket bound to state read outside the claim.
+        /// </param>
+        public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService, bool isAdmin, Func<Task> onPresenceClaimed)
         {
             var userId = sessionService.UserId;
             var playerId = sessionService.SelectedPlayerId;
@@ -107,6 +119,12 @@ namespace Game.Api.Services
             int? oldAccountPlayerId;
             try
             {
+                // The presence key is ours from here, so no switch-away credit can be mid-flight (ClaimPresenceKey
+                // waited any out) and none can start (TryClaimForSwitchCredit only claims an unset key). Read the
+                // connection's pinned state now, before anything below can start a loop that runs a command
+                // against it — see onPresenceClaimed.
+                await onPresenceClaimed();
+
                 // One live character per account (spike #922, decided A++) is enforced here too, not just one
                 // live socket per character: Session_{userId} (SessionStore) is keyed by account, so if a
                 // *different* character on this account still had a live socket, its connection would keep
