@@ -243,7 +243,9 @@ namespace Game.Core.Tests.Probability
 
         private static List<WeightedValue<int>> SetupMultiRandomElementList()
         {
-            var random = new Random();
+            // Seeded so the weight set is the same every run: an unseeded generator means a failure
+            // here can't be reproduced even once CI names the failing test.
+            var random = new Random(42);
 
             return Enumerable.Range(0, 20)
                 .Select(i => new WeightedValue<int>(i, random.Next(1, 1000)))

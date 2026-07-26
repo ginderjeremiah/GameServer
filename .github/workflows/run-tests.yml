@@ -249,6 +249,17 @@ jobs:
       shell: pwsh
       run: ./build/coverage.ps1 -NoBuild
 
+    - name: Upload backend test logs
+      # coverage.ps1 already prints the failing tests inline above (the answer is in the job log);
+      # this keeps the raw per-project logs — including the progress/timing lines it filters out —
+      # for the timing-sensitive failures where those timings are the diagnosis.
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: backend-test-logs
+        path: '**/TestResults/*.log'
+        if-no-files-found: ignore
+
     - name: Upload coverage report
       if: always()
       uses: actions/upload-artifact@v7
