@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { IZone } from '$lib/api';
-import { isZoneUnlocked, navigableZones, nextZoneByOrder, zonesByOrder } from '$lib/common/zone-progression';
+import { isZoneUnlocked, navigableZones, nextNavigableZone, zonesByOrder } from '$lib/common/zone-progression';
 import { makeZone } from '../../fixtures/zones';
 
 const zone = (id: number, order: number, unlockChallengeId?: number, retiredAt?: string): IZone =>
@@ -49,19 +49,32 @@ describe('isZoneUnlocked', () => {
 	});
 });
 
-describe('nextZoneByOrder', () => {
+describe('nextNavigableZone', () => {
 	const zones = [zone(30, 3), zone(10, 1), zone(20, 2)];
 
 	it('returns the next zone in authored order', () => {
-		expect(nextZoneByOrder(zones, 10)?.id).toBe(20);
-		expect(nextZoneByOrder(zones, 20)?.id).toBe(30);
+		expect(nextNavigableZone(zones, 10)?.id).toBe(20);
+		expect(nextNavigableZone(zones, 20)?.id).toBe(30);
 	});
 
 	it('returns undefined past the last zone', () => {
-		expect(nextZoneByOrder(zones, 30)).toBeUndefined();
+		expect(nextNavigableZone(zones, 30)).toBeUndefined();
 	});
 
 	it('returns undefined for an unknown current zone', () => {
-		expect(nextZoneByOrder(zones, 999)).toBeUndefined();
+		expect(nextNavigableZone(zones, 999)).toBeUndefined();
+	});
+
+	it('skips a retired zone rather than returning it as the next zone', () => {
+		const withRetiredMiddle = [zone(30, 3), zone(10, 1), zone(20, 2, undefined, '2026-01-01T00:00:00Z')];
+
+		expect(nextNavigableZone(withRetiredMiddle, 10)?.id).toBe(30);
+	});
+
+	it('returns undefined when the current zone is itself retired', () => {
+		// A player is lazily relocated out of a retired zone, so it has no "next" to advance into.
+		const retiredCurrent = [zone(10, 1, undefined, '2026-01-01T00:00:00Z'), zone(20, 2)];
+
+		expect(nextNavigableZone(retiredCurrent, 10)).toBeUndefined();
 	});
 });

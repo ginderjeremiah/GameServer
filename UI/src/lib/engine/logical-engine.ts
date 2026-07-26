@@ -18,58 +18,69 @@ const notifyIdleTimeLost = idleTimeLostHook.notify;
 export const onIdleTimeLost = idleTimeLostHook.onNotified;
 
 export class LogicalEngine {
-	public time = 0;
+	/** The measured tick rate, the one field with a reactive consumer (the nav sidebar's readout). */
 	public tickRate = 0;
 
-	private lastTime = 0;
-	private timeBank = 0;
-	private countTick = getEventCounter((t) => (this.tickRate = Math.round(t)));
-	private tickSource?: TickSource;
+	// Per-tick internals are `#`-private so statify never proxies them (#2123): `#time` advances every
+	// tick and `#lastTime`/`#timeBank` on every poll (~10ms), and nothing reads them reactively.
+	#time = 0;
+	#lastTime = 0;
+	#timeBank = 0;
+	#countTick = getEventCounter((t) => (this.tickRate = Math.round(t)));
+	#tickSource?: TickSource;
+
+	/**
+	 * The logical clock in `performance.now()` terms, read across the class boundary by `RenderEngine`
+	 * to derive its interpolation lead. Deliberately non-reactive — poll it, don't `$derived` it.
+	 */
+	public get time() {
+		return this.#time;
+	}
 
 	public start() {
-		if (this.tickSource) {
+		if (this.#tickSource) {
 			return;
 		}
 
-		this.lastTime = performance.now();
-		this.time = this.lastTime;
+		this.#lastTime = performance.now();
+		this.#time = this.#lastTime;
 
-		this.tickSource = createTickSource(() => this.logicLoop());
+		this.#tickSource = createTickSource(() => this.logicLoop());
 	}
 
 	public stop() {
-		if (!this.tickSource) {
+		if (!this.#tickSource) {
 			return;
 		}
 
-		this.tickSource.stop();
-		this.tickSource = undefined;
-		this.lastTime = 0;
-		this.timeBank = 0;
-		this.time = 0;
+		this.#tickSource.stop();
+		this.#tickSource = undefined;
+		this.#lastTime = 0;
+		this.#timeBank = 0;
+		this.#time = 0;
 		this.tickRate = 0;
 	}
 
 	private logicLoop() {
 		const now = performance.now();
-		const ts = now - this.lastTime;
-		this.lastTime = now;
+		const ts = now - this.#lastTime;
+		this.#lastTime = now;
 		this.update(ts);
 	}
 
 	private update(timeDelta: number) {
 		if (timeDelta > tickSizeX5) {
 			const lostTime = timeDelta - tickSizeX5;
-			this.time += lostTime;
+			this.#time += lostTime;
 			timeDelta = tickSizeX5;
 			notifyIdleTimeLost(lostTime);
 		}
 
-		this.timeBank += timeDelta;
-		while (this.timeBank >= tickSize) {
-			this.timeBank -= tickSize;
-			this.time += tickSize;
-			this.countTick();
+		this.#timeBank += timeDelta;
+		while (this.#timeBank >= tickSize) {
+			this.#timeBank -= tickSize;
+			this.#time += tickSize;
+			this.#countTick();
 			notifyLogicalUpdate(tickSize);
 		}
 	}

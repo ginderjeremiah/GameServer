@@ -29,9 +29,13 @@ export function isZoneUnlocked(zone: IZone, isChallengeCompleted: (challengeId: 
 	return zone.unlockChallengeId == null || isChallengeCompleted(zone.unlockChallengeId);
 }
 
-/** The zone immediately after the given zone in authored order, or undefined if it is the last. */
-export function nextZoneByOrder(zones: IZone[], currentZoneId: number): IZone | undefined {
-	const ordered = zonesByOrder(zones);
+/**
+ * The zone immediately after the given zone among the navigable ones, or undefined if it is the last
+ * (or is itself retired/unknown). Retired zones are skipped here rather than by the caller, so no
+ * caller can accidentally advance progression into one — and the ordering pass happens once.
+ */
+export function nextNavigableZone(zones: IZone[], currentZoneId: number): IZone | undefined {
+	const ordered = navigableZones(zones);
 	const idx = ordered.findIndex((z) => z.id === currentZoneId);
 	return idx >= 0 ? ordered[idx + 1] : undefined;
 }
