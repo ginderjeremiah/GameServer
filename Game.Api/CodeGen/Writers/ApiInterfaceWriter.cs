@@ -69,7 +69,7 @@ namespace Game.Api.CodeGen.Writers
                     fileBuilder.AppendLine(CodeGenTypeFormatter.GetImportText(importedDescriptors, "../"));
                 }
 
-                foreach (var interfaceType in group.OrderBy(d => d.Descriptor.TypeName))
+                foreach (var interfaceType in group.OrderBy(d => d.Descriptor.TypeName, StringComparer.Ordinal))
                 {
                     if (interfaceType.Descriptor.IsEnum)
                     {
@@ -164,7 +164,7 @@ namespace Game.Api.CodeGen.Writers
 
         private static string GetExportsText(IEnumerable<IGrouping<string, InterfaceDescriptorData>> interfaceDataGroups)
         {
-            return string.Join(Environment.NewLine, interfaceDataGroups.OrderBy(g => g.Key).Select(g => $"export * from './{g.Key}';"));
+            return string.Join(Environment.NewLine, interfaceDataGroups.OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => $"export * from './{g.Key}';"));
         }
     }
 }

@@ -17,6 +17,8 @@ dotnet run --project Game.Api -- codegen [outputDirectory]
 
 The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch api model/client drift.
 
+**The generated output must depend only on the sources, never on the generating machine.** Because the drift guard compares bytes, every casing and ordering decision in the codegen is culture-independent — `ToLowerInvariant`/`char.ToLowerInvariant` for the emitted identifiers and file names (a tr-TR machine's `ToLower` turns `Id` into the dotless `ıd`, which also mismatches the invariant `JsonNamingPolicy.CamelCase` the API serializes with), and `StringComparer.Ordinal` for every sort. Culture-aware collation orders mixed-case and separator-containing names differently from ordinal — and differently again across ICU versions — so a default-comparer sort would regenerate different bytes on another developer's locale.
+
 ### Generated domain constants (not just DTOs)
 
 The codegen also emits a small amount of **static domain data** that the frontend would otherwise hand-mirror — closing a latent parity gap where a backend-only change could silently disagree with the frontend (#282). The first such case is the engine's static attribute-modifier table:

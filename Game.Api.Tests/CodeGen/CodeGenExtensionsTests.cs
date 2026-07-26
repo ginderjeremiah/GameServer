@@ -1,5 +1,6 @@
 using Game.Api.CodeGen;
 using Game.Api.Sockets.Commands;
+using Game.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Api.Tests.CodeGen
@@ -274,6 +275,19 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Theory]
+        [InlineData("Id", "id")]
+        [InlineData("ItemId", "itemId")]
+        public void Decapitalize_TurkishCulture_LowercasesInvariantly(string input, string expected)
+        {
+            // tr-TR's culture-sensitive ToLower maps 'I' to the dotless 'ı', which would emit an
+            // identifier that neither matches the invariant JsonNamingPolicy.CamelCase the API
+            // serializes with nor compiles against the frontend's usage.
+            using var culture = new CultureScope("tr-TR");
+
+            Assert.Equal(expected, input.Decapitalize());
+        }
+
+        [Theory]
         [InlineData("HelloWorld", "hello-world")]
         [InlineData("oneTwoThree", "one-two-three")]
         [InlineData("NoBreaks", "no-breaks")]
@@ -282,6 +296,16 @@ namespace Game.Api.Tests.CodeGen
         public void SnakeCase_InsertsHyphenBetweenLowerThenUpperAndLowercases(string input, string expected)
         {
             Assert.Equal(expected, input.SnakeCase());
+        }
+
+        [Fact]
+        public void SnakeCase_TurkishCulture_LowercasesInvariantly()
+        {
+            // The generated file name would otherwise be "ıtem-ıd" on a tr-TR machine, so the same
+            // sources would emit differently-named files than CI's byte-compared output expects.
+            using var culture = new CultureScope("tr-TR");
+
+            Assert.Equal("item-id", "ItemId".SnakeCase());
         }
     }
 }

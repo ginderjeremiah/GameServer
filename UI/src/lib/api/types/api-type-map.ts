@@ -63,8 +63,8 @@ export type ApiResponseTypes = {
 	'AdminTools/AddEditEnemies': undefined;
 	'AdminTools/AddEditItemAttributes': undefined;
 	'AdminTools/AddEditItemModAttributes': undefined;
-	'AdminTools/AddEditItemMods': undefined;
 	'AdminTools/AddEditItemModSlots': undefined;
+	'AdminTools/AddEditItemMods': undefined;
 	'AdminTools/AddEditItems': undefined;
 	'AdminTools/AddEditLessons': undefined;
 	'AdminTools/AddEditPaths': undefined;
@@ -125,8 +125,8 @@ export type ApiRequestTypes = {
 	'AdminTools/AddEditEnemies': IChange<IEnemy>[];
 	'AdminTools/AddEditItemAttributes': IAddEditAttributesData;
 	'AdminTools/AddEditItemModAttributes': IAddEditAttributesData;
-	'AdminTools/AddEditItemMods': IChange<IItemMod>[];
 	'AdminTools/AddEditItemModSlots': IChange<IItemModSlot>[];
+	'AdminTools/AddEditItemMods': IChange<IItemMod>[];
 	'AdminTools/AddEditItems': IChange<IItem>[];
 	'AdminTools/AddEditLessons': IChange<ILesson>[];
 	'AdminTools/AddEditPaths': IChange<IPath>[];

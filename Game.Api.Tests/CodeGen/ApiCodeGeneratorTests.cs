@@ -1,5 +1,6 @@
 using Game.Api.CodeGen;
 using Game.Core;
+using Game.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Api.Tests.CodeGen
@@ -92,16 +93,29 @@ namespace Game.Api.Tests.CodeGen
         {
             // Ordering is grouped by declaring type then field name (not a flat alphabetical sort by
             // name alone), so this holds regardless of how many [ClientMirrored] constant classes exist.
+            // It is ordinal, not culture-aware: the emitted file is byte-compared by CI, so the order
+            // must not shift with the generating machine's locale or ICU version.
             var actual = ApiCodeGenerator.GetClientMirroredConstantFields()
                 .Select(field => (TypeName: field.DeclaringType?.Name, field.Name))
                 .ToList();
 
             var expected = actual
-                .OrderBy(entry => entry.TypeName)
-                .ThenBy(entry => entry.Name)
+                .OrderBy(entry => entry.TypeName, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Name, StringComparer.Ordinal)
                 .ToList();
 
             Assert.Equal(expected, actual);
+        }
+
+        [Fact]
+        public void GetClientMirroredConstantFields_OrderIsUnaffectedByHostCulture()
+        {
+            var invariantOrder = ApiCodeGenerator.GetClientMirroredConstantFields().Select(field => field.Name).ToList();
+
+            using var culture = new CultureScope("tr-TR");
+            var turkishOrder = ApiCodeGenerator.GetClientMirroredConstantFields().Select(field => field.Name).ToList();
+
+            Assert.Equal(invariantOrder, turkishOrder);
         }
     }
 }

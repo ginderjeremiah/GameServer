@@ -7,7 +7,7 @@ namespace Game.Api.CodeGen
     {
         public static string GetImportText(IEnumerable<CodeGenTypeDescriptor> typeDescriptors, string importPath = "./")
         {
-            var typeStrings = typeDescriptors.SelectMany(GetImportTexts).Distinct().OrderBy(t => t).ToList();
+            var typeStrings = typeDescriptors.SelectMany(GetImportTexts).Distinct().OrderBy(t => t, StringComparer.Ordinal).ToList();
             return typeStrings.Count > 3
                 ? $"import type {{{Environment.NewLine}\t{string.Join($",{Environment.NewLine}\t", typeStrings)}{Environment.NewLine}}} from '{importPath}';{Environment.NewLine}"
                 : $"import type {{ {string.Join(", ", typeStrings)} }} from '{importPath}';{Environment.NewLine}";
