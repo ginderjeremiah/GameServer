@@ -44,6 +44,20 @@ namespace Game.Core.Progress
         /// <summary>The proficiency-progress rows changed since load — what the write-behind save persists.</summary>
         public IEnumerable<PlayerProficiency> DirtyProficiencies => _dirtyProficiencies.Select(id => _proficiencies[id]);
 
+        private long _writeSequence;
+
+        /// <summary>
+        /// This aggregate's own monotonic write-behind sequence, stamped onto the envelope each save enqueues
+        /// (#2467). Deliberately a separate space from <see cref="Players.Player.WriteSequence"/>: the two
+        /// aggregates are separate enqueues, ordered independently, and write disjoint tables. Same shape and
+        /// same sentinel/increment rules — see <see cref="Players.Player.WriteSequence"/>.
+        /// </summary>
+        public required long WriteSequence
+        {
+            get => _writeSequence;
+            init => _writeSequence = value;
+        }
+
         public PlayerProgress(
             Player player,
             IEnumerable<PlayerStatistic> statistics,
@@ -55,6 +69,13 @@ namespace Game.Core.Progress
             _challenges = challengeProgress.ToDictionary(c => c.Challenge.Id);
             _proficiencies = proficiencies.ToDictionary(p => p.ProficiencyId);
         }
+
+        /// <summary>
+        /// Advances the counter and returns the value this save's envelope is stamped with. Called once per
+        /// save that actually enqueues something — a save with no dirty rows enqueues nothing and so must not
+        /// consume a sequence.
+        /// </summary>
+        public long AdvanceWriteSequence() => ++_writeSequence;
 
         /// <summary>
         /// Records the outcome of a completed battle and returns the (statistic type, entity) keys this call

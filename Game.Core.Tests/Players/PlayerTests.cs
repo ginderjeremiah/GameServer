@@ -1381,6 +1381,46 @@ namespace Game.Core.Tests.Players
             Assert.Empty(player.DomainEvents.OfType<SkillUnlockedEvent>());
         }
 
+        // ── Write-behind sequence (#2473) ─────────────────────────────────────
+
+        [Fact]
+        public void AdvanceWriteSequence_OnAFreshAggregate_StampsOneRatherThanTheUnsequencedSentinel()
+        {
+            var player = MakePlayer();
+            Assert.Equal(0, player.WriteSequence);
+
+            // 0 is the "this envelope carries no ordering information" sentinel, which the consuming guard
+            // bypasses entirely — a real counter stamping it would silently opt every write out of the guard.
+            Assert.Equal(1, player.AdvanceWriteSequence());
+            Assert.Equal(1, player.WriteSequence);
+        }
+
+        [Fact]
+        public void AdvanceWriteSequence_IsPerCallNotPerEvent_SoOneSavesEventsShareASequence()
+        {
+            var player = MakePlayer();
+
+            // The save path advances once and stamps every envelope that save buffers with the result, however
+            // many events it raised — the sequence orders saves against each other, not events within one.
+            var first = player.AdvanceWriteSequence();
+            player.ChangeZone(1);
+            player.GrantExp(5);
+            Assert.Equal(first, player.WriteSequence);
+
+            Assert.Equal(2, player.AdvanceWriteSequence());
+        }
+
+        [Fact]
+        public void WriteSequence_SeededOnRehydration_ContinuesRatherThanRestarting()
+        {
+            // A reconnect rehydrates from the cached blob, which carries the counter forward. Restarting from 0
+            // would re-stamp values the player's earlier writes already used, so the guard would read this
+            // session's genuinely newer writes as stale.
+            var player = new PlayerBuilder().WithWriteSequence(7).Build();
+
+            Assert.Equal(8, player.AdvanceWriteSequence());
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────────
 
         private static readonly Dictionary<int, int> NoProficiencies = [];

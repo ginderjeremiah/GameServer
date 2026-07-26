@@ -29,6 +29,7 @@ namespace Game.Core.TestInfrastructure.Builders
         private List<Skill> _selectedSkills = [];
         private List<LogPreference> _logPreferences = [];
         private List<PlayerLesson> _lessons = [];
+        private long _writeSequence = 0;
 
         public PlayerBuilder WithId(int id)
         {
@@ -120,8 +121,16 @@ namespace Game.Core.TestInfrastructure.Builders
             return this;
         }
 
+        /// <summary>Seeds the write-behind counter, as a rehydration from the cached blob would.</summary>
+        public PlayerBuilder WithWriteSequence(long writeSequence)
+        {
+            _writeSequence = writeSequence;
+            return this;
+        }
+
         public Player Build() => new()
         {
+            WriteSequence = _writeSequence,
             Id = _id,
             ClassId = _classId,
             Name = _name,

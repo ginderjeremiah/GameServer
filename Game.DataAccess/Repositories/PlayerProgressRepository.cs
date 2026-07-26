@@ -9,6 +9,7 @@ using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text.Json;
 using CoreChallenge = Game.Core.Progress.PlayerChallenge;
 using CoreProficiency = Game.Core.Progress.PlayerProficiency;
@@ -61,7 +62,10 @@ namespace Game.DataAccess.Repositories
                 player,
                 cached.Statistics.Select(ToCoreStatistic),
                 cached.Challenges.Select(c => ToCoreChallenge(c, player.Id)),
-                cached.Proficiencies.Select(ToCoreProficiency));
+                cached.Proficiencies.Select(ToCoreProficiency))
+            {
+                WriteSequence = cached.WriteSequence,
+            };
         }
 
         public async Task<List<CoreStat>> GetStatistics(int playerId, CancellationToken cancellationToken = default)
@@ -100,6 +104,13 @@ namespace Game.DataAccess.Repositories
 
             var playerId = progress.Player.Id;
 
+            // One sequence per enqueuing save, drawn from this aggregate's own counter rather than the player's
+            // — the two are separate enqueues writing disjoint tables, so they are ordered independently (#2473).
+            // Advanced only past the no-dirty-rows early return above, so a save that enqueues nothing consumes
+            // no sequence. The value is stamped on the envelope and carried into the cache advance below, so a
+            // reconnect reseeds the counter from it rather than restarting and re-stamping used values.
+            changed.WriteSequence = progress.AdvanceWriteSequence();
+
             // Enqueue the durable write-behind event first, then advance the cache. If the enqueue throws, the
             // cache must not have moved on to a snapshot that was never enqueued (and never will be), which
             // would be a silently lost write once the cache later evicts. Persist only the rows that changed
@@ -114,6 +125,7 @@ namespace Game.DataAccess.Repositories
                     Challenges = changed.Challenges,
                     Proficiencies = changed.Proficiencies,
                 }.Serialize(),
+                Sequence = changed.WriteSequence,
             };
             _updateBatch.Add(envelope);
 
@@ -192,7 +204,7 @@ namespace Game.DataAccess.Repositories
             {
                 try
                 {
-                    progress = FromHashFields(raw);
+                    progress = FromHashFields(raw, playerId);
                 }
                 catch (JsonException ex)
                 {
@@ -257,6 +269,10 @@ namespace Game.DataAccess.Repositories
 
             var rows = await statistics.Concat(challenges).Concat(proficiencies).ToListAsync(cancellationToken);
 
+            // The write sequence is left at its Unsequenced default: nothing persists it yet, so a cold load
+            // reseeds the counter from 0 and the next save stamps 1. Seeding it from the player's highest
+            // persisted watermark arrives with the table that holds them (#2474) — safe to defer, because
+            // nothing consumes the stamp until that same issue lands.
             var progress = new CachedPlayerProgress();
             foreach (var row in rows)
             {
@@ -329,6 +345,11 @@ namespace Game.DataAccess.Repositories
         // overwritten in place rather than duplicated.
         private static void MergeInto(CachedPlayerProgress target, CachedPlayerProgress changed)
         {
+            // A later Load in the same scope reseeds a fresh aggregate off this memo, so the counter has to
+            // move with the rows — otherwise that aggregate would restart from the pre-save value and re-stamp
+            // sequences this save already used.
+            target.WriteSequence = Math.Max(target.WriteSequence, changed.WriteSequence);
+
             foreach (var stat in changed.Statistics)
             {
                 var index = target.Statistics.FindIndex(s => s.StatisticTypeId == stat.StatisticTypeId && s.EntityId == stat.EntityId);
@@ -378,6 +399,12 @@ namespace Game.DataAccess.Repositories
         private static string ChallengeField(int challengeId) => $"C_{challengeId}";
         private static string ProficiencyField(int proficiencyId) => $"P_{proficiencyId}";
 
+        // Aggregate-level state rather than a row, so it gets a reserved field name outside the row-kind
+        // prefixes (S_/C_/P_) — grouping with the "_" presence marker, and ignored by FromHashFields' row
+        // parsing exactly as an unrecognised field always was, so a pre-upgrade instance reading a hash that
+        // carries it is unaffected.
+        private const string WriteSequenceField = "_seq";
+
         // Serializes each row as its own hash field, keyed by its natural identity, so Save can HSET only the
         // rows a save actually touched instead of rewriting the whole cached snapshot (#1635).
         private static Dictionary<string, string> ToHashFields(CachedPlayerProgress progress)
@@ -398,10 +425,18 @@ namespace Game.DataAccess.Repositories
                 fields[ProficiencyField(proficiency.ProficiencyId)] = proficiency.Serialize();
             }
 
+            // Only written once the counter has actually advanced: a cold reload has nothing to seed it from
+            // yet (#2474 adds the persisted watermarks it will read), and writing a 0 would waste a field
+            // asserting the very default a missing field already means.
+            if (progress.WriteSequence != DomainEventEnvelope.Unsequenced)
+            {
+                fields[WriteSequenceField] = progress.WriteSequence.ToString(CultureInfo.InvariantCulture);
+            }
+
             return fields;
         }
 
-        private static CachedPlayerProgress FromHashFields(Dictionary<string, string> fields)
+        private CachedPlayerProgress FromHashFields(Dictionary<string, string> fields, int playerId)
         {
             var progress = new CachedPlayerProgress();
             foreach (var (field, value) in fields)
@@ -424,6 +459,26 @@ namespace Game.DataAccess.Repositories
                 {
                     var proficiency = value.Deserialize<CachedPlayerProficiency>() ?? throw new JsonException($"Progress field '{field}' deserialized to null.");
                     progress.Proficiencies.Add(proficiency);
+                }
+                else if (field == WriteSequenceField)
+                {
+                    // An unparseable counter is treated as absent rather than as corruption: unlike a row it
+                    // carries no player data, so discarding the whole key over it would throw away real progress
+                    // rows to salvage an ordering hint. But it is logged rather than swallowed — the reseed
+                    // restarts the session at 1 against a watermark that may already be far higher, which under
+                    // the #2474 guard rejects every write that session makes until the counter climbs back past
+                    // it. Silent is the one thing that failure must not be.
+                    if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sequence))
+                    {
+                        progress.WriteSequence = sequence;
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Cached progress for player {PlayerId} carried an unparseable write sequence '{RawValue}'; reseeding the counter from 0. Writes from this session may be rejected as stale until it catches up.",
+                            playerId,
+                            value);
+                    }
                 }
             }
 

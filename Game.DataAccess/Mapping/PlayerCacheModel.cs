@@ -37,6 +37,20 @@ namespace Game.DataAccess.Mapping
         public required List<CachedPlayerSkill> Skills { get; init; }
         public required List<LogPreference> LogPreferences { get; init; }
         public required List<PlayerLesson> Lessons { get; init; }
+
+        /// <summary>
+        /// The player aggregate's write-behind sequence (#2473), carried here so it survives a reconnect or a
+        /// cross-instance rehydration rather than restarting — which would re-stamp already-used values and let
+        /// the consuming guard reject the session's genuinely newer writes.
+        /// <para>
+        /// The one member deliberately not <c>required</c>, for the same reason
+        /// <see cref="DomainEventEnvelope.Id"/> isn't: a blob written by a pre-upgrade instance carries no
+        /// "writeSequence", and requiring it would fail every such blob's deserialization on the first
+        /// upgraded read. Defaulting to <see cref="DomainEventEnvelope.Unsequenced"/> instead reseeds the
+        /// counter from 0, so the next save stamps 1 — the same cold-load behaviour as a database read.
+        /// </para>
+        /// </summary>
+        public long WriteSequence { get; init; } = DomainEventEnvelope.Unsequenced;
     }
 
     /// <summary>An unlocked item reduced to its id plus the player-specific state (equip slot, favorite).</summary>

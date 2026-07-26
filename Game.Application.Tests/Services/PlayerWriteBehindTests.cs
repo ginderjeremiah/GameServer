@@ -248,6 +248,128 @@ namespace Game.Application.Tests.Services
             Assert.Equal(1, rereadPlayer.CurrentZoneId);
         }
 
+        [Fact]
+        public async Task SavePlayer_StampsOneSequencePerSave_SharedByEveryEventThatSaveRaises()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            playerEntity.StatPointsGained = 106;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            // TryUpdateAttributes raises two events; both belong to one save of one consistent aggregate state,
+            // so they share a sequence — it orders saves against each other, not events within a save (#2473).
+            Assert.True(player.TryUpdateAttributes([new SimpleAttributeUpdate(EAttribute.Strength, 1)]));
+            await playerRepo.SavePlayer(player);
+
+            player.ChangeZone(1);
+            await playerRepo.SavePlayer(player);
+
+            var sequences = await ReadQueuedSequences(db);
+
+            // A brand-new player's counter starts at 0, so the first save stamps 1 — never the 0 sentinel, which
+            // would opt every one of that save's writes out of the guard consuming it (#2474).
+            Assert.Equal([1, 1, 2], sequences);
+        }
+
+        [Fact]
+        public async Task SavePlayer_RaisingNoEvents_StillConsumesASequence()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            // The player counter advances once per SavePlayer call, before the dispatch — so an eventless save
+            // (an accepted-but-unchanged command) burns a value with no envelope to carry it. That is fine and
+            // deliberate: the sequence only has to be monotonic, not gap-free, and the counter lives on an
+            // aggregate the connection holds for its lifetime. The progress aggregate deliberately does the
+            // opposite (see PlayerProgressRepositoryIntegrationTests), so pin both rather than leaving the
+            // asymmetry as a comment a later reader might "fix" into consistency.
+            await playerRepo.SavePlayer(player);
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            player.ChangeZone(1);
+            await playerRepo.SavePlayer(player);
+
+            Assert.Equal([2], await ReadQueuedSequences(db));
+        }
+
+        [Fact]
+        public async Task SavePlayer_EnvelopesCarriedForwardFromAFailedFlush_KeepTheirOriginalLowerSequence()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            // Shares the scope's PlayerUpdateBatch with the real repository, so the envelope its failed flush
+            // leaves buffered (#1494) is carried into the *next* save's flush — the case that makes stamping at
+            // buffer time rather than flush time load-bearing. A throwing pubsub is used rather than a cancelled
+            // token so nothing reaches Redis, keeping the queue's contents exactly assertable.
+            var batch = scope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>();
+            var throwingRepo = new PlayerRepository(
+                context,
+                scope.ServiceProvider.GetRequiredService<ICacheService>(),
+                new ThrowingPubSubService(),
+                scope.ServiceProvider.GetRequiredService<IDomainEventDispatcher>(),
+                batch,
+                scope.ServiceProvider.GetRequiredService<IItems>(),
+                scope.ServiceProvider.GetRequiredService<IItemMods>(),
+                scope.ServiceProvider.GetRequiredService<ISkills>(),
+                scope.ServiceProvider.GetRequiredService<ILogger<PlayerRepository>>());
+
+            player.ChangeZone(1);
+            await Assert.ThrowsAsync<PlayerPersistenceFlushFailedException>(() => throwingRepo.SavePlayer(player));
+
+            player.ChangeZone(2);
+            await playerRepo.SavePlayer(player);
+
+            // Both envelopes reach the queue on the second save's flush, but they must carry *different*
+            // sequences in the order they were raised. Stamping at flush time would give both the second save's
+            // value, erasing the fact that the carried-forward write is the older one — so a later out-of-order
+            // apply could no longer reject it.
+            var sequences = await ReadQueuedSequences(db);
+            Assert.Equal([1, 2], sequences);
+        }
+
+        // Reads the queue oldest-first (the queue is RPUSH/LPOP, so index 0 is the oldest) and projects each
+        // raw message to its envelope sequence.
+        private static async Task<List<long>> ReadQueuedSequences(IDatabase db)
+        {
+            var raw = await db.ListRangeAsync(Constants.PUBSUB_PLAYER_QUEUE);
+            return [.. raw.Select(value => ((string?)value)?.Deserialize<DomainEventEnvelope>()?.Sequence ?? DomainEventEnvelope.Unsequenced)];
+        }
+
         // Stands in for a domain event handler faulting partway through a dispatch: buffers an envelope into
         // the shared batch (as a sibling handler that already succeeded would have) before throwing, so the
         // test can assert SavePlayer still flushes what was buffered rather than losing it (#1819).

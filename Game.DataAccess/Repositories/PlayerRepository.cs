@@ -99,7 +99,10 @@ namespace Game.DataAccess.Repositories
             return PlayerCacheMapper.ToCore(model, _items, _itemMods, _skills);
         }
 
-        public IDisposable BeginBatch() => _updateBatch.BeginPlayerSave();
+        // Brackets several saves rather than being one, so it carries no sequence of its own — each SavePlayer
+        // inside it opens its own scope with its own. Passed explicitly so the scope's unsequenced-ness reads as
+        // deliberate here rather than as an omission.
+        public IDisposable BeginBatch() => _updateBatch.BeginPlayerSave(DomainEventEnvelope.Unsequenced);
 
         public async Task SavePlayer(Player player, CancellationToken cancellationToken = default)
         {
@@ -117,7 +120,11 @@ namespace Game.DataAccess.Repositories
             // before/around the failure. Instead the fault is captured and the flush still runs, then the fault
             // is rethrown (wrapped, see below) once the batch's already-buffered envelopes are safely enqueued (#1819).
             Exception? dispatchFault = null;
-            using (_updateBatch.BeginPlayerSave())
+
+            // One sequence per save, shared by every envelope this save's dispatch buffers, so the consume side
+            // can order this save's writes against the same player's earlier and later ones (#2473). Advanced
+            // before the dispatch because the publisher stamps each envelope as it buffers it.
+            using (_updateBatch.BeginPlayerSave(player.AdvanceWriteSequence()))
             {
                 try
                 {

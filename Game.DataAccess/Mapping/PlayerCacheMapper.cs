@@ -86,6 +86,7 @@ namespace Game.DataAccess.Mapping
                 Skills = skills,
                 LogPreferences = player.LogPreferences,
                 Lessons = player.Lessons,
+                WriteSequence = player.WriteSequence,
             };
         }
 
@@ -186,6 +187,7 @@ namespace Game.DataAccess.Mapping
                 SelectedSkills = selectedSkills,
                 LogPreferences = model.LogPreferences,
                 Lessons = model.Lessons,
+                WriteSequence = model.WriteSequence,
             };
         }
     }
