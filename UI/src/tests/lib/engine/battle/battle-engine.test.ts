@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EDamageType, EAttribute, ELogType, EModifierType, ESkillEffectTarget } from '$lib/api';
 import type { ISkill, IEnemy, IEnemyInstance } from '$lib/api';
 import { makeSkill } from '../../../fixtures/skills';
+import { makeEnemy } from '../../../fixtures/enemies';
 
 // Callbacks captured from the mocked engine hooks. `onLogicalUpdate` emits a delta,
 // `onRenderUpdate` a (renderDelta, logicalDelta) pair, and `onNewEnemyLoaded` an enemy instance.
@@ -174,15 +175,7 @@ describe('BattleEngine', () => {
 		mockSkills[0] = makeSkill({ id: 0, name: 'Slash', baseDamage: 100, cooldownMs: 500 });
 
 		mockEnemies.length = 0;
-		mockEnemies[1] = {
-			id: 1,
-			name: 'Goblin',
-			designerNotes: '',
-			isBoss: false,
-			attributeDistribution: [],
-			skillPool: [0],
-			spawns: []
-		};
+		mockEnemies[1] = makeEnemy({ id: 1, name: 'Goblin', skillPool: [0] });
 
 		engine = new BattleEngine();
 	});
