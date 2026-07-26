@@ -8,8 +8,11 @@ namespace Game.Core.Players
     public class PlayerStatPoints
     {
         /// <summary>
-        /// The attributes a player carries an allocation row for — the core (directly-allocatable) set, in
-        /// the enum's declaration order so every player's allocations read in the same canonical order.
+        /// The attributes a player carries an allocation row for — the core (directly-allocatable) set,
+        /// materialized in the enum's declaration order rather than read off the unordered
+        /// <see cref="CoreAttribute.CoreAttributes"/> set, so <see cref="CreateAllocations"/> seeds every new
+        /// character in the same deterministic order. Nothing reads meaning into the order of a player's
+        /// stored allocations (see <see cref="Rehydrate"/>).
         /// </summary>
         private static readonly EAttribute[] AllocatableAttributes =
             [.. Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore)];
@@ -40,23 +43,36 @@ namespace Game.Core.Players
         }
 
         /// <summary>
-        /// Restores a zero-amount row for every core attribute the player is missing one for, leaving
-        /// existing rows (and their amounts) untouched. Applied when the aggregate is rehydrated from
-        /// persistence so the seeded-row invariant <see cref="CreateAllocations"/> establishes at creation
-        /// holds for the life of the character — self-healing a player whose zero rows were dropped by the
-        /// pre-fix write-behind handler (#2459), and granting existing characters a row for a core attribute
+        /// Rebuilds a persisted player's stat points, restoring an allocation row for any core attribute the
+        /// stored set is missing one for. Rehydration goes through here rather than an object initializer so
+        /// the seeded-row invariant <see cref="CreateAllocations"/> establishes at creation cannot be
+        /// bypassed by a load path that forgets to re-establish it — which is what made #2459 a permanent
+        /// lockout rather than a lost zero. It also grants an existing character a row for a core attribute
         /// added after they were created.
+        /// <para>
+        /// Restored rows are appended, so a repaired character's allocations are not in the same order as a
+        /// freshly created one's. Nothing depends on that order: the client renders its stat steppers from
+        /// its own core-attribute list, and an allocation only reaches battle math as a per-attribute
+        /// additive modifier.
+        /// </para>
         /// </summary>
-        public void EnsureAllocatableAttributesArePresent()
+        public static PlayerStatPoints Rehydrate(List<StatAllocation> statAllocations, int statPointsGained, int statPointsUsed)
         {
-            var allocated = StatAllocations.Select(allocation => allocation.Attribute).ToHashSet();
+            var allocated = statAllocations.Select(allocation => allocation.Attribute).ToHashSet();
             foreach (var attribute in AllocatableAttributes)
             {
                 if (!allocated.Contains(attribute))
                 {
-                    StatAllocations.Add(new StatAllocation { Attribute = attribute, Amount = 0d });
+                    statAllocations.Add(new StatAllocation { Attribute = attribute, Amount = 0d });
                 }
             }
+
+            return new PlayerStatPoints
+            {
+                StatAllocations = statAllocations,
+                StatPointsGained = statPointsGained,
+                StatPointsUsed = statPointsUsed,
+            };
         }
 
         /// <summary>
