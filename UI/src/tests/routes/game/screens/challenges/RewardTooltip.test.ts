@@ -8,6 +8,7 @@ import type { ResolvedReward } from '$routes/game/screens/challenges/challenges-
 vi.mock('$stores', () => ({ staticData: {} }));
 
 import RewardTooltip from '$routes/game/screens/challenges/RewardTooltip.svelte';
+import { makeItemMod } from '../../../../fixtures/item-mods';
 
 const previewItem = (): Item =>
 	({
@@ -26,16 +27,15 @@ const previewItem = (): Item =>
 		totalAttributes: new BattleAttributes([{ attributeId: EAttribute.Strength, amount: 5 }], false)
 	}) as unknown as Item;
 
-const previewMod = (): IItemMod => ({
-	id: 1,
-	name: 'Blazing',
-	description: 'Hot.',
-	designerNotes: '',
-	itemModTypeId: EItemModType.Prefix,
-	rarityId: ERarity.Epic,
-	attributes: [{ attributeId: EAttribute.Strength, amount: 4 }],
-	tags: []
-});
+const previewMod = (): IItemMod =>
+	makeItemMod({
+		id: 1,
+		name: 'Blazing',
+		description: 'Hot.',
+		itemModTypeId: EItemModType.Prefix,
+		rarityId: ERarity.Epic,
+		attributes: [{ attributeId: EAttribute.Strength, amount: 4 }]
+	});
 
 const itemReward = (revealed: boolean): ResolvedReward =>
 	({

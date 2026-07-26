@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EChangeType, EItemModType, ERarity, type IItemMod } from '$lib/api';
 import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
+import { makeItemMod } from '../../../../fixtures/item-mods';
 
 /* Item-mod config transforms: `newItem` defaults, the derived meta line, and the
    persist path — a child-only attribute edit must NOT hit the identity Add/Edit
@@ -74,16 +75,15 @@ describe('itemModEntity', () => {
 	});
 
 	it('persist saves the tag set when tags change without re-sending an identity Edit', async () => {
-		const baseline: IItemMod = {
+		const baseline = makeItemMod({
 			id: 0,
 			name: 'Sharp',
 			description: 'desc',
-			designerNotes: '',
 			itemModTypeId: EItemModType.Prefix,
 			rarityId: ERarity.Rare,
 			attributes: [{ attributeId: 0, amount: 1 }],
 			tags: [1]
-		};
+		});
 		const record: IItemMod = { ...baseline, tags: [1, 2] }; // only the tag set changed
 		socket.itemMods = [record];
 
@@ -96,16 +96,14 @@ describe('itemModEntity', () => {
 	});
 
 	it('persist diffs attribute changes without sending an identity Edit when identity is unchanged', async () => {
-		const baseline: IItemMod = {
+		const baseline = makeItemMod({
 			id: 0,
 			name: 'Sharp',
-			description: '',
-			designerNotes: '',
 			itemModTypeId: EItemModType.Prefix,
 			rarityId: ERarity.Rare,
 			attributes: [{ attributeId: 0, amount: 1 }],
 			tags: [1]
-		};
+		});
 		const record: IItemMod = { ...baseline, attributes: [{ attributeId: 0, amount: 3 }] }; // only the bonus amount changed
 		socket.itemMods = [record];
 
@@ -125,16 +123,15 @@ describe('itemModEntity', () => {
 	it('persist Adds a new mod and saves its attributes/tags against the resolved id', async () => {
 		// A freshly-added record has a temporary negative id; persistEntity resolves the real
 		// id from the post-save refetch before running the attribute/tag child savers.
-		const added: IItemMod = {
+		const added = makeItemMod({
 			id: -1,
 			name: 'Keen',
 			description: 'Sharper edge',
-			designerNotes: '',
 			itemModTypeId: EItemModType.Prefix,
 			rarityId: ERarity.Rare,
 			attributes: [{ attributeId: 0, amount: 3 }],
 			tags: [5]
-		};
+		});
 		socket.itemMods = [{ ...added, id: 9 }]; // the persisted record at its real id
 
 		await itemModEntity.persist({ added: [added], modified: [], deleted: [], existingIds: [] });

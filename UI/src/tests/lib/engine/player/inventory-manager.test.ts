@@ -5,6 +5,8 @@ import { PUNCH_SKILL_ID } from '$lib/api/types/game-constants';
 import { makeSkill } from '../../../fixtures/skills';
 // Aliased: this suite's own `makeItem` is a positional adapter over the shared contract builder.
 import { makeItem as makeItemContract } from '../../../fixtures/items';
+// Aliased for the same reason: the local `makeItemMod` is an id-only adapter over the shared builder.
+import { makeItemMod as makeItemModContract } from '../../../fixtures/item-mods';
 
 const mockInventoryData: IInventoryData = {
 	unlockedItems: [],
@@ -83,16 +85,15 @@ const makeItem = (
 		attributes: [{ attributeId: EAttribute.Strength, amount: 5 }]
 	});
 
-const makeItemMod = (id: number): IItemMod => ({
-	id,
-	name: `Mod ${id}`,
-	description: `Mod description ${id}`,
-	designerNotes: '',
-	itemModTypeId: EItemModType.Component,
-	rarityId: ERarity.Uncommon,
-	attributes: [{ attributeId: EAttribute.Agility, amount: 3 }],
-	tags: []
-});
+const makeItemMod = (id: number): IItemMod =>
+	makeItemModContract({
+		id,
+		description: `Mod description ${id}`,
+		// Stated rather than inherited: it has to match the `Component` slot type the fixture items carry.
+		itemModTypeId: EItemModType.Component,
+		rarityId: ERarity.Uncommon,
+		attributes: [{ attributeId: EAttribute.Agility, amount: 3 }]
+	});
 
 const makeInventoryItem = (overrides: Partial<IInventoryItem> & { itemId: number }): IInventoryItem => ({
 	equipped: false,

@@ -2,25 +2,25 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import { EAttribute, EItemModType, ERarity, type IItemMod } from '$lib/api';
 import ModTooltip from '$routes/game/screens/challenges/ModTooltip.svelte';
+import { makeItemMod } from '../../../../fixtures/item-mods';
 
 // A prefix mod with a positive and a negative attribute, so the signed/positive/negative
 // rendering of the shared TooltipStatsGrid is exercised. `MaxHealth` also covers the
 // `normalizeText` split (camelCase -> "Max Health").
-const makeMod = (overrides: Partial<IItemMod> = {}): IItemMod => ({
-	id: 1,
-	name: 'Flaming',
-	description: 'Wreathed in flame.',
-	designerNotes: '',
-	itemModTypeId: EItemModType.Prefix,
-	rarityId: ERarity.Legendary,
-	attributes: [
-		{ attributeId: EAttribute.Strength, amount: 5 },
-		{ attributeId: EAttribute.MaxHealth, amount: 12 },
-		{ attributeId: EAttribute.Toughness, amount: -2 }
-	],
-	tags: [],
-	...overrides
-});
+const makeMod = (overrides: Partial<IItemMod> = {}): IItemMod =>
+	makeItemMod({
+		id: 1,
+		name: 'Flaming',
+		description: 'Wreathed in flame.',
+		itemModTypeId: EItemModType.Prefix,
+		rarityId: ERarity.Legendary,
+		attributes: [
+			{ attributeId: EAttribute.Strength, amount: 5 },
+			{ attributeId: EAttribute.MaxHealth, amount: 12 },
+			{ attributeId: EAttribute.Toughness, amount: -2 }
+		],
+		...overrides
+	});
 
 afterEach(cleanup);
 

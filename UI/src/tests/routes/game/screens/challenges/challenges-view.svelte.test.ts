@@ -55,6 +55,7 @@ import {
 	typeStats
 } from '$routes/game/screens/challenges/challenges-view.svelte';
 import { makeItem } from '../../../../fixtures/items';
+import { makeItemMod } from '../../../../fixtures/item-mods';
 
 /** Carries attributes and a mod slot by default — the reward tooltip renders both. */
 const item = (id: number, name: string, rarity: ERarity, cat: EItemCategory, extra: Partial<IItem> = {}): IItem =>
@@ -69,16 +70,16 @@ const item = (id: number, name: string, rarity: ERarity, cat: EItemCategory, ext
 		...extra
 	});
 
-const mod = (id: number, name: string, rarity: ERarity): IItemMod => ({
-	id,
-	name,
-	description: `${name} description`,
-	designerNotes: '',
-	itemModTypeId: EItemModType.Prefix,
-	rarityId: rarity,
-	attributes: [{ attributeId: EAttribute.Agility, amount: 3 }],
-	tags: []
-});
+const mod = (id: number, name: string, rarity: ERarity): IItemMod =>
+	makeItemMod({
+		id,
+		name,
+		description: `${name} description`,
+		// Stated rather than inherited: it has to match the `Prefix` slot the fixture items carry.
+		itemModTypeId: EItemModType.Prefix,
+		rarityId: rarity,
+		attributes: [{ attributeId: EAttribute.Agility, amount: 3 }]
+	});
 
 const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge => ({
 	description: `${over.name} description`,

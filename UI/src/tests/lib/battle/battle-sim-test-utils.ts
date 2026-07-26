@@ -2,10 +2,10 @@ import { Battler, newItem } from '$lib/battle';
 // Aliased: this module's own `makeSkill` builds a `SkillSpec` (pre-registration), not the contract.
 import { makeSkill as makeSkillContract } from '../../fixtures/skills';
 import { makeItem } from '../../fixtures/items';
+import { makeItemMod } from '../../fixtures/item-mods';
 import {
 	EAttribute,
 	EDamageType,
-	ERarity,
 	type EModifierType,
 	type ESkillEffectTarget,
 	type EItemModType,
@@ -209,16 +209,7 @@ export function equipmentFactory(itemRegistry: IItem[], itemModRegistry: IItemMo
 	return (spec: ItemSpec): IBattlerAttribute[] => {
 		const appliedMods: IAppliedModModel[] = spec.mods.map((mod, slotIndex) => {
 			const id = itemModRegistry.length;
-			itemModRegistry.push({
-				id,
-				name: `Mod ${id}`,
-				description: '',
-				designerNotes: '',
-				itemModTypeId: mod.type,
-				rarityId: ERarity.Common,
-				attributes: mod.attributes,
-				tags: []
-			});
+			itemModRegistry.push(makeItemMod({ id, itemModTypeId: mod.type, attributes: mod.attributes }));
 			return { itemModId: id, itemModSlotId: slotIndex };
 		});
 
