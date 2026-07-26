@@ -114,11 +114,38 @@ same-save events touching the same target still apply in whatever order the drai
 as today. That is the right place to stop: a save's events are all raised from one consistent aggregate
 state, so any order of them lands the same end state.
 
-**Plumbing.** `Sequence` goes on `DomainEventEnvelope` (defaulted, exactly like `Id` — so an envelope
-enqueued by a pre-upgrade instance mid-rolling-deploy still deserializes and simply carries sequence 0),
-not onto every domain event record. `PlayerUpdateEventDispatcher` then hands handlers a small
-`PlayerUpdateContext` carrying it, rather than widening `IPlayerUpdateHandler<T>.HandleAsync` with a
-positional parameter.
+**Plumbing.** `Sequence` goes on `DomainEventEnvelope` — defaulted so an envelope enqueued by a pre-upgrade
+instance mid-rolling-deploy still deserializes — not onto every domain event record.
+`PlayerUpdateEventDispatcher` then hands handlers a small `PlayerUpdateContext` carrying it, rather than
+widening `IPlayerUpdateHandler<T>.HandleAsync` with a positional parameter.
+
+**Sequence 0 is a sentinel meaning "unsequenced", not a low sequence — and the `Id` precedent does not
+transfer here.** `DomainEventEnvelope.Id` defaults to a fresh `Guid`, a harmless fabricated value that only
+needs to be unique. A defaulted `Sequence` of 0 is semantically loaded: it is the smallest value the guard
+can compare, so treating it as a real sequence makes it lose *every* comparison. That is a live
+lost-write path during exactly the window the default exists to survive:
+
+1. Player P is on an upgraded instance; their saves stamp 1, 2, 3 and an upgraded consumer advances P's
+   watermarks to 3.
+2. Mid-deploy, P reconnects and lands on a **pre-upgrade** instance — a rolling deploy is precisely the
+   event that forces those reconnects, and a player's one live socket isn't pinned to an instance across
+   them.
+3. That instance enqueues envelopes with no `sequence` property, which upgraded consumers read as 0.
+4. The guard compares against a watermark of 3, rejects, and acknowledges the event as a successful no-op.
+   Every guarded write for P — equipment, mods, allocations, progress — is discarded for their whole
+   session there.
+
+So an event carrying sequence 0 **bypasses the guard entirely**: it applies unconditionally and leaves the
+watermark untouched. That is precisely the pre-guard behaviour, which is the right semantic for an envelope
+that carries no ordering information — a guard cannot rank an event that declined to rank itself, and
+pretending it ranks lowest is what loses the write. Real counters therefore **start at 1**
+(`COALESCE(MAX("LastAppliedSequence"), 0)` on cold-load seed, increment-then-stamp), so a first save never
+stamps 0 and accidentally opts itself out.
+
+The alternative considered and rejected: a deploy-ordering constraint — ship the producer fleet-wide, then
+enable the guard a release later, so no sequence-0 envelope ever meets an advanced watermark (envelopes
+already queued are covered by the *TTL ≫ drain time* invariant). It works, but it is an ops constraint that
+has to be remembered at every deploy forever, and the sentinel makes it unnecessary.
 
 ### 2. Where the watermark lives — one generic table, granularity chosen per stream
 
@@ -139,16 +166,17 @@ taking the row lock first, with the data write applied only when it reports rows
 one transaction. A missing watermark row is an insert-if-missing seeded at `@seq` before the conditional
 update (or an `INSERT … ON CONFLICT DO UPDATE … WHERE`), so a first-ever write for a target isn't rejected.
 
-**The predicate is `<=`, not `<`** — it has to mirror the reject-only-on-strictly-older rule above, and the
-difference is not cosmetic. Under `<` the statement applies only when the watermark is *strictly* below the
-event, which rejects equal sequences: same-save siblings landing on one target would have the first advance
-the row and the second silently skipped, every sequence-0 envelope from a pre-upgrade instance would be
-discarded once that target's row existed at 0 (inverting the whole point of defaulting `Sequence` for
-rolling deploys), and the insert-if-missing seed would have no working value — seeded at `@seq`, the
-conditional update that follows would immediately no-op. `<=` collapses all three. The cost is that an
-exact duplicate re-applies rather than being skipped, paying one redundant no-op write; that is the correct
-trade under the queue's at-least-once contract and is the same choice §1 already made, so don't "optimize"
-it back to `<`.
+**The predicate is `<=`, not `<` — and note the operands are reversed from the rule in §1.** That rule is
+stated on the *event's* sequence (reject when `eventSeq < watermark`); the SQL is stated on the *column*
+(accept when `watermark <= eventSeq`). Both say the same thing, and getting this frame shift wrong is
+exactly the slip this paragraph exists to prevent. Under `<` the statement would apply only when the
+watermark is *strictly* below the event, rejecting equal sequences, which breaks two things: same-save
+siblings landing on one target would have the first advance the row and the second silently skipped, and
+the insert-if-missing seed would have no working value — seeded at `@seq`, the conditional update that
+follows would immediately no-op. Either is independently sufficient. The cost of `<=` is that an exact
+duplicate re-applies rather than being skipped, paying one redundant no-op write; that is the correct trade
+under the queue's at-least-once contract and is the same choice §1 already made, so don't "optimize" it back
+to `<`. (Sequence 0 never reaches this predicate at all — see the sentinel rule in §1.)
 
 **That transaction is a new pattern on this path, and it is the real cost of the design — not a free
 round-trip ride.** An earlier draft of this doc claimed the watermark upsert costs nothing because it rides
