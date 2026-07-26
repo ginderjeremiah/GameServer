@@ -384,10 +384,10 @@ namespace Game.Application.Services
             _classes.GetClass(classId)
             ?? throw new InvalidOperationException($"Class {classId} could not be resolved from the catalogue.");
 
-        // Projects proficiency progress to the battle-snapshot's level-only view, deriving it from the progress
-        // aggregate already loaded for this offline pass. Duplicated (not shared) from BattleService's identical
-        // live-path projection (BattleService.CaptureProficiencyLevels reads through the lean accessor instead):
-        // like ResolveClass above, a three-line, dependency-only helper not worth a shared abstraction (CLAUDE.md).
+        // Projects proficiency progress to the battle-snapshot view, deriving it from the progress aggregate
+        // already loaded for this offline pass. Duplicated (not shared) from BattleService's live-path
+        // projection, which reads through the lean accessor and omits Xp (the offline sim accrues from the
+        // current Xp; a live snapshot only needs levels): a dependency-only helper not worth sharing (CLAUDE.md).
         private static List<ProficiencyLevelSnapshot> ToProficiencyLevels(IEnumerable<PlayerProficiency> proficiencies) =>
             proficiencies
                 .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level, Xp = p.Xp })
