@@ -238,6 +238,45 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task AttributeAllocationsChanged_ZeroAmount_KeepsAndCreatesTheRowRatherThanDeletingIt()
+        {
+            // An allocation row's presence is what makes its attribute allocatable (#488), so a zero amount is
+            // the seeded state rather than "no data". Deleting the row (or skipping its insert) left the stat
+            // permanently blocked once the player fell through to a DB reload (#2459). Strength has a seeded
+            // row (the update path), Intellect has none (the insert path) — both must end up stored at 0.
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(MakeAttributeEvent(playerId, intellect: 0d, strength: 0d));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var rows = await context.PlayerAttributes.AsNoTracking()
+                .Where(pa => pa.PlayerId == playerId
+                    && (pa.AttributeId == (int)EAttribute.Strength || pa.AttributeId == (int)EAttribute.Intellect))
+                .ToListAsync(CancellationToken);
+            Assert.Equal(2, rows.Count);
+            Assert.All(rows, row => Assert.Equal(0m, row.Amount));
+        }
+
+        [Fact]
+        public async Task AttributeAllocationsChanged_AllocationClearedBackToZero_LeavesTheRowInPlace()
+        {
+            // The player spends into Strength and then refunds it. The second event's absolute 0 must overwrite
+            // the stored amount in place — not remove the row — so the refunded stat stays allocatable.
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(MakeAttributeEvent(playerId, intellect: 0d, strength: 12d));
+            await ApplyAsync(MakeAttributeEvent(playerId, intellect: 0d, strength: 0d));
+
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var strength = Assert.Single(await context.PlayerAttributes.AsNoTracking()
+                .Where(pa => pa.PlayerId == playerId && pa.AttributeId == (int)EAttribute.Strength)
+                .ToListAsync(CancellationToken));
+            Assert.Equal(0m, strength.Amount);
+        }
+
+        [Fact]
         public async Task ModApplied_AppliedTwice_ConvergesToOneRowWithLatestMod()
         {
             var (playerId, itemId, slotId, firstModId) = await SeedAppliedModFixtureAsync();
