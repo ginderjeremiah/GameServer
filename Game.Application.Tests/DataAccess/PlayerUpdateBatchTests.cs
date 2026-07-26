@@ -23,7 +23,7 @@ namespace Game.Application.Tests.DataAccess
 
             // A progress save raised within this window joins the player save's flush rather than publishing
             // on its own; disposing the scope (SavePlayer's dispatch having settled) ends the window.
-            using (batch.BeginPlayerSave())
+            using (batch.BeginPlayerSave(DomainEventEnvelope.Unsequenced))
             {
                 Assert.True(batch.PlayerSaveInProgress);
             }
@@ -38,11 +38,11 @@ namespace Game.Application.Tests.DataAccess
 
             // Mirrors OfflineProgressService: an outer BeginBatch scope wraps a nested SavePlayer, whose own
             // internal BeginPlayerSave must not end the outer caller's window when it disposes first (#2001).
-            using (batch.BeginPlayerSave())
+            using (batch.BeginPlayerSave(DomainEventEnvelope.Unsequenced))
             {
                 Assert.True(batch.PlayerSaveInProgress);
 
-                using (batch.BeginPlayerSave())
+                using (batch.BeginPlayerSave(DomainEventEnvelope.Unsequenced))
                 {
                     Assert.True(batch.PlayerSaveInProgress);
                 }
@@ -61,7 +61,7 @@ namespace Game.Application.Tests.DataAccess
 
             // A bare BeginBatch scope brackets several saves rather than being one, so it supplies no sequence —
             // anything buffered directly under it carries the sentinel rather than another save's value (#2473).
-            using (batch.BeginPlayerSave())
+            using (batch.BeginPlayerSave(DomainEventEnvelope.Unsequenced))
             {
                 Assert.Equal(DomainEventEnvelope.Unsequenced, batch.PlayerWriteSequence);
             }

@@ -62,8 +62,10 @@ namespace Game.DataAccess.Repositories
                 player,
                 cached.Statistics.Select(ToCoreStatistic),
                 cached.Challenges.Select(c => ToCoreChallenge(c, player.Id)),
-                cached.Proficiencies.Select(ToCoreProficiency),
-                cached.WriteSequence);
+                cached.Proficiencies.Select(ToCoreProficiency))
+            {
+                WriteSequence = cached.WriteSequence,
+            };
         }
 
         public async Task<List<CoreStat>> GetStatistics(int playerId, CancellationToken cancellationToken = default)
@@ -202,7 +204,7 @@ namespace Game.DataAccess.Repositories
             {
                 try
                 {
-                    progress = FromHashFields(raw);
+                    progress = FromHashFields(raw, playerId);
                 }
                 catch (JsonException ex)
                 {
@@ -434,7 +436,7 @@ namespace Game.DataAccess.Repositories
             return fields;
         }
 
-        private static CachedPlayerProgress FromHashFields(Dictionary<string, string> fields)
+        private CachedPlayerProgress FromHashFields(Dictionary<string, string> fields, int playerId)
         {
             var progress = new CachedPlayerProgress();
             foreach (var (field, value) in fields)
@@ -460,12 +462,22 @@ namespace Game.DataAccess.Repositories
                 }
                 else if (field == WriteSequenceField)
                 {
-                    // An unparseable counter is treated as absent rather than as corruption: unlike a row, it
-                    // carries no player data, and reseeding from 0 only costs the guard its ordering information
-                    // for this session — where discarding the whole key would throw away real progress rows.
+                    // An unparseable counter is treated as absent rather than as corruption: unlike a row it
+                    // carries no player data, so discarding the whole key over it would throw away real progress
+                    // rows to salvage an ordering hint. But it is logged rather than swallowed — the reseed
+                    // restarts the session at 1 against a watermark that may already be far higher, which under
+                    // the #2474 guard rejects every write that session makes until the counter climbs back past
+                    // it. Silent is the one thing that failure must not be.
                     if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sequence))
                     {
                         progress.WriteSequence = sequence;
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Cached progress for player {PlayerId} carried an unparseable write sequence '{RawValue}'; reseeding the counter from 0. Writes from this session may be rejected as stale until it catches up.",
+                            playerId,
+                            value);
                     }
                 }
             }

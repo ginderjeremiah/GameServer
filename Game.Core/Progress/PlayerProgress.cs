@@ -49,23 +49,25 @@ namespace Game.Core.Progress
         /// <summary>
         /// This aggregate's own monotonic write-behind sequence, stamped onto the envelope each save enqueues
         /// (#2467). Deliberately a separate space from <see cref="Players.Player.WriteSequence"/>: the two
-        /// aggregates are separate enqueues, ordered independently, and write disjoint tables. The sentinel and
-        /// increment rules are identical — see <see cref="Players.Player.WriteSequence"/>.
+        /// aggregates are separate enqueues, ordered independently, and write disjoint tables. Same shape and
+        /// same sentinel/increment rules — see <see cref="Players.Player.WriteSequence"/>.
         /// </summary>
-        public long WriteSequence => _writeSequence;
+        public required long WriteSequence
+        {
+            get => _writeSequence;
+            init => _writeSequence = value;
+        }
 
         public PlayerProgress(
             Player player,
             IEnumerable<PlayerStatistic> statistics,
             IEnumerable<PlayerChallenge> challengeProgress,
-            IEnumerable<PlayerProficiency> proficiencies,
-            long writeSequence = 0)
+            IEnumerable<PlayerProficiency> proficiencies)
         {
             Player = player;
             _statistics = statistics.ToDictionary(s => (s.Type, s.EntityId));
             _challenges = challengeProgress.ToDictionary(c => c.Challenge.Id);
             _proficiencies = proficiencies.ToDictionary(p => p.ProficiencyId);
-            _writeSequence = writeSequence;
         }
 
         /// <summary>

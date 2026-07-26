@@ -283,6 +283,38 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
+        public async Task SavePlayer_RaisingNoEvents_StillConsumesASequence()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+
+            // The player counter advances once per SavePlayer call, before the dispatch — so an eventless save
+            // (an accepted-but-unchanged command) burns a value with no envelope to carry it. That is fine and
+            // deliberate: the sequence only has to be monotonic, not gap-free, and the counter lives on an
+            // aggregate the connection holds for its lifetime. The progress aggregate deliberately does the
+            // opposite (see PlayerProgressRepositoryIntegrationTests), so pin both rather than leaving the
+            // asymmetry as a comment a later reader might "fix" into consistency.
+            await playerRepo.SavePlayer(player);
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            player.ChangeZone(1);
+            await playerRepo.SavePlayer(player);
+
+            Assert.Equal([2], await ReadQueuedSequences(db));
+        }
+
+        [Fact]
         public async Task SavePlayer_EnvelopesCarriedForwardFromAFailedFlush_KeepTheirOriginalLowerSequence()
         {
             using var scope = CreateScope();

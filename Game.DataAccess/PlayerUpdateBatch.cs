@@ -80,11 +80,12 @@ namespace Game.DataAccess
         /// <paramref name="writeSequence"/> is the sequence buffered envelopes are stamped with for the duration
         /// of the scope; the previous value is restored on disposal, so an inner <c>SavePlayer</c> scope opened
         /// inside an outer <see cref="Repositories.PlayerRepository.BeginBatch"/> one doesn't leak its sequence
-        /// to whatever the outer scope buffers afterwards. Callers that bracket saves rather than performing one
-        /// (<c>BeginBatch</c>) omit it.
+        /// to whatever the outer scope buffers afterwards. It has no default: a caller that brackets saves
+        /// rather than performing one passes <see cref="DomainEventEnvelope.Unsequenced"/> explicitly, so
+        /// "deliberately has no sequence" reads differently from "forgot to pass one".
         /// </para>
         /// </summary>
-        public IDisposable BeginPlayerSave(long writeSequence = DomainEventEnvelope.Unsequenced)
+        public IDisposable BeginPlayerSave(long writeSequence)
         {
             var previousSequence = _playerWriteSequence;
             _playerSaveDepth++;

@@ -48,7 +48,7 @@ namespace Game.Application.Tests.DataAccess
             using (var scope = CreateScope())
             {
                 var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-                var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []);
+                var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []) { WriteSequence = 0 };
                 progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
                     new BattleStats { PlayerDamageDealt = 12.5 }, isBossBattle: false, zoneId: 0);
 
@@ -96,7 +96,7 @@ namespace Game.Application.Tests.DataAccess
 
             using var scope = CreateScope();
             var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
-            var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []);
+            var progress = new PlayerProgress(MakeDomainPlayer(playerId), [], [], []) { WriteSequence = 0 };
             progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
                 new BattleStats(), isBossBattle: false, zoneId: 0);
 
@@ -240,7 +240,7 @@ namespace Game.Application.Tests.DataAccess
 
             // A progress save raised within a player save (the live battle-completion path) must NOT publish on
             // its own — it buffers into the shared batch so the player save's single flush carries it (#1237).
-            using (batch.BeginPlayerSave())
+            using (batch.BeginPlayerSave(DomainEventEnvelope.Unsequenced))
             {
                 await repo.Save(progress);
             }
@@ -327,6 +327,87 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.Equal(1, (await DequeueProgressEnvelope(redis)).Sequence);
             Assert.Equal(2, (await DequeueProgressEnvelope(redis)).Sequence);
+        }
+
+        [Fact]
+        public async Task Save_NoDirtyRows_DoesNotConsumeASequence()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+
+            using var scope = CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+
+            // A save with nothing dirty enqueues nothing, so it must not burn a sequence either — the counter is
+            // advanced past the early return, not before it. This is the deliberate asymmetry with SavePlayer,
+            // which advances even for an eventless save (see PlayerWriteBehindTests): there the counter lives on
+            // an aggregate held for the connection's lifetime, so a skipped value costs nothing, whereas here a
+            // gap would be reseeded from the cache on the next load and silently lost anyway.
+            var progress = await repo.Load(MakeDomainPlayer(playerId));
+            await repo.Save(progress);
+            Assert.Equal(0, await redis.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+            await repo.Save(progress);
+
+            // 1, not 2 — the no-op save above left the counter alone.
+            Assert.Equal(1, (await DequeueProgressEnvelope(redis)).Sequence);
+        }
+
+        [Fact]
+        public async Task Load_CachedSequenceIsUnparseable_ReseedsFromZeroAndWarnsRatherThanDiscardingTheRows()
+        {
+            var playerId = await SeedPlayerAsync();
+            using var multiplexer = await ConnectRedisAsync();
+            var redis = multiplexer.GetDatabase();
+            var hashKey = $"Progress_{playerId}";
+
+            using (var scope = CreateScope())
+            {
+                var repo = scope.ServiceProvider.GetRequiredService<IPlayerProgressRepository>();
+                var progress = await repo.Load(MakeDomainPlayer(playerId)); // cache miss -> creates the key
+                progress.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                    new BattleStats(), isBossBattle: false, zoneId: 0);
+                await repo.Save(progress);
+            }
+
+            var fields = await WaitForHashFieldCountAsync(redis, hashKey, minCount: 2);
+            var rowFieldCount = fields.Count(IsRowField);
+            Assert.True(rowFieldCount > 0, "Expected the first save to have written at least one statistic row.");
+            await DequeueProgressEnvelope(redis);
+
+            // Corrupt only the counter, leaving the rows intact.
+            await redis.HashSetAsync(hashKey, WriteSequenceField, "not-a-number");
+
+            using var logs = new CapturingLoggerProvider();
+            using var loggerFactory = LoggerFactory.Create(b => b.AddProvider(logs).SetMinimumLevel(LogLevel.Trace));
+            using var readScope = CreateScope();
+            var loggingRepo = new PlayerProgressRepository(
+                readScope.ServiceProvider.GetRequiredService<GameContext>(),
+                readScope.ServiceProvider.GetRequiredService<IChallenges>(),
+                readScope.ServiceProvider.GetRequiredService<ICacheService>(),
+                readScope.ServiceProvider.GetRequiredService<IPubSubService>(),
+                readScope.ServiceProvider.GetRequiredService<PlayerUpdateBatch>(),
+                loggerFactory.CreateLogger<PlayerProgressRepository>());
+
+            var reloaded = await loggingRepo.Load(MakeDomainPlayer(playerId));
+
+            // Unlike a corrupt *row*, an unparseable counter is not treated as key corruption: the rows carry
+            // real player progress and are kept, while the counter alone reseeds from 0.
+            Assert.Equal(rowFieldCount, (await redis.HashGetAllAsync(hashKey)).Count(IsRowField));
+
+            // But it is surfaced, not swallowed — the reseed restarts this session at 1 against a watermark that
+            // may already be far higher, which under the #2474 guard rejects every write it makes until the
+            // counter climbs back past it. Silent is the one thing that failure must not be.
+            Assert.Contains(logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("unparseable write sequence"));
+
+            reloaded.RecordBattleCompleted(MakeEnemy(), victory: true, playerDied: false, totalMs: 1000,
+                new BattleStats(), isBossBattle: false, zoneId: 0);
+            await loggingRepo.Save(reloaded);
+
+            Assert.Equal(1, (await DequeueProgressEnvelope(redis)).Sequence);
         }
 
         [Fact]

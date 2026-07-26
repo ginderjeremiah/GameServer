@@ -20,6 +20,15 @@ namespace Game.DataAccess.PlayerUpdates
         /// </summary>
         public long Sequence { get; private set; } = DomainEventEnvelope.Unsequenced;
 
-        public void SetSequence(long sequence) => Sequence = sequence;
+        /// <summary>
+        /// Populates the context from the envelope about to be applied. One method rather than a setter per
+        /// field, so later metadata extends this call rather than adding a second one the dispatcher could
+        /// forget — and so the dispatcher's call site reads as "describe this envelope" rather than as an
+        /// assignment whose completeness the reader has to verify.
+        /// </summary>
+        public void Describe(DomainEventEnvelope envelope)
+        {
+            Sequence = envelope.Sequence;
+        }
     }
 }

@@ -1526,7 +1526,7 @@ namespace Game.Core.Tests.Progress
             IEnumerable<PlayerProficiency>? proficiencies = null,
             long writeSequence = 0)
         {
-            return new PlayerProgress(player ?? new PlayerBuilder().Build(), statistics ?? [], challenges ?? [], proficiencies ?? [], writeSequence);
+            return new PlayerProgress(player ?? new PlayerBuilder().Build(), statistics ?? [], challenges ?? [], proficiencies ?? []) { WriteSequence = writeSequence };
         }
 
         private static PlayerStatistic Stat(EStatisticType type, int? entityId, decimal value) =>

@@ -438,6 +438,7 @@ namespace Game.Application.Tests.Mapping
 
             return new Player
             {
+                WriteSequence = 0,
                 Id = 1,
                 ClassId = 2,
                 Name = "Hero",

@@ -72,11 +72,13 @@ namespace Game.Core.Players
         /// <b>0 means "unsequenced", not "oldest".</b> It is the value an envelope from a pre-upgrade instance
         /// deserializes to, and the consuming guard bypasses it entirely rather than comparing it — so a real
         /// counter must never stamp it. <see cref="AdvanceWriteSequence"/> increments before returning, making the
-        /// first stamp of a cold-loaded aggregate 1. Settable only on rehydration (the cached blob carries it
+        /// first stamp of a cold-loaded aggregate 1. Settable only on construction (the cached blob carries it
         /// forward across reconnects); the save path advances it through <see cref="AdvanceWriteSequence"/>.
+        /// <c>required</c> so a new hydration path cannot silently omit the seed and restart the counter at 0,
+        /// re-stamping values the player's earlier saves already used.
         /// </para>
         /// </summary>
-        public long WriteSequence
+        public required long WriteSequence
         {
             get => _writeSequence;
             init => _writeSequence = value;

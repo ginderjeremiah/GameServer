@@ -99,7 +99,10 @@ namespace Game.DataAccess.Repositories
             return PlayerCacheMapper.ToCore(model, _items, _itemMods, _skills);
         }
 
-        public IDisposable BeginBatch() => _updateBatch.BeginPlayerSave();
+        // Brackets several saves rather than being one, so it carries no sequence of its own — each SavePlayer
+        // inside it opens its own scope with its own. Passed explicitly so the scope's unsequenced-ness reads as
+        // deliberate here rather than as an omission.
+        public IDisposable BeginBatch() => _updateBatch.BeginPlayerSave(DomainEventEnvelope.Unsequenced);
 
         public async Task SavePlayer(Player player, CancellationToken cancellationToken = default)
         {
