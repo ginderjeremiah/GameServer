@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import {
-	EChallengeGoalComparison,
-	EChallengeType,
-	EEntityType,
-	type IChallenge,
-	type IPlayerChallenge
-} from '$lib/api';
+import { EChallengeGoalComparison, EChallengeType, type IChallenge, type IPlayerChallenge } from '$lib/api';
 
 // Challenges fetches the player's progress over the socket (via the playerChallenges store) and
 // resolves the challenge catalogue + reward pools from staticData.
@@ -29,14 +23,13 @@ vi.mock('$stores', async (importOriginal) => {
 });
 
 import Challenges from '$routes/game/screens/challenges/Challenges.svelte';
+import { makeChallenge } from '../../../../fixtures/challenges';
 
-const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge => ({
-	description: `${over.name} description`,
-	designerNotes: '',
-	entityType: EEntityType.None,
-	progressGoal: 10,
-	...over
-});
+/* `challengeTypeId` stays required rather than inheriting the fixture default — the card's type badge and
+   objective sentence are driven by it — and the description is generated from the name so the rendered
+   card carries real prose instead of the fixture's empty placeholder. */
+const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge =>
+	makeChallenge({ description: `${over.name} description`, ...over });
 
 const PLAYER_CHALLENGES: IPlayerChallenge[] = [{ challengeId: 1, progress: 5, completed: false }];
 

@@ -8,23 +8,12 @@ import {
 } from '$lib/api';
 import { passiveSummary, weaponFirst } from '$routes/select/class-summary';
 import { makeAttribute } from '../../fixtures/attributes';
+import { makeCreatableClass } from '../../fixtures/classes';
 
-/* Deliberately partial: `ICreatableClass` has no shared fixture yet (#2456). */
+/* `passiveAmount` diverges from the fixture's inert 0: every case here reads the summary phrasing built
+   from a real passive. */
 const cls = (overrides: Partial<ICreatableClass> = {}): ICreatableClass =>
-	({
-		id: 0,
-		name: 'Warrior',
-		description: '',
-		word: 'kor',
-		passiveAttributeId: EAttribute.Endurance,
-		passiveAmount: 8,
-		passiveScalingAmount: 0,
-		passiveModifierType: EModifierType.Additive,
-		attributeDistributions: [],
-		starterSkills: [],
-		starterEquipment: [],
-		...overrides
-	}) as ICreatableClass;
+	makeCreatableClass({ id: 0, name: 'Warrior', word: 'kor', passiveAmount: 8, ...overrides });
 
 const attributes = [
 	makeAttribute(EAttribute.Endurance, 'Endurance', { code: 'END' }),

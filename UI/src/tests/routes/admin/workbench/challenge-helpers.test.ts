@@ -22,6 +22,7 @@ import {
 	typeEntityType,
 	typeStatistic
 } from '../../../../routes/admin/workbench/entities/challenge-helpers';
+import { makeChallenge } from '../../../fixtures/challenges';
 
 // Mirrors the GET /api/Challenges/ChallengeTypes metadata the page consumes.
 const TYPES: IChallengeType[] = [
@@ -110,20 +111,19 @@ const TYPES: IChallengeType[] = [
 	}
 ];
 
+/* Diverges from the fixture's neutral `statisticType`/`entityType` on purpose: this suite's subject is
+   the type→statistic→entity derivation, so each record carries the dimension its own type implies. */
 const make = (over: Partial<IChallenge>): IChallenge => {
 	const type = over.challengeTypeId ?? EChallengeType.EnemiesKilled;
 	const stat = typeStatistic(TYPES, type);
-	return {
+	return makeChallenge({
 		id: 1,
 		name: 'Test',
-		description: '',
-		designerNotes: '',
 		challengeTypeId: type,
 		statisticType: stat?.id,
 		entityType: stat?.entityType ?? EEntityType.None,
-		progressGoal: 10,
 		...over
-	};
+	});
 };
 
 // Tests resolve every entity dimension to a fixed token so the sentence is deterministic.

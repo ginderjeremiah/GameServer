@@ -3,6 +3,7 @@ import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
 import type { IChallenge } from '$lib/api';
 
 import RewardPicker, { type PickerRecord } from '$routes/admin/workbench/components/challenge/RewardPicker.svelte';
+import { makeChallenge } from '../../../../fixtures/challenges';
 
 const RECORDS: PickerRecord[] = [
 	{ id: 1, name: 'Iron Helm', color: 'var(--rarity-common)', tag: 'Common' },
@@ -10,9 +11,8 @@ const RECORDS: PickerRecord[] = [
 	{ id: 3, name: 'Leather Boots', color: 'var(--rarity-common)', tag: 'Common' }
 ];
 
-/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456). */
 const claimedBy = (id: number, name: string): Map<number, IChallenge> =>
-	new Map([[id, { id: 99, name } as IChallenge]]);
+	new Map([[id, makeChallenge({ id: 99, name })]]);
 
 afterEach(cleanup);
 

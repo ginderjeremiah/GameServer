@@ -18,6 +18,7 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 import ScopeField from '$routes/admin/workbench/components/challenge/ScopeField.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeChallenge } from '../../../../fixtures/challenges';
 
 const config = (): EntityConfig<Identified> =>
 	({
@@ -34,16 +35,15 @@ const config = (): EntityConfig<Identified> =>
 	}) as unknown as EntityConfig<Identified>;
 
 const setup = (over: Partial<IChallenge>) => {
-	/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456). */
-	const challenge: IChallenge = {
+	/* The type and entity dimension are stated rather than inherited: every case here turns on the scope
+	   the two drive. */
+	const challenge = makeChallenge({
 		id: 1,
 		name: 'Test',
-		description: '',
 		challengeTypeId: EChallengeType.EnemiesKilled,
 		entityType: EEntityType.Enemy,
-		progressGoal: 10,
 		...over
-	} as IChallenge;
+	});
 	const store = new EntityStore(config(), [challenge as unknown as Identified]);
 	const record = store.items[0] as unknown as IChallenge;
 	return { store, challenge: record, baseline: store.baselineOf(1) as unknown as IChallenge };
