@@ -1,6 +1,6 @@
 # Reference-Data Cache Reload (build-then-swap)
 
-> Satellite of [backend.md → Reference-data cache reload](./backend.md#reference-data-cache-reload-build-then-swap). Read this when working on the cache holders, the admin-write reload path, or the cross-instance invalidation plumbing.
+This doc covers the operational mechanics of the reference-data cache reload: the holder, the admin-write reload path, the cross-instance invalidation plumbing, and the reconciliation backstop. It is split from [backend.md → Reference-data cache reload](./backend.md#reference-data-cache-reload-build-then-swap) so the main doc keeps only the invariants a caller can rely on — including the **snapshot read-once idiom**, which every reference repo must follow.
 
 Cache busting is an **eager build-then-swap** (stale-while-revalidate), not a null-and-lazily-refill (see the [cache-reload spike](./spikes/356-reference-data-cache-reload.md)). Readers never observe an empty or torn snapshot, and never pay a refill query inline.
 
@@ -17,7 +17,3 @@ The broadcast publish itself is **awaited, not fire-and-forget** — unlike the 
 ## Periodic reconciliation backstop
 
 A periodic reconciliation sweep backstops Redis pub/sub's at-most-once delivery. A subscriber instance mid-reconnect (or otherwise transiently disconnected) when a notification is published simply never receives it — no error, no retry. Rather than serve stale reference data indefinitely, `CoalescingReferenceCacheReloader` races its signal wait against `ReferenceCacheReloadPolicy.ReconciliationInterval` (5 minutes by default) and runs a sweep if that interval elapses with no signal at all, logged distinctly from a signal-triggered sweep so an operator can tell them apart. Each sweep (signal or periodic) restarts the interval from zero, so this is "no sweep in N minutes," not a fixed wall-clock cadence.
-
-## Snapshot read-once idiom (repo reads)
-
-Because the swap is atomic, a reference repo must capture `holder.Current` **once per logical operation** (`var snapshot = holder.Current;`) and read everything off that local — re-reading it mid-operation could mix an old and a new snapshot.
