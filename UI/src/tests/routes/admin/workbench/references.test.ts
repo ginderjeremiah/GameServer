@@ -27,6 +27,7 @@ import {
 import { makePath, makeProficiency } from '../../../fixtures/proficiencies';
 import { makeSkill } from '../../../fixtures/skills';
 import { makeItem } from '../../../fixtures/items';
+import { makeZone } from '../../../fixtures/zones';
 
 const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => ({
 	id,
@@ -39,18 +40,7 @@ const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => 
 	...opts
 });
 
-const zone = (id: number, name: string, opts: Partial<IZone> = {}): IZone => ({
-	id,
-	name,
-	description: '',
-	designerNotes: '',
-	order: 0,
-	levelMin: 1,
-	levelMax: 10,
-	bossLevel: 1,
-	isHome: false,
-	...opts
-});
+const zone = (id: number, name: string, opts: Partial<IZone> = {}): IZone => makeZone({ id, name, ...opts });
 
 const challenge = (id: number, name: string, opts: Partial<IChallenge> = {}): IChallenge => ({
 	id,

@@ -62,20 +62,11 @@ vi.mock('$stores', () => ({ staticData, statistics, playerChallenges, registerTo
 
 import Fight from '$routes/game/screens/fight/Fight.svelte';
 import { makeBattler } from './fight-fixtures';
+import { makeZone as makeZoneContract } from '../../../../fixtures/zones';
 
-const makeZone = (over: Partial<IZone> = {}): IZone => ({
-	// Zone id == its index in staticData.zones (the Id-as-index invariant the boss view indexes by).
-	id: 0,
-	name: 'Verdant Hollow',
-	description: '',
-	designerNotes: '',
-	order: 1,
-	levelMin: 1,
-	levelMax: 10,
-	bossLevel: 1,
-	isHome: false,
-	...over
-});
+// Zone id == its index in staticData.zones (the Id-as-index invariant the boss view indexes by).
+const makeZone = (over: Partial<IZone> = {}): IZone =>
+	makeZoneContract({ id: 0, name: 'Verdant Hollow', order: 1, ...over });
 
 beforeEach(() => {
 	mockBattleEngine.player = makeBattler({ name: 'Aelara' });

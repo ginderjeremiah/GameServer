@@ -37,6 +37,7 @@ vi.mock('$lib/api', async (importOriginal) => {
 });
 
 import { zoneEntity, type WorkbenchZone } from '$routes/admin/workbench/entities/zone';
+import { makeZone } from '../../../../fixtures/zones';
 
 /** Finds the body posted to a given AdminTools endpoint (or undefined if never called). */
 const postBodyTo = (endpoint: string) => mockPost.mock.calls.find((c) => c[0] === endpoint)?.[1];
@@ -111,18 +112,10 @@ describe('zoneEntity', () => {
 	});
 
 	it('persist maps the sentinel back to an absent FK, passes real ids through, and saves the spawn table against the resolved id', async () => {
+		// Mirrors `zoneEntity.newItem`: a blank name and the picker's -1 "None" sentinel on both
+		// optional FKs, which is exactly what the mapping under test converts back to an absent FK.
 		const newZone = (over: Partial<WorkbenchZone>): WorkbenchZone => ({
-			id: -1,
-			name: '',
-			description: '',
-			designerNotes: '',
-			order: 0,
-			levelMin: 1,
-			levelMax: 10,
-			bossEnemyId: -1,
-			bossLevel: 1,
-			unlockChallengeId: -1,
-			isHome: false,
+			...makeZone({ id: -1, name: '', bossEnemyId: -1, unlockChallengeId: -1 }),
 			zoneEnemies: [],
 			...over
 		});

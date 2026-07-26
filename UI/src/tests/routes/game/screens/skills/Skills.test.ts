@@ -12,6 +12,7 @@ import {
 	type IZone
 } from '$lib/api';
 import { makeSkill } from '../../../../fixtures/skills';
+import { makeZone } from '../../../../fixtures/zones';
 import type { AttributeModifier } from '$lib/battle';
 import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
@@ -121,20 +122,7 @@ const SKILLS: ISkill[] = [
 ];
 
 // Zone 0 (idle range [2,8], boss enemy 2 at level 10): one in-zone spawn + the boss pill.
-const ZONES: IZone[] = [
-	{
-		id: 0,
-		name: 'Vale',
-		description: '',
-		designerNotes: '',
-		order: 0,
-		levelMin: 2,
-		levelMax: 8,
-		bossEnemyId: 2,
-		bossLevel: 10,
-		isHome: false
-	}
-];
+const ZONES: IZone[] = [makeZone({ id: 0, name: 'Vale', levelMin: 2, levelMax: 8, bossEnemyId: 2, bossLevel: 10 })];
 
 // amountPerLevel 1 gives each enemy Toughness 2·(1·level), within the preset-derived slider ceiling.
 const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
