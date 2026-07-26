@@ -5,12 +5,12 @@ import { EItemModType, ERarity, type IItemMod } from '$lib/api';
    that drift independently, even though a suite exercising applied mods usually imports both.
 
    The target set was confirmed with the throwaway-required-field probe, not a `grep` — only a suite
-   that constructs a *typed* `IItemMod` pays the contract-drift tax. Two exclusions are deliberate:
-   the production blank record (`routes/admin/workbench/entities/item-mod.ts`) and the live `ItemMod`
-   domain class (`lib/battle/item-mod.ts`) are the authoritative shapes and correctly stay literals,
-   and `challenges/OverviewPane.test.ts` asserts a deliberately partial literal `as IItemMod`, which
-   opts it out of drift detection entirely (#2447). A `grep` still finding mod literals under
-   `src/tests/` is expected, not a gap. */
+   that constructs a *typed* `IItemMod` pays the contract-drift tax. Exclusions are deliberate, in two
+   classes: the production blank record (`routes/admin/workbench/entities/item-mod.ts`) and the live
+   `ItemMod` domain class (`lib/battle/item-mod.ts`) are the authoritative shapes and correctly stay
+   literals; `challenges/OverviewPane.test.ts` and `lib/common/challenge-unlocks.test.ts` each assert a
+   deliberately partial literal `as IItemMod`, which opts them out of drift detection entirely (#2447).
+   A `grep` still finding mod literals under `src/tests/` is expected, not a gap. */
 
 /**
  * Builds an {@link IItemMod} reference-data entry for tests. Everything but the id is a neutral
