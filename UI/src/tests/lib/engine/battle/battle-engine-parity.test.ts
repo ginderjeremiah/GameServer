@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EAttribute, type IBattlerAttribute, type IEnemy, type ISkill } from '$lib/api';
 import { DEFAULT_MAX_BATTLE_MS } from '$lib/api/types/game-constants';
+import { makeEnemy } from '../../../fixtures/enemies';
 
 // Both consumers of the shared `battleStep` — the live, render-driven `BattleEngine.logicalUpdate` and the
 // headless `BattleSimulator` — must produce the same outcome for the same inputs and seed, since the backend
@@ -233,15 +234,10 @@ describe('BattleEngine parity with the headless BattleSimulator', () => {
 			// Configure the live engine to derive the identical player/enemy battlers and run it to completion.
 			mockPlayerManager.attributes = toBattlerAttributes(scenario.playerAttrs);
 			mockPlayerManager.selectedSkills = playerSkillIds;
-			mockEnemies[1] = {
-				id: 1,
-				name: 'Enemy',
-				designerNotes: '',
-				isBoss: false,
-				attributeDistribution: [],
-				skillPool: enemySkillIds,
-				spawns: []
-			};
+			// The engine derives the enemy's battler from the scenario's attributes, not the catalogue
+			// record, so an empty `attributeDistribution` keeps the live run arithmetically identical
+			// to the simulator's.
+			mockEnemies[1] = makeEnemy({ id: 1, name: 'Enemy', skillPool: enemySkillIds });
 
 			const engine = new BattleEngine();
 			engine.start();

@@ -28,17 +28,9 @@ import { makePath, makeProficiency } from '../../../fixtures/proficiencies';
 import { makeSkill } from '../../../fixtures/skills';
 import { makeItem } from '../../../fixtures/items';
 import { makeZone } from '../../../fixtures/zones';
+import { makeEnemy } from '../../../fixtures/enemies';
 
-const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => ({
-	id,
-	name,
-	designerNotes: '',
-	isBoss: false,
-	attributeDistribution: [],
-	skillPool: [],
-	spawns: [],
-	...opts
-});
+const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => makeEnemy({ id, name, ...opts });
 
 const zone = (id: number, name: string, opts: Partial<IZone> = {}): IZone => makeZone({ id, name, ...opts });
 

@@ -11,6 +11,7 @@ import {
 } from '$lib/api';
 import { makeSkill } from '../../../../fixtures/skills';
 import { makeZone } from '../../../../fixtures/zones';
+import { makeEnemy } from '../../../../fixtures/enemies';
 import { EAttributeModifierSource, type AttributeModifier } from '$lib/battle';
 import { classSignaturePassiveModifier } from '$lib/battle/class-modifiers';
 
@@ -145,18 +146,8 @@ const SKILLS: ISkill[] = [
 ];
 
 /* Compare-vs fixtures. Enemy Toughness resolves through the real BattleAttributes as
-   `2·Endurance` (no base, no Agility term), so each enemy's distribution is chosen for a
+   `2·Endurance` (no base, no Agility term), so each enemy states its own distribution for a
    clean expected value: with only per-level Endurance, Toughness = 2·amountPerLevel·level. */
-const enemy = (over: Partial<IEnemy> & { id: number }): IEnemy => ({
-	name: `Enemy ${over.id}`,
-	designerNotes: '',
-	isBoss: false,
-	attributeDistribution: [],
-	skillPool: [],
-	spawns: [],
-	...over
-});
-
 const enemyDist = (endurancePerLevel: number) => [
 	{ attributeId: EAttribute.Endurance, baseAmount: 0, amountPerLevel: endurancePerLevel }
 ];
@@ -165,10 +156,10 @@ const enemyDist = (endurancePerLevel: number) => [
 const ZONES: IZone[] = [makeZone({ id: 0, name: 'Vale', levelMin: 2, levelMax: 8, bossEnemyId: 2, bossLevel: 10 })];
 
 const ENEMIES: IEnemy[] = [
-	enemy({ id: 0, name: 'Imp', attributeDistribution: enemyDist(2), spawns: [{ zoneId: 0, weight: 1 }] }),
-	enemy({ id: 1, name: 'Wolf', attributeDistribution: enemyDist(5), spawns: [{ zoneId: 1, weight: 1 }] }),
-	enemy({ id: 2, name: 'Ogre King', isBoss: true, attributeDistribution: enemyDist(3) }),
-	enemy({
+	makeEnemy({ id: 0, name: 'Imp', attributeDistribution: enemyDist(2), spawns: [{ zoneId: 0, weight: 1 }] }),
+	makeEnemy({ id: 1, name: 'Wolf', attributeDistribution: enemyDist(5), spawns: [{ zoneId: 1, weight: 1 }] }),
+	makeEnemy({ id: 2, name: 'Ogre King', isBoss: true, attributeDistribution: enemyDist(3) }),
+	makeEnemy({
 		id: 3,
 		name: 'Wraith',
 		attributeDistribution: enemyDist(9),

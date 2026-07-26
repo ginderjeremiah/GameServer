@@ -38,6 +38,7 @@ vi.mock('$lib/api', async (importOriginal) => {
 });
 
 import { enemyEntity, type WorkbenchEnemy } from '$routes/admin/workbench/entities/enemy';
+import { makeEnemy } from '../../../../fixtures/enemies';
 
 /** Finds the body posted to a given AdminTools endpoint (or undefined if never called). */
 const postBodyTo = (endpoint: string) => mockPost.mock.calls.find((c) => c[0] === endpoint)?.[1];
@@ -64,13 +65,13 @@ beforeEach(() => {
 
 describe('enemyEntity', () => {
 	const baseline: WorkbenchEnemy = {
-		id: 0,
-		name: 'Bat',
-		designerNotes: '',
-		isBoss: false,
-		attributeDistribution: [{ attributeId: 0, baseAmount: 1, amountPerLevel: 0 }],
-		skillPool: [1],
-		spawns: [{ zoneId: 0, weight: 5 }],
+		...makeEnemy({
+			id: 0,
+			name: 'Bat',
+			attributeDistribution: [{ attributeId: 0, baseAmount: 1, amountPerLevel: 0 }],
+			skillPool: [1],
+			spawns: [{ zoneId: 0, weight: 5 }]
+		}),
 		bossZones: []
 	};
 
@@ -149,13 +150,14 @@ describe('enemyEntity', () => {
 		// A freshly-added record carries a temporary negative id; after the identity Add the
 		// backend appends it at a real id, which persistEntity resolves before the child savers run.
 		const added: WorkbenchEnemy = {
-			id: -1,
-			name: 'New Enemy',
-			designerNotes: '',
-			isBoss: true,
-			attributeDistribution: [{ attributeId: 0, baseAmount: 3, amountPerLevel: 1 }],
-			skillPool: [2],
-			spawns: [{ zoneId: 1, weight: 8 }],
+			...makeEnemy({
+				id: -1,
+				name: 'New Enemy',
+				isBoss: true,
+				attributeDistribution: [{ attributeId: 0, baseAmount: 3, amountPerLevel: 1 }],
+				skillPool: [2],
+				spawns: [{ zoneId: 1, weight: 8 }]
+			}),
 			bossZones: []
 		};
 		socket.enemies = [{ ...added, id: 7 }]; // the persisted record at its real id
@@ -184,16 +186,7 @@ describe('enemyEntity', () => {
 	});
 
 	it('persist Adds a bare new enemy without posting empty child collections (#1895)', async () => {
-		const added: WorkbenchEnemy = {
-			id: -1,
-			name: 'New Enemy',
-			designerNotes: '',
-			isBoss: false,
-			attributeDistribution: [],
-			skillPool: [],
-			spawns: [],
-			bossZones: []
-		};
+		const added: WorkbenchEnemy = { ...makeEnemy({ id: -1, name: 'New Enemy' }), bossZones: [] };
 		socket.enemies = [{ ...added, id: 7 }];
 
 		await enemyEntity.persist({ added: [added], modified: [], deleted: [], existingIds: [] });

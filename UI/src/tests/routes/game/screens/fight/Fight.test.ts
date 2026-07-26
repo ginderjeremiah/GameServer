@@ -63,6 +63,7 @@ vi.mock('$stores', () => ({ staticData, statistics, playerChallenges, registerTo
 import Fight from '$routes/game/screens/fight/Fight.svelte';
 import { makeBattler } from './fight-fixtures';
 import { makeZone as makeZoneContract } from '../../../../fixtures/zones';
+import { makeEnemy } from '../../../../fixtures/enemies';
 
 // Zone id == its index in staticData.zones (the Id-as-index invariant the boss view indexes by).
 const makeZone = (over: Partial<IZone> = {}): IZone =>
@@ -152,17 +153,7 @@ describe('Fight', () => {
 	describe('with a dedicated boss', () => {
 		beforeEach(() => {
 			staticData.zones = [makeZone({ bossEnemyId: 0, bossLevel: 18 })];
-			staticData.enemies = [
-				{
-					id: 0,
-					name: 'Catacomb Lich',
-					designerNotes: '',
-					isBoss: true,
-					attributeDistribution: [],
-					skillPool: [],
-					spawns: []
-				}
-			];
+			staticData.enemies = [makeEnemy({ id: 0, name: 'Catacomb Lich', isBoss: true })];
 		});
 
 		it('shows the Challenge trigger naming the zone boss when available', () => {
