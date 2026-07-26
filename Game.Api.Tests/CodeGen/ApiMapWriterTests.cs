@@ -87,6 +87,31 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void WriteApiMap_EndpointsOrderedOrdinally_NotByHostCulture()
+        {
+            // Ordinally '/' sorts below every letter and uppercase below lowercase; culture-aware
+            // collation weights both the other way, so a culture-sensitive sort emits these three in a
+            // different order — and a different order again on another machine's locale or ICU version.
+            var writer = new ApiMapWriter(_options);
+            var method = typeof(TestController).GetMethod("GetSimple")!;
+            var endpoints = new[]
+            {
+                new EndpointMetadata(method) { Endpoint = "alpha", IsGet = true },
+                new EndpointMetadata(method) { Endpoint = "PlayerData", IsGet = true },
+                new EndpointMetadata(method) { Endpoint = "Player/Get", IsGet = true },
+            };
+
+            writer.WriteApiMap(endpoints, "// Auto-generated");
+
+            var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-type-map.ts"));
+            var slashIndex = content.IndexOf("'Player/Get'", StringComparison.Ordinal);
+            var playerDataIndex = content.IndexOf("'PlayerData'", StringComparison.Ordinal);
+            var lowercaseIndex = content.IndexOf("'alpha'", StringComparison.Ordinal);
+            Assert.True(slashIndex >= 0 && slashIndex < playerDataIndex);
+            Assert.True(playerDataIndex < lowercaseIndex);
+        }
+
+        [Fact]
         public void WriteApiMap_ContainsImports_WhenTypesNeedInterface()
         {
             var writer = new ApiMapWriter(_options);

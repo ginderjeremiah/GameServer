@@ -1,5 +1,6 @@
 using Game.Api.CodeGen;
 using Game.Api.CodeGen.Writers;
+using Game.TestInfrastructure.Helpers;
 using System.Reflection;
 using Xunit;
 
@@ -85,6 +86,17 @@ namespace Game.Api.Tests.CodeGen
         public void ToScreamingSnakeCase_ConvertsPascalCaseNames(string pascalCase, string expected)
         {
             Assert.Equal(expected, ConstantsWriter.ToScreamingSnakeCase(pascalCase));
+        }
+
+        [Fact]
+        public void ToScreamingSnakeCase_TurkishCulture_UppercasesInvariantly()
+        {
+            // The sibling of the Decapitalize/SnakeCase locale guards: a culture-sensitive ToUpper would
+            // emit "İTEM_İD" here on a tr-TR machine, so the byte-compared game-constants.ts would depend
+            // on the generating machine's locale.
+            using var culture = new CultureScope("tr-TR");
+
+            Assert.Equal("ITEM_ID", ConstantsWriter.ToScreamingSnakeCase("ItemId"));
         }
 
         private string WriteAndRead(IEnumerable<FieldInfo> constants)

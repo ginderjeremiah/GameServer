@@ -152,6 +152,23 @@ namespace Game.Api.Tests.CodeGen
         }
 
         [Fact]
+        public void GetImportText_Multiple_OrdersImportsOrdinally()
+        {
+            // Culture-aware collation would emit ILoginCredentialsModel first (it compares
+            // case-insensitively before case), making the import line — which CI byte-compares —
+            // depend on the generating machine's locale.
+            var descriptors = new[]
+            {
+                GetPropertyDescriptor<ModelWithCollationSensitiveSiblings>("LoginCredentials"),
+                GetPropertyDescriptor<ModelWithCollationSensitiveSiblings>("LogPreference"),
+            };
+
+            var result = CodeGenTypeFormatter.GetImportText(descriptors);
+
+            Assert.StartsWith("import type { ILogPreferenceModel, ILoginCredentialsModel }", result);
+        }
+
+        [Fact]
         public void GetImportText_CustomPath_UsesProvidedPath()
         {
             var descriptors = new[] { GetPropertyDescriptor<NestedModel>("Child") };

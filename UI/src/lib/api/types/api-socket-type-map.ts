@@ -51,8 +51,8 @@ export type ApiSocketResponseTypes = {
 	'DefeatEnemy': IDefeatEnemyResponse;
 	'EquipItem': IEquipItemResponse;
 	'GetAttributes': IAttribute[];
-	'GetChallenges': IChallenge[];
 	'GetChallengeTypes': IChallengeType[];
+	'GetChallenges': IChallenge[];
 	'GetClasses': IClass[];
 	'GetEnemies': IEnemy[];
 	'GetItemMods': IItemMod[];

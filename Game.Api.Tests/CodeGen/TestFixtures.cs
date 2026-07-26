@@ -103,6 +103,26 @@ namespace Game.Api.Tests.CodeGen
         public DateTimeOffset DateTimeOffsetValue { get; set; }
     }
 
+    // A pair of names that collate differently ordinally ('P' < 'i') than under culture-aware collation
+    // (which compares case-insensitively first, ordering "Login…" before "LogP…") — mirroring the real
+    // ILogPreference/ILoginCredentials pair in the generated client. Used to pin that the codegen's
+    // byte-compared output is ordered ordinally and so cannot shift with the host machine's locale.
+    public class LogPreferenceModel : IModel
+    {
+        public int Id { get; set; }
+    }
+
+    public class LoginCredentialsModel : IModel
+    {
+        public string Username { get; set; } = "";
+    }
+
+    public class ModelWithCollationSensitiveSiblings : IModel
+    {
+        public LogPreferenceModel LogPreference { get; set; } = new();
+        public LoginCredentialsModel LoginCredentials { get; set; } = new();
+    }
+
     public class NestedModel : IModel
     {
         public SimpleModel Child { get; set; } = new();

@@ -7,20 +7,22 @@ namespace Game.Api.CodeGen
     {
         /// <summary>
         /// Returns a copy of this string, but the first letter is lowercase. An empty string is returned unchanged.
-        /// Used to emit camelCase TypeScript identifiers from PascalCase member names.
+        /// Used to emit camelCase TypeScript identifiers from PascalCase member names. The casing is invariant so the
+        /// emitted identifier matches the invariant <see cref="System.Text.Json.JsonNamingPolicy.CamelCase"/> the API
+        /// serializes with, on any host locale (a tr-TR machine would otherwise turn "Id" into the dotless "ıd").
         /// </summary>
         internal static string Decapitalize(this string str)
         {
-            return str.Length == 0 ? str : string.Concat(str[0].ToString().ToLower(), str.AsSpan(1));
+            return str.Length == 0 ? str : string.Concat(char.ToLowerInvariant(str[0]).ToString(), str.AsSpan(1));
         }
 
         /// <summary>
         /// Returns a copy of this string, but each sequence of a lowercase character followed by an uppercase character has a "-"
-        /// inserted between the characters then the entire string is converted to lowercase. Used to emit kebab-cased file names.
+        /// inserted between the characters then the entire string is lowercased invariantly. Used to emit kebab-cased file names.
         /// </summary>
         internal static string SnakeCase(this string str)
         {
-            return WordBreakRegex().Replace(str, "$1-$2").ToLower();
+            return WordBreakRegex().Replace(str, "$1-$2").ToLowerInvariant();
         }
 
         internal static NullabilityInfo GetNullabilityInfo(this ParameterInfo parameter)

@@ -9,14 +9,14 @@ import type {
 	ISignaturePassive
 } from '../';
 
-export interface ILoginCredentials {
-	username: string;
-	password: string;
-}
-
 export interface ILogPreference {
 	id: ELogType;
 	enabled: boolean;
+}
+
+export interface ILoginCredentials {
+	username: string;
+	password: string;
 }
 
 export interface IPlayerData {
