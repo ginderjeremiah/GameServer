@@ -134,8 +134,8 @@ namespace Game.Application.Tests.Mapping
         public void ToCore_MissingCoreAllocationRows_AreRestoredAtZero()
         {
             // A player persisted with only their non-zero allocation — the shape the pre-fix write-behind
-            // handler left behind (#2459) — must rehydrate with the full seeded set, or every other core stat
-            // stays permanently unallocatable behind the #488 row-presence anti-cheat.
+            // handler left behind (#2459) — must rehydrate with the full seeded set, so the client still
+            // receives a complete per-attribute spread to render and reconcile against.
             var model = BuildModel(statAllocations: [new() { Attribute = EAttribute.Strength, Amount = 5d }]);
 
             var player = PlayerCacheMapper.ToCore(model, Catalog(), Catalog(), Catalog());

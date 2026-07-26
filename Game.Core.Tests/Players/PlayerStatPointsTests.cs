@@ -145,43 +145,96 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void TryUpdateAttributes_UnknownAttribute_RejectsWithoutMutating()
+        public void TryUpdateAttributes_DerivedAttribute_RejectsWithoutMutating()
         {
-            // An update targeting an attribute the player has no allocation row for is rejected rather
-            // than silently succeeding as a no-op (#488). Only core attributes are seeded as rows, so an
-            // allocation into an unknown (or derived) attribute is an invalid request, not success.
-            var allocations = new List<StatAllocation>
-            {
-                new() { Attribute = EAttribute.Strength, Amount = 0 },
-            };
-            var stats = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 0 };
+            // An update targeting a derived attribute is rejected rather than silently succeeding as a
+            // no-op (#488): only the core attributes are directly allocatable, so MaxHealth — computed
+            // from Endurance — is an invalid request, not success.
+            var stats = MakeStats(gained: 10, used: 0);
 
-            var result = stats.TryUpdateAttributes([new Update(EAttribute.Luck, 3)]);
+            var result = stats.TryUpdateAttributes([new Update(EAttribute.MaxHealth, 3)]);
 
             Assert.False(result);
             Assert.Equal(0, stats.StatPointsUsed);
-            Assert.Equal(0, stats.StatAllocations.Single().Amount);
+            Assert.DoesNotContain(stats.StatAllocations, allocation => allocation.Attribute == EAttribute.MaxHealth);
         }
 
         [Fact]
-        public void TryUpdateAttributes_KnownAndUnknownAttributes_RejectsEntireSet()
+        public void TryUpdateAttributes_DerivedAttributeCarryingAStoredRow_IsStillRejected()
         {
-            // A set mixing a valid allocation with one for an attribute that has no row is rejected as a
-            // whole, leaving the valid allocation and the point pool untouched (#488).
-            var allocations = new List<StatAllocation>
-            {
-                new() { Attribute = EAttribute.Strength, Amount = 0 },
-            };
-            var stats = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 0 };
+            // The rule is "the attribute is derived", not "the attribute has no row" — a stray non-core row
+            // (which Rehydrate preserves rather than prunes) must not become a licence to allocate into it.
+            var stats = MakeStats(gained: 10, used: 0);
+            stats.StatAllocations.Add(new StatAllocation { Attribute = EAttribute.MaxHealth, Amount = 5d });
+
+            var result = stats.TryUpdateAttributes([new Update(EAttribute.MaxHealth, 3)]);
+
+            Assert.False(result);
+            Assert.Equal(0, stats.StatPointsUsed);
+            Assert.Equal(5d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.MaxHealth).Amount);
+        }
+
+        [Fact]
+        public void TryUpdateAttributes_CoreAndDerivedAttributes_RejectsEntireSet()
+        {
+            // A set mixing a valid allocation with a derived one is rejected as a whole, leaving the valid
+            // allocation and the point pool untouched (#488).
+            var stats = MakeStats(gained: 10, used: 0);
 
             var result = stats.TryUpdateAttributes([
                 new Update(EAttribute.Strength, 2),
-                new Update(EAttribute.Luck, 3),
+                new Update(EAttribute.MaxHealth, 3),
             ]);
 
             Assert.False(result);
             Assert.Equal(0, stats.StatPointsUsed);
-            Assert.Equal(0, stats.StatAllocations.Single().Amount);
+            Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+        }
+
+        [Fact]
+        public void TryUpdateAttributes_CoreAttributeWithNoRow_CreatesTheRowAndApplies()
+        {
+            // The #2459-shaped aggregate: every row but Strength is gone. A core attribute is allocatable
+            // because it is core, so the spend lands on a row created here rather than failing until some
+            // other path reseeds it.
+            var stats = DamagedStats(gained: 10, used: 1);
+
+            var result = stats.TryUpdateAttributes([new Update(EAttribute.Dexterity, 2)]);
+
+            Assert.True(result);
+            Assert.Equal(3, stats.StatPointsUsed);
+            Assert.Equal(2d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.Dexterity).Amount);
+        }
+
+        [Fact]
+        public void TryUpdateAttributes_NegativeUpdateOnAMissingRow_RejectsAsBelowZero()
+        {
+            // A created row starts at zero, so it is subject to the same non-negative rule as a stored one —
+            // creating it must not hand the payload a free unallocation.
+            var stats = DamagedStats(gained: 10, used: 1);
+
+            var result = stats.TryUpdateAttributes([new Update(EAttribute.Dexterity, -1)]);
+
+            Assert.False(result);
+            Assert.Equal(1, stats.StatPointsUsed);
+            Assert.DoesNotContain(stats.StatAllocations, allocation => allocation.Attribute == EAttribute.Dexterity);
+        }
+
+        [Fact]
+        public void TryUpdateAttributes_RejectedSet_LeavesNoRowBehindForItsCoreUpdates()
+        {
+            // All-or-nothing covers the created rows too: a rejected payload must not leave the row its
+            // valid half would have created, which would report an allocation the player never made.
+            var stats = DamagedStats(gained: 10, used: 1);
+
+            var result = stats.TryUpdateAttributes([
+                new Update(EAttribute.Dexterity, 2),
+                new Update(EAttribute.MaxHealth, 1),
+            ]);
+
+            Assert.False(result);
+            Assert.Equal(1, stats.StatPointsUsed);
+            Assert.Equal(EAttribute.Strength, stats.StatAllocations.Single().Attribute);
         }
 
         [Fact]
@@ -245,22 +298,6 @@ namespace Game.Core.Tests.Players
         }
 
         [Fact]
-        public void Rehydrate_RestoredRow_BecomesAllocatableAgain()
-        {
-            // The repair's whole point: the restored row lifts the #488 rejection, so the previously blocked
-            // stat accepts an allocation instead of failing forever.
-            List<StatAllocation> allocations = [new() { Attribute = EAttribute.Strength, Amount = 1d }];
-            var damaged = new PlayerStatPoints { StatAllocations = [.. allocations], StatPointsGained = 10, StatPointsUsed = 1 };
-            Assert.False(damaged.TryUpdateAttributes([new Update(EAttribute.Dexterity, 2)]));
-
-            var stats = PlayerStatPoints.Rehydrate(allocations, statPointsGained: 10, statPointsUsed: 1);
-
-            Assert.True(stats.TryUpdateAttributes([new Update(EAttribute.Dexterity, 2)]));
-            Assert.Equal(3, stats.StatPointsUsed);
-            Assert.Equal(2d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.Dexterity).Amount);
-        }
-
-        [Fact]
         public void Rehydrate_AlreadyCompleteSet_AddsNothingAndKeepsExistingAmounts()
         {
             var allocations = PlayerStatPoints.CreateAllocations();
@@ -282,6 +319,20 @@ namespace Game.Core.Tests.Players
             var stats = PlayerStatPoints.Rehydrate(allocations, statPointsGained: 10, statPointsUsed: 0);
 
             Assert.Equal(5d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.MaxHealth).Amount);
+        }
+
+        /// <summary>
+        /// A player whose stored allocations are missing every core row but Strength — the state a DB reload
+        /// left behind after the pre-fix write-behind handler deleted the zero-amount rows (#2459).
+        /// </summary>
+        private static PlayerStatPoints DamagedStats(int gained, int used)
+        {
+            return new PlayerStatPoints
+            {
+                StatAllocations = [new StatAllocation { Attribute = EAttribute.Strength, Amount = 1d }],
+                StatPointsGained = gained,
+                StatPointsUsed = used,
+            };
         }
 
         private static PlayerStatPoints MakeStats(int gained, int used)

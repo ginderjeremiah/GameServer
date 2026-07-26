@@ -161,10 +161,9 @@ namespace Game.DataAccess.Mapping
                 .Select(ps => skillsById[ps.SkillId])
                 .ToList();
 
-            // Rehydrate re-establishes the seeded allocation row per core attribute. Row presence is what makes
-            // an attribute allocatable, so restoring it on load (rather than only at creation) is what lets a
-            // character whose rows were dropped, or one predating a newly-added core attribute, allocate into
-            // it again. It owns that repair so a load path can't reintroduce #2459 by skipping it.
+            // Rehydrate re-establishes the seeded allocation row per core attribute, so a character whose rows
+            // were dropped, or one predating a newly-added core attribute, still loads with the complete
+            // spread the client renders. It owns that repair so no load path can skip it.
             var statPoints = PlayerStatPoints.Rehydrate(
                 model.StatAllocations,
                 statPointsGained: model.StatPointsGained,

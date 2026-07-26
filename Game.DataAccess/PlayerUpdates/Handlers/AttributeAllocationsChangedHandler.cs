@@ -35,9 +35,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
             var rowsByAttributeId = currentRows.ToFirstByKey(pa => pa.AttributeId);
 
             // Absolute upsert, zeros included: unlike the progress tier's statistics — where row absence is the
-            // "no data yet" state — an allocation row's presence is what makes its attribute allocatable at all
-            // (the #488 anti-cheat in PlayerStatPoints), so a stored 0 is the seeded state, not an empty one.
-            // Deleting it would permanently block the stat once the player falls through to a DB reload (#2459).
+            // "no data yet" state — a zero allocation is a real value the player can reallocate down to, and
+            // the complete spread is what the client renders, so a stored 0 is the seeded state, not an empty
+            // one. Deleting it would silently drop that reallocation until the next rehydration reseed.
             foreach (var alloc in evt.Allocations)
             {
                 var attributeId = (int)alloc.Attribute;
