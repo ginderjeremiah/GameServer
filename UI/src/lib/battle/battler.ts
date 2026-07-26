@@ -1,6 +1,12 @@
 import { Skill } from './skill';
 import { BattleAttributes } from './battle-attributes';
-import { mitigateDamage, resistanceTotal, cooldownMultiplier } from './battle-formulas';
+import {
+	mitigateDamage,
+	resistanceTotal,
+	cooldownMultiplier,
+	// Aliased so the delegation below doesn't read as a recursive call to the member of the same name.
+	effectiveCriticalChance as composeCriticalChance
+} from './battle-formulas';
 import { dotAccumulators } from './damage-types';
 import { isFielded } from './loadout';
 import { IBattlerAttribute, ISkillEffect, EAttribute, EDamageType, EModifierType } from '$lib/api';
@@ -182,9 +188,12 @@ export class Battler {
 	 *  here at consumption so the live draw and the backend combat rating's pricing of the same capability
 	 *  cannot derive it differently (#2439). A skill's `criticalChance` defaults to 0 (an authored-only
 	 *  opt-in), so an un-authored skill never crits regardless of the multiplier. Deliberately UNCLAMPED, for
-	 *  {@link effectiveParryChance}'s reason. Mirrors the backend `Battler.EffectiveCriticalChance`. */
+	 *  {@link effectiveParryChance}'s reason. Delegates to the free `effectiveCriticalChance` in
+	 *  `battle-formulas`, which the display consumers (skill tooltip, skills grid) read directly since they
+	 *  hold only a `BattleAttributes` — the same split as {@link cdMultiplier}. Mirrors the backend
+	 *  `Battler.EffectiveCriticalChance`. */
 	public effectiveCriticalChance(baseCriticalChance: number): number {
-		return baseCriticalChance * this.attributes.getValue(EAttribute.CriticalChanceMultiplier);
+		return composeCriticalChance(baseCriticalChance, this.attributes);
 	}
 
 	/** This battler's Cull execute investment against a target with `missingHpFraction` of its health missing —
@@ -193,7 +202,8 @@ export class Battler {
 	 *  samples the live target once per fire, the rating prices a fixed reference profile), which is why it is
 	 *  the caller's input rather than something read here (#2439). `ExecuteBonus` is an authored-only enabler
 	 *  idling at 0, so an un-enabled build invests exactly 0 and its multiplier is an exact 1.
-	 *  Mirrors the backend `Battler.ExecuteInvestment`. */
+	 *  The CALLER owns clamping `missingHpFraction` to `[0, 1]` — the engine clamps its live sample at the
+	 *  sample site — since a value above 1 would over-invest. Mirrors the backend `Battler.ExecuteInvestment`. */
 	public executeInvestment(missingHpFraction: number): number {
 		return this.attributes.getValue(EAttribute.ExecuteBonus) * missingHpFraction;
 	}

@@ -21,6 +21,7 @@ import {
 	calculateSkillDamage,
 	composePlayerBattleAttributes,
 	cooldownMultiplier,
+	effectiveCriticalChance,
 	expectedCritMultiplier,
 	isSkillDormant,
 	skillContributions,
@@ -237,7 +238,6 @@ export class SkillsView {
 	readonly metricsById = $derived.by(() => {
 		const attrs = this.battleAttributes;
 		const cdMultiplier = cooldownMultiplier(attrs);
-		const critChanceMultiplier = attrs.getValue(EAttribute.CriticalChanceMultiplier);
 		const skills = staticData.skills ?? [];
 		const byId: Record<number, SkillMetrics> = {};
 		for (const id of this.metricsSkillIds) {
@@ -246,8 +246,10 @@ export class SkillsView {
 				continue;
 			}
 			// Each skill's own base CriticalChance (#1453) is the opt-in enabler; the player's
-			// CriticalChanceMultiplier only scales it, so an unauthored skill (0) stays inert.
-			const critChance = skill.criticalChance * critChanceMultiplier;
+			// CriticalChanceMultiplier only scales it, so an unauthored skill (0) stays inert. Composed
+			// through the shared formula the simulation reads, so this grid cannot show a chance the
+			// battle no longer produces (#2439).
+			const critChance = effectiveCriticalChance(skill.criticalChance, attrs);
 			byId[skill.id] = {
 				skill,
 				rawDamage: calculateSkillDamage(skill, attrs),

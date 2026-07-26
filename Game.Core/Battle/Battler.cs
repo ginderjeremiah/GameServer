@@ -126,6 +126,13 @@ namespace Game.Core.Battle
         /// authored-only enabler idling at <c>0</c>, so an un-enabled build invests exactly <c>0</c> and its
         /// multiplier is an exact <c>1.0</c>.
         /// </summary>
+        /// <param name="missingHpFraction">
+        /// The target's missing-health fraction, which the <b>caller owns clamping to <c>[0, 1]</c></b> —
+        /// the engine <see cref="Math.Clamp"/>s its live sample at the sample site, the rating passes a fixed
+        /// reference constant. Not clamped here because the two callers establish it differently and neither
+        /// needs a second clamp; a value above <c>1</c> would over-invest and (since the Cull overlay tally
+        /// books on this) over-credit training.
+        /// </param>
         public double ExecuteInvestment(double missingHpFraction)
         {
             return _attributes[ExecuteBonus] * missingHpFraction;
