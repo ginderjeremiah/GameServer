@@ -249,6 +249,63 @@ namespace Game.Core.Tests.Battle
             Assert.Equal(0.0, battler.ExecuteInvestment(0.0), 10);
         }
 
+        // ── ToughnessMitigationFraction: Toughness / (Toughness + C) (#2450) ──
+        // The dimensionless curve ComputeNetDamage applies and CombatRating.Survivability prices, shared so the
+        // two cannot derive it differently. C = GameConstants.ToughnessMitigationConstant = 200. Mirrors the
+        // frontend battle-formulas.test.ts `toughnessMitigationFraction` cases with the same scenarios/results.
+
+        [Fact]
+        public void ToughnessMitigationFraction_NoToughness_IsZero()
+        {
+            // The reduce-to-nothing identity: Toughness defaults to 0, so the curve removes an exact 0 share.
+            var battler = MakeBattler();
+
+            Assert.Equal(0.0, battler.ToughnessMitigationFraction, 10);
+        }
+
+        [Fact]
+        public void ToughnessMitigationFraction_ToughnessAtTheConstant_IsExactlyHalf()
+        {
+            // The constant is the curve's half-point (#1487): Toughness = C removes 200 / (200 + 200) = 0.5.
+            var battler = MakeBattler((EAttribute.Toughness, 200));
+
+            Assert.Equal(0.5, battler.ToughnessMitigationFraction, 10);
+        }
+
+        [Fact]
+        public void ToughnessMitigationFraction_AsymptotesBelowOne()
+        {
+            // No immunity and no breakpoint: even overwhelming Toughness stays strictly under 1.
+            var battler = MakeBattler((EAttribute.Toughness, 2000));
+
+            Assert.Equal(2000.0 / 2200.0, battler.ToughnessMitigationFraction, 10);
+            Assert.True(battler.ToughnessMitigationFraction < 1.0);
+        }
+
+        [Fact]
+        public void ToughnessMitigationFraction_NegativeToughnessWithinThePole_IsNegative()
+        {
+            // Deliberately unclamped: a debuff-driven negative Toughness inverts the curve rather than
+            // flooring at 0% mitigation (#1483), which is what amplifies the hit in ComputeNetDamage.
+            // -100 / (-100 + 200) = -1.
+            var battler = MakeBattler((EAttribute.Toughness, -100));
+
+            Assert.Equal(-1.0, battler.ToughnessMitigationFraction, 10);
+        }
+
+        [Fact]
+        public void ToughnessMitigationFraction_IsTheCurveComputeNetDamageApplies()
+        {
+            // The anti-drift pin: the shared fraction and the mitigation step must agree exactly, so the
+            // rating's pricing and the engine's live hit can never price different curves (#2450).
+            var battler = MakeBattler((EAttribute.Toughness, 350));
+
+            Assert.Equal(
+                80 * (1 - battler.ToughnessMitigationFraction),
+                battler.ComputeNetDamage(80, EDamageType.Physical),
+                10);
+        }
+
         // ── TakeDamage: Toughness mitigation curve ─────────────────────────────
 
         [Fact]

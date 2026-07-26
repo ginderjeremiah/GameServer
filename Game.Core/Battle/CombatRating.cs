@@ -313,11 +313,11 @@ namespace Game.Core.Battle
 
             var resist = AverageIncomingResistance(effectiveCaster);
 
-            // The Toughness curve, inlined rather than through Battler.ComputeNetDamage: survivability needs
-            // the dimensionless mitigation fraction, not a transformed damage amount, but the tunable knob
-            // (GameConstants.ToughnessMitigationConstant) is still the single shared constant.
-            var toughness = effectiveCaster.GetAttributeValue(Toughness);
-            var toughnessReduction = toughness / (toughness + GameConstants.ToughnessMitigationConstant);
+            // The Toughness curve is read off the battler rather than re-derived here (#2450): the rating wants
+            // the dimensionless fraction and the engine wants the transformed damage amount, so the shared
+            // member is the fraction and Battler.ComputeNetDamage is what applies it to a hit. Uncapped, unlike
+            // avoid/resist below — the curve asymptotes below 1 on its own, so it needs no credit ceiling.
+            var toughnessReduction = effectiveCaster.ToughnessMitigationFraction;
 
             var cappedAvoid = Math.Min(avoid, ServerGameConstants.MaxMitigationCredit);
             var cappedResist = Math.Min(resist, ServerGameConstants.MaxMitigationCredit);

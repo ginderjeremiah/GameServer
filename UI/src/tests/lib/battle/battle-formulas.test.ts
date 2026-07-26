@@ -5,6 +5,7 @@ import { BattleAttributes } from '$lib/battle/battle-attributes';
 import {
 	amplifiedDamage,
 	toughnessMitigatedDamage,
+	toughnessMitigationFraction,
 	calculateSkillDamage,
 	cooldownMultiplier,
 	effectiveCriticalChance,
@@ -137,6 +138,32 @@ describe('battle-formulas', () => {
 
 			const sum = skillContributions(skill, attributes).reduce((total, c) => total + c.value, 0);
 			expect(skill.baseDamage + sum).toBe(calculateSkillDamage(skill, attributes));
+		});
+	});
+
+	// The dimensionless curve shared by the mitigation step and (backend-side) the combat rating (#2450):
+	// mirrors the backend `Battler.ToughnessMitigationFraction` with the same scenarios and results. C = 200.
+	describe('toughnessMitigationFraction', () => {
+		it('is zero at zero Toughness (reduce-to-nothing identity)', () => {
+			expect(toughnessMitigationFraction(0)).toBe(0);
+		});
+
+		it('is exactly half at the constant (the curve half-point, #1487)', () => {
+			expect(toughnessMitigationFraction(200)).toBeCloseTo(0.5, 10);
+		});
+
+		it('asymptotes below 1 — no immunity', () => {
+			expect(toughnessMitigationFraction(2000)).toBeCloseTo(2000 / 2200, 10);
+			expect(toughnessMitigationFraction(2000)).toBeLessThan(1);
+		});
+
+		it('is negative for a negative Toughness within the pole (#1483)', () => {
+			expect(toughnessMitigationFraction(-100)).toBeCloseTo(-1, 10);
+		});
+
+		it('is the curve toughnessMitigatedDamage applies', () => {
+			// The anti-drift pin: the shared fraction and the mitigation step must agree exactly.
+			expect(toughnessMitigatedDamage(80, 350)).toBeCloseTo(80 * (1 - toughnessMitigationFraction(350)), 10);
 		});
 	});
 
