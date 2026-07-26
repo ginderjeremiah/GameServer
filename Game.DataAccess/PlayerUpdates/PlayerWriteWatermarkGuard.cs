@@ -37,7 +37,16 @@ namespace Game.DataAccess.PlayerUpdates
         /// Advances the watermarks this event is allowed to advance and invokes <paramref name="applyAsync"/>
         /// with exactly those target keys, all inside one transaction. A key whose watermark already holds a
         /// <em>higher</em> sequence is rejected: it is not passed to <paramref name="applyAsync"/>, which must
-        /// therefore write only the targets it is handed rather than everything its event carries.
+        /// therefore write only the targets it is handed rather than everything its event carries. When
+        /// <em>every</em> key is rejected the callback is not invoked at all, so a handler must not put
+        /// unconditional work in it.
+        /// <para>
+        /// The callback is handed the <see cref="GameContext"/> it must write through. That is the load-bearing
+        /// invariant of the whole design rather than a convenience: the transaction only covers a write issued
+        /// on this same context, and a handler that resolved its own would write on a different connection,
+        /// outside it — leaving the watermark advanced with no data behind it, so the redelivery is rejected as
+        /// stale and the write is silently lost. Passing it makes that structural instead of a rule to remember.
+        /// </para>
         /// <para>
         /// Rejection is per target, not per event, because a progress event carries only a save's dirty rows —
         /// an all-or-nothing rule would let a newer event covering one statistic discard an older event's
@@ -53,7 +62,7 @@ namespace Game.DataAccess.PlayerUpdates
             int playerId,
             PlayerWriteStream stream,
             IReadOnlyCollection<string> targetKeys,
-            Func<IReadOnlySet<string>, Task> applyAsync)
+            Func<GameContext, IReadOnlySet<string>, Task> applyAsync)
         {
             try
             {
@@ -78,11 +87,11 @@ namespace Game.DataAccess.PlayerUpdates
             int playerId,
             PlayerWriteStream stream,
             IReadOnlyCollection<string> targetKeys,
-            Func<IReadOnlySet<string>, Task> applyAsync)
+            Func<GameContext, IReadOnlySet<string>, Task> applyAsync)
         {
-            // Distinct because ON CONFLICT DO UPDATE cannot affect the same row twice in one statement, and
-            // ordered so two events sharing a pair of targets take their row locks in the same order rather
-            // than deadlocking against each other.
+            // Distinct because ON CONFLICT DO UPDATE cannot affect the same row twice in one statement. The
+            // sort only makes the parameter array deterministic — lock acquisition order is governed by the
+            // statement's own ORDER BY (see AdvanceWatermarksAsync), which is the load-bearing one.
             var keys = targetKeys.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
 
             // Sequence 0 is the "unsequenced" sentinel, not the oldest sequence — it is what an envelope
@@ -94,7 +103,7 @@ namespace Game.DataAccess.PlayerUpdates
             // ordering information. An event with no targets takes the same path: there is nothing to guard.
             if (updateContext.Sequence == DomainEventEnvelope.Unsequenced || keys.Length == 0)
             {
-                await applyAsync(keys.ToHashSet(StringComparer.Ordinal));
+                await applyAsync(context, keys.ToHashSet(StringComparer.Ordinal));
                 return;
             }
 
@@ -103,7 +112,7 @@ namespace Game.DataAccess.PlayerUpdates
             var accepted = await AdvanceWatermarksAsync(playerId, stream, keys, updateContext.Sequence);
             if (accepted.Count > 0)
             {
-                await applyAsync(accepted);
+                await applyAsync(context, accepted);
             }
 
             await transaction.CommitAsync();

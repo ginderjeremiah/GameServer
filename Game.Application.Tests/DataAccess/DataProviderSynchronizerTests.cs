@@ -2196,10 +2196,14 @@ namespace Game.Application.Tests.DataAccess
             return drained;
         }
 
-        // Sequence defaults to the "unsequenced" sentinel, which is what a pre-upgrade instance's envelope
-        // carries and what makes the watermark guard (#2474) stand aside — so the scenarios below that aren't
-        // about ordering exercise the handlers exactly as they behaved before the guard existed.
-        private static string Serialize<T>(T evt, long sequence = DomainEventEnvelope.Unsequenced) where T : IDomainEvent
+        // Sequence defaults to a real one (not the unsequenced sentinel), so every scenario here runs the
+        // guarded path — transaction and watermark upsert included — which is what a production envelope now
+        // takes. It stays a no-op for scenarios that aren't about ordering: the guard accepts equal sequences,
+        // so any number of same-player events stamped 1 all apply. A test about ordering passes its sequences
+        // explicitly, which also reads better at the call site than relying on an omission.
+        private const long DefaultSequence = 1;
+
+        private static string Serialize<T>(T evt, long sequence = DefaultSequence) where T : IDomainEvent
         {
             var envelope = new DomainEventEnvelope
             {
@@ -2213,12 +2217,13 @@ namespace Game.Application.Tests.DataAccess
 
         // ProgressUpdatedEvent is a data-tier persistence payload (not an IDomainEvent), published by the
         // progress repo directly, so it gets its own envelope wrapper rather than the IDomainEvent helper.
-        private static string SerializeProgress(ProgressUpdatedEvent evt)
+        private static string SerializeProgress(ProgressUpdatedEvent evt, long sequence = DefaultSequence)
         {
             var envelope = new DomainEventEnvelope
             {
                 Type = nameof(ProgressUpdatedEvent),
                 Payload = evt.Serialize(),
+                Sequence = sequence,
             };
 
             return envelope.Serialize();

@@ -185,7 +185,6 @@ namespace Game.Application.Tests.DataAccess
             using (var scope = CreateScope())
             {
                 DescribeSequence(scope, 4);
-                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
                 var guard = scope.ServiceProvider.GetRequiredService<PlayerWriteWatermarkGuard>();
 
                 // The watermark advance and the data write share one transaction precisely so this can't
@@ -195,7 +194,7 @@ namespace Game.Application.Tests.DataAccess
                     playerId,
                     PlayerWriteStream.PlayerCore,
                     [PlayerWriteWatermarkGuard.PlayerScopedTarget],
-                    async _ =>
+                    async (context, _) =>
                     {
                         await context.Players.Where(p => p.Id == playerId).ExecuteUpdateAsync(s => s.SetProperty(p => p.Level, 99));
                         throw new InvalidOperationException("simulated failure between the watermark advance and the durable apply");
@@ -209,6 +208,82 @@ namespace Game.Application.Tests.DataAccess
             var rejected = await ApplyAsync(CoreEvent(playerId, level: 4, exp: 40), sequence: 4);
             Assert.Equal(0, rejected);
             await AssertPlayerAsync(playerId, level: 4, exp: 40);
+        }
+
+        [Fact]
+        public async Task GuardedApply_UniqueViolationInsideTheTransaction_RestartsTheWholeAttemptAndLandsTheWrite()
+        {
+            var playerId = await SeedPlayerAsync();
+            var target = $"stat:{(int)EStatisticType.EnemiesKilled}:";
+            var attempts = 0;
+
+            using (var scope = CreateScope())
+            {
+                DescribeSequence(scope, 4);
+                var guard = scope.ServiceProvider.GetRequiredService<PlayerWriteWatermarkGuard>();
+
+                // Mirrors ProgressUpdatedHandler's load-then-upsert shape, with the concurrent insert forced
+                // deterministically rather than raced for. A DbUpdateException aborts the surrounding
+                // transaction, so re-running only the apply would save into a transaction that can no longer
+                // commit — the restart has to unwind and redo the watermark advance too.
+                await guard.ExecuteGuardedAsync(playerId, PlayerWriteStream.Progress, [target], async (context, accepted) =>
+                {
+                    Assert.Contains(target, accepted);
+                    attempts++;
+
+                    var existing = await context.PlayerStatistics
+                        .Where(ps => ps.PlayerId == playerId && ps.StatisticTypeId == (int)EStatisticType.EnemiesKilled && ps.EntityId == null)
+                        .ToListAsync(CancellationToken);
+
+                    if (attempts == 1)
+                    {
+                        // Another instance applying an *unsequenced* envelope bypasses the guard, so it isn't
+                        // serialized by this watermark row and can land between the load and the save — the
+                        // one interleaving that still produces a unique violation now that same-target
+                        // sequenced applies queue behind each other on the watermark.
+                        await InsertGlobalKillsFromAnotherScopeAsync(playerId, value: 7);
+                    }
+
+                    if (existing.Count > 0)
+                    {
+                        existing[0].Value = 50;
+                    }
+                    else
+                    {
+                        context.PlayerStatistics.Add(new PlayerStatistic
+                        {
+                            PlayerId = playerId,
+                            StatisticTypeId = (int)EStatisticType.EnemiesKilled,
+                            EntityId = null,
+                            Value = 50,
+                        });
+                    }
+
+                    await context.SaveChangesAsync(CancellationToken);
+                });
+            }
+
+            // The second attempt loaded the now-existing row as an update and committed, and the watermark
+            // ends at the event's sequence — neither left behind by the rollback nor double-advanced.
+            Assert.Equal(2, attempts);
+            Assert.Equal(50, await ReadStatisticAsync(playerId, EStatisticType.EnemiesKilled, null));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.Progress, target));
+        }
+
+        // A separate scope means a separate GameContext on its own connection, so this commits independently
+        // of the guard's in-flight transaction rather than joining it.
+        private async Task InsertGlobalKillsFromAnotherScopeAsync(int playerId, decimal value)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            context.PlayerStatistics.Add(new PlayerStatistic
+            {
+                PlayerId = playerId,
+                StatisticTypeId = (int)EStatisticType.EnemiesKilled,
+                EntityId = null,
+                Value = value,
+            });
+            await context.SaveChangesAsync(CancellationToken);
         }
 
         private static PlayerCoreUpdatedEvent CoreEvent(int playerId, int level, int exp)

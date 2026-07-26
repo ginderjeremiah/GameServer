@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.PlayerUpdates.Handlers
 {
-    internal sealed class ProgressUpdatedHandler(GameContext context, PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<ProgressUpdatedEvent>
+    internal sealed class ProgressUpdatedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<ProgressUpdatedEvent>
     {
         // Keyed per row rather than per player: a progress event carries only a save's dirty rows, so a
         // per-player watermark would let a newer event covering statistic Y reject an older event carrying an
@@ -23,11 +23,12 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
 
             // The guard owns the transaction and the unique-violation restart the load-then-upsert below needs
             // (a concurrent apply of the same at-least-once event can insert a row between the load and the
-            // save), so this handler only has to write the rows it was handed.
-            return guard.ExecuteGuardedAsync(evt.PlayerId, PlayerWriteStream.Progress, targets, accepted => ApplyAsync(evt, accepted));
+            // save), so this handler only has to write the rows it was handed — through the context the guard
+            // passes it, which is the one its transaction covers.
+            return guard.ExecuteGuardedAsync(evt.PlayerId, PlayerWriteStream.Progress, targets, (context, accepted) => ApplyAsync(context, evt, accepted));
         }
 
-        private async Task ApplyAsync(ProgressUpdatedEvent evt, IReadOnlySet<string> accepted)
+        private static async Task ApplyAsync(GameContext context, ProgressUpdatedEvent evt, IReadOnlySet<string> accepted)
         {
             // Absolute upserts so re-applying the event under the retry policy converges to the same state.
             // Batched like the attribute-allocations handler: load the touched rows, set/insert, save once.
