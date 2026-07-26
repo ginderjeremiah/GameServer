@@ -21,21 +21,21 @@ vi.mock('$stores', () => ({ staticData, playerChallenges }));
 import ChallengeTooltip from '$components/tooltip/ChallengeTooltip.svelte';
 import { makeItem } from '../../fixtures/items';
 import { makeZone } from '../../fixtures/zones';
+import { makeChallenge } from '../../fixtures/challenges';
 
 const zone = (id: number, order: number, name: string, unlockChallengeId?: number): IZone =>
 	makeZone({ id, name, order, unlockChallengeId });
 
 const setup = (over: Partial<IChallenge> = {}) => {
 	staticData.challenges = [];
-	// Deliberately partial: `IChallenge` has no shared fixture yet (#2456); the tooltip reads only these fields.
-	staticData.challenges[5] = {
+	// The type is stated rather than inherited: the suite asserts on its label and accent colour.
+	staticData.challenges[5] = makeChallenge({
 		id: 5,
 		name: 'Cull the Swarm',
 		description: 'Defeat 10 enemies',
 		challengeTypeId: EChallengeType.EnemiesKilled,
-		progressGoal: 10,
 		...over
-	} as IChallenge;
+	});
 	staticData.challengeTypes = [{ id: EChallengeType.EnemiesKilled, name: 'Enemies Killed' }];
 	staticData.zones = [zone(20, 2, 'Beta', 5)];
 };

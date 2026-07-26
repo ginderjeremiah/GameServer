@@ -4,14 +4,12 @@ import { challengeCompletedMessage, resolveUnlockReward, zonesUnlockedBy, type U
 import { makeItem } from '../../fixtures/items';
 import { makeItemMod } from '../../fixtures/item-mods';
 import { makeZone } from '../../fixtures/zones';
+import { makeChallenge } from '../../fixtures/challenges';
 
 const zone = (id: number, order: number, name: string, unlockChallengeId?: number, retiredAt?: string): IZone =>
 	makeZone({ id, name, order, unlockChallengeId, retiredAt });
 
-/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456), and `resolveUnlockReward`
-   reads only the two reward ids. */
-const challenge = (over: Partial<IChallenge> = {}): IChallenge =>
-	({ id: 1, name: 'C', description: '', challengeTypeId: 0, entityType: 0, progressGoal: 10, ...over }) as IChallenge;
+const challenge = (over: Partial<IChallenge> = {}): IChallenge => makeChallenge({ id: 1, name: 'C', ...over });
 
 describe('zonesUnlockedBy', () => {
 	it('returns the zones gated on the challenge, in authored order', () => {

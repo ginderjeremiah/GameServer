@@ -32,6 +32,7 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 import ChallengeRewardSection from '$routes/admin/workbench/components/challenge/ChallengeRewardSection.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeChallenge } from '../../../../fixtures/challenges';
 
 const config = (): EntityConfig<Identified> =>
 	({
@@ -47,18 +48,8 @@ const config = (): EntityConfig<Identified> =>
 		persist: async () => []
 	}) as unknown as EntityConfig<Identified>;
 
-/* Every `as IChallenge` literal in this file is deliberately partial: `IChallenge` has no shared
-   fixture yet (#2456). */
 const setup = (over: Partial<IChallenge> = {}) => {
-	const challenge: IChallenge = {
-		id: 1,
-		name: 'Test',
-		description: '',
-		challengeTypeId: 1,
-		entityType: 0,
-		progressGoal: 10,
-		...over
-	} as IChallenge;
+	const challenge = makeChallenge({ id: 1, name: 'Test', ...over });
 	const store = new EntityStore(config(), [challenge as unknown as Identified]);
 	const record = store.items[0];
 	return { store, record, baseline: store.baselineOf(1) };
@@ -194,8 +185,8 @@ describe('ChallengeRewardSection', () => {
 	it('collapses an open picker when the rendered record switches to a different challenge', async () => {
 		// Two sibling challenges in the same store; the section is reused as the detail
 		// pane switches between them, and its $effect must reset the open picker on switch.
-		const first = { id: 1, name: 'One', challengeTypeId: 1, entityType: 0, progressGoal: 5 } as IChallenge;
-		const second = { id: 2, name: 'Two', challengeTypeId: 1, entityType: 0, progressGoal: 5 } as IChallenge;
+		const first = makeChallenge({ id: 1, name: 'One', progressGoal: 5 });
+		const second = makeChallenge({ id: 2, name: 'Two', progressGoal: 5 });
 		const store = new EntityStore(config(), [first, second] as unknown as Identified[]);
 
 		const { container, rerender } = render(ChallengeRewardSection, {

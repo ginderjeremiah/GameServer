@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
 	EAttribute,
-	EChallengeType,
 	EEntityType,
 	EItemCategory,
 	EItemModType,
@@ -29,21 +28,14 @@ import { makeItem } from '../../../fixtures/items';
 import { makeItemMod } from '../../../fixtures/item-mods';
 import { makeZone } from '../../../fixtures/zones';
 import { makeEnemy } from '../../../fixtures/enemies';
+import { makeChallenge } from '../../../fixtures/challenges';
 
 const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => makeEnemy({ id, name, ...opts });
 
 const zone = (id: number, name: string, opts: Partial<IZone> = {}): IZone => makeZone({ id, name, ...opts });
 
-const challenge = (id: number, name: string, opts: Partial<IChallenge> = {}): IChallenge => ({
-	id,
-	name,
-	description: '',
-	designerNotes: '',
-	challengeTypeId: EChallengeType.EnemiesKilled,
-	entityType: EEntityType.None,
-	progressGoal: 10,
-	...opts
-});
+const challenge = (id: number, name: string, opts: Partial<IChallenge> = {}): IChallenge =>
+	makeChallenge({ id, name, ...opts });
 
 const item = (id: number, name: string, opts: Partial<IItem> = {}): IItem =>
 	makeItem({ id, name, itemCategoryId: EItemCategory.Helm, ...opts });

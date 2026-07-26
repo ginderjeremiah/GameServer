@@ -5,24 +5,20 @@ import { render, fireEvent, cleanup, screen } from '@testing-library/svelte';
 // exercised: with no attribute-tooltip context here, the chips must stay out of the tab order.
 import ClassPicker from '$routes/select/ClassPicker.svelte';
 import { staticData } from '$stores/static-data.svelte';
-import { EEquipmentSlot, EModifierType, type ICreatableClass } from '$lib/api';
+import { EEquipmentSlot, type ICreatableClass } from '$lib/api';
+import { makeCreatableClass } from '../../fixtures/classes';
 
-/* Deliberately partial: `ICreatableClass` has no shared fixture yet (#2456). */
+/* `passiveAmount` diverges from the fixture's inert 0: the picker renders the passive as an attribute
+   chip, so the class needs a real amount for those assertions to read. The attribute itself is the
+   fixture's default (Endurance), which is what the mocked `staticData.attributes` resolves to. */
 const cls = (overrides: Partial<ICreatableClass> = {}): ICreatableClass =>
-	({
+	makeCreatableClass({
 		id: 0,
 		name: 'Warrior',
 		description: 'A frontline fighter.',
-		word: 'kor',
-		passiveAttributeId: 1,
 		passiveAmount: 8,
-		passiveScalingAmount: 0,
-		passiveModifierType: EModifierType.Additive,
-		attributeDistributions: [],
-		starterSkills: [],
-		starterEquipment: [],
 		...overrides
-	}) as ICreatableClass;
+	});
 
 beforeEach(() => {
 	staticData.attributes = [{ id: 1, code: 'END', name: 'Endurance' }] as unknown as NonNullable<
@@ -62,9 +58,6 @@ describe('ClassPicker', () => {
 		const classes = [
 			cls({
 				id: 0,
-				description: 'A frontline fighter.',
-				passiveAttributeId: 1,
-				passiveAmount: 8,
 				starterSkills: [
 					{ id: 1, name: 'Slash' },
 					{ id: 0, name: 'Punch' }

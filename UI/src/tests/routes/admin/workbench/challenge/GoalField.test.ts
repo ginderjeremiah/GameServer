@@ -13,6 +13,7 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 import GoalField from '$routes/admin/workbench/components/challenge/GoalField.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeChallenge } from '../../../../fixtures/challenges';
 
 const config = (): EntityConfig<Identified> =>
 	({
@@ -28,17 +29,15 @@ const config = (): EntityConfig<Identified> =>
 		persist: async () => []
 	}) as unknown as EntityConfig<Identified>;
 
-/* Every `as IChallenge` literal in this file is deliberately partial: `IChallenge` has no shared
-   fixture yet (#2456). */
 const setup = (over: Partial<IChallenge>) => {
-	const challenge: IChallenge = {
+	/* The type is stated rather than inherited: it selects the goal comparison and unit under test. */
+	const challenge = makeChallenge({
 		id: 1,
 		name: 'Test',
-		description: '',
 		challengeTypeId: EChallengeType.EnemiesKilled,
 		progressGoal: 25,
 		...over
-	} as IChallenge;
+	});
 	const store = new EntityStore(config(), [challenge as unknown as Identified]);
 	const record = store.items[0] as unknown as IChallenge;
 	return { store, challenge: record, baseline: store.baselineOf(1) as unknown as IChallenge };
@@ -73,7 +72,7 @@ describe('GoalField', () => {
 
 	it('marks dirty against a differing baseline', () => {
 		const { store, challenge } = setup({ statisticType: EStatisticType.EnemiesKilled });
-		const baseline = { ...challenge, progressGoal: 99 } as IChallenge;
+		const baseline: IChallenge = { ...challenge, progressGoal: 99 };
 		const { container } = render(GoalField, { props: { challenge, baseline, store } });
 		expect(container.querySelector('.dirty-dot')).toBeTruthy();
 	});

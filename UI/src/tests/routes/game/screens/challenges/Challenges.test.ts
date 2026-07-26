@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import {
-	EChallengeGoalComparison,
-	EChallengeType,
-	EEntityType,
-	type IChallenge,
-	type IPlayerChallenge
-} from '$lib/api';
+import { EChallengeGoalComparison, EChallengeType, type IPlayerChallenge } from '$lib/api';
 
 // Challenges fetches the player's progress over the socket (via the playerChallenges store) and
 // resolves the challenge catalogue + reward pools from staticData.
@@ -29,14 +23,7 @@ vi.mock('$stores', async (importOriginal) => {
 });
 
 import Challenges from '$routes/game/screens/challenges/Challenges.svelte';
-
-const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge => ({
-	description: `${over.name} description`,
-	designerNotes: '',
-	entityType: EEntityType.None,
-	progressGoal: 10,
-	...over
-});
+import { makeChallenge } from '../../../../fixtures/challenges';
 
 const PLAYER_CHALLENGES: IPlayerChallenge[] = [{ challengeId: 1, progress: 5, completed: false }];
 
@@ -49,8 +36,16 @@ beforeEach(() => {
 	staticData.challengeTypes = [
 		{ id: EChallengeType.EnemiesKilled, goalComparison: EChallengeGoalComparison.AtLeast, name: 'Enemies Killed' }
 	];
+	/* The type is stated rather than inherited (it drives the card's badge and objective sentence), and the
+	   description is real prose rather than the fixture's empty placeholder so the card renders one. */
 	staticData.challenges = [
-		challenge({ id: 1, name: 'First Blood', challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 })
+		makeChallenge({
+			id: 1,
+			name: 'First Blood',
+			description: 'First Blood description',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			progressGoal: 10
+		})
 	];
 	mockToastError.mockClear();
 	mockFetchSocket.mockClear();
