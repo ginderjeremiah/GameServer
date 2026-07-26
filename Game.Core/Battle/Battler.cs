@@ -189,11 +189,8 @@ namespace Game.Core.Battle
         /// mutating health: percentage resistance first (<c>dealt × (1 − Σ applies(type).Resistance)</c>,
         /// <b>unclamped</b> — a negative total amplifies as vulnerability, a total above <c>1</c> drives the
         /// result negative as absorption), then — only while the post-resistance damage is still positive — the
-        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + C))</c>
-        /// (<c>C</c> = <see cref="GameConstants.ToughnessMitigationConstant"/>). The toughness curve is a
-        /// diminishing-returns percentage: effective HP is linear in Toughness while the reduction asymptotes
-        /// below <c>100%</c> (no immunity), and the constant denominator means an investment retains its
-        /// mitigation % across all of progression (#1487, revising spike #1330's level normalization). The
+        /// <see cref="ToughnessMitigationFraction"/> multiplier <c>(1 − fraction)</c>, which owns the curve's
+        /// shape and rationale so they are stated once. The
         /// resistance sum is folded in the fixed <see cref="DamageTypes.ResistanceAttributes"/> order for parity;
         /// with no resistance and no Toughness the positive branch reduces to <c>dealt</c>. The whole stack is
         /// multiplicative — with Block's flat reduction removed (spike #1330 Area B) there is no flat subtraction
@@ -210,9 +207,7 @@ namespace Game.Core.Battle
                 return mitigated;
             }
 
-            // Toughness mitigation, through the shared fraction so CombatRating cannot price a different curve
-            // (#2450). Applied as a multiplier, so a positive hit can never go negative through it. Both
-            // simulators must compute this expression identically for battle parity.
+            // Both simulators must compute this expression identically for battle parity.
             return mitigated * (1 - ToughnessMitigationFraction);
         }
 

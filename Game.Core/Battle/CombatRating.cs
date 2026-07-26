@@ -315,13 +315,15 @@ namespace Game.Core.Battle
 
             // The Toughness curve is read off the battler rather than re-derived here (#2450): the rating wants
             // the dimensionless fraction and the engine wants the transformed damage amount, so the shared
-            // member is the fraction and Battler.ComputeNetDamage is what applies it to a hit. Uncapped, unlike
-            // avoid/resist below — the curve asymptotes below 1 on its own, so it needs no credit ceiling.
-            var toughnessReduction = effectiveCaster.ToughnessMitigationFraction;
-
+            // member is the fraction and Battler.ComputeNetDamage is what applies it to a hit. Consumed
+            // uncapped, unlike avoid/resist — within the pole the curve asymptotes below 1 on its own, so it
+            // needs no credit ceiling. Past Toughness = −C the fraction exceeds 1 and drives mitigationFraction
+            // negative into the Epsilon floor below; that is #1478's unreachable-by-authored-content case.
             var cappedAvoid = Math.Min(avoid, ServerGameConstants.MaxMitigationCredit);
             var cappedResist = Math.Min(resist, ServerGameConstants.MaxMitigationCredit);
-            var mitigationFraction = (1 - cappedAvoid) * (1 - cappedResist) * (1 - toughnessReduction);
+            var mitigationFraction = (1 - cappedAvoid)
+                * (1 - cappedResist)
+                * (1 - effectiveCaster.ToughnessMitigationFraction);
             return effectiveHealth / Math.Max(mitigationFraction, Epsilon);
         }
 

@@ -10,15 +10,19 @@ namespace Game.Core.Tests.Battle
     /// <summary>
     /// Direct unit tests for the combat arithmetic on <see cref="Battler"/>.
     /// <para>
-    /// These mirror the frontend suite <c>UI/src/tests/lib/battle/battler.test.ts</c>:
-    /// the <see cref="Battler.TakeDamage"/> toughness-curve/death cases, the
-    /// <see cref="Battler.GetCooldownMultiplier"/> formula, and the
+    /// These mirror the frontend suite, against whichever file hosts each member's frontend counterpart —
+    /// <c>UI/src/tests/lib/battle/battler.test.ts</c> for what lives on the frontend <c>Battler</c> (the
+    /// <see cref="Battler.TakeDamage"/> toughness-curve/death cases, the
+    /// <see cref="Battler.GetCooldownMultiplier"/> formula, the
     /// <see cref="Battler.EffectiveParryChance"/>/<see cref="Battler.EffectiveDodgeChance"/>
     /// avoidance products, and the <see cref="Battler.EffectiveCriticalChance"/>/
-    /// <see cref="Battler.ExecuteInvestment"/> offense compositions are asserted here with the
-    /// <b>same scenarios and the same expected results</b> as the frontend, so a future
+    /// <see cref="Battler.ExecuteInvestment"/> offense compositions), and
+    /// <c>battle-formulas.test.ts</c> for what the frontend keeps as a free function over
+    /// <c>BattleAttributes</c> (<see cref="Battler.ToughnessMitigationFraction"/>). Each is asserted here with
+    /// the <b>same scenarios and the same expected results</b> as the frontend, so a future
     /// divergence in the mitigation/cadence/avoidance/offense math fails on both sides (the same parity
     /// discipline used for <see cref="Mulberry32ParityTests"/> ⇄ <c>mulberry32-parity.test.ts</c>).
+    /// Keep this enumeration exhaustive — it is only useful while it is.
     /// Frontend-only concerns (skill-slot filling, render cooldowns, name/level wiring) are
     /// not part of the backend <see cref="Battler"/> and are intentionally not mirrored.
     /// </para>
