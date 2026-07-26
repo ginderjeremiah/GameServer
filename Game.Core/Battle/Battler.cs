@@ -138,6 +138,27 @@ namespace Game.Core.Battle
             return _attributes[ExecuteBonus] * missingHpFraction;
         }
 
+        /// <summary>
+        /// This battler's dimensionless Toughness mitigation fraction — <c>Toughness / (Toughness + C)</c>
+        /// (<c>C</c> = <see cref="GameConstants.ToughnessMitigationConstant"/>), the share of an incoming hit the
+        /// curve removes. A diminishing-returns percentage: effective HP is linear in Toughness while the
+        /// fraction asymptotes below <c>1</c> (no immunity), and the constant denominator means an investment
+        /// retains its mitigation % across all of progression (#1487, revising spike #1330's level
+        /// normalization). Composed here at consumption so the live curve
+        /// (<see cref="ComputeNetDamage"/>) and <see cref="CombatRating"/>'s pricing of the same mitigation
+        /// cannot derive it differently (#2450, completing the rule #2429/#2439 established for avoidance,
+        /// crit, and execute) — the rating needs this fraction, not a transformed damage amount, which is why
+        /// the shared member is the fraction rather than the mitigation step. Deliberately <b>unclamped</b>: a
+        /// debuff-driven negative Toughness yields a negative fraction and amplifies the hit (#1483), with the
+        /// pole at <c>Toughness = −C</c> left unguarded per #1478 (unreachable by authored content).
+        /// <para>
+        /// This is the curve's value, not a statement of when it applies: <see cref="ComputeNetDamage"/>
+        /// applies it only while the post-resistance damage is still positive, and DoT bypasses it entirely.
+        /// </para>
+        /// </summary>
+        public double ToughnessMitigationFraction =>
+            _attributes[Toughness] / (_attributes[Toughness] + GameConstants.ToughnessMitigationConstant);
+
         public double GetAttributeValue(EAttribute attribute)
         {
             return _attributes[attribute];
@@ -168,11 +189,8 @@ namespace Game.Core.Battle
         /// mutating health: percentage resistance first (<c>dealt × (1 − Σ applies(type).Resistance)</c>,
         /// <b>unclamped</b> — a negative total amplifies as vulnerability, a total above <c>1</c> drives the
         /// result negative as absorption), then — only while the post-resistance damage is still positive — the
-        /// <see cref="EAttribute.Toughness"/> mitigation multiplier <c>(1 − Toughness / (Toughness + C))</c>
-        /// (<c>C</c> = <see cref="GameConstants.ToughnessMitigationConstant"/>). The toughness curve is a
-        /// diminishing-returns percentage: effective HP is linear in Toughness while the reduction asymptotes
-        /// below <c>100%</c> (no immunity), and the constant denominator means an investment retains its
-        /// mitigation % across all of progression (#1487, revising spike #1330's level normalization). The
+        /// <see cref="ToughnessMitigationFraction"/> multiplier <c>(1 − fraction)</c>, which owns the curve's
+        /// shape and rationale so they are stated once. The
         /// resistance sum is folded in the fixed <see cref="DamageTypes.ResistanceAttributes"/> order for parity;
         /// with no resistance and no Toughness the positive branch reduces to <c>dealt</c>. The whole stack is
         /// multiplicative — with Block's flat reduction removed (spike #1330 Area B) there is no flat subtraction
@@ -189,15 +207,8 @@ namespace Game.Core.Battle
                 return mitigated;
             }
 
-            // Toughness mitigation: Toughness / (Toughness + C) as a multiplier, so EHP is linear in Toughness
-            // and the reduction asymptotes below 100% (a positive hit can never go negative through it). The
-            // curve is unclamped below 0 — a debuff-driven negative Toughness amplifies the hit (#1483), with
-            // the pole at Toughness = −C left unguarded per #1478 (unreachable by authored content). Both
-            // simulators must compute this expression identically for battle parity.
-            var toughness = _attributes[Toughness];
-            var toughnessReduction = toughness / (toughness + GameConstants.ToughnessMitigationConstant);
-
-            return mitigated * (1 - toughnessReduction);
+            // Both simulators must compute this expression identically for battle parity.
+            return mitigated * (1 - ToughnessMitigationFraction);
         }
 
         // The raw (unclamped, signed) resistance sum for a type — shared by ComputeNetDamage and

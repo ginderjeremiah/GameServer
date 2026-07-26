@@ -44,19 +44,28 @@ export function skillContributions(skill: ISkill, attributes: BattleAttributes):
 	}));
 }
 
-/** Damage dealt after the defender's {@link EAttribute.Toughness} mitigation curve. The curve reduces a hit by
- *  `Toughness / (Toughness + C)` (C = {@link TOUGHNESS_MITIGATION_CONSTANT}): effective HP is linear in
- *  Toughness while the reduction asymptotes below 100% (no immunity), and the constant denominator means an
- *  investment retains its mitigation % across all of progression (#1487, revising #1330's level normalization).
- *  With no Toughness the factor is an exact 1.0 and the hit is unchanged. Block's flat reduction was removed
- *  (#1330), so the stack is purely multiplicative and never needs a floor — `rawDamage` is already positive here
- *  (the absorption branch in {@link mitigateDamage} handles the non-positive case). The curve is unclamped below
- *  0 — a debuff-driven negative Toughness amplifies the hit (#1483), with the pole at `Toughness = −C` left
- *  unguarded per #1478 (unreachable by authored content). Mirrors the backend `Battler.ComputeNetDamage` — the
- *  expression must match bit-for-bit for battle parity. */
+/** The dimensionless share of an incoming hit the {@link EAttribute.Toughness} mitigation curve removes —
+ *  `Toughness / (Toughness + C)` (C = {@link TOUGHNESS_MITIGATION_CONSTANT}). A diminishing-returns percentage:
+ *  effective HP is linear in Toughness while the fraction asymptotes below 1 (no immunity), and the constant
+ *  denominator means an investment retains its mitigation % across all of progression (#1487, revising #1330's
+ *  level normalization). With no Toughness the fraction is an exact 0. Unclamped below 0 — a debuff-driven
+ *  negative Toughness amplifies the hit (#1483), with the pole at `Toughness = −C` left unguarded per #1478
+ *  (unreachable by authored content). This is the curve's value, not a statement of when it applies:
+ *  {@link mitigateDamage} applies it only while the post-resistance damage is still positive, and DoT bypasses
+ *  it entirely. Mirrors the backend `Battler.ToughnessMitigationFraction` — the expression must match
+ *  bit-for-bit for battle parity. */
+export function toughnessMitigationFraction(toughness: number): number {
+	return toughness / (toughness + TOUGHNESS_MITIGATION_CONSTANT);
+}
+
+/** Damage dealt after the defender's {@link EAttribute.Toughness} mitigation curve — `rawDamage` scaled by
+ *  `1 −` {@link toughnessMitigationFraction}, read through that shared fraction so the curve has one definition
+ *  (#2450). Block's flat reduction was removed (#1330), so the stack is purely multiplicative and never needs a
+ *  floor — `rawDamage` is already positive here (the absorption branch in {@link mitigateDamage} handles the
+ *  non-positive case). Mirrors the backend `Battler.ComputeNetDamage` — the expression must match bit-for-bit
+ *  for battle parity. */
 export function toughnessMitigatedDamage(rawDamage: number, toughness: number): number {
-	const toughnessReduction = toughness / (toughness + TOUGHNESS_MITIGATION_CONSTANT);
-	return rawDamage * (1 - toughnessReduction);
+	return rawDamage * (1 - toughnessMitigationFraction(toughness));
 }
 
 /** Amplifies an outgoing `rawDamage` hit of `damageType` by the ATTACKER's amplification:

@@ -51,7 +51,9 @@ namespace Game.Core
         /// percentage — <c>Toughness / (Toughness + C)</c> — that multiplies incoming direct hits.
         /// Effective HP is linear in this stat (each point is worth a constant % of EHP) while the reduction
         /// itself asymptotes below 100% (no immunity, no breakpoint). The constant denominator C is
-        /// <see cref="GameConstants.ToughnessMitigationConstant"/>; see <see cref="Battle.Battler.ComputeNetDamage"/>.
+        /// <see cref="GameConstants.ToughnessMitigationConstant"/>; the curve is defined by
+        /// <see cref="Battle.Battler.ToughnessMitigationFraction"/> and applied to a hit by
+        /// <see cref="Battle.Battler.ComputeNetDamage"/>.
         /// </summary>
         Toughness = 7,
 
