@@ -51,6 +51,7 @@ vi.mock('$stores', () => ({
 import ZoneNav from '$routes/game/screens/fight/ZoneNav.svelte';
 import { makeZone } from '../../../../fixtures/zones';
 
+/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456). */
 const challenge = (id: number, name: string, description: string): IChallenge =>
 	({ id, name, description, challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 }) as IChallenge;
 

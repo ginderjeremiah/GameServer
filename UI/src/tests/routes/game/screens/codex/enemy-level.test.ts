@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import type { IEnemy, IZone } from '$lib/api';
+import type { IEnemy } from '$lib/api';
 import { levelRange, spawnShare, zoneTotalWeight } from '$routes/game/screens/codex/enemy-level';
+import { makeEnemy } from '../../../../fixtures/enemies';
+import { makeZone } from '../../../../fixtures/zones';
 
 const zones = [
-	{ id: 0, name: 'Emberreach', order: 1, levelMin: 1, levelMax: 10, bossEnemyId: 2, bossLevel: 10 },
-	{ id: 1, name: 'Ashfen Marsh', order: 2, levelMin: 11, levelMax: 22, bossLevel: 22 },
-	{ id: 2, name: 'Sunken Causeway', order: 3, levelMin: 18, levelMax: 28, bossLevel: 28 }
-] as IZone[];
+	makeZone({ id: 0, name: 'Emberreach', order: 1, levelMin: 1, levelMax: 10, bossEnemyId: 2, bossLevel: 10 }),
+	makeZone({ id: 1, name: 'Ashfen Marsh', order: 2, levelMin: 11, levelMax: 22, bossLevel: 22 }),
+	makeZone({ id: 2, name: 'Sunken Causeway', order: 3, levelMin: 18, levelMax: 28, bossLevel: 28 })
+];
 
-const enemy = (over: Partial<IEnemy>): IEnemy =>
-	({ id: 0, name: 'E', isBoss: false, attributeDistribution: [], skillPool: [], spawns: [], ...over }) as IEnemy;
+const enemy = (over: Partial<IEnemy>): IEnemy => makeEnemy({ id: 0, name: 'E', ...over });
 
 describe('levelRange', () => {
 	it('fixes a boss at its zone’s bossLevel (min === max)', () => {

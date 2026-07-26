@@ -10,8 +10,12 @@ const summary = (id: number, name = `Hero${id}`): IPlayerSummary => ({
 	lastActivity: '2026-06-20T00:00:00Z'
 });
 
+/* Deliberately partial: `IPlayerData` is a 15-field aggregate (attributes, inventory, lessons,
+   signature passive) and this is its only test builder — the view under test reads id/name — so a
+   shared fixture would be ceremony for one consumer. */
 const player = (id: number): IPlayerData => ({ id, name: `Hero${id}` }) as IPlayerData;
 
+/* Deliberately partial: `ICreatableClass` has no shared fixture yet (#2456). */
 const creatable = (id: number): ICreatableClass =>
 	({
 		id,

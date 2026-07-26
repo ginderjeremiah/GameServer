@@ -26,7 +26,7 @@ const mockUsage = (items: UsageRecord[], mods: UsageRecord[]) => ({
 	modList: mods
 });
 
-const tag: ITag = { id: 5, name: 'Fire', tagCategoryId: 10 } as ITag;
+const tag: ITag = { id: 5, name: 'Fire', tagCategoryId: 10 };
 
 beforeEach(() => {
 	mockReference.tagColor.mockClear();

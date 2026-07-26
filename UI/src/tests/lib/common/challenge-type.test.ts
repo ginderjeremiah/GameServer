@@ -17,7 +17,9 @@ describe('challengeTypeColor', () => {
 });
 
 describe('challengeTypeName', () => {
-	const types = [{ id: EChallengeType.EnemiesKilled, name: 'Slayer' }] as IChallengeType[];
+	const types: IChallengeType[] = [
+		{ id: EChallengeType.EnemiesKilled, name: 'Slayer', goalComparison: EChallengeGoalComparison.AtLeast }
+	];
 
 	it('prefers the authored name from the reference set', () => {
 		expect(challengeTypeName(EChallengeType.EnemiesKilled, types)).toBe('Slayer');

@@ -7,6 +7,7 @@ import {
 	EAttributeModifierSource,
 	type AttributeModifier
 } from '$lib/battle/attribute-modifier';
+import { makeAttribute } from '../../fixtures/attributes';
 
 // The projection resolves names through `attributeName(id, staticData.attributes)`, so mock the
 // store to drive that reference set. Empty by default → names fall back to the normalised enum.
@@ -298,7 +299,7 @@ describe('BattleAttributes', () => {
 		});
 
 		it('resolves names from the Attributes reference set when available', () => {
-			mockAttributes[EAttribute.Strength] = { id: EAttribute.Strength, name: 'Physical Power' } as IAttribute;
+			mockAttributes[EAttribute.Strength] = makeAttribute(EAttribute.Strength, 'Physical Power');
 			const ba = new BattleAttributes(makeAttrs([EAttribute.Strength, 10]), false);
 
 			expect(ba.getAttributeMap()).toEqual([{ name: 'Physical Power', value: 10 }]);

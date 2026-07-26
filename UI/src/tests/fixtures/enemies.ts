@@ -3,14 +3,12 @@ import type { IEnemy } from '$lib/api';
 /* Shared `IEnemy` contract builder (#2446), following the `fixtures/items.ts` / `fixtures/zones.ts`
    convention.
 
-   The target set comes from the throwaway-required-field probe, not a `grep` — a
-   `grep "IEnemy => ({"` finds three of the eight suites. Excluded on purpose:
+   The target set came from the throwaway-required-field probe, not a `grep`. That probe is blind to
+   one class by construction: a builder that asserts a partial literal `as IEnemy` keeps compiling
+   when the contract gains a required field, so it never showed up. #2447 folded those in —
    `lib/common/enemy-attributes.test.ts` (two builders) and
-   `routes/game/screens/codex/enemy-level.test.ts` (one), which assert a partial literal `as IEnemy`.
-   The cast opts them out of drift detection, so the probe never sees them and converting them is
-   #2447's call, not this one's — note that issue's table lists `enemy-level.test.ts` only under
-   `IZone`, so its `IEnemy` builder needs picking up there too. A `grep` still finding enemy literals
-   under `src/tests/` is expected, not a gap. */
+   `routes/game/screens/codex/enemy-level.test.ts` (one) — so every typed `IEnemy` under `src/tests/`
+   now builds through here. Reintroducing an `as IEnemy` cast re-opens that hole; state why if you do. */
 
 /**
  * Builds an {@link IEnemy} reference-data entry for tests. Everything but the id is a neutral

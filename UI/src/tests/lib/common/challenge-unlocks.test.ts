@@ -1,20 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { EItemCategory, EItemModType, ERarity, type IChallenge, type IItem, type IItemMod, type IZone } from '$lib/api';
 import { challengeCompletedMessage, resolveUnlockReward, zonesUnlockedBy, type UnlockReward } from '$lib/common';
+import { makeItem } from '../../fixtures/items';
+import { makeItemMod } from '../../fixtures/item-mods';
+import { makeZone } from '../../fixtures/zones';
 
 const zone = (id: number, order: number, name: string, unlockChallengeId?: number, retiredAt?: string): IZone =>
-	({
-		id,
-		name,
-		description: '',
-		order,
-		levelMin: 1,
-		levelMax: 10,
-		bossLevel: 1,
-		unlockChallengeId,
-		retiredAt
-	}) as IZone;
+	makeZone({ id, name, order, unlockChallengeId, retiredAt });
 
+/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456), and `resolveUnlockReward`
+   reads only the two reward ids. */
 const challenge = (over: Partial<IChallenge> = {}): IChallenge =>
 	({ id: 1, name: 'C', description: '', challengeTypeId: 0, entityType: 0, progressGoal: 10, ...over }) as IChallenge;
 
@@ -43,9 +38,9 @@ describe('zonesUnlockedBy', () => {
 
 describe('resolveUnlockReward', () => {
 	const items: (IItem | undefined)[] = [];
-	items[3] = { id: 3, name: 'Iron Helm', itemCategoryId: EItemCategory.Helm, rarityId: ERarity.Rare } as IItem;
+	items[3] = makeItem({ id: 3, name: 'Iron Helm', itemCategoryId: EItemCategory.Helm, rarityId: ERarity.Rare });
 	const itemMods: (IItemMod | undefined)[] = [];
-	itemMods[4] = { id: 4, name: 'of Fury', itemModTypeId: EItemModType.Suffix, rarityId: ERarity.Epic } as IItemMod;
+	itemMods[4] = makeItemMod({ id: 4, name: 'of Fury', itemModTypeId: EItemModType.Suffix, rarityId: ERarity.Epic });
 	const refs = { items, itemMods };
 
 	it('resolves an item reward with rarity tier/accent, "rarity · category" sub-label and the source record', () => {

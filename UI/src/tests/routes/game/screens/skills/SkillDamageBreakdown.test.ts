@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { EAttribute, type IAttribute, type ISkill } from '$lib/api';
+import { EAttribute, type ISkill } from '$lib/api';
+import { makeAttribute } from '../../../../fixtures/attributes';
 import { makeSkill } from '../../../../fixtures/skills';
 
 // The breakdown resolves the crit-chance label and attribute names through the reference-data store,
@@ -16,8 +17,8 @@ import type { SkillMetrics, SkillsView } from '$routes/game/screens/skills/skill
 // CriticalChanceMultiplier is flagged `isPercentage`, reused for the per-skill crit chance's display
 // formatting, so the chance renders as e.g. `50%`.
 staticData.attributes = [
-	{ id: EAttribute.CriticalChanceMultiplier, name: 'Critical Chance', code: 'CRIT', isPercentage: true, decimals: 0 }
-] as unknown as IAttribute[];
+	makeAttribute(EAttribute.CriticalChanceMultiplier, 'Critical Chance', { code: 'CRIT', isPercentage: true })
+];
 
 const stubSkill = (over: Partial<ISkill> = {}): ISkill => makeSkill({ id: 0, name: 'Cleave', baseDamage: 50, ...over });
 

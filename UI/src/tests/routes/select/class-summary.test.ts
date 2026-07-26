@@ -1,20 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import {
+	EAttribute,
 	EEquipmentSlot,
 	EModifierType,
-	type IAttribute,
 	type ICreatableClass,
 	type ICreatableClassEquipment
 } from '$lib/api';
 import { passiveSummary, weaponFirst } from '$routes/select/class-summary';
+import { makeAttribute } from '../../fixtures/attributes';
 
+/* Deliberately partial: `ICreatableClass` has no shared fixture yet (#2456). */
 const cls = (overrides: Partial<ICreatableClass> = {}): ICreatableClass =>
 	({
 		id: 0,
 		name: 'Warrior',
 		description: '',
 		word: 'kor',
-		passiveAttributeId: 1,
+		passiveAttributeId: EAttribute.Endurance,
 		passiveAmount: 8,
 		passiveScalingAmount: 0,
 		passiveModifierType: EModifierType.Additive,
@@ -25,9 +27,9 @@ const cls = (overrides: Partial<ICreatableClass> = {}): ICreatableClass =>
 	}) as ICreatableClass;
 
 const attributes = [
-	{ id: 1, code: 'END' },
-	{ id: 2, code: 'INT' }
-] as unknown as IAttribute[];
+	makeAttribute(EAttribute.Endurance, 'Endurance', { code: 'END' }),
+	makeAttribute(EAttribute.Intellect, 'Intellect', { code: 'INT' })
+];
 
 describe('weaponFirst', () => {
 	it('orders the weapon ahead of other equipment', () => {
@@ -64,12 +66,18 @@ describe('passiveSummary', () => {
 	});
 
 	it('appends the scaling clause for an attribute-scaled passive', () => {
-		const summary = passiveSummary(cls({ passiveScalingAttributeId: 2, passiveScalingAmount: 0.5 }), attributes);
+		const summary = passiveSummary(
+			cls({ passiveScalingAttributeId: EAttribute.Intellect, passiveScalingAmount: 0.5 }),
+			attributes
+		);
 		expect(summary).toBe('+8 END (+0.5 per INT)');
 	});
 
 	it('omits the scaling clause when the scaling amount is zero', () => {
-		const summary = passiveSummary(cls({ passiveScalingAttributeId: 2, passiveScalingAmount: 0 }), attributes);
+		const summary = passiveSummary(
+			cls({ passiveScalingAttributeId: EAttribute.Intellect, passiveScalingAmount: 0 }),
+			attributes
+		);
 		expect(summary).toBe('+8 END');
 	});
 
