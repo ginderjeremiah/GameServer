@@ -1,9 +1,7 @@
-using Game.Abstractions.DataAccess;
 using Game.Api.Services;
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Application;
-using Game.Core.Players;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -31,7 +29,7 @@ namespace Game.Api.Tests.Unit
         {
             // WebSocket.SendAsync forbids overlapping sends, and the read loop, the pub/sub processor, and
             // the ping/close paths can all reach SendData, so it must serialize them itself.
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             var socket = new FakeWebSocket();
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, NullLogger<SocketContext>.Instance);
 
@@ -56,10 +54,10 @@ namespace Game.Api.Tests.Unit
             // A minimal in-memory provider: the executed GetStatisticTypes command needs no dependency, but
             // SocketHandler.RunCommand commits an IUnitOfWork from each work scope.
             await using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .BuildServiceProvider();
 
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             var commandFactory = new SocketCommandFactory();
             var countingScopeFactory = new CountingServiceScopeFactory(
                 provider.GetRequiredService<IServiceScopeFactory>());
@@ -84,19 +82,6 @@ namespace Game.Api.Tests.Unit
 
             Assert.Equal(2, countingScopeFactory.ScopesCreated);
             Assert.Equal(1, socket.MaxConcurrentSends);
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int playerId) { }
-            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
-        }
-
-        private sealed class NoOpUnitOfWork : IUnitOfWork
-        {
-            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }

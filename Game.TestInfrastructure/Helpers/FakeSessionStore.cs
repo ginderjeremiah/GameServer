@@ -4,9 +4,10 @@ using Game.Core.Players;
 namespace Game.TestInfrastructure.Helpers
 {
     /// <summary>
-    /// An in-memory <see cref="ISessionStore"/> that serves a single optional cached session and records
-    /// reads and writes, so the cache-hit/miss, rehydration, and forced-reload paths can be exercised
-    /// without Redis.
+    /// The canonical <see cref="ISessionStore"/> test double: an in-memory store that serves a single
+    /// optional cached session and records reads and writes, so the cache-hit/miss, rehydration, and
+    /// forced-reload paths can be exercised without Redis. With no <see cref="Session"/> assigned it is
+    /// an inert no-op store, which is all most callers need — use it rather than adding another double.
     /// </summary>
     public sealed class FakeSessionStore : ISessionStore
     {

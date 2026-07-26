@@ -1,9 +1,7 @@
-using Game.Abstractions.DataAccess;
 using Game.Api.Services;
 using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Application;
-using Game.Core.Players;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -31,7 +29,7 @@ namespace Game.Api.Tests.Unit
         public SocketReadLoopTests()
         {
             _provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .BuildServiceProvider();
             _scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
             _loggerFactory = LoggerFactory.Create(b => b.AddProvider(_logs).SetMinimumLevel(LogLevel.Trace));
@@ -169,7 +167,7 @@ namespace Game.Api.Tests.Unit
 
         private (SocketContext Context, SocketHandler Handler) CreateHandler(WebSocket socket, Action? onActivity = null)
         {
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(), _scopeFactory,
@@ -273,19 +271,6 @@ namespace Game.Api.Tests.Unit
         {
             public override AbstractSocketCommand CreateCommand(SocketCommandInfo commandInfo, IServiceScope scope)
                 => throw new NotSupportedException("These tests script receives only; no command is executed.");
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int playerId) { }
-            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
-        }
-
-        private sealed class NoOpUnitOfWork : IUnitOfWork
-        {
-            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }

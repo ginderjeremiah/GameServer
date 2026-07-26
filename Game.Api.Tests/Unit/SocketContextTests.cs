@@ -1,8 +1,7 @@
-using Game.Abstractions.DataAccess;
 using Game.Api;
 using Game.Api.Services;
 using Game.Api.Sockets;
-using Game.Core.Players;
+using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net.WebSockets;
 using System.Text;
@@ -310,7 +309,7 @@ namespace Game.Api.Tests.Unit
 
         private static SocketContext CreateContext(WebSocket socket, bool isAdmin = false, TimeSpan? closeAbortTimeout = null, TimeSpan? sendAbortTimeout = null)
         {
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             return new SocketContext(socket, playerId: 1, session, isAdmin, NullLogger<SocketContext>.Instance, closeAbortTimeout, sendAbortTimeout);
         }
 
@@ -488,14 +487,6 @@ namespace Game.Api.Tests.Unit
                 => new TaskCompletionSource<WebSocketReceiveResult>().Task;
             public override Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken) => Task.CompletedTask;
             public override void Dispose() { }
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int playerId) { }
-            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
         }
     }
 }

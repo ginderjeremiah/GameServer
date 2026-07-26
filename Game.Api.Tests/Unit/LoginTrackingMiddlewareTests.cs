@@ -3,6 +3,7 @@ using Game.Api.Http;
 using Game.Api.Middleware;
 using Game.Api.Services;
 using Game.Application.Services;
+using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,7 +33,7 @@ namespace Game.Api.Tests.Unit
         public async Task Unauthenticated_SkipsTrackingAndCallsNext()
         {
             var (middleware, userLogins, nextCalled) = CreateMiddleware();
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             var context = CreateContext(Ip, Fingerprint, UserAgent);
 
             await middleware.InvokeAsync(context, session, ScopeFactory(userLogins), new MemoryCache(new MemoryCacheOptions()));
@@ -186,7 +187,7 @@ namespace Game.Api.Tests.Unit
 
         private static SessionService AuthenticatedSession(int userId)
         {
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             session.SetAuthenticatedUser(userId);
             return session;
         }
@@ -254,18 +255,6 @@ namespace Game.Api.Tests.Unit
             {
                 throw new NotSupportedException();
             }
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<Game.Core.Players.PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) =>
-                Task.FromResult<Game.Core.Players.PlayerState?>(null);
-
-            public void Update(Game.Core.Players.PlayerState sessionData, int userId) { }
-
-            public Task UpdateAsync(Game.Core.Players.PlayerState sessionData, int userId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-            public void Clear(int userId) { }
         }
     }
 }

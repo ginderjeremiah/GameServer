@@ -34,7 +34,7 @@ namespace Game.Api.Tests.Unit
         public SocketCommandExecutionTests()
         {
             _provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .BuildServiceProvider();
             _scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
             _loggerFactory = LoggerFactory.Create(b => b.AddProvider(_logs).SetMinimumLevel(LogLevel.Trace));
@@ -189,7 +189,7 @@ namespace Game.Api.Tests.Unit
             // itself falls back to Abort() — otherwise the command lock, the handler, and the in-memory Player
             // stay pinned until process shutdown (#1760).
             var socket = new FakeWebSocket(new TaskCompletionSource().Task);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>(),
                 sendAbortTimeout: TimeSpan.FromMilliseconds(50));
@@ -269,12 +269,12 @@ namespace Game.Api.Tests.Unit
             var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
             var playerRepo = new FakePlayerRepository(reloadedPlayer);
             using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .AddScoped<IPlayerRepository>(_ => playerRepo)
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(
@@ -304,12 +304,12 @@ namespace Game.Api.Tests.Unit
             var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
             var playerRepo = new FakePlayerRepository(reloadedPlayer);
             using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .AddScoped<IPlayerRepository>(_ => playerRepo)
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var release = new TaskCompletionSource();
@@ -347,12 +347,12 @@ namespace Game.Api.Tests.Unit
             var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
             var playerRepo = new FakePlayerRepository(null, reloadedPlayer);
             using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .AddScoped<IPlayerRepository>(_ => playerRepo)
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             session.SetPlayer(originalPlayer);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
@@ -385,13 +385,13 @@ namespace Game.Api.Tests.Unit
             // #2174: the unit-of-work commit must observe the same per-command budget as ExecuteAsync — a
             // flush that itself wedges past the timeout must be cancellable rather than riding out Npgsql's
             // own command timeout, mirroring CommitFilter's HTTP-side behavior (which passes RequestAborted).
-            var unitOfWork = new CapturingUnitOfWork();
+            var unitOfWork = new FakeUnitOfWork();
             using var provider = new ServiceCollection()
                 .AddScoped<IUnitOfWork>(_ => unitOfWork)
                 .BuildServiceProvider();
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 1);
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(_ => null), provider.GetRequiredService<IServiceScopeFactory>(),
@@ -401,14 +401,14 @@ namespace Game.Api.Tests.Unit
 
             // A token backed by a real CancellationTokenSource reports CanBeCanceled; the prior default-token
             // call (CancellationToken.None) would not, so this fails without the fix.
-            Assert.NotNull(unitOfWork.ReceivedToken);
-            Assert.True(unitOfWork.ReceivedToken!.Value.CanBeCanceled);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.True(unitOfWork.LastToken.CanBeCanceled);
         }
 
         private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
         {
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             var context = new SocketContext(socket, playerId: 1, session, isAdmin: false, _loggerFactory.CreateLogger<SocketContext>());
             var handler = new SocketHandler(context, new StubCommandFactory(throwOn, throwOnCreate, selfDelivering), _scopeFactory,
@@ -501,30 +501,6 @@ namespace Game.Api.Tests.Unit
                 await context.SendData(Success());
                 await context.Close(ESocketCloseReason.SocketReplaced);
                 return Success();
-            }
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int playerId) { }
-            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
-        }
-
-        private sealed class NoOpUnitOfWork : IUnitOfWork
-        {
-            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        }
-
-        private sealed class CapturingUnitOfWork : IUnitOfWork
-        {
-            public CancellationToken? ReceivedToken { get; private set; }
-
-            public Task CommitAsync(CancellationToken cancellationToken = default)
-            {
-                ReceivedToken = cancellationToken;
-                return Task.CompletedTask;
             }
         }
 
