@@ -303,11 +303,15 @@ if it ever proves real.
 
 ## Implementation issues
 
-| Issue | Scope |
-|---|---|
-| [#2473](https://github.com/ginderjeremiah/GameServer/issues/2473) | Carry a per-player write sequence on the envelope and the producing aggregates |
-| [#2474](https://github.com/ginderjeremiah/GameServer/issues/2474) | Add `PlayerWriteWatermark` and guard the absolute-value handlers against stale writes |
-| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes` once the sequence guard makes the deferral redundant |
+| Issue | Scope | Status |
+|---|---|---|
+| [#2473](https://github.com/ginderjeremiah/GameServer/issues/2473) | Carry a per-player write sequence on the envelope and the producing aggregates | **Shipped** (#2492) |
+| [#2474](https://github.com/ginderjeremiah/GameServer/issues/2474) | Add `PlayerWriteWatermark` and guard the absolute-value handlers against stale writes | Open |
+| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes` once the sequence guard makes the deferral redundant | Open, blocked on #2474 |
+
+The producer half is live: `DomainEventEnvelope.Sequence` carries the stamp with `Unsequenced = 0` as an
+explicit sentinel constant, and `Player.AdvanceWriteSequence()` pre-increments so a cold-loaded aggregate's
+first stamp is 1. Nothing reads the stamp until #2474, so the hazard is still open.
 
 ## Aside: where the original assumption eroded
 

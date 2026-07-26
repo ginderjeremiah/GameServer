@@ -61,6 +61,36 @@ namespace Game.Core.Players
         /// </summary>
         public required uint? LastCreditedBattleSeed { get; set; }
 
+        private long _writeSequence;
+
+        /// <summary>
+        /// Monotonic per-player counter stamped onto every write-behind envelope this aggregate's saves enqueue,
+        /// so the consume side can tell a newer write from an older one and reject the stale one (#2467). It lives
+        /// on the domain object rather than the data tier because there is no connection-scoped home for it there
+        /// — the same reason <see cref="Progress.PlayerProgress"/> already carries its dirty-row tracking here.
+        /// <para>
+        /// <b>0 means "unsequenced", not "oldest".</b> It is the value an envelope from a pre-upgrade instance
+        /// deserializes to, and the consuming guard bypasses it entirely rather than comparing it — so a real
+        /// counter must never stamp it. <see cref="AdvanceWriteSequence"/> increments before returning, making the
+        /// first stamp of a cold-loaded aggregate 1. Settable only on construction (the cached blob carries it
+        /// forward across reconnects); the save path advances it through <see cref="AdvanceWriteSequence"/>.
+        /// <c>required</c> so a new hydration path cannot silently omit the seed and restart the counter at 0,
+        /// re-stamping values the player's earlier saves already used.
+        /// </para>
+        /// </summary>
+        public required long WriteSequence
+        {
+            get => _writeSequence;
+            init => _writeSequence = value;
+        }
+
+        /// <summary>
+        /// Advances the counter and returns the value this save's envelopes are stamped with. Called once per
+        /// save, not once per event: every event of one save shares a sequence, since they are raised from one
+        /// consistent aggregate state and so impose no ordering among themselves.
+        /// </summary>
+        public long AdvanceWriteSequence() => ++_writeSequence;
+
         public void ChangeZone(int zoneId)
         {
             CurrentZoneId = zoneId;

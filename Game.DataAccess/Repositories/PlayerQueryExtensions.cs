@@ -14,6 +14,12 @@ namespace Game.DataAccess.Repositories
     /// cannot silently omit one (a compile error), so completeness is structural rather than a convention. The
     /// flat, relational shape keeps the projection a trivial column copy with no correlated sub-queries.
     /// <para>
+    /// <see cref="PlayerCacheModel.WriteSequence"/> is the deliberate exception — not <c>required</c> and not
+    /// projected, because no column backs it yet: a cold database load seeds the counter from 0 and the next
+    /// save stamps 1 (#2473). Seeding it from the player's highest persisted watermark arrives with the table
+    /// that holds them (#2474).
+    /// </para>
+    /// <para>
     /// It is split into one query per collection (<see cref="RelationalQueryableExtensions.AsSplitQuery{TEntity}"/>):
     /// the unbounded collections (unlocked items, applied mods, skills) would otherwise be JOINed into a single
     /// result set, multiplying into a cartesian product that grows as the player progresses.

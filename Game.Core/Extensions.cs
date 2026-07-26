@@ -88,12 +88,15 @@ namespace Game.Core
 
         /// <summary>
         /// Returns a copy of this string, but the first letter is uppercase. An empty string is returned unchanged.
+        /// The casing is invariant because callers derive display names that are persisted (the EF seed data in
+        /// <c>GameContext</c>) as well as sent on the wire, so a host locale must not change the stored value
+        /// (a tr-TR machine would otherwise turn a leading "i" into the dotted "İ").
         /// </summary>
         /// <param name="str"></param>
         /// <returns>A string with the first letter uppercase.</returns>
         public static string Capitalize(this string str)
         {
-            return str.Length == 0 ? str : string.Concat(str[0].ToString().ToUpper(), str.AsSpan(1));
+            return str.Length == 0 ? str : string.Concat(char.ToUpperInvariant(str[0]).ToString(), str.AsSpan(1));
         }
 
         /// <summary>

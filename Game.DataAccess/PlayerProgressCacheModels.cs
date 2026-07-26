@@ -12,6 +12,14 @@ namespace Game.DataAccess
         public List<CachedPlayerStatistic> Statistics { get; set; } = [];
         public List<CachedPlayerChallenge> Challenges { get; set; } = [];
         public List<CachedPlayerProficiency> Proficiencies { get; set; } = [];
+
+        /// <summary>
+        /// The progress aggregate's write-behind sequence (#2473), persisted as its own reserved hash field so
+        /// it survives a reconnect the same way <see cref="Mapping.PlayerCacheModel.WriteSequence"/> does for
+        /// the player. Unlike the three lists this is aggregate-level state rather than a row, so it rides
+        /// alongside a save's dirty rows instead of being one of them.
+        /// </summary>
+        public long WriteSequence { get; set; } = DomainEventEnvelope.Unsequenced;
     }
 
     internal sealed class CachedPlayerStatistic

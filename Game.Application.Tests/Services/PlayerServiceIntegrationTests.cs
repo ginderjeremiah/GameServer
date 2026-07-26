@@ -141,12 +141,12 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task TryUpdateAttributes_ThenDrainedAndReloadedFromDb_KeepsEveryCoreAttributeAllocatable()
+        public async Task TryUpdateAttributes_ThenDrainedAndReloadedFromDb_KeepsEveryCoreAttributeRow()
         {
             // The full loop #2459 broke: allocate → write-behind drain → Redis key lapses → DB fall-through
             // reload. The event carries the player's whole allocation list, zeros included, so a handler that
-            // dropped the zero rows left the DB holding only the allocated stat — and every other core
-            // attribute permanently unallocatable behind the #488 row-presence anti-cheat.
+            // dropped the zero rows left the DB holding only the allocated stat. Allocatability no longer
+            // hangs off row presence, but the persisted spread is still the shape the client reconciles onto.
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
 

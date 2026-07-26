@@ -1,6 +1,6 @@
 using Game.Api.CodeGen;
 using Game.Api.CodeGen.Writers;
-using Game.TestInfrastructure.Helpers;
+using Game.Core.TestInfrastructure.Helpers;
 using System.Reflection;
 using Xunit;
 

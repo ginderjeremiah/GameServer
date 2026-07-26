@@ -19,6 +19,7 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 import ChallengeConditionSection from '$routes/admin/workbench/components/challenge/ChallengeConditionSection.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeChallenge } from '../../../../fixtures/challenges';
 
 const CHALLENGE_TYPES = [
 	{
@@ -45,18 +46,17 @@ const config = (): EntityConfig<Identified> =>
 	}) as unknown as EntityConfig<Identified>;
 
 const setup = (over: Partial<IChallenge> = {}) => {
-	/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456). */
-	const challenge: IChallenge = {
+	/* The condition dimension is stated in full rather than inherited: the suite asserts these four fields
+	   are re-derived (and the target cleared) when the objective type changes. */
+	const challenge = makeChallenge({
 		id: 1,
 		name: 'Test',
-		description: '',
 		challengeTypeId: EChallengeType.EnemiesKilled,
 		statisticType: EStatisticType.EnemiesKilled,
 		entityType: EEntityType.Enemy,
 		targetEntityId: 0,
-		progressGoal: 10,
 		...over
-	} as IChallenge;
+	});
 	const store = new EntityStore(config(), [challenge as unknown as Identified]);
 	const record = store.items[0];
 	return { store, record, baseline: store.baselineOf(1) };

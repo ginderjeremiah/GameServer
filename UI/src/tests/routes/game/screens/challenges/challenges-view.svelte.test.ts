@@ -56,6 +56,7 @@ import {
 } from '$routes/game/screens/challenges/challenges-view.svelte';
 import { makeItem } from '../../../../fixtures/items';
 import { makeItemMod } from '../../../../fixtures/item-mods';
+import { makeChallenge } from '../../../../fixtures/challenges';
 
 /** Carries attributes and a mod slot by default — the reward tooltip renders both. */
 const item = (id: number, name: string, rarity: ERarity, cat: EItemCategory, extra: Partial<IItem> = {}): IItem =>
@@ -81,13 +82,11 @@ const mod = (id: number, name: string, rarity: ERarity): IItemMod =>
 		attributes: [{ attributeId: EAttribute.Agility, amount: 3 }]
 	});
 
-const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge => ({
-	description: `${over.name} description`,
-	designerNotes: '',
-	entityType: EEntityType.None,
-	progressGoal: 10,
-	...over
-});
+/* `challengeTypeId` stays required rather than inheriting the fixture default — the view-model's goal
+   comparison and target resolution are driven by it — and the description is generated from the name so
+   each card carries real prose instead of the fixture's empty placeholder. */
+const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge =>
+	makeChallenge({ description: `${over.name} description`, ...over });
 
 beforeEach(() => {
 	staticData.items = [];

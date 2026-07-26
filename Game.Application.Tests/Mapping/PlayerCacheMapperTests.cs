@@ -131,11 +131,42 @@ namespace Game.Application.Tests.Mapping
         }
 
         [Fact]
+        public void WriteSequence_RoundTripsThroughTheLeanModel()
+        {
+            // The cached blob is what carries the counter across a reconnect or a cross-instance rehydration,
+            // so both directions of the mapping must preserve it — dropping either would silently reseed the
+            // player from 0 and re-stamp sequences their earlier writes already used (#2473).
+            var rehydrated = PlayerCacheMapper.ToCore(BuildModel(writeSequence: 12), Catalog(), Catalog(), Catalog());
+            Assert.Equal(12, rehydrated.WriteSequence);
+
+            rehydrated.AdvanceWriteSequence();
+
+            Assert.Equal(13, PlayerCacheMapper.ToCacheModel(rehydrated).WriteSequence);
+        }
+
+        [Fact]
+        public void Deserialize_BlobWithNoWriteSequence_SeedsTheCounterFromZeroRatherThanFailing()
+        {
+            // A blob cached by a pre-upgrade instance carries no "writeSequence" — the reason it is the one
+            // non-required member on the model. Were it required, every such blob would throw on the first
+            // upgraded read and route every active player through GetPlayer's corrupt-blob self-heal (an Error
+            // log plus a database reload apiece) on deploy day.
+            var legacyBlob = BuildModel(writeSequence: 12).Serialize().Replace(",\"writeSequence\":12", string.Empty);
+            Assert.DoesNotContain("writeSequence", legacyBlob);
+
+            var model = legacyBlob.Deserialize<PlayerCacheModel>();
+
+            Assert.NotNull(model);
+            Assert.Equal(0, model.WriteSequence);
+            Assert.Equal(1, PlayerCacheMapper.ToCore(model, Catalog(), Catalog(), Catalog()).AdvanceWriteSequence());
+        }
+
+        [Fact]
         public void ToCore_MissingCoreAllocationRows_AreRestoredAtZero()
         {
             // A player persisted with only their non-zero allocation — the shape the pre-fix write-behind
-            // handler left behind (#2459) — must rehydrate with the full seeded set, or every other core stat
-            // stays permanently unallocatable behind the #488 row-presence anti-cheat.
+            // handler left behind (#2459) — must rehydrate with the full seeded set, so the client still
+            // receives a complete per-attribute spread to render and reconcile against.
             var model = BuildModel(statAllocations: [new() { Attribute = EAttribute.Strength, Amount = 5d }]);
 
             var player = PlayerCacheMapper.ToCore(model, Catalog(), Catalog(), Catalog());
@@ -350,8 +381,10 @@ namespace Game.Application.Tests.Mapping
             List<LogPreference>? logPreferences = null,
             List<PlayerLesson>? lessons = null,
             bool autoChallengeBoss = false,
-            uint? lastCreditedBattleSeed = null) => new()
+            uint? lastCreditedBattleSeed = null,
+            long writeSequence = 0) => new()
             {
+                WriteSequence = writeSequence,
                 Id = 1,
                 ClassId = 2,
                 Name = "Hero",
@@ -405,6 +438,7 @@ namespace Game.Application.Tests.Mapping
 
             return new Player
             {
+                WriteSequence = 0,
                 Id = 1,
                 ClassId = 2,
                 Name = "Hero",

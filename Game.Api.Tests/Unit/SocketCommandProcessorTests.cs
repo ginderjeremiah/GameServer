@@ -1,4 +1,3 @@
-using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Api;
 using Game.Api.Services;
@@ -6,7 +5,6 @@ using Game.Api.Sockets;
 using Game.Api.Sockets.Commands;
 using Game.Application;
 using Game.Core;
-using Game.Core.Players;
 using Game.TestInfrastructure.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -34,7 +32,7 @@ namespace Game.Api.Tests.Unit
         public SocketCommandProcessorTests()
         {
             _provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .BuildServiceProvider();
             _loggerFactory = LoggerFactory.Create(b => b.AddProvider(_logs).SetMinimumLevel(LogLevel.Trace));
         }
@@ -191,7 +189,7 @@ namespace Game.Api.Tests.Unit
                 pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry);
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 42);
 
             // The Subscribe failure propagates out of RegisterSocket...
@@ -235,7 +233,7 @@ namespace Game.Api.Tests.Unit
                 pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry);
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 99);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -281,7 +279,7 @@ namespace Game.Api.Tests.Unit
                 pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry, timeProvider);
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 77);
 
             var context = await manager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask);
@@ -325,7 +323,7 @@ namespace Game.Api.Tests.Unit
                 pubSub, cache, new CapturingCommandFactory(_ => null), scopeFactory, _loggerFactory, registry);
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             await session.CreateSession(userId: 1, playerId: 77);
             var context = await manager.RegisterSocket(socket, session, isAdmin: false, onPresenceClaimed: () => Task.CompletedTask);
 
@@ -378,7 +376,7 @@ namespace Game.Api.Tests.Unit
                 capturingPubSub, new NoOpCacheService(), commandFactory, scopeFactory, _loggerFactory, registry);
 
             var socket = new FakeWebSocket(sendDuration: TimeSpan.Zero);
-            var session = new SessionService(new NoOpSessionStore());
+            var session = new SessionService(new FakeSessionStore());
             session.CreateSession(userId: 1, playerId: 1).GetAwaiter().GetResult();
             // RegisterSocket wires the real processor into the fake pub/sub via RegisterSocketCommandListener,
             // so the captured callback is the production GetSocketCommandProcessor closure under test.
@@ -777,19 +775,6 @@ namespace Game.Api.Tests.Unit
             public CancellationToken ApplicationStopping => CancellationToken.None;
             public CancellationToken ApplicationStopped => CancellationToken.None;
             public void StopApplication() { }
-        }
-
-        private sealed class NoOpSessionStore : ISessionStore
-        {
-            public Task<PlayerState?> GetSession(int userId, CancellationToken cancellationToken = default) => Task.FromResult<PlayerState?>(null);
-            public void Update(PlayerState sessionData, int playerId) { }
-            public Task UpdateAsync(PlayerState sessionData, int playerId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-            public void Clear(int userId) { }
-        }
-
-        private sealed class NoOpUnitOfWork : IUnitOfWork
-        {
-            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }

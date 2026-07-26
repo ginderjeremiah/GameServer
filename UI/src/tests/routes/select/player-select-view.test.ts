@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PlayerSelectView, type PlayerSelectDeps } from '$routes/select/player-select-view.svelte';
 import type { ICreatableClass, IPlayerData, IPlayerSummary } from '$lib/api';
+import { makeCreatableClass } from '../../fixtures/classes';
 
 const summary = (id: number, name = `Hero${id}`): IPlayerSummary => ({
 	id,
@@ -15,15 +16,7 @@ const summary = (id: number, name = `Hero${id}`): IPlayerSummary => ({
    shared fixture would be ceremony for one consumer. */
 const player = (id: number): IPlayerData => ({ id, name: `Hero${id}` }) as IPlayerData;
 
-/* Deliberately partial: `ICreatableClass` has no shared fixture yet (#2456). */
-const creatable = (id: number): ICreatableClass =>
-	({
-		id,
-		name: `Class${id}`,
-		starterSkills: [],
-		starterEquipment: [],
-		attributeDistributions: []
-	}) as unknown as ICreatableClass;
+const creatable = (id: number): ICreatableClass => makeCreatableClass({ id, name: `Class${id}` });
 
 const makeDeps = (overrides: Partial<PlayerSelectDeps> = {}): PlayerSelectDeps => ({
 	selectPlayer: vi.fn().mockResolvedValue({ ok: true, player: player(1) }),

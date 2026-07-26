@@ -1,5 +1,6 @@
 using Game.Api.Filters;
 using Game.Application;
+using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
@@ -20,7 +21,7 @@ namespace Game.Api.Tests.Unit
         // times CommitAsync was invoked.
         private static async Task<int> RunAsync(Exception? exception, bool exceptionHandled)
         {
-            var unitOfWork = new RecordingUnitOfWork();
+            var unitOfWork = new FakeUnitOfWork();
             var httpContext = new DefaultHttpContext();
             var actionContext = new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
             var executing = new ActionExecutingContext(actionContext, [], new Dictionary<string, object?>(), controller: new object());
@@ -53,17 +54,6 @@ namespace Game.Api.Tests.Unit
         {
             // The faulted-request guard: an unhandled exception must leave the change set unpersisted.
             Assert.Equal(0, await RunAsync(new InvalidOperationException("boom"), exceptionHandled: false));
-        }
-
-        private sealed class RecordingUnitOfWork : IUnitOfWork
-        {
-            public int CommitCount { get; private set; }
-
-            public Task CommitAsync(CancellationToken cancellationToken = default)
-            {
-                CommitCount++;
-                return Task.CompletedTask;
-            }
         }
     }
 }
