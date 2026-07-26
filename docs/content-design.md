@@ -221,7 +221,7 @@ Zones supply the *shared* pressure; each class gets its own **progression route*
 
 Template per class: **roots → first tailored unlock → archetype hooks → Z3 win condition → mid-game direction (incl. its hidden-gateway target)**.
 
-> ⚠ The tailored-challenge examples assume a **kills-by-damage-type statistic** that does not exist yet — tracked in [#1455](https://github.com/ginderjeremiah/GameServer/issues/1455).
+> The tailored-challenge examples rest on the **kills-by-damage-type statistic** ([#1455](https://github.com/ginderjeremiah/GameServer/issues/1455), shipped), so these routes are authorable in the Workbench today.
 
 **Swordsman — the relentless edge (depth + riposte)**
 - **Roots:** Swordsmanship + **Riposte** (the kit's parry stance — mechanic implemented, [#1457](https://github.com/ginderjeremiah/GameServer/issues/1457); the stance is a plain skill with one timed self-effect granting `ParryChance`, and the riposte fires the equipped weapon's signature — so the sword riposte trains Swordsmanship + Riposte together, making the Duelist gateway self-reinforcing).
