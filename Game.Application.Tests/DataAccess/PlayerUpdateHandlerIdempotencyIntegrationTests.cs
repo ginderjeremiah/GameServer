@@ -240,10 +240,10 @@ namespace Game.Application.Tests.DataAccess
         [Fact]
         public async Task AttributeAllocationsChanged_ZeroAmount_KeepsAndCreatesTheRowRatherThanDeletingIt()
         {
-            // An allocation row's presence is what makes its attribute allocatable (#488), so a zero amount is
-            // the seeded state rather than "no data". Deleting the row (or skipping its insert) left the stat
-            // permanently blocked once the player fell through to a DB reload (#2459). Strength has a seeded
-            // row (the update path), Intellect has none (the insert path) — both must end up stored at 0.
+            // A zero allocation is a genuine stored value — the amount a player reallocated down to — rather
+            // than "no data", so deleting the row (or skipping its insert) would silently drop that
+            // reallocation. Strength has a seeded row (the update path), Intellect has none (the insert
+            // path) — both must end up stored at 0.
             var playerId = await SeedPlayerAsync();
 
             await ApplyAsync(MakeAttributeEvent(playerId, intellect: 0d, strength: 0d));

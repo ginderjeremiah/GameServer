@@ -32,10 +32,12 @@ namespace Game.Core.Players
 
         /// <summary>
         /// Builds the seeded allocation set every player carries: one zero-amount row per core attribute.
-        /// The rows must exist even at zero because <see cref="TryUpdateAttributes"/> rejects an allocation
-        /// into an attribute with no row (the #488 anti-cheat), so a missing row permanently blocks its stat.
-        /// The amount is zero because the class's starting spread is delivered by the level-scaled locked
-        /// base at battler assembly, never seeded into the free pool.
+        /// The rows are a display/persistence convenience — they give the client a complete per-attribute
+        /// spread to render and reconcile against without inferring the missing entries — not a correctness
+        /// requirement: <see cref="TryUpdateAttributes"/> decides allocatability from
+        /// <see cref="CoreAttribute.IsCore"/> and creates a row on first spend, so a missing one costs a
+        /// stale display at worst. The amount is zero because the class's starting spread is delivered by
+        /// the level-scaled locked base at battler assembly, never seeded into the free pool.
         /// </summary>
         public static List<StatAllocation> CreateAllocations()
         {
@@ -45,10 +47,11 @@ namespace Game.Core.Players
         /// <summary>
         /// Rebuilds a persisted player's stat points, restoring an allocation row for any core attribute the
         /// stored set is missing one for. Rehydration goes through here rather than an object initializer so
-        /// the seeded-row invariant <see cref="CreateAllocations"/> establishes at creation cannot be
-        /// bypassed by a load path that forgets to re-establish it — which is what made #2459 a permanent
-        /// lockout rather than a lost zero. It also grants an existing character a row for a core attribute
-        /// added after they were created.
+        /// the complete-spread shape <see cref="CreateAllocations"/> establishes at creation cannot be
+        /// bypassed by a load path that forgets to re-establish it, and so an existing character gains a row
+        /// for a core attribute added after they were created. The repair is belt-and-braces rather than a
+        /// correctness requirement — since <see cref="TryUpdateAttributes"/> stopped treating row presence
+        /// as permission, a missing row is a lost zero, not the permanent lockout of #2459.
         /// <para>
         /// Restored rows are appended, so a repaired character's allocations are not in the same order as a
         /// freshly created one's. Nothing depends on that order: the client renders its stat steppers from
@@ -83,26 +86,32 @@ namespace Game.Core.Players
         public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             var allocationsByAttribute = StatAllocations.ToDictionary(allocation => allocation.Attribute);
-            // Match each update to the player's existing allocation row. Two payloads are rejected
-            // outright (no mutation, all-or-nothing anti-cheat contract):
-            //  - An update targeting an attribute the player has no allocation row for (#488): only the
-            //    core attributes are seeded as rows, so allocating into an unknown (or derived) attribute
-            //    is an invalid request, not a silent no-op that still reports success.
+            // Match each update to the player's allocation row, creating one at zero if the attribute has
+            // none yet. Two payloads are rejected outright (no mutation, all-or-nothing anti-cheat contract):
+            //  - An update targeting a non-core attribute (#488): only the core attributes are directly
+            //    allocatable, so allocating into a derived (or undefined) one is an invalid request, not a
+            //    silent no-op that still reports success. The rule is asked of the attribute itself rather
+            //    than inferred from row presence — a seeded row is a display convenience maintained
+            //    elsewhere, and reading permission off it made a dropped row a permanent lockout (#2459).
             //  - A duplicate update for the same attribute (#698): an ambiguous payload can't be resolved
             //    to a single intended amount, so the whole request is invalid rather than a silent
             //    partial apply (keeping only the first update) that still reports success.
             var matchedUpdates = new Dictionary<EAttribute, (StatAllocation Allocation, IAttributeUpdate Update)>();
+            var createdAllocations = new List<StatAllocation>();
             foreach (var update in changedAttributes)
             {
-                if (!allocationsByAttribute.TryGetValue(update.Attribute, out var allocation))
+                if (!CoreAttribute.IsCore(update.Attribute) || matchedUpdates.ContainsKey(update.Attribute))
                 {
                     return false;
                 }
 
-                if (!matchedUpdates.TryAdd(update.Attribute, (allocation, update)))
+                if (!allocationsByAttribute.TryGetValue(update.Attribute, out var allocation))
                 {
-                    return false;
+                    allocation = new StatAllocation { Attribute = update.Attribute, Amount = 0d };
+                    createdAllocations.Add(allocation);
                 }
+
+                matchedUpdates.Add(update.Attribute, (allocation, update));
             }
 
             // long accumulator: matchedUpdates.Values.Sum for int uses checked arithmetic and would
@@ -113,6 +122,9 @@ namespace Game.Core.Players
             if (availablePoints - changedPoints >= 0
                 && matchedUpdates.Values.All(match => match.Allocation.Amount + (long)match.Update.Amount >= 0))
             {
+                // Rows created above are published only now, so a rejected payload leaves the allocation set
+                // exactly as it found it.
+                StatAllocations.AddRange(createdAllocations);
                 StatPointsUsed += (int)changedPoints;
                 foreach (var (allocation, update) in matchedUpdates.Values)
                 {

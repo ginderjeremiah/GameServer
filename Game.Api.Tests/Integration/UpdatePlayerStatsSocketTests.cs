@@ -114,10 +114,9 @@ namespace Game.Api.Tests.Integration
         [Fact]
         public async Task UpdatePlayerStats_DerivedAttribute_ReturnsErrorAndLeavesAllocationsUnchanged()
         {
-            // 6 available points (106 gained − 100 used). Only the core attributes carry an allocation row, so
-            // a derived one (MaxHealth, computed from Endurance) has none — allocating into it must be rejected
-            // rather than silently reporting success, and the valid Strength delta in the same set must not
-            // apply (#488).
+            // 6 available points (106 gained − 100 used). Only the core attributes are directly allocatable,
+            // so a derived one (MaxHealth, computed from Endurance) must be rejected rather than silently
+            // reporting success, and the valid Strength delta in the same set must not apply (#488).
             var (userId, _) = await SeedPlayerAsync(statPointsGained: 106);
             await LoginAsync(Username, Password);
 
@@ -142,8 +141,8 @@ namespace Game.Api.Tests.Integration
         public async Task UpdatePlayerStats_CoreAttributeWithNoPersistedRow_IsStillAllocatable()
         {
             // The seeder persists rows only for Strength and Endurance, so Luck reaches the loaded aggregate
-            // solely through the rehydration reseed. It must be allocatable: the #488 row-presence anti-cheat
-            // is meant to block derived attributes, not to strand a core one whose row went missing (#2459).
+            // solely through the rehydration reseed. It must be allocatable end-to-end: the #488 anti-cheat
+            // blocks derived attributes, never a core one whose row went missing (#2459).
             var (userId, _) = await SeedPlayerAsync(statPointsGained: 106);
             await LoginAsync(Username, Password);
 

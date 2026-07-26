@@ -58,8 +58,7 @@ namespace Game.Core.Players
                 Skills = starterSkills,
                 Equipment = starterEquipment,
                 // The seeded allocation rows are owned by PlayerStatPoints — the same set the rehydration path
-                // re-establishes — so creation and reload can never disagree on which attributes a player can
-                // allocate into.
+                // re-establishes — so creation and reload can never disagree on the spread a player carries.
                 Attributes = PlayerStatPoints.CreateAllocations(),
                 LogPreferences = CreateDefaultLogPreferences(),
             };
