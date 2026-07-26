@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Fails the build when a gated assembly (or gated namespace sub-area) drops below its floor.

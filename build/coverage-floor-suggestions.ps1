@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Prints paste-ready, margin-safe floors for build/coverage-floors.json from the latest coverage run.

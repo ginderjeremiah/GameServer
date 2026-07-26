@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Shared pure helpers for the backend coverage gate, floor-reseed and coverage-run scripts.

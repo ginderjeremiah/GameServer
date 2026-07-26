@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Collects merged backend coverage across all test projects, builds a report, and runs the gate.
