@@ -47,8 +47,9 @@ const config = (): EntityConfig<Identified> =>
 		persist: async () => []
 	}) as unknown as EntityConfig<Identified>;
 
+/* Every `as IChallenge` literal in this file is deliberately partial: `IChallenge` has no shared
+   fixture yet (#2456). */
 const setup = (over: Partial<IChallenge> = {}) => {
-	/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456). */
 	const challenge: IChallenge = {
 		id: 1,
 		name: 'Test',
